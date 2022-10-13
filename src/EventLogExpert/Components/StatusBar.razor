@@ -1,0 +1,17 @@
+﻿@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+@using EventLogExpert.Store
+@using Fluxor
+@inject IState<StatusBarState> statusBarState
+
+<style>
+    .status-bar {
+        background-color: #3C64E7;
+        color: white;
+    }
+</style>
+
+<div class="status-bar">Events Loaded: @statusBarState.Value.EventsLoaded</div>
+
+@code {
+
+}

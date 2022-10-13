@@ -1,0 +1,105 @@
+﻿@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+@using EventLogExpert.Store
+@using System.Diagnostics.Eventing.Reader
+@using Fluxor
+@inject IState<EventLogState> eventLogState
+
+<style>
+    .table-container {
+        flex: 1;
+        overflow: auto;
+        background-color: #222222;
+        color: #9CDCFE;
+    }
+
+    table {
+        border-spacing: 0;
+        width: calc(100% - 10px);
+        table-layout: fixed;
+    }
+
+    tr:nth-child(odd) {
+        background-color: #353535;
+    }
+
+    th {
+        position: sticky;
+        top: 0px;
+        background-color: #353535;
+        z-index: 2;
+    }
+
+    td {
+        overflow: hidden;
+    }
+
+    .table-divider {
+        width: 1px;
+        margin: 0;
+        padding: 0;
+        background: #111111;
+    }
+</style>
+
+<div class="table-container">
+<table>
+	<thead>
+		<tr>
+			<th nowrap width="@(colWidths["RecordId"])px">Rec</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["TimeCreated"])px">Time</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["Id"])px">Id</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["MachineName"])px">Machine</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["Level"])px">Level</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["ProviderName"])px">Source</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["Task"])px">Task</th>
+            <th class="table-divider"></th>
+            <th nowrap width="@(colWidths["Description"])px">Description</th>
+		</tr>
+	</thead>
+	<tbody>
+        <Virtualize Items="@eventLogState.Value.EventsToDisplay" Context="evt">
+			<tr>
+                <td nowrap>@evt.RecordId</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.TimeCreated</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.Id</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.MachineName</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.LevelDisplayName</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.ProviderName</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.TaskDisplayName</td>
+                <th class="table-divider"></th>
+                <td nowrap>@evt.Description</td>
+			</tr>
+        </Virtualize>
+	</tbody>
+</table>
+</div>
+
+@code {
+    Dictionary<string, int> colWidths = new Dictionary<string, int>()
+    {
+        { "RecordId", 10 },
+        { "TimeCreated", 25 },
+        { "Id", 10 },
+        { "MachineName", 10 },
+        { "Level", 15 },
+        { "ProviderName", 25 },
+        { "Task", 20 },
+        { "Description", 200 }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+    }
+}
