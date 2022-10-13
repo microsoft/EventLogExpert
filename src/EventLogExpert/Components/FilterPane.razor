@@ -1,0 +1,56 @@
+﻿@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+@using EventLogExpert.EventUtils
+@using EventLogExpert.Store
+@using Fluxor
+@using System.Linq.Expressions
+@inject IState<FilterPaneState> filterPaneState
+@inject Fluxor.IDispatcher dispatcher
+
+<style>
+    .filter-pane {
+        margin: 5px;
+    }
+
+    .filter-text {
+        width: 100px;
+    }
+</style>
+
+<div class="filter-pane">
+    <span>Event ID: </span>
+    <input type="number" class="filter-text" @bind-value="filterEventId" />
+    <span>Description: </span>
+    <input type="text" class="filter-input" @bind-value="filterDescription" />
+    <button @onclick="ApplyFilter">Apply</button>
+    <span>Last Filter: </span>
+    <span>@(filterPaneState.Value.RecentFilters.FirstOrDefault())</span>
+</div>
+
+@code {
+    string filterEventId = "";
+    string filterDescription = "";
+
+    private void ApplyFilter()
+    {
+        var comparisonsToPerform = new List<Func<DisplayEvent, bool>>();
+        var filterStrings = new List<string>();
+
+        if (filterEventId.Length > 0)
+        {
+            var eventId = int.Parse(filterEventId);
+            comparisonsToPerform.Add(e => e.Id == eventId);
+            filterStrings.Add($"EventId == {eventId}");
+        }
+
+        if (filterDescription.Length > 0)
+        {
+            comparisonsToPerform.Add(e => e.Description.Contains(filterDescription, StringComparison.OrdinalIgnoreCase));
+            filterStrings.Add($"Description contains '{filterDescription}'");
+        }
+
+        var filterText = string.Join(" && ", filterStrings);
+
+        dispatcher.Dispatch(new FilterPaneAction.AddRecentFilter(filterText));
+        dispatcher.Dispatch(new EventLogAction.FilterEvents(comparisonsToPerform));
+    }
+}
