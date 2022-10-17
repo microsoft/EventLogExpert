@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.Eventing.Reader;
+﻿using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 using Fluxor;
@@ -34,6 +35,9 @@ public class EventLogEffects
         // Do this on a background thread so we don't hang the UI
         await Task.Run(() =>
         {
+            var sw = new Stopwatch();
+            sw.Start();
+
             List<DisplayEventModel> events = new();
 
             while (reader.ReadEvent() is { } e)
@@ -48,8 +52,9 @@ public class EventLogEffects
                     e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
                     e.FormatDescription()));
 
-                if (events.Count % 1000 == 0)
+                if (sw.ElapsedMilliseconds > 1000)
                 {
+                    sw.Restart();
                     dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
                 }
             }
