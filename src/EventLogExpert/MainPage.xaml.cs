@@ -1,10 +1,12 @@
-﻿using EventLogExpert.Store;
+﻿using EventLogExpert.Store.Actions;
+using EventLogExpert.Store.State;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
 public partial class MainPage : ContentPage
 {
-    private Fluxor.IDispatcher _fluxorDispatcher;
+    private IDispatcher _fluxorDispatcher;
 
     public MainPage()
     {
@@ -18,7 +20,8 @@ public partial class MainPage : ContentPage
         {
             while (_fluxorDispatcher == null)
             {
-                _fluxorDispatcher = Handler?.MauiContext.Services.GetService<Fluxor.IDispatcher>();
+                _fluxorDispatcher = Handler?.MauiContext?.Services.GetService<IDispatcher>();
+
                 if (_fluxorDispatcher == null)
                 {
                     Thread.Sleep(50);
@@ -29,28 +32,34 @@ public partial class MainPage : ContentPage
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
     {
-        var options = new PickOptions();
-        options.FileTypes = new FilePickerFileType(
-            new Dictionary<DevicePlatform, IEnumerable<string>>
+        var options = new PickOptions
+        {
+            FileTypes = new FilePickerFileType(
+                new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                        { DevicePlatform.WinUI, new[] { ".evtx" } }
+                    { DevicePlatform.WinUI, new[] { ".evtx" } }
                 }
-            );
+            )
+        };
+
         var result = await FilePicker.Default.PickAsync(options);
+
         if (result != null)
         {
             _fluxorDispatcher.Dispatch(
                 new EventLogAction.OpenLog(
                     new EventLogState.LogSpecifier(
-                        result.FullPath, Store.EventLogState.LogType.File)));
+                        result.FullPath,
+                        EventLogState.LogType.File)));
         }
     }
 
     private void OpenLiveLog_Clicked(object sender, EventArgs e)
     {
         _fluxorDispatcher.Dispatch(
-                new EventLogAction.OpenLog(
-                    new EventLogState.LogSpecifier(
-                        "Application", Store.EventLogState.LogType.Live)));
+            new EventLogAction.OpenLog(
+                new EventLogState.LogSpecifier(
+                    "Application",
+                    EventLogState.LogType.Live)));
     }
 }

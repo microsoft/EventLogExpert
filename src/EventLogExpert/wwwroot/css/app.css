@@ -1,7 +1,29 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
+:root {
+    --clr-lightblue: #9CDCFE;
+    --clr-black: #111111;
+
+    --clr-statusbar: #3C64E7;
+    
+    --background-dark: #222222;
+    --background-darkgray: #353535;
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light', 'Ubuntu', 'Droid Sans', sans-serif;
+    font-size: 10pt;
+}
+
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    background-color: var(--background-dark);
+    color: var(--clr-lightblue);
 }
 
 h1:focus {
@@ -67,7 +89,55 @@ a, .btn-link {
     display: none;
 }
 
-@supports (-webkit-touch-callout: none) {
+.table-container {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--background-dark);
+    color: var(--clr-lightblue);
+}
+
+table {
+    border-spacing: 0;
+    width: calc(100% - 10px);
+    table-layout: fixed;
+}
+
+tr:nth-child(odd) {
+    background-color: var(--background-darkgray);
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background-color: var(--background-darkgray);
+    z-index: 2;
+}
+
+td {
+    overflow: hidden;
+}
+
+.table-divider {
+    width: 1px;
+    margin: 0;
+    padding: 0;
+    background: var(--clr-black);
+}
+
+.filter-pane {
+    margin: 5px;
+}
+
+.filter-text {
+    width: 100px;
+}
+
+.status-bar {
+    background-color: var(--clr-statusbar);
+    color: white;
+}
+
+/*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {
         display: flex;
         position: sticky;
@@ -81,4 +151,4 @@ a, .btn-link {
 	.flex-column, .navbar-brand {
 		padding-left: env(safe-area-inset-left);
 	}
-}
+}*/

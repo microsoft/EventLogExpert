@@ -4,6 +4,10 @@ VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert", "EventLogExpert\EventLogExpert.csproj", "{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventLogExpert.Store", "EventLogExpert.Store\EventLogExpert.Store.csproj", "{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EventLogExpert.Library", "EventLogExpert.Library\EventLogExpert.Library.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -16,6 +20,14 @@ Global
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
