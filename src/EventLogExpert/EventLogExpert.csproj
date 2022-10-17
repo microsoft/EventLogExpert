@@ -29,6 +29,7 @@
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
         <TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
         <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
+        <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
@@ -50,12 +51,15 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Fluxor.Blazor.Web" Version="5.5.0" />
-      <PackageReference Include="System.Diagnostics.EventLog" Version="6.0.0" />
+      <Compile Remove="Pages\**" />
+      <Content Remove="Pages\**" />
+      <EmbeddedResource Remove="Pages\**" />
+      <MauiXaml Remove="Pages\**" />
+      <None Remove="Pages\**" />
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="Pages\" />
+      <ProjectReference Include="..\EventLogExpert.Store\EventLogExpert.Store.csproj" />
     </ItemGroup>
 
 </Project>

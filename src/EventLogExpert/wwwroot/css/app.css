@@ -1,7 +1,19 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    height: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light', 'Ubuntu', 'Droid Sans', sans-serif;
+    font-size: 10pt;
+}
+
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    background-color: #222222;
+    color: #9CDCFE;
 }
 
 h1:focus {
@@ -65,6 +77,54 @@ a, .btn-link {
 
 .status-bar-safe-area {
     display: none;
+}
+
+.table-container {
+    flex: 1;
+    overflow: auto;
+    background-color: #222222;
+    color: #9CDCFE;
+}
+
+table {
+    border-spacing: 0;
+    width: calc(100% - 10px);
+    table-layout: fixed;
+}
+
+tr:nth-child(odd) {
+    background-color: #353535;
+}
+
+th {
+    position: sticky;
+    top: 0px;
+    background-color: #353535;
+    z-index: 2;
+}
+
+td {
+    overflow: hidden;
+}
+
+.table-divider {
+    width: 1px;
+    margin: 0;
+    padding: 0;
+    background: #111111;
+}
+
+.filter-pane {
+    margin: 5px;
+}
+
+.filter-text {
+    width: 100px;
+}
+
+.status-bar {
+    background-color: #3C64E7;
+    color: white;
 }
 
 @supports (-webkit-touch-callout: none) {

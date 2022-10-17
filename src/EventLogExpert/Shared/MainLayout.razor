@@ -1,26 +1,8 @@
-﻿@inherits LayoutComponentBase
-@using EventLogExpert.Components
-
-<style>
-    html, body {
-        height: 100%;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light', 'Ubuntu', 'Droid Sans', sans-serif;
-        font-size: 10pt;
-    }
-
-    .page {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        max-height: 100vh;
-        background-color: #222222;
-        color: #9CDCFE;
-    }
-</style>
+﻿@using EventLogExpert.Components
+@inherits LayoutComponentBase
 
 <div class="page">
     <FilterPane />
-	<EventTable />
+    <EventTable />
     <StatusBar />
 </div>
