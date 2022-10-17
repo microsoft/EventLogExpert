@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics.Eventing.Reader;
 using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Readers;
 using EventLogExpert.Store.Actions;
 using Fluxor;
 using static EventLogExpert.Store.State.EventLogState;
@@ -22,31 +21,37 @@ public class EventLogEffects
     {
         dispatcher.Dispatch(new EventLogAction.ClearEvents());
 
-        Func<Task<List<EventRecord>>> readEvents = action.LogSpecifier.LogType == LogType.Live
-            ? EventReader.GetActiveEventLogReader("Application")
-            : EventReader.GetEventLogFileReader(action.LogSpecifier.Name);
+        EventLogReader reader;
+        if (action.LogSpecifier.LogType == LogType.Live)
+        {
+            reader = new EventLogReader("Application", PathType.LogName);
+        }
+        else
+        {
+            reader = new EventLogReader(action.LogSpecifier.Name, PathType.FilePath);
+        }
 
         // Do this on a background thread so we don't hang the UI
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
             List<DisplayEventModel> events = new();
 
-            while (await readEvents() is { } batch)
+            while (reader.ReadEvent() is { } e)
             {
-                foreach (var e in batch)
-                {
-                    events.Add(new DisplayEventModel(
-                        e.RecordId,
-                        e.TimeCreated,
-                        e.Id,
-                        e.MachineName,
-                        LevelNames[e.Level ?? 0],
-                        e.ProviderName,
-                        e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
-                        e.FormatDescription()));
-                }
+                events.Add(new DisplayEventModel(
+                    e.RecordId,
+                    e.TimeCreated,
+                    e.Id,
+                    e.MachineName,
+                    LevelNames[e.Level ?? 0],
+                    e.ProviderName,
+                    e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
+                    e.FormatDescription()));
 
-                dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+                if (events.Count % 1000 == 0)
+                {
+                    dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+                }
             }
 
             events.Reverse();
