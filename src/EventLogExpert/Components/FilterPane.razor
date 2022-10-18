@@ -3,11 +3,24 @@
 @inject IDispatcher Dispatcher
 
 <div class="filter-pane">
-    <span>Event ID: </span>
-    <input type="number" class="filter-text" @bind-value="filterEventId" />
-    <span>Description: </span>
-    <input type="text" class="filter-input" @bind-value="filterDescription" />
-    <button @onclick="ApplyFilter">Apply</button>
-    <span>Last Filter: </span>
-    <span>@(FilterPaneState.Value.RecentFilters.FirstOrDefault())</span>
+
+    <EditForm Model="_filter" OnSubmit="ApplyFilter">
+        <span>Event ID: </span>
+        <InputSelect @bind-Value="_filter.Id">
+            <option value="-1">None</option>
+            @foreach (var id in FilterPaneState.Value.EventIdsAll)
+            {
+                <option value="@id">@id</option>
+            }
+        </InputSelect>
+
+        <span>Description: </span>
+
+        <button type="submit">Apply</button>
+        <button @onclick="ResetFilter">Clear</button>
+
+        <span>Last Filter: </span>
+        <span>@(FilterPaneState.Value.RecentFilters.FirstOrDefault())</span>
+    </EditForm>
+
 </div>

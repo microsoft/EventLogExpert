@@ -5,31 +5,38 @@ namespace EventLogExpert.Components;
 
 public partial class FilterPane
 {
-    private string filterEventId = "";
-    private string filterDescription = "";
+    private readonly List<Func<DisplayEventModel, bool>> _comparisonsToPerform = new();
+    private readonly FilterModel _filter = new();
 
     private void ApplyFilter()
     {
-        var comparisonsToPerform = new List<Func<DisplayEventModel, bool>>();
         var filterStrings = new List<string>();
+        _comparisonsToPerform.Clear();
 
-        if (filterEventId.Length > 0)
+        if (_filter.Id != -1)
         {
-            var eventId = int.Parse(filterEventId);
-            comparisonsToPerform.Add(e => e.Id == eventId);
-            filterStrings.Add($"EventId == {eventId}");
+            _comparisonsToPerform.Add(e => e.Id == _filter.Id);
+            filterStrings.Add($"EventId == {_filter.Id}");
         }
 
-        if (filterDescription.Length > 0)
-        {
-            comparisonsToPerform.Add(e =>
-                e.Description.Contains(filterDescription, StringComparison.OrdinalIgnoreCase));
+        //if (filterDescription.Length > 0)
+        //{
+        //    comparisonsToPerform.Add(e =>
+        //        e.Description.Contains(filterDescription, StringComparison.OrdinalIgnoreCase));
 
-            filterStrings.Add($"Description contains '{filterDescription}'");
-        }
+        //    filterStrings.Add($"Description contains '{filterDescription}'");
+        //}
 
         var filterText = string.Join(" && ", filterStrings);
         Dispatcher.Dispatch(new FilterPaneAction.AddRecentFilter(filterText));
-        Dispatcher.Dispatch(new EventLogAction.FilterEvents(comparisonsToPerform));
+        Dispatcher.Dispatch(new EventLogAction.FilterEvents(_comparisonsToPerform));
+    }
+
+    private void ResetFilter()
+    {
+        _comparisonsToPerform.Clear();
+        _filter.Id = -1;
+        _comparisonsToPerform.Add(e => e.Id == _filter.Id);
+        Dispatcher.Dispatch(new EventLogAction.FilterEvents(_comparisonsToPerform));
     }
 }
