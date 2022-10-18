@@ -1,8 +1,8 @@
-﻿using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using EventLogExpert.Library.Models;
+﻿using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 using Fluxor;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.State.EventLogState;
 
 namespace EventLogExpert.Store.Effects;
