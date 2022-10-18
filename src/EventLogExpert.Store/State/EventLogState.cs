@@ -1,6 +1,6 @@
-﻿using System.Collections.Immutable;
-using EventLogExpert.Library.Models;
+﻿using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Store.State;
 

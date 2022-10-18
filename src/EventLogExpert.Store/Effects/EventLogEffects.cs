@@ -1,8 +1,8 @@
-﻿using System.Diagnostics.Eventing.Reader;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Readers;
+﻿using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 using Fluxor;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.State.EventLogState;
 
 namespace EventLogExpert.Store.Effects;
@@ -22,31 +22,41 @@ public class EventLogEffects
     {
         dispatcher.Dispatch(new EventLogAction.ClearEvents());
 
-        Func<Task<List<EventRecord>>> readEvents = action.LogSpecifier.LogType == LogType.Live
-            ? EventReader.GetActiveEventLogReader("Application")
-            : EventReader.GetEventLogFileReader(action.LogSpecifier.Name);
+        EventLogReader reader;
+        if (action.LogSpecifier.LogType == LogType.Live)
+        {
+            reader = new EventLogReader("Application", PathType.LogName);
+        }
+        else
+        {
+            reader = new EventLogReader(action.LogSpecifier.Name, PathType.FilePath);
+        }
 
         // Do this on a background thread so we don't hang the UI
-        await Task.Run(async () =>
+        await Task.Run(() =>
         {
+            var sw = new Stopwatch();
+            sw.Start();
+
             List<DisplayEventModel> events = new();
 
-            while (await readEvents() is { } batch)
+            while (reader.ReadEvent() is { } e)
             {
-                foreach (var e in batch)
-                {
-                    events.Add(new DisplayEventModel(
-                        e.RecordId,
-                        e.TimeCreated,
-                        e.Id,
-                        e.MachineName,
-                        LevelNames[e.Level ?? 0],
-                        e.ProviderName,
-                        e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
-                        e.FormatDescription()));
-                }
+                events.Add(new DisplayEventModel(
+                    e.RecordId,
+                    e.TimeCreated,
+                    e.Id,
+                    e.MachineName,
+                    LevelNames[e.Level ?? 0],
+                    e.ProviderName,
+                    e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
+                    e.FormatDescription()));
 
-                dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+                if (sw.ElapsedMilliseconds > 1000)
+                {
+                    sw.Restart();
+                    dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+                }
             }
 
             events.Reverse();

@@ -1,7 +1,7 @@
-﻿using System.Diagnostics.Eventing.Reader;
-using System.Runtime.InteropServices;
-using EventLogExpert.Library.Helpers;
+﻿using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
+using System.Diagnostics.Eventing.Reader;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Library.Providers;
 
@@ -16,7 +16,8 @@ public class EventMessageProvider
 
     public EventMessageProvider(string providerName, Action<string> traceAction) : this(providerName,
         null,
-        traceAction) { }
+        traceAction)
+    { }
 
     public EventMessageProvider(string providerName, string computerName, Action<string> traceAction)
     {
