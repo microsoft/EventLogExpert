@@ -1,5 +1,8 @@
-﻿using EventLogExpert.Store.State;
+﻿using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Store.State;
 using Fluxor;
+using Fluxor.Extensions;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EventLogExpert;
 
@@ -26,6 +29,8 @@ public static class MauiProgram
             options.ScanAssemblies(typeof(MauiProgram).Assembly).WithLifetime(StoreLifetime.Singleton);
             options.ScanAssemblies(typeof(EventLogState).Assembly).WithLifetime(StoreLifetime.Singleton);
         });
+
+        builder.Services.AddSingleton<IEventResolver, EventReaderEventResolver>();
 
         return builder.Build();
     }

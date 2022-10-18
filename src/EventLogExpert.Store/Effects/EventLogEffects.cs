@@ -1,6 +1,8 @@
-﻿using EventLogExpert.Library.Models;
+﻿using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.State.EventLogState;
@@ -9,6 +11,13 @@ namespace EventLogExpert.Store.Effects;
 
 public class EventLogEffects
 {
+    private readonly IEventResolver _eventResolver;
+
+    public EventLogEffects(IEventResolver eventResolver)
+    {
+        _eventResolver = eventResolver;
+    }
+
     private static readonly Dictionary<byte, string> LevelNames = new()
     {
         { 0, "Information" },
@@ -18,7 +27,7 @@ public class EventLogEffects
     };
 
     [EffectMethod]
-    public static async Task HandleOpenLogAction(EventLogAction.OpenLog action, IDispatcher dispatcher)
+    public async Task HandleOpenLogAction(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
         dispatcher.Dispatch(new EventLogAction.ClearEvents());
 
@@ -39,18 +48,18 @@ public class EventLogEffects
             sw.Start();
 
             List<DisplayEventModel> events = new();
+            HashSet<int> eventIdsAll = new();
+            HashSet<string> eventProviderNamesAll = new();
+            HashSet<string> eventTaskNamesAll = new();
 
             while (reader.ReadEvent() is { } e)
             {
-                events.Add(new DisplayEventModel(
-                    e.RecordId,
-                    e.TimeCreated,
-                    e.Id,
-                    e.MachineName,
-                    LevelNames[e.Level ?? 0],
-                    e.ProviderName,
-                    e.Task is 0 or null ? "None" : TryGetValue(() => e.TaskDisplayName),
-                    e.FormatDescription()));
+                var resolved = _eventResolver.Resolve(e);
+                eventIdsAll.Add(resolved.Id);
+                eventProviderNamesAll.Add(resolved.ProviderName);
+                eventTaskNamesAll.Add(resolved.TaskDisplayName);
+
+                events.Add(resolved);
 
                 if (sw.ElapsedMilliseconds > 1000)
                 {
@@ -60,20 +69,7 @@ public class EventLogEffects
             }
 
             events.Reverse();
-            dispatcher.Dispatch(new EventLogAction.LoadEvents(events));
+            dispatcher.Dispatch(new EventLogAction.LoadEvents(events, eventIdsAll.ToImmutableList(), eventProviderNamesAll.ToImmutableList(), eventTaskNamesAll.ToImmutableList()));
         });
-    }
-
-    private static T TryGetValue<T>(Func<T> func)
-    {
-        try
-        {
-            var result = func();
-            return result;
-        }
-        catch
-        {
-            return default;
-        }
     }
 }

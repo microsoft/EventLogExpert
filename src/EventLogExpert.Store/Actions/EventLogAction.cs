@@ -9,7 +9,7 @@ public record EventLogAction
 
     public record ClearEvents : EventLogAction;
 
-    public record LoadEvents(ICollection<DisplayEventModel> Events) : EventLogAction;
+    public record LoadEvents(ICollection<DisplayEventModel> Events, IReadOnlyList<int> AllEventIds, IReadOnlyList<string> AllProviderNames, IReadOnlyList<string> AllTaskNames) : EventLogAction;
 
     public record FilterEvents(IList<Func<DisplayEventModel, bool>> Filter) : EventLogAction;
 }
