@@ -8,7 +8,7 @@
         <span>Event ID: </span>
         <InputSelect @bind-Value="_filter.Id">
             <option value="-1">None</option>
-            @foreach (var id in FilterPaneState.Value.EventIdsAll)
+            @foreach (var id in FilterPaneState.Value.EventIdsAll.OrderBy(id => id))
             {
                 <option value="@id">@id</option>
             }

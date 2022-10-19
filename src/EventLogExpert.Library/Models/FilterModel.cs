@@ -2,5 +2,6 @@
 
 public class FilterModel
 {
-    public int Id { get; set; }
+    // Set to -1 to ensure filter dropdown shows "None"
+    public int Id { get; set; } = -1;
 }
