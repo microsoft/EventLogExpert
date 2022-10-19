@@ -1,4 +1,5 @@
-﻿using EventLogExpert.Library.Models;
+﻿using EventLogExpert.Library.Helpers;
+using EventLogExpert.Library.Models;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Library.EventResolvers;
@@ -10,11 +11,6 @@ namespace EventLogExpert.Library.EventResolvers;
 /// </summary>
 public class EventReaderEventResolver : IEventResolver
 {
-    private static readonly Dictionary<byte, string> LevelNames = new()
-    {
-        { 0, "Information" }, { 2, "Error" }, { 3, "Warning" }, { 4, "Information" }
-    };
-
     public DisplayEventModel Resolve(EventRecord eventRecord)
     {
         return new DisplayEventModel(
@@ -22,7 +18,7 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.TimeCreated,
             eventRecord.Id,
             eventRecord.MachineName,
-            LevelNames[eventRecord.Level ?? 0],
+            (SeverityLevel?)eventRecord.Level,
             eventRecord.ProviderName,
             eventRecord.Task is 0 or null ? "None" : TryGetValue(() => eventRecord.TaskDisplayName),
             string.IsNullOrEmpty(eventRecord.FormatDescription()) ? string.Empty : eventRecord.FormatDescription());

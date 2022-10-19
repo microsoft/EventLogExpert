@@ -14,6 +14,15 @@
             }
         </InputSelect>
 
+        <span>Severity: </span>
+        <InputSelect @bind-Value="_filter.Level">
+            <option value="">All</option>
+            @foreach (SeverityLevel? level in Enum.GetValues(typeof(SeverityLevel)))
+            {
+                <option value="@level">@level.ToString()</option>
+            }
+        </InputSelect>
+
         <span>Description: </span>
         <InputText @bind-Value="_filter.Description" />
 

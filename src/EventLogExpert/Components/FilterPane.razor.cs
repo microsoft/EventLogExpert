@@ -1,3 +1,4 @@
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 
@@ -18,6 +19,12 @@ public partial class FilterPane
             filterStrings.Add($"EventId == {_filter.Id}");
         }
 
+        if (_filter.Level is not null)
+        {
+            comparisonsToPerform.Add(e => e.Level == _filter.Level);
+            filterStrings.Add($"Severity == {_filter.Level}");
+        }
+
         if (!string.IsNullOrWhiteSpace(_filter.Description))
         {
             comparisonsToPerform.Add(e =>
@@ -34,6 +41,7 @@ public partial class FilterPane
     private void ResetFilter()
     {
         _filter.Id = -1;
+        _filter.Level = null;
         _filter.Description = string.Empty;
         Dispatcher.Dispatch(new EventLogAction.ClearFilters());
     }
