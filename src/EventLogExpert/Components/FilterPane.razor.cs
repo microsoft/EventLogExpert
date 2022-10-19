@@ -18,13 +18,13 @@ public partial class FilterPane
             filterStrings.Add($"EventId == {_filter.Id}");
         }
 
-        //if (filterDescription.Length > 0)
-        //{
-        //    comparisonsToPerform.Add(e =>
-        //        e.Description.Contains(filterDescription, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(_filter.Description))
+        {
+            comparisonsToPerform.Add(e =>
+                e.Description.Contains(_filter.Description, StringComparison.OrdinalIgnoreCase));
 
-        //    filterStrings.Add($"Description contains '{filterDescription}'");
-        //}
+            filterStrings.Add($"Description contains '{_filter.Description}'");
+        }
 
         var filterText = string.Join(" && ", filterStrings);
         Dispatcher.Dispatch(new FilterPaneAction.AddRecentFilter(filterText));
@@ -34,6 +34,7 @@ public partial class FilterPane
     private void ResetFilter()
     {
         _filter.Id = -1;
+        _filter.Description = string.Empty;
         Dispatcher.Dispatch(new EventLogAction.ClearFilters());
     }
 }

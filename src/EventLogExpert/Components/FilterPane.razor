@@ -15,6 +15,7 @@
         </InputSelect>
 
         <span>Description: </span>
+        <InputText @bind-Value="_filter.Description" />
 
         <button type="submit">Apply</button>
         <button @onclick="ResetFilter">Clear</button>
