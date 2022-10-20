@@ -3,11 +3,52 @@
 @inject IDispatcher Dispatcher
 
 <div class="filter-pane">
-    <span>Event ID: </span>
-    <input type="number" class="filter-text" @bind-value="filterEventId" />
-    <span>Description: </span>
-    <input type="text" class="filter-input" @bind-value="filterDescription" />
-    <button @onclick="ApplyFilter">Apply</button>
-    <span>Last Filter: </span>
-    <span>@(FilterPaneState.Value.RecentFilters.FirstOrDefault())</span>
+
+    <EditForm Model="_filter" OnSubmit="ApplyFilter">
+        <span>Event ID: </span>
+        <InputSelect class="input-filter-id" @bind-Value="_filter.Id">
+            <option value="-1">None</option>
+            @foreach (var id in FilterPaneState.Value.EventIdsAll.OrderBy(id => id))
+            {
+                <option value="@id">@id</option>
+            }
+        </InputSelect>
+
+        <span>Severity: </span>
+        <InputSelect class="input-filter-severity" @bind-Value="_filter.Level">
+            <option value="">All</option>
+            @foreach (SeverityLevel? level in Enum.GetValues(typeof(SeverityLevel)))
+            {
+                <option value="@level">@level.ToString()</option>
+            }
+        </InputSelect>
+
+        <span>Provider: </span>
+        <InputSelect class="input-filter-dropdown" @bind-Value="_filter.Provider">
+            <option value="">All</option>
+            @foreach (var provider in FilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n))
+            {
+                <option value="@provider">@provider</option>
+            }
+        </InputSelect>
+
+        <span>Task: </span>
+        <InputSelect class="input-filter-dropdown" @bind-Value="_filter.Task">
+            <option value="">All</option>
+            @foreach (var task in FilterPaneState.Value.TaskNamesAll.OrderBy(n => n))
+            {
+                <option value="@task">@task</option>
+            }
+        </InputSelect>
+
+        <span>Description: </span>
+        <InputText class="input-filter-description" @bind-Value="_filter.Description" />
+
+        <button type="submit">Apply</button>
+        <button @onclick="ResetFilter">Clear</button>
+
+        <span>Last Filter: </span>
+        <span>@(FilterPaneState.Value.RecentFilters.FirstOrDefault())</span>
+    </EditForm>
+
 </div>

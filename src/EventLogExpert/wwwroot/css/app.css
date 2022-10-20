@@ -44,13 +44,13 @@ a, .btn-link {
     padding-top: 1.1rem;
 }
 
-.valid.modified:not([type=checkbox]) {
+/*.valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }
 
 .invalid {
     outline: 1px solid red;
-}
+}*/
 
 .validation-message {
     color: red;
@@ -130,6 +130,22 @@ td {
 
 .filter-text {
     width: 100px;
+}
+
+.input-filter-id {
+    width: 60px;
+}
+
+.input-filter-severity {
+    width:100px;
+}
+
+.input-filter-dropdown {
+    width: 250px;
+}
+
+.input-filter-description {
+    width: 250px;
 }
 
 .status-bar {

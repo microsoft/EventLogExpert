@@ -13,15 +13,4 @@ public partial class EventTable
         { "Task", 20 },
         { "Description", 200 }
     };
-
-    //private void OnFilterInput(string eventId)
-    //{
-    //    if (int.TryParse(eventId, out int id) is not true)
-    //    {
-    //        _displayEvents = EventLogState.Value.EventsToDisplay.ToList();
-    //        return;
-    //    }
-
-    //    _displayEvents = EventLogState.Value.EventsToDisplay.Where(entry => entry.Id == id).ToList();
-    //}
 }
