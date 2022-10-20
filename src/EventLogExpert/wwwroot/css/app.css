@@ -132,6 +132,22 @@ td {
     width: 100px;
 }
 
+.input-filter-id {
+    width: 60px;
+}
+
+.input-filter-severity {
+    width:100px;
+}
+
+.input-filter-dropdown {
+    width: 250px;
+}
+
+.input-filter-description {
+    width: 250px;
+}
+
 .status-bar {
     background-color: var(--clr-statusbar);
     color: white;

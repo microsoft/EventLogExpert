@@ -1,4 +1,3 @@
-using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 
@@ -13,6 +12,7 @@ public partial class FilterPane
         var filterStrings = new List<string>();
         List<Func<DisplayEventModel, bool>> comparisonsToPerform = new();
 
+        // TODO: Break these into separate functions for future multi select filtering
         if (_filter.Id != -1)
         {
             comparisonsToPerform.Add(e => e.Id == _filter.Id);
@@ -23,6 +23,18 @@ public partial class FilterPane
         {
             comparisonsToPerform.Add(e => e.Level == _filter.Level);
             filterStrings.Add($"Severity == {_filter.Level}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_filter.Provider))
+        {
+            comparisonsToPerform.Add(e => string.Equals(e.ProviderName, _filter.Provider));
+            filterStrings.Add($"ProviderName == '{_filter.Provider}'");
+        }
+
+        if (!string.IsNullOrWhiteSpace(_filter.Task))
+        {
+            comparisonsToPerform.Add(e => string.Equals(e.TaskDisplayName, _filter.Task));
+            filterStrings.Add($"Description contains '{_filter.Task}'");
         }
 
         if (!string.IsNullOrWhiteSpace(_filter.Description))
@@ -42,6 +54,8 @@ public partial class FilterPane
     {
         _filter.Id = -1;
         _filter.Level = null;
+        _filter.Provider = string.Empty;
+        _filter.Task = string.Empty;
         _filter.Description = string.Empty;
         Dispatcher.Dispatch(new EventLogAction.ClearFilters());
     }

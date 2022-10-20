@@ -9,5 +9,9 @@ public class FilterModel
 
     public SeverityLevel? Level { get; set; }
 
+    public string Provider { get; set; } = string.Empty;
+
+    public string Task { get; set; } = string.Empty;
+
     public string Description { get; set; } = string.Empty;
 }

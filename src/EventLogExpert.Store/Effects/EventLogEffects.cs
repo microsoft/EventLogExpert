@@ -18,20 +18,13 @@ public class EventLogEffects
         _eventResolver = eventResolver;
     }
 
-    private static readonly Dictionary<byte, string> LevelNames = new()
-    {
-        { 0, "Information" },
-        { 2, "Error" },
-        { 3, "Warning" },
-        { 4, "Information" }
-    };
-
     [EffectMethod]
     public async Task HandleOpenLogAction(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
         dispatcher.Dispatch(new EventLogAction.ClearEvents());
 
         EventLogReader reader;
+
         if (action.LogSpecifier.LogType == LogType.Live)
         {
             reader = new EventLogReader("Application", PathType.LogName);
@@ -69,7 +62,11 @@ public class EventLogEffects
             }
 
             events.Reverse();
-            dispatcher.Dispatch(new EventLogAction.LoadEvents(events, eventIdsAll.ToImmutableList(), eventProviderNamesAll.ToImmutableList(), eventTaskNamesAll.ToImmutableList()));
+
+            dispatcher.Dispatch(new EventLogAction.LoadEvents(events,
+                eventIdsAll.ToImmutableList(),
+                eventProviderNamesAll.ToImmutableList(),
+                eventTaskNamesAll.ToImmutableList()));
         });
     }
 }
