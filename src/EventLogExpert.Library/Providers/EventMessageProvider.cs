@@ -58,11 +58,30 @@ public class EventMessageProvider
 
             try
             {
-                // https://stackoverflow.com/questions/33498244/marshaling-a-message-table-resource
-                hModule = NativeMethods.LoadLibrary(file);
+                /*
+                 * https://stackoverflow.com/questions/33498244/marshaling-a-message-table-resource
+                 * 
+                 * The approach documented there has some issues, so we deviate a bit.
+                 * 
+                 * RT_MESSAGETABLE is not found unless LoadLibraryEx is called with LOAD_LIBRARY_AS_DATAFILE.
+                 * So we must use LoadLibraryEx below rather than LoadLibrary. Msedgeupdate.dll exposes this
+                 * issue.
+                 */
+                
+                hModule = NativeMethods.LoadLibraryEx(file, IntPtr.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+
+                // TODO: Evaulate if there's any need to EnumResourceTypes.
+                // This is an alternative approach to FindResource. Leaving it here until we're sure FindResource is good enough.
+                var result = NativeMethods.EnumResourceTypes(hModule, GetMessagesFromOneResource, IntPtr.Zero);
 
                 var msgTableInfo =
                     NativeMethods.FindResource(hModule, 1, NativeMethods.RT_MESSAGETABLE);
+
+                if (msgTableInfo == IntPtr.Zero)
+                {
+                    _traceAction($"No message table found. Returning 0 messages from file: {file}");
+                    continue;
+                }
 
                 var msgTable = NativeMethods.LoadResource(hModule, msgTableInfo);
                 var memTable = NativeMethods.LockResource(msgTable);
@@ -90,6 +109,13 @@ public class EventMessageProvider
                         else if (flags == 1)
                         {
                             text = Marshal.PtrToStringUni(textPtr);
+                        }
+                        else if (flags == 2)
+                        {
+                            // All the ESE messages are a single-byte character set
+                            // but have flags of 2, which is not defined. So just
+                            // treat it as ANSI I guess?
+                            text = Marshal.PtrToStringAnsi(textPtr);
                         }
                         else
                         {
@@ -133,6 +159,12 @@ public class EventMessageProvider
         return messages;
     }
 
+    private bool GetMessagesFromOneResource(IntPtr hModule, string lpszType, IntPtr lParam)
+    {
+        // No need to implement this as long as we can use FindResource instead.
+        return true;
+    }
+
     /// <summary>
     ///     Loads the messages for a modern provider. This info is stored at
     ///     Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT
@@ -144,11 +176,22 @@ public class EventMessageProvider
 
         var provider = new ProviderDetails { ProviderName = _providerName };
 
-        var providerMetadata = new ProviderMetadata(_providerName);
+        ProviderMetadata providerMetadata;
+        try
+        {
+            providerMetadata = new ProviderMetadata(_providerName);
+        }
+        catch (Exception ex)
+        {
+            _traceAction($"Couldn't get metadata for rovider {_providerName}. Exception: {ex}. Returning empty Events list.");
+            provider.Events = new List<EventModel>();
+            return provider;
+        }
 
         if (providerMetadata.Id == Guid.Empty)
         {
-            _traceAction($"Provider {_providerName} has no provider GUID. Returning empty provider.");
+            _traceAction($"Provider {_providerName} has no provider GUID. Returning empty Events list.");
+            provider.Events = new List<EventModel>();
             return provider;
         }
 
