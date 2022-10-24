@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Library.Helpers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.Helpers;
 
 namespace EventLogExpert.Library.Models;
 

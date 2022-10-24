@@ -1,4 +1,7 @@
-﻿namespace EventLogExpert.Library.Models;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.Library.Models;
 
 /// <summary>
 ///     Represents a message that was originally stored in a Message File (see

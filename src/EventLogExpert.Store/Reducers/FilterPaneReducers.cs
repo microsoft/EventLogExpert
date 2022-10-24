@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Store.Actions;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Store.Actions;
 using EventLogExpert.Store.State;
 using Fluxor;
 using System.Collections.Immutable;

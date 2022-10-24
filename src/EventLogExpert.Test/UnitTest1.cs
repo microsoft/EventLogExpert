@@ -1,3 +1,6 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 using EventLogExpert.Library.EventResolvers;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;

@@ -1,8 +1,9 @@
-﻿using EventLogExpert.Library.EventResolvers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.State;
 using Fluxor;
-using Fluxor.Extensions;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace EventLogExpert;
 

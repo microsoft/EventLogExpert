@@ -1,4 +1,7 @@
-﻿using Fluxor;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using Fluxor;
 
 namespace EventLogExpert.Store.State;
 

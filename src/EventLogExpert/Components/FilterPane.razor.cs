@@ -1,3 +1,6 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Actions;
 

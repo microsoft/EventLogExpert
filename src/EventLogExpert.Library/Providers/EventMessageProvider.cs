@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Library.Helpers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
@@ -67,7 +70,7 @@ public class EventMessageProvider
                  * So we must use LoadLibraryEx below rather than LoadLibrary. Msedgeupdate.dll exposes this
                  * issue.
                  */
-                
+
                 hModule = NativeMethods.LoadLibraryEx(file, IntPtr.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
 
                 // TODO: Evaulate if there's any need to EnumResourceTypes.
