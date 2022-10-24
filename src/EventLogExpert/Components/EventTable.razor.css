@@ -1,0 +1,34 @@
+﻿.table-container {
+    flex: 1;
+    overflow: auto;
+    background-color: var(--background-dark);
+    color: var(--clr-lightblue);
+}
+
+table {
+    border-spacing: 0;
+    width: calc(100% - 10px);
+    table-layout: fixed;
+}
+
+tr:nth-child(odd) {
+    background-color: var(--background-darkgray);
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background-color: var(--background-darkgray);
+    z-index: 2;
+}
+
+td {
+    overflow: hidden;
+}
+
+.table-divider {
+    width: 1px;
+    margin: 0;
+    padding: 0;
+    background: var(--clr-black);
+}
