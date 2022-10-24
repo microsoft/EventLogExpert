@@ -118,7 +118,7 @@ public class LocalProviderEventResolver : IEventResolver
             }
             else
             {
-                taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task}";
+                taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
             }
 
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
