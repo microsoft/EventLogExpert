@@ -1,6 +1,9 @@
-﻿using Fluxor;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
 
-namespace EventLogExpert.Store.State;
+using Fluxor;
+
+namespace EventLogExpert.Store.StatusBar;
 
 [FeatureState(MaximumStateChangedNotificationsPerSecond = 1)]
 public class StatusBarState

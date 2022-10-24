@@ -1,7 +1,10 @@
-﻿using Fluxor;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Store.State;
+namespace EventLogExpert.Store.FilterPane;
 
 [FeatureState]
 public class FilterPaneState

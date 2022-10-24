@@ -1,5 +1,9 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 using EventLogExpert.Library.Models;
-using EventLogExpert.Store.Actions;
+using EventLogExpert.Store.EventLog;
+using EventLogExpert.Store.FilterPane;
 
 namespace EventLogExpert.Components;
 

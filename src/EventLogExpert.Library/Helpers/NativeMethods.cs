@@ -1,4 +1,7 @@
-﻿using System.Runtime.InteropServices;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
 // We are defining some win32 types in this file, so we

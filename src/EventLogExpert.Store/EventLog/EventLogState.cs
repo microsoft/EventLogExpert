@@ -1,7 +1,10 @@
-﻿using EventLogExpert.Library.Models;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.Models;
 using Fluxor;
 
-namespace EventLogExpert.Store.State;
+namespace EventLogExpert.Store.EventLog;
 
 /// <summary>
 ///     NOTE: Because Virtualize requires an ICollection<T>, we have to use

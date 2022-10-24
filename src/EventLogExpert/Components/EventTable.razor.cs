@@ -1,3 +1,6 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 namespace EventLogExpert.Components;
 
 public partial class EventTable

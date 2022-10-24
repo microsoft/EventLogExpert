@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Library.Helpers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.Helpers;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
 

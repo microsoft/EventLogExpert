@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Library.Helpers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
 using System.Diagnostics;
@@ -118,7 +121,7 @@ public class LocalProviderEventResolver : IEventResolver
             }
             else
             {
-                taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task}";
+                taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
             }
 
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;

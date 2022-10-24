@@ -236,3 +236,8 @@ dotnet_style_prefer_auto_properties = true:silent
 dotnet_style_object_initializer = true:suggestion
 dotnet_style_collection_initializer = true:suggestion
 dotnet_style_namespace_match_folder = true:suggestion
+
+#### File header templates ####
+
+[*.cs]
+file_header_template = // Copyright (c) Microsoft Corporation.\n// Licensed under the MIT License.

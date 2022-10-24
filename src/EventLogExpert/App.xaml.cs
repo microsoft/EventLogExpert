@@ -1,4 +1,7 @@
-﻿namespace EventLogExpert;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert;
 
 public partial class App : Application
 {

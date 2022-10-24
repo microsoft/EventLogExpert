@@ -1,7 +1,9 @@
-﻿using EventLogExpert.Library.Models;
-using EventLogExpert.Store.State;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
 
-namespace EventLogExpert.Store.Actions;
+using EventLogExpert.Library.Models;
+
+namespace EventLogExpert.Store.EventLog;
 
 public record EventLogAction
 {

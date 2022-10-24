@@ -1,8 +1,9 @@
-﻿using EventLogExpert.Store.Actions;
-using EventLogExpert.Store.State;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
 using Fluxor;
 
-namespace EventLogExpert.Store.Reducers;
+namespace EventLogExpert.Store.StatusBar;
 
 public class StatusBarReducers
 {
