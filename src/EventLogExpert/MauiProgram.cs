@@ -30,7 +30,7 @@ public static class MauiProgram
             options.ScanAssemblies(typeof(EventLogState).Assembly).WithLifetime(StoreLifetime.Singleton);
         });
 
-        builder.Services.AddSingleton<IEventResolver, EventReaderEventResolver>();
+        builder.Services.AddSingleton<IEventResolver, LocalProviderEventResolver>();
 
         return builder.Build();
     }
