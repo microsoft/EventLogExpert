@@ -2,11 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
-using EventLogExpert.Store.Actions;
-using EventLogExpert.Store.State;
 using Fluxor;
 
-namespace EventLogExpert.Store.Reducers;
+namespace EventLogExpert.Store.EventLog;
 
 public class EventLogReducers
 {

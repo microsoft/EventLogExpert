@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Store.Actions;
+namespace EventLogExpert.Store.FilterPane;
 
 public record FilterPaneAction
 {

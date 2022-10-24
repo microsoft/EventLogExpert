@@ -4,7 +4,7 @@
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Store.State;
+namespace EventLogExpert.Store.FilterPane;
 
 [FeatureState]
 public class FilterPaneState

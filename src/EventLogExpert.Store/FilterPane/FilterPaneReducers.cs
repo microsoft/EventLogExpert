@@ -1,12 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Store.Actions;
-using EventLogExpert.Store.State;
+using EventLogExpert.Store.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Store.Reducers;
+namespace EventLogExpert.Store.FilterPane;
 
 public class FilterPaneReducers
 {

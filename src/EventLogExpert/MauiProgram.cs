@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Store.State;
+using EventLogExpert.Store.EventLog;
 using Fluxor;
 
 namespace EventLogExpert;

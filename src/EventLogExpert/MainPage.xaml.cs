@@ -1,8 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Store.Actions;
-using EventLogExpert.Store.State;
+using EventLogExpert.Store.EventLog;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;

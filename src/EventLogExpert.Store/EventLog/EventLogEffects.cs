@@ -3,14 +3,14 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Models;
-using EventLogExpert.Store.Actions;
+using EventLogExpert.Store.StatusBar;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using static EventLogExpert.Store.State.EventLogState;
+using static EventLogExpert.Store.EventLog.EventLogState;
 
-namespace EventLogExpert.Store.Effects;
+namespace EventLogExpert.Store.EventLog;
 
 public class EventLogEffects
 {

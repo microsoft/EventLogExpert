@@ -2,9 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
-using EventLogExpert.Store.State;
 
-namespace EventLogExpert.Store.Actions;
+namespace EventLogExpert.Store.EventLog;
 
 public record EventLogAction
 {
