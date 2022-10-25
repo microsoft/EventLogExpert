@@ -7,8 +7,6 @@
 
 table {
     border-spacing: 0;
-    width: calc(100% - 10px);
-    table-layout: fixed;
 }
 
 tr:nth-child(odd) {
@@ -16,18 +14,21 @@ tr:nth-child(odd) {
 }
 
 th {
+    white-space: nowrap;
+    overflow: hidden;
     position: sticky;
     top: 0;
     background-color: var(--background-darkgray);
-    z-index: 2;
 }
 
 td {
+    white-space: nowrap;
     overflow: hidden;
 }
 
 .table-divider {
-    width: 1px;
+    min-width: 4px;
+    max-width: 4px;
     margin: 0;
     padding: 0;
     background: var(--clr-black);
