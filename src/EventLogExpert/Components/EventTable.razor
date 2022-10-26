@@ -1,25 +1,26 @@
 ﻿@inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
+@inject IJSRuntime JS
 
 <div class="table-container">
     <table>
         <thead>
         <tr>
             <th style="@GetInlineStyle("RecordId")">Rec</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "RecordId"))"></th>
             <th style="@GetInlineStyle("TimeCreated")">Time</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "TimeCreated"))"></th>
             <th style="@GetInlineStyle("Id")x">Id</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Id"))"></th>
             <th style="@GetInlineStyle("MachineName")">Machine</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "MachineName"))"></th>
             <th style="@GetInlineStyle("Level")">Level</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Level"))"></th>
             <th style="@GetInlineStyle("ProviderName")">Source</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "ProviderName"))"></th>
             <th style="@GetInlineStyle("Task")">Task</th>
-            <th class="table-divider"></th>
+            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Task"))"></th>
             <th style="@GetDescriptionStyle()">Description</th>
         </tr>
         </thead>

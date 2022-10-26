@@ -19,6 +19,11 @@ th {
     position: sticky;
     top: 0;
     background-color: var(--background-darkgray);
+    cursor: default;
+}
+
+th.table-divider {
+    cursor: col-resize;
 }
 
 td {
