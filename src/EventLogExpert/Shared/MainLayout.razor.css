@@ -1,0 +1,7 @@
+﻿.display_layout {
+    display: flex;
+    flex-direction: column;
+
+    /* 20px offset for status bar - Adjust later if file menu gets adjusted */
+    height: calc(100vh - 20px);
+}

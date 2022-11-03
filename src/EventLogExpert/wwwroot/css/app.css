@@ -10,6 +10,15 @@
     --background-darkgray: #353535;
 }
 
+::-webkit-scrollbar {
+    width: 5px;
+    background: var(--background-darkgray);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--clr-statusbar);
+}
+
 html, body {
     height: 100%;
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe WPC', 'Segoe UI', 'HelveticaNeue-Light', 'Ubuntu', 'Droid Sans', sans-serif;
@@ -87,6 +96,31 @@ a, .btn-link {
 
 .status-bar-safe-area {
     display: none;
+}
+
+/*Moving these back temporarily until custom filter inputs area created*/
+.filter-text {
+    width: 100px;
+}
+
+.input-filter-id {
+    width: 60px;
+}
+
+.input-filter-severity {
+    width: 100px;
+}
+
+.input-filter-dropdown {
+    width: 250px;
+}
+
+.input-filter-description {
+    width: 250px;
+}
+
+.button-toggle {
+    cursor: pointer;
 }
 
 /*@supports (-webkit-touch-callout: none) {

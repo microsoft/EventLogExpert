@@ -1,15 +1,14 @@
-﻿.filter-pane {
+﻿.details-pane {
     margin: 5px;
     height: 25%;
-
     transition: all 0.5s;
 }
 
-    .filter-pane[data-toggle="false"] {
-        height: auto;
-    }
+.details-pane[data-toggle="false"] {
+    height: auto;
+}
 
-.filter-row {
+.details-row {
     display: flex;
     justify-content: space-between;
 }

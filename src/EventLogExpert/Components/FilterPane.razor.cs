@@ -11,6 +11,8 @@ public partial class FilterPane
 {
     private readonly FilterModel _filter = new();
 
+    private bool _expandMenu = false;
+
     private void ApplyFilter()
     {
         var filterStrings = new List<string>();
@@ -63,4 +65,6 @@ public partial class FilterPane
         _filter.Description = string.Empty;
         Dispatcher.Dispatch(new EventLogAction.ClearFilters());
     }
+
+    private void ToggleMenu() => _expandMenu = !_expandMenu;
 }
