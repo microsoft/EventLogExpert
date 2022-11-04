@@ -1,9 +1,10 @@
-﻿@inherits FluxorComponent
+﻿@using EventLogExpert.Shared.Components
+@inherits FluxorComponent
 @inject IState<FilterPaneState> FilterPaneState
 @inject IDispatcher Dispatcher
 
-<div class="filter-pane" data-toggle="@_expandMenu.ToString().ToLower()">
-    
+<div class="filter-pane">
+
     <div class="filter-row">
         <EditForm Model="_filter" OnSubmit="ApplyFilter">
             <span>Event ID: </span>
@@ -53,7 +54,20 @@
 
         </EditForm>
 
-        <span class="button-toggle" @onclick="ToggleMenu">X</span>
+        <span class="button-toggle" @onclick="AddFilter">+</span>
+        @if (_filters.Any())
+        {
+            <span class="button-toggle" data-rotate="@_expandMenu.ToString().ToLower()" @onclick="ToggleMenu">
+                <i class="bi bi-chevron-up"></i>
+            </span>
+        }
+    </div>
+
+    <div class="filter-content" data-toggle="@_expandMenu.ToString().ToLower()">
+        @foreach (var item in _filters)
+        {
+            <FilterRow />
+        }
     </div>
 
 </div>

@@ -1,6 +1,7 @@
 ﻿.table-container {
     flex: 1;
     overflow: auto;
+    padding-left: 5px;
     background-color: var(--background-dark);
     color: var(--clr-lightblue);
 }

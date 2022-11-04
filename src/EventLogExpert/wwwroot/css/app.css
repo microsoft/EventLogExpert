@@ -5,7 +5,7 @@
     --clr-black: #111111;
 
     --clr-statusbar: #3C64E7;
-    
+
     --background-dark: #222222;
     --background-darkgray: #353535;
 }
@@ -122,6 +122,10 @@ a, .btn-link {
 .button-toggle {
     cursor: pointer;
 }
+
+    .button-toggle[data-rotate="true"] {
+        transform: translateY(-10%) rotate(-180deg);
+    }
 
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {

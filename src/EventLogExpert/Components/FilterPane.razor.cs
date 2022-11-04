@@ -10,8 +10,15 @@ namespace EventLogExpert.Components;
 public partial class FilterPane
 {
     private readonly FilterModel _filter = new();
+    private readonly List<FilterModel> _filters = new();
 
     private bool _expandMenu = false;
+
+    private void AddFilter()
+    {
+        _filters.Add(_filter);
+        _expandMenu = true;
+    }
 
     private void ApplyFilter()
     {

@@ -1,15 +1,28 @@
 ﻿.filter-pane {
     margin: 5px;
-    height: 25%;
 
-    transition: all 0.5s;
+    max-height: 25%;
 }
-
-    .filter-pane[data-toggle="false"] {
-        height: auto;
-    }
 
 .filter-row {
     display: flex;
     justify-content: space-between;
 }
+
+.filter-content {
+    display: flex;
+    flex-direction: column;
+
+    max-height: calc(100% - 25px);
+    overflow: auto;
+
+    border-bottom: solid var(--background-darkgray);
+
+    transition: all 1s;
+}
+
+    .filter-content[data-toggle="false"] {
+        display: none;
+
+        border: none;
+    }
