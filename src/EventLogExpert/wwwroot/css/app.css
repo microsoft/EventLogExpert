@@ -1,8 +1,11 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css");
 
 :root {
     --clr-lightblue: #9CDCFE;
     --clr-black: #111111;
+    --clr-red: #ee0d0d;
+    --clr-green: #0dee0d;
 
     --clr-statusbar: #3C64E7;
 
@@ -125,6 +128,36 @@ a, .btn-link {
 
     .button-toggle[data-rotate="true"] {
         transform: translateY(-10%) rotate(-180deg);
+    }
+
+.button-primary {
+    color: var(--clr-lightblue);
+    background: none;
+    border: var(--clr-lightblue);
+}
+
+.button-remove {
+    color: var(--clr-red);
+    background: none;
+    border: var(--clr-red);
+}
+
+.button-save {
+    color: var(--clr-green);
+    background: none;
+    border: var(--clr-green);
+}
+
+    .button-primary:focus,
+    .button-remove:focus,
+    .button-save:focus {
+        border: none;
+    }
+
+    .button-primary:hover,
+    .button-remove:hover,
+    .button-save:hover {
+        filter: brightness(0.9);
     }
 
 /*@supports (-webkit-touch-callout: none) {

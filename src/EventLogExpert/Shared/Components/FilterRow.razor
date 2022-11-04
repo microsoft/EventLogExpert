@@ -1,7 +1,22 @@
-﻿<div class="filter-row">
-    <span>Filter</span>
+﻿@inject IDispatcher Dispatcher
+
+<div class="filter-row">
+    <span>Filter: @Value.Id</span>
     <div>
-        <span>Edit</span>
-        <span>Remove</span>
+        @if (_isEditing)
+        {
+            <button class="button-save" @onclick="SaveFilter">
+                <i class="bi bi-check-circle"></i> Save
+            </button>
+        }
+        else
+        {
+            <button class="button-primary" @onclick="EditFilter">
+                <i class="bi bi-funnel"></i> Edit
+            </button>
+        }
+        <button class="button-remove" @onclick="RemoveFilter">
+            <i class="bi bi-dash-circle"></i> Remove
+        </button>
     </div>
 </div>
