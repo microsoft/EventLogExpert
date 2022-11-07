@@ -106,45 +106,66 @@ a, .btn-link {
     width: 100px;
 }
 
-.input-filter-id {
-    width: 60px;
-}
-
-.input-filter-severity {
-    width: 100px;
-}
-
-.input-filter-dropdown {
-    width: 250px;
-}
-
+.input-filter-select,
+.input-filter-id,
+.input-filter-severity,
+.input-filter-dropdown,
 .input-filter-description {
-    width: 250px;
+    background: none;
+    border: none;
+    border-bottom: 0.1rem solid var(--clr-lightblue);
+    color: white;
+    margin-right: 2rem;
+    text-align: center;
 }
 
-.button-toggle {
-    cursor: pointer;
-}
+    .input-filter-select { width: 100px; }
+
+    .input-filter-id { width: 60px; }
+
+    .input-filter-severity { width: 100px; }
+
+    .input-filter-dropdown { width: 250px; }
+
+    .input-filter-description { width: 250px; }
+
+        .input-filter-select:focus-visible,
+        .input-filter-id:focus-visible,
+        .input-filter-severity:focus-visible,
+        .input-filter-dropdown:focus-visible,
+        .input-filter-description:focus-visible {
+            outline: none;
+        }
+
+        .input-filter-select > option,
+        .input-filter-id > option,
+        .input-filter-severity > option,
+        .input-filter-dropdown > option,
+        .input-filter-description > option {
+            background: var(--background-dark);
+        }
+
+.button-toggle { cursor: pointer; }
 
     .button-toggle[data-rotate="true"] {
         transform: translateY(-10%) rotate(-180deg);
     }
 
-.button-primary {
+.button-primary,
+.button-remove,
+.button-save {
     color: var(--clr-lightblue);
-    background: none;
     border: var(--clr-lightblue);
+    background: none;
 }
 
 .button-remove {
     color: var(--clr-red);
-    background: none;
     border: var(--clr-red);
 }
 
 .button-save {
     color: var(--clr-green);
-    background: none;
     border: var(--clr-green);
 }
 

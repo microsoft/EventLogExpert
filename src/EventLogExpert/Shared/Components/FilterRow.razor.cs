@@ -9,14 +9,11 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class FilterRow
 {
-    private bool _isEditing;
-
-    [Parameter]
-    public FilterModel Value { get; set; } = null!;
+    [Parameter] public FilterModel Value { get; set; } = null!;
 
     private void EditFilter()
     {
-        _isEditing = true;
+        Value.IsEditing = true;
     }
 
     private void RemoveFilter()
@@ -26,6 +23,6 @@ public partial class FilterRow
 
     private void SaveFilter()
     {
-        _isEditing = false;
+        Value.IsEditing = false;
     }
 }

@@ -5,9 +5,12 @@
 }
 
 .filter-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
 }
+
+    .filter-row .header-center { text-align: center; }
+    .filter-row .header-justify-right { justify-self: right; }
 
 .filter-content {
     display: flex;
