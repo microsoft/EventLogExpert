@@ -17,13 +17,13 @@
         {
             <span class="header-center"> [Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
 
-            <span class="button-toggle header-justify-right" data-rotate="@_expandMenu.ToString().ToLower()" @onclick="ToggleMenu">
+            <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
                 <i class="bi bi-caret-up"></i>
             </span>
         }
     </div>
 
-    <div class="filter-content" data-toggle="@_expandMenu.ToString().ToLower()">
+    <div class="filter-content" data-toggle="@MenuState">
         @foreach (var item in FilterPaneState.Value.CurrentFilters)
         {
             <FilterRow Value="@item" />

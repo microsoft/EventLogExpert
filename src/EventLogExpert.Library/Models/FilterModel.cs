@@ -21,7 +21,12 @@ public class FilterModel
 
     public FilterComparison FilterComparison { get; set; }
 
-    public string? FilterStringValue { get; set; }
+    // TODO: Find a better way to do this
+    // (object?) does not work, gets set as a string from blazor select component so SeverityLevel cast fails on get call
 
     public int? FilterIntValue { get; set; }
+
+    public SeverityLevel? FilterSeverityValue { get; set; }
+
+    public string? FilterStringValue { get; set; }
 }

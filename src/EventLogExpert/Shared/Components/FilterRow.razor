@@ -27,7 +27,7 @@
             {
                 case FilterType.EventId :
                     <select class="input-filter-id" @bind="Value.FilterIntValue">
-                        <option value="-1">None</option>
+                        <option value="null">None</option>
                         @foreach (var id in AvailableFilterPaneState.Value.EventIdsAll.OrderBy(id => id))
                         {
                             <option value="@id">@id</option>
@@ -35,8 +35,8 @@
                     </select>
                     break;
                 case FilterType.Severity :
-                    <select class="input-filter-severity" @bind="Value.FilterIntValue">
-                        <option value="">All</option>
+                    <select class="input-filter-severity" @bind="Value.FilterSeverityValue">
+                        <option value="null">All</option>
                         @foreach (SeverityLevel? level in Enum.GetValues(typeof(SeverityLevel)))
                         {
                             <option value="@level">@level.ToString()</option>
@@ -45,7 +45,7 @@
                     break;
                 case FilterType.Provider :
                     <select class="input-filter-dropdown" @bind="Value.FilterStringValue">
-                        <option value="">All</option>
+                        <option value="null">All</option>
                         @foreach (var provider in AvailableFilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n))
                         {
                             <option value="@provider">@provider</option>
@@ -54,7 +54,7 @@
                     break;
                 case FilterType.Task :
                     <select class="input-filter-dropdown" @bind="Value.FilterStringValue">
-                        <option value="">All</option>
+                        <option value="null">All</option>
                         @foreach (var task in AvailableFilterPaneState.Value.TaskNamesAll.OrderBy(n => n))
                         {
                             <option value="@task">@task</option>

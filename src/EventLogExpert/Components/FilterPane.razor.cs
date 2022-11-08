@@ -11,7 +11,20 @@ public partial class FilterPane
 {
     private readonly OldFilterModel _filter = new();
 
-    private bool _expandMenu = false;
+    private bool _expandMenu;
+
+    private string MenuState
+    {
+        get
+        {
+            if (!FilterPaneState.Value.CurrentFilters.Any())
+            {
+                _expandMenu = false;
+            }
+
+            return _expandMenu.ToString().ToLower();
+        }
+    }
 
     private void AddFilter()
     {
