@@ -12,4 +12,6 @@ public record FilterPaneAction
     public record AddFilter;
 
     public record RemoveFilter(FilterModel FilterModel);
+
+    public record ApplyFilters;
 }

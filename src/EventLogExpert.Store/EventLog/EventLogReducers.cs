@@ -13,10 +13,11 @@ public class EventLogReducers
         new(state.ActiveLog, new List<DisplayEventModel>(), new List<DisplayEventModel>());
 
     [ReducerMethod]
-    public static EventLogState ReduceFilterEvents(EventLogState state, EventLogAction.FilterEvents action) =>
-        new(state.ActiveLog,
-            state.Events,
-            action.Filter.Count < 1 ? state.Events : state.Events.Where(ev => action.Filter.All(f => f(ev))).ToList());
+    public static EventLogState ReduceFilterEvents(EventLogState state, EventLogAction.FilterEvents action) => new(
+        state.ActiveLog,
+        state.Events,
+        action.Filters.Any() is false ? state.Events :
+            state.Events.Where(ev => action.Filters.All(f => f(ev))).ToList());
 
     [ReducerMethod(typeof(EventLogAction.ClearFilters))]
     public static EventLogState ReduceClearFilters(EventLogState state) =>

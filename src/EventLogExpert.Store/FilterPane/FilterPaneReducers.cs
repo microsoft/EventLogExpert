@@ -9,6 +9,10 @@ namespace EventLogExpert.Store.FilterPane;
 
 public class FilterPaneReducers
 {
+    private readonly IDispatcher _dispatcher;
+
+    public FilterPaneReducers(IDispatcher dispatcher) => _dispatcher = dispatcher;
+
     [ReducerMethod(typeof(FilterPaneAction.AddFilter))]
     public static FilterPaneState ReduceAddFilterAction(FilterPaneState state)
     {
@@ -35,7 +39,7 @@ public class FilterPaneReducers
         EventLogAction.LoadEvents action) => new(action.AllEventIds, action.AllProviderNames, action.AllTaskNames);
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
+    public FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
         var filter = updatedList.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
@@ -46,6 +50,8 @@ public class FilterPaneReducers
         }
 
         updatedList.Remove(filter);
+
+        _dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
 
         return new FilterPaneState(updatedList);
     }

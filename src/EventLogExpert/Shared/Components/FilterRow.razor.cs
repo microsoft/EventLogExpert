@@ -36,9 +36,30 @@ public partial class FilterRow
         if (SetComparisonString())
         {
             // Set the actual filter
+            SetComparison();
         }
 
         Value.IsEditing = false;
+
+        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
+    }
+
+    private void SetComparison()
+    {
+        switch (Value.FilterComparison)
+        {
+            case FilterComparison.Equals :
+                SetEqualsComparison();
+                break;
+            case FilterComparison.Contains :
+                SetContainsComparison();
+                break;
+            case FilterComparison.NotEqual :
+                SetNotEqualsComparison();
+                break;
+            default :
+                return;
+        }
     }
 
     private bool SetComparisonString()
@@ -97,5 +118,102 @@ public partial class FilterRow
         Value.ComparisonString = stringBuilder.ToString();
 
         return true;
+    }
+
+    private void SetContainsComparison()
+    {
+        switch (Value.FilterType)
+        {
+            case FilterType.EventId :
+                // TODO: Clean this up, extension method?
+                Value.Comparison = x => x.Id.ToString().Contains(Value.FilterIntValue.ToString()!);
+                break;
+            case FilterType.Severity :
+                Value.Comparison = x => x.Level.ToString()!.Contains(Value.FilterSeverityValue.ToString()!);
+                break;
+            case FilterType.Provider :
+                Value.Comparison = x =>
+                    x.ProviderName.Contains(Value.FilterStringValue!, StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Task :
+                Value.Comparison = x =>
+                    x.TaskDisplayName.Contains(Value.FilterStringValue!, StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Description :
+                Value.Comparison = x =>
+                    x.Description.Contains(Value.FilterStringValue!, StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            default :
+                return;
+        }
+    }
+
+    private void SetEqualsComparison()
+    {
+        switch (Value.FilterType)
+        {
+            case FilterType.EventId :
+                Value.Comparison = x => x.Id == Value.FilterIntValue;
+                break;
+            case FilterType.Severity :
+                Value.Comparison = x => x.Level == Value.FilterSeverityValue;
+                break;
+            case FilterType.Provider :
+                Value.Comparison = x => string.Equals(x.ProviderName,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Task :
+                Value.Comparison = x => string.Equals(x.TaskDisplayName,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Description :
+                Value.Comparison = x => string.Equals(x.Description,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            default :
+                return;
+        }
+    }
+
+    private void SetNotEqualsComparison()
+    {
+        switch (Value.FilterType)
+        {
+            case FilterType.EventId :
+                Value.Comparison = x => x.Id != Value.FilterIntValue;
+                break;
+            case FilterType.Severity :
+                Value.Comparison = x => x.Level != Value.FilterSeverityValue;
+                break;
+            case FilterType.Provider :
+                Value.Comparison = x => !string.Equals(x.ProviderName,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Task :
+                Value.Comparison = x => !string.Equals(x.TaskDisplayName,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            case FilterType.Description :
+                Value.Comparison = x => !string.Equals(x.Description,
+                    Value.FilterStringValue,
+                    StringComparison.InvariantCultureIgnoreCase);
+
+                break;
+            default :
+                return;
+        }
     }
 }
