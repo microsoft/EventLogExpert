@@ -8,7 +8,7 @@ namespace EventLogExpert;
 
 public partial class MainPage : ContentPage
 {
-    private IDispatcher _fluxorDispatcher;
+    private IDispatcher? _fluxorDispatcher;
 
     public MainPage()
     {
@@ -48,7 +48,7 @@ public partial class MainPage : ContentPage
 
         if (result != null)
         {
-            _fluxorDispatcher.Dispatch(
+            _fluxorDispatcher?.Dispatch(
                 new EventLogAction.OpenLog(
                     new EventLogState.LogSpecifier(
                         result.FullPath,
@@ -58,7 +58,7 @@ public partial class MainPage : ContentPage
 
     private void OpenLiveLog_Clicked(object sender, EventArgs e)
     {
-        _fluxorDispatcher.Dispatch(
+        _fluxorDispatcher?.Dispatch(
             new EventLogAction.OpenLog(
                 new EventLogState.LogSpecifier(
                     "Application",

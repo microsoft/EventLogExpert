@@ -7,14 +7,26 @@ namespace EventLogExpert.Library.Models;
 
 public class FilterModel
 {
-    // Set to -1 to indicate that the filter is not set
-    public int Id { get; set; } = -1;
+    public FilterModel(int id) => Id = id;
 
-    public SeverityLevel? Level { get; set; }
+    public int Id { get; set; }
 
-    public string Provider { get; set; } = string.Empty;
+    public Func<DisplayEventModel, bool>? Comparison { get; set; }
 
-    public string Task { get; set; } = string.Empty;
+    public string? ComparisonString { get; set; }
 
-    public string Description { get; set; } = string.Empty;
+    public bool IsEditing { get; set; } = true;
+
+    public FilterType FilterType { get; set; }
+
+    public FilterComparison FilterComparison { get; set; }
+
+    // TODO: Find a better way to do this
+    // (object?) does not work, gets set as a string from blazor select component so SeverityLevel cast fails on get call
+
+    public int? FilterIntValue { get; set; }
+
+    public SeverityLevel? FilterSeverityValue { get; set; }
+
+    public string? FilterStringValue { get; set; }
 }

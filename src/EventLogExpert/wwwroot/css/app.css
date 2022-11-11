@@ -1,13 +1,25 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
+@import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css");
 
 :root {
     --clr-lightblue: #9CDCFE;
     --clr-black: #111111;
+    --clr-red: #ee0d0d;
+    --clr-green: #0dee0d;
 
     --clr-statusbar: #3C64E7;
-    
+
     --background-dark: #222222;
     --background-darkgray: #353535;
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+    background: var(--background-darkgray);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--clr-statusbar);
 }
 
 html, body {
@@ -88,6 +100,86 @@ a, .btn-link {
 .status-bar-safe-area {
     display: none;
 }
+
+/*Moving these back temporarily until custom filter inputs area created*/
+.filter-text {
+    width: 100px;
+}
+
+.input-filter-select,
+.input-filter-id,
+.input-filter-severity,
+.input-filter-dropdown,
+.input-filter-description {
+    background: none;
+    border: none;
+    border-bottom: 0.1rem solid var(--clr-lightblue);
+    color: white;
+    margin-right: 2rem;
+    text-align: center;
+}
+
+    .input-filter-select { width: 100px; }
+
+    .input-filter-id { width: 60px; }
+
+    .input-filter-severity { width: 100px; }
+
+    .input-filter-dropdown { width: 250px; }
+
+    .input-filter-description { width: 250px; }
+
+        .input-filter-select:focus-visible,
+        .input-filter-id:focus-visible,
+        .input-filter-severity:focus-visible,
+        .input-filter-dropdown:focus-visible,
+        .input-filter-description:focus-visible {
+            outline: none;
+        }
+
+        .input-filter-select > option,
+        .input-filter-id > option,
+        .input-filter-severity > option,
+        .input-filter-dropdown > option,
+        .input-filter-description > option {
+            background: var(--background-dark);
+        }
+
+.button-toggle { cursor: pointer; }
+
+    .button-toggle[data-rotate="true"] {
+        transform: translateY(-10%) rotate(-180deg);
+    }
+
+.button-primary,
+.button-remove,
+.button-save {
+    color: var(--clr-lightblue);
+    border: var(--clr-lightblue);
+    background: none;
+}
+
+.button-remove {
+    color: var(--clr-red);
+    border: var(--clr-red);
+}
+
+.button-save {
+    color: var(--clr-green);
+    border: var(--clr-green);
+}
+
+    .button-primary:focus,
+    .button-remove:focus,
+    .button-save:focus {
+        border: none;
+    }
+
+    .button-primary:hover,
+    .button-remove:hover,
+    .button-save:hover {
+        filter: brightness(0.9);
+    }
 
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {

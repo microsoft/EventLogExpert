@@ -20,5 +20,5 @@ public record EventLogAction
 
     public record ClearFilters : EventLogAction;
 
-    public record FilterEvents(List<Func<DisplayEventModel, bool>> Filter) : EventLogAction;
+    public record FilterEvents(IEnumerable<Func<DisplayEventModel, bool>> Filters) : EventLogAction;
 }

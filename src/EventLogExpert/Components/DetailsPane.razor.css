@@ -1,0 +1,18 @@
+﻿.details-pane {
+    margin: 5px;
+    height: 25%;
+
+    border-top: solid var(--background-darkgray);
+
+    transition: all 1s;
+}
+
+.details-pane[data-toggle="false"] {
+    /* Temporary - Will eventually be display: none */
+    height: auto;
+}
+
+.details-row {
+    display: flex;
+    justify-content: space-between;
+}

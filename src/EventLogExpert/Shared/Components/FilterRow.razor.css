@@ -1,0 +1,10 @@
+﻿.filter-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+    .filter-row .button-primary,
+    .filter-row .button-remove,
+    .filter-row .button-save {
+        width: 6rem;
+    }

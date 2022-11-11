@@ -1,23 +1,31 @@
 ﻿.filter-pane {
     margin: 5px;
+
+    max-height: 25%;
 }
 
-.filter-text {
-    width: 100px;
+.filter-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
 }
 
-.input-filter-id {
-    width: 60px;
+    .filter-row .header-center { text-align: center; }
+    .filter-row .header-justify-right { justify-self: right; }
+
+.filter-content {
+    display: flex;
+    flex-direction: column;
+
+    max-height: calc(100% - 20px);
+    overflow: auto;
+
+    border-bottom: solid var(--background-darkgray);
+
+    transition: all 1s;
 }
 
-.input-filter-severity {
-    width: 100px;
-}
+    .filter-content[data-toggle="false"] {
+        display: none;
 
-.input-filter-dropdown {
-    width: 250px;
-}
-
-.input-filter-description {
-    width: 250px;
-}
+        border: none;
+    }

@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Reflection;
+using System.Runtime.Serialization;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Library.Helpers;
@@ -17,5 +19,13 @@ public static class ExtensionMethods
             Regex.Escape(findMe),
             Regex.Replace(newValue, "\\$[0-9]+", @"$$$0"),
             RegexOptions.IgnoreCase);
+    }
+
+    public static string ToFullString(this Enum value)
+    {
+        var memberAttribute = value.GetType().GetField(value.ToString())?
+            .GetCustomAttribute(typeof(EnumMemberAttribute)) as EnumMemberAttribute;
+
+        return memberAttribute?.Value ?? value.ToString();
     }
 }
