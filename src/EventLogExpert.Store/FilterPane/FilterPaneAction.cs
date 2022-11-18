@@ -13,5 +13,9 @@ public record FilterPaneAction
 
     public record RemoveFilter(FilterModel FilterModel);
 
+    public record AddSubFilter(Guid ParentId);
+
+    public record RemoveSubFilter(Guid ParentId, SubFilterModel SubFilterModel);
+
     public record ApplyFilters;
 }

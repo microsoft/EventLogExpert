@@ -13,6 +13,8 @@ public partial class FilterRow
 {
     [Parameter] public FilterModel Value { get; set; } = null!;
 
+    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
+
     //[Parameter] public EventCallback<object?> ValueChanged { get; set; }
 
     private void EditFilter()
