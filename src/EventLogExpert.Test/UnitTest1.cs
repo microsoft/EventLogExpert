@@ -24,8 +24,8 @@ public class UnitTest1
 
         var resolvers = new List<IEventResolver>()
         {
-            new EventReaderEventResolver(),
-            new LocalProviderEventResolver(s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
+            new LocalProviderEventResolver(s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); }),
+            new EventProviderDatabaseEventResolver(s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
         };
 
         EventRecord er;
