@@ -48,10 +48,10 @@ public class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Opcodes)
-            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
+            .HasConversion<JsonValueConverter<Dictionary<int, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Tasks)
-            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
+            .HasConversion<JsonValueConverter<Dictionary<int, string>>>();
     }
 }

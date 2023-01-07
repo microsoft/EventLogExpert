@@ -17,7 +17,7 @@ public class ProviderDetails
 
     public Dictionary<long, string> Keywords { get; set; }
 
-    public Dictionary<long, string> Opcodes { get; set; }
+    public Dictionary<int, string> Opcodes { get; set; }
 
-    public Dictionary<long, string> Tasks { get; set; }
+    public Dictionary<int, string> Tasks { get; set; }
 }

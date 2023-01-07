@@ -43,8 +43,8 @@ public class EventMessageProvider
             provider.Messages ??= new List<MessageModel>();
             provider.Events ??= new List<EventModel>();
             provider.Keywords ??= new Dictionary<long, string>();
-            provider.Opcodes ??= new Dictionary<long, string>();
-            provider.Tasks ??= new Dictionary<long, string>();
+            provider.Opcodes ??= new Dictionary<int, string>();
+            provider.Tasks ??= new Dictionary<int, string>();
 
             return provider;
         }
@@ -204,12 +204,6 @@ public class EventMessageProvider
             return provider;
         }
 
-        if (providerMetadata.Id == Guid.Empty)
-        {
-            _traceAction($"Provider {_providerName} has no provider GUID. Returning empty provider.");
-            return provider;
-        }
-
         try
         {
             provider.Events = providerMetadata.Events.Select(e => new EventModel
@@ -249,12 +243,12 @@ public class EventMessageProvider
         try
         {
             provider.Opcodes = providerMetadata.Opcodes
-                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
                 .ToDictionary(p => p.Key, p => p.Value);
         }
         catch (Exception ex)
         {
-            provider.Opcodes = new Dictionary<long, string>();
+            provider.Opcodes = new Dictionary<int, string>();
             _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:");
             _traceAction(ex.ToString());
         }
@@ -262,12 +256,12 @@ public class EventMessageProvider
         try
         {
             provider.Tasks = providerMetadata.Tasks
-                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
                 .ToDictionary(p => p.Key, p => p.Value);
         }
         catch (Exception ex)
         {
-            provider.Tasks = new Dictionary<long, string>();
+            provider.Tasks = new Dictionary<int, string>();
             _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:");
             _traceAction(ex.ToString());
         }

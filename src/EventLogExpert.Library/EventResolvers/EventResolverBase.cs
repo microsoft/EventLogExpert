@@ -131,26 +131,33 @@ public class EventResolverBase
 
         if (description == null)
         {
-            var potentialTaskNames = providerDetails.Messages?.Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName).ToList();
-            if (potentialTaskNames != null && potentialTaskNames.Any())
-            {
-                taskName = potentialTaskNames[0].Text;
-
-                if (potentialTaskNames.Count > 1)
-                {
-                    _tracer("More than one matching task ID was found.");
-                    _tracer($"  eventRecord.Task: {eventRecord.Task}");
-                    _tracer("   Potential matches:");
-                    potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}"));
-                }
-            }
-            else
-            {
-                taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
-            }
-
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
             description = FormatDescription(eventRecord, description);
+        }
+
+        if (taskName == null && eventRecord.Task.HasValue)
+        {
+            providerDetails.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
+            if (taskName == null)
+            {
+                var potentialTaskNames = providerDetails.Messages?.Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName).ToList();
+                if (potentialTaskNames != null && potentialTaskNames.Any())
+                {
+                    taskName = potentialTaskNames[0].Text;
+
+                    if (potentialTaskNames.Count > 1)
+                    {
+                        _tracer("More than one matching task ID was found.");
+                        _tracer($"  eventRecord.Task: {eventRecord.Task}");
+                        _tracer("   Potential matches:");
+                        potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}"));
+                    }
+                }
+                else
+                {
+                    taskName = eventRecord.Task == null | eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
+                }
+            }
         }
 
         return new DisplayEventModel(
