@@ -4,14 +4,9 @@
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace EventLogExpert.Library.EventResolvers;
 
@@ -56,7 +51,7 @@ public class EventResolverBase
                 if (propValue is DateTime)
                 {
                     // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
-                    sb.Append(((DateTime)propValue).ToUniversalTime().ToString("\u200Eyyyy\u200E-\u200EMM\u200E-\u200EddTHH:mm:ss.fffffff00K"));
+                    sb.Append(((DateTime)propValue).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
                 }
                 else
                 {

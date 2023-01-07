@@ -44,6 +44,7 @@ public class UnitTest1
                     .Replace("\r", "")  // I can't figure out the logic of FormatMessage() for when it leaves
                     .Replace("\n", "")  // CRLFs and spaces in or takes them out, so I'm just giving up for now.
                     .Replace(" ", "")   // If we're this close to matching FormatMessage() then we're close enough.
+                    .Replace("\u200E", "") // Remove LRM marks from dates.
                     .Trim());
             }
 
