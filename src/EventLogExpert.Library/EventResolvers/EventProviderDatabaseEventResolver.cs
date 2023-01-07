@@ -14,13 +14,15 @@ using System.Threading.Tasks;
 
 namespace EventLogExpert.Library.EventResolvers;
 
-public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
+public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {
     private List<EventProviderDbContext> dbContexts = new();
 
     private readonly string dbFolder = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert", "Databases");
 
     private Dictionary<string, ProviderDetails?> _providerDetails = new();
+
+    private bool disposedValue;
 
     public EventProviderDatabaseEventResolver() : this(s => { }) { }
 
@@ -89,5 +91,29 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         }
 
         return lastResult;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                foreach (var context in dbContexts)
+                {
+                    context.Dispose();
+                }
+            }
+
+            _providerDetails = null;
+
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }
