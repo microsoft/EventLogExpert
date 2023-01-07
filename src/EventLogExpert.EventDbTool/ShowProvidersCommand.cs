@@ -21,18 +21,22 @@ public class ShowProvidersCommand : DbToolCommand
         var filterOption = new Option<string>(
             name: "--filter",
             description: "Filter for provider names matching the specified regex string.");
+        var verboseOption = new Option<bool>(
+            name: "--verbose",
+            description: "Verbose logging. May be useful for troubleshooting.");
         showProvidersCommand.AddOption(detailedOption);
         showProvidersCommand.AddOption(filterOption);
-        showProvidersCommand.SetHandler((detailedOptionValue, filterOptionValue) =>
+        showProvidersCommand.AddOption(verboseOption);
+        showProvidersCommand.SetHandler((detailedOptionValue, filterOptionValue, verboseOptionValue) =>
         {
-            ShowProviderInfo(detailedOptionValue, filterOptionValue);
+            ShowProviderInfo(detailedOptionValue, filterOptionValue, verboseOptionValue);
         },
-        detailedOption, filterOption);
+        detailedOption, filterOption, verboseOption);
 
         return showProvidersCommand;
     }
 
-    public static void ShowProviderInfo(bool detailed, string filter)
+    public static void ShowProviderInfo(bool detailed, string filter, bool verbose)
     {
         var providerNames = GetProviderNames(filter);
 
@@ -48,7 +52,7 @@ public class ShowProvidersCommand : DbToolCommand
             LogProviderDetailHeader(providerNames);
             foreach (var providerName in providerNames)
             {
-                var provider = new EventMessageProvider(providerName, s => { });
+                var provider = new EventMessageProvider(providerName, verbose ? s => Console.WriteLine(s) : s => { });
                 var details = provider.LoadProviderDetails();
                 LogProviderDetails(details);
 
