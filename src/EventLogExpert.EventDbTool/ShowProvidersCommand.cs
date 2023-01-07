@@ -54,9 +54,12 @@ public class ShowProvidersCommand : DbToolCommand
             {
                 var provider = new EventMessageProvider(providerName, verbose ? s => Console.WriteLine(s) : s => { });
                 var details = provider.LoadProviderDetails();
-                LogProviderDetails(details);
+                if (details != null)
+                {
+                    LogProviderDetails(details);
 
-                details = null;
+                    details = null;
+                }
             }
         }
     }
