@@ -104,7 +104,7 @@ public class EventResolverBase
 
                 var e = modernEvents[0];
 
-                taskName = providerDetails.Tasks.FirstOrDefault(t => t.Value == e.Task)?.Name;
+                providerDetails.Tasks.TryGetValue(e.Task, out taskName);
 
                 // If we don't have a description template
                 if (string.IsNullOrEmpty(e.Description))

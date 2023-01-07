@@ -15,16 +15,9 @@ public class ProviderDetails
     /// <summary>Events and related items from modern provider</summary>
     public List<EventModel> Events { get; set; }
 
-    public List<ValueName> Keywords { get; set; }
+    public Dictionary<long, string> Keywords { get; set; }
 
-    public List<ValueName> Opcodes { get; set; }
+    public Dictionary<long, string> Opcodes { get; set; }
 
-    public List<ValueName> Tasks { get; set; }
-
-    public class ValueName
-    {
-        public long Value { get; set; }
-
-        public string Name { get; set; }
-    }
+    public Dictionary<long, string> Tasks { get; set; }
 }

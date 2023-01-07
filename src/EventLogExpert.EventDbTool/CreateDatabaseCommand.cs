@@ -58,11 +58,14 @@ public class CreateDatabaseCommand : DbToolCommand
         {
             var provider = new EventMessageProvider(providerName, verboseLogging ? s => Console.WriteLine(s) : s => { });
             var details = provider.LoadProviderDetails();
-            dbContext.ProviderDetails.Add(details);
+            if (details != null)
+            {
+                dbContext.ProviderDetails.Add(details);
 
-            LogProviderDetails(details);
+                LogProviderDetails(details);
 
-            details = null;
+                details = null;
+            }
         }
 
         Console.WriteLine();

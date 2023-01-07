@@ -42,10 +42,10 @@ public class EventMessageProvider
             // We got some sort of data back, so make sure all the collections are there
             provider.Messages ??= new List<MessageModel>();
             provider.Events ??= new List<EventModel>();
-            provider.Keywords ??= new List<ProviderDetails.ValueName>();
-            provider.Opcodes ??= new List<ProviderDetails.ValueName>();
-            provider.Tasks ??= new List<ProviderDetails.ValueName>();
-            
+            provider.Keywords ??= new Dictionary<long, string>();
+            provider.Opcodes ??= new Dictionary<long, string>();
+            provider.Tasks ??= new Dictionary<long, string>();
+
             return provider;
         }
     }
@@ -191,7 +191,7 @@ public class EventMessageProvider
     {
         _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}");
 
-        var provider = new ProviderDetails();
+        var provider = new ProviderDetails { ProviderName = _providerName };
 
         ProviderMetadata providerMetadata;
         try
@@ -235,12 +235,13 @@ public class EventMessageProvider
         try
         {
             provider.Keywords = providerMetadata.Keywords
-                .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-                .ToList();
+                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
+                
         }
         catch (Exception ex)
         {
-            provider.Keywords = new List<ProviderDetails.ValueName>();
+            provider.Keywords = new Dictionary<long, string>();
             _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:");
             _traceAction(ex.ToString());
         }
@@ -248,12 +249,12 @@ public class EventMessageProvider
         try
         {
             provider.Opcodes = providerMetadata.Opcodes
-                .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-                .ToList();
+                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
         }
         catch (Exception ex)
         {
-            provider.Opcodes = new List<ProviderDetails.ValueName>();
+            provider.Opcodes = new Dictionary<long, string>();
             _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:");
             _traceAction(ex.ToString());
         }
@@ -261,12 +262,12 @@ public class EventMessageProvider
         try
         {
             provider.Tasks = providerMetadata.Tasks
-                .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-                .ToList();
+                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
         }
         catch (Exception ex)
         {
-            provider.Tasks = new List<ProviderDetails.ValueName>();
+            provider.Tasks = new Dictionary<long, string>();
             _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:");
             _traceAction(ex.ToString());
         }

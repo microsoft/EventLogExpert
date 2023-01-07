@@ -44,14 +44,14 @@ public class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Keywords)
-            .HasConversion<JsonValueConverter<List<ProviderDetails.ValueName>>>();
+            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Opcodes)
-            .HasConversion<JsonValueConverter<List<ProviderDetails.ValueName>>>();
+            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Tasks)
-            .HasConversion<JsonValueConverter<List<ProviderDetails.ValueName>>>();
+            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
     }
 }
