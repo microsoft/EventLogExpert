@@ -16,7 +16,7 @@ public class DbToolCommand
 {
     private static string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
 
-    public static List<string> GetProviderNames(string filter)
+    public static List<string> GetLocalProviderNames(string filter)
     {
         var session = new EventLogSession();
         var providers = new List<string>(session.GetProviderNames().OrderBy(name => name));
@@ -32,7 +32,7 @@ public class DbToolCommand
 
     public static void LogProviderDetailHeader(IEnumerable<string> providerNames)
     {
-        var maxNameLength = providerNames.Max(p => p.Length);
+        var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
         if (maxNameLength < 14) maxNameLength = 14;
         _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
         Console.WriteLine(string.Format(_providerDetailFormat, "Provider Name", "Events", "Keywords", "Opcodes", "Tasks", "Messages"));
