@@ -25,15 +25,29 @@ public class EventMessageProvider
     public EventMessageProvider(string providerName, string computerName, Action<string> traceAction)
     {
         _providerName = providerName;
-        _traceAction = s => { };
+        _traceAction = traceAction;
         _registryProvider = new RegistryProvider(computerName, _traceAction);
     }
 
-    public ProviderDetails LoadProviderDetails()
+    public ProviderDetails? LoadProviderDetails()
     {
         var provider = LoadMessagesFromModernProvider();
-        provider.Messages = LoadMessagesFromLegacyProvider().ToList();
-        return provider;
+        provider.Messages = LoadMessagesFromLegacyProvider()?.ToList();
+        if (provider.Events == null && provider.Messages == null)
+        {
+            return null;
+        }
+        else
+        {
+            // We got some sort of data back, so make sure all the collections are there
+            provider.Messages ??= new List<MessageModel>();
+            provider.Events ??= new List<EventModel>();
+            provider.Keywords ??= new Dictionary<long, string>();
+            provider.Opcodes ??= new Dictionary<int, string>();
+            provider.Tasks ??= new Dictionary<int, string>();
+
+            return provider;
+        }
     }
 
     /// <summary>
@@ -41,7 +55,7 @@ public class EventMessageProvider
     ///     the registry. This information is stored at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
     /// </summary>
     /// <returns></returns>
-    private IEnumerable<MessageModel> LoadMessagesFromLegacyProvider()
+    private IEnumerable<MessageModel>? LoadMessagesFromLegacyProvider()
     {
         _traceAction($"LoadMessagesFromLegacyProvider called for provider {_providerName}");
 
@@ -49,8 +63,8 @@ public class EventMessageProvider
 
         if (legacyProviderFiles == null)
         {
-            _traceAction($"No message files found for provider {_providerName}. Returning 0 messages.");
-            return new MessageModel[0];
+            _traceAction($"No message files found for provider {_providerName}. Returning null.");
+            return null;
         }
 
         var messages = new List<MessageModel>();
@@ -186,42 +200,71 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _traceAction($"Couldn't get metadata for rovider {_providerName}. Exception: {ex}. Returning empty Events list.");
-            provider.Events = new List<EventModel>();
+            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}. Returning empty provider.");
             return provider;
         }
 
-        if (providerMetadata.Id == Guid.Empty)
+        try
         {
-            _traceAction($"Provider {_providerName} has no provider GUID. Returning empty Events list.");
+            provider.Events = providerMetadata.Events.Select(e => new EventModel
+            {
+                Description = e.Description,
+                Id = e.Id,
+                Keywords = e.Keywords.Select(k => k.Value).ToArray(),
+                Level = e.Level.Value,
+                LogName = e.LogLink.LogName,
+                Opcode = e.Opcode.Value,
+                Task = e.Task.Value,
+                Version = e.Version,
+                Template = e.Template
+            }).ToList();
+        }
+        catch (Exception ex)
+        {
             provider.Events = new List<EventModel>();
-            return provider;
+            _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:");
+            _traceAction(ex.ToString());
         }
 
-        provider.Events = providerMetadata.Events.Select(e => new EventModel
+        try
         {
-            Description = e.Description,
-            Id = e.Id,
-            Keywords = e.Keywords.Select(k => k.Value).ToArray(),
-            Level = e.Level.Value,
-            LogName = e.LogLink.LogName,
-            Opcode = e.Opcode.Value,
-            Task = e.Task.Value,
-            Version = e.Version,
-            Template = e.Template
-        }).ToList();
+            provider.Keywords = providerMetadata.Keywords
+                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
+                
+        }
+        catch (Exception ex)
+        {
+            provider.Keywords = new Dictionary<long, string>();
+            _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:");
+            _traceAction(ex.ToString());
+        }
 
-        provider.Keywords = providerMetadata.Keywords
-            .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-            .ToList();
+        try
+        {
+            provider.Opcodes = providerMetadata.Opcodes
+                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
+        }
+        catch (Exception ex)
+        {
+            provider.Opcodes = new Dictionary<int, string>();
+            _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:");
+            _traceAction(ex.ToString());
+        }
 
-        provider.Opcodes = providerMetadata.Opcodes
-            .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-            .ToList();
-
-        provider.Tasks = providerMetadata.Tasks
-            .Select(i => new ProviderDetails.ValueName { Value = i.Value, Name = i.DisplayName ?? i.Name })
-            .ToList();
+        try
+        {
+            provider.Tasks = providerMetadata.Tasks
+                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
+                .ToDictionary(p => p.Key, p => p.Value);
+        }
+        catch (Exception ex)
+        {
+            provider.Tasks = new Dictionary<int, string>();
+            _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:");
+            _traceAction(ex.ToString());
+        }
 
         _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}");
         return provider;

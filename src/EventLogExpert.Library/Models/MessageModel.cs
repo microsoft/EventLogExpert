@@ -14,7 +14,7 @@ public class MessageModel
     /// <summary>
     ///     The log name that this event will appear in.
     /// </summary>
-    public string LogLink { get; set; }
+    public string? LogLink { get; set; }
 
     /// <summary>
     ///     The provider name for this message
@@ -37,13 +37,13 @@ public class MessageModel
     ///     different computers (for example, from different versions
     ///     of Windows or applications such as Exchange Server).
     /// </summary>
-    public string Tag { get; set; }
+    public string? Tag { get; set; }
 
     /// <summary>
     ///     Some providers may include an XML template that describes
     ///     the included properties.
     /// </summary>
-    public string Template { get; set; }
+    public string? Template { get; set; }
 
     /// <summary>
     ///     The text of the message

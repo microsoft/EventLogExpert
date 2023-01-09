@@ -9,7 +9,7 @@ public class EventModel
 
     public byte Version { get; set; }
 
-    public string LogName { get; set; }
+    public string? LogName { get; set; }
 
     public int Level { get; set; }
 
@@ -19,7 +19,7 @@ public class EventModel
 
     public long[] Keywords { get; set; }
 
-    public string Template { get; set; }
+    public string? Template { get; set; }
 
-    public string Description { get; set; }
+    public string? Description { get; set; }
 }
