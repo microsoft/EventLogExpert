@@ -113,8 +113,8 @@ public class UnitTest1
 
         var resolvers = new List<IEventResolver>()
         {
-            new LocalProviderEventResolver(s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); }),
-            new EventProviderDatabaseEventResolver(s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
+            new LocalProviderEventResolver(),
+            new EventProviderDatabaseEventResolver(null, s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
         };
 
         EventRecord er;
@@ -152,41 +152,5 @@ public class UnitTest1
         }
 
         Assert.Equal(0, mismatchCount);
-    }
-
-    [Fact]
-    public void PerformanceTestEventReaderEventResolver()
-    {
-        var sw = new System.Diagnostics.Stopwatch();
-        sw.Start();
-
-        var eventLogReader = new EventLogReader("Application", PathType.LogName);
-        var resolver = new EventReaderEventResolver();
-        EventRecord er;
-        while (null != (er = eventLogReader.ReadEvent()))
-        {
-            resolver.Resolve(er);
-        }
-
-        sw.Stop();
-        _outputHelper.WriteLine($"Elapsed: {sw.ElapsedMilliseconds}");
-    }
-
-    [Fact]
-    public void PerformanceTestLocalProviderEventResolver()
-    {
-        var sw = new System.Diagnostics.Stopwatch();
-        sw.Start();
-
-        var eventLogReader = new EventLogReader("Application", PathType.LogName);
-        var resolver = new LocalProviderEventResolver();
-        EventRecord er;
-        while (null != (er = eventLogReader.ReadEvent()))
-        {
-            resolver.Resolve(er);
-        }
-
-        sw.Stop();
-        _outputHelper.WriteLine($"Elapsed: {sw.ElapsedMilliseconds}");
     }
 }

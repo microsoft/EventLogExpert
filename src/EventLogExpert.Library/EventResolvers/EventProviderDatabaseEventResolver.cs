@@ -5,12 +5,9 @@ using EventLogExpert.Library.EventProviderDatabase;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
-using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Library.EventResolvers;
 
@@ -24,22 +21,116 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver() : this(s => { }) { }
+    public EventProviderDatabaseEventResolver() : this(ImmutableArray<string>.Empty, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(Action<string> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases) : this(activeDatabases, s => { }) { }
+
+    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
     {
         if (!Directory.Exists(dbFolder))
         {
             Directory.CreateDirectory(dbFolder);
         }
 
-        var dbFiles = Directory.GetFiles(dbFolder, "*.db");
-        foreach (var file in dbFiles)
+        AvailableDatabases = ImmutableArray<string>.Empty;
+
+        if (activeDatabases != null && activeDatabases.Any())
+        {
+            ActiveDatabases = activeDatabases.ToImmutableArray();
+        }
+        else
+        {
+            ActiveDatabases = ImmutableArray<string>.Empty;
+        }
+
+        LoadDatabases();
+    }
+
+    /// <summary>
+    /// Loads the databases. If ActiveDatabases is populated, any databases
+    /// not named therein are skipped.
+    /// </summary>
+    private void LoadDatabases()
+    {
+        foreach (var context in dbContexts)
+        {
+            context.Dispose();
+        }
+
+        var allDbFiles = SortDatabases(Directory.GetFiles(dbFolder, "*.db"));
+
+        AvailableDatabases = allDbFiles.ToImmutableArray();
+
+        var databasesToLoad = ActiveDatabases.Any() ? ActiveDatabases.Where(db => allDbFiles.Contains(db)) : allDbFiles;
+
+        foreach (var file in databasesToLoad)
         {
             var c = new EventProviderDbContext(file, readOnly: true);
             c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
             dbContexts.Add(c);
         }
+    }
+
+    /// <summary>
+    /// If the database file name ends in a year or a number, such as Exchange 2019 or
+    /// Windows 2016, we want to sort the database files by descending version, but by
+    /// ascending product name. This generally means that databases named for products
+    /// like Exchange will be checked for matching providers first, and Windows will
+    /// be checked last, with newer versions being checked before older versions.
+    /// </summary>
+    /// <param name="databaseNames"></param>
+    /// <returns></returns>
+    private IEnumerable<string> SortDatabases(IEnumerable<string> databaseNames)
+    {
+        if (databaseNames == null || !databaseNames.Any())
+        {
+            return Array.Empty<string>();
+        }
+
+        var r = new Regex("^(.+) (\\S+)$");
+
+        return databaseNames
+            .Select(name =>
+            {
+                var m = r.Match(name);
+                if (m.Success)
+                {
+                    return new
+                    {
+                        FirstPart = m.Groups[1].Value + " ",
+                        SecondPart = m.Groups[2].Value
+                    };
+                }
+                else
+                {
+                    return new
+                    {
+                        FirstPart = name,
+                        SecondPart = ""
+                    };
+                }
+            })
+            .OrderBy(n => n.FirstPart)
+            .ThenByDescending(n => n.SecondPart)
+            .Select(n => n.FirstPart + n.SecondPart)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Changes the active databases. Note that existing database
+    /// connections are closed and the provider cache is cleared.
+    /// </summary>
+    /// <param name="databaseNames">
+    /// If this value is empty, all available databases are loaded.
+    /// Otherwise, only the databases specified in this value are loaded.
+    /// Also, the order of this value determines the order in which
+    /// we search the databases when attempting to find a matching
+    /// provider.
+    /// </param>
+    public void SetActiveDatabases(IEnumerable<string> databaseNames)
+    {
+        ActiveDatabases = databaseNames.ToImmutableArray();
+        LoadDatabases();
     }
 
     public DisplayEventModel Resolve(EventRecord eventRecord)
@@ -116,4 +207,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
+
+    public ImmutableArray<string> AvailableDatabases { get; private set; } = ImmutableArray<string>.Empty;
+
+    public ImmutableArray<string> ActiveDatabases { get; private set; } = ImmutableArray<string>.Empty;
 }

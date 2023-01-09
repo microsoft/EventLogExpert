@@ -2,13 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Providers;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Eventing.Reader;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -19,7 +14,7 @@ public class DbToolCommand
     public static List<string> GetLocalProviderNames(string filter)
     {
         var session = new EventLogSession();
-        var providers = new List<string>(session.GetProviderNames().OrderBy(name => name));
+        var providers = new List<string>(session.GetProviderNames().Distinct().OrderBy(name => name));
 
         if (!string.IsNullOrEmpty(filter))
         {
