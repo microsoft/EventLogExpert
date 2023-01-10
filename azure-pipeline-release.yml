@@ -1,0 +1,145 @@
+trigger:
+  none
+
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: UseDotNet@2
+  displayName: 'Install .NET SDK'
+  inputs:
+    version: '7.x'
+    performMultiLevelLookup: true
+
+- script: dotnet workload restore src/EventLogExpert.sln
+  displayName: 'dotnet workload restore'
+
+- script: dotnet test src/EventLogExpert.sln
+  displayName: 'dotnet test'
+
+- pwsh: |
+    $now = [DateTime]::UtcNow
+    $versionString = "$($now.ToString(`"y.M.d`")).$($now.Hour * 60 + $now.Minute)"
+    Write-Host "##vso[task.setvariable variable=ReleaseVersion]$versionString"
+    Write-Host $versionString
+  displayName: 'create version string'
+
+- pwsh: |
+    echo "ReleaseVersion: $(ReleaseVersion)"
+    [xml]$manifest = Get-Content -Raw "src\EventLogExpert\Platforms\Windows\Package.appxmanifest"
+    $manifest.Package.Identity.Version = "$(ReleaseVersion)"
+    $manifest.Save("src\EventLogExpert\Platforms\Windows\Package.appxmanifest")
+    Get-Content "src\EventLogExpert\Platforms\Windows\Package.appxmanifest"
+  displayName: 'set version in manifest'
+
+- pwsh: >
+    dotnet publish src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj `
+    --self-contained `
+    -c Release `
+    -o "$(build.artifactStagingDirectory)" `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:PublishSingleFile=true `
+    -p:PublishTrimmed=true `
+    -p:Version=$(ReleaseVersion)
+  displayName: 'dotnet publish EventDbTool'
+
+- pwsh: >
+    dotnet publish src/EventLogExpert/EventLogExpert.csproj `
+    -c Release `
+    -f net6.0-windows10.0.19041.0 `
+    -p:AppxBundle=Never `
+    -p:AppInstallerCheckForUpdateFrequency=OnApplicationRun `
+    -p:AppInstallerUpdateFrequency=1 `
+    -p:AppInstallerUri="https://github.com/microsoft/EventLogExpert/releases/latest/download/" `
+    -p:GenerateAppInstallerFile=true `
+    -p:OutputPath="$(build.artifactStagingDirectory)\AppInstaller\" `
+    -p:RuntimeIdentifierOverride=win10-x64 `
+    -p:UapAppxPackageBuildMode=SideLoadOnly `
+    -p:Version=$(ReleaseVersion)
+  displayName: 'dotnet publish EventLogExpert'
+
+- pwsh: |
+    Get-ChildItem -Recurse "$(build.artifactStagingDirectory)"
+  displayName: 'show all files'
+
+- pwsh: |
+    Get-ChildItem "$(build.artifactStagingDirectory)\AppInstaller\AppPackages\*.appinstaller" | % { Move-Item $_ "$(build.artifactStagingDirectory)" }
+    $msixFolder = Get-ChildItem "$(build.artifactStagingDirectory)\AppInstaller\AppPackages\" -Directory
+    echo "msixFolder: $msixFolder"
+    Get-ChildItem $msixFolder *.msix | % { Move-Item $_ "$(build.artifactStagingDirectory)" }
+    Get-ChildItem (Join-Path $msixFolder "\Dependencies\x64\") *.msix | % { Move-Item $_ "$(build.artifactStagingDirectory)" }
+  displayName: 'move msix to staging directory'
+
+- pwsh: |
+    Get-ChildItem "$(build.artifactStagingDirectory)"
+  displayName: 'show staging directory'
+
+- pwsh: |
+    $appInstallerFile = Get-Item "$(build.artifactStagingDirectory)\*.appinstaller"
+    [xml]$appinstaller = Get-Content -Raw $appInstallerFile
+    $appInstaller.AppInstaller.MainPackage.Uri = $appInstaller.AppInstaller.MainPackage.Uri -replace "/download/(.*)/", "/download/"
+    $appInstaller.AppInstaller.Dependencies.Package.Uri = $appInstaller.AppInstaller.Dependencies.Package.Uri -replace "/download/(.*)/", "/download/"
+    $appInstaller.Save($appInstallerFile)
+    Get-Content $appInstallerFile
+  displayName: 'update appinstaller paths'
+
+- task: EsrpCodeSigning@2
+  inputs:
+    ConnectedServiceName: 'ESRP CodeSign for EventLogExpert'
+    FolderPath: "$(build.artifactStagingDirectory)"
+    Pattern: 'EventLogExpert*.msix,*.exe'
+    signConfigType: 'inlineSignParams'
+    inlineOperation: |
+      [
+        {
+          "keyCode": "CP-230012",
+          "operationSetCode": "SigntoolSign",
+          "parameters": [
+            {
+              "parameterName": "OpusName",
+              "parameterValue": "EventLogExpert"
+            },
+            {
+              "parameterName": "OpusInfo",
+              "parameterValue": "https://github.com/microsoft/EventLogExpert"
+            },
+            {
+              "parameterName": "PageHash",
+              "parameterValue": "/NPH"
+            },
+            {
+              "parameterName": "FileDigest",
+              "parameterValue": "/fd sha256"
+            },
+            {
+              "parameterName": "TimeStamp",
+              "parameterValue": "/tr \"http://rfc3161.gtm.corp.microsoft.com/TSS/HttpTspServer\" /td sha256"
+            }
+          ],
+          "toolName": "signtool.exe",
+          "toolVersion": "6.2.9304.0"
+        }
+      ]
+    SessionTimeout: '60'
+    MaxConcurrency: '50'
+    MaxRetryAttempts: '5'
+
+- pwsh: |
+    Get-ChildItem "$(build.artifactStagingDirectory)\*.exe" | % { Compress-Archive $_ "$(build.artifactStagingDirectory)\$([IO.Path]::GetFilenameWithoutExtension($_.Name)).zip" }
+
+- task: GitHubRelease@1
+  displayName: 'Create GitHub Release - Draft'
+  inputs:
+    gitHubConnection: 'github.com_eventlogexpert'
+    repositoryName: microsoft/EventLogExpert
+    action: create
+    tagSource: userSpecifiedTag
+    tagPattern: 'v$(ReleaseVersion)'
+    tag: v$(ReleaseVersion)
+    title: v$(ReleaseVersion)
+    assets: |
+      $(build.artifactStagingDirectory)\*.appinstaller
+      $(build.artifactStagingDirectory)\*.msix
+      $(build.artifactStagingDirectory)\*.zip
+    addChangeLog: true
+    isDraft: true
