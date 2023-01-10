@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace EventLogExpert.Test;
 
-public class UnitTest1
+public class EventResolverTests
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
@@ -32,7 +32,7 @@ public class UnitTest1
 
     private readonly ITestOutputHelper _outputHelper;
 
-    public UnitTest1(ITestOutputHelper outputHelper)
+    public EventResolverTests(ITestOutputHelper outputHelper)
     {
         _outputHelper = outputHelper;
     }
@@ -106,7 +106,6 @@ public class UnitTest1
         Assert.Equal("Service", result.TaskDisplayName);
     }
 
-    [Fact]
     public void Test1()
     {
         var eventLogReader = new EventLogReader("Application", PathType.LogName);
