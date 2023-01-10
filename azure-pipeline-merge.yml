@@ -1,0 +1,17 @@
+pool:
+  vmImage: 'windows-latest'
+
+steps:
+- task: UseDotNet@2
+  displayName: 'Install .NET SDK'
+  inputs:
+    version: '7.x'
+    performMultiLevelLookup: true
+
+- script: dotnet workload restore src/EventLogExpert.sln
+
+- script: dotnet test src/EventLogExpert.sln
+
+- script: dotnet publish src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj -p:PublishProfile=FolderProfile
+
+- script: dotnet publish src/EventLogExpert/EventLogExpert.csproj -f net6.0-windows10.0.19041.0 -c Release
