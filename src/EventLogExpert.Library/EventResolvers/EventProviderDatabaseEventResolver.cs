@@ -23,6 +23,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     public EventProviderDatabaseEventResolver() : this(ImmutableArray<string>.Empty, s => { }) { }
 
+    public EventProviderDatabaseEventResolver(Action<string> tracer) : this(ImmutableArray<string>.Empty, tracer) { }
+
     public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases) : this(activeDatabases, s => { }) { }
 
     public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
@@ -65,7 +67,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
         foreach (var file in databasesToLoad)
         {
-            var c = new EventProviderDbContext(file, readOnly: true);
+            var c = new EventProviderDbContext(file, readOnly: true, _tracer);
             c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
             dbContexts.Add(c);
         }
@@ -156,6 +158,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
                     if (lastResult?.Description != null)
                     {
+                        _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
                         _providerDetails.Add(eventRecord.ProviderName, providerDetails);
                         return lastResult;
                     }

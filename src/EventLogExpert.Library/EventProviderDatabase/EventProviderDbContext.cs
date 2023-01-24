@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
 
 namespace EventLogExpert.Library.EventProviderDatabase;
 
@@ -11,8 +12,21 @@ public class EventProviderDbContext : DbContext
 {
     private readonly bool _readOnly;
 
-    public EventProviderDbContext(string path, bool readOnly)
+    private readonly Action<string> _tracer;
+
+    public EventProviderDbContext(string path, bool readOnly, Action<string>? tracer = null)
     {
+        if (tracer != null)
+        {
+            _tracer = tracer;
+        }
+        else
+        {
+            _tracer = s => { };
+        }
+
+        _tracer($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}");
+
         Name = System.IO.Path.GetFileNameWithoutExtension(path);
         Path = path;
         _readOnly = readOnly;
