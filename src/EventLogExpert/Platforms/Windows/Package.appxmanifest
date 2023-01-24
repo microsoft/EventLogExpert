@@ -5,11 +5,11 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap rescap">
 
-  <Identity Name="maui-package-name-placeholder" Publisher="CN=User Name" Version="0.0.0.0" />
+  <Identity Name="eventlogexpert" Publisher="CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US" Version="0.9.0.0" />
 
   <Properties>
-    <DisplayName>$placeholder$</DisplayName>
-    <PublisherDisplayName>User Name</PublisherDisplayName>
+    <DisplayName>EventLogExpert</DisplayName>
+    <PublisherDisplayName>Microsoft Corporation</PublisherDisplayName>
     <Logo>$placeholder$.png</Logo>
   </Properties>
 
@@ -25,8 +25,8 @@
   <Applications>
     <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="$targetentrypoint$">
       <uap:VisualElements
-        DisplayName="$placeholder$"
-        Description="$placeholder$"
+        DisplayName="EventLogExpert"
+        Description="A tool for reviewing Windows event logs."
         Square150x150Logo="$placeholder$.png"
         Square44x44Logo="$placeholder$.png"
         BackgroundColor="transparent">
