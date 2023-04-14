@@ -1,3 +1,4 @@
+﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31611.283
@@ -15,30 +16,36 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Test", "EventLogExpert.Test\EventLogExpert.Test.csproj", "{E5D3A2A2-6001-452F-8ECE-7263D72C9438}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.EventDbTool", "EventLogExpert.EventDbTool\EventLogExpert.EventDbTool.csproj", "{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Any CPU = Debug|Any CPU
-		Release|Any CPU = Release|Any CPU
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|Any CPU.Deploy.0 = Release|Any CPU
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|x64.ActiveCfg = Debug|x64
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|x64.Build.0 = Debug|x64
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Debug|x64.Deploy.0 = Debug|x64
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.ActiveCfg = Release|x64
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.Build.0 = Release|x64
+		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.Deploy.0 = Release|x64
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|x64.ActiveCfg = Debug|x64
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|x64.Build.0 = Debug|x64
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|x64.ActiveCfg = Release|x64
+		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|x64.Build.0 = Release|x64
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|x64.ActiveCfg = Debug|x64
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|x64.Build.0 = Debug|x64
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|x64.ActiveCfg = Release|x64
+		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|x64.Build.0 = Release|x64
+		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|x64.ActiveCfg = Debug|x64
+		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|x64.Build.0 = Debug|x64
+		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|x64.ActiveCfg = Release|x64
+		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|x64.Build.0 = Release|x64
+		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Debug|x64.ActiveCfg = Debug|x64
+		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Debug|x64.Build.0 = Debug|x64
+		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Release|x64.ActiveCfg = Release|x64
+		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

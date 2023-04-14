@@ -1,0 +1,7 @@
+{
+  "profiles": {
+    "EventLogExpert.EventDbTool": {
+      "commandName": "Project"
+    }
+  }
+}
