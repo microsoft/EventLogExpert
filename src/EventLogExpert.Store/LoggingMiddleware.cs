@@ -1,5 +1,6 @@
 ﻿using EventLogExpert.Library.Helpers;
 using EventLogExpert.Store.EventLog;
+using EventLogExpert.Store.FilterPane;
 using Fluxor;
 using System.Text.Json;
 
@@ -24,7 +25,7 @@ namespace EventLogExpert.Store
                 // We don't want to serialize all the events.
                 _debugLogger.Trace($"Action: EventLogAction.LoadEvents with {loadEventsAction.Events.Count} events.");
             }
-            else if (action is EventLogAction.FilterEvents)
+            else if (action is EventLogAction.FilterEvents or FilterPaneAction.RemoveFilter)
             {
                 // We can't serialize a Func.
                 _debugLogger.Trace($"Action: EventLogAction.FilterEventsAction.");
