@@ -117,9 +117,83 @@ public partial class FilterRow
         }
 
         stringBuilder.AppendLine(filterType);
+
+        if (Value.SubFilters.Count > 0)
+        {
+            foreach (var subFilter in Value.SubFilters)
+            {
+                var comparison = GetSubFilterComparisonString(subFilter);
+
+                if (comparison != null) { stringBuilder.AppendLine(comparison); }
+            }
+        }
+
         Value.ComparisonString = stringBuilder.ToString();
 
         return true;
+    }
+
+    private string? GetSubFilterComparisonString(SubFilterModel subFilter)
+    {
+        if (subFilter.FilterIntValue is null &&
+            subFilter.FilterSeverityValue is null &&
+            subFilter.FilterStringValue is null)
+        {
+            return null;
+        }
+
+        StringBuilder stringBuilder = new();
+
+        switch (subFilter.Comparison)
+        {
+            case SubFilterComparison.And :
+                stringBuilder.AppendLine(" AND ");
+                break;
+            case SubFilterComparison.Or :
+                stringBuilder.AppendLine(" OR ");
+                break;
+            default :
+                return null;
+        }
+
+        switch (subFilter.FilterComparison)
+        {
+            case FilterComparison.Equals :
+                stringBuilder.AppendLine("== ");
+                break;
+            case FilterComparison.Contains :
+                stringBuilder.AppendLine("contains ");
+                break;
+            case FilterComparison.NotEqual :
+                stringBuilder.AppendLine("!= ");
+                break;
+            default :
+                return null;
+        }
+
+        string? filterType;
+
+        switch (Value.FilterType)
+        {
+            case FilterType.EventId :
+                filterType = subFilter.FilterIntValue.ToString();
+                break;
+            case FilterType.Severity :
+                filterType = subFilter.FilterSeverityValue.ToString();
+                break;
+            case FilterType.Provider :
+            case FilterType.Task :
+            case FilterType.Description :
+                filterType = subFilter.FilterStringValue;
+                break;
+            default :
+                return null;
+        }
+
+        if (string.IsNullOrEmpty(filterType)) { return null; }
+
+        stringBuilder.AppendLine(filterType);
+        return stringBuilder.ToString();
     }
 
     private void SetContainsComparison()
