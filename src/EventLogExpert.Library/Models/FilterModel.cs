@@ -11,7 +11,7 @@ public class FilterModel
 
     public Guid Id { get; set; }
 
-    public Func<DisplayEventModel, bool>? Comparison { get; set; }
+    public List<Func<DisplayEventModel, bool>> Comparison { get; set; } = new();
 
     public string? ComparisonString { get; set; }
 

@@ -9,8 +9,6 @@ public class SubFilterModel
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public SubFilterComparison Comparison { get; set; }
-
     public FilterComparison FilterComparison { get; set; }
 
     public int? FilterIntValue { get; set; }

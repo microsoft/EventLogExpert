@@ -4,15 +4,7 @@
 <div class="subfilter-row">
     <div>
 
-        <span>Join On: </span>
-        <select class="input-filter-id" @bind="@Value.Comparison">
-            @foreach (SubFilterComparison type in Enum.GetValues(typeof(SubFilterComparison)))
-            {
-                <option value="@type">@type.ToString()</option>
-            }
-        </select>
-
-        <span>Comparison: </span>
+        <span>Join On Comparison: </span>
         <select class="input-filter-select" @bind="@Value.FilterComparison">
             @foreach (FilterComparison type in Enum.GetValues(typeof(FilterComparison)))
             {

@@ -27,5 +27,3 @@ public enum FilterComparison
     Contains,
     [EnumMember(Value = "Not Equal")] NotEqual
 }
-
-public enum SubFilterComparison { And, Or }

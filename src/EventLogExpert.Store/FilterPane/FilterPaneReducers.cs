@@ -66,8 +66,6 @@ public class FilterPaneReducers
 
         updatedList.Remove(filter);
 
-        _dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
-
         return state with { CurrentFilters = updatedList };
     }
 
