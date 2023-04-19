@@ -20,7 +20,7 @@ public partial class FilterRow
     private void RemoveFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value));
-        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
+        SaveFilter();
     }
 
     private void SaveFilter()
@@ -28,6 +28,9 @@ public partial class FilterRow
         // Validate the filter and create the UI string
         if (SetComparisonString())
         {
+            // Reset the filter since we are going to rebuild
+            Value.Comparison.Clear();
+
             // Set the actual filter
             SetComparison(Value);
 
