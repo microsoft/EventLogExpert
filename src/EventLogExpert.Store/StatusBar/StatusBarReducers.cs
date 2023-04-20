@@ -9,5 +9,5 @@ public class StatusBarReducers
 {
     [ReducerMethod]
     public static StatusBarState ReduceSetEventsLoaded(StatusBarState state, StatusBarAction.SetEventsLoaded action) =>
-        new(action.EventCount);
+        new() { EventsLoaded = action.EventCount };
 }
