@@ -7,11 +7,11 @@ namespace EventLogExpert.Library.Models;
 
 public class FilterModel
 {
-    public FilterModel(int id) => Id = id;
+    public FilterModel(Guid id) => Id = id;
 
-    public int Id { get; set; }
+    public Guid Id { get; set; }
 
-    public Func<DisplayEventModel, bool>? Comparison { get; set; }
+    public List<Func<DisplayEventModel, bool>> Comparison { get; set; } = new();
 
     public string? ComparisonString { get; set; }
 
@@ -29,4 +29,6 @@ public class FilterModel
     public SeverityLevel? FilterSeverityValue { get; set; }
 
     public string? FilterStringValue { get; set; }
+
+    public List<SubFilterModel> SubFilters { get; set; } = new();
 }

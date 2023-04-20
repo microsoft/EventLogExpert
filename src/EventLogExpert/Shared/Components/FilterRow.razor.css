@@ -1,10 +1,22 @@
 ﻿.filter-row {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
 }
+
+    .filter-row.edit-grid { grid-template-columns: 1fr auto 1fr; }
+
+    .filter-row .row-center { justify-self: center; }
+    .filter-row .button-primary.row-center { width: 120px; }
+
+    .filter-row .row-justify-right { justify-self: right; }
 
     .filter-row .button-primary,
     .filter-row .button-remove,
     .filter-row .button-save {
         width: 6rem;
     }
+
+.sub-filter-row {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+}

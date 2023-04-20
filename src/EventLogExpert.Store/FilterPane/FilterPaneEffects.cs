@@ -16,14 +16,11 @@ public class FilterPaneEffects
     [EffectMethod(typeof(FilterPaneAction.ApplyFilters))]
     public Task HandleApplyFiltersAction(IDispatcher dispatcher)
     {
-        List<Func<DisplayEventModel, bool>> filters = new();
+        List<FilterModel> filters = new();
 
-        foreach (var filter in _state.Value.CurrentFilters)
+        foreach (var filterModel in _state.Value.CurrentFilters)
         {
-            if (filter.Comparison is not null)
-            {
-                filters.Add(filter.Comparison);
-            }
+            if (filterModel.Comparison.Any()) { filters.Add(filterModel); }
         }
 
         dispatcher.Dispatch(new EventLogAction.FilterEvents(filters));

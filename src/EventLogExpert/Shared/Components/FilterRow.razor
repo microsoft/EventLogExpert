@@ -1,7 +1,7 @@
 ﻿@inject IState<AvailableFilterState> AvailableFilterPaneState
 @inject IDispatcher Dispatcher
 
-<div class="filter-row">
+<div class="filter-row @(Value.IsEditing ? "edit-grid" : "")">
     @if (Value.IsEditing)
     {
         <div>
@@ -67,7 +67,12 @@
                     break;
             }
 
+
         </div>
+
+        <button class="button-primary row-center" @onclick="AddSubFilter">
+            <i class="bi bi-plus-circle"></i> Add Sub Filter
+        </button>
     }
     else if (string.IsNullOrWhiteSpace(Value.ComparisonString))
     {
@@ -78,7 +83,7 @@
         <span>@Value.ComparisonString</span>
     }
 
-    <div>
+    <div class="row-justify-right">
         @if (Value.IsEditing)
         {
             <button class="button-save" @onclick="SaveFilter">
@@ -95,4 +100,15 @@
             <i class="bi bi-dash-circle"></i> Remove
         </button>
     </div>
+
+</div>
+
+<div class="sub-filter-row">
+    @if (Value.SubFilters.Any() && Value.IsEditing)
+    {
+        @foreach (var item in Value.SubFilters)
+        {
+            <SubFilterRow ParentId="@Value.Id" FilterType="@Value.FilterType" Value="@item" />
+        }
+    }
 </div>

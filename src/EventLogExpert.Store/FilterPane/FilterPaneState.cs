@@ -7,14 +7,7 @@ using Fluxor;
 namespace EventLogExpert.Store.FilterPane;
 
 [FeatureState]
-public class FilterPaneState
+public record FilterPaneState
 {
-    public FilterPaneState(IEnumerable<FilterModel> currentFilters)
-    {
-        CurrentFilters = currentFilters;
-    }
-
-    public FilterPaneState() { }
-
-    public IEnumerable<FilterModel> CurrentFilters { get; } = Enumerable.Empty<FilterModel>();
+    public IEnumerable<FilterModel> CurrentFilters { get; init; } = Enumerable.Empty<FilterModel>();
 }

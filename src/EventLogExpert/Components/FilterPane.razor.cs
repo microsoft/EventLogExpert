@@ -1,15 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
 using EventLogExpert.Store.FilterPane;
 
 namespace EventLogExpert.Components;
 
 public partial class FilterPane
 {
-    private readonly OldFilterModel _filter = new();
-
     private bool _expandMenu;
 
     private string MenuState

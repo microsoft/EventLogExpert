@@ -16,27 +16,42 @@ public class FilterPaneReducers
     [ReducerMethod(typeof(FilterPaneAction.AddFilter))]
     public static FilterPaneState ReduceAddFilterAction(FilterPaneState state)
     {
-        var id = state.CurrentFilters.Count();
+        var updatedList = state.CurrentFilters.ToList();
 
-        if (id <= 0)
+        if (updatedList.Count <= 0)
         {
-            return new FilterPaneState(new List<FilterModel> { new(id) });
+            return state with { CurrentFilters = new List<FilterModel> { new(Guid.NewGuid()) } };
         }
 
-        var updatedList = state.CurrentFilters.ToList();
-        updatedList.Add(new FilterModel(id));
+        updatedList.Add(new FilterModel(Guid.NewGuid()));
 
-        return new FilterPaneState(updatedList);
+        return state with { CurrentFilters = updatedList };
     }
 
     [ReducerMethod(typeof(FilterPaneAction.AddAvailableFilters))]
-    public static AvailableFilterState
-        ReduceAddRecentFilter(AvailableFilterState state) =>
-        new(state.EventIdsAll, state.EventProviderNamesAll, state.TaskNamesAll);
+    public static AvailableFilterState ReduceAddRecentFilter(AvailableFilterState state) => state;
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceAddSubFilterAction(FilterPaneState state, FilterPaneAction.AddSubFilter action)
+    {
+        var updatedList = state.CurrentFilters.ToList();
+        var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
+
+        if (parentFilter is null) { return state; } // If not parent filter, something went wrong and bail
+
+        parentFilter.SubFilters.Add(new SubFilterModel());
+
+        return state with { CurrentFilters = updatedList };
+    }
 
     [ReducerMethod]
     public static AvailableFilterState ReduceLoadEventsAction(AvailableFilterState state,
-        EventLogAction.LoadEvents action) => new(action.AllEventIds, action.AllProviderNames, action.AllTaskNames);
+        EventLogAction.LoadEvents action) => state with
+    {
+        EventIdsAll = action.AllEventIds,
+        EventProviderNamesAll = action.AllProviderNames,
+        TaskNamesAll = action.AllTaskNames
+    };
 
     [ReducerMethod]
     public FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
@@ -46,13 +61,24 @@ public class FilterPaneReducers
 
         if (filter is null)
         {
-            return new FilterPaneState(state.CurrentFilters);
+            return state;
         }
 
         updatedList.Remove(filter);
 
-        _dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
+        return state with { CurrentFilters = updatedList };
+    }
 
-        return new FilterPaneState(updatedList);
+    [ReducerMethod]
+    public FilterPaneState ReduceRemoveSubFilterAction(FilterPaneState state, FilterPaneAction.RemoveSubFilter action)
+    {
+        var updatedList = state.CurrentFilters.ToList();
+        var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
+
+        if (parentFilter is null) { return state; }
+
+        parentFilter.SubFilters.Remove(action.SubFilterModel);
+
+        return state with { CurrentFilters = updatedList };
     }
 }
