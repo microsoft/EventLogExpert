@@ -9,15 +9,17 @@ namespace EventLogExpert.Store.EventLog;
 public class EventLogReducers
 {
     [ReducerMethod(typeof(EventLogAction.ClearEvents))]
-    public static EventLogState ReduceClearEvents(EventLogState state) => 
-        new(state.ActiveLog, new List<DisplayEventModel>(), new List<DisplayEventModel>());
+    public static EventLogState ReduceClearEvents(EventLogState state) => state with
+    {
+        Events = new List<DisplayEventModel>(), EventsToDisplay = new List<DisplayEventModel>()
+    };
 
     [ReducerMethod]
     public static EventLogState ReduceFilterEvents(EventLogState state, EventLogAction.FilterEvents action)
     {
         if (!state.Events.Any()) { return state; }
 
-        if (!action.Filters.Any()) { return new(state.ActiveLog, state.Events, state.Events); }
+        if (!action.Filters.Any()) { return state with { EventsToDisplay = state.Events }; }
 
         var events = state.Events.AsEnumerable();
 
@@ -28,18 +30,18 @@ public class EventLogReducers
 
         var filteredEvents = events.DistinctBy(ev => ev.RecordId).OrderByDescending(ev => ev.RecordId).ToList();
 
-        return new(state.ActiveLog, state.Events, filteredEvents);
+        return state with { EventsToDisplay = filteredEvents };
     }
 
     [ReducerMethod(typeof(EventLogAction.ClearFilters))]
     public static EventLogState ReduceClearFilters(EventLogState state) =>
-        new(state.ActiveLog, state.Events, state.Events);
+        state with { EventsToDisplay = state.Events };
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action) =>
-        new(state.ActiveLog, action.Events, action.Events);
+        state with { Events = action.Events, EventsToDisplay = action.Events };
 
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
-        new(action.LogSpecifier, state.Events, state.EventsToDisplay);
+        new() { ActiveLog = action.LogSpecifier };
 }

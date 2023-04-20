@@ -12,28 +12,15 @@ namespace EventLogExpert.Store.EventLog;
 ///     If that ever changes we should consider making these immutable.
 /// </summary>
 [FeatureState]
-public class EventLogState
+public record EventLogState
 {
-    public EventLogState(
-        LogSpecifier activeLog,
-        List<DisplayEventModel> events,
-        List<DisplayEventModel> eventsToDisplay
-    )
-    {
-        ActiveLog = activeLog;
-        Events = events;
-        EventsToDisplay = eventsToDisplay;
-    }
-
-    private EventLogState() { }
-
     public enum LogType { Live, File }
 
-    public LogSpecifier ActiveLog { get; } = null!;
+    public LogSpecifier ActiveLog { get; init; } = null!;
 
-    public List<DisplayEventModel> Events { get; } = new();
+    public List<DisplayEventModel> Events { get; init; } = new();
 
-    public List<DisplayEventModel> EventsToDisplay { get; } = new();
+    public List<DisplayEventModel> EventsToDisplay { get; init; } = new();
 
     public record LogSpecifier(string Name, LogType? LogType);
 }
