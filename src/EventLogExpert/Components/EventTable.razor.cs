@@ -32,7 +32,7 @@ public partial class EventTable
         if (firstRender)
         {
             _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/EventTable.razor.js");
-            _jsModule?.InvokeVoidAsync("enableColumnResize", _tableRef);
+            _jsModule?.InvokeVoidAsync("enableColumnResize", _tableRef).AsTask();
         }
 
         await base.OnAfterRenderAsync(firstRender);
