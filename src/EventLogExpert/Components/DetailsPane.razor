@@ -1,10 +1,28 @@
-﻿<div class="details-pane" data-toggle="@_expandMenu.ToString().ToLower()">
+﻿@inherits FluxorComponent
 
-    <div class="details-row">
-        <div>Details</div>
-        <span class="button-toggle" data-rotate="@_expandMenu.ToString().ToLower()" @onclick="ToggleMenu">
-            <i class="bi bi-caret-up"></i>
-        </span>
+@inject IActionSubscriber ActionSubscriber
+@inject IState<EventLogState> EventLogState
+
+@if (Event is not null)
+{
+    <div class="details-pane" data-toggle="@_expandMenu.ToString().ToLower()">
+
+        <div class="details-header">
+            <div>Details</div>
+            <span class="button-toggle" data-rotate="@_expandMenu.ToString().ToLower()" @onclick="ToggleMenu">
+                <i class="bi bi-caret-up"></i>
+            </span>
+        </div>
+
+        <div class="details-row">
+            <div>Provider: @Event.ProviderName</div>
+            <div>EventId: @Event.Id</div>
+            <div>Severity: @Event.Level</div>
+            <div>Time: @Event.TimeCreated</div>
+        </div>
+
+        <div>Description:</div>
+        <div class="details-description">@Event.Description</div>
+
     </div>
-
-</div>
+}

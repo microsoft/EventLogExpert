@@ -22,5 +22,7 @@ public record EventLogState
 
     public List<DisplayEventModel> EventsToDisplay { get; init; } = new();
 
+    public DisplayEventModel? SelectedEvent { get; set; }
+
     public record LogSpecifier(string Name, LogType? LogType);
 }

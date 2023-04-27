@@ -1,5 +1,6 @@
 ﻿@inherits FluxorComponent
 
+@inject IDispatcher Dispatcher
 @inject IState<EventLogState> EventLogState
 @inject IJSRuntime JS
 
@@ -25,25 +26,25 @@
         </tr>
         </thead>
         <tbody>
-            <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
-                <tr>
-                    <td style="@GetInlineStyle("RecordId")">@evt.RecordId</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("TimeCreated")">@evt.TimeCreated</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("Id")">@evt.Id</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("MachineName")">@evt.MachineName</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("Level")">@evt.Level</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("ProviderName")">@evt.ProviderName</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetInlineStyle("Task")">@evt.TaskDisplayName</td>
-                    <th class="table-divider"></th>
-                    <td style="@GetDescriptionStyle()">@evt.Description</td>
-                </tr>
-            </Virtualize>
+        <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
+            <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
+                <td style="@GetInlineStyle("RecordId")">@evt.RecordId</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("TimeCreated")">@evt.TimeCreated</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("Id")">@evt.Id</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("MachineName")">@evt.MachineName</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("Level")">@evt.Level</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("ProviderName")">@evt.ProviderName</td>
+                <th class="table-divider"></th>
+                <td style="@GetInlineStyle("Task")">@evt.TaskDisplayName</td>
+                <th class="table-divider"></th>
+                <td style="@GetDescriptionStyle()">@evt.Description</td>
+            </tr>
+        </Virtualize>
         </tbody>
     </table>
 </div>

@@ -1,6 +1,11 @@
 ﻿.details-pane {
+    display: flex;
+    flex-direction: column;
+
     margin: 5px;
-    height: 25%;
+    min-height: 25%;
+    max-height: 40%;
+    overflow: hidden;
 
     border-top: solid var(--background-darkgray);
 
@@ -8,11 +13,28 @@
 }
 
 .details-pane[data-toggle="false"] {
-    /* Temporary - Will eventually be display: none */
-    height: auto;
+    min-height: auto;
+}
+
+    .details-pane[data-toggle="false"] > :not(.details-header) {
+        display: none;
+    }
+
+.details-header {
+    display: flex;
+    justify-content: space-between;
 }
 
 .details-row {
     display: flex;
-    justify-content: space-between;
+    flex-direction: row;
+}
+
+    .details-row > div {
+        padding-right: 5rem;
+    }
+
+.details-description {
+    max-height: 100%;
+    overflow-y: auto;
 }

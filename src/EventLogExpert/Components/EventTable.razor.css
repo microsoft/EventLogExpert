@@ -39,3 +39,5 @@ td {
     padding: 0;
     background: var(--clr-black);
 }
+
+.table-row { cursor: pointer; }
