@@ -13,9 +13,13 @@ public partial class FilterRow
 {
     [Parameter] public FilterModel Value { get; set; } = null!;
 
-    private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
+    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
+
+    private void EditFilter() => Value.IsEditing = true;
+
+    private string? GetSubFilterComparisonString(SubFilterModel subFilter)
     {
-        if (subFilter.FilterValue is null || subFilter.FilterValue < 0)
+        if (!IsValidFilterValue(subFilter.FilterValue))
         {
             return null;
         }
@@ -41,9 +45,21 @@ public partial class FilterRow
         return stringBuilder.ToString();
     }
 
-    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
+    private bool IsValidFilterValue(dynamic value)
+    {
+        switch (Value.FilterType)
+        {
+            case FilterType.EventId :
+            case FilterType.Severity :
+                return value < 0 is false;
+            case FilterType.Provider :
+            case FilterType.Task :
+            case FilterType.Description :
+                return string.IsNullOrWhiteSpace(value) is false;
+        }
 
-    private void EditFilter() => Value.IsEditing = true;
+        return false;
+    }
 
     private void RemoveFilter()
     {
@@ -116,7 +132,7 @@ public partial class FilterRow
 
     private bool SetComparisonString()
     {
-        if (Value.FilterValue is null || Value.FilterValue < 0)
+        if (!IsValidFilterValue(Value.FilterValue))
         {
             Value.ComparisonString = null;
             return false;
