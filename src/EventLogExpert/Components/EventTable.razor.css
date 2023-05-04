@@ -9,6 +9,7 @@
 table {
     border-spacing: 0;
     width: 100%;
+    table-layout: fixed;
 }
 
 thead>tr>th { padding-left: .5rem; }
