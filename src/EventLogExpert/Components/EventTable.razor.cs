@@ -4,7 +4,6 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Components;
@@ -25,57 +24,29 @@ public partial class EventTable
         { "Task", 150 }
     };
 
-    private double _columnMouseXLast = -1;
-    private string _columnResizingName = "";
     private IJSObjectReference? _jsModule;
-    private DotNetObjectReference<EventTable>? _thisObj;
+    private ElementReference _tableRef;
 
-    [JSInvokable]
-    public void MouseMoveCallback(MouseEventArgs e)
-    {
-        int difference = (int)(_columnMouseXLast - e.ClientX);
-        var newColumnWidth = _colWidths[_columnResizingName] - difference;
-
-        if (newColumnWidth < 10)
-        {
-            newColumnWidth = 10;
-        }
-
-        _colWidths[_columnResizingName] = newColumnWidth;
-        _columnMouseXLast = e.ClientX;
-        StateHasChanged();
-    }
-
-    [JSInvokable]
-    public void MouseUpCallback()
-    {
-        _columnResizingName = "";
-        _columnMouseXLast = -1;
-    }
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        _jsModule = await JS.InvokeAsync<IJSObjectReference>("import", "./Components/EventTable.razor.js");
-        _thisObj = DotNetObjectReference.Create(this);
+        if (firstRender)
+        {
+            _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/EventTable.razor.js");
+            _jsModule?.InvokeVoidAsync("enableColumnResize", _tableRef).AsTask();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     private string GetDescriptionStyle()
     {
         var total = _colWidths.Values.Sum() + (TableDividerWidth * _colWidths.Count) + ScrollBarWidth;
-        return $"min-width: calc(100vw - {total}px); max-width: calc(100vw - {total}px);";
+        return $"width: calc(100vw - {total}px);";
     }
 
-    private string GetInlineStyle(string colName)
-    {
-        return $"min-width: {_colWidths[colName]}px; max-width: {_colWidths[colName]}px;";
-    }
-
-    private void OnMouseDownDivider(MouseEventArgs e, string columnName)
-    {
-        _columnResizingName = columnName;
-        _columnMouseXLast = e.ClientX;
-        _jsModule?.InvokeVoidAsync("startColumnResize", _thisObj);
-    }
+    private string GetInlineStyle(string colName) => $"width: {_colWidths[colName]}px";
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }

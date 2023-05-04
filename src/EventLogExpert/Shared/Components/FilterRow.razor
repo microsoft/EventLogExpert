@@ -7,7 +7,7 @@
         <div>
 
             <span>Filter On: </span>
-            <select class="input-filter-select" @bind="@Value.FilterType">
+            <select class="input-filter-select" @bind="@Value.FilterType" disabled="@(Value.SubFilters.Count > 0)">
                 @foreach (FilterType type in Enum.GetValues(typeof(FilterType)))
                 {
                     <option value="@type">@type.ToString()</option>
@@ -26,47 +26,29 @@
             @switch (Value.FilterType)
             {
                 case FilterType.EventId :
-                    <select class="input-filter-id" @bind="Value.FilterIntValue">
-                        <option value="null">None</option>
-                        @foreach (var id in AvailableFilterPaneState.Value.EventIdsAll.OrderBy(id => id))
-                        {
-                            <option value="@id">@id</option>
-                        }
-                    </select>
+                    <FilterSelect CssClass="input-filter-id" TInput="int"
+                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
+                        Items="AvailableFilterPaneState.Value.EventIdsAll.OrderBy(id => id)" />
                     break;
                 case FilterType.Severity :
-                    <select class="input-filter-severity" @bind="Value.FilterSeverityValue">
-                        <option value="null">All</option>
-                        @foreach (SeverityLevel? level in Enum.GetValues(typeof(SeverityLevel)))
-                        {
-                            <option value="@level">@level.ToString()</option>
-                        }
-                    </select>
+                    <FilterSelect CssClass="input-filter-severity" TInput="SeverityLevel"
+                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
                     break;
                 case FilterType.Provider :
-                    <select class="input-filter-dropdown" @bind="Value.FilterStringValue">
-                        <option value="null">All</option>
-                        @foreach (var provider in AvailableFilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n))
-                        {
-                            <option value="@provider">@provider</option>
-                        }
-                    </select>
+                    <FilterSelect CssClass="input-filter-dropdown" TInput="string"
+                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
+                        Items="AvailableFilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n)" />
                     break;
                 case FilterType.Task :
-                    <select class="input-filter-dropdown" @bind="Value.FilterStringValue">
-                        <option value="null">All</option>
-                        @foreach (var task in AvailableFilterPaneState.Value.TaskNamesAll.OrderBy(n => n))
-                        {
-                            <option value="@task">@task</option>
-                        }
-                    </select>
+                    <FilterSelect CssClass="input-filter-dropdown" TInput="string"
+                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
+                        Items="AvailableFilterPaneState.Value.TaskNamesAll.OrderBy(n => n)" />
                     break;
                 case FilterType.Description :
                 default :
-                    <input type="text" class="input-filter-description" @bind="Value.FilterStringValue" />
+                    <FilterInput Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
                     break;
             }
-
 
         </div>
 

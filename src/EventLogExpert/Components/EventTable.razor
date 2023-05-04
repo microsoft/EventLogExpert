@@ -2,49 +2,34 @@
 
 @inject IDispatcher Dispatcher
 @inject IState<EventLogState> EventLogState
-@inject IJSRuntime JS
 
 <div class="table-container">
-    <table>
+    <table @ref="@_tableRef">
         <thead>
-        <tr>
-            <th style="@GetInlineStyle("RecordId")">Rec</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "RecordId"))"></th>
-            <th style="@GetInlineStyle("TimeCreated")">Time</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "TimeCreated"))"></th>
-            <th style="@GetInlineStyle("Id")x">Id</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Id"))"></th>
-            <th style="@GetInlineStyle("MachineName")">Machine</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "MachineName"))"></th>
-            <th style="@GetInlineStyle("Level")">Level</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Level"))"></th>
-            <th style="@GetInlineStyle("ProviderName")">Source</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "ProviderName"))"></th>
-            <th style="@GetInlineStyle("Task")">Task</th>
-            <th class="table-divider" @onmousedown="@(e => OnMouseDownDivider(e, "Task"))"></th>
-            <th style="@GetDescriptionStyle()">Description</th>
-        </tr>
+            <tr>
+                <th style="@GetInlineStyle("RecordId")">Rec</th>
+                <th style="@GetInlineStyle("TimeCreated")">Time</th>
+                <th style="@GetInlineStyle("Id")x">Id</th>
+                <th style="@GetInlineStyle("MachineName")">Machine</th>
+                <th style="@GetInlineStyle("Level")">Level</th>
+                <th style="@GetInlineStyle("ProviderName")">Source</th>
+                <th style="@GetInlineStyle("Task")">Task</th>
+                <th style="@GetDescriptionStyle()">Description</th>
+            </tr>
         </thead>
         <tbody>
-        <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
-            <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
-                <td style="@GetInlineStyle("RecordId")">@evt.RecordId</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("TimeCreated")">@evt.TimeCreated</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("Id")">@evt.Id</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("MachineName")">@evt.MachineName</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("Level")">@evt.Level</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("ProviderName")">@evt.ProviderName</td>
-                <th class="table-divider"></th>
-                <td style="@GetInlineStyle("Task")">@evt.TaskDisplayName</td>
-                <th class="table-divider"></th>
-                <td style="@GetDescriptionStyle()">@evt.Description</td>
-            </tr>
-        </Virtualize>
+            <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
+                <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
+                    <td style="@GetInlineStyle("RecordId")">@evt.RecordId</td>
+                    <td style="@GetInlineStyle("TimeCreated")">@evt.TimeCreated</td>
+                    <td style="@GetInlineStyle("Id")">@evt.Id</td>
+                    <td style="@GetInlineStyle("MachineName")">@evt.MachineName</td>
+                    <td style="@GetInlineStyle("Level")">@evt.Level</td>
+                    <td style="@GetInlineStyle("ProviderName")">@evt.ProviderName</td>
+                    <td style="@GetInlineStyle("Task")">@evt.TaskDisplayName</td>
+                    <td style="@GetDescriptionStyle()">@evt.Description</td>
+                </tr>
+            </Virtualize>
         </tbody>
     </table>
 </div>
