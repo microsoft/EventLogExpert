@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
@@ -39,7 +40,7 @@ public class FilterPaneReducers
 
         if (parentFilter is null) { return state; } // If not parent filter, something went wrong and bail
 
-        parentFilter.SubFilters.Add(new SubFilterModel());
+        parentFilter.SubFilters.Add(new SubFilterModel(parentFilter.FilterType));
 
         return state with { CurrentFilters = updatedList };
     }

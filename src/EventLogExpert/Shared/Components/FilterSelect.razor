@@ -1,0 +1,27 @@
+@typeparam TInput
+
+<select class="@CssClass" value="@Value" @onchange="UpdateValue">
+    @switch (Value)
+    {
+        case int :
+            <option value="0">Empty</option>
+            break;
+        case string :
+            <option value="">Empty</option>
+            break;
+        case SeverityLevel :
+            @foreach (SeverityLevel level in Enum.GetValues(typeof(SeverityLevel)))
+            {
+                <option value="@level">@level.ToString()</option>
+            }
+            break;
+    }
+
+    @if (Items is not null)
+    {
+        @foreach (var id in Items)
+        {
+            <option value="@id">@id</option>
+        }
+    }
+</select>
