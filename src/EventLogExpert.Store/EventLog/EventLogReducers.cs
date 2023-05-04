@@ -14,6 +14,10 @@ public class EventLogReducers
         Events = new List<DisplayEventModel>(), EventsToDisplay = new List<DisplayEventModel>()
     };
 
+    [ReducerMethod(typeof(EventLogAction.ClearFilters))]
+    public static EventLogState ReduceClearFilters(EventLogState state) =>
+        state with { EventsToDisplay = state.Events };
+
     [ReducerMethod]
     public static EventLogState ReduceFilterEvents(EventLogState state, EventLogAction.FilterEvents action)
     {
@@ -33,10 +37,6 @@ public class EventLogReducers
         return state with { EventsToDisplay = filteredEvents };
     }
 
-    [ReducerMethod(typeof(EventLogAction.ClearFilters))]
-    public static EventLogState ReduceClearFilters(EventLogState state) =>
-        state with { EventsToDisplay = state.Events };
-
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action) =>
         state with { Events = action.Events, EventsToDisplay = action.Events };
@@ -44,4 +44,11 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
         new() { ActiveLog = action.LogSpecifier };
+
+    public static EventLogState ReduceSelectEvent(EventLogState state, EventLogAction.SelectEvent action)
+    {
+        if (state.SelectedEvent == action.SelectedEvent) { return state; }
+
+        return state with { SelectedEvent = action.SelectedEvent };
+    }
 }

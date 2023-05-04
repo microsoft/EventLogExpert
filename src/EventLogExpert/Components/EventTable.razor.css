@@ -31,4 +31,4 @@ td {
     overflow: hidden;
 }
 
-
+.table-row { cursor: pointer; }

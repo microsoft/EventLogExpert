@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Models;
+using EventLogExpert.Store.EventLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -44,8 +46,7 @@ public partial class EventTable
         return $"width: calc(100vw - {total}px);";
     }
 
-    private string GetInlineStyle(string colName)
-    {
-        return $"width: {_colWidths[colName]}px;";
-    }
+    private string GetInlineStyle(string colName) => $"width: {_colWidths[colName]}px";
+
+    private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }

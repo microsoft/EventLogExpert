@@ -21,4 +21,6 @@ public record EventLogAction
     public record ClearFilters : EventLogAction;
 
     public record FilterEvents(IEnumerable<FilterModel> Filters) : EventLogAction;
+
+    public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
 }

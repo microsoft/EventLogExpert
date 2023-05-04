@@ -1,5 +1,6 @@
 ﻿@inherits FluxorComponent
 
+@inject IDispatcher Dispatcher
 @inject IState<EventLogState> EventLogState
 
 <div class="table-container">
@@ -18,7 +19,7 @@
         </thead>
         <tbody>
             <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
-                <tr>
+                <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
                     <td style="@GetInlineStyle("RecordId")">@evt.RecordId</td>
                     <td style="@GetInlineStyle("TimeCreated")">@evt.TimeCreated</td>
                     <td style="@GetInlineStyle("Id")">@evt.Id</td>
