@@ -181,6 +181,21 @@ a, .btn-link {
         filter: brightness(0.9);
     }
 
+div.table-divider {
+    width: 5px;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    cursor: col-resize;
+    border-right: 2px solid var(--clr-black);
+}
+
+    div.table-divider:hover { cursor: col-resize !important; }
+
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {
         display: flex;
