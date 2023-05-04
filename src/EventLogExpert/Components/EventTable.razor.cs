@@ -10,9 +10,6 @@ namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
-    private const int ScrollBarWidth = 18;
-    private const int TableDividerWidth = 4;
-
     private readonly Dictionary<string, int> _colWidths = new()
     {
         { "RecordId", 75 },
@@ -38,12 +35,6 @@ public partial class EventTable
         }
 
         await base.OnAfterRenderAsync(firstRender);
-    }
-
-    private string GetDescriptionStyle()
-    {
-        var total = _colWidths.Values.Sum() + (TableDividerWidth * _colWidths.Count) + ScrollBarWidth;
-        return $"width: calc(100vw - {total}px);";
     }
 
     private string GetInlineStyle(string colName) => $"width: {_colWidths[colName]}px";
