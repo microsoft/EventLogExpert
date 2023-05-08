@@ -9,9 +9,11 @@ internal class Utils
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
-    public static bool HasProviderDatabases()
+    internal static bool HasProviderDatabases()
     {
-        var path = Path.Join(FileSystem.Current.AppDataDirectory, "Databases");
+        var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "EventLogExpert",
+            "Databases");
 
         try
         {
