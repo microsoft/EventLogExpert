@@ -9,12 +9,31 @@ internal class Utils
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
+    internal static bool HasProviderDatabases()
+    {
+        var path = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "EventLogExpert",
+            "Databases");
+
+        try
+        {
+            return Directory.EnumerateFiles(path, "*.db").Any();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     internal static void InitTracing()
     {
         // Set up tracing to a file
-        var eventLogExpertDataFolder = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert");
+        var eventLogExpertDataFolder =
+            Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert");
+
         var debugLogPath = Path.Join(eventLogExpertDataFolder, "debug.log");
         var fileInfo = new FileInfo(debugLogPath);
+
         if (fileInfo.Exists && fileInfo.Length > _maxLogSize)
         {
             fileInfo.Delete();
@@ -26,7 +45,7 @@ internal class Utils
         // Trace all exceptions
         AppDomain.CurrentDomain.FirstChanceException += (o, args) =>
         {
-           Trace($"{args.Exception}");
+            Trace($"{args.Exception}");
         };
     }
 

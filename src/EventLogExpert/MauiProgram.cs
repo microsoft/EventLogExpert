@@ -6,7 +6,6 @@ using EventLogExpert.Library.Helpers;
 using EventLogExpert.Store;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
-using System.Diagnostics;
 
 namespace EventLogExpert;
 
@@ -37,7 +36,14 @@ public static class MauiProgram
             options.AddMiddleware<LoggingMiddleware>();
         });
 
-        builder.Services.AddSingleton<IEventResolver>(new EventProviderDatabaseEventResolver(Utils.Trace));
+        if (Utils.HasProviderDatabases())
+        {
+            builder.Services.AddSingleton<IEventResolver>(new EventProviderDatabaseEventResolver(Utils.Trace));
+        }
+        else
+        {
+            builder.Services.AddSingleton<IEventResolver, LocalProviderEventResolver>();
+        }
 
         return builder.Build();
     }

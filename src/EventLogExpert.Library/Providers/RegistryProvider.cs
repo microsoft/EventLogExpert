@@ -53,8 +53,8 @@ public class RegistryProvider
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
-            // Skip Security since it requires elevation
-            if (logSubKeyName == "Security")
+            // Skip Security and State since it requires elevation
+            if (logSubKeyName is "Security" or "State")
             {
                 continue;
             }
