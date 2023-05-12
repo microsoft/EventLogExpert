@@ -176,7 +176,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 (SeverityLevel?)eventRecord.Level,
                 eventRecord.ProviderName,
                 "",
-                "Description not found. No provider available.");
+                "Description not found. No provider available.",
+                FormatXml(eventRecord, null));
         }
 
         if (lastResult.Description == null)

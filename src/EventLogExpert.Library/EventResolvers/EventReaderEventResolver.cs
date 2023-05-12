@@ -16,6 +16,9 @@ public class EventReaderEventResolver : IEventResolver
 {
     public DisplayEventModel Resolve(EventRecord eventRecord)
     {
+        var desc = eventRecord.FormatDescription();
+        var xml = eventRecord.ToXml();
+
         return new DisplayEventModel(
             eventRecord.RecordId,
             eventRecord.TimeCreated,
@@ -24,7 +27,8 @@ public class EventReaderEventResolver : IEventResolver
             (SeverityLevel?)eventRecord.Level,
             eventRecord.ProviderName,
             eventRecord.Task is 0 or null ? "None" : TryGetValue(() => eventRecord.TaskDisplayName),
-            string.IsNullOrEmpty(eventRecord.FormatDescription()) ? string.Empty : eventRecord.FormatDescription());
+            string.IsNullOrEmpty(desc) ? string.Empty : desc,
+            string.IsNullOrEmpty(xml) ? string.Empty : xml);
     }
 
     private static T TryGetValue<T>(Func<T> func)

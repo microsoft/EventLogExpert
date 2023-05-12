@@ -42,7 +42,8 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 (SeverityLevel?)eventRecord.Level,
                 eventRecord.ProviderName,
                 "",
-                "Description not found. No provider available.");
+                "Description not found. No provider available.",
+                "");
         }
 
         var result = ResolveFromProviderDetails(eventRecord, providerDetails);
