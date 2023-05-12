@@ -1,5 +1,4 @@
 ﻿@inject IState<AvailableFilterState> AvailableFilterPaneState
-@inject IDispatcher Dispatcher
 
 <div class="filter-row @(Value.IsEditing ? "edit-grid" : "")">
     @if (Value.IsEditing)
