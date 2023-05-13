@@ -130,7 +130,13 @@ public class EventResolverTests
         var resolvers = new List<IEventResolver>()
         {
             new LocalProviderEventResolver(),
-            new EventProviderDatabaseEventResolver(null, s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
+            new EventProviderDatabaseEventResolver(
+                "C:\\" /* TODO: Figure out how to specify the VFS database path without a Microsoft.Maui.Storage.FileSystem dependency */,
+                s => {
+                    _outputHelper.WriteLine(s);
+                    Debug.WriteLine(s);
+                    Debug.Flush();
+                })
         };
 
         EventRecord er;

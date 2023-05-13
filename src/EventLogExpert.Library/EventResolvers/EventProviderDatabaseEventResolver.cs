@@ -15,23 +15,25 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 {
     private List<EventProviderDbContext> dbContexts = new();
 
-    private readonly string dbFolder = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert", "Databases");
+    private readonly string _dbFolder;
 
     private Dictionary<string, ProviderDetails?> _providerDetails = new();
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver() : this(ImmutableArray<string>.Empty, s => { }) { }
+    public EventProviderDatabaseEventResolver(string databaseFolder) : this(databaseFolder, ImmutableArray<string>.Empty, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(Action<string> tracer) : this(ImmutableArray<string>.Empty, tracer) { }
+    public EventProviderDatabaseEventResolver(string databaseFolder, Action<string> tracer) : this(databaseFolder, ImmutableArray<string>.Empty, tracer) { }
 
-    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases) : this(activeDatabases, s => { }) { }
+    public EventProviderDatabaseEventResolver(string databaseFolder, IEnumerable<string> activeDatabases) : this(databaseFolder, activeDatabases, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(string databaseFolder, IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
     {
-        if (!Directory.Exists(dbFolder))
+        _dbFolder = databaseFolder;
+
+        if (!Directory.Exists(_dbFolder))
         {
-            Directory.CreateDirectory(dbFolder);
+            Directory.CreateDirectory(_dbFolder);
         }
 
         AvailableDatabases = ImmutableArray<string>.Empty;
@@ -59,7 +61,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             context.Dispose();
         }
 
-        var allDbFiles = SortDatabases(Directory.GetFiles(dbFolder, "*.db"));
+        var allDbFiles = SortDatabases(Directory.GetFiles(_dbFolder, "*.db"));
 
         AvailableDatabases = allDbFiles.ToImmutableArray();
 
