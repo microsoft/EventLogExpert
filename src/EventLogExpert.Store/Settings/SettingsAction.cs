@@ -7,7 +7,9 @@ namespace EventLogExpert.Store.Settings;
 
 public record SettingsAction
 {
-    public record Load : SettingsAction;
+    public record LoadProviders(string Path) : SettingsAction;
+
+    public record LoadSettings(string Path) : SettingsAction;
 
     public record OpenMenu : SettingsAction;
 

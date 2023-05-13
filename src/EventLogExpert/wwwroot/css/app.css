@@ -127,7 +127,7 @@ a, .btn-link {
 
     .input-filter-description { width: 250px; }
 
-    .input-timezone-select { width: 250px; }
+    .input-timezone-select { width: 400px; }
 
         .input-filter-select:focus-visible,
         .input-filter-id:focus-visible,

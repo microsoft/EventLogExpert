@@ -16,7 +16,8 @@ public partial class MainLayout : IDisposable
 
     protected override void OnInitialized()
     {
-        Dispatcher.Dispatch(new SettingsAction.Load());
+        Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
+        Dispatcher.Dispatch(new SettingsAction.LoadSettings(Utils.SettingsPath));
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
         base.OnInitialized();
     }

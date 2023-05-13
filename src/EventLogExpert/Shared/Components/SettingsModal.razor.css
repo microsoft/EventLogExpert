@@ -1,6 +1,5 @@
 ﻿dialog {
-    width: 25%;
-    height: 25%;
+    height: 30%;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);
@@ -14,6 +13,7 @@
     height: 100%;
 
     overflow-y: auto;
+    overflow-x: hidden;
 }
 
     .provider-list > p {

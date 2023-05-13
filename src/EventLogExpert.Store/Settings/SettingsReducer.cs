@@ -9,45 +9,45 @@ namespace EventLogExpert.Store.Settings;
 
 public class SettingsReducer
 {
-    public static string ProviderPath => Path.Join(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "EventLogExpert",
-        "Databases");
-
-    public static string SettingsPath => Path.Join(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "EventLogExpert",
-        "settings.json");
-
-    [ReducerMethod(typeof(SettingsAction.Load))]
-    public static SettingsState ReduceLoad(SettingsState state)
+    [ReducerMethod]
+    public static SettingsState ReduceLoadProvider(SettingsState state, SettingsAction.LoadProviders action)
     {
-        SettingsModel? config = null;
         IEnumerable<string> providers = Enumerable.Empty<string>();
 
-        // TODO: Split these into their own actions
-
         try
         {
-            using FileStream stream = File.OpenRead(SettingsPath);
-            config = JsonSerializer.Deserialize<SettingsModel>(stream);
-        }
-        catch
-        { // File may not exist, can be ignored
-        }
-
-        try
-        {
-            if (Directory.Exists(ProviderPath))
+            if (Directory.Exists(action.Path))
             {
-                providers = Directory.EnumerateFiles(ProviderPath, "*.db").Select(Path.GetFileName).OfType<string>();
+                providers = Directory.EnumerateFiles(action.Path, "*.db").Select(Path.GetFileName).OfType<string>();
             }
         }
         catch
         { // Directory may not exist, can be ignored
         }
 
-        return new SettingsState { TimeZone = config?.TimeZoneOffset ?? 0, LoadedProviders = providers };
+        return state with { LoadedProviders = providers };
+    }
+
+    [ReducerMethod]
+    public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettings action)
+    {
+        SettingsModel? config = null;
+
+        try
+        {
+            using FileStream stream = File.OpenRead(action.Path);
+            config = JsonSerializer.Deserialize<SettingsModel>(stream);
+        }
+        catch
+        { // File may not exist, can be ignored
+        }
+
+        if (config is null || string.IsNullOrEmpty(config.TimeZoneId)) { return state; }
+
+        return state with
+        {
+            TimeZoneId = config.TimeZoneId, TimeZone = TimeZoneInfo.FindSystemTimeZoneById(config.TimeZoneId)
+        };
     }
 
     [ReducerMethod]
@@ -56,14 +56,13 @@ public class SettingsReducer
         try
         {
             var config = JsonSerializer.Serialize(action.Settings);
-            File.WriteAllText(Path.Join(action.Path, "settings.json"), config);
-            //File.WriteAllText(SettingsPath, config);
-            //using FileStream stream = File.OpenWrite(SettingsPath);
-            //using StreamWriter writer = new(stream);
+            File.WriteAllText(action.Path, config);
 
-            //writer.Write(config);
-
-            return state with { TimeZone = action.Settings.TimeZoneOffset };
+            return state with
+            {
+                TimeZoneId = action.Settings.TimeZoneId,
+                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(action.Settings.TimeZoneId)
+            };
         }
         catch
         { // TODO: Log a warning

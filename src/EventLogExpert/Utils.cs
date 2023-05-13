@@ -5,15 +5,22 @@ using System.Diagnostics;
 
 namespace EventLogExpert;
 
-internal class Utils
+internal static class Utils
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
-    internal static bool HasProviderDatabases(string path)
+    public static string DatabasePath => Path.Join(FileSystem.AppDataDirectory, "Databases");
+
+    public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
+
+    internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
+        destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
+
+    internal static bool HasProviderDatabases()
     {
         try
         {
-            return Directory.EnumerateFiles(path, "*.db").Any();
+            return Directory.EnumerateFiles(DatabasePath, "*.db").Any();
         }
         catch
         {

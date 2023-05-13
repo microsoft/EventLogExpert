@@ -19,11 +19,11 @@ public partial class SettingsModal
 
     private async void Close() => await JsRuntime.InvokeVoidAsync("closeSettingsModal");
 
-    private void Load(SettingsAction.OpenMenu action) => _request.TimeZoneOffset = SettingsState.Value.TimeZone;
+    private void Load(SettingsAction.OpenMenu action) => _request.TimeZoneId = SettingsState.Value.TimeZoneId;
 
     private void Save()
     {
-        Dispatcher.Dispatch(new SettingsAction.Save(_request, FileSystem.Current.AppDataDirectory));
+        Dispatcher.Dispatch(new SettingsAction.Save(_request, Utils.SettingsPath));
         Close();
     }
 }

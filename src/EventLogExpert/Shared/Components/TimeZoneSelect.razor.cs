@@ -7,16 +7,15 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class TimeZoneSelect
 {
-    [Parameter] public int Value { get; set; }
+    [Parameter] public string Value { get; set; } = null!;
 
-    [Parameter] public EventCallback<int> ValueChanged { get; set; }
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
 
     private async Task SetValue(ChangeEventArgs args)
     {
-        if (int.TryParse(args.Value?.ToString(), out int value))
-        {
-            Value = value;
-            await ValueChanged.InvokeAsync(Value);
-        }
+        if (string.IsNullOrEmpty(args.Value?.ToString())) { return; }
+
+        Value = args.Value.ToString()!;
+        await ValueChanged.InvokeAsync(Value);
     }
 }

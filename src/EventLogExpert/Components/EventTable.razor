@@ -21,7 +21,7 @@
             <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
                 <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
                     <td>@evt.RecordId</td>
-                    <td>@evt.TimeCreated?.AddHours(SettingsState.Value.TimeZone)</td>
+                    <td>@evt.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</td>
                     <td>@evt.Id</td>
                     <td>@evt.MachineName</td>
                     <td>@evt.Level</td>

@@ -19,7 +19,7 @@
             <div>Provider: @Event.ProviderName</div>
             <div>EventId: @Event.Id</div>
             <div>Severity: @Event.Level</div>
-            <div>Time: @Event.TimeCreated?.AddHours(SettingsState.Value.TimeZone)</div>
+            <div>Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
         </div>
 
         <div>Description:</div>
