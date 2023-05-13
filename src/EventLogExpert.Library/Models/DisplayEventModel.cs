@@ -13,5 +13,6 @@ public record DisplayEventModel(
     SeverityLevel? Level,
     string ProviderName,
     string TaskDisplayName,
-    string Description
+    string Description,
+    string Xml
 );

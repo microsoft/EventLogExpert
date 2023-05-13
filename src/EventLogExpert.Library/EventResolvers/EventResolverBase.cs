@@ -7,6 +7,7 @@ using EventLogExpert.Library.Providers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace EventLogExpert.Library.EventResolvers;
 
@@ -77,9 +78,66 @@ public class EventResolverBase
         return description;
     }
 
+    protected string FormatXml(EventRecord record, string? template)
+    {
+        var sb = new StringBuilder(
+            "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\">\r\n" +
+            $"  <System>\r\n" +
+            $"    <Provider Name=\"{record.ProviderName}\" />\r\n" +
+            $"    <EventID{(record.Qualifiers.HasValue ? $" Qualifiers=\"{record.Qualifiers.Value}\"" : "")}>{record.Id}</EventID>\r\n" +
+            $"    <Level>{record.Level}</Level>\r\n" +
+            $"    <Task>{record.Task}</Task>\r\n" +
+            $"    <Keywords>{(record.Keywords.HasValue ? ("0x" + record.Keywords.Value.ToString("X")) : "0x0")}</Keywords>\r\n" +
+            $"    <TimeCreated SystemTime=\"{(record.TimeCreated.HasValue ? record.TimeCreated.Value.ToString("o") : "")}\" />\r\n" +
+            $"    <EventRecordID>{record.RecordId}</EventRecordID>\r\n" +
+            $"    <Channel>{record.LogName}</Channel>\r\n" +
+            $"    <Computer>{record.MachineName}</Computer>\r\n" +
+            $"  </System>\r\n" +
+            $"  <EventData>\r\n");
+
+        if (!string.IsNullOrEmpty(template))
+        {
+            var propertyNames = new List<string>();
+            var index = -1;
+            while (-1 < (index = template.IndexOf("name=", index + 1)))
+            {
+                var nameStart = index + 6;
+                var nameEnd = template.IndexOf('"', nameStart);
+                var name = template.Substring(nameStart, nameEnd - nameStart);
+                propertyNames.Add(name);
+            }
+
+            for (var i = 0; i < record.Properties.Count; i++)
+            {
+                if (i >= propertyNames.Count)
+                {
+                    _tracer("EventResolverBase.FormatXml(): Property count exceeds template names.");
+                    _tracer($"  Provider: {record.ProviderName} EventID: {record.Id} Property count: {record.Properties.Count} Name count: {propertyNames.Count}");
+                    break;
+                }
+
+                sb.Append($"    <{propertyNames[i]}>{record.Properties[i].Value}</{propertyNames[i]}>\r\n");
+            }
+        }
+        else
+        {
+            foreach (var p in record.Properties)
+            {
+                sb.Append($"    <Data>{p.Value}</Data>\r\n");
+            }
+        }
+
+        sb.Append(
+            "  </EventData>\r\n" +
+            "</Event>");
+
+        return sb.ToString();
+    }
+
     protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, ProviderDetails providerDetails)
     {
         string? description = null;
+        string? xml = null;
         string? taskName = null;
 
         if (eventRecord.Version != null && eventRecord.LogName != null)
@@ -106,7 +164,7 @@ public class EventResolverBase
 
                 providerDetails.Tasks.TryGetValue(e.Task, out taskName);
 
-                // If we don't have a description template
+                // If we don't have a description
                 if (string.IsNullOrEmpty(e.Description))
                 {
                     // And we have exactly one property
@@ -118,7 +176,7 @@ public class EventResolverBase
                     }
                     else
                     {
-                        description = "This event record is missing a template. The following information was included with the event:\n\n" +
+                        description = "This event record is missing a description. The following information was included with the event:\n\n" +
                             string.Join("\n", eventRecord.Properties);
                     }
                 }
@@ -126,6 +184,8 @@ public class EventResolverBase
                 {
                     description = FormatDescription(eventRecord, e.Description);
                 }
+
+                xml = FormatXml(eventRecord, e.Template);
             }
         }
 
@@ -133,6 +193,7 @@ public class EventResolverBase
         {
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
             description = FormatDescription(eventRecord, description);
+            xml = FormatXml(eventRecord, null);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)
@@ -168,6 +229,7 @@ public class EventResolverBase
                 (SeverityLevel?)eventRecord.Level,
                 eventRecord.ProviderName,
                 taskName,
-                description);
+                description,
+                xml);
     }
 }

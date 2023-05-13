@@ -106,6 +106,23 @@ public class EventResolverTests
         Assert.Equal("Service", result.TaskDisplayName);
     }
 
+    [Fact]
+    public void PerfTest()
+    {
+        var sw = new Stopwatch();
+        sw.Start();
+        var eventLogReader = new EventLogReader("Application", PathType.LogName);
+        var resolver = new LocalProviderEventResolver();
+        EventRecord er;
+        while (null != (er = eventLogReader.ReadEvent()))
+        {
+            resolver.Resolve(er);
+        }
+
+        sw.Stop();
+        Debug.WriteLine(sw.ElapsedMilliseconds);
+    }
+
     public void Test1()
     {
         var eventLogReader = new EventLogReader("Application", PathType.LogName);
@@ -113,33 +130,52 @@ public class EventResolverTests
         var resolvers = new List<IEventResolver>()
         {
             new LocalProviderEventResolver(),
-            new EventProviderDatabaseEventResolver(null, s => { _outputHelper.WriteLine(s); Debug.WriteLine(s); Debug.Flush(); })
+            new EventProviderDatabaseEventResolver(
+                "C:\\" /* TODO: Figure out how to specify the VFS database path without a Microsoft.Maui.Storage.FileSystem dependency */,
+                s => {
+                    _outputHelper.WriteLine(s);
+                    Debug.WriteLine(s);
+                    Debug.Flush();
+                })
         };
 
         EventRecord er;
         HashSet<string> uniqueDescriptions = new();
+        HashSet<string> uniqueXml = new();
 
         var totalCount = 0;
         var mismatchCount = 0;
+        var xmlMismatchCount = 0;
         var mismatches = new List<List<string>>();
+        var xmlMismatches = new List<List<string>>();
         while (null != (er = eventLogReader.ReadEvent()))
         {
             uniqueDescriptions.Clear();
 
             foreach (var r in resolvers)
             {
-                uniqueDescriptions.Add(r.Resolve(er).Description
+                var resolved = r.Resolve(er);
+
+                uniqueDescriptions.Add(resolved.Description
                     .Replace("\r", "")  // I can't figure out the logic of FormatMessage() for when it leaves
                     .Replace("\n", "")  // CRLFs and spaces in or takes them out, so I'm just giving up for now.
                     .Replace(" ", "")   // If we're this close to matching FormatMessage() then we're close enough.
                     .Replace("\u200E", "") // Remove LRM marks from dates.
                     .Trim());
+
+                uniqueXml.Add(resolved.Xml);
             }
 
             if (uniqueDescriptions.Count > 1)
             {
                 mismatchCount++;
                 mismatches.Add(uniqueDescriptions.ToList());
+            }
+
+            if (uniqueXml.Count > 1)
+            {
+                xmlMismatchCount++;
+                xmlMismatches.Add(uniqueXml.ToList());
             }
 
             totalCount++;
