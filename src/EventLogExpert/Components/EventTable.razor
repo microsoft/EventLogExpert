@@ -1,6 +1,7 @@
 ﻿@inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
+@inject IState<SettingsState> SettingsState
 
 <div class="table-container">
     <table @ref="@_tableRef">
@@ -20,7 +21,7 @@
             <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
                 <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
                     <td>@evt.RecordId</td>
-                    <td>@evt.TimeCreated</td>
+                    <td>@evt.TimeCreated?.AddHours(SettingsState.Value.TimeZone)</td>
                     <td>@evt.Id</td>
                     <td>@evt.MachineName</td>
                     <td>@evt.Level</td>

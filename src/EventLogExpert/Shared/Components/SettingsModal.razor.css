@@ -1,0 +1,30 @@
+﻿dialog {
+    width: 25%;
+    height: 25%;
+
+    color: var(--clr-lightblue);
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}
+
+.provider-list {
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+
+    overflow-y: auto;
+}
+
+    .provider-list > p {
+        margin: 0px;
+    }
+
+.button-group {
+    display: flex;
+    justify-content: flex-end;
+}
+
+    .button-group > button {
+        width: 50px;
+    }

@@ -2,6 +2,7 @@
 
 @inject IActionSubscriber ActionSubscriber
 @inject IState<EventLogState> EventLogState
+@inject IState<SettingsState> SettingsState
 
 @if (Event is not null)
 {
@@ -18,7 +19,7 @@
             <div>Provider: @Event.ProviderName</div>
             <div>EventId: @Event.Id</div>
             <div>Severity: @Event.Level</div>
-            <div>Time: @Event.TimeCreated</div>
+            <div>Time: @Event.TimeCreated?.AddHours(SettingsState.Value.TimeZone)</div>
         </div>
 
         <div>Description:</div>
