@@ -11,6 +11,8 @@ internal static class Utils
 
     public static string DatabasePath => Path.Join(FileSystem.AppDataDirectory, "Databases");
 
+    public static string LoggingPath => Path.Join(FileSystem.AppDataDirectory, "debug.log");
+
     public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
 
     internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
@@ -31,18 +33,14 @@ internal static class Utils
     internal static void InitTracing()
     {
         // Set up tracing to a file
-        var eventLogExpertDataFolder =
-            Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert");
-
-        var debugLogPath = Path.Join(eventLogExpertDataFolder, "debug.log");
-        var fileInfo = new FileInfo(debugLogPath);
+        var fileInfo = new FileInfo(LoggingPath);
 
         if (fileInfo.Exists && fileInfo.Length > _maxLogSize)
         {
             fileInfo.Delete();
         }
 
-        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(debugLogPath, "myListener"));
+        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(LoggingPath, "myListener"));
         System.Diagnostics.Trace.AutoFlush = true;
 
         // Trace all exceptions
