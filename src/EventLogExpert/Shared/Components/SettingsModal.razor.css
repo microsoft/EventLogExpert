@@ -6,6 +6,15 @@
     background-color: var(--background-dark);
 }
 
+.tz-row {
+    margin-bottom: 1rem;
+}
+
+.provider-row {
+    display: flex;
+    justify-content: space-between;
+}
+
 .provider-list {
     display: flex;
     flex-direction: column;

@@ -9,9 +9,16 @@
 
         <ValidationSummary />
 
-        <div style="margin-bottom: 1rem">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
+        <div class="tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
 
-        <div>Loaded Providers: </div>
+        <div class="provider-row">
+            <div>Loaded Providers: </div>
+
+            <button class="button-primary" type="button" @onclick="ImportProvider">
+                <i class="bi bi-plus-circle"></i> Add Provider
+            </button>
+        </div>
+
         <div class="provider-list">
             @if (SettingsState.Value.LoadedProviders.Any())
             {
