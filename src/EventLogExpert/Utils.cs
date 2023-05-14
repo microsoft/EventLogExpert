@@ -5,15 +5,24 @@ using System.Diagnostics;
 
 namespace EventLogExpert;
 
-internal class Utils
+internal static class Utils
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
-    internal static bool HasProviderDatabases(string path)
+    public static string DatabasePath => Path.Join(FileSystem.AppDataDirectory, "Databases");
+
+    public static string LoggingPath => Path.Join(FileSystem.AppDataDirectory, "debug.log");
+
+    public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
+
+    internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
+        destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
+
+    internal static bool HasProviderDatabases()
     {
         try
         {
-            return Directory.EnumerateFiles(path, "*.db").Any();
+            return Directory.EnumerateFiles(DatabasePath, "*.db").Any();
         }
         catch
         {
@@ -24,18 +33,14 @@ internal class Utils
     internal static void InitTracing()
     {
         // Set up tracing to a file
-        var eventLogExpertDataFolder =
-            Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "EventLogExpert");
-
-        var debugLogPath = Path.Join(eventLogExpertDataFolder, "debug.log");
-        var fileInfo = new FileInfo(debugLogPath);
+        var fileInfo = new FileInfo(LoggingPath);
 
         if (fileInfo.Exists && fileInfo.Length > _maxLogSize)
         {
             fileInfo.Delete();
         }
 
-        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(debugLogPath, "myListener"));
+        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(LoggingPath, "myListener"));
         System.Diagnostics.Trace.AutoFlush = true;
 
         // Trace all exceptions

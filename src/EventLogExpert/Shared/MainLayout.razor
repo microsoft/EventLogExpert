@@ -1,5 +1,12 @@
-﻿@using EventLogExpert.Components
+﻿@using EventLogExpert.Shared.Components
+@using EventLogExpert.Components
+
 @inherits LayoutComponentBase
+
+@inject IActionSubscriber ActionSubscriber
+@inject IJSRuntime JsRuntime
+
+<SettingsModal />
 
 <div class="page">
     <div class="display_layout">

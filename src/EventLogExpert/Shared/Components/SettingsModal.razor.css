@@ -1,0 +1,39 @@
+﻿dialog {
+    height: 30%;
+
+    color: var(--clr-lightblue);
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}
+
+.tz-row {
+    margin-bottom: 1rem;
+}
+
+.provider-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+.provider-list {
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+    .provider-list > p {
+        margin: 0px;
+    }
+
+.button-group {
+    display: flex;
+    justify-content: flex-end;
+}
+
+    .button-group > button {
+        width: 50px;
+    }

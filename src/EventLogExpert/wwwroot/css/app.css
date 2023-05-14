@@ -107,7 +107,8 @@ a, .btn-link {
 .input-filter-id,
 .input-filter-severity,
 .input-filter-dropdown,
-.input-filter-description {
+.input-filter-description,
+.input-timezone-select {
     background: none;
     border: none;
     border-bottom: 0.1rem solid var(--clr-lightblue);
@@ -126,11 +127,14 @@ a, .btn-link {
 
     .input-filter-description { width: 250px; }
 
+    .input-timezone-select { width: 400px; }
+
         .input-filter-select:focus-visible,
         .input-filter-id:focus-visible,
         .input-filter-severity:focus-visible,
         .input-filter-dropdown:focus-visible,
-        .input-filter-description:focus-visible {
+        .input-filter-description:focus-visible,
+        .input-timezone-select:focus-visible {
             outline: none;
         }
 
@@ -138,7 +142,8 @@ a, .btn-link {
         .input-filter-id > option,
         .input-filter-severity > option,
         .input-filter-dropdown > option,
-        .input-filter-description > option {
+        .input-filter-description > option,
+        .input-timezone-select > option {
             background: var(--background-dark);
         }
 
@@ -179,7 +184,7 @@ a, .btn-link {
     }
 
 div.table-divider {
-    width: 5px;
+    width: 8px;
     margin: 0;
     padding: 0;
     user-select: none;
@@ -191,7 +196,17 @@ div.table-divider {
     border-right: 2px solid var(--clr-black);
 }
 
+    /* col-resize is currently bugged in WebView2 */
+    /* https://github.com/dotnet/maui/issues/9960 */
     div.table-divider:hover { cursor: col-resize !important; }
+
+form {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    height: 100%;
+}
 
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {

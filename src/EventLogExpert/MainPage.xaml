@@ -10,6 +10,11 @@
             <MenuFlyoutItem Text="Open File" Clicked="OpenFile_Clicked"></MenuFlyoutItem>
             <MenuFlyoutItem Text="Open Live Event Log" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
         </MenuBarItem>
+        <MenuBarItem Text="Tools">
+            <MenuFlyoutItem Text="Settings" Clicked="OpenSettingsModal_Clicked" />
+            <!-- Option to export providers? -->
+            <!-- Manual check for updates option or an about page with option to check for updates? -->
+        </MenuBarItem>
     </ContentPage.MenuBarItems>
 
     <BlazorWebView HostPage="wwwroot/index.html">

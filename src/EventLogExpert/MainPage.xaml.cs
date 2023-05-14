@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Store.EventLog;
+using EventLogExpert.Store.Settings;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
@@ -26,7 +27,7 @@ public partial class MainPage : ContentPage
             )
         };
 
-        var result = await FilePicker.Default.PickAsync(options);
+        FileResult? result = await FilePicker.Default.PickAsync(options);
 
         if (result != null)
         {
@@ -46,4 +47,7 @@ public partial class MainPage : ContentPage
                     "Application",
                     EventLogState.LogType.Live)));
     }
+
+    private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
 }

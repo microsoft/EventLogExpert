@@ -1,0 +1,43 @@
+@inherits FluxorComponent
+
+@inject IJSRuntime JsRuntime
+@inject IState<SettingsState> SettingsState
+
+<dialog id="settingsDialog">
+
+    <EditForm id="SettingsForm" Model="_request" OnValidSubmit="Save">
+
+        <ValidationSummary />
+
+        <div class="tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
+
+        <div class="provider-row">
+            <div>Loaded Providers: </div>
+
+            <button class="button-primary" type="button" @onclick="ImportProvider">
+                <i class="bi bi-plus-circle"></i> Add Provider
+            </button>
+        </div>
+
+        <div class="provider-list">
+            @if (SettingsState.Value.LoadedProviders.Any())
+            {
+                @foreach (var provider in SettingsState.Value.LoadedProviders)
+                {
+                    <p>@provider</p>
+                }
+            }
+            else
+            {
+                <p>None</p>
+            }
+        </div>
+
+        <div class="button-group">
+            <button class="button-save" type="submit">Save</button>
+            <button class="button-primary" type="reset" @onclick="Close">Exit</button>
+        </div>
+
+    </EditForm>
+
+</dialog>

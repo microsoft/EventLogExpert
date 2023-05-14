@@ -1,0 +1,6 @@
+<select class="input-timezone-select" value="@Value" @onchange="SetValue">
+    @foreach (var timeZone in TimeZoneInfo.GetSystemTimeZones())
+    {
+        <option value="@timeZone.Id" selected="@(timeZone.Id == Value)">@timeZone.DisplayName</option>
+    }
+</select>
