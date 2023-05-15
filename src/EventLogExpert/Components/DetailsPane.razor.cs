@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
+using System.Text;
 
 namespace EventLogExpert.Components;
 
@@ -19,7 +20,26 @@ public partial class DetailsPane
         base.OnInitialized();
     }
 
-    private void CopyXml() => Clipboard.SetTextAsync(Event?.Xml);
+    private void CopyEvent()
+    {
+        StringBuilder stringToCopy = new();
+
+        stringToCopy.AppendLine($"Log Name: {EventLogState.Value.ActiveLog.Name}");
+        stringToCopy.AppendLine($"Source: {Event?.ProviderName}");
+        stringToCopy.AppendLine($"Date: {Event?.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)}");
+        stringToCopy.AppendLine($"Event ID: {Event?.Id}");
+        stringToCopy.AppendLine($"Task Category: {Event?.TaskDisplayName}");
+        stringToCopy.AppendLine($"Level: {Event?.Level}");
+        stringToCopy.AppendLine("Keywords:");
+        stringToCopy.AppendLine("User:");  // TODO: Update after DisplayEventModel is updated
+        stringToCopy.AppendLine($"Computer: {Event?.MachineName}");
+        stringToCopy.AppendLine("Description:");
+        stringToCopy.AppendLine(Event?.Description);
+        stringToCopy.AppendLine("Event Xml:");
+        stringToCopy.AppendLine(Event?.Xml);
+
+        Clipboard.SetTextAsync(stringToCopy.ToString());
+    }
 
     private void ToggleMenu() => _expandMenu = !_expandMenu;
 
