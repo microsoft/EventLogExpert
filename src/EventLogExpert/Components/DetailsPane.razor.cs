@@ -19,6 +19,8 @@ public partial class DetailsPane
         base.OnInitialized();
     }
 
+    private void CopyXml() => Clipboard.SetTextAsync(Event?.Xml);
+
     private void ToggleMenu() => _expandMenu = !_expandMenu;
 
     private void ToggleXml() => _expandXml = !_expandXml;
