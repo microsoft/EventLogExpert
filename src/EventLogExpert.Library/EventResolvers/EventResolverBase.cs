@@ -88,7 +88,7 @@ public class EventResolverBase
             $"    <Level>{record.Level}</Level>\r\n" +
             $"    <Task>{record.Task}</Task>\r\n" +
             $"    <Keywords>{(record.Keywords.HasValue ? ("0x" + record.Keywords.Value.ToString("X")) : "0x0")}</Keywords>\r\n" +
-            $"    <TimeCreated SystemTime=\"{(record.TimeCreated.HasValue ? record.TimeCreated.Value.ToString("o") : "")}\" />\r\n" +
+            $"    <TimeCreated SystemTime=\"{(record.TimeCreated.HasValue ? record.TimeCreated.Value.ToUniversalTime().ToString("o") : "")}\" />\r\n" +
             $"    <EventRecordID>{record.RecordId}</EventRecordID>\r\n" +
             $"    <Channel>{record.LogName}</Channel>\r\n" +
             $"    <Computer>{record.MachineName}</Computer>\r\n" +
