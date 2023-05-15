@@ -127,7 +127,11 @@ a, .btn-link {
 
     .input-filter-description { width: 250px; }
 
-    .input-timezone-select { width: 400px; }
+    .input-timezone-select {
+        width: 400px;
+
+        text-align-last: center;
+    }
 
         .input-filter-select:focus-visible,
         .input-filter-id:focus-visible,
@@ -146,6 +150,8 @@ a, .btn-link {
         .input-timezone-select > option {
             background: var(--background-dark);
         }
+
+    .input-timezone-select > option { text-align: left; }
 
 .button-toggle { cursor: pointer; }
 
