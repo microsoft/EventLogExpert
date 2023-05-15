@@ -1,6 +1,5 @@
 ﻿@inherits FluxorComponent
 
-@inject IActionSubscriber ActionSubscriber
 @inject IState<EventLogState> EventLogState
 @inject IState<SettingsState> SettingsState
 
@@ -15,15 +14,27 @@
             </span>
         </div>
 
-        <div class="details-row">
-            <div>Provider: @Event.ProviderName</div>
-            <div>EventId: @Event.Id</div>
-            <div>Severity: @Event.Level</div>
-            <div>Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
+        <div class="details-group" data-toggle="@_expandXml.ToString().ToLower()">
+            <div class="details-row">
+                <div>Provider: @Event.ProviderName</div>
+                <div>EventId: @Event.Id</div>
+                <div>Severity: @Event.Level</div>
+                <div>Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
+            </div>
+
+            <div>Description:</div>
+            <p class="details-description">@Event.Description</p>
         </div>
 
-        <div>Description:</div>
-        <div class="details-description">@Event.Description</div>
+        <div class="details-row-xml">
+            <div>XML:</div>
+            <button class="button-primary" @onclick="CopyXml">Copy XML</button>
+            <span class="button-toggle" data-rotate="@_expandXml.ToString().ToLower()" @onclick="ToggleXml">
+                <i class="bi bi-caret-up"></i>
+            </span>
+        </div>
+
+        <p class="details-xml" data-toggle="@_expandXml.ToString().ToLower()">@Event.Xml</p>
 
     </div>
 }
