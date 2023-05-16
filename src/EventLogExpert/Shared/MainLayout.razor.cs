@@ -19,6 +19,7 @@ public partial class MainLayout : IDisposable
         Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
         Dispatcher.Dispatch(new SettingsAction.LoadSettings(Utils.SettingsPath));
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
+        Utils.CheckForUpdates();
         base.OnInitialized();
     }
 
