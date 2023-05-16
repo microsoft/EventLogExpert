@@ -48,6 +48,9 @@ public class EventResolverBase
 
                 sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
                 var propIndex = int.Parse(matches[i].Value.Trim(new[] { '{', '}', '%' }));
+
+                if (propIndex - 1 >= eventRecord.Properties.Count) { return "Unable to format description"; }
+                
                 var propValue = eventRecord.Properties[propIndex - 1].Value;
                 if (propValue is DateTime)
                 {
