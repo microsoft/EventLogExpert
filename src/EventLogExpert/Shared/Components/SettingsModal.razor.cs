@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Settings;
 using Microsoft.JSInterop;
+using System.IO.Compression;
 
 namespace EventLogExpert.Shared.Components;
 
@@ -25,7 +26,7 @@ public partial class SettingsModal
         {
             PickerTitle = "Please select a database file",
             FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, new[] { ".db" } } })
+                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, new[] { ".db", ".zip" } } })
         };
 
         try
@@ -38,6 +39,11 @@ public partial class SettingsModal
             {
                 var destination = Path.Join(Utils.DatabasePath, item.FileName);
                 File.Copy(item.FullPath, destination, true);
+                if (Path.GetExtension(destination) == ".zip")
+                {
+                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, overwriteFiles: true);
+                    File.Delete(destination);
+                }
             }
         }
         catch
