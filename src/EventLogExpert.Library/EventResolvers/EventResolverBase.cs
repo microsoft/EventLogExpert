@@ -119,7 +119,17 @@ public class EventResolverBase
                     break;
                 }
 
-                sb.Append($"    <{propertyNames[i]}>{record.Properties[i].Value}</{propertyNames[i]}>\r\n");
+                if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && record.Properties[i].Value is byte[] val)
+                {
+                    // Handle event 7036 from Service Control Manager binary data
+                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
+                    sb.Append($"    <Data Name=\"{propertyNames[i + 1]}\">{Convert.ToHexString(val)}</Data>\r\n");
+                    i++;
+                }
+                else
+                {
+                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{record.Properties[i].Value}</Data>\r\n");
+                }
             }
         }
         else
