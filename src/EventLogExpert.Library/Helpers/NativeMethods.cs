@@ -32,8 +32,6 @@ public class NativeMethods
         LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008
     }
 
-#region Restart Manager Enums
-
     /// <summary>Flags for the RegisterApplicationRestart function</summary>
     [Flags]
     public enum RestartFlags
@@ -50,8 +48,6 @@ public class NativeMethods
         /// <summary>Do not restart the process if the computer is restarted as the result of an update.</summary>
         RESTART_NO_REBOOT = 8
     }
-
-#endregion Restart Manager Enums
 
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool EnumResourceTypes(IntPtr hModule, EnumResTypeProc lpEnumFunc, IntPtr lParam);
@@ -74,10 +70,7 @@ public class NativeMethods
     [DllImport("kernel32.dll")]
     public static extern IntPtr LockResource(IntPtr hResData);
 
-#region Restart Manager Methods
-
     // https://learn.microsoft.com/en-us/windows/msix/non-store-developer-updates
-
     /// <summary>Registers the active instance of an application for restart.</summary>
     /// <param name="pwzCommandLine">
     ///     A pointer to a Unicode string that specifies the command-line arguments for the
@@ -94,13 +87,11 @@ public class NativeMethods
     [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
     public static extern uint RegisterApplicationRestart(string? pwzCommandLine, RestartFlags dwFlags);
 
-#endregion Restart Manager Methods
-
     [StructLayout(LayoutKind.Sequential)]
     public struct MESSAGE_RESOURCE_BLOCK
     {
-        public int HighId;
         public int LowId;
+        public int HighId;
         public int OffsetToEntries;
     }
 }
