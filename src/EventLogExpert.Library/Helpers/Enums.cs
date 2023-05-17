@@ -16,8 +16,8 @@ public enum SeverityLevel
 public enum FilterType
 {
     EventId,
-    Severity,
-    Provider,
+    Level,
+    Source,
     Task,
     Description
 }
@@ -26,5 +26,6 @@ public enum FilterComparison
 {
     Equals,
     Contains,
-    [EnumMember(Value = "Not Equal")] NotEqual
+    [EnumMember(Value = "Not Equal")] NotEqual,
+    [EnumMember(Value = "Not Contains")] NotContains
 }

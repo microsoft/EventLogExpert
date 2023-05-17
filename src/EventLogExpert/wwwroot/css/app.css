@@ -18,9 +18,7 @@
     background: var(--background-darkgray);
 }
 
-::-webkit-scrollbar-thumb {
-    background: var(--clr-statusbar);
-}
+::-webkit-scrollbar-thumb { background: var(--clr-statusbar); }
 
 html, body {
     height: 100%;
@@ -35,11 +33,10 @@ html, body {
     color: var(--clr-lightblue);
 }
 
-h1:focus {
-    outline: none;
-}
+h1:focus { outline: none; }
 
-a, .btn-link {
+a,
+.btn-link {
     color: #0071c1;
 }
 
@@ -49,9 +46,7 @@ a, .btn-link {
     border-color: #1861ac;
 }
 
-.content {
-    padding-top: 1.1rem;
-}
+.content { padding-top: 1.1rem; }
 
 /*.valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
@@ -61,9 +56,7 @@ a, .btn-link {
     outline: 1px solid red;
 }*/
 
-.validation-message {
-    color: red;
-}
+.validation-message { color: red; }
 
 #blazor-error-ui {
     background: lightyellow;
@@ -90,18 +83,12 @@ a, .btn-link {
     color: white;
 }
 
-.blazor-error-boundary::after {
-    content: "An error has occurred."
-}
+.blazor-error-boundary::after { content: "An error has occurred." }
 
-.status-bar-safe-area {
-    display: none;
-}
+.status-bar-safe-area { display: none; }
 
 /*Moving these back temporarily until custom filter inputs area created*/
-.filter-text {
-    width: 100px;
-}
+.filter-text { width: 100px; }
 
 .input-filter-select,
 .input-filter-id,
@@ -114,7 +101,8 @@ a, .btn-link {
     border-bottom: 0.1rem solid var(--clr-lightblue);
     color: white;
     margin-right: 2rem;
-    text-align: center;
+    text-align: left;
+    text-align-last: center;
 }
 
     .input-filter-select { width: 100px; }
@@ -127,11 +115,7 @@ a, .btn-link {
 
     .input-filter-description { width: 250px; }
 
-    .input-timezone-select {
-        width: 400px;
-
-        text-align-last: center;
-    }
+    .input-timezone-select { width: 400px; }
 
         .input-filter-select:focus-visible,
         .input-filter-id:focus-visible,
@@ -155,9 +139,7 @@ a, .btn-link {
 
 .button-toggle { cursor: pointer; }
 
-    .button-toggle[data-rotate="true"] {
-        transform: translateY(-10%) rotate(-180deg);
-    }
+    .button-toggle[data-rotate="true"] { transform: translateY(-10%) rotate(-180deg); }
 
 .button-primary,
 .button-remove,

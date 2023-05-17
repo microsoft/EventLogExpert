@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Store.FilterPane;
 

@@ -8,7 +8,7 @@ using Fluxor;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using static EventLogExpert.Store.EventLog.EventLogState;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Store.EventLog;
 
@@ -28,7 +28,7 @@ public class EventLogEffects
 
         EventLogReader reader;
 
-        if (action.LogSpecifier.LogType == LogType.Live)
+        if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
         {
             reader = new EventLogReader("Application", PathType.LogName);
         }
@@ -52,8 +52,8 @@ public class EventLogEffects
             {
                 var resolved = _eventResolver.Resolve(e);
                 eventIdsAll.Add(resolved.Id);
-                eventProviderNamesAll.Add(resolved.ProviderName);
-                eventTaskNamesAll.Add(resolved.TaskDisplayName);
+                eventProviderNamesAll.Add(resolved.Source);
+                eventTaskNamesAll.Add(resolved.TaskCategory);
 
                 events.Add(resolved);
 

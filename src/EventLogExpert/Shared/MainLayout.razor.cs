@@ -2,12 +2,18 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Store.Settings;
+using Fluxor;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared;
 
 public partial class MainLayout : IDisposable
 {
+    [Inject] private IActionSubscriber ActionSubscriber { get; set; } = null!;
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
     public void Dispose()
     {
         ActionSubscriber.UnsubscribeFromAllActions(this);
@@ -24,5 +30,5 @@ public partial class MainLayout : IDisposable
     }
 
     private void OpenSettingsModal(SettingsAction.OpenMenu action) =>
-        JsRuntime.InvokeVoidAsync("openSettingsModal").AsTask();
+        JSRuntime.InvokeVoidAsync("openSettingsModal").AsTask();
 }

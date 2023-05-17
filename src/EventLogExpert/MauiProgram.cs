@@ -4,7 +4,6 @@
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Store;
-using EventLogExpert.Store.EventLog;
 using Fluxor;
 
 namespace EventLogExpert;
@@ -32,13 +31,13 @@ public static class MauiProgram
         builder.Services.AddFluxor(options =>
         {
             options.ScanAssemblies(typeof(MauiProgram).Assembly).WithLifetime(StoreLifetime.Singleton);
-            options.ScanAssemblies(typeof(EventLogState).Assembly).WithLifetime(StoreLifetime.Singleton);
             options.AddMiddleware<LoggingMiddleware>();
         });
 
         if (Utils.HasProviderDatabases())
         {
-            builder.Services.AddSingleton<IEventResolver>(new EventProviderDatabaseEventResolver(Utils.DatabasePath, Utils.Trace));
+            builder.Services.AddSingleton<IEventResolver>(
+                new EventProviderDatabaseEventResolver(Utils.DatabasePath, Utils.Trace));
         }
         else
         {

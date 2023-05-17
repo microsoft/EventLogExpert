@@ -9,10 +9,10 @@ public record DisplayEventModel(
     long? RecordId,
     DateTime? TimeCreated,
     int Id,
-    string MachineName,
+    string ComputerName,
     SeverityLevel? Level,
-    string ProviderName,
-    string TaskDisplayName,
+    string Source,
+    string TaskCategory,
     string Description,
     string Xml
 );
