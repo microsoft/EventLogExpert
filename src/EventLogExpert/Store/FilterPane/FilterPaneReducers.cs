@@ -1,10 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Store.FilterPane;
 

@@ -5,8 +5,6 @@ VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert", "EventLogExpert\EventLogExpert.csproj", "{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Store", "EventLogExpert.Store\EventLogExpert.Store.csproj", "{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}"
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Library", "EventLogExpert.Library\EventLogExpert.Library.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5F157DE7-62EB-4577-834B-58EA31AEC78B}"
@@ -30,10 +28,6 @@ Global
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.ActiveCfg = Release|x64
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.Build.0 = Release|x64
 		{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}.Release|x64.Deploy.0 = Release|x64
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|x64.ActiveCfg = Debug|x64
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Debug|x64.Build.0 = Debug|x64
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|x64.ActiveCfg = Release|x64
-		{B7040C3F-2FFF-4ABF-8F67-2F03D3BEDDB3}.Release|x64.Build.0 = Release|x64
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|x64.ActiveCfg = Debug|x64
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|x64.Build.0 = Debug|x64
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|x64.ActiveCfg = Release|x64
