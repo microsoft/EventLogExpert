@@ -13,8 +13,8 @@ public class SubFilterModel
         FilterValue = filterType switch
         {
             FilterType.EventId => default(int),
-            FilterType.Severity => SeverityLevel.All,
-            FilterType.Provider => string.Empty,
+            FilterType.Level => SeverityLevel.All,
+            FilterType.Source => string.Empty,
             FilterType.Task => string.Empty,
             FilterType.Description => string.Empty,
             _ => throw new Exception("Invalid Filter Type")

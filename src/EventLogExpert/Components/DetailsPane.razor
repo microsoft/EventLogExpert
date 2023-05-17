@@ -16,10 +16,10 @@
 
         <div class="details-group" data-toggle="@_expandXml.ToString().ToLower()">
             <div class="details-row">
-                <div>Provider: @Event.ProviderName</div>
-                <div>EventId: @Event.Id</div>
-                <div>Severity: @Event.Level</div>
-                <div>Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
+                <div>Source: @Event.Source</div>
+                <div>Event Id: @Event.Id</div>
+                <div>Level: @Event.Level</div>
+                <div>Date and Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
             </div>
 
             <div>Description:</div>

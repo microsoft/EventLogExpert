@@ -25,14 +25,14 @@ public partial class DetailsPane
         StringBuilder stringToCopy = new();
 
         stringToCopy.AppendLine($"Log Name: {EventLogState.Value.ActiveLog.Name}");
-        stringToCopy.AppendLine($"Source: {Event?.ProviderName}");
+        stringToCopy.AppendLine($"Source: {Event?.Source}");
         stringToCopy.AppendLine($"Date: {Event?.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)}");
         stringToCopy.AppendLine($"Event ID: {Event?.Id}");
-        stringToCopy.AppendLine($"Task Category: {Event?.TaskDisplayName}");
+        stringToCopy.AppendLine($"Task Category: {Event?.TaskCategory}");
         stringToCopy.AppendLine($"Level: {Event?.Level}");
         stringToCopy.AppendLine("Keywords:");
         stringToCopy.AppendLine("User:");  // TODO: Update after DisplayEventModel is updated
-        stringToCopy.AppendLine($"Computer: {Event?.MachineName}");
+        stringToCopy.AppendLine($"Computer: {Event?.ComputerName}");
         stringToCopy.AppendLine("Description:");
         stringToCopy.AppendLine(Event?.Description);
         stringToCopy.AppendLine("Event Xml:");

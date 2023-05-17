@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Settings;
+using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.IO.Compression;
 
@@ -12,13 +13,15 @@ public partial class SettingsModal
 {
     private readonly SettingsModel _request = new();
 
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
     protected override void OnInitialized()
     {
         SubscribeToAction<SettingsAction.OpenMenu>(Load);
         base.OnInitialized();
     }
 
-    private async void Close() => await JsRuntime.InvokeVoidAsync("closeSettingsModal");
+    private async void Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
 
     private async void ImportProvider()
     {
@@ -26,7 +29,10 @@ public partial class SettingsModal
         {
             PickerTitle = "Please select a database file",
             FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, new[] { ".db", ".zip" } } })
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, new[] { ".db", ".zip" } }
+                })
         };
 
         try
@@ -34,14 +40,15 @@ public partial class SettingsModal
             var result = await FilePicker.Default.PickMultipleAsync(options);
 
             Directory.CreateDirectory(Utils.DatabasePath);
-            
+
             foreach (var item in result)
             {
                 var destination = Path.Join(Utils.DatabasePath, item.FileName);
                 File.Copy(item.FullPath, destination, true);
+
                 if (Path.GetExtension(destination) == ".zip")
                 {
-                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, overwriteFiles: true);
+                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, true);
                     File.Delete(destination);
                 }
             }

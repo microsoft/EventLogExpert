@@ -29,11 +29,11 @@
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
                         Items="AvailableFilterPaneState.Value.EventIdsAll.OrderBy(id => id)" />
                     break;
-                case FilterType.Severity :
+                case FilterType.Level :
                     <FilterSelect CssClass="input-filter-severity" TInput="SeverityLevel"
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
                     break;
-                case FilterType.Provider :
+                case FilterType.Source :
                     <FilterSelect CssClass="input-filter-dropdown" TInput="string"
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
                         Items="AvailableFilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n)" />

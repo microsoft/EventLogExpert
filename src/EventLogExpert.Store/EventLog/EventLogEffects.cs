@@ -52,8 +52,8 @@ public class EventLogEffects
             {
                 var resolved = _eventResolver.Resolve(e);
                 eventIdsAll.Add(resolved.Id);
-                eventProviderNamesAll.Add(resolved.ProviderName);
-                eventTaskNamesAll.Add(resolved.TaskDisplayName);
+                eventProviderNamesAll.Add(resolved.Source);
+                eventTaskNamesAll.Add(resolved.TaskCategory);
 
                 events.Add(resolved);
 

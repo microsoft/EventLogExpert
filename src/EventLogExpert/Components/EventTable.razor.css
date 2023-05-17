@@ -12,11 +12,9 @@ table {
     table-layout: fixed;
 }
 
-thead>tr>th { padding-left: .5rem; }
+thead > tr > th { padding-left: .5rem; }
 
-tr:nth-child(odd) {
-    background-color: var(--background-darkgray);
-}
+tr:nth-child(odd) { background-color: var(--background-darkgray); }
 
 th {
     white-space: nowrap;
@@ -33,3 +31,15 @@ td {
 }
 
 .table-row { cursor: pointer; }
+
+#level { width: 100px; }
+
+#time { width: 165px; }
+
+#source { width: 250px; }
+
+#id { width: 100px; }
+
+#task { width: 250px; }
+
+#description { width: 100%; }
