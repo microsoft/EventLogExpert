@@ -48,7 +48,7 @@ public partial class SettingsModal
 
                 if (Path.GetExtension(destination) == ".zip")
                 {
-                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, true);
+                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, overwriteFiles: true);
                     File.Delete(destination);
                 }
             }
