@@ -172,7 +172,7 @@ a,
     }
 
 div.table-divider {
-    width: 8px;
+    width: 10px;
     margin: 0;
     padding: 0;
     user-select: none;
@@ -180,13 +180,11 @@ div.table-divider {
     top: 0;
     right: 0;
     z-index: 1;
-    cursor: col-resize;
-    border-right: 2px solid var(--clr-black);
 }
 
     /* col-resize is currently bugged in WebView2 */
     /* https://github.com/dotnet/maui/issues/9960 */
-    div.table-divider:hover { cursor: col-resize !important; }
+    div.table-divider:hover { cursor: e-resize !important; }
 
 form {
     display: flex;
