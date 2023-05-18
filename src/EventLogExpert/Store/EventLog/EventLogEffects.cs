@@ -64,6 +64,8 @@ public class EventLogEffects
                 }
             }
 
+            dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+
             events.Reverse();
 
             dispatcher.Dispatch(new EventLogAction.LoadEvents(events,
