@@ -10,17 +10,13 @@ namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
-    private IJSObjectReference? _jsModule;
-    private ElementReference _tableRef;
-
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>("import", "./Components/EventTable.razor.js");
-            await _jsModule.InvokeVoidAsync("enableColumnResize", _tableRef);
+            await JSRuntime.InvokeVoidAsync("enableColumnResize");
         }
 
         await base.OnAfterRenderAsync(firstRender);

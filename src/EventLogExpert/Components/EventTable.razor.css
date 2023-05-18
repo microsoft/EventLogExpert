@@ -8,11 +8,10 @@
 
 table {
     border-spacing: 0;
+    border-collapse: collapse;
     width: 100%;
     table-layout: fixed;
 }
-
-thead > tr > th { padding-left: .5rem; }
 
 tr:nth-child(odd) { background-color: var(--background-darkgray); }
 
@@ -25,10 +24,15 @@ th {
     cursor: default;
 }
 
-td {
+th, td {
     white-space: nowrap;
     overflow: hidden;
+    padding-left: .5rem;
+    border-right: 1px solid var(--clr-black);
 }
+
+    th:last-child,
+    td:last-child { border-right: none; }
 
 .table-row { cursor: pointer; }
 

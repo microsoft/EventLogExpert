@@ -1,8 +1,27 @@
-﻿export function deleteColumnResize(table) {
-    table.querySelectorAll(".table-divider").forEach(x => x.remove());
-}
+﻿
+window.openSettingsModal = () => {
+    const settingsModal = document.getElementById("settingsDialog");
 
-export function enableColumnResize(table) {
+    if (settingsModal != null) {
+        settingsModal.showModal();
+    }
+};
+
+window.closeSettingsModal = () => {
+    const settingsModal = document.getElementById("settingsDialog");
+
+    if (settingsModal != null) {
+        settingsModal.close();
+    }
+};
+
+window.deleteColumnResize = () => {
+    const table = document.getElementById("eventTable");
+    table.querySelectorAll(".table-divider").forEach(x => x.remove());
+};
+
+window.enableColumnResize = () => {
+    const table = document.getElementById("eventTable");
     const columns = table.querySelectorAll("th");
 
     if (columns != null) {
@@ -62,6 +81,8 @@ export function enableColumnResize(table) {
             divider.addEventListener("mousedown", mouseDownHandler);
         };
 
-        [].forEach.call(columns, function(column) { createResizableColumn(column); });
+        for (let i = 0; i < columns.length - 1; i++) {
+            createResizableColumn(columns[i]);
+        }
     }
-}
+};
