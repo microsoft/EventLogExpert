@@ -52,9 +52,8 @@ internal static class Utils
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(content[0].Version.Remove(0, 1));
 
-            // TODO: Change this to == since we want to force an update anytime we are not on the latest
-            // This will help us force a rollback if ever needed
-            if (newVersion.CompareTo(currentVersion) <= 0) { return; }
+            // Equality comparison allows us to downgrade in the event that we pull a release
+            if (newVersion.CompareTo(currentVersion) == 0) { return; }
 
             await Application.Current.MainPage.DisplayAlert("Update Available",
                 "A new version has been detected, app will restart shortly.",
