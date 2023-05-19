@@ -8,7 +8,10 @@
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
             <MenuFlyoutItem Text="Open File" Clicked="OpenFile_Clicked"></MenuFlyoutItem>
-            <MenuFlyoutItem Text="Open Live Event Log" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
+            <MenuFlyoutSubItem Text="Open Live Event Log">
+                <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
+                <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
+            </MenuFlyoutSubItem>
         </MenuBarItem>
         <MenuBarItem Text="Tools">
             <MenuFlyoutItem Text="Settings" Clicked="OpenSettingsModal_Clicked" />

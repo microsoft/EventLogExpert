@@ -44,7 +44,7 @@ public partial class MainPage : ContentPage
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
                 new EventLogState.LogSpecifier(
-                    "Application",
+                    ((MenuFlyoutItem)sender).Text,
                     EventLogState.LogType.Live)));
     }
 
