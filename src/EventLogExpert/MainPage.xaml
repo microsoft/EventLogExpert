@@ -11,6 +11,7 @@
             <MenuFlyoutSubItem Text="Open Live Event Log">
                 <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
                 <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
+                <MenuFlyoutSubItem Text="Other Logs" x:Name="OtherLogsFlyoutSubitem"></MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
         </MenuBarItem>
         <MenuBarItem Text="Tools">
