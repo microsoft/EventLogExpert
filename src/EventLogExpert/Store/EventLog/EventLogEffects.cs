@@ -30,7 +30,7 @@ public class EventLogEffects
 
         if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
         {
-            reader = new EventLogReader("Application", PathType.LogName);
+            reader = new EventLogReader(action.LogSpecifier.Name, PathType.LogName);
         }
         else
         {
