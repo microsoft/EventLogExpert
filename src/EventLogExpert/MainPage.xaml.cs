@@ -3,6 +3,7 @@
 
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
+using System.Diagnostics.Eventing.Reader;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
@@ -16,6 +17,8 @@ public partial class MainPage : ContentPage
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
+
+        PopulateOtherLogsMenu();
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
@@ -39,8 +42,10 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void OpenLiveLog_Clicked(object sender, EventArgs e)
+    private void OpenLiveLog_Clicked(object? sender, EventArgs e)
     {
+        if (sender == null) return;
+
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
                 new EventLogState.LogSpecifier(
@@ -50,4 +55,31 @@ public partial class MainPage : ContentPage
 
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
+
+    private void PopulateOtherLogsMenu()
+    {
+        var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
+        var session = new EventLogSession();
+        var names = session.GetLogNames()
+            .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
+            .OrderBy(n => n)
+            .Where(n =>
+            {
+                try
+                {
+                    return session.GetLogInformation(n, PathType.LogName).CreationTime.HasValue;
+                }
+                catch
+                {
+                    return false;
+                }
+            });
+
+        foreach (var name in names)
+        {
+            var m = new MenuFlyoutItem { Text = name };
+            m.Clicked += OpenLiveLog_Clicked;
+            OtherLogsFlyoutSubitem.Add(m);
+        }
+    }
 }
