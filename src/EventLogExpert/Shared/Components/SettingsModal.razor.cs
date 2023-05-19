@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.Settings;
 using Microsoft.AspNetCore.Components;
@@ -57,7 +58,19 @@ public partial class SettingsModal
         { // TODO: Log Error
         }
 
-        Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
+        bool answer = await Application.Current.MainPage.DisplayAlert("Reboot Required",
+            "In order to use these providers, a restart of the application is required. Would you like to restart now?",
+            "Yes", "No");
+
+        if (!answer)
+        {
+            Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
+            return;
+        }
+
+        uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+
+        if (res == 0) { Application.Current.Quit(); }
     }
 
     private void Load(SettingsAction.OpenMenu action) => _request.TimeZoneId = SettingsState.Value.TimeZoneId;
