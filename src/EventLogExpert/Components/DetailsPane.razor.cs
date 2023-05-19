@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
+using Fluxor;
 using System.Text;
 
 namespace EventLogExpert.Components;
@@ -16,8 +17,19 @@ public partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<EventLogAction.SelectEvent>(UpdateDetails);
         base.OnInitialized();
+        EventLogState.StateChanged += (s, e) =>
+        {
+            if (s is State<EventLogState> state)
+            {
+                if (state.Value.SelectedEvent != Event)
+                {
+                    Event = state.Value.SelectedEvent;
+                    _expandMenu = true;
+                    _expandXml = false;
+                }
+            }
+        };
     }
 
     private void CopyEvent()
@@ -44,12 +56,4 @@ public partial class DetailsPane
     private void ToggleMenu() => _expandMenu = !_expandMenu;
 
     private void ToggleXml() => _expandXml = !_expandXml;
-
-    private void UpdateDetails(EventLogAction.SelectEvent action)
-    {
-        Event = action.SelectedEvent;
-        _expandMenu = true;
-        _expandXml = false;
-        StateHasChanged();
-    }
 }

@@ -45,6 +45,7 @@ public class EventLogReducers
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
         new() { ActiveLog = action.LogSpecifier };
 
+    [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, EventLogAction.SelectEvent action)
     {
         if (state.SelectedEvent == action.SelectedEvent) { return state; }
