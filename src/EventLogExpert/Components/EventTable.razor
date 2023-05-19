@@ -17,7 +17,7 @@
         </thead>
         <tbody>
             <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
-                <tr class="table-row" @onclick="@(() => SelectEvent(evt))">
+                <tr class="@GetCss(evt)" @onclick="() => SelectEvent(evt)">
                     <td>@evt.Level</td>
                     <td>@evt.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</td>
                     <td>@evt.Source</td>

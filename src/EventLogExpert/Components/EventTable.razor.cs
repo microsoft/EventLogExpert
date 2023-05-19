@@ -22,5 +22,8 @@ public partial class EventTable
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
+        "table-row selected" : "table-row";
+
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }
