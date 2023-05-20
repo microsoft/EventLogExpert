@@ -50,11 +50,11 @@ public class EventLogEffects
             HashSet<int> eventIdsAll = new();
             HashSet<string> eventProviderNamesAll = new();
             HashSet<string> eventTaskNamesAll = new();
-            EventBookmark lastEventBookmark = null!;
+            EventRecord lastEvent = null!;
 
             while (reader.ReadEvent() is { } e)
             {
-                lastEventBookmark = e.Bookmark;
+                lastEvent = e;
                 var resolved = _eventResolver.Resolve(e);
                 eventIdsAll.Add(resolved.Id);
                 eventProviderNamesAll.Add(resolved.Source);
@@ -79,9 +79,9 @@ public class EventLogEffects
             {
                 var query = new EventLogQuery(action.LogSpecifier.Name, PathType.LogName);
 
-                if (lastEventBookmark != null)
+                if (lastEvent != null)
                 {
-                    watcher = new EventLogWatcher(query, lastEventBookmark);
+                    watcher = new EventLogWatcher(query, lastEvent.Bookmark);
                 }
                 else
                 {
