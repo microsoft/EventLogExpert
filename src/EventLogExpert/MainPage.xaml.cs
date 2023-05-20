@@ -82,4 +82,23 @@ public partial class MainPage : ContentPage
             OtherLogsFlyoutSubitem.Add(m);
         }
     }
+
+    private void LoadNewEvents_Clicked(object sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+    }
+
+    private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
+    {
+        if (((MenuFlyoutItem)sender).Text == "Continuously Update")
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
+            ((MenuFlyoutItem)sender).Text = "Continuously Update ✓";
+        }
+        else
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
+            ((MenuFlyoutItem)sender).Text = "Continuously Update";
+        }
+    }
 }

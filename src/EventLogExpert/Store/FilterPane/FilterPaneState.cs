@@ -10,4 +10,6 @@ namespace EventLogExpert.Store.FilterPane;
 public record FilterPaneState
 {
     public IEnumerable<FilterModel> CurrentFilters { get; init; } = Enumerable.Empty<FilterModel>();
+
+    public IEnumerable<FilterModel> AppliedFilters { get; init; } = Enumerable.Empty<FilterModel>();
 }

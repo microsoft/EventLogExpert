@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
+using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Store.FilterPane;
@@ -13,6 +14,40 @@ public class FilterPaneReducers
     private readonly IDispatcher _dispatcher;
 
     public FilterPaneReducers(IDispatcher dispatcher) => _dispatcher = dispatcher;
+
+    [ReducerMethod]
+    public static AvailableFilterState ReduceAddEvent(AvailableFilterState state, EventLogAction.AddEvent action)
+    {
+        var ev = action.NewEvent;
+
+        var newState = state;
+        
+        // These lookups against EventIdsAll, etc, could be slow if
+        // we have a lot of values. Consider whether we should change these to
+        // ImmutableHashSets.
+        if (!state.EventIdsAll.Contains(ev.Id))
+        {
+            var newId = new List<int> { ev.Id };
+            var allIds = newId.Concat(state.EventIdsAll).ToImmutableList();
+            newState = state with { EventIdsAll = allIds };
+        }
+
+        if (!state.EventProviderNamesAll.Contains(ev.Source))
+        {
+            var newProvider = new List<string> { ev.Source };
+            var allProviders = newProvider.Concat(state.EventProviderNamesAll).ToImmutableList();
+            newState = state with { EventProviderNamesAll = allProviders };
+        }
+
+        if (!state.TaskNamesAll.Contains(ev.TaskCategory))
+        {
+            var newTask = new List<string> { ev.TaskCategory };
+            var allTasks = newTask.Concat(state.TaskNamesAll).ToImmutableList();
+            newState = state with { TaskNamesAll = allTasks };
+        }
+
+        return newState;
+    }
 
     [ReducerMethod(typeof(FilterPaneAction.AddFilter))]
     public static FilterPaneState ReduceAddFilterAction(FilterPaneState state)
@@ -81,5 +116,20 @@ public class FilterPaneReducers
         parentFilter.SubFilters.Remove(action.SubFilterModel);
 
         return state with { CurrentFilters = updatedList };
+    }
+
+    [ReducerMethod(typeof(FilterPaneAction.ApplyFilters))]
+    public FilterPaneState ReduceApplyFilters(FilterPaneState state)
+    {
+        List<FilterModel> filters = new();
+        foreach (var filterModel in state.CurrentFilters)
+        {
+            if (filterModel.Comparison.Any())
+            {
+                filters.Add(filterModel);
+            }
+        }
+
+        return state with { AppliedFilters = filters };
     }
 }

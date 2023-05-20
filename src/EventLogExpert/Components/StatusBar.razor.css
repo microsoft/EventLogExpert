@@ -2,3 +2,7 @@
     background-color: var(--clr-statusbar);
     color: white;
 }
+
+.status-bar > span {
+    margin-right: 10px;
+}

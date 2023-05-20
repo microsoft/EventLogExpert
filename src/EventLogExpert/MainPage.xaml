@@ -19,6 +19,10 @@
             <!-- Option to export providers? -->
             <!-- Manual check for updates option or an about page with option to check for updates? -->
         </MenuBarItem>
+        <MenuBarItem Text="View">
+            <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked"></MenuFlyoutItem>
+            <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked"></MenuFlyoutItem>
+        </MenuBarItem>
     </ContentPage.MenuBarItems>
 
     <BlazorWebView HostPage="wwwroot/index.html">
