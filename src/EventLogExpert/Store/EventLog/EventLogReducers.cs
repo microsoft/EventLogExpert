@@ -63,8 +63,15 @@ public class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
-        new() { ActiveLog = action.LogSpecifier };
+    public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action)
+    {
+        if (state.Watcher != null)
+        {
+            state.Watcher.Dispose();
+        }
+
+        return new() { ActiveLog = action.LogSpecifier, ContinuouslyUpdate = state.ContinuouslyUpdate };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, EventLogAction.SelectEvent action)
