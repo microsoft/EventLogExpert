@@ -1,7 +1,7 @@
 ﻿.table-container {
     flex: 1;
     overflow: auto;
-    padding: 0px 5px;
+    padding: 0 5px;
     background-color: var(--background-dark);
     color: var(--clr-lightblue);
 }
@@ -16,8 +16,6 @@ table {
 tr:nth-child(odd) { background-color: var(--background-darkgray); }
 
 th {
-    white-space: nowrap;
-    overflow: hidden;
     position: sticky;
     top: 0;
     background-color: var(--background-darkgray);
@@ -49,6 +47,6 @@ th, td {
 
 #id { width: 100px; }
 
-#task { width: 250px; }
+#task { width: 200px; }
 
 #description { width: 100%; }

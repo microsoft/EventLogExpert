@@ -55,9 +55,12 @@ internal static class Utils
             // Equality comparison allows us to downgrade in the event that we pull a release
             if (newVersion.CompareTo(currentVersion) == 0) { return; }
 
-            await Application.Current.MainPage.DisplayAlert("Update Available",
-                "A new version has been detected, app will restart shortly.",
-                "Ok");
+            if (Application.Current?.MainPage is not null)
+            {
+                await Application.Current.MainPage.DisplayAlert("Update Available",
+                    "A new version has been detected, app will restart shortly.",
+                    "Ok");
+            }
 
             uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
@@ -122,7 +125,7 @@ internal static class Utils
         Version currentVersion =
             new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
 
-        Application.Current.Windows[0].Title = title is null ? 
+        Application.Current.Windows[0].Title = title is null ?
             $"EventLogExpert {currentVersion}" :
             $"EventLogExpert {currentVersion} {title}";
     }
