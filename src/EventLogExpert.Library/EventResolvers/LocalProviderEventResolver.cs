@@ -42,7 +42,11 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                "");
+                eventRecord.Properties,
+                eventRecord.Qualifiers,
+                eventRecord.Keywords,
+                eventRecord.LogName,
+                null);
         }
 
         // The Properties getter is expensive, so we only call the getter once,

@@ -28,7 +28,12 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.ProviderName,
             eventRecord.Task is 0 or null ? "None" : TryGetValue(() => eventRecord.TaskDisplayName),
             string.IsNullOrEmpty(desc) ? string.Empty : desc,
-            string.IsNullOrEmpty(xml) ? string.Empty : xml);
+            eventRecord.Properties,
+            eventRecord.Qualifiers,
+            eventRecord.Keywords,
+            eventRecord.LogName,
+            null
+            );
     }
 
     private static T TryGetValue<T>(Func<T> func)

@@ -81,72 +81,6 @@ public class EventResolverBase
         return description;
     }
 
-    protected string FormatXml(EventRecord record, IList<EventProperty> properties, string? template)
-    {
-        var sb = new StringBuilder(
-            "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\">\r\n" +
-            $"  <System>\r\n" +
-            $"    <Provider Name=\"{record.ProviderName}\" />\r\n" +
-            $"    <EventID{(record.Qualifiers.HasValue ? $" Qualifiers=\"{record.Qualifiers.Value}\"" : "")}>{record.Id}</EventID>\r\n" +
-            $"    <Level>{record.Level}</Level>\r\n" +
-            $"    <Task>{record.Task}</Task>\r\n" +
-            $"    <Keywords>{(record.Keywords.HasValue ? ("0x" + record.Keywords.Value.ToString("X")) : "0x0")}</Keywords>\r\n" +
-            $"    <TimeCreated SystemTime=\"{(record.TimeCreated.HasValue ? record.TimeCreated.Value.ToUniversalTime().ToString("o") : "")}\" />\r\n" +
-            $"    <EventRecordID>{record.RecordId}</EventRecordID>\r\n" +
-            $"    <Channel>{record.LogName}</Channel>\r\n" +
-            $"    <Computer>{record.MachineName}</Computer>\r\n" +
-            $"  </System>\r\n" +
-            $"  <EventData>\r\n");
-
-        if (!string.IsNullOrEmpty(template))
-        {
-            var propertyNames = new List<string>();
-            var index = -1;
-            while (-1 < (index = template.IndexOf("name=", index + 1)))
-            {
-                var nameStart = index + 6;
-                var nameEnd = template.IndexOf('"', nameStart);
-                var name = template.Substring(nameStart, nameEnd - nameStart);
-                propertyNames.Add(name);
-            }
-
-            for (var i = 0; i < properties.Count; i++)
-            {
-                if (i >= propertyNames.Count)
-                {
-                    _tracer("EventResolverBase.FormatXml(): Property count exceeds template names.");
-                    _tracer($"  Provider: {record.ProviderName} EventID: {record.Id} Property count: {properties.Count} Name count: {propertyNames.Count}");
-                    break;
-                }
-
-                if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && properties[i].Value is byte[] val)
-                {
-                    // Handle event 7036 from Service Control Manager binary data
-                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
-                    sb.Append($"    <Data Name=\"{propertyNames[i + 1]}\">{Convert.ToHexString(val)}</Data>\r\n");
-                    i++;
-                }
-                else
-                {
-                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{properties[i].Value}</Data>\r\n");
-                }
-            }
-        }
-        else
-        {
-            foreach (var p in properties)
-            {
-                sb.Append($"    <Data>{p.Value}</Data>\r\n");
-            }
-        }
-
-        sb.Append(
-            "  </EventData>\r\n" +
-            "</Event>");
-
-        return sb.ToString();
-    }
-
     /// <summary>
     /// Resolve event descriptions from a provider.
     /// </summary>
@@ -164,6 +98,7 @@ public class EventResolverBase
         string? description = null;
         string? xml = null;
         string? taskName = null;
+        string? template = null;
 
         if (eventRecord.Version != null && eventRecord.LogName != null)
         {
@@ -210,7 +145,7 @@ public class EventResolverBase
                     description = FormatDescription(eventProperties, e.Description);
                 }
 
-                xml = FormatXml(eventRecord, eventProperties, e.Template);
+                template = e.Template;
             }
         }
 
@@ -218,7 +153,6 @@ public class EventResolverBase
         {
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
             description = FormatDescription(eventProperties, description);
-            xml = FormatXml(eventRecord, eventProperties, null);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)
@@ -255,6 +189,10 @@ public class EventResolverBase
                 eventRecord.ProviderName,
                 taskName,
                 description,
-                xml);
+                eventProperties,
+                eventRecord.Qualifiers,
+                eventRecord.Keywords,
+                eventRecord.LogName,
+                template);
     }
 }
