@@ -7,11 +7,11 @@
 
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
-            <MenuFlyoutItem Text="Open File" Clicked="OpenFile_Clicked"></MenuFlyoutItem>
+            <MenuFlyoutItem Text="Open File" Clicked="OpenFile_Clicked" />
             <MenuFlyoutSubItem Text="Open Live Event Log">
-                <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
-                <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked"></MenuFlyoutItem>
-                <MenuFlyoutSubItem Text="Other Logs" x:Name="OtherLogsFlyoutSubitem"></MenuFlyoutSubItem>
+                <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
+                <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
+                <MenuFlyoutSubItem Text="Other Logs" x:Name="OtherLogsFlyoutSubitem" />
             </MenuFlyoutSubItem>
         </MenuBarItem>
         <MenuBarItem Text="Tools">
@@ -20,8 +20,8 @@
             <!-- Manual check for updates option or an about page with option to check for updates? -->
         </MenuBarItem>
         <MenuBarItem Text="View">
-            <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked"></MenuFlyoutItem>
-            <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked"></MenuFlyoutItem>
+            <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
+            <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" />
         </MenuBarItem>
     </ContentPage.MenuBarItems>
 

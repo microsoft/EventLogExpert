@@ -112,4 +112,18 @@ internal static class Utils
     }
 
     internal static void Trace(string message) => System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {message}");
+
+    internal static void UpdateAppTitle(string? title = null)
+    {
+        if (Application.Current?.Windows.Any() is not true) { return; }
+
+        PackageVersion packageVersion = Package.Current.Id.Version;
+
+        Version currentVersion =
+            new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
+
+        Application.Current.Windows[0].Title = title is null ? 
+            $"EventLogExpert {currentVersion}" :
+            $"EventLogExpert {currentVersion} {title}";
+    }
 }

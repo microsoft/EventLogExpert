@@ -40,6 +40,8 @@ public partial class MainPage : ContentPage
                         result.FullPath,
                         EventLogState.LogType.File)));
         }
+
+        Utils.UpdateAppTitle(result?.FullPath);
     }
 
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
@@ -51,6 +53,8 @@ public partial class MainPage : ContentPage
                 new EventLogState.LogSpecifier(
                     ((MenuFlyoutItem)sender).Text,
                     EventLogState.LogType.Live)));
+
+        Utils.UpdateAppTitle(((MenuFlyoutItem)sender).Text);
     }
 
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
