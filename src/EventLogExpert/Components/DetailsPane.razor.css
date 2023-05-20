@@ -12,9 +12,9 @@
     transition: all 1s;
 }
 
-.details-pane[data-toggle="false"] { min-height: auto; }
+    .details-pane[data-toggle="false"] { min-height: auto; }
 
-    .details-pane[data-toggle="false"] > :not(.details-header) { display: none; }
+        .details-pane[data-toggle="false"] > :not(.details-header) { display: none; }
 
 .details-header {
     display: flex;
@@ -39,8 +39,8 @@
 }
 
 .details-row-xml {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
 }
 
 .details-xml {

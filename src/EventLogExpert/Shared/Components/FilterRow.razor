@@ -1,6 +1,6 @@
 ﻿@inject IState<AvailableFilterState> AvailableFilterPaneState
 
-<div class="filter-row @(Value.IsEditing ? "edit-grid" : "")">
+<div class="filter-row">
     @if (Value.IsEditing)
     {
         <div>
@@ -50,10 +50,6 @@
             }
 
         </div>
-
-        <button class="button-primary row-center" @onclick="AddSubFilter">
-            <i class="bi bi-plus-circle"></i> Add Sub Filter
-        </button>
     }
     else if (string.IsNullOrWhiteSpace(Value.ComparisonString))
     {
@@ -67,6 +63,10 @@
     <div class="row-justify-right">
         @if (Value.IsEditing)
         {
+            <button class="button-primary" @onclick="AddSubFilter">
+                <i class="bi bi-plus-circle"></i> Add Sub Filter
+            </button>
+
             <button class="button-save" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
             </button>

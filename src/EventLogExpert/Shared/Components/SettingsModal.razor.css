@@ -6,9 +6,7 @@
     background-color: var(--background-dark);
 }
 
-.tz-row {
-    margin-bottom: 1rem;
-}
+.tz-row { margin-bottom: 1rem; }
 
 .provider-row {
     display: flex;
@@ -25,15 +23,11 @@
     overflow-x: hidden;
 }
 
-    .provider-list > p {
-        margin: 0px;
-    }
+    .provider-list > p { margin: 0; }
 
 .button-group {
     display: flex;
     justify-content: flex-end;
 }
 
-    .button-group > button {
-        width: 50px;
-    }
+    .button-group > button { width: 50px; }

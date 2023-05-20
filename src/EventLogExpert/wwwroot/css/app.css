@@ -90,6 +90,10 @@ a,
 /*Moving these back temporarily until custom filter inputs area created*/
 .filter-text { width: 100px; }
 
+.header-center { text-align: center; }
+
+.header-justify-right { justify-self: right; }
+
 .input-filter-select,
 .input-filter-id,
 .input-filter-severity,
@@ -113,7 +117,10 @@ a,
 
     .input-filter-dropdown { width: 250px; }
 
-    .input-filter-description { width: 250px; }
+    .input-filter-description {
+        width: 250px;
+        text-align: center;
+    }
 
     .input-timezone-select { width: 400px; }
 
@@ -172,7 +179,7 @@ a,
     }
 
 div.table-divider {
-    width: 10px;
+    width: 8px;
     margin: 0;
     padding: 0;
     user-select: none;
