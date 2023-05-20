@@ -141,12 +141,16 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     {
         DisplayEventModel lastResult = null;
 
+        // The Properties getter is expensive, so we only call the getter once,
+        // and we pass this value separately from the eventRecord so it can be reused.
+        var eventProperties = eventRecord.Properties;
+
         if (_providerDetails.ContainsKey(eventRecord.ProviderName))
         {
             _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
             if (providerDetails != null)
             {
-                lastResult = ResolveFromProviderDetails(eventRecord, providerDetails);
+                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
             }
         }
         else
@@ -156,7 +160,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 var providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == eventRecord.ProviderName);
                 if (providerDetails != null)
                 {
-                    lastResult = ResolveFromProviderDetails(eventRecord, providerDetails);
+                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
 
                     if (lastResult?.Description != null)
                     {
@@ -179,7 +183,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                FormatXml(eventRecord, null));
+                FormatXml(eventRecord, eventProperties, null));
         }
 
         if (lastResult.Description == null)

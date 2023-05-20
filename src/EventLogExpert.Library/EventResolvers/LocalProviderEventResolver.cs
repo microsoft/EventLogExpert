@@ -45,7 +45,11 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 "");
         }
 
-        var result = ResolveFromProviderDetails(eventRecord, providerDetails);
+        // The Properties getter is expensive, so we only call the getter once,
+        // and we pass this value separately from the eventRecord so it can be reused.
+        var eventProperties = eventRecord.Properties;
+
+        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
 
         if (result.Description == null)
         {

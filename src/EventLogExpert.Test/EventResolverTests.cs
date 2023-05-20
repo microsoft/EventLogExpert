@@ -26,7 +26,7 @@ public class EventResolverTests
 
         public DisplayEventModel Resolve(EventRecord eventRecord)
         {
-            return ResolveFromProviderDetails(eventRecord, _providerDetailsList[0]);
+            return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0]);
         }
     }
 
