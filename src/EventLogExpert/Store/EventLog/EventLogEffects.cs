@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
@@ -15,10 +16,12 @@ namespace EventLogExpert.Store.EventLog;
 public class EventLogEffects
 {
     private readonly IEventResolver _eventResolver;
+    private readonly ITraceLogger _debugLogger;
 
-    public EventLogEffects(IEventResolver eventResolver)
+    public EventLogEffects(IEventResolver eventResolver, ITraceLogger debugLogger)
     {
         _eventResolver = eventResolver;
+        _debugLogger = debugLogger;
     }
 
     [EffectMethod]
@@ -47,9 +50,11 @@ public class EventLogEffects
             HashSet<int> eventIdsAll = new();
             HashSet<string> eventProviderNamesAll = new();
             HashSet<string> eventTaskNamesAll = new();
+            EventBookmark lastEventBookmark = null!;
 
             while (reader.ReadEvent() is { } e)
             {
+                lastEventBookmark = e.Bookmark;
                 var resolved = _eventResolver.Resolve(e);
                 eventIdsAll.Add(resolved.Id);
                 eventProviderNamesAll.Add(resolved.Source);
@@ -68,7 +73,35 @@ public class EventLogEffects
 
             events.Reverse();
 
+            EventLogWatcher watcher = null!;
+
+            if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
+            {
+                var query = new EventLogQuery(action.LogSpecifier.Name, PathType.LogName);
+
+                if (lastEventBookmark != null)
+                {
+                    watcher = new EventLogWatcher(query, lastEventBookmark);
+                }
+                else
+                {
+                    watcher = new EventLogWatcher(query);
+                }
+
+                watcher.EventRecordWritten += (watcher, eventArgs) =>
+                {
+                    _debugLogger.Trace("EventRecordWritten was called.");
+                    var resolved = _eventResolver.Resolve(eventArgs.EventRecord);
+                    dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
+                };
+
+                watcher.Enabled = true;
+
+                _debugLogger.Trace("EventLogWatcher enabled.");
+            }
+
             dispatcher.Dispatch(new EventLogAction.LoadEvents(events,
+                watcher,
                 eventIdsAll.ToImmutableList(),
                 eventProviderNamesAll.ToImmutableList(),
                 eventTaskNamesAll.ToImmutableList()));

@@ -1,6 +1,7 @@
 ﻿@inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
+@inject IState<FilterPaneState> FilterPaneState
 @inject IState<SettingsState> SettingsState
 
 <div class="table-container">
@@ -16,7 +17,7 @@
             </tr>
         </thead>
         <tbody>
-            <Virtualize Items="@EventLogState.Value.EventsToDisplay" Context="evt">
+            <Virtualize Items="@GetFilteredEvents()" Context="evt" @ref="_virtualizeComponent">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td>@evt.Level</td>
                     <td>@evt.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</td>

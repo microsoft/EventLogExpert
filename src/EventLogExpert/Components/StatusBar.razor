@@ -1,5 +1,23 @@
 ﻿@inherits FluxorComponent
 
+@inject IState<EventLogState> EventLogState
 @inject IState<StatusBarState> StatusBarState
 
-<div class="status-bar">Events Loaded: @StatusBarState.Value.EventsLoaded</div>
+@if (EventLogState.Value.Events.Count < 1 || EventLogState.Value.ActiveLog.LogType == EventLogExpert.Store.EventLog.EventLogState.LogType.File)
+{
+    <div class="status-bar">Events Loaded: @StatusBarState.Value.EventsLoaded</div>
+}
+else
+{
+    <div class="status-bar">
+        <span>Events Loaded: @EventLogState.Value.Events.Count</span>
+        @if (EventLogState.Value.ContinuouslyUpdate)
+        {
+            <span>Continuously Updating</span>
+        }
+        else
+        {
+            <span>New Events: @EventLogState.Value.NewEvents.Count</span>
+        }
+    </div>
+}

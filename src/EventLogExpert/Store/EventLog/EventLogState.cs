@@ -3,14 +3,11 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
+using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Store.EventLog;
 
-/// <summary>
-///     NOTE: Because Virtualize requires an ICollection<T>, we have to use
-///     some sort of mutable collection for EventsToDisplay, unfortunately.
-///     If that ever changes we should consider making these immutable.
-/// </summary>
 [FeatureState]
 public record EventLogState
 {
@@ -18,11 +15,15 @@ public record EventLogState
 
     public LogSpecifier ActiveLog { get; init; } = null!;
 
-    public List<DisplayEventModel> Events { get; init; } = new();
+    public bool ContinuouslyUpdate { get; init; } = false;
 
-    public List<DisplayEventModel> EventsToDisplay { get; init; } = new();
-
-    public DisplayEventModel? SelectedEvent { get; set; }
+    public ImmutableList<DisplayEventModel> Events { get; init; } = ImmutableList<DisplayEventModel>.Empty;
 
     public record LogSpecifier(string Name, LogType? LogType);
+
+    public ImmutableList<DisplayEventModel> NewEvents { get; init; } = ImmutableList<DisplayEventModel>.Empty;
+
+    public DisplayEventModel? SelectedEvent { get; init; }
+
+    public EventLogWatcher? Watcher { get; init; } = null!;
 }
