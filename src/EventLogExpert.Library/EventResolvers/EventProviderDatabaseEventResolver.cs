@@ -183,7 +183,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                FormatXml(eventRecord, eventProperties, null));
+                eventProperties,
+                eventRecord.Qualifiers,
+                eventRecord.Keywords,
+                eventRecord.LogName,
+                null);
         }
 
         if (lastResult.Description == null)

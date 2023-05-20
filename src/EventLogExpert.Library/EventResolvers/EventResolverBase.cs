@@ -164,6 +164,7 @@ public class EventResolverBase
         string? description = null;
         string? xml = null;
         string? taskName = null;
+        string? template = null;
 
         if (eventRecord.Version != null && eventRecord.LogName != null)
         {
@@ -210,7 +211,7 @@ public class EventResolverBase
                     description = FormatDescription(eventProperties, e.Description);
                 }
 
-                xml = FormatXml(eventRecord, eventProperties, e.Template);
+                template = e.Template;
             }
         }
 
@@ -218,7 +219,6 @@ public class EventResolverBase
         {
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
             description = FormatDescription(eventProperties, description);
-            xml = FormatXml(eventRecord, eventProperties, null);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)
@@ -255,6 +255,10 @@ public class EventResolverBase
                 eventRecord.ProviderName,
                 taskName,
                 description,
-                xml);
+                eventProperties,
+                eventRecord.Qualifiers,
+                eventRecord.Keywords,
+                eventRecord.LogName,
+                template);
     }
 }
