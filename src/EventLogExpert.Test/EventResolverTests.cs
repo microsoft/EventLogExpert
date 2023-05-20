@@ -123,6 +123,34 @@ public class EventResolverTests
         Debug.WriteLine(sw.ElapsedMilliseconds);
     }
 
+    [Fact]
+    public void PerfTest2()
+    {
+        var sw = new Stopwatch();
+        var eventLogReader = new EventLogReader("Application", PathType.LogName);
+        var resolver = new LocalProviderEventResolver();
+        var eventRecords = new List<EventRecord>();
+        EventRecord er;
+
+        sw.Start();
+        while (null != (er = eventLogReader.ReadEvent()))
+        {
+            eventRecords.Add(er);
+        }
+
+        sw.Stop();
+        Debug.WriteLine("Reading events took " + sw.ElapsedMilliseconds);
+
+        sw.Restart();
+        foreach (var record in eventRecords)
+        {
+            resolver.Resolve(record);
+        }
+
+        sw.Stop();
+        Debug.WriteLine("Resolving events took " + sw.ElapsedMilliseconds);
+    }
+
     public void Test1()
     {
         var eventLogReader = new EventLogReader("Application", PathType.LogName);
