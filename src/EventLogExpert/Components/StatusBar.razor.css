@@ -1,6 +1,7 @@
 ﻿.status-bar {
     background-color: var(--clr-statusbar);
     color: white;
+    padding-left: 5px;
 }
 
 .status-bar > span {
