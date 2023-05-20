@@ -11,6 +11,13 @@ else
 {
     <div class="status-bar">
         <span>Events Loaded: @EventLogState.Value.Events.Count</span>
-        <span>New Events: @EventLogState.Value.NewEvents.Count</span>
+        @if (EventLogState.Value.ContinuouslyUpdate)
+        {
+            <span>Continuously Updating</span>
+        }
+        else
+        {
+            <span>New Events: @EventLogState.Value.NewEvents.Count</span>
+        }
     </div>
 }
