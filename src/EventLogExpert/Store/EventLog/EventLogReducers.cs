@@ -77,8 +77,8 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetContinouslyUpdate(EventLogState state, EventLogAction.SetContinouslyUpdate action)
     {
-        var newState = state with { ContinuouslyUpdate = action.continuouslyUpdate };
-        if (action.continuouslyUpdate)
+        var newState = state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
+        if (action.ContinuouslyUpdate)
         {
             newState = newState with
             {

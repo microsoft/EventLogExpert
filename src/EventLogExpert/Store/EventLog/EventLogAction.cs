@@ -26,5 +26,5 @@ public record EventLogAction
 
     public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
 
-    public record SetContinouslyUpdate(bool continuouslyUpdate) : EventLogAction;
+    public record SetContinouslyUpdate(bool ContinuouslyUpdate) : EventLogAction;
 }

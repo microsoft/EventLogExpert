@@ -23,7 +23,7 @@ public record EventLogState
 
     public ImmutableList<DisplayEventModel> NewEvents { get; init; } = ImmutableList<DisplayEventModel>.Empty;
 
-    public DisplayEventModel? SelectedEvent { get; set; }
+    public DisplayEventModel? SelectedEvent { get; init; }
 
     public EventLogWatcher? Watcher { get; init; } = null!;
 }

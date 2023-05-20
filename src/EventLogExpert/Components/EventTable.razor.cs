@@ -6,17 +6,15 @@ using EventLogExpert.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web.Virtualization;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using System;
 
 namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    private Virtualize<DisplayEventModel>? _virtualizeComponent;
 
-    private Virtualize<DisplayEventModel>? virtualizeComponent;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -30,21 +28,22 @@ public partial class EventTable
 
     protected override void OnInitialized()
     {
-        base.OnInitialized();
-
         IList<DisplayEventModel> lastEventList = EventLogState.Value.Events;
+
         EventLogState.StateChanged += (s, e) =>
         {
-            if (s is State<EventLogState> state)
+            if (s is State<EventLogState> state && !Equals(state.Value.Events, lastEventList))
             {
-                if (state.Value.Events != lastEventList)
-                {
-                    lastEventList = state.Value.Events;
-                    virtualizeComponent?.RefreshDataAsync();
-                }
+                lastEventList = state.Value.Events;
+                _virtualizeComponent?.RefreshDataAsync();
             }
         };
+
+        base.OnInitialized();
     }
+
+    private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
+        "table-row selected" : "table-row";
 
     private IList<DisplayEventModel> GetFilteredEvents()
     {
@@ -59,9 +58,6 @@ public partial class EventTable
                     .Any(comp => comp(e))))
             .ToList();
     }
-
-    private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
-        "table-row selected" : "table-row";
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }
