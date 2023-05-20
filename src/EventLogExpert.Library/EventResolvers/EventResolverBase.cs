@@ -22,7 +22,7 @@ public class EventResolverBase
         _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
     }
 
-    protected string? FormatDescription(EventRecord eventRecord, string? descriptionTemplate)
+    protected string? FormatDescription(IList<EventProperty> properties, string? descriptionTemplate)
     {
         if (descriptionTemplate == null)
         {
@@ -49,9 +49,9 @@ public class EventResolverBase
                 sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
                 var propIndex = int.Parse(matches[i].Value.Trim(new[] { '{', '}', '%' }));
 
-                if (propIndex - 1 >= eventRecord.Properties.Count) { return "Unable to format description"; }
+                if (propIndex - 1 >= properties.Count) { return "Unable to format description"; }
                 
-                var propValue = eventRecord.Properties[propIndex - 1].Value;
+                var propValue = properties[propIndex - 1].Value;
                 if (propValue is DateTime)
                 {
                     // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
@@ -81,7 +81,7 @@ public class EventResolverBase
         return description;
     }
 
-    protected string FormatXml(EventRecord record, string? template)
+    protected string FormatXml(EventRecord record, IList<EventProperty> properties, string? template)
     {
         var sb = new StringBuilder(
             "<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\">\r\n" +
@@ -110,16 +110,16 @@ public class EventResolverBase
                 propertyNames.Add(name);
             }
 
-            for (var i = 0; i < record.Properties.Count; i++)
+            for (var i = 0; i < properties.Count; i++)
             {
                 if (i >= propertyNames.Count)
                 {
                     _tracer("EventResolverBase.FormatXml(): Property count exceeds template names.");
-                    _tracer($"  Provider: {record.ProviderName} EventID: {record.Id} Property count: {record.Properties.Count} Name count: {propertyNames.Count}");
+                    _tracer($"  Provider: {record.ProviderName} EventID: {record.Id} Property count: {properties.Count} Name count: {propertyNames.Count}");
                     break;
                 }
 
-                if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && record.Properties[i].Value is byte[] val)
+                if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && properties[i].Value is byte[] val)
                 {
                     // Handle event 7036 from Service Control Manager binary data
                     sb.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
@@ -128,13 +128,13 @@ public class EventResolverBase
                 }
                 else
                 {
-                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{record.Properties[i].Value}</Data>\r\n");
+                    sb.Append($"    <Data Name=\"{propertyNames[i]}\">{properties[i].Value}</Data>\r\n");
                 }
             }
         }
         else
         {
-            foreach (var p in record.Properties)
+            foreach (var p in properties)
             {
                 sb.Append($"    <Data>{p.Value}</Data>\r\n");
             }
@@ -147,7 +147,19 @@ public class EventResolverBase
         return sb.ToString();
     }
 
-    protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, ProviderDetails providerDetails)
+    /// <summary>
+    /// Resolve event descriptions from a provider.
+    /// </summary>
+    /// <param name="eventRecord"></param>
+    /// <param name="eventProperties">
+    ///     The getter for EventRecord.Properties is expensive, so we require the caller
+    ///     to call it and then pass this value separately. This ensures the value can be
+    ///     reused by both the caller and the resolver, optimizing performance in this
+    ///     critical path.
+    /// </param>
+    /// <param name="providerDetails"></param>
+    /// <returns></returns>
+    protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, IList<EventProperty> eventProperties, ProviderDetails providerDetails)
     {
         string? description = null;
         string? xml = null;
@@ -195,18 +207,18 @@ public class EventResolverBase
                 }
                 else
                 {
-                    description = FormatDescription(eventRecord, e.Description);
+                    description = FormatDescription(eventProperties, e.Description);
                 }
 
-                xml = FormatXml(eventRecord, e.Template);
+                xml = FormatXml(eventRecord, eventProperties, e.Template);
             }
         }
 
         if (description == null)
         {
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
-            description = FormatDescription(eventRecord, description);
-            xml = FormatXml(eventRecord, null);
+            description = FormatDescription(eventProperties, description);
+            xml = FormatXml(eventRecord, eventProperties, null);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)

@@ -6,7 +6,6 @@ using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
-using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Library.EventResolvers;
 
@@ -30,7 +29,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
             _providerDetails.Add(eventRecord.ProviderName, provider.LoadProviderDetails());
         }
 
-        _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
+        _providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails);
 
         if (providerDetails == null)
         {
@@ -46,7 +45,11 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 "");
         }
 
-        var result = ResolveFromProviderDetails(eventRecord, providerDetails);
+        // The Properties getter is expensive, so we only call the getter once,
+        // and we pass this value separately from the eventRecord so it can be reused.
+        var eventProperties = eventRecord.Properties;
+
+        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
 
         if (result.Description == null)
         {

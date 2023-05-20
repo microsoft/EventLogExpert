@@ -13,6 +13,7 @@ namespace EventLogExpert.Library.Providers;
 /// </summary>
 public class EventMessageProvider
 {
+    private static HashSet<string> _allProviderNames = (new EventLogSession()).GetProviderNames().ToHashSet();
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;
     private readonly Action<string> _traceAction;
@@ -192,6 +193,12 @@ public class EventMessageProvider
         _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}");
 
         var provider = new ProviderDetails { ProviderName = _providerName };
+
+        if (!_allProviderNames.Contains(_providerName))
+        {
+            _traceAction($"{_providerName} modern provider is not present. Returning empty provider.");
+            return provider;
+        }
 
         ProviderMetadata providerMetadata;
         try
