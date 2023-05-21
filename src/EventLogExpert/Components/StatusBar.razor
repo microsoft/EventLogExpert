@@ -17,7 +17,11 @@ else
         }
         else
         {
-            <span>New Events: @EventLogState.Value.NewEvents.Count</span>
+            <span>New Events: @EventLogState.Value.NewEventBuffer.Events.Count</span>
+            @if (EventLogState.Value.NewEventBuffer.IsBufferFull)
+            {
+                <span>Buffer Full</span>
+            }
         }
     </div>
 }

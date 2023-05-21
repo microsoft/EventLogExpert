@@ -10,6 +10,10 @@ namespace EventLogExpert.Store.EventLog;
 [FeatureState]
 public record EventLogState
 {
+    public record EventBuffer(ImmutableList<DisplayEventModel> Events, bool IsBufferFull);
+
+    public record LogSpecifier(string Name, LogType? LogType);
+
     public enum LogType { Live, File }
 
     public LogSpecifier ActiveLog { get; init; } = null!;
@@ -18,9 +22,7 @@ public record EventLogState
 
     public ImmutableList<DisplayEventModel> Events { get; init; } = ImmutableList<DisplayEventModel>.Empty;
 
-    public record LogSpecifier(string Name, LogType? LogType);
-
-    public ImmutableList<DisplayEventModel> NewEvents { get; init; } = ImmutableList<DisplayEventModel>.Empty;
+    public EventBuffer NewEventBuffer { get; init; } = new (ImmutableList<DisplayEventModel>.Empty, false);
 
     public DisplayEventModel? SelectedEvent { get; init; }
 
