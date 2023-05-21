@@ -4,12 +4,15 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
+using Microsoft.AspNetCore.Components;
 using System.Text;
 
 namespace EventLogExpert.Components;
 
 public partial class DetailsPane
 {
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> selectedEventSelection { get; set; } = null!;
+
     private bool _expandMenu = false;
     private bool _expandXml = false;
 
@@ -18,16 +21,14 @@ public partial class DetailsPane
     protected override void OnInitialized()
     {
         base.OnInitialized();
-        EventLogState.StateChanged += (s, e) =>
+
+        selectedEventSelection.Select(s => s.SelectedEvent);
+        selectedEventSelection.SelectedValueChanged += (s, v) =>
         {
-            if (s is State<EventLogState> state)
+            if (v != null)
             {
-                if (state.Value.SelectedEvent != Event)
-                {
-                    Event = state.Value.SelectedEvent;
-                    _expandMenu = true;
-                    _expandXml = false;
-                }
+                _expandMenu = true;
+                _expandXml = false;
             }
         };
     }
