@@ -31,12 +31,14 @@ public class EventLogReducers
         }
         else
         {
-            newState = newState with { NewEvents = newEvent.Concat(state.NewEvents).ToImmutableList() };
-        }
+            var updatedBuffer = newEvent.Concat(state.NewEventBuffer.Events).ToImmutableList();
+            var full = updatedBuffer.Count >= MaxNewEvents;
+            newState = newState with { NewEventBuffer = new(updatedBuffer, full) };
 
-        if (newState.NewEvents.Count >= MaxNewEvents && state.Watcher != null && state.Watcher.IsWatching)
-        {
-            state.Watcher.StopWatching();
+            if (full && state.Watcher != null && state.Watcher.IsWatching)
+            {
+                state.Watcher.StopWatching();
+            }
         }
 
         return newState;
@@ -53,7 +55,12 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
-        var newState = state with { Events = state.NewEvents.Concat(state.Events).ToImmutableList(), NewEvents = ImmutableList<DisplayEventModel>.Empty };
+        var newState = state with
+        {
+            Events = state.NewEventBuffer.Events.Concat(state.Events).ToImmutableList(),
+            NewEventBuffer = new(ImmutableList<DisplayEventModel>.Empty, false)
+        };
+
         if (state.Watcher != null && !state.Watcher.IsWatching)
         {
             state.Watcher.StartWatching();
@@ -86,8 +93,8 @@ public class EventLogReducers
         {
             newState = newState with
             {
-                Events = state.NewEvents.Concat(state.Events).ToImmutableList(),
-                NewEvents = ImmutableList<DisplayEventModel>.Empty
+                Events = state.NewEventBuffer.Events.Concat(state.Events).ToImmutableList(),
+                NewEventBuffer = new(ImmutableList<DisplayEventModel>.Empty, false)
             };
         }
 
