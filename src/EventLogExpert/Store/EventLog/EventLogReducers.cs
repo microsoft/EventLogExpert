@@ -34,9 +34,14 @@ public class EventLogReducers
             newState = newState with { NewEvents = newEvent.Concat(state.NewEvents).ToImmutableList() };
         }
 
-        if (newState.NewEvents.Count >= MaxNewEvents && state.Watcher != null)
+        if (newState.NewEvents.Count >= MaxNewEvents && state.Watcher != null && state.Watcher.Enabled)
         {
-            state.Watcher.Enabled = false;
+            newState = newState with { Watcher = null };
+
+            // This must run on a different thread to avoid a deadlock. This causes
+            // the EventLogWatcher to block until other callbacks complete, and they
+            // cannot complete if we are tying up the Store by blocking on this thread.
+            Task.Run(() => state.Watcher.Enabled = false);
         }
 
         return newState;
