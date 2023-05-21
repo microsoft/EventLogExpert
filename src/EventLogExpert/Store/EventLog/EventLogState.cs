@@ -4,7 +4,6 @@
 using EventLogExpert.Library.Models;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Store.EventLog;
 
@@ -25,5 +24,5 @@ public record EventLogState
 
     public DisplayEventModel? SelectedEvent { get; init; }
 
-    public EventLogWatcher? Watcher { get; init; } = null!;
+    public LiveLogWatcher? Watcher { get; init; } = null!;
 }

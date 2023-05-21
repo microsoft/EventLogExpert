@@ -73,31 +73,20 @@ public class EventLogEffects
 
             events.Reverse();
 
-            EventLogWatcher watcher = null!;
+            LiveLogWatcher watcher = null!;
 
             if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
             {
-                var query = new EventLogQuery(action.LogSpecifier.Name, PathType.LogName);
+                watcher = new LiveLogWatcher(
+                    action.LogSpecifier.Name,
+                    lastEvent?.Bookmark,
+                    _debugLogger,
+                    _eventResolver,
+                    dispatcher);
 
-                if (lastEvent != null)
-                {
-                    watcher = new EventLogWatcher(query, lastEvent.Bookmark);
-                }
-                else
-                {
-                    watcher = new EventLogWatcher(query);
-                }
+                watcher.StartWatching();
 
-                watcher.EventRecordWritten += (watcher, eventArgs) =>
-                {
-                    _debugLogger.Trace("EventRecordWritten was called.");
-                    var resolved = _eventResolver.Resolve(eventArgs.EventRecord);
-                    dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
-                };
-
-                watcher.Enabled = true;
-
-                _debugLogger.Trace("EventLogWatcher enabled.");
+                _debugLogger.Trace("LiveLogWatcher created and started.");
             }
 
             dispatcher.Dispatch(new EventLogAction.LoadEvents(events,

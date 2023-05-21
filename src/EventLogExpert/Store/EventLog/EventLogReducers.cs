@@ -34,14 +34,9 @@ public class EventLogReducers
             newState = newState with { NewEvents = newEvent.Concat(state.NewEvents).ToImmutableList() };
         }
 
-        if (newState.NewEvents.Count >= MaxNewEvents && state.Watcher != null && state.Watcher.Enabled)
+        if (newState.NewEvents.Count >= MaxNewEvents && state.Watcher != null && state.Watcher.IsWatching)
         {
-            newState = newState with { Watcher = null };
-
-            // This must run on a different thread to avoid a deadlock. This causes
-            // the EventLogWatcher to block until other callbacks complete, and they
-            // cannot complete if we are tying up the Store by blocking on this thread.
-            Task.Run(() => state.Watcher.Enabled = false);
+            state.Watcher.StopWatching();
         }
 
         return newState;
@@ -59,9 +54,9 @@ public class EventLogReducers
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
         var newState = state with { Events = state.NewEvents.Concat(state.Events).ToImmutableList(), NewEvents = ImmutableList<DisplayEventModel>.Empty };
-        if (state.Watcher != null && !state.Watcher.Enabled)
+        if (state.Watcher != null && !state.Watcher.IsWatching)
         {
-            state.Watcher.Enabled = true;
+            state.Watcher.StartWatching();
         }
 
         return newState;
@@ -70,10 +65,7 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action)
     {
-        if (state.Watcher != null)
-        {
-            state.Watcher.Dispose();
-        }
+        state.Watcher?.StopWatching();
 
         return new() { ActiveLog = action.LogSpecifier, ContinuouslyUpdate = state.ContinuouslyUpdate };
     }
