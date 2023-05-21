@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
-using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Store.EventLog;
 
@@ -14,7 +13,7 @@ public record EventLogAction
 
     public record LoadEvents(
         List<DisplayEventModel> Events,
-        EventLogWatcher Watcher,
+        LiveLogWatcher Watcher,
         IReadOnlyList<int> AllEventIds,
         IReadOnlyList<string> AllProviderNames,
         IReadOnlyList<string> AllTaskNames
