@@ -92,8 +92,6 @@ public partial class MainPage : ContentPage
 
     private async void PopulateOtherLogsMenu()
     {
-        await Task.Delay(5000);
-
         var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
         var session = new EventLogSession();
         var names = session.GetLogNames()
