@@ -32,9 +32,15 @@
             }
         </div>
 
-        <div class="button-group">
-            <button class="button-save" type="submit">Save</button>
-            <button class="button-primary" type="reset" @onclick="Close">Exit</button>
+        <div class="footer-group">
+            <div class="prerelease-group">
+                Pre-release Builds: <BooleanSelect @bind-Value="_request.IsPrereleaseEnabled" />
+            </div>
+
+            <div class="button-group">
+                <button class="button-save" type="submit">Save</button>
+                <button class="button-primary" type="button" @onclick="Close">Exit</button>
+            </div>
         </div>
 
     </EditForm>

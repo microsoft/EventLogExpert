@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using System.Diagnostics;
+using System.Text;
 using System.Text.Json;
 using Windows.ApplicationModel;
 using Windows.Management.Deployment;
@@ -14,20 +15,24 @@ internal static class Utils
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
+    private static bool _isDevBuild;
+    private static bool _isPrereleaseBuild;
+
     public static string DatabasePath => Path.Join(FileSystem.AppDataDirectory, "Databases");
 
     public static string LoggingPath => Path.Join(FileSystem.AppDataDirectory, "debug.log");
 
     public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
 
-    internal static async void CheckForUpdates()
+    internal static async Task<bool> CheckForUpdates(bool isPrerelease)
     {
-        PackageVersion packageVersion = Package.Current.Id.Version;
+        Version currentVersion = GetCurrentVersion();
 
-        Version currentVersion =
-            new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
-
-        if (currentVersion.Major <= 1) { return; }
+        if (currentVersion.Major <= 1)
+        {
+            _isDevBuild = true;
+            return false;
+        }
 
         HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/"), };
 
@@ -35,25 +40,42 @@ internal static class Utils
         client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
         client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
 
-        // TODO: Currently only "pre release" is available, can swith to releases/latest once offical releases are out
-        // Only a single release will be available, no need to index into 0 for latest
-        // This will also allow us to force an install if we need to rollback a version
         var response = await client.GetAsync("/repos/microsoft/EventLogExpert/releases");
 
-        if (response.IsSuccessStatusCode is not true) { return; }
+        if (response.IsSuccessStatusCode is not true) { return false; }
 
         try
         {
             var stream = await response.Content.ReadAsStreamAsync();
-            var content = await JsonSerializer.DeserializeAsync<List<GitReleaseModel>>(stream);
+            var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
 
-            if (content is null) { return; }
+            if (content is null) { return false; }
+
+            // Versions are based on current DateTime so this is safer than dealing with
+            // stripping the v off the Version for every release
+            var releases = content.OrderByDescending(x => x.ReleaseDate).ToArray();
+
+            GitReleaseModel? latest = isPrerelease ?
+                releases.FirstOrDefault(x => x.IsPrerelease) :
+                releases.FirstOrDefault();
+
+            if (latest is null) { return false; }
+
+            _isPrereleaseBuild = latest.IsPrerelease;
 
             // Need to drop the v off the version number provided by GitHub
-            var newVersion = new Version(content[0].Version.Remove(0, 1));
+            var newVersion = new Version(latest.Version.TrimStart('v'));
 
             // Equality comparison allows us to downgrade in the event that we pull a release
-            if (newVersion.CompareTo(currentVersion) == 0) { return; }
+            if (newVersion.CompareTo(currentVersion) == 0) { return false; }
+
+            string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
+
+            if (downloadPath is null) { return false; }
+
+            uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+
+            if (res != 0) { return false; }
 
             if (Application.Current?.MainPage is not null)
             {
@@ -62,21 +84,18 @@ internal static class Utils
                     "Ok");
             }
 
-            uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
-
-            if (res != 0) { return; }
-
             PackageManager packageManager = new();
 
-            // Assets[1] should contain the MSIX
-            // TODO: Add Logic to validate that content[0].Assets.Where Name contains .msix
-            await packageManager.AddPackageAsync(new Uri(content[0].Assets[1].Uri),
+            await packageManager.AddPackageAsync(new Uri(downloadPath),
                 null,
                 DeploymentOptions.ForceTargetApplicationShutdown);
         }
         catch
         { // TODO: Log Update Failure
+            return false;
         }
+
+        return true;
     }
 
     internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
@@ -116,17 +135,42 @@ internal static class Utils
 
     internal static void Trace(string message) => System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {message}");
 
-    internal static void UpdateAppTitle(string? title = null)
+    internal static void UpdateAppTitle(string? logName = null)
     {
         if (Application.Current?.Windows.Any() is not true) { return; }
 
+        Version currentVersion = GetCurrentVersion();
+
+        StringBuilder title = new("EventLogExpert ");
+
+        if (_isDevBuild)
+        {
+            title.Append("(Development)");
+        }
+        else if (_isPrereleaseBuild)
+        {
+            title.Append($"(Preview) {currentVersion}");
+        }
+        else
+        {
+            title.Append(currentVersion);
+        }
+
+        if (logName is not null)
+        {
+            title.Append($" {logName}");
+        }
+
+        Application.Current.Windows[0].Title = title.ToString();
+    }
+
+    private static Version GetCurrentVersion()
+    {
         PackageVersion packageVersion = Package.Current.Id.Version;
 
         Version currentVersion =
             new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
 
-        Application.Current.Windows[0].Title = title is null ?
-            $"EventLogExpert {currentVersion}" :
-            $"EventLogExpert {currentVersion} {title}";
+        return currentVersion;
     }
 }

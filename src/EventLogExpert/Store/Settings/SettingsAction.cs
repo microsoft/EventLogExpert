@@ -7,6 +7,8 @@ namespace EventLogExpert.Store.Settings;
 
 public record SettingsAction
 {
+    public record CheckForUpdates : SettingsAction;
+
     public record LoadProviders(string Path) : SettingsAction;
 
     public record LoadSettings(string Path) : SettingsAction;

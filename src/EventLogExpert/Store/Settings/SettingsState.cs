@@ -12,5 +12,7 @@ public record SettingsState
 
     public TimeZoneInfo TimeZone { get; init; } = null!;
 
+    public bool IsPrereleaseEnabled { get; init; }
+
     public IEnumerable<string> LoadedProviders { get; init; } = Enumerable.Empty<string>();
 }
