@@ -92,34 +92,33 @@ public partial class MainPage : ContentPage
 
     private async void PopulateOtherLogsMenu()
     {
-        // Do this in the background to improve startup time.
-        var names = await Task.Run(() =>
-        {
-            var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
-            var session = new EventLogSession();
-            var names = session.GetLogNames()
-                .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
-                .OrderBy(n => n)
-                .Where(n =>
-                {
-                    try
-                    {
-                        return session.GetLogInformation(n, PathType.LogName).CreationTime.HasValue;
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-                });
-
-            return names;
-        });
+        var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
+        var session = new EventLogSession();
+        var names = session.GetLogNames()
+            .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
+            .OrderBy(n => n);
 
         foreach (var name in names)
         {
-            var m = new MenuFlyoutItem { Text = name };
-            m.Clicked += OpenLiveLog_Clicked;
-            OtherLogsFlyoutSubitem.Add(m);
+            // Do this in the background to improve startup time.
+            var hasLogInformation = await Task.Run(() =>
+            {
+                try
+                {
+                    return session.GetLogInformation(name, PathType.LogName).CreationTime.HasValue;
+                }
+                catch
+                {
+                    return false;
+                }
+            });
+
+            if (hasLogInformation)
+            {
+                var m = new MenuFlyoutItem { Text = name };
+                m.Clicked += OpenLiveLog_Clicked;
+                OtherLogsFlyoutSubitem.Add(m);
+            }
         }
     }
 
