@@ -69,7 +69,7 @@ internal static class Utils
             // Equality comparison allows us to downgrade in the event that we pull a release
             if (newVersion.CompareTo(currentVersion) == 0) { return false; }
 
-            string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".appinstaller"))?.Uri;
+            string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
 
             if (downloadPath is null) { return false; }
 
@@ -86,9 +86,9 @@ internal static class Utils
 
             PackageManager packageManager = new();
 
-            await packageManager.AddPackageByAppInstallerFileAsync(new Uri(downloadPath),
-                AddPackageByAppInstallerOptions.ForceTargetAppShutdown,
-                packageManager.GetDefaultPackageVolume());
+            await packageManager.AddPackageAsync(new Uri(downloadPath),
+                null,
+                DeploymentOptions.ForceTargetApplicationShutdown);
         }
         catch
         { // TODO: Log Update Failure
