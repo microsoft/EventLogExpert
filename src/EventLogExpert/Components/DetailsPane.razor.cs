@@ -11,7 +11,7 @@ namespace EventLogExpert.Components;
 
 public partial class DetailsPane
 {
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> selectedEventSelection { get; set; } = null!;
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; set; } = null!;
 
     private bool _expandMenu = false;
     private bool _expandXml = false;
@@ -22,11 +22,12 @@ public partial class DetailsPane
     {
         base.OnInitialized();
 
-        selectedEventSelection.Select(s => s.SelectedEvent);
-        selectedEventSelection.SelectedValueChanged += (s, v) =>
+        SelectedEventSelection.Select(s => s.SelectedEvent);
+        SelectedEventSelection.SelectedValueChanged += (s, v) =>
         {
             if (v != null)
             {
+                Event = EventLogState.Value.SelectedEvent;
                 _expandMenu = true;
                 _expandXml = false;
             }

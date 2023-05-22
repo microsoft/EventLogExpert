@@ -3,8 +3,7 @@
 @inject IState<EventLogState> EventLogState
 @inject IState<SettingsState> SettingsState
 
-@{ var selectedEvent = EventLogState.Value.SelectedEvent; }
-@if (selectedEvent is not null)
+@if (Event is not null)
 {
     <div class="details-pane" data-toggle="@_expandMenu.ToString().ToLower()">
 
@@ -17,14 +16,14 @@
 
         <div class="details-group" data-toggle="@_expandXml.ToString().ToLower()">
             <div class="details-row">
-                <div>Source: @selectedEvent.Source</div>
-                <div>Event Id: @selectedEvent.Id</div>
-                <div>Level: @selectedEvent.Level</div>
-                <div>Date and Time: @selectedEvent.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
+                <div>Source: @Event.Source</div>
+                <div>Event Id: @Event.Id</div>
+                <div>Level: @Event.Level</div>
+                <div>Date and Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
             </div>
 
             <div>Description:</div>
-            <p class="details-description">@selectedEvent.Description</p>
+            <p class="details-description">@Event.Description</p>
         </div>
 
         <div class="details-row-xml">
@@ -35,7 +34,7 @@
             </span>
         </div>
 
-        <p class="details-xml" data-toggle="@_expandXml.ToString().ToLower()">@selectedEvent.Xml</p>
+        <p class="details-xml" data-toggle="@_expandXml.ToString().ToLower()">@Event.Xml</p>
 
     </div>
 }
