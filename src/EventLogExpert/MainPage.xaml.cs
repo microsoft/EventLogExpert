@@ -1,8 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
+using Microsoft.AspNetCore.Components;
 using System.Diagnostics.Eventing.Reader;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -11,6 +13,8 @@ namespace EventLogExpert;
 public partial class MainPage : ContentPage
 {
     private readonly IDispatcher _fluxorDispatcher;
+
+    [Inject] private IEventResolver _resolver { get; init; } = null!;
 
     public MainPage(IDispatcher fluxorDispatcher)
     {
