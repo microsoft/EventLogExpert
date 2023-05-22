@@ -142,8 +142,6 @@ a,
             background: var(--background-dark);
         }
 
-    .input-timezone-select > option { text-align: left; }
-
 .button-toggle { cursor: pointer; }
 
     .button-toggle[data-rotate="true"] { transform: translateY(-10%) rotate(-180deg); }

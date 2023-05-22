@@ -6,4 +6,6 @@ namespace EventLogExpert.Library.Models;
 public record SettingsModel
 {
     public string TimeZoneId { get; set; } = string.Empty;
+
+    public bool IsPrereleaseEnabled { get; set; }
 }

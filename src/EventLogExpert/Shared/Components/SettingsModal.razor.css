@@ -25,6 +25,16 @@
 
     .provider-list > p { margin: 0; }
 
+.footer-group {
+    display: flex;
+    justify-content: space-between;
+}
+
+.prerelease-group {
+    display: flex;
+    align-items: center;
+}
+
 .button-group {
     display: flex;
     justify-content: flex-end;

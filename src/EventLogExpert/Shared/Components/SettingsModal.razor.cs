@@ -18,11 +18,16 @@ public partial class SettingsModal
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<SettingsAction.OpenMenu>(Load);
+        SettingsState.StateChanged += (s, e) => ResetRequestModel();
+
         base.OnInitialized();
     }
 
-    private async void Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
+    private async void Close()
+    {
+        await JSRuntime.InvokeVoidAsync("closeSettingsModal");
+        ResetRequestModel();
+    }
 
     private async void ImportProvider()
     {
@@ -56,11 +61,13 @@ public partial class SettingsModal
         }
         catch
         { // TODO: Log Error
+            return;
         }
 
-        bool answer = await Application.Current.MainPage.DisplayAlert("Reboot Required",
+        bool answer = await Application.Current!.MainPage!.DisplayAlert("Reboot Required",
             "In order to use these providers, a restart of the application is required. Would you like to restart now?",
-            "Yes", "No");
+            "Yes",
+            "No");
 
         if (!answer)
         {
@@ -73,7 +80,13 @@ public partial class SettingsModal
         if (res == 0) { Application.Current.Quit(); }
     }
 
-    private void Load(SettingsAction.OpenMenu action) => _request.TimeZoneId = SettingsState.Value.TimeZoneId;
+    private void ResetRequestModel()
+    {
+        _request.TimeZoneId = SettingsState.Value.TimeZoneId;
+        _request.IsPrereleaseEnabled = SettingsState.Value.IsPrereleaseEnabled;
+
+        StateHasChanged();
+    }
 
     private void Save()
     {

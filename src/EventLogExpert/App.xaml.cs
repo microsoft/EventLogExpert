@@ -13,4 +13,13 @@ public partial class App : Application
 
         MainPage = new NavigationPage(new MainPage(fluxorDispatcher));
     }
+
+    protected override Window CreateWindow(IActivationState? activationState)
+    {
+        var window = base.CreateWindow(activationState);
+
+        window.Title = "EventLogExpert";
+
+        return window;
+    }
 }
