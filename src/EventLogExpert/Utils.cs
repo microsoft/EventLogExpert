@@ -56,8 +56,8 @@ internal static class Utils
             var releases = content.OrderByDescending(x => x.ReleaseDate).ToArray();
 
             GitReleaseModel? latest = isPrerelease ?
-                releases.FirstOrDefault(x => x.IsPrerelease) :
-                releases.FirstOrDefault();
+                releases.FirstOrDefault() :
+                releases.FirstOrDefault(x => !x.IsPrerelease);
 
             if (latest is null) { return false; }
 
