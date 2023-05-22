@@ -3,25 +3,31 @@
 @inject IState<EventLogState> EventLogState
 @inject IState<StatusBarState> StatusBarState
 
-@if (EventLogState.Value.Events.Count < 1 || EventLogState.Value.ActiveLog.LogType == EventLogExpert.Store.EventLog.EventLogState.LogType.File)
-{
-    <div class="status-bar">Events Loaded: @StatusBarState.Value.EventsLoaded</div>
-}
-else
-{
-    <div class="status-bar">
+<div class="status-bar">
+    @if (EventLogState.Value.Events.Count < 1 || EventLogState.Value.ActiveLog.LogType == EventLogExpert.Store.EventLog.EventLogState.LogType.File)
+    {
+        <span>Events Loaded: @StatusBarState.Value.EventsLoaded</span>
+    }
+    else
+    {
         <span>Events Loaded: @EventLogState.Value.Events.Count</span>
-        @if (EventLogState.Value.ContinuouslyUpdate)
+    }
+
+    @if (EventLogState.Value.ContinuouslyUpdate)
+    {
+        <span>Continuously Updating</span>
+    }
+    else
+    {
+        <span>New Events: @EventLogState.Value.NewEventBuffer.Events.Count</span>
+        @if (EventLogState.Value.NewEventBuffer.IsBufferFull)
         {
-            <span>Continuously Updating</span>
+            <span>Buffer Full</span>
         }
-        else
-        {
-            <span>New Events: @EventLogState.Value.NewEventBuffer.Events.Count</span>
-            @if (EventLogState.Value.NewEventBuffer.IsBufferFull)
-            {
-                <span>Buffer Full</span>
-            }
-        }
-    </div>
-}
+    }
+
+    @if (!string.IsNullOrEmpty(StatusBarState.Value.ResolverStatus))
+    {
+        <span>@StatusBarState.Value.ResolverStatus</span>
+    }
+</div>

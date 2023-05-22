@@ -13,11 +13,17 @@ namespace EventLogExpert.Library.EventResolvers;
 
 public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {
+    public string Status { get; private set; } = string.Empty;
+
+    public event EventHandler<string>? StatusChanged;
+
     private List<EventProviderDbContext> dbContexts = new();
 
     private readonly string _dbFolder;
 
     private Dictionary<string, ProviderDetails?> _providerDetails = new();
+
+    private volatile bool _ready = false;
 
     private bool disposedValue;
 
@@ -54,7 +60,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// Loads the databases. If ActiveDatabases is populated, any databases
     /// not named therein are skipped.
     /// </summary>
-    private void LoadDatabases()
+    private async void LoadDatabases()
     {
         foreach (var context in dbContexts)
         {
@@ -67,12 +73,36 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
         var databasesToLoad = ActiveDatabases.Any() ? ActiveDatabases.Where(db => allDbFiles.Contains(db)) : allDbFiles;
 
-        foreach (var file in databasesToLoad)
+        var contexts = await Task.Run(() =>
         {
-            var c = new EventProviderDbContext(file, readOnly: true, _tracer);
-            c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
-            dbContexts.Add(c);
-        }
+            var contexts = new List<EventProviderDbContext>();
+            foreach (var file in databasesToLoad)
+            {
+                var c = new EventProviderDbContext(file, readOnly: false, _tracer);
+                if (c.IsUpgradeNeeded())
+                {
+                    UpdateStatus($"Upgrading database {c.Name}. Please wait...");
+                    c.PerformUpgradeIfNeeded();
+                }
+
+                c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
+                contexts.Add(c);
+            }
+
+            UpdateStatus(string.Empty);
+
+            return contexts;
+        });
+
+        dbContexts = contexts;
+
+        _ready = true;
+    }
+
+    private void UpdateStatus(string message)
+    {
+        Status = message;
+        StatusChanged?.Invoke(this, message);
     }
 
     /// <summary>
@@ -139,6 +169,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     public DisplayEventModel Resolve(EventRecord eventRecord)
     {
+        while (!_ready)
+        {
+            Thread.Sleep(100);
+        }
+
         DisplayEventModel lastResult = null;
 
         // The Properties getter is expensive, so we only call the getter once,

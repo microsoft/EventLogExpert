@@ -14,6 +14,10 @@ namespace EventLogExpert.Library.EventResolvers;
 /// </summary>
 public class EventReaderEventResolver : IEventResolver
 {
+    public string Status { get; private set; } = string.Empty;
+
+    public event EventHandler<string>? StatusChanged;
+
     public DisplayEventModel Resolve(EventRecord eventRecord)
     {
         var desc = eventRecord.FormatDescription();

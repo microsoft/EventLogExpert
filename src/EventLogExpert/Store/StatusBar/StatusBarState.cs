@@ -9,4 +9,6 @@ namespace EventLogExpert.Store.StatusBar;
 public record StatusBarState
 {
     public int EventsLoaded { get; init; }
+
+    public string ResolverStatus { get; init; } = string.Empty;
 }
