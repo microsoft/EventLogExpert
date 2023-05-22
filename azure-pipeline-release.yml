@@ -80,9 +80,11 @@ steps:
     [xml]$appinstaller = Get-Content -Raw $appInstallerFile
     $appInstaller.AppInstaller.MainPackage.Uri = $appInstaller.AppInstaller.MainPackage.Uri -replace "/download/(.*)/", "/download/"
     $appInstaller.AppInstaller.Dependencies.Package.Uri = $appInstaller.AppInstaller.Dependencies.Package.Uri -replace "/download/(.*)/", "/download/"
+    $e = $appInstaller.CreateElement("ForceUpdateFromAnyVersion", "http://schemas.microsoft.com/appx/appinstaller/2017/2")
+    $e.InnerText = "true"
     $appInstaller.Save($appInstallerFile)
     Get-Content $appInstallerFile
-  displayName: 'update appinstaller paths'
+  displayName: 'update appinstaller'
 
 - task: EsrpCodeSigning@2
   inputs:
