@@ -26,6 +26,10 @@ public class LoggingMiddleware : Middleware
             // We don't want to serialize all the events.
             _debugLogger.Trace($"Action: EventLogAction.LoadEvents with {loadEventsAction.Events.Count} events.");
         }
+        else if (action is EventLogAction.AddEvent addEventsAction)
+        {
+            _debugLogger.Trace($"Action: EventLogAction.AddEvent with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
+        }
         else if (action is FilterPaneAction.RemoveFilter)
         {
             // We can't serialize a Func.
