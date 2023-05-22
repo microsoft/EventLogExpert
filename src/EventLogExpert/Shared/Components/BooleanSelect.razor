@@ -1,0 +1,7 @@
+<div class="toggle">
+    <input type="radio" id="@Id false" name="@Id" value="false" checked="@(!Value)" @onchange="SetValue" />
+    <label for="@Id false">Disabled</label>
+
+    <input type="radio" id="@Id true" name="@Id" value="true" checked="@(Value)" @onchange="SetValue" />
+    <label for="@Id true">Enabled</label>
+</div>

@@ -46,7 +46,9 @@ public class SettingsReducer
 
         return state with
         {
-            TimeZoneId = config.TimeZoneId, TimeZone = TimeZoneInfo.FindSystemTimeZoneById(config.TimeZoneId)
+            TimeZoneId = config.TimeZoneId,
+            TimeZone = TimeZoneInfo.FindSystemTimeZoneById(config.TimeZoneId),
+            IsPrereleaseEnabled = config.IsPrereleaseEnabled
         };
     }
 
@@ -61,7 +63,8 @@ public class SettingsReducer
             return state with
             {
                 TimeZoneId = action.Settings.TimeZoneId,
-                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(action.Settings.TimeZoneId)
+                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(action.Settings.TimeZoneId),
+                IsPrereleaseEnabled = action.Settings.IsPrereleaseEnabled
             };
         }
         catch

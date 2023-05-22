@@ -9,6 +9,10 @@ public record GitReleaseModel
 {
     [JsonPropertyName("name")] public string Version { get; set; } = null!;
 
+    [JsonPropertyName("prerelease")] public bool IsPrerelease { get; set; }
+
+    [JsonPropertyName("published_at")] public DateTime ReleaseDate { get; set; }
+
     [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
 }
 

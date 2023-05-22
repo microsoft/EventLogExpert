@@ -44,6 +44,28 @@ public partial class MainPage : ContentPage
         Utils.UpdateAppTitle(result?.FullPath);
     }
 
+    private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new SettingsAction.CheckForUpdates());
+
+    private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
+    {
+        if (((MenuFlyoutItem)sender).Text == "Continuously Update")
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
+            ((MenuFlyoutItem)sender).Text = "Continuously Update ✓";
+        }
+        else
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
+            ((MenuFlyoutItem)sender).Text = "Continuously Update";
+        }
+    }
+
+    private void LoadNewEvents_Clicked(object sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+    }
+
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
     {
         if (sender == null) return;
@@ -84,25 +106,6 @@ public partial class MainPage : ContentPage
             var m = new MenuFlyoutItem { Text = name };
             m.Clicked += OpenLiveLog_Clicked;
             OtherLogsFlyoutSubitem.Add(m);
-        }
-    }
-
-    private void LoadNewEvents_Clicked(object sender, EventArgs e)
-    {
-        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
-    }
-
-    private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
-    {
-        if (((MenuFlyoutItem)sender).Text == "Continuously Update")
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update ✓";
-        }
-        else
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update";
         }
     }
 }
