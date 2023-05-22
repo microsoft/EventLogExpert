@@ -4,7 +4,8 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
 using Microsoft.EntityFrameworkCore;
-using System.Diagnostics;
+using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using System.Text.Json;
 
 namespace EventLogExpert.Library.EventProviderDatabase;
 
@@ -50,22 +51,101 @@ public class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Messages)
-            .HasConversion<JsonValueConverter<List<MessageModel>>>();
+            .HasConversion<CompressedJsonValueConverter<List<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Events)
-            .HasConversion<JsonValueConverter<List<EventModel>>>();
+            .HasConversion<CompressedJsonValueConverter<List<EventModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Keywords)
-            .HasConversion<JsonValueConverter<Dictionary<long, string>>>();
+            .HasConversion<CompressedJsonValueConverter<Dictionary<long, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Opcodes)
-            .HasConversion<JsonValueConverter<Dictionary<int, string>>>();
+            .HasConversion<CompressedJsonValueConverter<Dictionary<int, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Tasks)
-            .HasConversion<JsonValueConverter<Dictionary<int, string>>>();
+            .HasConversion<CompressedJsonValueConverter<Dictionary<int, string>>>();
+    }
+
+    public bool IsUpgradeNeeded()
+    {
+        var connection = Database.GetDbConnection();
+        Database.OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT * FROM sqlite_schema";
+        using var reader = command.ExecuteReader();
+        var needsUpgrade = false;
+        while (reader.Read())
+        {
+            var val = reader["sql"]?.ToString();
+            if (val?.Contains("\"Messages\" TEXT NOT NULL") ?? false)
+            {
+                needsUpgrade = true;
+                break;
+            }
+        }
+
+        reader.Close();
+
+        _tracer($"EventProviderDbContext.IsUpgradeNeeded() returning {needsUpgrade} for database {Path}");
+
+        return needsUpgrade;
+    }
+
+    public void PerformUpgradeIfNeeded()
+    {
+        if (!IsUpgradeNeeded())
+        {
+            return;
+        }
+
+        var size = new FileInfo(Path).Length;
+
+        _tracer($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}");
+
+        var connection = Database.GetDbConnection();
+        Database.OpenConnection();
+        using var command = connection.CreateCommand();
+
+        var allProviderDetails = new List<ProviderDetails>();
+
+        command.CommandText = "SELECT * FROM \"ProviderDetails\"";
+        var detailsReader = command.ExecuteReader();
+        while (detailsReader.Read())
+        {
+            var p = new ProviderDetails
+            {
+                ProviderName = (string)detailsReader["ProviderName"],
+                Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]),
+                Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]),
+                Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]),
+                Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]),
+                Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"])
+            };
+            allProviderDetails.Add(p);
+        }
+
+        detailsReader.Close();
+
+        command.CommandText = "DROP TABLE \"ProviderDetails\"";
+        command.ExecuteNonQuery();
+        command.CommandText = "VACUUM";
+        command.ExecuteNonQuery();
+
+        Database.EnsureCreated();
+
+        foreach (var p in allProviderDetails)
+        {
+            ProviderDetails.Add(p);
+        }
+
+        SaveChanges();
+
+        size = new FileInfo(Path).Length;
+
+        _tracer($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}");
     }
 }

@@ -18,6 +18,8 @@ class Program
 
         rootCommand.AddCommand(DiffDatabaseCommand.GetCommand());
 
+        rootCommand.AddCommand(UpgradeDatabaseCommand.GetCommand());
+
         return await rootCommand.InvokeAsync(args);
     }
 }

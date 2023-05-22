@@ -69,7 +69,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
         foreach (var file in databasesToLoad)
         {
-            var c = new EventProviderDbContext(file, readOnly: true, _tracer);
+            var c = new EventProviderDbContext(file, readOnly: false, _tracer);
+            c.PerformUpgradeIfNeeded();
             c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
             dbContexts.Add(c);
         }
