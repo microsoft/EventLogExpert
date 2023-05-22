@@ -17,6 +17,10 @@ public class EventResolverTests
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
+        public string Status { get; private set; } = string.Empty;
+
+        public event EventHandler<string>? StatusChanged;
+
         private readonly List<ProviderDetails> _providerDetailsList;
 
         internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base(s => Debug.WriteLine(s))
