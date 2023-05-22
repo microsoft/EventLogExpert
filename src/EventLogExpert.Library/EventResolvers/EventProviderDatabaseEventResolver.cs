@@ -13,6 +13,10 @@ namespace EventLogExpert.Library.EventResolvers;
 
 public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {
+    public string Status { get; private set; } = string.Empty;
+
+    public event EventHandler<string>? StatusChanged;
+
     private List<EventProviderDbContext> dbContexts = new();
 
     private readonly string _dbFolder;
@@ -75,10 +79,17 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             foreach (var file in databasesToLoad)
             {
                 var c = new EventProviderDbContext(file, readOnly: false, _tracer);
-                c.PerformUpgradeIfNeeded();
+                if (c.IsUpgradeNeeded())
+                {
+                    UpdateStatus($"Upgrading database {c.Name}. Please wait...");
+                    c.PerformUpgradeIfNeeded();
+                }
+
                 c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
                 contexts.Add(c);
             }
+
+            UpdateStatus(string.Empty);
 
             return contexts;
         });
@@ -86,6 +97,12 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         dbContexts = contexts;
 
         _ready = true;
+    }
+
+    private void UpdateStatus(string message)
+    {
+        Status = message;
+        StatusChanged?.Invoke(this, message);
     }
 
     /// <summary>

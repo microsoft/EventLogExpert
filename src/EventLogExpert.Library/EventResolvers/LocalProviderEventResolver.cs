@@ -15,6 +15,10 @@ namespace EventLogExpert.Library.EventResolvers;
 /// </summary>
 public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 {
+    public string Status { get; private set; } = string.Empty;
+
+    public event EventHandler<string>? StatusChanged;
+
     private Dictionary<string, ProviderDetails?> _providerDetails = new();
 
     public LocalProviderEventResolver() : base(s => Debug.WriteLine(s)) { }

@@ -12,5 +12,9 @@ namespace EventLogExpert.Library.EventResolvers
     public interface IEventResolver
     {
         public DisplayEventModel Resolve(EventRecord eventRecord);
+
+        public string Status { get; }
+
+        public event EventHandler<string>? StatusChanged;
     }
 }

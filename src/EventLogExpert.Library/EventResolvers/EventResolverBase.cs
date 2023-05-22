@@ -13,10 +13,6 @@ namespace EventLogExpert.Library.EventResolvers;
 
 public class EventResolverBase
 {
-    public event EventHandler<string>? StatusChanged;
-
-    public string Status { get; protected set; } = string.Empty;
-
     protected readonly Action<string> _tracer;
 
     private readonly Regex _formatRegex = new("%+[0-9]+");
