@@ -66,8 +66,7 @@ internal static class Utils
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
 
-            // Equality comparison allows us to downgrade in the event that we pull a release
-            if (newVersion.CompareTo(currentVersion) == 0) { return false; }
+            if (newVersion.CompareTo(currentVersion) <= 0) { return false; }
 
             string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
 
