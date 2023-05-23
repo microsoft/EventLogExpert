@@ -182,7 +182,7 @@ public class EventResolverBase
 
         return new DisplayEventModel(
                 eventRecord.RecordId,
-                eventRecord.TimeCreated?.ToUniversalTime(),
+                eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
                 (SeverityLevel?)eventRecord.Level,

@@ -1,7 +1,10 @@
 ﻿@using EventLogExpert.Shared.Components
+
 @inherits FluxorComponent
 
+@inject IState<AvailableFilterState> AvailableFilterState
 @inject IState<FilterPaneState> FilterPaneState
+@inject IState<SettingsState> SettingsState
 
 <div class="filter-pane">
 
@@ -28,10 +31,10 @@
     <div class="filter-content" data-toggle="@MenuState">
         <EditForm id="filter-form" Model="_model" OnValidSubmit="ApplyDateFilter">
             <span>
-                Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" />
+                After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" />
             </span>
             <span>
-                After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" />
+                Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" />
             </span>
 
             <button class="button-save" type="submit">

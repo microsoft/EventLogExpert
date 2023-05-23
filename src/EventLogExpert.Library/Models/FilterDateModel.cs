@@ -5,7 +5,7 @@ namespace EventLogExpert.Library.Models;
 
 public record FilterDateModel
 {
-    public DateTime Before { get; set; }
-
     public DateTime After { get; set; }
+
+    public DateTime Before { get; set; }
 }

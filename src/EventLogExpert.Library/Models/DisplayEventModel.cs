@@ -9,7 +9,7 @@ namespace EventLogExpert.Library.Models;
 
 public record DisplayEventModel(
     long? RecordId,
-    DateTime? TimeCreated,
+    DateTime TimeCreated,
     int Id,
     string ComputerName,
     SeverityLevel? Level,
@@ -34,7 +34,7 @@ public record DisplayEventModel(
             $"    <Level>{Level}</Level>\r\n" +
             $"    <Task>{TaskCategory}</Task>\r\n" +
             $"    <Keywords>{(Keywords.HasValue ? ("0x" + Keywords.Value.ToString("X")) : "0x0")}</Keywords>\r\n" +
-            $"    <TimeCreated SystemTime=\"{(TimeCreated.HasValue ? TimeCreated.Value.ToUniversalTime().ToString("o") : "")}\" />\r\n" +
+            $"    <TimeCreated SystemTime=\"{TimeCreated.ToUniversalTime():o}\" />\r\n" +
             $"    <EventRecordID>{RecordId}</EventRecordID>\r\n" +
             $"    <Channel>{LogName}</Channel>\r\n" +
             $"    <Computer>{ComputerName}</Computer>\r\n" +

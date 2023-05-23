@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -17,4 +18,6 @@ public record AvailableFilterState
     public IEnumerable<string> EventProviderNamesAll { get; init; } = ImmutableList<string>.Empty;
 
     public IEnumerable<string> TaskNamesAll { get; init; } = ImmutableList<string>.Empty;
+
+    public FilterDateModel EventDateRange { get; init; } = new();
 }

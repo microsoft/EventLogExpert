@@ -21,7 +21,7 @@ public class FilterPaneReducers
         var ev = action.NewEvent;
 
         var newState = state;
-        
+
         // These lookups against EventIdsAll, etc, could be slow if
         // we have a lot of values. Consider whether we should change these to
         // ImmutableHashSets.
@@ -86,11 +86,16 @@ public class FilterPaneReducers
     {
         EventIdsAll = action.AllEventIds,
         EventProviderNamesAll = action.AllProviderNames,
-        TaskNamesAll = action.AllTaskNames
+        TaskNamesAll = action.AllTaskNames,
+        EventDateRange = new FilterDateModel
+        {
+            After = action.Events.Last().TimeCreated, 
+            Before = action.Events.First().TimeCreated
+        }
     };
 
     [ReducerMethod]
-    public FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
+    public static FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
         var filter = updatedList.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
@@ -106,7 +111,8 @@ public class FilterPaneReducers
     }
 
     [ReducerMethod]
-    public FilterPaneState ReduceRemoveSubFilterAction(FilterPaneState state, FilterPaneAction.RemoveSubFilter action)
+    public static FilterPaneState ReduceRemoveSubFilterAction(FilterPaneState state,
+        FilterPaneAction.RemoveSubFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
         var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
@@ -119,9 +125,10 @@ public class FilterPaneReducers
     }
 
     [ReducerMethod(typeof(FilterPaneAction.ApplyFilters))]
-    public FilterPaneState ReduceApplyFilters(FilterPaneState state)
+    public static FilterPaneState ReduceApplyFilters(FilterPaneState state)
     {
         List<FilterModel> filters = new();
+
         foreach (var filterModel in state.CurrentFilters)
         {
             if (filterModel.Comparison.Any())
@@ -132,4 +139,9 @@ public class FilterPaneReducers
 
         return state with { AppliedFilters = filters };
     }
+
+    [ReducerMethod]
+    public static FilterPaneState
+        ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
+        state with { FilteredDateRange = action.FilterDateModel };
 }

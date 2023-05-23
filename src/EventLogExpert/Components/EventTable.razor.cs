@@ -22,27 +22,16 @@ public partial class EventTable
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    protected override void OnInitialized()
-    {
-        base.OnInitialized();
-    }
-
     private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
         "table-row selected" : "table-row";
 
-    private IList<DisplayEventModel> GetFilteredEvents()
-    {
-        if (!FilterPaneState.Value.AppliedFilters.Any())
-        {
-            return EventLogState.Value.Events;
-        }
-
-        return EventLogState.Value.Events
-            .Where(e => FilterPaneState.Value.AppliedFilters
-                .All(filter => filter.Comparison
-                    .Any(comp => comp(e))))
-            .ToList();
-    }
+    private IList<DisplayEventModel> GetFilteredEvents() => EventLogState.Value.Events
+        .Where(e => e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
+            e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before)
+        .Where(e => FilterPaneState.Value.AppliedFilters
+            .All(filter => filter.Comparison
+                .Any(comp => comp(e))))
+        .ToList();
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }
