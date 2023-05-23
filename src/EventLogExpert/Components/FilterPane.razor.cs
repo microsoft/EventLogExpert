@@ -3,8 +3,6 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.FilterPane;
-using Fluxor;
-using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components;
 
@@ -16,23 +14,17 @@ public partial class FilterPane
 
     private bool _expandMenu;
 
-    [Inject] private IStateSelection<AvailableFilterState, FilterDateModel> AvailableFilterDates { get; set; } = null!;
-
     private string MenuState => _expandMenu.ToString().ToLower();
 
     protected override void OnInitialized()
     {
-        AvailableFilterDates.Select(x => x.EventDateRange);
-
-        AvailableFilterDates.SelectedValueChanged += (sender, args) =>
+        AvailableFilterState.StateChanged += (sender, args) =>
         {
             _availableRange = AvailableFilterState.Value.EventDateRange;
             ResetDateModel();
             ApplyDateFilter();
         };
 
-        // Temp: Will reuse this to trigger filters to run anytime a new event log is loaded
-        //AvailableFilterState.StateChanged += (sender, args) => { ResetDateFilter(); };
         SettingsState.StateChanged += (sender, args) => { ResetDateModel(); };
 
         base.OnInitialized();
