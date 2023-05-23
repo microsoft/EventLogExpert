@@ -64,7 +64,7 @@ public partial class SettingsModal
             return;
         }
 
-        bool answer = await Application.Current!.MainPage!.DisplayAlert("Reboot Required",
+        bool answer = await Application.Current!.MainPage!.DisplayAlert("Application Restart Required",
             "In order to use these providers, a restart of the application is required. Would you like to restart now?",
             "Yes",
             "No");
