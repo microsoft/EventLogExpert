@@ -125,10 +125,22 @@ internal static class Utils
         System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(LoggingPath, "myListener"));
         System.Diagnostics.Trace.AutoFlush = true;
 
+        var firstChanceSemaphore = new SemaphoreSlim(1);
+
         // Trace all exceptions
         AppDomain.CurrentDomain.FirstChanceException += (o, args) =>
         {
-            Trace($"{args.Exception}");
+            // Unless we're already tracing one.
+            //
+            // When an instance of EventLogExpert is launched by double-clicking an evtx file
+            // and no databases are present, we get into a condition where we're trying to trace
+            // a first-chance exception, and the act of tracing causes another first-chance
+            // exception, which we then try to trace, until we hit a stack overflow.
+            if (firstChanceSemaphore.Wait(100))
+            {
+                Trace($"{args.Exception}");
+                firstChanceSemaphore.Release();
+            }
         };
     }
 

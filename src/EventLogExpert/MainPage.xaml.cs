@@ -27,6 +27,24 @@ public partial class MainPage : ContentPage
         PopulateOtherLogsMenu();
 
         ListenForResolverStatus();
+
+        var args = Environment.GetCommandLineArgs();
+        if (args.Length > 1)
+        {
+            OpenEventLogFile(args[1]);
+        }
+    }
+
+    private void OpenEventLogFile(string fileName)
+    {
+        _fluxorDispatcher.Dispatch(
+                new EventLogAction.OpenLog(
+                    new EventLogState.LogSpecifier(
+                        fileName,
+                        EventLogState.LogType.File)));
+
+
+        Utils.UpdateAppTitle(fileName);
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
@@ -42,14 +60,8 @@ public partial class MainPage : ContentPage
 
         if (result != null)
         {
-            _fluxorDispatcher.Dispatch(
-                new EventLogAction.OpenLog(
-                    new EventLogState.LogSpecifier(
-                        result.FullPath,
-                        EventLogState.LogType.File)));
+            OpenEventLogFile(result.FullPath);
         }
-
-        Utils.UpdateAppTitle(result?.FullPath);
     }
 
     private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
