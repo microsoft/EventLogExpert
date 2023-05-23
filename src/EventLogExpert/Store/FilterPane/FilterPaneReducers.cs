@@ -46,6 +46,8 @@ public class FilterPaneReducers
             newState = state with { TaskNamesAll = allTasks };
         }
 
+        newState = state with { EventDateRange = state.EventDateRange with { Before = ev.TimeCreated } };
+
         return newState;
     }
 

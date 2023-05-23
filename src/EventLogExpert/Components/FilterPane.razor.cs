@@ -28,6 +28,7 @@ public partial class FilterPane
         {
             _availableRange = AvailableFilterState.Value.EventDateRange;
             ResetDateModel();
+            ApplyDateFilter();
         };
 
         // Temp: Will reuse this to trigger filters to run anytime a new event log is loaded
