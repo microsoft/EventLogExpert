@@ -1,5 +1,4 @@
 ﻿@using EventLogExpert.Shared.Components
-
 @inherits FluxorComponent
 
 @inject IState<FilterPaneState> FilterPaneState
@@ -14,17 +13,35 @@
             </button>
         </div>
 
-        @if (FilterPaneState.Value.CurrentFilters.Any())
-        {
-            <span class="header-center"> [Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
+        <div class="header-center">
+            @if (FilterPaneState.Value.CurrentFilters.Any())
+            {
+                <span>[Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
+            }
+        </div>
 
-            <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
-                <i class="bi bi-caret-up"></i>
-            </span>
-        }
+        <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
+            <i class="bi bi-caret-up"></i>
+        </span>
     </div>
 
     <div class="filter-content" data-toggle="@MenuState">
+        <EditForm id="filter-form" Model="_model" OnValidSubmit="ApplyDateFilter">
+            <span>
+                Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" />
+            </span>
+            <span>
+                After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" />
+            </span>
+
+            <button class="button-save" type="submit">
+                <i class="bi bi-check-circle"></i> Apply
+            </button>
+            <button class="button-remove" type="button" @onclick="ResetDateFilter">
+                <i class="bi bi-dash-circle"></i> Reset
+            </button>
+        </EditForm>
+
         @foreach (var item in FilterPaneState.Value.CurrentFilters)
         {
             <FilterRow Value="@item" />

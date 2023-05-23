@@ -99,6 +99,7 @@ a,
 .input-filter-severity,
 .input-filter-dropdown,
 .input-filter-description,
+.input-filter-datetime,
 .input-timezone-select {
     background: none;
     border: none;
@@ -122,6 +123,12 @@ a,
         text-align: center;
     }
 
+    .input-filter-datetime { width: 200px; }
+
+        .input-filter-datetime::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
+
     .input-timezone-select { width: 400px; }
 
         .input-filter-select:focus-visible,
@@ -129,6 +136,7 @@ a,
         .input-filter-severity:focus-visible,
         .input-filter-dropdown:focus-visible,
         .input-filter-description:focus-visible,
+        .input-filter-datetime:focus-visible,
         .input-timezone-select:focus-visible {
             outline: none;
         }
@@ -190,14 +198,6 @@ div.table-divider {
     /* col-resize is currently bugged in WebView2 */
     /* https://github.com/dotnet/maui/issues/9960 */
     div.table-divider:hover { cursor: e-resize !important; }
-
-form {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-
-    height: 100%;
-}
 
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {
