@@ -96,6 +96,11 @@ public class EventLogReducers
                 Events = state.NewEventBuffer.Events.Concat(state.Events).ToList().AsReadOnly(),
                 NewEventBuffer = new(new List<DisplayEventModel>().AsReadOnly(), false)
             };
+
+            if (state.Watcher != null && !state.Watcher.IsWatching)
+            {
+                state.Watcher.StartWatching();
+            }
         }
 
         return newState;
