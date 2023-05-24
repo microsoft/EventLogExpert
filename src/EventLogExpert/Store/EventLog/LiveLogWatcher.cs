@@ -64,9 +64,15 @@ public class LiveLogWatcher
             }
         };
 
-        _watcher.Enabled = true;
+        // When the watcher is enabled, it reads all the events since the
+        // last bookmark. Do this on a background thread so we don't tie
+        // up the UI.
+        Task.Run(() =>
+        {
+            _watcher.Enabled = true;
 
-        _debugLogger.Trace("LiveLogWatcher started watching.");
+            _debugLogger.Trace("LiveLogWatcher started watching.");
+        });
     }
 
     public void StopWatching()
