@@ -27,11 +27,11 @@ public class EventLogReducers
 
         if (state.ContinuouslyUpdate)
         {
-            newState = newState with { Events = newEvent.Concat(state.Events).ToImmutableList() };
+            newState = newState with { Events = newEvent.Concat(state.Events).ToList().AsReadOnly() };
         }
         else
         {
-            var updatedBuffer = newEvent.Concat(state.NewEventBuffer.Events).ToImmutableList();
+            var updatedBuffer = newEvent.Concat(state.NewEventBuffer.Events).ToList().AsReadOnly();
             var full = updatedBuffer.Count >= MaxNewEvents;
             newState = newState with { NewEventBuffer = new(updatedBuffer, full) };
 
@@ -46,19 +46,19 @@ public class EventLogReducers
 
     [ReducerMethod(typeof(EventLogAction.ClearEvents))]
     public static EventLogState ReduceClearEvents(EventLogState state) => 
-        state with { Events = ImmutableList<DisplayEventModel>.Empty };
+        state with { Events = new List<DisplayEventModel>().AsReadOnly() };
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action) =>
-        state with { Events = action.Events.ToImmutableList(), Watcher = action.Watcher };
+        state with { Events = action.Events.ToList().AsReadOnly(), Watcher = action.Watcher };
 
     [ReducerMethod]
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
         var newState = state with
         {
-            Events = state.NewEventBuffer.Events.Concat(state.Events).ToImmutableList(),
-            NewEventBuffer = new(ImmutableList<DisplayEventModel>.Empty, false)
+            Events = state.NewEventBuffer.Events.Concat(state.Events).ToList().AsReadOnly(),
+            NewEventBuffer = new(new List<DisplayEventModel>().AsReadOnly(), false)
         };
 
         if (state.Watcher != null && !state.Watcher.IsWatching)
@@ -93,8 +93,8 @@ public class EventLogReducers
         {
             newState = newState with
             {
-                Events = state.NewEventBuffer.Events.Concat(state.Events).ToImmutableList(),
-                NewEventBuffer = new(ImmutableList<DisplayEventModel>.Empty, false)
+                Events = state.NewEventBuffer.Events.Concat(state.Events).ToList().AsReadOnly(),
+                NewEventBuffer = new(new List<DisplayEventModel>().AsReadOnly(), false)
             };
         }
 
