@@ -138,6 +138,7 @@ a,
         .input-filter-dropdown:focus-visible,
         .input-filter-description:focus-visible,
         .input-filter-datetime:focus-visible,
+        .input-advanced-filter:focus-visible,
         .input-timezone-select:focus-visible {
             outline: none;
         }

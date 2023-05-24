@@ -35,5 +35,9 @@
 #filter-form > input { color: #fff; }
 
 .input-advanced-filter {
-    width: 500px;
+    width: 800px;
+}
+
+.advanced-filter-error {
+    margin-left: 70px;
 }

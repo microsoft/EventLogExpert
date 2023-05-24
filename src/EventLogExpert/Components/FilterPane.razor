@@ -92,14 +92,14 @@
                 {
                     if (_isAdvancedFilterValid)
                     {
-                        <button class="button-save" @onclick="ApplyAdvancedFilter">
+                        <button class="button-save" type="button" @onclick="ApplyAdvancedFilter">
                             <i class="bi bi-check-circle"></i> Apply
                         </button>
                     }
                 }
                 else
                 {
-                    <button class="button-save" @onclick="EditAdvancedFilter">
+                    <button class="button-save" type="button" @onclick="EditAdvancedFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
                 }
@@ -108,7 +108,7 @@
                 </button>
                 @if (!_isAdvancedFilterValid)
                 {
-                    <div>@_advancedFilterErrorMessage</div>
+                    <div><span class="advanced-filter-error">@_advancedFilterErrorMessage</span></div>
                 }
             </div>
         }
