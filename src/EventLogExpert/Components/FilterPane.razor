@@ -20,9 +20,16 @@
                     <i class="bi bi-plus-circle"></i> Add Date Filter
                 </button>
             }
+
+            @if (!_isAdvancedFilterVisible)
+            {
+                <button class="button-primary" @onclick="AddAdvancedFilter">
+                    <i class="bi bi-plus-circle"></i> Add Advanced Filter
+                </button>
+            }
         </div>
         
-        @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible)
+        @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
         {
             <div class="header-center">
                 @if (FilterPaneState.Value.CurrentFilters.Any())
@@ -71,6 +78,39 @@
         @foreach (var item in FilterPaneState.Value.CurrentFilters)
         {
             <FilterRow Value="@item" />
+        }
+
+        @if (_isAdvancedFilterVisible)
+        {
+            <div>
+                <span>
+                    Expression: <input class="input-advanced-filter" type="text"
+                                       placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
+                                       @oninput="AdvancedFilterChanged" disabled="@(!_canEditAdvancedFilter)" />
+                </span>
+                @if (_canEditAdvancedFilter)
+                {
+                    if (_isAdvancedFilterValid)
+                    {
+                        <button class="button-save" @onclick="ApplyAdvancedFilter">
+                            <i class="bi bi-check-circle"></i> Apply
+                        </button>
+                    }
+                }
+                else
+                {
+                    <button class="button-save" @onclick="EditAdvancedFilter">
+                        <i class="bi bi-funnel"></i> Edit
+                    </button>
+                }
+                <button class="button-remove" type="button" @onclick="RemoveAdvancedFilter">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+                @if (!_isAdvancedFilterValid)
+                {
+                    <div>@_advancedFilterErrorMessage</div>
+                }
+            </div>
         }
     </div>
 

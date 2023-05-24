@@ -14,4 +14,6 @@ public record FilterPaneState
     public IEnumerable<FilterModel> AppliedFilters { get; init; } = Enumerable.Empty<FilterModel>();
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
+
+    public string AdvancedFilter { get; init; } = string.Empty;
 }

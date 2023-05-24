@@ -21,15 +21,19 @@
     transition: all 1s;
 }
 
-    .filter-content[data-toggle="false"] {
-        display: none;
+.filter-content[data-toggle="false"] {
+    display: none;
 
-        border: none;
-    }
+    border: none;
+}
 
 #filter-form {
     display: flex;
     flex-direction: row;
 }
 
-    #filter-form > input { color: #fff; }
+#filter-form > input { color: #fff; }
+
+.input-advanced-filter {
+    width: 500px;
+}

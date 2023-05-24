@@ -20,4 +20,6 @@ public record FilterPaneAction
     public record ApplyFilters;
 
     public record SetFilterDateRange(FilterDateModel? FilterDateModel);
+
+    public record SetAdvancedFilter(string Expression);
 }
