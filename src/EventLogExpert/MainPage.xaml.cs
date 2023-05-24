@@ -43,7 +43,6 @@ public partial class MainPage : ContentPage
                         fileName,
                         EventLogState.LogType.File)));
 
-
         Utils.UpdateAppTitle(fileName);
     }
 

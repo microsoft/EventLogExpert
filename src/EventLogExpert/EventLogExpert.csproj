@@ -61,7 +61,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="Fluxor.Blazor.Web" Version="5.7.0" />
+      <PackageReference Include="Fluxor.Blazor.Web" Version="5.8.0" />
     </ItemGroup>
 
     <ItemGroup>
