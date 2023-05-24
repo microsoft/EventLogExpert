@@ -8,32 +8,25 @@ namespace EventLogExpert.Components;
 
 public partial class FilterPane
 {
-    private readonly FilterDateModel _model = new();
+    private FilterDateModel _model = new();
 
-    private FilterDateModel? _availableRange;
+    private bool _editingDateRange = false;
 
     private bool _expandMenu;
 
     private string MenuState => _expandMenu.ToString().ToLower();
 
-    protected override void OnInitialized()
-    {
-        AvailableFilterState.StateChanged += (sender, args) =>
-        {
-            _availableRange = AvailableFilterState.Value.EventDateRange;
-            ResetDateModel();
-            ApplyDateFilter();
-        };
-
-        SettingsState.StateChanged += (sender, args) => { ResetDateModel(); };
-
-        base.OnInitialized();
-    }
-
     private void AddFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.AddFilter());
         _expandMenu = true;
+    }
+
+    private void AddDateFilter()
+    {
+        _model.Before = EventLogState.Value.Events.FirstOrDefault()?.TimeCreated.AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ?? DateTime.Now;
+        _model.After = EventLogState.Value.Events.LastOrDefault()?.TimeCreated.AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ?? DateTime.Now;
+        _editingDateRange = true;
     }
 
     private void ApplyDateFilter()
@@ -45,25 +38,21 @@ public partial class FilterPane
         };
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(model));
+        _editingDateRange = false;
     }
 
-    private void ResetDateFilter()
+    private void RemoveDateFilter()
     {
-        if (_availableRange is null) { return; }
-
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(_availableRange));
-        ResetDateModel();
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(null));
+        _editingDateRange = false;
     }
 
-    private void ResetDateModel()
+    private void EditDateFilter()
     {
-        // Adding 1 minute offset because DateTime input does not include seconds so we don't want to drop events
-        _model.After = _availableRange?.After.AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
-            DateTime.Now;
-
-        _model.Before = _availableRange?.Before.AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
-            DateTime.Now;
+        _editingDateRange = true;
     }
+
+    public bool IsEditingDisabled => _editingDateRange == false;
 
     private void ToggleMenu() => _expandMenu = !_expandMenu;
 }

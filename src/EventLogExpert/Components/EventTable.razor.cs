@@ -26,7 +26,7 @@ public partial class EventTable
         "table-row selected" : "table-row";
 
     private IList<DisplayEventModel> GetFilteredEvents() => EventLogState.Value.Events
-        .Where(e => e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
+        .Where(e => FilterPaneState.Value.FilteredDateRange == null ? true : e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
             e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before)
         .Where(e => FilterPaneState.Value.AppliedFilters
             .All(filter => filter.Comparison

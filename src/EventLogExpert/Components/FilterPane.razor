@@ -3,6 +3,7 @@
 @inherits FluxorComponent
 
 @inject IState<AvailableFilterState> AvailableFilterState
+@inject IState<EventLogState> EventLogState
 @inject IState<FilterPaneState> FilterPaneState
 @inject IState<SettingsState> SettingsState
 
@@ -27,28 +28,48 @@
             <i class="bi bi-caret-up"></i>
         </span>
     </div>
-
     <div class="filter-content" data-toggle="@MenuState">
-        <EditForm id="filter-form" Model="_model" OnValidSubmit="ApplyDateFilter">
-            <span>
-                After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" />
-            </span>
-            <span>
-                Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" />
-            </span>
-
-            <button class="button-save" type="submit">
-                <i class="bi bi-check-circle"></i> Apply
-            </button>
-            <button class="button-remove" type="button" @onclick="ResetDateFilter">
-                <i class="bi bi-dash-circle"></i> Reset
-            </button>
-        </EditForm>
-
         @foreach (var item in FilterPaneState.Value.CurrentFilters)
         {
             <FilterRow Value="@item" />
         }
     </div>
 
+    @if (FilterPaneState.Value.FilteredDateRange == null && !_editingDateRange)
+    {
+        <div>
+            <button class="button-primary" @onclick="AddDateFilter">
+                <i class="bi bi-plus-circle"></i> Add Date Filter
+            </button>
+        </div>
+    }
+    else
+    {
+        <div>
+            <EditForm id="filter-form" Model="_model">
+                <span>
+                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" disabled="@IsEditingDisabled" />
+                </span>
+                <span>
+                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" disabled="@IsEditingDisabled" />
+                </span>
+
+                @if (_editingDateRange)
+                {
+                    <button class="button-save" @onclick="ApplyDateFilter">
+                        <i class="bi bi-check-circle"></i> Apply
+                    </button>
+                }
+                else
+                {
+                    <button class="button-save" @onclick="EditDateFilter">
+                        <i class="bi bi-funnel"></i> Edit
+                    </button>
+                }
+                <button class="button-remove" type="button" @onclick="RemoveDateFilter">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+            </EditForm>
+        </div>
+    }
 </div>
