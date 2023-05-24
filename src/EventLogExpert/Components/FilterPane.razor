@@ -1,5 +1,4 @@
 ﻿@using EventLogExpert.Shared.Components
-
 @inherits FluxorComponent
 
 @inject IState<AvailableFilterState> AvailableFilterState
@@ -10,51 +9,48 @@
 <div class="filter-pane">
 
     <div class="filter-row">
-
         <div>
             <button class="button-primary" @onclick="AddFilter">
                 <i class="bi bi-plus-circle"></i> Add Filter
             </button>
-        </div>
 
-        <div class="header-center">
-            @if (FilterPaneState.Value.CurrentFilters.Any())
+            @if (!_isDateFilterVisible)
             {
-                <span>[Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
+                <button class="button-primary" @onclick="AddDateFilter">
+                    <i class="bi bi-plus-circle"></i> Add Date Filter
+                </button>
             }
         </div>
-
-        <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
-            <i class="bi bi-caret-up"></i>
-        </span>
-    </div>
-    <div class="filter-content" data-toggle="@MenuState">
-        @foreach (var item in FilterPaneState.Value.CurrentFilters)
+        
+        @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible)
         {
-            <FilterRow Value="@item" />
+            <div class="header-center">
+                @if (FilterPaneState.Value.CurrentFilters.Any())
+                {
+                    <span>[Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
+                }
+            </div>
+
+            <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
+                <i class="bi bi-caret-up"></i>
+            </span>
         }
     </div>
 
-    @if (FilterPaneState.Value.FilteredDateRange == null && !_editingDateRange)
-    {
-        <div>
-            <button class="button-primary" @onclick="AddDateFilter">
-                <i class="bi bi-plus-circle"></i> Add Date Filter
-            </button>
-        </div>
-    }
-    else
-    {
-        <div>
+    <div class="filter-content" data-toggle="@MenuState">
+        @if (_isDateFilterVisible)
+        {
             <EditForm id="filter-form" Model="_model">
                 <span>
-                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.After" disabled="@IsEditingDisabled" />
+                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" 
+                               @bind-Value="_model.After" disabled="@(!_canEditDate)" />
                 </span>
                 <span>
-                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" @bind-Value="_model.Before" disabled="@IsEditingDisabled" />
+                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" 
+                                @bind-Value="_model.Before" disabled="@(!_canEditDate)" />
                 </span>
 
-                @if (_editingDateRange)
+                @if (_canEditDate)
                 {
                     <button class="button-save" @onclick="ApplyDateFilter">
                         <i class="bi bi-check-circle"></i> Apply
@@ -70,6 +66,12 @@
                     <i class="bi bi-dash-circle"></i> Remove
                 </button>
             </EditForm>
-        </div>
-    }
+        }
+
+        @foreach (var item in FilterPaneState.Value.CurrentFilters)
+        {
+            <FilterRow Value="@item" />
+        }
+    </div>
+
 </div>
