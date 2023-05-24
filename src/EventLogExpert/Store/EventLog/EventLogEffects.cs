@@ -30,10 +30,8 @@ public class EventLogEffects
     {
         FilterDateModel filterDateModel = new()
         {
-            // HTML DateTime input does not contain anything below minutes
-            // so we need to offset to prevent dropping these events
-            After = action.Events.Last().TimeCreated.AddMinutes(-1), 
-            Before = action.Events.First().TimeCreated.AddMinutes(1)
+            After = action.Events.Last().TimeCreated, 
+            Before = action.Events.First().TimeCreated
         };
 
         dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(filterDateModel));

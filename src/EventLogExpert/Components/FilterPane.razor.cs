@@ -57,8 +57,12 @@ public partial class FilterPane
 
     private void ResetDateModel()
     {
-        _model.After = _availableRange?.After.ConvertTimeZone(SettingsState.Value.TimeZone) ?? DateTime.Now;
-        _model.Before = _availableRange?.Before.ConvertTimeZone(SettingsState.Value.TimeZone) ?? DateTime.Now;
+        // Adding 1 minute offset because DateTime input does not include seconds so we don't want to drop events
+        _model.After = _availableRange?.After.AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+            DateTime.Now;
+
+        _model.Before = _availableRange?.Before.AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+            DateTime.Now;
     }
 
     private void ToggleMenu() => _expandMenu = !_expandMenu;
