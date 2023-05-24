@@ -5,6 +5,7 @@ using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Linq.Dynamic.Core;
 
 namespace EventLogExpert.Components;
 
@@ -47,6 +48,11 @@ public partial class EventTable
             filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.AppliedFilters
                 .All(filter => filter.Comparison
                     .Any(comp => comp(e))));
+        }
+
+        if (!string.IsNullOrEmpty(FilterPaneState.Value.AdvancedFilter))
+        {
+            filteredEvents = filteredEvents.Where(FilterPaneState.Value.AdvancedFilter);
         }
 
         return filteredEvents.ToList();

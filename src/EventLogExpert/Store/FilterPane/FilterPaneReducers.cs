@@ -146,4 +146,8 @@ public class FilterPaneReducers
     public static FilterPaneState
         ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
         state with { FilteredDateRange = action.FilterDateModel };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetAdvancedFilter(FilterPaneState state, FilterPaneAction.SetAdvancedFilter action) =>
+        state with { AdvancedFilter = action.Expression };
 }
