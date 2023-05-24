@@ -22,6 +22,12 @@ public partial class EventTable
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override void OnInitialized()
+    {
+        MaximumStateChangedNotificationsPerSecond = 2;
+        base.OnInitialized();
+    }
+
     private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
         "table-row selected" : "table-row";
 
