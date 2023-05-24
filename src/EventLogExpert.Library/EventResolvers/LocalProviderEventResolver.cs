@@ -39,7 +39,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
         {
             return new DisplayEventModel(
                 eventRecord.RecordId,
-                eventRecord.TimeCreated?.ToUniversalTime(),
+                eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
                 (SeverityLevel?)eventRecord.Level,

@@ -19,7 +19,7 @@
                 <div>Source: @Event.Source</div>
                 <div>Event Id: @Event.Id</div>
                 <div>Level: @Event.Level</div>
-                <div>Date and Time: @Event.TimeCreated?.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
+                <div>Date and Time: @Event.TimeCreated.ConvertTimeZone(SettingsState.Value.TimeZone)</div>
             </div>
 
             <div>Description:</div>

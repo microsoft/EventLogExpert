@@ -4,6 +4,7 @@
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
+using EventLogExpert.Store.FilterPane;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
 using System.Collections.Immutable;
@@ -15,13 +16,25 @@ namespace EventLogExpert.Store.EventLog;
 
 public class EventLogEffects
 {
-    private readonly IEventResolver _eventResolver;
     private readonly ITraceLogger _debugLogger;
+    private readonly IEventResolver _eventResolver;
 
     public EventLogEffects(IEventResolver eventResolver, ITraceLogger debugLogger)
     {
         _eventResolver = eventResolver;
         _debugLogger = debugLogger;
+    }
+
+    [EffectMethod]
+    public async Task HandleLoadEventsAction(EventLogAction.LoadEvents action, IDispatcher dispatcher)
+    {
+        FilterDateModel filterDateModel = new()
+        {
+            After = action.Events.Last().TimeCreated, 
+            Before = action.Events.First().TimeCreated
+        };
+
+        dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(filterDateModel));
     }
 
     [EffectMethod]

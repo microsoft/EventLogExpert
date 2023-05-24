@@ -25,7 +25,7 @@ public class EventReaderEventResolver : IEventResolver
 
         return new DisplayEventModel(
             eventRecord.RecordId,
-            eventRecord.TimeCreated?.ToUniversalTime(),
+            eventRecord.TimeCreated!.Value.ToUniversalTime(),
             eventRecord.Id,
             eventRecord.MachineName,
             (SeverityLevel?)eventRecord.Level,

@@ -18,4 +18,6 @@ public record FilterPaneAction
     public record RemoveSubFilter(Guid ParentId, SubFilterModel SubFilterModel);
 
     public record ApplyFilters;
+
+    public record SetFilterDateRange(FilterDateModel FilterDateModel);
 }
