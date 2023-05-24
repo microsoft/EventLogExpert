@@ -22,16 +22,35 @@ public partial class EventTable
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override void OnInitialized()
+    {
+        MaximumStateChangedNotificationsPerSecond = 2;
+        base.OnInitialized();
+    }
+
     private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
         "table-row selected" : "table-row";
 
-    private IList<DisplayEventModel> GetFilteredEvents() => EventLogState.Value.Events
-        .Where(e => e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
-            e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before)
-        .Where(e => FilterPaneState.Value.AppliedFilters
-            .All(filter => filter.Comparison
-                .Any(comp => comp(e))))
-        .ToList();
+    private IList<DisplayEventModel> GetFilteredEvents()
+    {
+        var filteredEvents = EventLogState.Value.Events.AsQueryable();
+
+        if (FilterPaneState.Value.FilteredDateRange is not null)
+        {
+            filteredEvents = filteredEvents.Where(e =>
+                e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
+                e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before);
+        }
+
+        if (FilterPaneState.Value.AppliedFilters.Any())
+        {
+            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.AppliedFilters
+                .All(filter => filter.Comparison
+                    .Any(comp => comp(e))));
+        }
+
+        return filteredEvents.ToList();
+    }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 }

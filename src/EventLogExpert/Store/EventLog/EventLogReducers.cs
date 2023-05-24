@@ -13,7 +13,7 @@ public class EventLogReducers
     /// The maximum number of new events we will hold in the state
     /// before we turn off the watcher.
     /// </summary>
-    private static readonly int MaxNewEvents = 5000;
+    private static readonly int MaxNewEvents = 1000;
 
     [ReducerMethod]
     public static EventLogState ReduceAddEvent(EventLogState state, EventLogAction.AddEvent action)

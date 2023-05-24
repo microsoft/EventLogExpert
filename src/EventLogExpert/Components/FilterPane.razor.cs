@@ -10,60 +10,65 @@ public partial class FilterPane
 {
     private readonly FilterDateModel _model = new();
 
-    private FilterDateModel? _availableRange;
+    private bool _canEditDate = true;
+    private bool _isDateFilterVisible;
+    private bool _isFilterListVisible;
 
-    private bool _expandMenu;
-
-    private string MenuState => _expandMenu.ToString().ToLower();
-
-    protected override void OnInitialized()
+    private string MenuState
     {
-        AvailableFilterState.StateChanged += (sender, args) =>
+        get
         {
-            _availableRange = AvailableFilterState.Value.EventDateRange;
-            ResetDateModel();
-            ApplyDateFilter();
-        };
+            if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible)
+            {
+                return _isFilterListVisible.ToString().ToLower();
+            }
 
-        SettingsState.StateChanged += (sender, args) => { ResetDateModel(); };
+            return "false";
+        }
+    }
 
-        base.OnInitialized();
+    private void AddDateFilter()
+    {
+        _isFilterListVisible = true;
+        _canEditDate = true;
+
+        // Offset by 1 minute to make sure we don't drop events
+        // since HTML input DateTime does not go lower than minutes
+        _model.Before = EventLogState.Value.Events.FirstOrDefault()?.TimeCreated
+                .AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+            DateTime.Now;
+
+        _model.After = EventLogState.Value.Events.LastOrDefault()?.TimeCreated
+                .AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+            DateTime.Now;
+
+        _isDateFilterVisible = true;
     }
 
     private void AddFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.AddFilter());
-        _expandMenu = true;
+        _isFilterListVisible = true;
     }
 
     private void ApplyDateFilter()
     {
         FilterDateModel model = new()
         {
-            After = _model.After.ToUniversalTime(), 
-            Before = _model.Before.ToUniversalTime()
+            After = _model.After.ToUniversalTime(), Before = _model.Before.ToUniversalTime()
         };
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(model));
+        _canEditDate = false;
     }
 
-    private void ResetDateFilter()
+    private void RemoveDateFilter()
     {
-        if (_availableRange is null) { return; }
-
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(_availableRange));
-        ResetDateModel();
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(null));
+        _isDateFilterVisible = false;
     }
 
-    private void ResetDateModel()
-    {
-        // Adding 1 minute offset because DateTime input does not include seconds so we don't want to drop events
-        _model.After = _availableRange?.After.AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
-            DateTime.Now;
+    private void EditDateFilter() => _canEditDate = true;
 
-        _model.Before = _availableRange?.Before.AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
-            DateTime.Now;
-    }
-
-    private void ToggleMenu() => _expandMenu = !_expandMenu;
+    private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 }

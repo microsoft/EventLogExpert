@@ -62,7 +62,6 @@ public partial class MainPage : ContentPage
             OpenEventLogFile(result.FullPath);
         }
     }
-
     private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.CheckForUpdates());
 
