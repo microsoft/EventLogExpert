@@ -4,7 +4,7 @@
 @inject IState<FilterPaneState> FilterPaneState
 @inject IState<SettingsState> SettingsState
 
-<div class="table-container">
+<div class="table-container" @onclick="HideContextMenu">
     <table id="eventTable">
         <thead>
             <tr>
@@ -31,11 +31,15 @@
                     <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog</td>
                     <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
                     <td>@evt.Source</td>
-                    <td>@evt.Id</td>
+                    <td @oncontextmenu="@(e => ShowIdContextMenu(e, evt.Id))">@evt.Id</td>
                     <td>@evt.TaskCategory</td>
                     <td>@evt.Description</td>
                 </tr>
             </Virtualize>
         </tbody>
     </table>
+    <ul id="context-menu" class="dropdown-menu dropdown-menu-dark" role="menu" style="@GetContextMenuStyle()">
+        <li><a class="dropdown-item" href="#">Show Id @(_contextMenuId) Only</a></li>
+        <li><a class="dropdown-item" href="#">Exclude Id @(_contextMenuId)</a></li>
+    </ul>
 </div>

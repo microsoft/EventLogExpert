@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Linq.Dynamic.Core;
 
@@ -11,9 +12,19 @@ namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
+    private double _contextMenuLeft = 0;
+
+    private double _contextMenuTop = 0;
+
+    private int _contextMenuId = 0;
+
+    private bool _isContextMenuVisible = false;
+
     private bool _isDateTimeDescending = true;
 
     private string IsDateTimeDescending => _isDateTimeDescending.ToString().ToLower();
+
+    private ElementReference _contextMenu;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -70,6 +81,31 @@ public partial class EventTable
     }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
+
+    private string GetContextMenuStyle()
+    {
+        if (!_isContextMenuVisible)
+        {
+            return "display: none;";
+        }
+        else
+        {
+            return $"display: block; position: absolute; left: {_contextMenuLeft}px; top: {_contextMenuTop}px;";
+        }
+    }
+
+    private void HideContextMenu()
+    {
+        _isContextMenuVisible = false;
+    }
+
+    private void ShowIdContextMenu(MouseEventArgs args, int id)
+    {
+        _contextMenuId = id;
+        _contextMenuLeft = args.PageX;
+        _contextMenuTop = args.PageY;
+        _isContextMenuVisible = true;
+    }
 
     private void ToggleDateTime() => _isDateTimeDescending = !_isDateTimeDescending;
 }
