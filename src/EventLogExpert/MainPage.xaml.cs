@@ -6,6 +6,7 @@ using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
+using Microsoft.Maui.Storage;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
@@ -64,6 +65,27 @@ public partial class MainPage : ContentPage
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
     {
+        var result = await GetFilePickerResult();
+
+        if (result != null)
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+            OpenEventLogFile(result.FullPath);
+        }
+    }
+
+    public async void AddFile_Clicked(object sender, EventArgs e)
+    {
+        var result = await GetFilePickerResult();
+
+        if (result != null)
+        {
+            OpenEventLogFile(result.FullPath);
+        }
+    }
+
+    private async Task<FileResult?> GetFilePickerResult()
+    {
         var options = new PickOptions
         {
             FileTypes = new FilePickerFileType(
@@ -71,13 +93,9 @@ public partial class MainPage : ContentPage
             )
         };
 
-        FileResult? result = await FilePicker.Default.PickAsync(options);
-
-        if (result != null)
-        {
-            OpenEventLogFile(result.FullPath);
-        }
+        return await FilePicker.Default.PickAsync(options);
     }
+
     private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.CheckForUpdates());
 
@@ -99,6 +117,13 @@ public partial class MainPage : ContentPage
     }
 
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+
+        AddLiveLog_Clicked(sender, e);
+    }
+
+    private void AddLiveLog_Clicked(object? sender, EventArgs e)
     {
         if (sender == null) return;
 
@@ -148,7 +173,10 @@ public partial class MainPage : ContentPage
             {
                 var m = new MenuFlyoutItem { Text = name };
                 m.Clicked += OpenLiveLog_Clicked;
-                OtherLogsFlyoutSubitem.Add(m);
+                OpenOtherLogsFlyoutSubitem.Add(m);
+
+                var addm = new MenuFlyoutItem { Text = name };
+                addm.Clicked += AddLiveLog_Clicked;
             }
         }
     }

@@ -7,13 +7,23 @@
 
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
-            <MenuFlyoutItem Text="Open File" Clicked="OpenFile_Clicked" />
-            <MenuFlyoutSubItem Text="Open Live Event Log">
-                <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
-                <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
-                <MenuFlyoutSubItem Text="Other Logs" x:Name="OtherLogsFlyoutSubitem" />
+            <MenuFlyoutSubItem Text="Open">
+                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" />
+                <MenuFlyoutSubItem Text="Live Event Log">
+                    <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
+                    <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
+                    <MenuFlyoutSubItem Text="Other Logs" x:Name="OpenOtherLogsFlyoutSubitem" />
+                </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
-            <MenuFlyoutItem Text="Close" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
+            <MenuFlyoutSubItem Text="Add Another Log To This View">
+                <MenuFlyoutItem Text="File" Clicked="AddFile_Clicked" />
+                <MenuFlyoutSubItem Text="Live Event Log">
+                    <MenuFlyoutItem Text="Application" Clicked="AddLiveLog_Clicked" />
+                    <MenuFlyoutItem Text="System" Clicked="AddLiveLog_Clicked" />
+                    <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" />
+                </MenuFlyoutSubItem>
+            </MenuFlyoutSubItem>
+            <MenuFlyoutItem Text="Close All Open Logs" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
