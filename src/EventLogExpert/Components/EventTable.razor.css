@@ -20,6 +20,13 @@ th {
     top: 0;
     background-color: var(--background-darkgray);
     cursor: default;
+
+    & > span {
+        position: absolute;
+        right: 5px;
+
+        &[data-rotate="true"] { top: 25%; }
+    }
 }
 
 th, td {

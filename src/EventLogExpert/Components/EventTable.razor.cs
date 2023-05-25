@@ -11,6 +11,10 @@ namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
+    private bool _isDateTimeDescending = true;
+
+    private string IsDateTimeDescending => _isDateTimeDescending.ToString().ToLower();
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -55,8 +59,15 @@ public partial class EventTable
             filteredEvents = filteredEvents.Where(FilterPaneState.Value.AdvancedFilter);
         }
 
+        if (!_isDateTimeDescending)
+        {
+            filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
+        }
+
         return filteredEvents.ToList();
     }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
+
+    private void ToggleDateTime() => _isDateTimeDescending = !_isDateTimeDescending;
 }
