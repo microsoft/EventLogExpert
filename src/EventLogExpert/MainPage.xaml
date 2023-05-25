@@ -18,6 +18,8 @@
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" />
+            <MenuFlyoutItem Text="Show Log Name Column" Clicked="ShowLogName_Clicked" />
+            <MenuFlyoutItem Text="Show Computer Name Column" Clicked="ShowComputerName_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="Tools">
             <MenuFlyoutItem Text="Settings" Clicked="OpenSettingsModal_Clicked" />

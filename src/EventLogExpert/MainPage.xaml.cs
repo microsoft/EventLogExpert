@@ -154,4 +154,14 @@ public partial class MainPage : ContentPage
             _fluxorDispatcher.Dispatch(new StatusBarAction.SetResolverStatus(_resolver.Status));
         }
     }
+
+    private void ShowLogName_Clicked(object? sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowLogName());
+    }
+
+    private void ShowComputerName_Clicked(object? sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
+    }
 }

@@ -15,4 +15,8 @@ public record SettingsState
     public bool IsPrereleaseEnabled { get; init; }
 
     public IEnumerable<string> LoadedProviders { get; init; } = Enumerable.Empty<string>();
+
+    public bool ShowLogName { get; init; }
+
+    public bool ShowComputerName { get; init; }
 }
