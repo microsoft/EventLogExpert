@@ -13,6 +13,7 @@
                 <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
                 <MenuFlyoutSubItem Text="Other Logs" x:Name="OtherLogsFlyoutSubitem" />
             </MenuFlyoutSubItem>
+            <MenuFlyoutItem Text="Close" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />

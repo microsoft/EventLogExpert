@@ -46,8 +46,6 @@ public class FilterPaneReducers
             newState = state with { TaskNamesAll = allTasks };
         }
 
-        newState = state with { EventDateRange = state.EventDateRange with { Before = ev.TimeCreated } };
-
         return newState;
     }
 
@@ -88,12 +86,7 @@ public class FilterPaneReducers
     {
         EventIdsAll = action.AllEventIds,
         EventProviderNamesAll = action.AllProviderNames,
-        TaskNamesAll = action.AllTaskNames,
-        EventDateRange = new FilterDateModel
-        {
-            After = action.Events.Last().TimeCreated, 
-            Before = action.Events.First().TimeCreated
-        }
+        TaskNamesAll = action.AllTaskNames
     };
 
     [ReducerMethod]

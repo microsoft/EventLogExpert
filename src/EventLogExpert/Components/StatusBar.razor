@@ -4,14 +4,12 @@
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
-    @if (EventLogState.Value.Events.Count < 1 || EventLogState.Value.ActiveLog.LogType == EventLogExpert.Store.EventLog.EventLogState.LogType.File)
+    @if (EventLogState.Value.EventsLoading > 0)
     {
-        <span>Events Loaded: @StatusBarState.Value.EventsLoaded</span>
+        <span>Loading Progress: @EventLogState.Value.EventsLoading</span>
     }
-    else
-    {
-        <span>Events Loaded: @EventLogState.Value.Events.Count</span>
-    }
+    
+    <span>Events Loaded: @EventLogState.Value.Events.Count</span>
 
     @if (EventLogState.Value.ContinuouslyUpdate)
     {
@@ -19,8 +17,8 @@
     }
     else
     {
-        <span>New Events: @EventLogState.Value.NewEventBuffer.Events.Count</span>
-        @if (EventLogState.Value.NewEventBuffer.IsBufferFull)
+        <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
+        @if (EventLogState.Value.NewEventBufferIsFull)
         {
             <span>Buffer Full</span>
         }

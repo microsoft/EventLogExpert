@@ -9,11 +9,9 @@ public record EventLogAction
 {
     public record AddEvent(DisplayEventModel NewEvent) : EventLogAction;
 
-    public record ClearEvents : EventLogAction;
-
     public record LoadEvents(
+        string LogName,
         List<DisplayEventModel> Events,
-        LiveLogWatcher Watcher,
         IReadOnlyList<int> AllEventIds,
         IReadOnlyList<string> AllProviderNames,
         IReadOnlyList<string> AllTaskNames
@@ -23,7 +21,13 @@ public record EventLogAction
 
     public record OpenLog(EventLogState.LogSpecifier LogSpecifier) : EventLogAction;
 
+    public record CloseLog(string LogName) : EventLogAction;
+
+    public record CloseAll() : EventLogAction;
+
     public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
 
     public record SetContinouslyUpdate(bool ContinuouslyUpdate) : EventLogAction;
+
+    public record SetEventsLoading(int Count) : EventLogAction;
 }

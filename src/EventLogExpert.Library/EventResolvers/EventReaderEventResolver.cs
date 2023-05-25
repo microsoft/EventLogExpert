@@ -18,7 +18,7 @@ public class EventReaderEventResolver : IEventResolver
 
     public event EventHandler<string>? StatusChanged;
 
-    public DisplayEventModel Resolve(EventRecord eventRecord)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
         var desc = eventRecord.FormatDescription();
         var xml = eventRecord.ToXml();
@@ -36,8 +36,8 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.Qualifiers,
             eventRecord.Keywords,
             eventRecord.LogName,
-            null
-            );
+            null,
+            OwningLogName);
     }
 
     private static T TryGetValue<T>(Func<T> func)

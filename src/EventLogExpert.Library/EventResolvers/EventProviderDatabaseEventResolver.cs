@@ -167,7 +167,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         LoadDatabases();
     }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
         while (!_ready)
         {
@@ -185,7 +185,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
             if (providerDetails != null)
             {
-                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
+                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
             }
         }
         else
@@ -195,7 +195,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 var providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == eventRecord.ProviderName);
                 if (providerDetails != null)
                 {
-                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
+                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
 
                     if (lastResult?.Description != null)
                     {
@@ -222,7 +222,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 eventRecord.LogName,
-                null);
+                null,
+                OwningLogName);
         }
 
         if (lastResult.Description == null)

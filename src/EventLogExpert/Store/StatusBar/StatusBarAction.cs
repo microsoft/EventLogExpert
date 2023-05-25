@@ -5,7 +5,5 @@ namespace EventLogExpert.Store.StatusBar;
 
 public record StatusBarAction
 {
-    public record SetEventsLoaded(int EventCount);
-
     public record SetResolverStatus(string ResolverStatus);
 }

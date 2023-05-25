@@ -5,7 +5,9 @@ using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
+using Fluxor;
 using System.Diagnostics.Eventing.Reader;
+using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
@@ -16,13 +18,16 @@ public partial class MainPage : ContentPage
 
     private readonly IEventResolver _resolver;
 
-    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver)
+    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver, IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState)
     {
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
 
         _resolver = resolver;
+
+        activeLogsState.Select(e => e.ActiveLogs);
+        activeLogsState.SelectedValueChanged += (sender, activeLogs) => Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
 
         PopulateOtherLogsMenu();
 
@@ -42,8 +47,6 @@ public partial class MainPage : ContentPage
                     new EventLogState.LogSpecifier(
                         fileName,
                         EventLogState.LogType.File)));
-
-        Utils.UpdateAppTitle(fileName);
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
@@ -88,13 +91,20 @@ public partial class MainPage : ContentPage
     {
         if (sender == null) return;
 
+        var logName = ((MenuFlyoutItem)sender).Text;
+
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
                 new EventLogState.LogSpecifier(
-                    ((MenuFlyoutItem)sender).Text,
+                    logName,
                     EventLogState.LogType.Live)));
+    }
 
-        Utils.UpdateAppTitle(((MenuFlyoutItem)sender).Text);
+    private void CloseAll_Clicked(object? sender, EventArgs e)
+    {
+        if (sender == null) return;
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
 
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>

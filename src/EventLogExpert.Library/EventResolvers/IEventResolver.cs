@@ -11,7 +11,7 @@ namespace EventLogExpert.Library.EventResolvers
     /// </summary>
     public interface IEventResolver
     {
-        public DisplayEventModel Resolve(EventRecord eventRecord);
+        public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName);
 
         public string Status { get; }
 
