@@ -177,6 +177,7 @@ public partial class MainPage : ContentPage
 
                 var addm = new MenuFlyoutItem { Text = name };
                 addm.Clicked += AddLiveLog_Clicked;
+                AddOtherLogsFlyoutSubitem.Add(addm);
             }
         }
     }
