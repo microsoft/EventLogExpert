@@ -4,6 +4,7 @@
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Store;
+using EventLogExpert.Store.EventLog;
 using Fluxor;
 
 namespace EventLogExpert;
@@ -43,6 +44,8 @@ public static class MauiProgram
         {
             builder.Services.AddSingleton<IEventResolver, LocalProviderEventResolver>();
         }
+
+        builder.Services.AddSingleton<ILogWatcherService, LiveLogWatcher>();
 
         return builder.Build();
     }

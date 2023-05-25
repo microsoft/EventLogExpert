@@ -25,7 +25,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
     public LocalProviderEventResolver(Action<string> tracer) : base(tracer) { }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
         if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
         {
@@ -50,14 +50,15 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 eventRecord.LogName,
-                null);
+                null,
+                OwningLogName);
         }
 
         // The Properties getter is expensive, so we only call the getter once,
         // and we pass this value separately from the eventRecord so it can be reused.
         var eventProperties = eventRecord.Properties;
 
-        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails);
+        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
 
         if (result.Description == null)
         {

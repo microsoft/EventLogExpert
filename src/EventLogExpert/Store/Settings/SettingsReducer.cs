@@ -72,4 +72,12 @@ public class SettingsReducer
             return state;
         }
     }
+
+    [ReducerMethod]
+    public static SettingsState ReduceToggleShowLogName(SettingsState state, SettingsAction.ToggleShowLogName action) =>
+        state with { ShowLogName = !state.ShowLogName };
+
+    [ReducerMethod]
+    public static SettingsState ReduceToggleShowComputerName(SettingsState state, SettingsAction.ToggleShowComputerName action) =>
+        state with { ShowComputerName = !state.ShowComputerName };
 }

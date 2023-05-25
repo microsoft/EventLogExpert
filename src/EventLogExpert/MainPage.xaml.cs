@@ -5,7 +5,10 @@ using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
+using Fluxor;
+using Microsoft.Maui.Storage;
 using System.Diagnostics.Eventing.Reader;
+using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
@@ -16,13 +19,29 @@ public partial class MainPage : ContentPage
 
     private readonly IEventResolver _resolver;
 
-    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver)
+    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver,
+        IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
+        IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<SettingsState, bool> showLogNameState,
+        IStateSelection<SettingsState, bool> showComputerNameState)
     {
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
 
         _resolver = resolver;
+
+        activeLogsState.Select(e => e.ActiveLogs);
+        activeLogsState.SelectedValueChanged += (sender, activeLogs) => Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
+
+        continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
+        continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) => ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}";
+
+        showLogNameState.Select(e => e.ShowLogName);
+        showLogNameState.SelectedValueChanged += (sender, showLogName) => ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}";
+
+        showComputerNameState.Select(e => e.ShowComputerName);
+        showComputerNameState.SelectedValueChanged += (sender, showComputerName) => ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
 
         PopulateOtherLogsMenu();
 
@@ -42,11 +61,30 @@ public partial class MainPage : ContentPage
                     new EventLogState.LogSpecifier(
                         fileName,
                         EventLogState.LogType.File)));
-
-        Utils.UpdateAppTitle(fileName);
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
+    {
+        var result = await GetFilePickerResult();
+
+        if (result != null)
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+            OpenEventLogFile(result.FullPath);
+        }
+    }
+
+    public async void AddFile_Clicked(object sender, EventArgs e)
+    {
+        var result = await GetFilePickerResult();
+
+        if (result != null)
+        {
+            OpenEventLogFile(result.FullPath);
+        }
+    }
+
+    private async Task<FileResult?> GetFilePickerResult()
     {
         var options = new PickOptions
         {
@@ -55,13 +93,9 @@ public partial class MainPage : ContentPage
             )
         };
 
-        FileResult? result = await FilePicker.Default.PickAsync(options);
-
-        if (result != null)
-        {
-            OpenEventLogFile(result.FullPath);
-        }
+        return await FilePicker.Default.PickAsync(options);
     }
+
     private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.CheckForUpdates());
 
@@ -70,12 +104,10 @@ public partial class MainPage : ContentPage
         if (((MenuFlyoutItem)sender).Text == "Continuously Update")
         {
             _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update ✓";
         }
         else
         {
             _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update";
         }
     }
 
@@ -86,15 +118,29 @@ public partial class MainPage : ContentPage
 
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
     {
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+
+        AddLiveLog_Clicked(sender, e);
+    }
+
+    private void AddLiveLog_Clicked(object? sender, EventArgs e)
+    {
         if (sender == null) return;
+
+        var logName = ((MenuFlyoutItem)sender).Text;
 
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
                 new EventLogState.LogSpecifier(
-                    ((MenuFlyoutItem)sender).Text,
+                    logName,
                     EventLogState.LogType.Live)));
+    }
 
-        Utils.UpdateAppTitle(((MenuFlyoutItem)sender).Text);
+    private void CloseAll_Clicked(object? sender, EventArgs e)
+    {
+        if (sender == null) return;
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
 
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
@@ -127,7 +173,10 @@ public partial class MainPage : ContentPage
             {
                 var m = new MenuFlyoutItem { Text = name };
                 m.Clicked += OpenLiveLog_Clicked;
-                OtherLogsFlyoutSubitem.Add(m);
+                OpenOtherLogsFlyoutSubitem.Add(m);
+
+                var addm = new MenuFlyoutItem { Text = name };
+                addm.Clicked += AddLiveLog_Clicked;
             }
         }
     }
@@ -143,5 +192,15 @@ public partial class MainPage : ContentPage
         {
             _fluxorDispatcher.Dispatch(new StatusBarAction.SetResolverStatus(_resolver.Status));
         }
+    }
+
+    private void ShowLogName_Clicked(object? sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowLogName());
+    }
+
+    private void ShowComputerName_Clicked(object? sender, EventArgs e)
+    {
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
     }
 }

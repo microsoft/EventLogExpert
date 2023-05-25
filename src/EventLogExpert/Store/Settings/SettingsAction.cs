@@ -16,4 +16,8 @@ public record SettingsAction
     public record OpenMenu : SettingsAction;
 
     public record Save(SettingsModel Settings, string Path) : SettingsAction;
+
+    public record ToggleShowLogName() : SettingsAction;
+
+    public record ToggleShowComputerName() : SettingsAction;
 }

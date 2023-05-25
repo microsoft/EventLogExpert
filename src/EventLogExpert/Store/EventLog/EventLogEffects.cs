@@ -4,7 +4,6 @@
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
-using EventLogExpert.Store.StatusBar;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Diagnostics;
@@ -16,19 +15,19 @@ namespace EventLogExpert.Store.EventLog;
 public class EventLogEffects
 {
     private readonly ITraceLogger _debugLogger;
+    private readonly ILogWatcherService _logWatcherService;
     private readonly IEventResolver _eventResolver;
 
-    public EventLogEffects(IEventResolver eventResolver, ITraceLogger debugLogger)
+    public EventLogEffects(IEventResolver eventResolver, ITraceLogger debugLogger, ILogWatcherService logWatcherService)
     {
         _eventResolver = eventResolver;
         _debugLogger = debugLogger;
+        _logWatcherService = logWatcherService;
     }
 
     [EffectMethod]
     public async Task HandleOpenLogAction(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        dispatcher.Dispatch(new EventLogAction.ClearEvents());
-
         EventLogReader reader;
 
         if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
@@ -55,7 +54,7 @@ public class EventLogEffects
             while (reader.ReadEvent() is { } e)
             {
                 lastEvent = e;
-                var resolved = _eventResolver.Resolve(e);
+                var resolved = _eventResolver.Resolve(e, action.LogSpecifier.Name);
                 eventIdsAll.Add(resolved.Id);
                 eventProviderNamesAll.Add(resolved.Source);
                 eventTaskNamesAll.Add(resolved.TaskCategory);
@@ -65,35 +64,37 @@ public class EventLogEffects
                 if (sw.ElapsedMilliseconds > 1000)
                 {
                     sw.Restart();
-                    dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
+                    dispatcher.Dispatch(new EventLogAction.SetEventsLoading(events.Count));
                 }
             }
 
-            dispatcher.Dispatch(new StatusBarAction.SetEventsLoaded(events.Count));
-
             events.Reverse();
 
-            LiveLogWatcher watcher = null!;
-
-            if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
-            {
-                watcher = new LiveLogWatcher(
-                    action.LogSpecifier.Name,
-                    lastEvent?.Bookmark,
-                    _debugLogger,
-                    _eventResolver,
-                    dispatcher);
-
-                watcher.StartWatching();
-
-                _debugLogger.Trace("LiveLogWatcher created and started.");
-            }
-
-            dispatcher.Dispatch(new EventLogAction.LoadEvents(events,
-                watcher,
+            dispatcher.Dispatch(new EventLogAction.LoadEvents(
+                action.LogSpecifier.Name,
+                events,
                 eventIdsAll.ToImmutableList(),
                 eventProviderNamesAll.ToImmutableList(),
                 eventTaskNamesAll.ToImmutableList()));
+
+            dispatcher.Dispatch(new EventLogAction.SetEventsLoading(0));
+
+            if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
+            {
+                _logWatcherService.AddLog(action.LogSpecifier.Name, lastEvent?.Bookmark);
+            }
         });
+    }
+
+    [EffectMethod]
+    public async Task HandleCloseLogAction(EventLogAction.CloseLog action, IDispatcher dispatcher)
+    {
+        _logWatcherService.RemoveLog(action.LogName);
+    }
+
+    [EffectMethod]
+    public async Task HandleCloseAllAction(EventLogAction.CloseAll action, IDispatcher dispatcher)
+    {
+        _logWatcherService.RemoveAll();
     }
 }

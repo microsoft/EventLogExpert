@@ -7,7 +7,6 @@ using EventLogExpert.Library.Providers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 namespace EventLogExpert.Library.EventResolvers;
 
@@ -93,7 +92,7 @@ public class EventResolverBase
     /// </param>
     /// <param name="providerDetails"></param>
     /// <returns></returns>
-    protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, IList<EventProperty> eventProperties, ProviderDetails providerDetails)
+    protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, IList<EventProperty> eventProperties, ProviderDetails providerDetails, string owningLogName)
     {
         string? description = null;
         string? xml = null;
@@ -193,6 +192,7 @@ public class EventResolverBase
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 eventRecord.LogName,
-                template);
+                template,
+                owningLogName);
     }
 }

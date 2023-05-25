@@ -38,7 +38,7 @@ public partial class DetailsPane
     {
         StringBuilder stringToCopy = new();
 
-        stringToCopy.AppendLine($"Log Name: {EventLogState.Value.ActiveLog.Name}");
+        stringToCopy.AppendLine($"Log Name: {Event?.LogName}");
         stringToCopy.AppendLine($"Source: {Event?.Source}");
         stringToCopy.AppendLine($"Date: {Event?.TimeCreated.ConvertTimeZone(SettingsState.Value.TimeZone)}");
         stringToCopy.AppendLine($"Event ID: {Event?.Id}");
