@@ -1,4 +1,4 @@
-﻿@inject IState<AvailableFilterState> AvailableFilterPaneState
+﻿@inject IState<EventLogState> EventLogState
 
 <div class="filter-row">
     @if (Value.IsEditing)
@@ -27,7 +27,7 @@
                 case FilterType.EventId :
                     <FilterSelect CssClass="input-filter-id" TInput="int"
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="AvailableFilterPaneState.Value.EventIdsAll.OrderBy(id => id)" />
+                        Items="EventLogState.Value.EventIds.OrderBy(id => id)" />
                     break;
                 case FilterType.Level :
                     <FilterSelect CssClass="input-filter-severity" TInput="SeverityLevel"
@@ -36,12 +36,12 @@
                 case FilterType.Source :
                     <FilterSelect CssClass="input-filter-dropdown" TInput="string"
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="AvailableFilterPaneState.Value.EventProviderNamesAll.OrderBy(n => n)" />
+                        Items="EventLogState.Value.EventProviderNames.OrderBy(n => n)" />
                     break;
                 case FilterType.Task :
                     <FilterSelect CssClass="input-filter-dropdown" TInput="string"
                         Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="AvailableFilterPaneState.Value.TaskNamesAll.OrderBy(n => n)" />
+                        Items="EventLogState.Value.TaskNames.OrderBy(n => n)" />
                     break;
                 case FilterType.Description :
                 default :

@@ -28,9 +28,9 @@ public class EventResolverTests
             _providerDetailsList = providerDetailsList;
         }
 
-        public DisplayEventModel Resolve(EventRecord eventRecord)
+        public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLog)
         {
-            return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0]);
+            return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], OwningLog);
         }
     }
 
@@ -103,7 +103,7 @@ public class EventResolverTests
         };
 
         var resolver = new UnitTestEventResolver(new List<ProviderDetails> { providerDetails });
-        var result = resolver.Resolve(eventRecord.Object);
+        var result = resolver.Resolve(eventRecord.Object, "Test");
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
         Assert.Equal(expectedDescription, result.Description);
@@ -120,7 +120,7 @@ public class EventResolverTests
         EventRecord er;
         while (null != (er = eventLogReader.ReadEvent()))
         {
-            resolver.Resolve(er);
+            resolver.Resolve(er, "Test");
         }
 
         sw.Stop();
@@ -148,7 +148,7 @@ public class EventResolverTests
         sw.Restart();
         foreach (var record in eventRecords)
         {
-            resolver.Resolve(record);
+            resolver.Resolve(record, "Test");
         }
 
         sw.Stop();
@@ -186,7 +186,7 @@ public class EventResolverTests
 
             foreach (var r in resolvers)
             {
-                var resolved = r.Resolve(er);
+                var resolved = r.Resolve(er, "Test");
 
                 uniqueDescriptions.Add(resolved.Description
                     .Replace("\r", "")  // I can't figure out the logic of FormatMessage() for when it leaves

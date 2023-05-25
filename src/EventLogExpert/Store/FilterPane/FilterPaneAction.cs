@@ -7,8 +7,6 @@ namespace EventLogExpert.Store.FilterPane;
 
 public record FilterPaneAction
 {
-    public record AddAvailableFilters(string FilterText);
-
     public record AddFilter;
 
     public record RemoveFilter(FilterModel FilterModel);

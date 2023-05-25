@@ -18,6 +18,12 @@ public record EventLogState
 
     public ReadOnlyCollection<LogSpecifier> ActiveLogs { get; init; } = new List<LogSpecifier>().AsReadOnly();
 
+    public ReadOnlyCollection<int> EventIds { get; init; } = new List<int>().AsReadOnly();
+
+    public ReadOnlyCollection<string> EventProviderNames { get; init; } = new List<string>().AsReadOnly();
+
+    public ReadOnlyCollection<string> TaskNames { get; init;} = new List<string>().AsReadOnly();
+
     public bool ContinuouslyUpdate { get; init; } = false;
 
     public ReadOnlyCollection<DisplayEventModel> Events { get; init; } = new List<DisplayEventModel>().AsReadOnly();
