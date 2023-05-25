@@ -30,10 +30,18 @@ public partial class EventTable
             await JSRuntime.InvokeVoidAsync("enableColumnResize");
 
             showLogState.Select(s => s.ShowLogName);
-            showLogState.SelectedValueChanged += async (sender, showLogName) => await JSRuntime.InvokeVoidAsync("enableColumnResize");
+            showLogState.SelectedValueChanged += async (sender, showLogName) =>
+            {
+                await JSRuntime.InvokeVoidAsync("deleteColumnResize");
+                await JSRuntime.InvokeVoidAsync("enableColumnResize");
+            };
 
             showComputerState.Select(s => s.ShowComputerName);
-            showComputerState.SelectedValueChanged += async (sender, showComputer) => await JSRuntime.InvokeVoidAsync("enableColumnResize");
+            showComputerState.SelectedValueChanged += async (sender, showComputer) =>
+            {
+                await JSRuntime.InvokeVoidAsync("deleteColumnResize");
+                await JSRuntime.InvokeVoidAsync("enableColumnResize");
+            };
         }
 
         await base.OnAfterRenderAsync(firstRender);
