@@ -43,7 +43,10 @@ public partial class SettingsModal
 
         try
         {
-            var result = await FilePicker.Default.PickMultipleAsync(options);
+            var result = (await FilePicker.Default.PickMultipleAsync(options)).ToList();
+
+            // User canceled or no files selected
+            if (!result.Any()) { return; }
 
             Directory.CreateDirectory(Utils.DatabasePath);
 
