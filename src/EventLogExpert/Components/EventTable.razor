@@ -9,7 +9,12 @@
         <thead>
             <tr>
                 <th id="level">Level</th>
-                <th id="time">Date and Time</th>
+                <th id="time">
+                    Date and Time
+                    <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
+                        <i class="bi bi-caret-up"></i>
+                    </span>
+                </th>
                 <th id="source">Source</th>
                 <th id="id">Event ID</th>
                 <th id="task">Task Category</th>
