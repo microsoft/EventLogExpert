@@ -18,7 +18,11 @@ public partial class MainPage : ContentPage
 
     private readonly IEventResolver _resolver;
 
-    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver, IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState)
+    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver,
+        IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
+        IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<SettingsState, bool> showLogNameState,
+        IStateSelection<SettingsState, bool> showComputerNameState)
     {
         InitializeComponent();
 
@@ -28,6 +32,15 @@ public partial class MainPage : ContentPage
 
         activeLogsState.Select(e => e.ActiveLogs);
         activeLogsState.SelectedValueChanged += (sender, activeLogs) => Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
+
+        continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
+        continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) => ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}";
+
+        showLogNameState.Select(e => e.ShowLogName);
+        showLogNameState.SelectedValueChanged += (sender, showLogName) => ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}";
+
+        showComputerNameState.Select(e => e.ShowComputerName);
+        showComputerNameState.SelectedValueChanged += (sender, showComputerName) => ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
 
         PopulateOtherLogsMenu();
 
@@ -73,12 +86,10 @@ public partial class MainPage : ContentPage
         if (((MenuFlyoutItem)sender).Text == "Continuously Update")
         {
             _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update ✓";
         }
         else
         {
             _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
-            ((MenuFlyoutItem)sender).Text = "Continuously Update";
         }
     }
 
