@@ -3,6 +3,8 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.FilterPane;
+using EventLogExpert.Store.Settings;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Linq.Dynamic.Core;
 
@@ -10,7 +12,7 @@ namespace EventLogExpert.Components;
 
 public partial class FilterPane
 {
-    private readonly FilterDateModel _model = new();
+    private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
 
     private Timer? _advancedFilterDebounceTimer = null;
     private string _advancedFilterErrorMessage = string.Empty;
@@ -35,6 +37,16 @@ public partial class FilterPane
         }
     }
 
+    [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
+
+    protected override void OnInitialized()
+    {
+        TimeZoneState.Select(x => x.TimeZoneId);
+        TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
+
+        base.OnInitialized();
+    }
+
     private void AddAdvancedFilter()
     {
         _isFilterListVisible = true;
@@ -47,14 +59,16 @@ public partial class FilterPane
         _isFilterListVisible = true;
         _canEditDate = true;
 
+        _model.TimeZoneInfo = SettingsState.Value.TimeZone;
+
         // Offset by 1 minute to make sure we don't drop events
         // since HTML input DateTime does not go lower than minutes
         _model.Before = EventLogState.Value.Events.FirstOrDefault()?.TimeCreated
-                .AddMinutes(1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+                .AddMinutes(1).ConvertTimeZone(_model.TimeZoneInfo) ??
             DateTime.Now;
 
         _model.After = EventLogState.Value.Events.LastOrDefault()?.TimeCreated
-                .AddMinutes(-1).ConvertTimeZone(SettingsState.Value.TimeZone) ??
+                .AddMinutes(-1).ConvertTimeZone(_model.TimeZoneInfo) ??
             DateTime.Now;
 
         _isDateFilterVisible = true;
@@ -143,5 +157,14 @@ public partial class FilterPane
             message = ex.Message;
             return false;
         }
+    }
+
+    private void UpdateFilterDateModel()
+    {
+        var temp = _model.TimeZoneInfo;
+        _model.TimeZoneInfo = SettingsState.Value.TimeZone;
+
+        _model.Before = TimeZoneInfo.ConvertTime(_model.Before, temp, _model.TimeZoneInfo);
+        _model.After = TimeZoneInfo.ConvertTime(_model.After, temp, _model.TimeZoneInfo);
     }
 }
