@@ -8,4 +8,6 @@ public record FilterDateModel
     public DateTime After { get; set; }
 
     public DateTime Before { get; set; }
+
+    public TimeZoneInfo TimeZoneInfo { get; set; } = null!;
 }
