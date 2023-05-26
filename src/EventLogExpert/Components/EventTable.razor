@@ -8,14 +8,6 @@
     <table id="eventTable">
         <thead>
             <tr>
-                @if (SettingsState.Value.ShowLogName)
-                {
-                    <th id="logname">Log Name</th>
-                }
-                @if (SettingsState.Value.ShowComputerName)
-                {
-                    <th id="computername">Computer</th>
-                }
                 <th id="level">Level</th>
                 <th id="time">
                     Date and Time
@@ -23,6 +15,8 @@
                         <i class="bi bi-caret-up"></i>
                     </span>
                 </th>
+                <th id="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
+                <th id="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
                 <th id="source">Source</th>
                 <th id="id">Event ID</th>
                 <th id="task">Task Category</th>
@@ -32,16 +26,10 @@
         <tbody>
             <Virtualize Items="@GetFilteredEvents()" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                    @if (SettingsState.Value.ShowLogName)
-                    {
-                        <td>@evt.OwningLog</td>
-                    }
-                    @if (SettingsState.Value.ShowComputerName)
-                    {
-                        <td>@evt.ComputerName</td>
-                    }
                     <td>@evt.Level</td>
                     <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.TimeZone)</td>
+                    <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog</td>
+                    <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
                     <td>@evt.Source</td>
                     <td>@evt.Id</td>
                     <td>@evt.TaskCategory</td>
