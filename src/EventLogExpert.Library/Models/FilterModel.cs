@@ -22,6 +22,8 @@ public class FilterModel
 
     public bool IsEditing { get; set; } = true;
 
+    public bool IsEnabled { get; set; } = true;
+
     public FilterType FilterType { get => _filterType; set => UpdateFilterType(value); }
 
     public FilterComparison FilterComparison { get; set; }

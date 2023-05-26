@@ -19,9 +19,9 @@ public partial class FilterPane
     private string? _advancedFilterValue = null;
     private bool _canEditAdvancedFilter = true;
     private bool _canEditDate = true;
-    private bool _isDateFilterVisible;
     private bool _isAdvancedFilterValid;
     private bool _isAdvancedFilterVisible;
+    private bool _isDateFilterVisible;
     private bool _isFilterListVisible;
 
     private string MenuState
@@ -45,6 +45,13 @@ public partial class FilterPane
         TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
 
         base.OnInitialized();
+    }
+
+    private void AddAdvancedFilter()
+    {
+        _isFilterListVisible = true;
+        _canEditAdvancedFilter = true;
+        _isAdvancedFilterVisible = true;
     }
 
     private void AddDateFilter()
@@ -73,16 +80,10 @@ public partial class FilterPane
         _isFilterListVisible = true;
     }
 
-    private void AddAdvancedFilter()
-    {
-        _isFilterListVisible = true;
-        _canEditAdvancedFilter = true;
-        _isAdvancedFilterVisible = true;
-    }
-
     private void AdvancedFilterChanged(ChangeEventArgs e)
     {
         _advancedFilterValue = e.Value as string;
+
         if (_advancedFilterDebounceTimer != null)
         {
             _advancedFilterDebounceTimer.Dispose();
@@ -92,7 +93,7 @@ public partial class FilterPane
         {
             _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
             _advancedFilterErrorMessage = message;
-            this.InvokeAsync(() => StateHasChanged());
+            InvokeAsync(() => StateHasChanged());
         }, e.Value as string, 250, 0);
     }
 
@@ -103,14 +104,6 @@ public partial class FilterPane
             _canEditAdvancedFilter = false;
             Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(_advancedFilterValue));
         }
-    }
-
-    private void EditAdvancedFilter() => _canEditAdvancedFilter = true;
-
-    private void RemoveAdvancedFilter()
-    {
-        Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(string.Empty));
-        _isAdvancedFilterVisible = false;
     }
 
     private void ApplyDateFilter()
@@ -124,13 +117,25 @@ public partial class FilterPane
         _canEditDate = false;
     }
 
+    private void EditAdvancedFilter() => _canEditAdvancedFilter = true;
+
+    private void EditDateFilter() => _canEditDate = true;
+
+    private void RemoveAdvancedFilter()
+    {
+        Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(string.Empty));
+        _isAdvancedFilterVisible = false;
+    }
+
     private void RemoveDateFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(null));
         _isDateFilterVisible = false;
     }
 
-    private void EditDateFilter() => _canEditDate = true;
+    private void ToggleAdvancedFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilter());
+
+    private void ToggleDateFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterDate());
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 
@@ -141,6 +146,7 @@ public partial class FilterPane
         if (string.IsNullOrEmpty(expression)) return false;
 
         var testQueryable = new List<DisplayEventModel>();
+
         try
         {
             var result = testQueryable.AsQueryable().Where(expression).ToList();

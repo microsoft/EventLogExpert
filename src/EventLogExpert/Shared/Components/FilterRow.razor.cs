@@ -15,6 +15,12 @@ public partial class FilterRow
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 
+    private void ToggleFilter()
+    {
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilter(Value.Id));
+        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
+    }
+
     private void EditFilter() => Value.IsEditing = true;
 
     private string? GetSubFilterComparisonString(SubFilterModel subFilter)
