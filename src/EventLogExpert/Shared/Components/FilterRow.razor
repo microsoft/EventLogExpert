@@ -70,16 +70,31 @@
             <button class="button-save" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
             </button>
+
+            <button class="button-remove fixed-width" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
+            </button>
         }
         else
         {
             <button class="button-primary" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
             </button>
+
+            @if (Value.IsEnabled)
+            {
+                <button class="button-remove fixed-width" @onclick="ToggleFilter">
+                    <i class="bi bi-dash-circle"></i> Disable
+                </button>
+            }
+            else
+            {
+                <button class="button-save fixed-width" @onclick="ToggleFilter">
+                    <i class="bi bi-plus-circle"></i> Enable
+                </button>
+            }
         }
-        <button class="button-remove" @onclick="RemoveFilter">
-            <i class="bi bi-dash-circle"></i> Remove
-        </button>
+        
     </div>
 
 </div>

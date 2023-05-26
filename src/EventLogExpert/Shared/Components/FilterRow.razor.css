@@ -7,10 +7,7 @@
 
     .filter-row .row-justify-right { justify-self: right; }
 
-    .filter-row .button-primary { width: 10rem; }
-
-    .filter-row .button-remove,
-    .filter-row .button-save { width: 6rem; }
+.fixed-width { width: 6rem; }
 
 .sub-filter-row {
     display: flex;

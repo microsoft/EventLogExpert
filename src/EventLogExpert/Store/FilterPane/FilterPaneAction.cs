@@ -9,6 +9,8 @@ public record FilterPaneAction
 {
     public record AddFilter;
 
+    public record ToggleFilter(Guid Id);
+
     public record RemoveFilter(FilterModel FilterModel);
 
     public record AddSubFilter(Guid ParentId);
