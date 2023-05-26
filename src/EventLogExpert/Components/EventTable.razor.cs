@@ -3,8 +3,6 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
-using EventLogExpert.Store.Settings;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Linq.Dynamic.Core;
@@ -19,29 +17,11 @@ public partial class EventTable
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    [Inject] private IStateSelection<SettingsState, bool> showLogState { get; init; } = null!;
-
-    [Inject] private IStateSelection<SettingsState, bool> showComputerState { get; init; } = null!;
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await JSRuntime.InvokeVoidAsync("enableColumnResize");
-
-            showLogState.Select(s => s.ShowLogName);
-            showLogState.SelectedValueChanged += async (sender, showLogName) =>
-            {
-                await JSRuntime.InvokeVoidAsync("deleteColumnResize");
-                await JSRuntime.InvokeVoidAsync("enableColumnResize");
-            };
-
-            showComputerState.Select(s => s.ShowComputerName);
-            showComputerState.SelectedValueChanged += async (sender, showComputer) =>
-            {
-                await JSRuntime.InvokeVoidAsync("deleteColumnResize");
-                await JSRuntime.InvokeVoidAsync("enableColumnResize");
-            };
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -50,6 +30,7 @@ public partial class EventTable
     protected override void OnInitialized()
     {
         MaximumStateChangedNotificationsPerSecond = 2;
+
         base.OnInitialized();
     }
 

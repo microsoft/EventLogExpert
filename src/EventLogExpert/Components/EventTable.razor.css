@@ -34,10 +34,9 @@ th, td {
     overflow: hidden;
     padding-left: .5rem;
     border-right: 1px solid var(--clr-black);
-}
 
-    th:last-child,
-    td:last-child { border-right: none; }
+    &:last-child { border-right: none; }
+}
 
 .selected {
     background-color: var(--clr-lightblue) !important;
