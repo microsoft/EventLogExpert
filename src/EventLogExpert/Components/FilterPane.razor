@@ -64,7 +64,7 @@
                 }
                 else
                 {
-                    <button class="button-save" @onclick="EditDateFilter">
+                    <button class="button-primary" @onclick="EditDateFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
                 }
@@ -98,7 +98,7 @@
                 }
                 else
                 {
-                    <button class="button-save" type="button" @onclick="EditAdvancedFilter">
+                    <button class="button-primary" type="button" @onclick="EditAdvancedFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
                 }
@@ -107,7 +107,9 @@
                 </button>
                 @if (!_isAdvancedFilterValid)
                 {
-                    <div><span class="advanced-filter-error">@_advancedFilterErrorMessage</span></div>
+                    <div hidden="@(string.IsNullOrWhiteSpace(_advancedFilterErrorMessage))">
+                        <span class="advanced-filter-error">@_advancedFilterErrorMessage</span>
+                    </div>
                 }
             </div>
         }
