@@ -61,16 +61,30 @@
                     <button class="button-save" @onclick="ApplyDateFilter">
                         <i class="bi bi-check-circle"></i> Apply
                     </button>
+
+                    <button class="button-remove" type="button" @onclick="RemoveDateFilter">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
                 }
                 else
                 {
                     <button class="button-primary" @onclick="EditDateFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
+
+                    @if (FilterPaneState.Value.FilteredDateRange!.IsEnabled)
+                    {
+                        <button class="button-remove" @onclick="ToggleDateFilter">
+                            <i class="bi bi-dash-circle"></i> Disable
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="button-save" @onclick="ToggleDateFilter">
+                            <i class="bi bi-plus-circle"></i> Enable
+                        </button>
+                    }
                 }
-                <button class="button-remove" type="button" @onclick="RemoveDateFilter">
-                    <i class="bi bi-dash-circle"></i> Remove
-                </button>
             </EditForm>
         }
 
@@ -95,16 +109,31 @@
                             <i class="bi bi-check-circle"></i> Apply
                         </button>
                     }
+
+                    <button class="button-remove" type="button" @onclick="RemoveAdvancedFilter">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
                 }
                 else
                 {
                     <button class="button-primary" type="button" @onclick="EditAdvancedFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
+
+                    @if (FilterPaneState.Value.IsAdvancedFilterEnabled)
+                    {
+                        <button class="button-remove" @onclick="ToggleAdvancedFilter">
+                            <i class="bi bi-dash-circle"></i> Disable
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="button-save" @onclick="ToggleAdvancedFilter">
+                            <i class="bi bi-plus-circle"></i> Enable
+                        </button>
+                    }
                 }
-                <button class="button-remove" type="button" @onclick="RemoveAdvancedFilter">
-                    <i class="bi bi-dash-circle"></i> Remove
-                </button>
+                
                 @if (!_isAdvancedFilterValid)
                 {
                     <div hidden="@(string.IsNullOrWhiteSpace(_advancedFilterErrorMessage))">

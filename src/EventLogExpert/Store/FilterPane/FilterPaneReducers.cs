@@ -53,25 +53,6 @@ public class FilterPaneReducers
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceToggleFilterAction(FilterPaneState state,
-        FilterPaneAction.ToggleFilter action)
-    {
-        List<FilterModel> filters = new();
-
-        foreach (var filterModel in state.CurrentFilters)
-        {
-            if (filterModel.Id == action.Id)
-            {
-                filterModel.IsEnabled = !filterModel.IsEnabled;
-            }
-
-            filters.Add(filterModel);
-        }
-
-        return state with { CurrentFilters = filters };
-    }
-
-    [ReducerMethod]
     public static FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
@@ -109,4 +90,38 @@ public class FilterPaneReducers
     public static FilterPaneState
         ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
         state with { FilteredDateRange = action.FilterDateModel };
+
+    [ReducerMethod(typeof(FilterPaneAction.ToggleAdvancedFilter))]
+    public static FilterPaneState ReduceToggleAdvancedFilter(FilterPaneState state) =>
+        state with { IsAdvancedFilterEnabled = !state.IsAdvancedFilterEnabled };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceToggleFilterAction(FilterPaneState state,
+        FilterPaneAction.ToggleFilter action)
+    {
+        List<FilterModel> filters = new();
+
+        foreach (var filterModel in state.CurrentFilters)
+        {
+            if (filterModel.Id == action.Id)
+            {
+                filterModel.IsEnabled = !filterModel.IsEnabled;
+            }
+
+            filters.Add(filterModel);
+        }
+
+        return state with { CurrentFilters = filters };
+    }
+
+    [ReducerMethod(typeof(FilterPaneAction.ToggleFilterDate))]
+    public static FilterPaneState ReduceToggleFilterDate(FilterPaneState state)
+    {
+        if (state.FilteredDateRange is null) { return state; }
+
+        return state with
+        {
+            FilteredDateRange = state.FilteredDateRange with { IsEnabled = !state.FilteredDateRange.IsEnabled }
+        };
+    }
 }

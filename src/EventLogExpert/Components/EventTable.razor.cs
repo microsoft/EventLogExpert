@@ -41,7 +41,7 @@ public partial class EventTable
     {
         var filteredEvents = EventLogState.Value.Events.AsQueryable();
 
-        if (FilterPaneState.Value.FilteredDateRange is not null)
+        if (FilterPaneState.Value.FilteredDateRange is not null && FilterPaneState.Value.FilteredDateRange.IsEnabled)
         {
             filteredEvents = filteredEvents.Where(e =>
                 e.TimeCreated >= FilterPaneState.Value.FilteredDateRange.After &&
@@ -55,7 +55,8 @@ public partial class EventTable
                     .Any(comp => comp(e))));
         }
 
-        if (!string.IsNullOrEmpty(FilterPaneState.Value.AdvancedFilter))
+        if (!string.IsNullOrEmpty(FilterPaneState.Value.AdvancedFilter) &&
+            FilterPaneState.Value.IsAdvancedFilterEnabled)
         {
             filteredEvents = filteredEvents.Where(FilterPaneState.Value.AdvancedFilter);
         }

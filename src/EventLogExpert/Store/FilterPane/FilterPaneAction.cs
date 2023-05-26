@@ -21,5 +21,9 @@ public record FilterPaneAction
 
     public record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
+    public record ToggleFilterDate();
+
     public record SetAdvancedFilter(string Expression);
+
+    public record ToggleAdvancedFilter();
 }
