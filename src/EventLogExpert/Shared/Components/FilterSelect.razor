@@ -1,17 +1,27 @@
-@inject IState<EventLogState> EventLogState
+@typeparam InputType
 
 <div class="input-select">
     <label>
-        <input type="text" class="input-filter-select" value="@Value" @oninput="OnInputChange"
+        <input type="text" class="input-filter-dropdown" value="@Value.ToFullString()" readonly
             @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
         <i class="bi bi-caret-up" data-toggle="@IsDropDownVisible"></i>
     </label>
 
     <div class="dropdown-list" data-toggle="@IsDropDownVisible">
-        <div @onclick="() => UpdateValue(string.Empty)">All</div>
-        @foreach (var item in FilteredItems)
+        @if (typeof(FilterType).IsAssignableFrom(typeof(InputType)))
         {
-            <div @onclick="() => UpdateValue(item)">@item</div>
+            @foreach (InputType item in Enum.GetValues(typeof(FilterType)))
+            {
+                <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
+            }
+        }
+
+        @if (typeof(FilterComparison).IsAssignableFrom(typeof(InputType)))
+        {
+            @foreach (InputType item in Enum.GetValues(typeof(FilterComparison)))
+            {
+                <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
+            }
         }
     </div>
 </div>

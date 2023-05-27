@@ -1,20 +1,10 @@
 ﻿<div class="subfilter-row">
     <div class="filter-content">
         <span>Join On: </span>
-        <select class="input-filter-dropdown" @bind="@Value.FilterType">
-            @foreach (FilterType type in Enum.GetValues(typeof(FilterType)))
-            {
-                <option value="@type">@type.ToString()</option>
-            }
-        </select>
+        <FilterSelect @bind-Value="Value.FilterType" InputType="FilterType" />
 
         <span>Comparison: </span>
-        <select class="input-filter-dropdown" @bind="@Value.FilterComparison">
-            @foreach (FilterComparison type in Enum.GetValues(typeof(FilterComparison)))
-            {
-                <option value="@type">@type.ToFullString()</option>
-            }
-        </select>
+        <FilterSelect @bind-Value="Value.FilterComparison" InputType="FilterComparison" />
 
         <span>Value: </span>
         @if (Value.FilterType is FilterType.Description)
@@ -23,7 +13,7 @@
         }
         else
         {
-            <FilterSelect @bind-Value="@Value.FilterValue" Type="Value.FilterType" />
+            <FilterValueSelect @bind-Value="@Value.FilterValue" Type="Value.FilterType" />
         }
 
     </div>

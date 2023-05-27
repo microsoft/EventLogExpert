@@ -14,7 +14,7 @@ public enum SeverityLevel
 
 public enum FilterType
 {
-    EventId,
+    [EnumMember(Value = "Event ID")] EventId,
     Level,
     Source,
     Task,
