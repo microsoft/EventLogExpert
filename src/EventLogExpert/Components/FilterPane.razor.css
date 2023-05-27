@@ -1,27 +1,25 @@
 ﻿.filter-pane {
+    display: flex;
+    flex-direction: column;
+
     margin: 5px;
 
-    max-height: 25%;
+    /* max-height: 25%; */
 }
 
-.filter-row {
+.filter-header {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
 }
 
-.filter-content {
-    display: flex;
-    flex-direction: column;
-
-    max-height: calc(100% - 20px);
-    overflow: auto;
+.filter-group {
+    /* overflow: auto; */
 
     border-bottom: solid var(--background-darkgray);
-
     transition: all 1s;
 }
 
-.filter-content[data-toggle="false"] {
+.filter-group[data-toggle="false"] {
     display: none;
 
     border: none;

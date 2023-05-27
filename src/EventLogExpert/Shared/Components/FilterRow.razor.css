@@ -3,6 +3,8 @@
     justify-content: space-between;
 }
 
+    .filter-row .filter-content { display: flex; }
+
     .filter-row .row-center { justify-self: center; }
 
     .filter-row .row-justify-right { justify-self: right; }

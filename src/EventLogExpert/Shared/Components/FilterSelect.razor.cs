@@ -1,34 +1,76 @@
 using EventLogExpert.Library.Helpers;
 using Microsoft.AspNetCore.Components;
-using ValueChangedEventArgs = EventLogExpert.Library.EventArgs.ValueChangedEventArgs;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class FilterSelect<TInput>
+public partial class FilterSelect
 {
-    [Parameter]
-    public string CssClass { get; set; } = "";
+    private bool _isDropDownVisible;
+    private List<string> _items = new();
+    private FilterType _type;
 
     [Parameter]
-    public IEnumerable<TInput>? Items { get; set; }
-
-    [Parameter]
-    public EventCallback<ValueChangedEventArgs> OnValueChangedEvent { get; set; }
-
-    [Parameter]
-    public TInput Value { get; set; } = default!;
-
-    private async Task UpdateValue(ChangeEventArgs args)
+    public FilterType Type
     {
-        if (Value is SeverityLevel && Enum.TryParse(args.Value?.ToString(), out SeverityLevel value))
+        get => _type;
+        set
         {
-            Value = (TInput)Convert.ChangeType(value, typeof(TInput));
+            _type = value;
+            ResetItems();
         }
-        else
-        {
-            Value = (TInput)Convert.ChangeType(args.Value, typeof(TInput))!;
-        }
+    }
 
-        await OnValueChangedEvent.InvokeAsync(new ValueChangedEventArgs(Value));
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
+
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private List<string> FilteredItems => _items.Where(x => x.ToLower().Contains(Value.ToLower())).ToList();
+
+    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
+
+    private async void OnInputChange(ChangeEventArgs args)
+    {
+        Value = args.Value?.ToString() ?? string.Empty;
+        await ValueChanged.InvokeAsync(Value);
+    }
+
+    private void ResetItems()
+    {
+        switch (Type)
+        {
+            case FilterType.EventId :
+                _items = EventLogState.Value.EventIds.Select(x => x.ToString()).ToList();
+                break;
+            case FilterType.Level :
+                _items = new List<string>();
+
+                foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
+                {
+                    _items.Add(item.ToString());
+                }
+
+                break;
+            case FilterType.Source :
+                _items = EventLogState.Value.EventProviderNames.ToList();
+
+                break;
+            case FilterType.Task :
+                _items = EventLogState.Value.TaskNames.ToList();
+
+                break;
+            case FilterType.Description :
+            default :
+                break;
+        }
+    }
+
+    private void SetDropDownVisibility(bool visible) => _isDropDownVisible = visible;
+
+    private async Task UpdateValue(string value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(Value);
     }
 }

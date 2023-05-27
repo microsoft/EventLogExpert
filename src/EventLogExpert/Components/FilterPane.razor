@@ -6,8 +6,7 @@
 @inject IState<SettingsState> SettingsState
 
 <div class="filter-pane">
-
-    <div class="filter-row">
+    <div class="filter-header">
         <div>
             <button class="button-primary" @onclick="AddFilter">
                 <i class="bi bi-plus-circle"></i> Add Filter
@@ -27,7 +26,7 @@
                 </button>
             }
         </div>
-        
+
         @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
         {
             <div class="header-center">
@@ -43,17 +42,17 @@
         }
     </div>
 
-    <div class="filter-content" data-toggle="@MenuState">
+    <div class="filter-group" data-toggle="@MenuState">
         @if (_isDateFilterVisible)
         {
             <EditForm id="filter-form" Model="_model">
                 <span>
-                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" 
-                               @bind-Value="_model.After" disabled="@(!_canEditDate)" />
+                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal"
+                        @bind-Value="_model.After" disabled="@(!_canEditDate)" />
                 </span>
                 <span>
-                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal" 
-                                @bind-Value="_model.Before" disabled="@(!_canEditDate)" />
+                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal"
+                        @bind-Value="_model.Before" disabled="@(!_canEditDate)" />
                 </span>
 
                 @if (_canEditDate)
@@ -98,8 +97,8 @@
             <div>
                 <span>
                     Expression: <input class="input-advanced-filter" type="text"
-                                       placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-                                       @oninput="AdvancedFilterChanged" disabled="@(!_canEditAdvancedFilter)" />
+                        placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
+                        @oninput="AdvancedFilterChanged" disabled="@(!_canEditAdvancedFilter)" />
                 </span>
                 @if (_canEditAdvancedFilter)
                 {
@@ -133,7 +132,7 @@
                         </button>
                     }
                 }
-                
+
                 @if (!_isAdvancedFilterValid)
                 {
                     <div hidden="@(string.IsNullOrWhiteSpace(_advancedFilterErrorMessage))">
@@ -143,5 +142,4 @@
             </div>
         }
     </div>
-
 </div>

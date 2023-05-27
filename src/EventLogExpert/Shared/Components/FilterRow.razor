@@ -1,12 +1,9 @@
-﻿@inject IState<EventLogState> EventLogState
-
-<div class="filter-row">
+﻿<div class="filter-row">
     @if (Value.IsEditing)
     {
-        <div>
-
+        <div class="filter-content">
             <span>Filter On: </span>
-            <select class="input-filter-select" @bind="@Value.FilterType" disabled="@(Value.SubFilters.Count > 0)">
+            <select class="input-filter-dropdown" @bind="@Value.FilterType">
                 @foreach (FilterType type in Enum.GetValues(typeof(FilterType)))
                 {
                     <option value="@type">@type.ToString()</option>
@@ -14,7 +11,7 @@
             </select>
 
             <span>Comparison: </span>
-            <select class="input-filter-select" @bind="@Value.FilterComparison">
+            <select class="input-filter-dropdown" @bind="@Value.FilterComparison">
                 @foreach (FilterComparison type in Enum.GetValues(typeof(FilterComparison)))
                 {
                     <option value="@type">@type.ToFullString()</option>
@@ -22,33 +19,16 @@
             </select>
 
             <span>Value: </span>
-            @switch (Value.FilterType)
-            {
-                case FilterType.EventId :
-                    <FilterSelect CssClass="input-filter-id" TInput="int"
-                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="EventLogState.Value.EventIds.OrderBy(id => id)" />
-                    break;
-                case FilterType.Level :
-                    <FilterSelect CssClass="input-filter-severity" TInput="SeverityLevel"
-                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
-                    break;
-                case FilterType.Source :
-                    <FilterSelect CssClass="input-filter-dropdown" TInput="string"
-                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="EventLogState.Value.EventProviderNames.OrderBy(n => n)" />
-                    break;
-                case FilterType.Task :
-                    <FilterSelect CssClass="input-filter-dropdown" TInput="string"
-                        Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                        Items="EventLogState.Value.TaskNames.OrderBy(n => n)" />
-                    break;
-                case FilterType.Description :
-                default :
-                    <FilterInput Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
-                    break;
-            }
-
+            <div>
+                @if (Value.FilterType is FilterType.Description)
+                {
+                    <FilterInput @bind-Value="@Value.FilterValue" />
+                }
+                else
+                {
+                    <FilterSelect @bind-Value="@Value.FilterValue" Type="Value.FilterType" />
+                }
+            </div>
         </div>
     }
     else if (string.IsNullOrWhiteSpace(Value.ComparisonString))
@@ -94,17 +74,15 @@
                 </button>
             }
         }
-        
     </div>
-
 </div>
 
-<div class="sub-filter-row">
-    @if (Value.SubFilters.Any() && Value.IsEditing)
-    {
+@if (Value.SubFilters.Any() && Value.IsEditing)
+{
+    <div class="sub-filter-row">
         @foreach (var item in Value.SubFilters)
         {
-            <SubFilterRow ParentId="@Value.Id" FilterType="@Value.FilterType" Value="@item" />
+            <SubFilterRow ParentId="@Value.Id" FilterType="Value.FilterType" Value="@item" />
         }
-    }
-</div>
+    </div>
+}
