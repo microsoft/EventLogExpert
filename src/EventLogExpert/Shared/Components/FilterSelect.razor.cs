@@ -1,34 +1,24 @@
-using EventLogExpert.Library.Helpers;
-using Microsoft.AspNetCore.Components;
-using ValueChangedEventArgs = EventLogExpert.Library.EventArgs.ValueChangedEventArgs;
+﻿using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class FilterSelect<TInput>
+public partial class FilterSelect<InputType> where InputType : Enum
 {
-    [Parameter]
-    public string CssClass { get; set; } = "";
+    private bool _isDropDownVisible;
 
     [Parameter]
-    public IEnumerable<TInput>? Items { get; set; }
+    public InputType Value { get; set; } = default!;
 
     [Parameter]
-    public EventCallback<ValueChangedEventArgs> OnValueChangedEvent { get; set; }
+    public EventCallback<InputType> ValueChanged { get; set; }
 
-    [Parameter]
-    public TInput Value { get; set; } = default!;
+    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
 
-    private async Task UpdateValue(ChangeEventArgs args)
+    private void SetDropDownVisibility(bool visible) => _isDropDownVisible = visible;
+
+    private async Task UpdateValue(InputType value)
     {
-        if (Value is SeverityLevel && Enum.TryParse(args.Value?.ToString(), out SeverityLevel value))
-        {
-            Value = (TInput)Convert.ChangeType(value, typeof(TInput));
-        }
-        else
-        {
-            Value = (TInput)Convert.ChangeType(args.Value, typeof(TInput))!;
-        }
-
-        await OnValueChangedEvent.InvokeAsync(new ValueChangedEventArgs(Value));
+        Value = value;
+        await ValueChanged.InvokeAsync(Value);
     }
 }

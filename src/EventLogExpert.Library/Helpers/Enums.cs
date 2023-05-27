@@ -7,7 +7,6 @@ namespace EventLogExpert.Library.Helpers;
 
 public enum SeverityLevel
 {
-    All = -1,
     Error = 2,
     Warning = 3,
     Information = 4
@@ -15,7 +14,7 @@ public enum SeverityLevel
 
 public enum FilterType
 {
-    EventId,
+    [EnumMember(Value = "Event ID")] EventId,
     Level,
     Source,
     Task,

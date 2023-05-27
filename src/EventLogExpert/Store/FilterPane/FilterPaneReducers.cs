@@ -31,7 +31,7 @@ public class FilterPaneReducers
 
         if (parentFilter is null) { return state; } // If not parent filter, something went wrong and bail
 
-        parentFilter.SubFilters.Add(new SubFilterModel(parentFilter.FilterType));
+        parentFilter.SubFilters.Add(new SubFilterModel());
 
         return state with { CurrentFilters = updatedList };
     }

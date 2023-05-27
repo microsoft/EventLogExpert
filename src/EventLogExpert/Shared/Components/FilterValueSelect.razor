@@ -1,0 +1,17 @@
+@inject IState<EventLogState> EventLogState
+
+<div class="input-select">
+    <label>
+        <input type="text" class="input-filter-select" value="@Value" @oninput="OnInputChange"
+            @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
+        <i class="bi bi-caret-up" data-toggle="@IsDropDownVisible"></i>
+    </label>
+
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+        <div @onmousedown="() => UpdateValue(string.Empty)">All</div>
+        @foreach (var item in FilteredItems)
+        {
+            <div @onmousedown="() => UpdateValue(item)">@item</div>
+        }
+    </div>
+</div>

@@ -14,7 +14,10 @@
     }
 }
 
-.tz-row { margin-bottom: 1rem; }
+.tz-row {
+    display: flex;
+    margin-bottom: 1rem;
+}
 
 .provider-row {
     display: flex;

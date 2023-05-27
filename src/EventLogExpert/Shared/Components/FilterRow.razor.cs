@@ -13,56 +13,41 @@ public partial class FilterRow
 {
     [Parameter] public FilterModel Value { get; set; } = null!;
 
-    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
-
-    private void ToggleFilter()
+    private static string GetComparisonString(FilterType type, FilterComparison comparison) => comparison switch
     {
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilter(Value.Id));
-        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
-    }
+        FilterComparison.Equals => $"{type} == ",
+        FilterComparison.Contains => $"{type}.Contains",
+        FilterComparison.NotEqual => $"{type} != ",
+        FilterComparison.NotContains => $"!{type}.Contains",
+        _ => string.Empty,
+    };
 
-    private void EditFilter() => Value.IsEditing = true;
-
-    private string? GetSubFilterComparisonString(SubFilterModel subFilter)
+    private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
     {
-        if (!IsValidFilterValue(subFilter.FilterValue))
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(subFilter.FilterValue)) { return null; }
 
-        StringBuilder stringBuilder = new(" OR ");
+        StringBuilder stringBuilder = new(" || ");
+        stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
 
         switch (subFilter.FilterComparison)
         {
             case FilterComparison.Equals :
-                stringBuilder.AppendLine("== ");
+            case FilterComparison.NotEqual :
+                stringBuilder.Append($"\"{subFilter.FilterValue}\"");
                 break;
             case FilterComparison.Contains :
-                stringBuilder.AppendLine("contains ");
-                break;
-            case FilterComparison.NotEqual :
-                stringBuilder.AppendLine("!= ");
-                break;
             case FilterComparison.NotContains :
-                stringBuilder.AppendLine("!contains ");
+                stringBuilder.Append($"(\"{subFilter.FilterValue}\")");
                 break;
-            default :
-                return null;
+            default : return null;
         }
 
-        stringBuilder.AppendLine($"{subFilter.FilterValue}");
         return stringBuilder.ToString();
     }
 
-    private bool IsValidFilterValue(dynamic value)
-    {
-        return Value.FilterType switch
-        {
-            FilterType.EventId or FilterType.Level => value < 0 is false,
-            FilterType.Source or FilterType.Task or FilterType.Description => string.IsNullOrWhiteSpace(value) is false,
-            _ => false,
-        };
-    }
+    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
+
+    private void EditFilter() => Value.IsEditing = true;
 
     private void RemoveFilter()
     {
@@ -102,16 +87,16 @@ public partial class FilterRow
             switch (filterModel.FilterComparison)
             {
                 case FilterComparison.Equals :
-                    SetEqualsComparison(filterModel.FilterValue);
+                    SetEqualsComparison(filterModel.FilterType, filterModel.FilterValue);
                     break;
                 case FilterComparison.Contains :
-                    SetContainsComparison(filterModel.FilterValue);
+                    SetContainsComparison(filterModel.FilterType, filterModel.FilterValue);
                     break;
                 case FilterComparison.NotEqual :
-                    SetNotEqualsComparison(filterModel.FilterValue);
+                    SetNotEqualsComparison(filterModel.FilterType, filterModel.FilterValue);
                     break;
                 case FilterComparison.NotContains :
-                    SetNotContainsComparison(filterModel.FilterValue);
+                    SetNotContainsComparison(filterModel.FilterType, filterModel.FilterValue);
                     break;
                 default :
                     return;
@@ -122,16 +107,16 @@ public partial class FilterRow
             switch (subFilterModel.FilterComparison)
             {
                 case FilterComparison.Equals :
-                    SetEqualsComparison(subFilterModel.FilterValue);
+                    SetEqualsComparison(subFilterModel.FilterType, subFilterModel.FilterValue);
                     break;
                 case FilterComparison.Contains :
-                    SetContainsComparison(subFilterModel.FilterValue);
+                    SetContainsComparison(subFilterModel.FilterType, subFilterModel.FilterValue);
                     break;
                 case FilterComparison.NotEqual :
-                    SetNotEqualsComparison(subFilterModel.FilterValue);
+                    SetNotEqualsComparison(subFilterModel.FilterType, subFilterModel.FilterValue);
                     break;
                 case FilterComparison.NotContains :
-                    SetNotContainsComparison(subFilterModel.FilterValue);
+                    SetNotContainsComparison(subFilterModel.FilterType, subFilterModel.FilterValue);
                     break;
                 default :
                     return;
@@ -141,35 +126,26 @@ public partial class FilterRow
 
     private bool SetComparisonString()
     {
-        if (!IsValidFilterValue(Value.FilterValue))
+        if (string.IsNullOrWhiteSpace(Value.FilterValue))
         {
             Value.ComparisonString = null;
             return false;
         }
 
-        StringBuilder stringBuilder = new();
-
-        stringBuilder.AppendLine($"{Value.FilterType} ");
+        StringBuilder stringBuilder = new(GetComparisonString(Value.FilterType, Value.FilterComparison));
 
         switch (Value.FilterComparison)
         {
             case FilterComparison.Equals :
-                stringBuilder.AppendLine("== ");
+            case FilterComparison.NotEqual :
+                stringBuilder.Append($"\"{Value.FilterValue}\"");
                 break;
             case FilterComparison.Contains :
-                stringBuilder.AppendLine("contains ");
-                break;
-            case FilterComparison.NotEqual :
-                stringBuilder.AppendLine("!= ");
-                break;
             case FilterComparison.NotContains :
-                stringBuilder.AppendLine("!contains ");
+                stringBuilder.Append($"(\"{Value.FilterValue}\")");
                 break;
-            default :
-                return false;
+            default : return false;
         }
-
-        stringBuilder.AppendLine($"{Value.FilterValue}");
 
         if (Value.SubFilters.Count > 0)
         {
@@ -186,15 +162,15 @@ public partial class FilterRow
         return true;
     }
 
-    private void SetContainsComparison(dynamic? value)
+    private void SetContainsComparison(FilterType filterType, string value)
     {
-        switch (Value.FilterType)
+        switch (filterType)
         {
             case FilterType.EventId :
-                Value.Comparison.Add(x => x.Id.ToString().Contains(value?.ToString()));
+                Value.Comparison.Add(x => x.Id.ToString().Contains(value));
                 break;
             case FilterType.Level :
-                Value.Comparison.Add(x => x.Level.ToString()?.Contains(value?.ToString()));
+                Value.Comparison.Add(x => x.Level.ToString()?.Contains(value) is true);
                 break;
             case FilterType.Source :
                 Value.Comparison.Add(x =>
@@ -216,15 +192,17 @@ public partial class FilterRow
         }
     }
 
-    private void SetEqualsComparison(dynamic? value)
+    private void SetEqualsComparison(FilterType filterType, string value)
     {
-        switch (Value.FilterType)
+        switch (filterType)
         {
             case FilterType.EventId :
-                Value.Comparison.Add(x => x.Id == value);
+                if (int.TryParse(value, out int id)) { Value.Comparison.Add(x => x.Id == id); }
+
                 break;
             case FilterType.Level :
-                Value.Comparison.Add(x => x.Level == value);
+                if (Enum.TryParse(value, out SeverityLevel level)) { Value.Comparison.Add(x => x.Level == level); }
+
                 break;
             case FilterType.Source :
                 Value.Comparison.Add(x =>
@@ -246,15 +224,15 @@ public partial class FilterRow
         }
     }
 
-    private void SetNotContainsComparison(dynamic? value)
+    private void SetNotContainsComparison(FilterType filterType, string value)
     {
-        switch (Value.FilterType)
+        switch (filterType)
         {
             case FilterType.EventId :
-                Value.Comparison.Add(x => !x.Id.ToString().Contains(value?.ToString()));
+                Value.Comparison.Add(x => !x.Id.ToString().Contains(value));
                 break;
             case FilterType.Level :
-                Value.Comparison.Add(x => !x.Level.ToString()?.Contains(value?.ToString()));
+                Value.Comparison.Add(x => !x.Level.ToString()?.Contains(value) is true);
                 break;
             case FilterType.Source :
                 Value.Comparison.Add(x =>
@@ -276,15 +254,17 @@ public partial class FilterRow
         }
     }
 
-    private void SetNotEqualsComparison(dynamic? value)
+    private void SetNotEqualsComparison(FilterType filterType, string value)
     {
-        switch (Value.FilterType)
+        switch (filterType)
         {
             case FilterType.EventId :
-                Value.Comparison.Add(x => x.Id != value);
+                if (int.TryParse(value, out int id)) { Value.Comparison.Add(x => x.Id != id); }
+
                 break;
             case FilterType.Level :
-                Value.Comparison.Add(x => x.Level != value);
+                if (Enum.TryParse(value, out SeverityLevel level)) { Value.Comparison.Add(x => x.Level != level); }
+
                 break;
             case FilterType.Source :
                 Value.Comparison.Add(x =>
@@ -304,5 +284,11 @@ public partial class FilterRow
             default :
                 return;
         }
+    }
+
+    private void ToggleFilter()
+    {
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilter(Value.Id));
+        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilters());
     }
 }

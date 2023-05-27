@@ -7,15 +7,21 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class TimeZoneSelect
 {
-    [Parameter] public string Value { get; set; } = null!;
+    private bool _isDropDownVisible;
 
-    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+    [Parameter]
+    public string Value { get; set; } = string.Empty;
 
-    private async Task SetValue(ChangeEventArgs args)
+    [Parameter]
+    public EventCallback<string> ValueChanged { get; set; }
+
+    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
+
+    private void SetDropDownVisibility(bool visible) => _isDropDownVisible = visible;
+
+    private async Task UpdateValue(string value)
     {
-        if (string.IsNullOrEmpty(args.Value?.ToString())) { return; }
-
-        Value = args.Value.ToString()!;
+        Value = value;
         await ValueChanged.InvokeAsync(Value);
     }
 }

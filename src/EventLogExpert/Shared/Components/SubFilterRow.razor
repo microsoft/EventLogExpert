@@ -1,42 +1,19 @@
-﻿@inject IState<EventLogState> EventLogState
+﻿<div class="subfilter-row">
+    <div class="filter-content">
+        <span>Join On: </span>
+        <FilterSelect @bind-Value="Value.FilterType" InputType="FilterType" />
 
-<div class="subfilter-row">
-    <div>
-
-        <span>Join On Comparison: </span>
-        <select class="input-filter-select" @bind="@Value.FilterComparison">
-            @foreach (FilterComparison type in Enum.GetValues(typeof(FilterComparison)))
-            {
-                <option value="@type">@type.ToFullString()</option>
-            }
-        </select>
+        <span>Comparison: </span>
+        <FilterSelect @bind-Value="Value.FilterComparison" InputType="FilterComparison" />
 
         <span>Value: </span>
-        @switch (FilterType)
+        @if (Value.FilterType is FilterType.Description)
         {
-            case FilterType.EventId :
-                <FilterSelect CssClass="input-filter-id" TInput="int"
-                    Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                    Items="EventLogState.Value.EventIds.OrderBy(id => id)" />
-                break;
-            case FilterType.Level :
-                <FilterSelect CssClass="input-filter-severity" TInput="SeverityLevel"
-                    Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
-                break;
-            case FilterType.Source :
-                <FilterSelect CssClass="input-filter-dropdown" TInput="string"
-                    Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                    Items="EventLogState.Value.EventProviderNames.OrderBy(n => n)" />
-                break;
-            case FilterType.Task :
-                <FilterSelect CssClass="input-filter-dropdown" TInput="string"
-                    Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue"
-                    Items="EventLogState.Value.TaskNames.OrderBy(n => n)" />
-                break;
-            case FilterType.Description :
-            default :
-                <FilterInput Value="@Value.FilterValue" OnValueChangedEvent="@Value.UpdateFilterValue" />
-                break;
+            <FilterInput @bind-Value="@Value.FilterValue" />
+        }
+        else
+        {
+            <FilterValueSelect @bind-Value="@Value.FilterValue" Type="Value.FilterType" />
         }
 
     </div>

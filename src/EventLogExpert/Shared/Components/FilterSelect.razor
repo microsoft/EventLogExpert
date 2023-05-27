@@ -1,27 +1,27 @@
-@typeparam TInput
+@typeparam InputType
 
-<select class="@CssClass" value="@Value" @onchange="UpdateValue">
-    @switch (Value)
-    {
-        case int :
-            <option value="0">Empty</option>
-            break;
-        case string :
-            <option value="">Empty</option>
-            break;
-        case SeverityLevel :
-            @foreach (SeverityLevel level in Enum.GetValues(typeof(SeverityLevel)))
-            {
-                <option value="@level">@level.ToString()</option>
-            }
-            break;
-    }
+<div class="input-select">
+    <label>
+        <input type="text" class="input-filter-dropdown" value="@Value.ToFullString()" readonly
+            @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
+        <i class="bi bi-caret-up" data-toggle="@IsDropDownVisible"></i>
+    </label>
 
-    @if (Items is not null)
-    {
-        @foreach (var id in Items)
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+        @if (typeof(FilterType).IsAssignableFrom(typeof(InputType)))
         {
-            <option value="@id">@id</option>
+            @foreach (InputType item in Enum.GetValues(typeof(FilterType)))
+            {
+                <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
+            }
         }
-    }
-</select>
+
+        @if (typeof(FilterComparison).IsAssignableFrom(typeof(InputType)))
+        {
+            @foreach (InputType item in Enum.GetValues(typeof(FilterComparison)))
+            {
+                <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
+            }
+        }
+    </div>
+</div>
