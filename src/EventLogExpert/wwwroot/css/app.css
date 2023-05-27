@@ -109,12 +109,15 @@ a,
     text-align-last: center;
 }
 
-    .input-filter-dropdown {
+    .input-filter-dropdown,
+    .input-timezone-select {
         width: 120px;
         text-align: center;
         cursor: default;
         user-select: none;
     }
+
+    .input-timezone-select { width: 350px; }
 
     .input-filter-select,
     .input-filter-description {
@@ -145,8 +148,6 @@ a,
             filter: invert(1);
         }
 
-    .input-timezone-select { width: 400px; }
-
         .input-filter-select:focus-visible,
         .input-filter-dropdown:focus-visible,
         .input-filter-description:focus-visible,
@@ -156,9 +157,7 @@ a,
             outline: none;
         }
 
-        .input-filter-dropdown > option,
-        .input-filter-description > option,
-        .input-timezone-select > option {
+        .input-filter-description > option {
             background: var(--background-dark);
         }
 
