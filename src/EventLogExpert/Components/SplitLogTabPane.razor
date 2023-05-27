@@ -1,0 +1,23 @@
+@inherits FluxorComponent
+
+@inject IState<EventLogState> EventLogState
+
+@if (EventLogState.Value.ActiveLogs.Count > 1)
+{
+    <div class="tab-pane">
+        <div class="tab-row">
+            <div>
+                <input type="radio" name="tab" id="log0" checked />
+                <label for="log0" tabindex="0">Combined</label>
+            </div>
+
+            @foreach (var log in EventLogState.Value.ActiveLogs)
+            {
+                <div>
+                    <input type="radio" name="tab" id="@($"log_{log.Name}")" checked />
+                    <label for="@($"log_{log.Name}")" tabindex="0">@log.Name</label>
+                </div>
+            }
+        </div>
+    </div>
+}
