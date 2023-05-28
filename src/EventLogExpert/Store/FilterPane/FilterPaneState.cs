@@ -3,15 +3,14 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Store.FilterPane;
 
 [FeatureState]
 public record FilterPaneState
 {
-    public IEnumerable<FilterModel> CurrentFilters { get; init; } = Enumerable.Empty<FilterModel>();
-
-    public IEnumerable<FilterModel> AppliedFilters { get; init; } = Enumerable.Empty<FilterModel>();
+    public ReadOnlyCollection<FilterModel> CurrentFilters { get; init; } = new List<FilterModel>().AsReadOnly();
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 

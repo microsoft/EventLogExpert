@@ -8,23 +8,32 @@ namespace EventLogExpert.Store.FilterPane;
 
 public class FilterPaneReducers
 {
-    [ReducerMethod(typeof(FilterPaneAction.AddFilter))]
-    public static FilterPaneState ReduceAddFilterAction(FilterPaneState state)
+    [ReducerMethod]
+    public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
     {
-        var updatedList = state.CurrentFilters.ToList();
-
-        if (updatedList.Count <= 0)
+        if (!state.CurrentFilters.Any())
         {
-            return state with { CurrentFilters = new List<FilterModel> { new(Guid.NewGuid()) } };
+            return state with { CurrentFilters = new List<FilterModel> { new() }.AsReadOnly() };
         }
 
-        updatedList.Add(new FilterModel(Guid.NewGuid()));
+        if (action.FilterModel is null)
+        {
+            return state with
+            {
+                CurrentFilters = state.CurrentFilters.Concat(new[] { new FilterModel() })
+                    .ToList().AsReadOnly()
+            };
+        }
 
-        return state with { CurrentFilters = updatedList };
+        return state with
+        {
+            CurrentFilters = state.CurrentFilters.Concat(new[] { action.FilterModel })
+                .ToList().AsReadOnly()
+        };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceAddSubFilterAction(FilterPaneState state, FilterPaneAction.AddSubFilter action)
+    public static FilterPaneState ReduceAddSubFilter(FilterPaneState state, FilterPaneAction.AddSubFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
         var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
@@ -33,30 +42,14 @@ public class FilterPaneReducers
 
         parentFilter.SubFilters.Add(new SubFilterModel());
 
-        return state with { CurrentFilters = updatedList };
-    }
-
-    [ReducerMethod(typeof(FilterPaneAction.ApplyFilters))]
-    public static FilterPaneState ReduceApplyFilters(FilterPaneState state)
-    {
-        List<FilterModel> filters = new();
-
-        foreach (var filterModel in state.CurrentFilters)
-        {
-            if (filterModel.Comparison.Any() && filterModel.IsEnabled)
-            {
-                filters.Add(filterModel);
-            }
-        }
-
-        return state with { AppliedFilters = filters };
+        return state with { CurrentFilters = updatedList.AsReadOnly() };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
+    public static FilterPaneState ReduceRemoveFilter(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
-        var filter = updatedList.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
+        var filter = updatedList.FirstOrDefault(filter => filter.Id == action.Id);
 
         if (filter is null)
         {
@@ -65,11 +58,11 @@ public class FilterPaneReducers
 
         updatedList.Remove(filter);
 
-        return state with { CurrentFilters = updatedList };
+        return state with { CurrentFilters = updatedList.AsReadOnly() };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveSubFilterAction(FilterPaneState state,
+    public static FilterPaneState ReduceRemoveSubFilter(FilterPaneState state,
         FilterPaneAction.RemoveSubFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
@@ -77,14 +70,26 @@ public class FilterPaneReducers
 
         if (parentFilter is null) { return state; }
 
-        parentFilter.SubFilters.Remove(action.SubFilterModel);
+        parentFilter.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
 
-        return state with { CurrentFilters = updatedList };
+        return state with { CurrentFilters = updatedList.AsReadOnly() };
     }
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetAdvancedFilter(FilterPaneState state,
         FilterPaneAction.SetAdvancedFilter action) => state with { AdvancedFilter = action.Expression };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)
+    {
+        return state with
+        {
+            CurrentFilters = state.CurrentFilters
+                .Where(filter => filter.Id != action.FilterModel.Id)
+                .Concat(new[] { action.FilterModel })
+                .ToList().AsReadOnly()
+        };
+    }
 
     [ReducerMethod]
     public static FilterPaneState
@@ -96,8 +101,27 @@ public class FilterPaneReducers
         state with { IsAdvancedFilterEnabled = !state.IsAdvancedFilterEnabled };
 
     [ReducerMethod]
-    public static FilterPaneState ReduceToggleFilterAction(FilterPaneState state,
-        FilterPaneAction.ToggleFilter action)
+    public static FilterPaneState ReduceToggleEditFilter(FilterPaneState state,
+        FilterPaneAction.ToggleEditFilter action)
+    {
+        List<FilterModel> filters = new();
+
+        foreach (var filterModel in state.CurrentFilters)
+        {
+            if (filterModel.Id == action.Id)
+            {
+                filterModel.IsEditing = !filterModel.IsEditing;
+            }
+
+            filters.Add(filterModel);
+        }
+
+        return state with { CurrentFilters = filters.AsReadOnly() };
+    }
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceToggleEnableFilter(FilterPaneState state,
+        FilterPaneAction.ToggleEnableFilter action)
     {
         List<FilterModel> filters = new();
 
@@ -111,7 +135,7 @@ public class FilterPaneReducers
             filters.Add(filterModel);
         }
 
-        return state with { CurrentFilters = filters };
+        return state with { CurrentFilters = filters.AsReadOnly() };
     }
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleFilterDate))]

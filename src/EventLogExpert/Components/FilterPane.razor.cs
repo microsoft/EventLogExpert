@@ -84,17 +84,14 @@ public partial class FilterPane
     {
         _advancedFilterValue = e.Value as string;
 
-        if (_advancedFilterDebounceTimer != null)
-        {
-            _advancedFilterDebounceTimer.Dispose();
-        }
+        _advancedFilterDebounceTimer?.Dispose();
 
         _advancedFilterDebounceTimer = new(s =>
-        {
-            _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
-            _advancedFilterErrorMessage = message;
-            InvokeAsync(() => StateHasChanged());
-        }, e.Value as string, 250, 0);
+            {
+                _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
+                _advancedFilterErrorMessage = message;
+                InvokeAsync(StateHasChanged);
+            }, e.Value as string, 250, 0);
     }
 
     private void ApplyAdvancedFilter()
@@ -121,6 +118,9 @@ public partial class FilterPane
 
     private void EditDateFilter() => _canEditDate = true;
 
+    private int GetActiveFilters() =>
+        FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+
     private void RemoveAdvancedFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(string.Empty));
@@ -143,7 +143,7 @@ public partial class FilterPane
     {
         message = string.Empty;
 
-        if (string.IsNullOrEmpty(expression)) return false;
+        if (string.IsNullOrEmpty(expression)) { return false; }
 
         var testQueryable = new List<DisplayEventModel>();
 

@@ -48,9 +48,10 @@ public partial class EventTable
                 e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before);
         }
 
-        if (FilterPaneState.Value.AppliedFilters.Any())
+        if (FilterPaneState.Value.CurrentFilters.Any())
         {
-            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.AppliedFilters
+            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.CurrentFilters
+                .Where(filter => filter.IsEnabled && !filter.IsEditing)
                 .All(filter => filter.Comparison
                     .Any(comp => comp(e))));
         }

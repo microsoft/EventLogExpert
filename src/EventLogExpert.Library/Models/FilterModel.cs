@@ -5,9 +5,11 @@ using EventLogExpert.Library.Helpers;
 
 namespace EventLogExpert.Library.Models;
 
-public record FilterModel(Guid Id)
+public record FilterModel
 {
     private FilterType _filterType;
+
+    public Guid Id { get; } = Guid.NewGuid();
 
     public List<Func<DisplayEventModel, bool>> Comparison { get; set; } = new();
 
