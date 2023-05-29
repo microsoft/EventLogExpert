@@ -3,28 +3,38 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Store.FilterPane;
 
 public class FilterPaneReducers
 {
-    [ReducerMethod(typeof(FilterPaneAction.AddFilter))]
-    public static FilterPaneState ReduceAddFilterAction(FilterPaneState state)
+    [ReducerMethod]
+    public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
     {
-        var updatedList = state.CurrentFilters.ToList();
-
-        if (updatedList.Count <= 0)
+        if (!state.CurrentFilters.Any())
         {
-            return state with { CurrentFilters = new List<FilterModel> { new(Guid.NewGuid()) } };
+            return state with { CurrentFilters = new List<FilterModel> { new() }.ToImmutableList() };
         }
 
-        updatedList.Add(new FilterModel(Guid.NewGuid()));
+        if (action.FilterModel is null)
+        {
+            return state with
+            {
+                CurrentFilters = state.CurrentFilters.Concat(new[] { new FilterModel() })
+                    .ToImmutableList()
+            };
+        }
 
-        return state with { CurrentFilters = updatedList };
+        return state with
+        {
+            CurrentFilters = state.CurrentFilters.Concat(new[] { action.FilterModel })
+                .ToImmutableList()
+        };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceAddSubFilterAction(FilterPaneState state, FilterPaneAction.AddSubFilter action)
+    public static FilterPaneState ReduceAddSubFilter(FilterPaneState state, FilterPaneAction.AddSubFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
         var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
@@ -33,30 +43,14 @@ public class FilterPaneReducers
 
         parentFilter.SubFilters.Add(new SubFilterModel());
 
-        return state with { CurrentFilters = updatedList };
-    }
-
-    [ReducerMethod(typeof(FilterPaneAction.ApplyFilters))]
-    public static FilterPaneState ReduceApplyFilters(FilterPaneState state)
-    {
-        List<FilterModel> filters = new();
-
-        foreach (var filterModel in state.CurrentFilters)
-        {
-            if (filterModel.Comparison.Any() && filterModel.IsEnabled)
-            {
-                filters.Add(filterModel);
-            }
-        }
-
-        return state with { AppliedFilters = filters };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveFilterAction(FilterPaneState state, FilterPaneAction.RemoveFilter action)
+    public static FilterPaneState ReduceRemoveFilter(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
-        var filter = updatedList.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
+        var filter = updatedList.FirstOrDefault(filter => filter.Id == action.Id);
 
         if (filter is null)
         {
@@ -65,11 +59,11 @@ public class FilterPaneReducers
 
         updatedList.Remove(filter);
 
-        return state with { CurrentFilters = updatedList };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveSubFilterAction(FilterPaneState state,
+    public static FilterPaneState ReduceRemoveSubFilter(FilterPaneState state,
         FilterPaneAction.RemoveSubFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
@@ -77,9 +71,9 @@ public class FilterPaneReducers
 
         if (parentFilter is null) { return state; }
 
-        parentFilter.SubFilters.Remove(action.SubFilterModel);
+        parentFilter.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
 
-        return state with { CurrentFilters = updatedList };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
@@ -87,17 +81,53 @@ public class FilterPaneReducers
         FilterPaneAction.SetAdvancedFilter action) => state with { AdvancedFilter = action.Expression };
 
     [ReducerMethod]
+    public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)
+    {
+        return state with
+        {
+            CurrentFilters = state.CurrentFilters
+                .Where(filter => filter.Id != action.FilterModel.Id)
+                .Concat(new[] { action.FilterModel })
+                .ToImmutableList()
+        };
+    }
+
+    [ReducerMethod]
     public static FilterPaneState
         ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
         state with { FilteredDateRange = action.FilterDateModel };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetNumberOfFilteredEvents(FilterPaneState state,
+        FilterPaneAction.SetNumberOfFilteredEvents action) =>
+        state with { NumberOfFilteredEvents = action.NumberOfFilteredEvents };
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleAdvancedFilter))]
     public static FilterPaneState ReduceToggleAdvancedFilter(FilterPaneState state) =>
         state with { IsAdvancedFilterEnabled = !state.IsAdvancedFilterEnabled };
 
     [ReducerMethod]
-    public static FilterPaneState ReduceToggleFilterAction(FilterPaneState state,
-        FilterPaneAction.ToggleFilter action)
+    public static FilterPaneState ReduceToggleEditFilter(FilterPaneState state,
+        FilterPaneAction.ToggleEditFilter action)
+    {
+        List<FilterModel> filters = new();
+
+        foreach (var filterModel in state.CurrentFilters)
+        {
+            if (filterModel.Id == action.Id)
+            {
+                filterModel.IsEditing = !filterModel.IsEditing;
+            }
+
+            filters.Add(filterModel);
+        }
+
+        return state with { CurrentFilters = filters.ToImmutableList() };
+    }
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceToggleEnableFilter(FilterPaneState state,
+        FilterPaneAction.ToggleEnableFilter action)
     {
         List<FilterModel> filters = new();
 
@@ -111,7 +141,7 @@ public class FilterPaneReducers
             filters.Add(filterModel);
         }
 
-        return state with { CurrentFilters = filters };
+        return state with { CurrentFilters = filters.ToImmutableList() };
     }
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleFilterDate))]

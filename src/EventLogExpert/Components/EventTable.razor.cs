@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
+using EventLogExpert.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Linq.Dynamic.Core;
@@ -39,6 +40,8 @@ public partial class EventTable
 
     private IList<DisplayEventModel> GetFilteredEvents()
     {
+        int numberOfFilteredEvents = 0;
+        int initialNumberOfEvents = EventLogState.Value.Events.Count;
         var filteredEvents = EventLogState.Value.Events.AsQueryable();
 
         if (FilterPaneState.Value.FilteredDateRange is not null && FilterPaneState.Value.FilteredDateRange.IsEnabled)
@@ -48,9 +51,10 @@ public partial class EventTable
                 e.TimeCreated <= FilterPaneState.Value.FilteredDateRange.Before);
         }
 
-        if (FilterPaneState.Value.AppliedFilters.Any())
+        if (FilterPaneState.Value.CurrentFilters.Any())
         {
-            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.AppliedFilters
+            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.CurrentFilters
+                .Where(filter => filter.IsEnabled && !filter.IsEditing)
                 .All(filter => filter.Comparison
                     .Any(comp => comp(e))));
         }
@@ -64,6 +68,16 @@ public partial class EventTable
         if (!_isDateTimeDescending)
         {
             filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
+        }
+
+        if (filteredEvents.Count() != initialNumberOfEvents)
+        {
+            numberOfFilteredEvents = (filteredEvents.Count() - initialNumberOfEvents) + initialNumberOfEvents;
+        }
+
+        if (numberOfFilteredEvents != FilterPaneState.Value.NumberOfFilteredEvents)
+        {
+            Dispatcher.Dispatch(new FilterPaneAction.SetNumberOfFilteredEvents(numberOfFilteredEvents));
         }
 
         return filteredEvents.ToList();

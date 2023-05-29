@@ -1,6 +1,7 @@
 ﻿@inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
+@inject IState<FilterPaneState> FilterPaneState
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
@@ -10,6 +11,11 @@
     }
     
     <span>Events Loaded: @EventLogState.Value.Events.Count</span>
+    
+    @if (FilterPaneState.Value.CurrentFilters.Any())
+    {
+        <span>Filtered Events: @FilterPaneState.Value.NumberOfFilteredEvents</span>
+    }
 
     @if (EventLogState.Value.ContinuouslyUpdate)
     {

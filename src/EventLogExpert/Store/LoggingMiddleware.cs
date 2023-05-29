@@ -30,6 +30,10 @@ public class LoggingMiddleware : Middleware
         {
             _debugLogger.Trace($"Action: EventLogAction.AddEvent with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
         }
+        else if (action is FilterPaneAction.SetFilter)
+        {
+            _debugLogger.Trace("Action: EventLogAction.SetFilter.");
+        }
         else if (action is FilterPaneAction.RemoveFilter)
         {
             // We can't serialize a Func.
