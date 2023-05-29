@@ -17,17 +17,22 @@
         <span>Filtered Events: @FilterPaneState.Value.NumberOfFilteredEvents</span>
     }
 
-    @if (EventLogState.Value.ContinuouslyUpdate)
+    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == EventLogExpert.Store.EventLog.EventLogState.LogType.Live))
     {
-        <span>Continuously Updating</span>
-    }
-    else
-    {
-        <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
-        @if (EventLogState.Value.NewEventBufferIsFull)
+        @if (EventLogState.Value.ContinuouslyUpdate)
         {
-            <span>Buffer Full</span>
+            <span>Continuously Updating</span>
         }
+        else
+        {
+            <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
+            @if (EventLogState.Value.NewEventBufferIsFull)
+            {
+                <span>Buffer Full</span>
+            }
+
+        }
+
     }
 
     @if (!string.IsNullOrEmpty(StatusBarState.Value.ResolverStatus))
