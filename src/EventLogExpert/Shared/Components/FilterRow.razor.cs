@@ -51,7 +51,17 @@ public partial class FilterRow
                     subFilter.FilterType,
                     subFilter.FilterValue);
 
-                if (comparison is null) { return; }
+                if (comparison is null)
+                {
+                    if (Application.Current?.MainPage is not null)
+                    {
+                        await Application.Current.MainPage.DisplayAlert("Invalid Filter",
+                            "The sub filter you have created is an invalid filter, please adjust and try again.",
+                            "Ok");
+                    }
+
+                    return;
+                }
 
                 comparisons.Add(comparison);
             }
