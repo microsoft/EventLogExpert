@@ -13,21 +13,20 @@ public record EventLogState
 {
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
-    public record LogSpecifier(string Name, LogType? LogType);
-
     public enum LogType { Live, File }
 
-    public ImmutableList<LogSpecifier> ActiveLogs { get; init; } = ImmutableList<LogSpecifier>.Empty;
+    public record EventLogData(
+        string Name,
+        LogType Type,
+        ReadOnlyCollection<DisplayEventModel> Events,
+        ImmutableHashSet<int> EventIds,
+        ImmutableHashSet<string> EventProviderNames,
+        ImmutableHashSet<string> TaskNames
+        );
 
-    public ImmutableHashSet<int> EventIds { get; init; } = ImmutableHashSet<int>.Empty;
-
-    public ImmutableHashSet<string> EventProviderNames { get; init; } = ImmutableHashSet<string>.Empty;
-
-    public ImmutableHashSet<string> TaskNames { get; init;} = ImmutableHashSet<string>.Empty;
+    public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;
 
     public bool ContinuouslyUpdate { get; init; } = false;
-
-    public ReadOnlyCollection<DisplayEventModel> Events { get; init; } = new List<DisplayEventModel>().AsReadOnly();
 
     public int EventsLoading { get; set; } = 0;
 

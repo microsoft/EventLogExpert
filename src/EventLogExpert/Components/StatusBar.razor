@@ -10,7 +10,7 @@
         <span>Loading Progress: @EventLogState.Value.EventsLoading</span>
     }
     
-    <span>Events Loaded: @EventLogState.Value.Events.Count</span>
+    <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
     
     @if (FilterPaneState.Value.CurrentFilters.Any())
     {
