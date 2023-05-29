@@ -18,11 +18,21 @@ public partial class FilterRow
 
     private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
 
-    private void SaveFilter()
+    private async void SaveFilter()
     {
         FilterModel newModel = Value with { };
 
-        if (!FilterMethods.TryParse(newModel, out string? comparisonString)) { return; }
+        if (!FilterMethods.TryParse(newModel, out string? comparisonString))
+        {
+            if (Application.Current?.MainPage is not null)
+            {
+                await Application.Current.MainPage.DisplayAlert("Invalid Filter",
+                    "The filter you have created is an invalid filter, please adjust and try again.",
+                    "Ok");
+            }
+
+            return;
+        }
 
         List<Func<DisplayEventModel, bool>> comparisons = new();
 
