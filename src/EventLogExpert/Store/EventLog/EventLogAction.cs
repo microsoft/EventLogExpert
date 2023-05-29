@@ -12,9 +12,9 @@ public record EventLogAction
     public record LoadEvents(
         string LogName,
         List<DisplayEventModel> Events,
-        IReadOnlyList<int> AllEventIds,
-        IReadOnlyList<string> AllProviderNames,
-        IReadOnlyList<string> AllTaskNames
+        IEnumerable<int> AllEventIds,
+        IEnumerable<string> AllProviderNames,
+        IEnumerable<string> AllTaskNames
     ) : EventLogAction;
 
     public record LoadNewEvents() : EventLogAction;

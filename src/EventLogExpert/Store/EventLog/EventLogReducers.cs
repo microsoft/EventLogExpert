@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Store.EventLog;
@@ -42,20 +43,17 @@ public class EventLogReducers
 
         if (!state.EventIds.Contains(action.NewEvent.Id))
         {
-            newState = newState with { EventIds = (new[] {action.NewEvent.Id})
-                .Concat(state.EventIds).ToList().AsReadOnly() };
+            newState = newState with { EventIds = state.EventIds.Add(action.NewEvent.Id) };
         }
 
         if (!state.EventProviderNames.Contains(action.NewEvent.Source))
         {
-            newState = newState with { EventProviderNames = (new[] {action.NewEvent.Source})
-                .Concat(state.EventProviderNames).ToList().AsReadOnly() };
+            newState = newState with { EventProviderNames = state.EventProviderNames.Add(action.NewEvent.Source) };
         }
 
         if (!state.TaskNames.Contains(action.NewEvent.TaskCategory))
         {
-            newState = newState with { TaskNames = (new[] { action.NewEvent.TaskCategory })
-                .Concat(state.TaskNames).ToList().AsReadOnly() };
+            newState = newState with { TaskNames = state.TaskNames.Add(action.NewEvent.TaskCategory) };
         }
 
         return newState;
@@ -69,12 +67,9 @@ public class EventLogReducers
             Events = action.Events.Concat(state.Events)
                 .OrderByDescending(e => e.TimeCreated)
                 .ToList().AsReadOnly(),
-            EventIds = action.AllEventIds.Concat(state.EventIds)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly(),
-            EventProviderNames = action.AllProviderNames.Concat(state.EventProviderNames)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly(),
-            TaskNames = action.AllTaskNames.Concat(state.TaskNames)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly()
+            EventIds = state.EventIds.Union(action.AllEventIds),
+            EventProviderNames = state.EventProviderNames.Union(action.AllProviderNames),
+            TaskNames = state.TaskNames.Union(action.AllTaskNames)
         };
     }
 
@@ -92,10 +87,9 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action)
     {
-        var newLog = new List<LogSpecifier> { action.LogSpecifier };
         return state with
         {
-            ActiveLogs = newLog.Concat(state.ActiveLogs).ToList().AsReadOnly()
+            ActiveLogs = state.ActiveLogs.Add(action.LogSpecifier)
         };
     }
 
@@ -107,13 +101,13 @@ public class EventLogReducers
         {
             return state with
             {
-                ActiveLogs = new List<LogSpecifier>().AsReadOnly(),
+                ActiveLogs = ImmutableList<LogSpecifier>.Empty,
                 Events = new List<DisplayEventModel>().AsReadOnly(),
                 NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
                 NewEventBufferIsFull = false,
-                EventIds = new List<int>().AsReadOnly(),
-                EventProviderNames = new List<string>().AsReadOnly(),
-                TaskNames = new List<string>().AsReadOnly()
+                EventIds = ImmutableHashSet<int>.Empty,
+                EventProviderNames = ImmutableHashSet<string>.Empty,
+                TaskNames = ImmutableHashSet<string>.Empty
             };
         }
 
@@ -121,7 +115,7 @@ public class EventLogReducers
         {
             ActiveLogs = state.ActiveLogs
                 .Where(l => l.Name != action.LogName)
-                .ToList().AsReadOnly(),
+                .ToImmutableList(),
             Events = state.Events
                 .Where(e => e.OwningLog != action.LogName)
                 .ToList().AsReadOnly(),
@@ -142,13 +136,13 @@ public class EventLogReducers
     {
         return state with
         {
-            ActiveLogs = new List<LogSpecifier>().AsReadOnly(),
+            ActiveLogs = ImmutableList<LogSpecifier>.Empty,
             Events = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBufferIsFull = false,
-            EventIds = new List<int>().AsReadOnly(),
-            EventProviderNames = new List<string>().AsReadOnly(),
-            TaskNames = new List<string>().AsReadOnly()
+            EventIds = ImmutableHashSet<int>.Empty,
+            EventProviderNames = ImmutableHashSet<string>.Empty,
+            TaskNames = ImmutableHashSet<string>.Empty
         };
     }
 
@@ -198,9 +192,9 @@ public class EventLogReducers
 
         return state with
         {
-            EventIds = eventIds.ToList().AsReadOnly(),
-            EventProviderNames = providerNames.ToList().AsReadOnly(),
-            TaskNames = taskNames.ToList().AsReadOnly()
+            EventIds = eventIds.ToImmutableHashSet(),
+            EventProviderNames = providerNames.ToImmutableHashSet(),
+            TaskNames = taskNames.ToImmutableHashSet()
         };
     }
 }
