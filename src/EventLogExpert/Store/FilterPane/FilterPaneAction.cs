@@ -28,4 +28,6 @@ public record FilterPaneAction
     public record SetAdvancedFilter(string Expression);
 
     public record ToggleAdvancedFilter;
+
+    public record SetNumberOfFilteredEvents(int NumberOfFilteredEvents);
 }

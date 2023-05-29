@@ -96,6 +96,11 @@ public class FilterPaneReducers
         ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
         state with { FilteredDateRange = action.FilterDateModel };
 
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetNumberOfFilteredEvents(FilterPaneState state,
+        FilterPaneAction.SetNumberOfFilteredEvents action) =>
+        state with { NumberOfFilteredEvents = action.NumberOfFilteredEvents };
+
     [ReducerMethod(typeof(FilterPaneAction.ToggleAdvancedFilter))]
     public static FilterPaneState ReduceToggleAdvancedFilter(FilterPaneState state) =>
         state with { IsAdvancedFilterEnabled = !state.IsAdvancedFilterEnabled };
