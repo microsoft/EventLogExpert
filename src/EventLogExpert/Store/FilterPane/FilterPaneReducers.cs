@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Store.FilterPane;
 
@@ -13,7 +14,7 @@ public class FilterPaneReducers
     {
         if (!state.CurrentFilters.Any())
         {
-            return state with { CurrentFilters = new List<FilterModel> { new() }.AsReadOnly() };
+            return state with { CurrentFilters = new List<FilterModel> { new() }.ToImmutableList() };
         }
 
         if (action.FilterModel is null)
@@ -21,14 +22,14 @@ public class FilterPaneReducers
             return state with
             {
                 CurrentFilters = state.CurrentFilters.Concat(new[] { new FilterModel() })
-                    .ToList().AsReadOnly()
+                    .ToImmutableList()
             };
         }
 
         return state with
         {
             CurrentFilters = state.CurrentFilters.Concat(new[] { action.FilterModel })
-                .ToList().AsReadOnly()
+                .ToImmutableList()
         };
     }
 
@@ -42,7 +43,7 @@ public class FilterPaneReducers
 
         parentFilter.SubFilters.Add(new SubFilterModel());
 
-        return state with { CurrentFilters = updatedList.AsReadOnly() };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
@@ -58,7 +59,7 @@ public class FilterPaneReducers
 
         updatedList.Remove(filter);
 
-        return state with { CurrentFilters = updatedList.AsReadOnly() };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
@@ -72,7 +73,7 @@ public class FilterPaneReducers
 
         parentFilter.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
 
-        return state with { CurrentFilters = updatedList.AsReadOnly() };
+        return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
     [ReducerMethod]
@@ -87,7 +88,7 @@ public class FilterPaneReducers
             CurrentFilters = state.CurrentFilters
                 .Where(filter => filter.Id != action.FilterModel.Id)
                 .Concat(new[] { action.FilterModel })
-                .ToList().AsReadOnly()
+                .ToImmutableList()
         };
     }
 
@@ -121,7 +122,7 @@ public class FilterPaneReducers
             filters.Add(filterModel);
         }
 
-        return state with { CurrentFilters = filters.AsReadOnly() };
+        return state with { CurrentFilters = filters.ToImmutableList() };
     }
 
     [ReducerMethod]
@@ -140,7 +141,7 @@ public class FilterPaneReducers
             filters.Add(filterModel);
         }
 
-        return state with { CurrentFilters = filters.AsReadOnly() };
+        return state with { CurrentFilters = filters.ToImmutableList() };
     }
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleFilterDate))]

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Store.FilterPane;
@@ -10,7 +11,7 @@ namespace EventLogExpert.Store.FilterPane;
 [FeatureState]
 public record FilterPaneState
 {
-    public ReadOnlyCollection<FilterModel> CurrentFilters { get; init; } = new List<FilterModel>().AsReadOnly();
+    public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList.Create<FilterModel>();
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 
