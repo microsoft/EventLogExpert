@@ -67,7 +67,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             context.Dispose();
         }
 
-        var allDbFiles = SortDatabases(Directory.GetFiles(_dbFolder, "*.db"));
+        var allDbFiles = SortDatabases(Directory.GetFiles(_dbFolder, "*.db").Select(path => Path.GetFileName(path)));
 
         AvailableDatabases = allDbFiles.ToImmutableArray();
 
@@ -78,7 +78,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             var contexts = new List<EventProviderDbContext>();
             foreach (var file in databasesToLoad)
             {
-                var c = new EventProviderDbContext(file, readOnly: false, _tracer);
+                var c = new EventProviderDbContext(Path.Join(_dbFolder, file), readOnly: false, _tracer);
                 if (c.IsUpgradeNeeded())
                 {
                     UpdateStatus($"Upgrading database {c.Name}. Please wait...");
