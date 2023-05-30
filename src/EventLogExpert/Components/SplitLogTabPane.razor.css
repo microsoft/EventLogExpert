@@ -33,6 +33,8 @@ label {
 
     max-width: calc(100vw / 5);
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 
     background: var(--background-darkgray);
     cursor: pointer;

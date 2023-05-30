@@ -7,15 +7,17 @@
     <div class="tab-pane">
         <div class="tab-row">
             <div>
-                <input type="radio" name="tab" id="log0" checked />
-                <label for="log0" tabindex="0">Combined</label>
+                <input type="radio" name="tab" id="log" checked @onclick="() => SetActiveLog(null)" />
+                <label for="log" tabindex="0">Combined</label>
             </div>
 
-            @foreach (var log in EventLogState.Value.ActiveLogs)
+            @for (int i = 0; i < EventLogState.Value.ActiveLogs.Count; i++)
             {
+                int index = i;
                 <div>
-                    <input type="radio" name="tab" id="@($"log_{log.Name}")" checked />
-                    <label for="@($"log_{log.Name}")" tabindex="0">@log.Name</label>
+                    <input type="radio" name="tab" id="@($"log{index}")"
+                        @onclick="() => SetActiveLog(EventLogState.Value.ActiveLogs.ElementAt(index).Key)" />
+                    <label for="@($"log{index}")" tabindex="0">@GetTabName(EventLogState.Value.ActiveLogs.ElementAt(index).Key)</label>
                 </div>
             }
         </div>

@@ -1,10 +1,21 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using Microsoft.AspNetCore.Components;
+
 namespace EventLogExpert.Components;
 
 public partial class SplitLogTabPane
 {
-    // Selecting a tab can also update the App Title so its not flooded with multiple paths
-    // Need to detect if Log Name is is path and split to just show file name (title can contain path)
+    [Parameter] public string? ActiveLog { get; set; }
+
+    [Parameter] public EventCallback<string?> ActiveLogChanged { get; set; }
+
+    private static string GetTabName(string path) => Path.GetFileNameWithoutExtension(path);
+
+    private async Task SetActiveLog(string? activeLog)
+    {
+        ActiveLog = activeLog;
+        await ActiveLogChanged.InvokeAsync(ActiveLog);
+    }
 }
