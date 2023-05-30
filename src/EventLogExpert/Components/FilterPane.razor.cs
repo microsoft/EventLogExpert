@@ -61,23 +61,26 @@ public partial class FilterPane
 
         _model.TimeZoneInfo = SettingsState.Value.TimeZone;
 
-        // Offset by 1 minute to make sure we don't drop events
-        // since HTML input DateTime does not go lower than minutes
-        _model.Before = EventLogState.Value.ActiveLogs.Values
+        // Round up/down to the nearest hour
+        var hourTicks = TimeSpan.FromHours(1).Ticks;
+
+        _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
             .Where(log => log.Events.Any())
             .Select(log => log.Events.First().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
             .First()
-            .AddMinutes(1).ConvertTimeZone(_model.TimeZoneInfo);
+            .Ticks + hourTicks) / hourTicks))
+            .ConvertTimeZone(_model.TimeZoneInfo);
 
-        _model.After = EventLogState.Value.ActiveLogs.Values
+        _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
             .Where(log => log.Events.Any())
             .Select(log => log.Events.Last().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
             .Last()
-            .AddMinutes(-1).ConvertTimeZone(_model.TimeZoneInfo);
+            .Ticks / hourTicks))
+            .ConvertTimeZone(_model.TimeZoneInfo);
 
         _isDateFilterVisible = true;
     }
