@@ -35,7 +35,7 @@ public partial class MainPage : ContentPage
         activeLogsState.Select(e => e.ActiveLogs);
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
-            Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
+            Utils.UpdateAppTitle(string.Join(" ", activeLogs.Values.Select(l => l.Name)));
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
 
