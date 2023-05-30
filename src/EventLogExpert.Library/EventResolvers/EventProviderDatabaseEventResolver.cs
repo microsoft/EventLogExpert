@@ -163,6 +163,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// </param>
     public void SetActiveDatabases(IEnumerable<string> databaseNames)
     {
+        _ready = false;
         ActiveDatabases = databaseNames.ToImmutableArray();
         LoadDatabases();
     }
