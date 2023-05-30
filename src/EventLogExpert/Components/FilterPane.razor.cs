@@ -41,7 +41,7 @@ public partial class FilterPane
 
     protected override void OnInitialized()
     {
-        TimeZoneState.Select(x => x.TimeZoneId);
+        TimeZoneState.Select(x => x.Config.TimeZoneId);
         TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
 
         base.OnInitialized();
@@ -59,7 +59,7 @@ public partial class FilterPane
         _isFilterListVisible = true;
         _canEditDate = true;
 
-        _model.TimeZoneInfo = SettingsState.Value.TimeZone;
+        _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
 
         // Round up/down to the nearest hour
         var hourTicks = TimeSpan.FromHours(1).Ticks;
@@ -173,7 +173,7 @@ public partial class FilterPane
     private void UpdateFilterDateModel()
     {
         var temp = _model.TimeZoneInfo;
-        _model.TimeZoneInfo = SettingsState.Value.TimeZone;
+        _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
 
         _model.Before = TimeZoneInfo.ConvertTime(_model.Before, temp, _model.TimeZoneInfo);
         _model.After = TimeZoneInfo.ConvertTime(_model.After, temp, _model.TimeZoneInfo);

@@ -40,7 +40,7 @@ public partial class DetailsPane
 
         stringToCopy.AppendLine($"Log Name: {Event?.LogName}");
         stringToCopy.AppendLine($"Source: {Event?.Source}");
-        stringToCopy.AppendLine($"Date: {Event?.TimeCreated.ConvertTimeZone(SettingsState.Value.TimeZone)}");
+        stringToCopy.AppendLine($"Date: {Event?.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)}");
         stringToCopy.AppendLine($"Event ID: {Event?.Id}");
         stringToCopy.AppendLine($"Task Category: {Event?.TaskCategory}");
         stringToCopy.AppendLine($"Level: {Event?.Level}");

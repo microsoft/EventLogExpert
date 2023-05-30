@@ -27,7 +27,7 @@
             <Virtualize Items="@GetFilteredEvents()" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td>@evt.Level</td>
-                    <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.TimeZone)</td>
+                    <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
                     <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog</td>
                     <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
                     <td>@evt.Source</td>
