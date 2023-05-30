@@ -67,9 +67,4 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
         return result;
     }
-
-    public void SetActiveDatabases(IEnumerable<string> databaseNames)
-    {
-        return;
-    }
 }

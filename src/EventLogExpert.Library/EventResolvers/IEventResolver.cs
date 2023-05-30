@@ -16,7 +16,5 @@ namespace EventLogExpert.Library.EventResolvers
         public string Status { get; }
 
         public event EventHandler<string>? StatusChanged;
-
-        public void SetActiveDatabases(IEnumerable<string> databaseNames);
     }
 }
