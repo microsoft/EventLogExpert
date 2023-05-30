@@ -5,6 +5,7 @@ using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
+using System.Collections.Immutable;
 using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -12,9 +13,10 @@ namespace EventLogExpert;
 
 public partial class App : Application
 {
+
     public App(IDispatcher fluxorDispatcher,
         IEventResolver resolver,
-        IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
+        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogState,
         IStateSelection<SettingsState, bool> showComputerState,

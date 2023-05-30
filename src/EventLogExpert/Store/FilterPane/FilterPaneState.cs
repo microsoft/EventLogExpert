@@ -3,19 +3,21 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Store.FilterPane;
 
 [FeatureState]
 public record FilterPaneState
 {
-    public IEnumerable<FilterModel> CurrentFilters { get; init; } = Enumerable.Empty<FilterModel>();
-
-    public IEnumerable<FilterModel> AppliedFilters { get; init; } = Enumerable.Empty<FilterModel>();
+    public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList.Create<FilterModel>();
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 
     public string AdvancedFilter { get; init; } = string.Empty;
 
     public bool IsAdvancedFilterEnabled { get; set; } = true;
+
+    public int NumberOfFilteredEvents { get; set; }
 }

@@ -6,6 +6,7 @@ using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
@@ -17,9 +18,10 @@ public partial class MainPage : ContentPage
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IEventResolver _resolver;
 
+
     public MainPage(IDispatcher fluxorDispatcher,
         IEventResolver resolver,
-        IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
+        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogNameState,
         IStateSelection<SettingsState, bool> showComputerNameState,
@@ -73,10 +75,9 @@ public partial class MainPage : ContentPage
     private void OpenEventLogFile(string fileName)
     {
         _fluxorDispatcher.Dispatch(
-            new EventLogAction.OpenLog(
-                new LogSpecifier(
+                new EventLogAction.OpenLog(
                     fileName,
-                    LogType.File)));
+                    LogType.File));
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
@@ -147,9 +148,8 @@ public partial class MainPage : ContentPage
 
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
-                new LogSpecifier(
-                    logName,
-                    LogType.Live)));
+                logName,
+                LogType.Live));
     }
 
     private void CloseAll_Clicked(object? sender, EventArgs e)

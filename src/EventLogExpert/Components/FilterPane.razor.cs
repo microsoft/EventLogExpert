@@ -61,15 +61,26 @@ public partial class FilterPane
 
         _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
 
-        // Offset by 1 minute to make sure we don't drop events
-        // since HTML input DateTime does not go lower than minutes
-        _model.Before = EventLogState.Value.Events.FirstOrDefault()?.TimeCreated
-                .AddMinutes(1).ConvertTimeZone(_model.TimeZoneInfo) ??
-            DateTime.Now;
+        // Round up/down to the nearest hour
+        var hourTicks = TimeSpan.FromHours(1).Ticks;
 
-        _model.After = EventLogState.Value.Events.LastOrDefault()?.TimeCreated
-                .AddMinutes(-1).ConvertTimeZone(_model.TimeZoneInfo) ??
-            DateTime.Now;
+        _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.First().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .First()
+            .Ticks + hourTicks) / hourTicks))
+            .ConvertTimeZone(_model.TimeZoneInfo);
+
+        _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.Last().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .Last()
+            .Ticks / hourTicks))
+            .ConvertTimeZone(_model.TimeZoneInfo);
 
         _isDateFilterVisible = true;
     }
@@ -84,17 +95,14 @@ public partial class FilterPane
     {
         _advancedFilterValue = e.Value as string;
 
-        if (_advancedFilterDebounceTimer != null)
-        {
-            _advancedFilterDebounceTimer.Dispose();
-        }
+        _advancedFilterDebounceTimer?.Dispose();
 
         _advancedFilterDebounceTimer = new(s =>
-        {
-            _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
-            _advancedFilterErrorMessage = message;
-            InvokeAsync(() => StateHasChanged());
-        }, e.Value as string, 250, 0);
+            {
+                _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
+                _advancedFilterErrorMessage = message;
+                InvokeAsync(StateHasChanged);
+            }, e.Value as string, 250, 0);
     }
 
     private void ApplyAdvancedFilter()
@@ -121,6 +129,9 @@ public partial class FilterPane
 
     private void EditDateFilter() => _canEditDate = true;
 
+    private int GetActiveFilters() =>
+        FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+
     private void RemoveAdvancedFilter()
     {
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(string.Empty));
@@ -143,7 +154,7 @@ public partial class FilterPane
     {
         message = string.Empty;
 
-        if (string.IsNullOrEmpty(expression)) return false;
+        if (string.IsNullOrEmpty(expression)) { return false; }
 
         var testQueryable = new List<DisplayEventModel>();
 

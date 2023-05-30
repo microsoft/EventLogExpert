@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Store.EventLog;
@@ -20,7 +21,7 @@ public class EventLogReducers
     {
         // Sometimes the watcher doesn't stop firing events immediately. Let's
         // make sure the events being added are for a log that is still "open".
-        if (!state.ActiveLogs.Any(l => l.Name == action.NewEvent.OwningLog))
+        if (!state.ActiveLogs.ContainsKey(action.NewEvent.OwningLog))
         {
             return state;
         }
@@ -31,7 +32,10 @@ public class EventLogReducers
 
         if (state.ContinuouslyUpdate)
         {
-            newState = newState with { Events = newEvent.Concat(state.Events).ToList().AsReadOnly() };
+            var oldLogData = state.ActiveLogs[action.NewEvent.OwningLog];
+            var updatedLogData = AddEventsToLogData(oldLogData, newEvent);
+            var updatedDictionary = state.ActiveLogs.Remove(action.NewEvent.OwningLog).Add(action.NewEvent.OwningLog, updatedLogData);
+            newState = newState with { ActiveLogs = updatedDictionary };
         }
         else
         {
@@ -40,62 +44,58 @@ public class EventLogReducers
             newState = newState with { NewEventBuffer = updatedBuffer, NewEventBufferIsFull = full };
         }
 
-        if (!state.EventIds.Contains(action.NewEvent.Id))
-        {
-            newState = newState with { EventIds = (new[] {action.NewEvent.Id})
-                .Concat(state.EventIds).ToList().AsReadOnly() };
-        }
-
-        if (!state.EventProviderNames.Contains(action.NewEvent.Source))
-        {
-            newState = newState with { EventProviderNames = (new[] {action.NewEvent.Source})
-                .Concat(state.EventProviderNames).ToList().AsReadOnly() };
-        }
-
-        if (!state.TaskNames.Contains(action.NewEvent.TaskCategory))
-        {
-            newState = newState with { TaskNames = (new[] { action.NewEvent.TaskCategory })
-                .Concat(state.TaskNames).ToList().AsReadOnly() };
-        }
-
         return newState;
     }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
     {
-        return state with
+        var newLogsCollection = state.ActiveLogs;
+
+        if (state.ActiveLogs.ContainsKey(action.LogName))
         {
-            Events = action.Events.Concat(state.Events)
-                .OrderByDescending(e => e.TimeCreated)
-                .ToList().AsReadOnly(),
-            EventIds = action.AllEventIds.Concat(state.EventIds)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly(),
-            EventProviderNames = action.AllProviderNames.Concat(state.EventProviderNames)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly(),
-            TaskNames = action.AllTaskNames.Concat(state.TaskNames)
-                .Distinct().OrderBy(n => n).ToList().AsReadOnly()
-        };
+            newLogsCollection = state.ActiveLogs.Remove(action.LogName);
+        }
+
+        newLogsCollection = newLogsCollection.Add(action.LogName, new EventLogData
+        (
+            action.LogName,
+            action.Type,
+            action.Events.AsReadOnly(),
+            action.AllEventIds.ToImmutableHashSet(),
+            action.AllProviderNames.ToImmutableHashSet(),
+            action.AllTaskNames.ToImmutableHashSet()
+        ));
+
+        return state with { ActiveLogs = newLogsCollection };
     }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
-        return state with
+        var newState = state with { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty };
+
+        foreach (var log in state.ActiveLogs.Values)
         {
-            Events = state.NewEventBuffer.Concat(state.Events).OrderByDescending(e => e.TimeCreated).ToList().AsReadOnly(),
+            var newLogData = AddEventsToLogData(log, state.NewEventBuffer.Where(e => e.OwningLog == log.Name));
+            newState = newState with { ActiveLogs = newState.ActiveLogs.Add(log.Name, newLogData) };
+        }
+
+        newState = newState with
+        {
             NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBufferIsFull = false
         };
+
+        return newState;
     }
 
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action)
     {
-        var newLog = new List<LogSpecifier> { action.LogSpecifier };
         return state with
         {
-            ActiveLogs = newLog.Concat(state.ActiveLogs).ToList().AsReadOnly()
+            ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.LogType))
         };
     }
 
@@ -103,34 +103,14 @@ public class EventLogReducers
     public static EventLogState ReduceCloseLog(EventLogState state, EventLogAction.CloseLog action)
     {
         // If that was the only open log, do this the easy way
-        if (state.ActiveLogs.Count == 1 && state.ActiveLogs[0].Name == action.LogName)
-        {
-            return state with
-            {
-                ActiveLogs = new List<LogSpecifier>().AsReadOnly(),
-                Events = new List<DisplayEventModel>().AsReadOnly(),
-                NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
-                NewEventBufferIsFull = false,
-                EventIds = new List<int>().AsReadOnly(),
-                EventProviderNames = new List<string>().AsReadOnly(),
-                TaskNames = new List<string>().AsReadOnly()
-            };
-        }
 
         var newState = state with
         {
-            ActiveLogs = state.ActiveLogs
-                .Where(l => l.Name != action.LogName)
-                .ToList().AsReadOnly(),
-            Events = state.Events
-                .Where(e => e.OwningLog != action.LogName)
-                .ToList().AsReadOnly(),
+            ActiveLogs = state.ActiveLogs.Remove(action.LogName),
             NewEventBuffer = state.NewEventBuffer
                 .Where(e => e.OwningLog != action.LogName)
                 .ToList().AsReadOnly()
         };
-
-        newState = RecalculateAvailableValueCollections(newState);
 
         newState = newState with { NewEventBufferIsFull = newState.NewEventBuffer.Count >= MaxNewEvents ? true : false };
 
@@ -142,13 +122,9 @@ public class EventLogReducers
     {
         return state with
         {
-            ActiveLogs = new List<LogSpecifier>().AsReadOnly(),
-            Events = new List<DisplayEventModel>().AsReadOnly(),
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
             NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
-            NewEventBufferIsFull = false,
-            EventIds = new List<int>().AsReadOnly(),
-            EventProviderNames = new List<string>().AsReadOnly(),
-            TaskNames = new List<string>().AsReadOnly()
+            NewEventBufferIsFull = false
         };
     }
 
@@ -166,11 +142,18 @@ public class EventLogReducers
         var newState = state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
         if (action.ContinuouslyUpdate)
         {
+            newState = newState with { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty };
+            foreach (var log in state.ActiveLogs.Values)
+            {
+                newState = newState with
+                {
+                    ActiveLogs = newState.ActiveLogs.Add(log.Name,
+                        AddEventsToLogData(state.ActiveLogs[log.Name], state.NewEventBuffer.Where(e => e.OwningLog == log.Name)))
+                };
+            }
+
             newState = newState with
             {
-                Events = state.NewEventBuffer.Concat(state.Events)
-                    .OrderByDescending(e => e.TimeCreated)
-                    .ToList().AsReadOnly(),
                 NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
                 NewEventBufferIsFull = false
             };
@@ -183,24 +166,32 @@ public class EventLogReducers
     public static EventLogState ReduceSetEventsLoading(EventLogState state, EventLogAction.SetEventsLoading action) =>
         state with { EventsLoading = action.Count };
 
-    private static EventLogState RecalculateAvailableValueCollections(EventLogState state)
+    private static EventLogData AddEventsToLogData(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
     {
-        var eventIds = new HashSet<int>();
-        var providerNames = new HashSet<string>();
-        var taskNames = new HashSet<string>();
-
-        foreach (var e in state.Events)
+        var newEvents = eventsToAdd.ToList();
+        var updatedEvents = eventsToAdd.Concat(logData.Events).ToList().AsReadOnly();
+        var updatedEventIds = logData.EventIds.Union(eventsToAdd.Select(e => e.Id));
+        var updatedProviderNames = logData.EventProviderNames.Union(eventsToAdd.Select(e => e.Source));
+        var updatedTaskNames = logData.TaskNames.Union(eventsToAdd.Select(e => e.TaskCategory));
+        var updatedLogData = logData with
         {
-            eventIds.Add(e.Id);
-            providerNames.Add(e.Source);
-            taskNames.Add(e.TaskCategory);
-        }
-
-        return state with
-        {
-            EventIds = eventIds.ToList().AsReadOnly(),
-            EventProviderNames = providerNames.ToList().AsReadOnly(),
-            TaskNames = taskNames.ToList().AsReadOnly()
+            Events = updatedEvents,
+            EventIds = updatedEventIds,
+            EventProviderNames = updatedProviderNames,
+            TaskNames = updatedTaskNames
         };
+
+        return updatedLogData;
+    }
+
+    private static EventLogData GetEmptyLogData(string LogName, LogType LogType)
+    {
+        return new EventLogData(
+            LogName,
+            LogType,
+            new List<DisplayEventModel>().AsReadOnly(),
+            ImmutableHashSet<int>.Empty,
+            ImmutableHashSet<string>.Empty,
+            ImmutableHashSet<string>.Empty);
     }
 }

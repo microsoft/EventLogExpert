@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
+using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Store.EventLog;
 
@@ -11,15 +12,16 @@ public record EventLogAction
 
     public record LoadEvents(
         string LogName,
+        EventLogState.LogType Type,
         List<DisplayEventModel> Events,
-        IReadOnlyList<int> AllEventIds,
-        IReadOnlyList<string> AllProviderNames,
-        IReadOnlyList<string> AllTaskNames
+        IEnumerable<int> AllEventIds,
+        IEnumerable<string> AllProviderNames,
+        IEnumerable<string> AllTaskNames
     ) : EventLogAction;
 
     public record LoadNewEvents() : EventLogAction;
 
-    public record OpenLog(EventLogState.LogSpecifier LogSpecifier) : EventLogAction;
+    public record OpenLog(string LogName, LogType LogType) : EventLogAction;
 
     public record CloseLog(string LogName) : EventLogAction;
 
