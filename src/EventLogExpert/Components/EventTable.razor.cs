@@ -40,9 +40,11 @@ public partial class EventTable
 
     private IList<DisplayEventModel> GetFilteredEvents()
     {
+        var allEventsCombined = EventLogState.Value.ActiveLogs.Values.SelectMany(l => l.Events);
+
         int numberOfFilteredEvents = 0;
-        int initialNumberOfEvents = EventLogState.Value.Events.Count;
-        var filteredEvents = EventLogState.Value.Events.AsQueryable();
+        int initialNumberOfEvents = allEventsCombined.Count();
+        var filteredEvents = allEventsCombined.AsQueryable();
 
         if (FilterPaneState.Value.FilteredDateRange is not null && FilterPaneState.Value.FilteredDateRange.IsEnabled)
         {
@@ -68,6 +70,13 @@ public partial class EventTable
         if (!_isDateTimeDescending)
         {
             filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
+        }
+        else if (EventLogState.Value.ActiveLogs.Count > 1)
+        {
+            // If we only have one log open, the allEventsCombined enumerable already
+            // has them all in descending order. However, if there's more than one,
+            // we need to order them here.
+            filteredEvents = filteredEvents.OrderByDescending(x => x.TimeCreated);
         }
 
         if (filteredEvents.Count() != initialNumberOfEvents)

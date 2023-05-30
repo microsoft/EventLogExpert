@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Store.EventLog;
@@ -12,21 +13,20 @@ public record EventLogState
 {
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
-    public record LogSpecifier(string Name, LogType? LogType);
-
     public enum LogType { Live, File }
 
-    public ReadOnlyCollection<LogSpecifier> ActiveLogs { get; init; } = new List<LogSpecifier>().AsReadOnly();
+    public record EventLogData(
+        string Name,
+        LogType Type,
+        ReadOnlyCollection<DisplayEventModel> Events,
+        ImmutableHashSet<int> EventIds,
+        ImmutableHashSet<string> EventProviderNames,
+        ImmutableHashSet<string> TaskNames
+        );
 
-    public ReadOnlyCollection<int> EventIds { get; init; } = new List<int>().AsReadOnly();
-
-    public ReadOnlyCollection<string> EventProviderNames { get; init; } = new List<string>().AsReadOnly();
-
-    public ReadOnlyCollection<string> TaskNames { get; init;} = new List<string>().AsReadOnly();
+    public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;
 
     public bool ContinuouslyUpdate { get; init; } = false;
-
-    public ReadOnlyCollection<DisplayEventModel> Events { get; init; } = new List<DisplayEventModel>().AsReadOnly();
 
     public int EventsLoading { get; set; } = 0;
 

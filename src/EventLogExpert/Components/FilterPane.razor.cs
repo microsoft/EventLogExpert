@@ -63,13 +63,21 @@ public partial class FilterPane
 
         // Offset by 1 minute to make sure we don't drop events
         // since HTML input DateTime does not go lower than minutes
-        _model.Before = EventLogState.Value.Events.FirstOrDefault()?.TimeCreated
-                .AddMinutes(1).ConvertTimeZone(_model.TimeZoneInfo) ??
-            DateTime.Now;
+        _model.Before = EventLogState.Value.ActiveLogs.Values
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.First().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .First()
+            .AddMinutes(1).ConvertTimeZone(_model.TimeZoneInfo);
 
-        _model.After = EventLogState.Value.Events.LastOrDefault()?.TimeCreated
-                .AddMinutes(-1).ConvertTimeZone(_model.TimeZoneInfo) ??
-            DateTime.Now;
+        _model.After = EventLogState.Value.ActiveLogs.Values
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.Last().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .Last()
+            .AddMinutes(-1).ConvertTimeZone(_model.TimeZoneInfo);
 
         _isDateFilterVisible = true;
     }
