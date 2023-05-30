@@ -30,13 +30,13 @@ public class EventLogEffects
     {
         EventLogReader reader;
 
-        if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
+        if (action.LogType == EventLogState.LogType.Live)
         {
-            reader = new EventLogReader(action.LogSpecifier.Name, PathType.LogName);
+            reader = new EventLogReader(action.LogName, PathType.LogName);
         }
         else
         {
-            reader = new EventLogReader(action.LogSpecifier.Name, PathType.FilePath);
+            reader = new EventLogReader(action.LogName, PathType.FilePath);
         }
 
         // Do this on a background thread so we don't hang the UI
@@ -56,7 +56,7 @@ public class EventLogEffects
                 while (reader.ReadEvent() is { } e)
                 {
                     lastEvent = e;
-                    var resolved = _eventResolver.Resolve(e, action.LogSpecifier.Name);
+                    var resolved = _eventResolver.Resolve(e, action.LogName);
                     eventIdsAll.Add(resolved.Id);
                     eventProviderNamesAll.Add(resolved.Source);
                     eventTaskNamesAll.Add(resolved.TaskCategory);
@@ -73,7 +73,8 @@ public class EventLogEffects
                 events.Reverse();
 
                 dispatcher.Dispatch(new EventLogAction.LoadEvents(
-                    action.LogSpecifier.Name,
+                    action.LogName,
+                    action.LogType,
                     events,
                     eventIdsAll.ToImmutableList(),
                     eventProviderNamesAll.ToImmutableList(),
@@ -81,9 +82,9 @@ public class EventLogEffects
 
                 dispatcher.Dispatch(new EventLogAction.SetEventsLoading(0));
 
-                if (action.LogSpecifier.LogType == EventLogState.LogType.Live)
+                if (action.LogType == EventLogState.LogType.Live)
                 {
-                    _logWatcherService.AddLog(action.LogSpecifier.Name, lastEvent?.Bookmark);
+                    _logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
                 }
             }
         });

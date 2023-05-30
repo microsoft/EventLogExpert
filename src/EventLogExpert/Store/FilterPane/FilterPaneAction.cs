@@ -7,23 +7,27 @@ namespace EventLogExpert.Store.FilterPane;
 
 public record FilterPaneAction
 {
-    public record AddFilter;
+    public record AddFilter(FilterModel? FilterModel = null);
 
-    public record ToggleFilter(Guid Id);
+    public record SetFilter(FilterModel FilterModel);
 
-    public record RemoveFilter(FilterModel FilterModel);
+    public record ToggleEnableFilter(Guid Id);
 
-    public record AddSubFilter(Guid ParentId);
+    public record ToggleEditFilter(Guid Id);
 
-    public record RemoveSubFilter(Guid ParentId, SubFilterModel SubFilterModel);
+    public record RemoveFilter(Guid Id);
 
-    public record ApplyFilters;
+    public record AddSubFilter(Guid ParentId, FilterMode? FilterMode = null);
+
+    public record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
 
     public record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
-    public record ToggleFilterDate();
+    public record ToggleFilterDate;
 
     public record SetAdvancedFilter(string Expression);
 
-    public record ToggleAdvancedFilter();
+    public record ToggleAdvancedFilter;
+
+    public record SetNumberOfFilteredEvents(int NumberOfFilteredEvents);
 }

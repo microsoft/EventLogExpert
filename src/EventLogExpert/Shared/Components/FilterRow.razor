@@ -72,7 +72,7 @@
     <div class="sub-filter-row">
         @foreach (var item in Value.SubFilters)
         {
-            <SubFilterRow ParentId="@Value.Id" FilterType="Value.FilterType" Value="@item" />
+            <SubFilterRow ParentId="Value.Id" Value="@item" />
         }
     </div>
 }
