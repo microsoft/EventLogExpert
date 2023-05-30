@@ -22,13 +22,10 @@ public partial class MainLayout : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        Dispatcher.Dispatch(new SettingsAction.LoadSettings(Utils.SettingsPath));
-        Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
-
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
         ActionSubscriber.SubscribeToAction<SettingsAction.CheckForUpdates>(this, CheckForUpdates);
 
-        await Utils.CheckForUpdates(SettingsState.Value.IsPrereleaseEnabled);
+        await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
         Utils.UpdateAppTitle();
 
         await base.OnInitializedAsync();
@@ -36,7 +33,7 @@ public partial class MainLayout : IDisposable
 
     private async void CheckForUpdates(SettingsAction.CheckForUpdates action)
     {
-        bool result = await Utils.CheckForUpdates(SettingsState.Value.IsPrereleaseEnabled);
+        bool result = await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
 
         if (result is false && Application.Current?.MainPage is not null)
         {

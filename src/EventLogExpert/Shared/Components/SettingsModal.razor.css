@@ -1,5 +1,5 @@
-﻿dialog {
-    height: 30%;
+dialog {
+    height: 60%;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);
@@ -34,7 +34,7 @@
     overflow-x: hidden;
 }
 
-    .provider-list > p { margin: 0; }
+    .provider-list > span { margin: 0; }
 
 .footer-group {
     display: flex;

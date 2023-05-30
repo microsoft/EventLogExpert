@@ -3,81 +3,114 @@
 
 using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Text.Json;
 
 namespace EventLogExpert.Store.Settings;
 
 public class SettingsReducer
 {
-    [ReducerMethod]
-    public static SettingsState ReduceLoadProvider(SettingsState state, SettingsAction.LoadProviders action)
+    private static readonly ReaderWriterLockSlim ConfigSrwLock = new();
+
+    [ReducerMethod(typeof(SettingsAction.LoadProviders))]
+    public static SettingsState ReduceLoadProvider(SettingsState state)
     {
-        IEnumerable<string> providers = Enumerable.Empty<string>();
+        List<string> providers = new();
 
         try
         {
-            if (Directory.Exists(action.Path))
+            if (Directory.Exists(Utils.DatabasePath))
             {
-                providers = Directory.EnumerateFiles(action.Path, "*.db").Select(Path.GetFileName).OfType<string>();
+                foreach (var item in Directory.EnumerateFiles(Utils.DatabasePath, "*.db"))
+                {
+                    providers.Add(Path.GetFileName(item));
+                }
             }
         }
         catch
-        { // Directory may not exist, can be ignored
+        { // TODO: Log Failure
+            return state;
         }
 
-        return state with { LoadedProviders = providers };
+        if (providers.Count <= 0) { return state; }
+
+        SettingsModel? config = ReadSettingsConfig();
+
+        if (config?.DisabledProviders is not null)
+        {
+            providers.RemoveAll(enabled => config.DisabledProviders
+                .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
+        }
+
+        return state with { LoadedProviders = providers.ToImmutableList() };
     }
 
-    [ReducerMethod]
-    public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettings action)
+    [ReducerMethod(typeof(SettingsAction.LoadSettings))]
+    public static SettingsState ReduceLoadSettings(SettingsState state)
     {
-        SettingsModel? config = null;
-
-        try
-        {
-            using FileStream stream = File.OpenRead(action.Path);
-            config = JsonSerializer.Deserialize<SettingsModel>(stream);
-        }
-        catch
-        { // File may not exist, can be ignored
-        }
+        SettingsModel? config = ReadSettingsConfig();
 
         if (config is null || string.IsNullOrEmpty(config.TimeZoneId)) { return state; }
 
-        return state with
-        {
-            TimeZoneId = config.TimeZoneId,
-            TimeZone = TimeZoneInfo.FindSystemTimeZoneById(config.TimeZoneId),
-            IsPrereleaseEnabled = config.IsPrereleaseEnabled
-        };
+        return state with { Config = config };
     }
 
     [ReducerMethod]
     public static SettingsState ReduceSave(SettingsState state, SettingsAction.Save action)
     {
-        try
-        {
-            var config = JsonSerializer.Serialize(action.Settings);
-            File.WriteAllText(action.Path, config);
+        var success = WriteSettingsConfig(action.Settings);
 
-            return state with
-            {
-                TimeZoneId = action.Settings.TimeZoneId,
-                TimeZone = TimeZoneInfo.FindSystemTimeZoneById(action.Settings.TimeZoneId),
-                IsPrereleaseEnabled = action.Settings.IsPrereleaseEnabled
-            };
-        }
-        catch
-        { // TODO: Log a warning
-            return state;
-        }
+        if (!success) { return state; }
+
+        return state with { Config = action.Settings };
     }
+
+    [ReducerMethod]
+    public static SettingsState ReduceToggleShowComputerName(SettingsState state,
+        SettingsAction.ToggleShowComputerName action) => state with { ShowComputerName = !state.ShowComputerName };
 
     [ReducerMethod]
     public static SettingsState ReduceToggleShowLogName(SettingsState state, SettingsAction.ToggleShowLogName action) =>
         state with { ShowLogName = !state.ShowLogName };
 
-    [ReducerMethod]
-    public static SettingsState ReduceToggleShowComputerName(SettingsState state, SettingsAction.ToggleShowComputerName action) =>
-        state with { ShowComputerName = !state.ShowComputerName };
+    private static SettingsModel? ReadSettingsConfig()
+    {
+        try
+        {
+            ConfigSrwLock.EnterReadLock();
+
+            using FileStream stream = File.OpenRead(Utils.SettingsPath);
+            return JsonSerializer.Deserialize<SettingsModel>(stream);
+        }
+        catch
+        { // File may not exist, can be ignored
+            return null;
+        }
+        finally { ConfigSrwLock.ExitReadLock(); }
+    }
+
+    private static bool WriteSettingsConfig(SettingsModel settings)
+    {
+        try
+        {
+            ConfigSrwLock.EnterWriteLock();
+
+            var config = JsonSerializer.Serialize(settings);
+            File.WriteAllText(Utils.SettingsPath, config);
+
+            return true;
+        }
+        catch (Exception ex)
+        { // TODO: Log a warning
+            if (Application.Current?.MainPage is not null)
+            {
+                Application.Current.MainPage.DisplayAlert("Failed to save config",
+                    $"An error occured while trying to save the configuration, please try again\r\n{ex.Message}",
+                    "Ok");
+            }
+
+            return false;
+        }
+        finally { ConfigSrwLock.ExitWriteLock(); }
+    }
 }

@@ -19,11 +19,17 @@
         </div>
 
         <div class="provider-list">
-            @if (SettingsState.Value.LoadedProviders.Any())
+            @if (_providers?.Any() is true)
             {
-                @foreach (var provider in SettingsState.Value.LoadedProviders)
+                @foreach (var provider in _providers)
                 {
-                    <p>@provider</p>
+                    <div class="provider-row">
+                        <span>@provider</span>
+                        <button class="button-remove" type="button" @onclick="() => DisableProvider(provider)">
+                            <i class="bi bi-dash-circle"></i> Disable
+                        </button>
+                    </div>
+
                 }
             }
             else
@@ -31,6 +37,25 @@
                 <p>None</p>
             }
         </div>
+        
+        @if (_request.DisabledProviders?.Any() is true)
+        {
+            <div class="provider-row">
+                <div>Disabled Providers: </div>
+            </div>
+
+            <div class="provider-list">
+                @foreach (var provider in _request.DisabledProviders)
+                {
+                    <div class="provider-row">
+                        <span>@provider</span>
+                        <button class="button-save" type="button" @onclick="() => EnableProvider(provider)">
+                            <i class="bi bi-plus-circle"></i> Enable
+                        </button>
+                    </div>
+                }
+            </div>
+        }
 
         <div class="footer-group">
             <div class="prerelease-group">

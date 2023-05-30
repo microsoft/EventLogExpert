@@ -12,15 +12,24 @@ namespace EventLogExpert;
 
 public partial class App : Application
 {
-    public App(IDispatcher fluxorDispatcher, IEventResolver resolver,
+    public App(IDispatcher fluxorDispatcher,
+        IEventResolver resolver,
         IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogState,
-        IStateSelection<SettingsState,bool> showComputerState)
+        IStateSelection<SettingsState, bool> showComputerState,
+        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState)
     {
         InitializeComponent();
 
-        MainPage = new NavigationPage(new MainPage(fluxorDispatcher, resolver, activeLogsState, continuouslyUpdateState, showLogState, showComputerState));
+        MainPage = new NavigationPage(
+            new MainPage(fluxorDispatcher,
+                resolver,
+                activeLogsState,
+                continuouslyUpdateState,
+                showLogState,
+                showComputerState,
+                loadedProvidersState));
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

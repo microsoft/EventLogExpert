@@ -12,13 +12,15 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class SettingsModal
 {
-    private readonly SettingsModel _request = new();
+    private List<string>? _providers;
+    private bool _providersHasChanged;
+    private SettingsModel _request = new();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override void OnInitialized()
     {
-        SettingsState.StateChanged += (s, e) => ResetRequestModel();
+        SettingsState.StateChanged += (s, e) => ResetSettingsModel();
 
         base.OnInitialized();
     }
@@ -26,7 +28,25 @@ public partial class SettingsModal
     private async void Close()
     {
         await JSRuntime.InvokeVoidAsync("closeSettingsModal");
-        ResetRequestModel();
+        ResetSettingsModel();
+    }
+
+    private void DisableProvider(string provider)
+    {
+        _request.DisabledProviders ??= new List<string>();
+
+        _request.DisabledProviders?.Add(provider);
+        _providers?.Remove(provider);
+
+        _providersHasChanged = true;
+    }
+
+    private void EnableProvider(string provider)
+    {
+        _request.DisabledProviders?.Remove(provider);
+        _providers?.Add(provider);
+
+        _providersHasChanged = true;
     }
 
     private async void ImportProvider()
@@ -74,7 +94,7 @@ public partial class SettingsModal
 
         if (!answer)
         {
-            Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
+            Dispatcher.Dispatch(new SettingsAction.LoadProviders());
             return;
         }
 
@@ -83,17 +103,51 @@ public partial class SettingsModal
         if (res == 0) { Application.Current.Quit(); }
     }
 
-    private void ResetRequestModel()
+    private async void RemoveProvider(string provider)
     {
-        _request.TimeZoneId = SettingsState.Value.TimeZoneId;
-        _request.IsPrereleaseEnabled = SettingsState.Value.IsPrereleaseEnabled;
+        bool answer = await Application.Current!.MainPage!.DisplayAlert("Remove Provider",
+            "Are you sure you want to remove this provider?",
+            "Yes",
+            "No");
+
+        if (!answer) { return; }
+
+        try
+        {
+            var destination = Path.Join(Utils.DatabasePath, provider);
+            File.Delete(destination);
+        }
+        catch
+        { // TODO: Log Error
+            return;
+        }
+
+        Dispatcher.Dispatch(new SettingsAction.LoadProviders());
+    }
+
+    private void ResetSettingsModel()
+    {
+        _request = SettingsState.Value.Config with { };
+
+        _providers = SettingsState.Value.LoadedProviders.ToList();
+        _providersHasChanged = false;
 
         StateHasChanged();
     }
 
     private void Save()
     {
-        Dispatcher.Dispatch(new SettingsAction.Save(_request, Utils.SettingsPath));
+
+        if (_providersHasChanged)
+        {
+            Dispatcher.Dispatch(new SettingsAction.Save(_request));
+            Dispatcher.Dispatch(new SettingsAction.LoadProviders());
+        }
+        else
+        {
+            Dispatcher.Dispatch(new SettingsAction.Save(_request));
+        }
+
         Close();
     }
 }

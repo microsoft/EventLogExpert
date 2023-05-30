@@ -52,4 +52,9 @@ public class EventReaderEventResolver : IEventResolver
             return default;
         }
     }
+
+    public void SetActiveDatabases(IEnumerable<string> databaseNames)
+    {
+        return;
+    }
 }

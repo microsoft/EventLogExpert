@@ -6,7 +6,6 @@ using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
-using Microsoft.Maui.Storage;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
@@ -16,38 +15,55 @@ namespace EventLogExpert;
 public partial class MainPage : ContentPage
 {
     private readonly IDispatcher _fluxorDispatcher;
-
     private readonly IEventResolver _resolver;
 
-    public MainPage(IDispatcher fluxorDispatcher, IEventResolver resolver,
+    public MainPage(IDispatcher fluxorDispatcher,
+        IEventResolver resolver,
         IStateSelection<EventLogState, IEnumerable<LogSpecifier>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogNameState,
-        IStateSelection<SettingsState, bool> showComputerNameState)
+        IStateSelection<SettingsState, bool> showComputerNameState,
+        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState)
     {
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
-
         _resolver = resolver;
 
         activeLogsState.Select(e => e.ActiveLogs);
-        activeLogsState.SelectedValueChanged += (sender, activeLogs) => Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
+
+        activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
+            Utils.UpdateAppTitle(string.Join(" ", activeLogs.Select(l => l.Name)));
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
-        continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) => ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}";
+
+        continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) =>
+            ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}";
 
         showLogNameState.Select(e => e.ShowLogName);
-        showLogNameState.SelectedValueChanged += (sender, showLogName) => ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}";
+
+        showLogNameState.SelectedValueChanged += (sender, showLogName) =>
+            ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}";
 
         showComputerNameState.Select(e => e.ShowComputerName);
-        showComputerNameState.SelectedValueChanged += (sender, showComputerName) => ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
+
+        showComputerNameState.SelectedValueChanged += (sender, showComputerName) =>
+            ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
+
+        loadedProvidersState.Select(s => s.LoadedProviders);
+
+        loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
+            _resolver.SetActiveDatabases(loadedProviders);
+
+        fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
+        fluxorDispatcher.Dispatch(new SettingsAction.LoadProviders());
 
         PopulateOtherLogsMenu();
 
         ListenForResolverStatus();
 
         var args = Environment.GetCommandLineArgs();
+
         if (args.Length > 1)
         {
             OpenEventLogFile(args[1]);
@@ -57,10 +73,10 @@ public partial class MainPage : ContentPage
     private void OpenEventLogFile(string fileName)
     {
         _fluxorDispatcher.Dispatch(
-                new EventLogAction.OpenLog(
-                    new EventLogState.LogSpecifier(
-                        fileName,
-                        EventLogState.LogType.File)));
+            new EventLogAction.OpenLog(
+                new LogSpecifier(
+                    fileName,
+                    LogType.File)));
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
@@ -131,9 +147,9 @@ public partial class MainPage : ContentPage
 
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
-                new EventLogState.LogSpecifier(
+                new LogSpecifier(
                     logName,
-                    EventLogState.LogType.Live)));
+                    LogType.Live)));
     }
 
     private void CloseAll_Clicked(object? sender, EventArgs e)
@@ -150,6 +166,7 @@ public partial class MainPage : ContentPage
     {
         var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
         var session = new EventLogSession();
+
         var names = session.GetLogNames()
             .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
             .OrderBy(n => n);
