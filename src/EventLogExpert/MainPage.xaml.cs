@@ -55,7 +55,12 @@ public partial class MainPage : ContentPage
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
-            _resolver.SetActiveDatabases(loadedProviders);
+        {
+            if (_resolver is EventProviderDatabaseEventResolver dbResolver)
+            {
+                dbResolver.SetActiveDatabases(loadedProviders);
+            }
+        };
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
