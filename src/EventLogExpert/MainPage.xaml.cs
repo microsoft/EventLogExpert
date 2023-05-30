@@ -6,6 +6,7 @@ using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
+using Microsoft.Maui.ApplicationModel;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.EventLog.EventLogState;
@@ -34,22 +35,26 @@ public partial class MainPage : ContentPage
         activeLogsState.Select(e => e.ActiveLogs);
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
-            Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
+            MainThread.InvokeOnMainThreadAsync(() =>
+                Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name))));
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
 
         continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) =>
-            ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}";
+            MainThread.InvokeOnMainThreadAsync(() =>
+                ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}");
 
         showLogNameState.Select(e => e.ShowLogName);
 
         showLogNameState.SelectedValueChanged += (sender, showLogName) =>
-            ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}";
+            MainThread.InvokeOnMainThreadAsync(() =>
+                ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}");
 
         showComputerNameState.Select(e => e.ShowComputerName);
 
         showComputerNameState.SelectedValueChanged += (sender, showComputerName) =>
-            ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
+            MainThread.InvokeOnMainThreadAsync(() =>
+                ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}");
 
         loadedProvidersState.Select(s => s.LoadedDatabases);
 

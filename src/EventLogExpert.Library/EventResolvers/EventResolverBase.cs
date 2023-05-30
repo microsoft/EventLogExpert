@@ -35,41 +35,49 @@ public class EventResolverBase
         var matches = _formatRegex.Matches(description);
         if (matches.Count > 0)
         {
-            var sb = new StringBuilder();
-            var lastIndex = 0;
-            for (var i = 0; i < matches.Count; i++)
+            try
             {
-                if (matches[i].Value.StartsWith("%%"))
+                var sb = new StringBuilder();
+                var lastIndex = 0;
+                for (var i = 0; i < matches.Count; i++)
                 {
-                    // The % is escaped, so skip it.
-                    continue;
+                    if (matches[i].Value.StartsWith("%%"))
+                    {
+                        // The % is escaped, so skip it.
+                        continue;
+                    }
+
+                    sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
+                    var propIndex = int.Parse(matches[i].Value.Trim(new[] { '{', '}', '%' }));
+
+                    if (propIndex - 1 >= properties.Count) { return "Unable to format description"; }
+
+                    var propValue = properties[propIndex - 1].Value;
+                    if (propValue is DateTime)
+                    {
+                        // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
+                        sb.Append(((DateTime)propValue).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                    }
+                    else
+                    {
+                        sb.Append(propValue);
+                    }
+
+                    lastIndex = matches[i].Index + matches[i].Length;
                 }
 
-                sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
-                var propIndex = int.Parse(matches[i].Value.Trim(new[] { '{', '}', '%' }));
-
-                if (propIndex - 1 >= properties.Count) { return "Unable to format description"; }
-                
-                var propValue = properties[propIndex - 1].Value;
-                if (propValue is DateTime)
+                if (lastIndex < description.Length)
                 {
-                    // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
-                    sb.Append(((DateTime)propValue).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
-                }
-                else
-                {
-                    sb.Append(propValue);
+                    sb.Append(description.Substring(lastIndex));
                 }
 
-                lastIndex = matches[i].Index + matches[i].Length;
+                description = sb.ToString();
             }
-
-            if (lastIndex < description.Length)
+            catch (Exception ex)
             {
-                sb.Append(description.Substring(lastIndex));
+                _tracer($"FormatDescription exception was caught: {ex}");
+                return "Unable to format description";
             }
-
-            description = sb.ToString();
         }
 
         while (description.EndsWith("\r\n"))
