@@ -38,8 +38,17 @@ public class EventMessageProvider
         {
             return null;
         }
+        else
+        {
+            // We got some sort of data back, so make sure all the collections are there
+            provider.Messages ??= new List<MessageModel>();
+            provider.Events ??= new List<EventModel>();
+            provider.Keywords ??= new Dictionary<long, string>();
+            provider.Opcodes ??= new Dictionary<int, string>();
+            provider.Tasks ??= new Dictionary<int, string>();
 
             return provider;
+        }
     }
 
     /// <summary>
