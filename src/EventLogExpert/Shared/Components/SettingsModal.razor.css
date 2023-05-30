@@ -19,12 +19,12 @@ dialog {
     margin-bottom: 1rem;
 }
 
-.provider-row {
+.database-row {
     display: flex;
     justify-content: space-between;
 }
 
-.provider-list {
+.database-list {
     display: flex;
     flex-direction: column;
 

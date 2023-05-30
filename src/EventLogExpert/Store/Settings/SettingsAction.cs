@@ -9,7 +9,7 @@ public record SettingsAction
 {
     public record CheckForUpdates : SettingsAction;
 
-    public record LoadProviders : SettingsAction;
+    public record LoadDatabases : SettingsAction;
 
     public record LoadSettings : SettingsAction;
 

@@ -52,13 +52,13 @@ public partial class MainPage : ContentPage
         showComputerNameState.SelectedValueChanged += (sender, showComputerName) =>
             ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}";
 
-        loadedProvidersState.Select(s => s.LoadedProviders);
+        loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
             _resolver.SetActiveDatabases(loadedProviders);
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
-        fluxorDispatcher.Dispatch(new SettingsAction.LoadProviders());
+        fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
         PopulateOtherLogsMenu();
 

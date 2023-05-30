@@ -20,7 +20,7 @@ public partial class App : Application
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogState,
         IStateSelection<SettingsState, bool> showComputerState,
-        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState)
+        IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState)
     {
         InitializeComponent();
 
@@ -31,7 +31,7 @@ public partial class App : Application
                 continuouslyUpdateState,
                 showLogState,
                 showComputerState,
-                loadedProvidersState));
+                loadedDatabasesState));
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

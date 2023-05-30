@@ -32,6 +32,11 @@ public class EventResolverTests
         {
             return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], OwningLog);
         }
+
+        public void SetActiveDatabases(IEnumerable<string> databaseNames)
+        {
+            return;
+        }
     }
 
     private readonly ITestOutputHelper _outputHelper;

@@ -12,7 +12,7 @@ public record SettingsState
 {
     public SettingsModel Config { get; init; } = new();
 
-    public IImmutableList<string> LoadedProviders { get; init; } = ImmutableList<string>.Empty;
+    public IImmutableList<string> LoadedDatabases { get; init; } = ImmutableList<string>.Empty;
 
     public bool ShowLogName { get; init; }
 

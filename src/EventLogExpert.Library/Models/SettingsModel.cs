@@ -12,7 +12,7 @@ public record SettingsModel
     [JsonIgnore]
     public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId);
 
-    public IList<string>? DisabledProviders { get; set; }
+    public IList<string>? DisabledDatabases { get; set; }
 
     public bool IsPrereleaseEnabled { get; set; }
 }

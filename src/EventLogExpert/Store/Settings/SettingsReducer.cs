@@ -5,6 +5,7 @@ using EventLogExpert.Library.Models;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Store.Settings;
 
@@ -12,10 +13,10 @@ public class SettingsReducer
 {
     private static readonly ReaderWriterLockSlim ConfigSrwLock = new();
 
-    [ReducerMethod(typeof(SettingsAction.LoadProviders))]
-    public static SettingsState ReduceLoadProvider(SettingsState state)
+    [ReducerMethod(typeof(SettingsAction.LoadDatabases))]
+    public static SettingsState ReduceLoadDatabases(SettingsState state)
     {
-        List<string> providers = new();
+        List<string> databases = new();
 
         try
         {
@@ -23,7 +24,7 @@ public class SettingsReducer
             {
                 foreach (var item in Directory.EnumerateFiles(Utils.DatabasePath, "*.db"))
                 {
-                    providers.Add(Path.GetFileName(item));
+                    databases.Add(Path.GetFileName(item));
                 }
             }
         }
@@ -32,17 +33,17 @@ public class SettingsReducer
             return state;
         }
 
-        if (providers.Count <= 0) { return state; }
+        if (databases.Count <= 0) { return state; }
 
         SettingsModel? config = ReadSettingsConfig();
 
-        if (config?.DisabledProviders is not null)
+        if (config?.DisabledDatabases is not null)
         {
-            providers.RemoveAll(enabled => config.DisabledProviders
+            databases.RemoveAll(enabled => config.DisabledDatabases
                 .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
         }
 
-        return state with { LoadedProviders = providers.ToImmutableList() };
+        return state with { LoadedDatabases = SortDatabases(databases).ToImmutableList() };
     }
 
     [ReducerMethod(typeof(SettingsAction.LoadSettings))]
@@ -87,6 +88,25 @@ public class SettingsReducer
             return null;
         }
         finally { ConfigSrwLock.ExitReadLock(); }
+    }
+
+    private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
+    {
+        var r = new Regex("^(.+) (\\S+)$");
+
+        return databases
+            .Select(name =>
+            {
+                var m = r.Match(name);
+
+                return m.Success
+                    ? new { FirstPart = m.Groups[1].Value + " ", SecondPart = m.Groups[2].Value }
+                    : new { FirstPart = name, SecondPart = "" };
+            })
+            .OrderBy(n => n.FirstPart)
+            .ThenByDescending(n => n.SecondPart)
+            .Select(n => n.FirstPart + n.SecondPart)
+            .ToList();
     }
 
     private static bool WriteSettingsConfig(SettingsModel settings)

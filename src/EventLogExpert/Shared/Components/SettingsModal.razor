@@ -10,22 +10,22 @@
 
         <div class="tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
 
-        <div class="provider-row">
-            <div>Loaded Providers: </div>
+        <div class="database-row">
+            <div>Loaded Databases: </div>
 
-            <button class="button-primary" type="button" @onclick="ImportProvider">
+            <button class="button-primary" type="button" @onclick="ImportDatabase">
                 <i class="bi bi-plus-circle"></i> Add Provider
             </button>
         </div>
 
-        <div class="provider-list">
-            @if (_providers?.Any() is true)
+        <div class="database-list">
+            @if (_databases?.Any() is true)
             {
-                @foreach (var provider in _providers)
+                @foreach (var database in _databases)
                 {
-                    <div class="provider-row">
-                        <span>@provider</span>
-                        <button class="button-remove" type="button" @onclick="() => DisableProvider(provider)">
+                    <div class="database-row">
+                        <span>@database</span>
+                        <button class="button-remove" type="button" @onclick="() => DisableDatabase(database)">
                             <i class="bi bi-dash-circle"></i> Disable
                         </button>
                     </div>
@@ -38,18 +38,18 @@
             }
         </div>
         
-        @if (_request.DisabledProviders?.Any() is true)
+        @if (_request.DisabledDatabases?.Any() is true)
         {
-            <div class="provider-row">
-                <div>Disabled Providers: </div>
+            <div class="database-row">
+                <div>Disabled Databases: </div>
             </div>
 
-            <div class="provider-list">
-                @foreach (var provider in _request.DisabledProviders)
+            <div class="database-list">
+                @foreach (var database in _request.DisabledDatabases)
                 {
-                    <div class="provider-row">
-                        <span>@provider</span>
-                        <button class="button-save" type="button" @onclick="() => EnableProvider(provider)">
+                    <div class="database-row">
+                        <span>@database</span>
+                        <button class="button-save" type="button" @onclick="() => EnableDatabase(database)">
                             <i class="bi bi-plus-circle"></i> Enable
                         </button>
                     </div>
