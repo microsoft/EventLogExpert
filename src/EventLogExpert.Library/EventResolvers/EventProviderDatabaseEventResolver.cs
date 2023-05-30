@@ -205,6 +205,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                     }
                 }
             }
+
+            if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
+            {
+                _providerDetails.Add(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
+            }
         }
 
         if (lastResult == null)
