@@ -41,7 +41,7 @@ public partial class FilterValueSelect
         switch (Type)
         {
             case FilterType.EventId :
-                _items = EventLogState.Value.EventIds.Select(x => x.ToString()).ToList();
+                _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds).Select(id => id.ToString()).ToList();
                 break;
             case FilterType.Level :
                 _items = new List<string>();
@@ -53,11 +53,11 @@ public partial class FilterValueSelect
 
                 break;
             case FilterType.Source :
-                _items = EventLogState.Value.EventProviderNames.ToList();
+                _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames).Select(name => name.ToString()).ToList();
 
                 break;
             case FilterType.Task :
-                _items = EventLogState.Value.TaskNames.ToList();
+                _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames).Select(name => name.ToString()).ToList();
 
                 break;
             case FilterType.Description :

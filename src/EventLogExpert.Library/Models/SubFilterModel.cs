@@ -9,7 +9,7 @@ public record SubFilterModel
 {
     private FilterType _filterType;
 
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; } = Guid.NewGuid();
 
     public FilterType FilterType
     {

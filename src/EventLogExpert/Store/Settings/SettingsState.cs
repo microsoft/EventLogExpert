@@ -1,20 +1,18 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Store.Settings;
 
 [FeatureState]
 public record SettingsState
 {
-    public string TimeZoneId { get; init; } = string.Empty;
+    public SettingsModel Config { get; init; } = new();
 
-    public TimeZoneInfo TimeZone { get; init; } = null!;
-
-    public bool IsPrereleaseEnabled { get; init; }
-
-    public IEnumerable<string> LoadedProviders { get; init; } = Enumerable.Empty<string>();
+    public IImmutableList<string> LoadedDatabases { get; init; } = ImmutableList<string>.Empty;
 
     public bool ShowLogName { get; init; }
 

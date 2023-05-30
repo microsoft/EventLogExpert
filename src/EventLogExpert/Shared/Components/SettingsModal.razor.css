@@ -1,5 +1,5 @@
-﻿dialog {
-    height: 30%;
+dialog {
+    height: 60%;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);
@@ -19,12 +19,12 @@
     margin-bottom: 1rem;
 }
 
-.provider-row {
+.database-row {
     display: flex;
     justify-content: space-between;
 }
 
-.provider-list {
+.database-list {
     display: flex;
     flex-direction: column;
 
@@ -34,7 +34,7 @@
     overflow-x: hidden;
 }
 
-    .provider-list > p { margin: 0; }
+    .provider-list > span { margin: 0; }
 
 .footer-group {
     display: flex;

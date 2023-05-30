@@ -32,7 +32,7 @@
             <div class="header-center">
                 @if (FilterPaneState.Value.CurrentFilters.Any())
                 {
-                    <span>[Active Filters: @FilterPaneState.Value.CurrentFilters.Count()]</span>
+                    <span>[Active Filters: @GetActiveFilters()]</span>
                 }
             </div>
 

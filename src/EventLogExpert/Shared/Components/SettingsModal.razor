@@ -10,20 +10,26 @@
 
         <div class="tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
 
-        <div class="provider-row">
-            <div>Loaded Providers: </div>
+        <div class="database-row">
+            <div>Loaded Databases: </div>
 
-            <button class="button-primary" type="button" @onclick="ImportProvider">
+            <button class="button-primary" type="button" @onclick="ImportDatabase">
                 <i class="bi bi-plus-circle"></i> Add Provider
             </button>
         </div>
 
-        <div class="provider-list">
-            @if (SettingsState.Value.LoadedProviders.Any())
+        <div class="database-list">
+            @if (_databases?.Any() is true)
             {
-                @foreach (var provider in SettingsState.Value.LoadedProviders)
+                @foreach (var database in _databases)
                 {
-                    <p>@provider</p>
+                    <div class="database-row">
+                        <span>@database</span>
+                        <button class="button-remove" type="button" @onclick="() => DisableDatabase(database)">
+                            <i class="bi bi-dash-circle"></i> Disable
+                        </button>
+                    </div>
+
                 }
             }
             else
@@ -31,6 +37,25 @@
                 <p>None</p>
             }
         </div>
+        
+        @if (_request.DisabledDatabases?.Any() is true)
+        {
+            <div class="database-row">
+                <div>Disabled Databases: </div>
+            </div>
+
+            <div class="database-list">
+                @foreach (var database in _request.DisabledDatabases)
+                {
+                    <div class="database-row">
+                        <span>@database</span>
+                        <button class="button-save" type="button" @onclick="() => EnableDatabase(database)">
+                            <i class="bi bi-plus-circle"></i> Enable
+                        </button>
+                    </div>
+                }
+            </div>
+        }
 
         <div class="footer-group">
             <div class="prerelease-group">

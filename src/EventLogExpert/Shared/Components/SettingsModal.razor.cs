@@ -12,13 +12,15 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class SettingsModal
 {
-    private readonly SettingsModel _request = new();
+    private List<string>? _databases;
+    private bool _databasesHasChanged;
+    private SettingsModel _request = new();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override void OnInitialized()
     {
-        SettingsState.StateChanged += (s, e) => ResetRequestModel();
+        SettingsState.StateChanged += (s, e) => ResetSettingsModel();
 
         base.OnInitialized();
     }
@@ -26,10 +28,28 @@ public partial class SettingsModal
     private async void Close()
     {
         await JSRuntime.InvokeVoidAsync("closeSettingsModal");
-        ResetRequestModel();
+        ResetSettingsModel();
     }
 
-    private async void ImportProvider()
+    private void DisableDatabase(string database)
+    {
+        _request.DisabledDatabases ??= new List<string>();
+
+        _request.DisabledDatabases?.Add(database);
+        _databases?.Remove(database);
+
+        _databasesHasChanged = true;
+    }
+
+    private void EnableDatabase(string database)
+    {
+        _request.DisabledDatabases?.Remove(database);
+        _databases?.Add(database);
+
+        _databasesHasChanged = true;
+    }
+
+    private async void ImportDatabase()
     {
         PickOptions options = new()
         {
@@ -68,13 +88,12 @@ public partial class SettingsModal
         }
 
         bool answer = await Application.Current!.MainPage!.DisplayAlert("Application Restart Required",
-            "In order to use these providers, a restart of the application is required. Would you like to restart now?",
-            "Yes",
-            "No");
+            "In order to use these databases, a restart of the application is required. Would you like to restart now?",
+            "Yes", "No");
 
         if (!answer)
         {
-            Dispatcher.Dispatch(new SettingsAction.LoadProviders(Utils.DatabasePath));
+            Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
             return;
         }
 
@@ -83,17 +102,50 @@ public partial class SettingsModal
         if (res == 0) { Application.Current.Quit(); }
     }
 
-    private void ResetRequestModel()
+    private async void RemoveDatabase(string database)
     {
-        _request.TimeZoneId = SettingsState.Value.TimeZoneId;
-        _request.IsPrereleaseEnabled = SettingsState.Value.IsPrereleaseEnabled;
+        bool answer = await Application.Current!.MainPage!.DisplayAlert("Remove Database",
+            "Are you sure you want to remove this database?",
+            "Yes", "No");
+
+        if (!answer) { return; }
+
+        try
+        {
+            var destination = Path.Join(Utils.DatabasePath, database);
+            File.Delete(destination);
+        }
+        catch
+        { // TODO: Log Error
+            return;
+        }
+
+        Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+    }
+
+    private void ResetSettingsModel()
+    {
+        _request = SettingsState.Value.Config with { };
+
+        _databases = SettingsState.Value.LoadedDatabases.ToList();
+        _databasesHasChanged = false;
 
         StateHasChanged();
     }
 
     private void Save()
     {
-        Dispatcher.Dispatch(new SettingsAction.Save(_request, Utils.SettingsPath));
+
+        if (_databasesHasChanged)
+        {
+            Dispatcher.Dispatch(new SettingsAction.Save(_request));
+            Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+        }
+        else
+        {
+            Dispatcher.Dispatch(new SettingsAction.Save(_request));
+        }
+
         Close();
     }
 }
