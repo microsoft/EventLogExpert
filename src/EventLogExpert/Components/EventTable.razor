@@ -6,7 +6,7 @@
 
 <SplitLogTabPane @bind-ActiveLog="@_activeLog" />
 
-<div class="table-container">
+<div class="table-container" hidden="@(_activeLog != null)">
     <table id="eventTable">
         <thead>
             <tr>
@@ -26,7 +26,7 @@
             </tr>
         </thead>
         <tbody>
-            <Virtualize Items="GetFilteredEvents()" Context="evt">
+            <Virtualize Items="GetFilteredEvents(null)" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td>@evt.Level</td>
                     <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
@@ -41,3 +41,45 @@
         </tbody>
     </table>
 </div>
+
+@if (EventLogState.Value.ActiveLogs.Count > 1)
+{
+    @foreach (var log in EventLogState.Value.ActiveLogs)
+    {
+        <div class="table-container" hidden="@(_activeLog != log.Key)">
+            <table id="eventTable">
+                <thead>
+                    <tr>
+                        <th id="level">Level</th>
+                        <th id="time">
+                            Date and Time
+                            <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
+                                <i class="bi bi-caret-up"></i>
+                            </span>
+                        </th>
+                        <th id="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
+                        <th id="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
+                        <th id="source">Source</th>
+                        <th id="id">Event ID</th>
+                        <th id="task">Task Category</th>
+                        <th id="description">Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <Virtualize Items="GetFilteredEvents(null)" Context="evt">
+                        <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
+                            <td>@evt.Level</td>
+                            <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
+                            <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog</td>
+                            <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
+                            <td>@evt.Source</td>
+                            <td>@evt.Id</td>
+                            <td>@evt.TaskCategory</td>
+                            <td>@evt.Description</td>
+                        </tr>
+                    </Virtualize>
+                </tbody>
+            </table>
+        </div>
+    }
+}
