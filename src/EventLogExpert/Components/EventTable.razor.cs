@@ -58,10 +58,11 @@ public partial class EventTable
 
         if (FilterPaneState.Value.CurrentFilters.Any())
         {
-            filteredEvents = filteredEvents.Where(e => FilterPaneState.Value.CurrentFilters
-                .Where(filter => filter.IsEnabled && !filter.IsEditing)
+            filteredEvents = filteredEvents.AsParallel().Where(e => FilterPaneState.Value.CurrentFilters
+                .Where(filter => filter is { IsEnabled: true, IsEditing: false })
                 .All(filter => filter.Comparison
-                    .Any(comp => comp(e))));
+                    .Any(comp => comp(e))))
+                .AsQueryable();
         }
 
         if (!string.IsNullOrEmpty(FilterPaneState.Value.AdvancedFilter) &&
