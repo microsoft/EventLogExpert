@@ -70,7 +70,7 @@ public partial class MainPage : ContentPage
         {
             if (_resolver is EventProviderDatabaseEventResolver dbResolver)
             {
-                dbResolver.SetActiveDatabases(loadedProviders);
+                dbResolver.SetActiveDatabases(loadedProviders.Select(path => Path.Join(Utils.DatabasePath, path)));
             }
         };
 

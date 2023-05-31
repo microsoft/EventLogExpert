@@ -35,10 +35,12 @@ public static class MauiProgram
             options.AddMiddleware<LoggingMiddleware>();
         });
 
+        Directory.CreateDirectory(Utils.DatabasePath);
+
         if (Utils.HasProviderDatabases())
         {
             builder.Services.AddSingleton<IEventResolver>(
-                new EventProviderDatabaseEventResolver(Utils.DatabasePath, Utils.Trace));
+                new EventProviderDatabaseEventResolver(Utils.Trace));
         }
         else
         {
