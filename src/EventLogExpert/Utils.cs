@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Windows.ApplicationModel;
+using Windows.Foundation;
 using Windows.Management.Deployment;
 
 namespace EventLogExpert;
@@ -72,29 +73,55 @@ internal static class Utils
 
             if (downloadPath is null) { return false; }
 
-            var result = false;
+            var shouldReboot = false;
 
             if (Application.Current?.MainPage is not null)
             {
-                result = await Application.Current.MainPage.DisplayAlert("Update Available",
-                    "A new version has been detected, a restart of the application is required. Would you like to restart now?",
+                shouldReboot = await Application.Current.MainPage.DisplayAlert("Update Available",
+                    "A new version has been detected, would you like to install and reload the application?",
                     "Yes", "No");
             }
 
             PackageManager packageManager = new();
 
-            if (result)
+            IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment;
+
+            if (shouldReboot)
             {
                 uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
                 if (res != 0) { return false; }
 
-                await packageManager.AddPackageAsync(new Uri(downloadPath),
+                deployment = packageManager.AddPackageAsync(new Uri(downloadPath),
                     null,
                     DeploymentOptions.ForceTargetApplicationShutdown);
             }
+            else
+            {
+                deployment = packageManager.AddPackageAsync(new Uri(downloadPath), null, DeploymentOptions.None);
+            }
 
-            await packageManager.AddPackageAsync(new Uri(downloadPath), null, DeploymentOptions.None);
+            deployment.Progress = (result, progress) =>
+            {
+                MainThread.InvokeOnMainThreadAsync(() => UpdateAppTitle($"Installing: {progress.percentage}%"));
+            };
+
+            deployment.Completed = (result, progress) =>
+            {
+                MainThread.InvokeOnMainThreadAsync(() =>
+                {
+                    if (result.Status is AsyncStatus.Error && Application.Current?.MainPage is not null)
+                    {
+                        Application.Current.MainPage.DisplayAlert("Update Failure",
+                            $"Update failed to install:\r\n{result.ErrorCode}",
+                            "Ok");
+                    }
+
+                    UpdateAppTitle();
+                });
+            };
+
+            await deployment;
         }
         catch
         { // TODO: Log Update Failure
