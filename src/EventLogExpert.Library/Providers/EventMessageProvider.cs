@@ -32,8 +32,27 @@ public class EventMessageProvider
 
     public ProviderDetails? LoadProviderDetails()
     {
-        var provider = LoadMessagesFromModernProvider();
-        provider.Messages = LoadMessagesFromLegacyProvider()?.ToList();
+        ProviderMetadata providerMetadata = null;
+        try
+        {
+            providerMetadata = new ProviderMetadata(_providerName);
+        }
+        catch (Exception ex)
+        {
+            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.");
+        }
+
+        ProviderDetails provider;
+        if (providerMetadata != null)
+        {
+            provider = LoadMessagesFromModernProvider(providerMetadata);
+        }
+        else
+        {
+            provider = new ProviderDetails { ProviderName = _providerName };
+        }
+
+        provider.Messages = LoadMessagesFromLegacyProvider(providerMetadata?.MessageFilePath)?.ToList();
         if (provider.Events == null && provider.Messages == null)
         {
             return null;
@@ -56,7 +75,7 @@ public class EventMessageProvider
     ///     the registry. This information is stored at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
     /// </summary>
     /// <returns></returns>
-    private IEnumerable<MessageModel>? LoadMessagesFromLegacyProvider()
+    private IEnumerable<MessageModel>? LoadMessagesFromLegacyProvider(string? messageFilePath)
     {
         _traceAction($"LoadMessagesFromLegacyProvider called for provider {_providerName}");
 
@@ -64,8 +83,16 @@ public class EventMessageProvider
 
         if (legacyProviderFiles == null)
         {
-            _traceAction($"No message files found for provider {_providerName}. Returning null.");
-            return null;
+            if (messageFilePath == null)
+            {
+                _traceAction($"No message files found for provider {_providerName}. Returning null.");
+                return null;
+            }
+            else
+            {
+                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.");
+                legacyProviderFiles = new[] {messageFilePath};
+            }
         }
 
         var messages = new List<MessageModel>();
@@ -188,7 +215,7 @@ public class EventMessageProvider
     ///     Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT
     /// </summary>
     /// <returns></returns>
-    private ProviderDetails LoadMessagesFromModernProvider()
+    private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
     {
         _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}");
 
@@ -197,17 +224,6 @@ public class EventMessageProvider
         if (!_allProviderNames.Contains(_providerName))
         {
             _traceAction($"{_providerName} modern provider is not present. Returning empty provider.");
-            return provider;
-        }
-
-        ProviderMetadata providerMetadata;
-        try
-        {
-            providerMetadata = new ProviderMetadata(_providerName);
-        }
-        catch (Exception ex)
-        {
-            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}. Returning empty provider.");
             return provider;
         }
 
