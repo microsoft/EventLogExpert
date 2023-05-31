@@ -90,7 +90,7 @@ public partial class EventTable
             numberOfFilteredEvents = returnList.Count - initialNumberOfEvents + initialNumberOfEvents;
         }
 
-        if (numberOfFilteredEvents != FilterPaneState.Value.NumberOfFilteredEvents)
+        if (_activeLog == logName && numberOfFilteredEvents != FilterPaneState.Value.NumberOfFilteredEvents)
         {
             Dispatcher.Dispatch(new FilterPaneAction.SetNumberOfFilteredEvents(numberOfFilteredEvents));
         }
