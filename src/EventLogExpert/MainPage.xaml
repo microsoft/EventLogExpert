@@ -9,7 +9,7 @@
         <MenuBarItem Text="File">
             <MenuFlyoutSubItem Text="Open">
                 <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" />
-                <MenuFlyoutSubItem Text="Live Event Log">
+                <MenuFlyoutSubItem Text="Live Event Log" x:Name="OpenLiveLogFlyoutSubitem">
                     <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
                     <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
                     <MenuFlyoutSubItem Text="Other Logs" x:Name="OpenOtherLogsFlyoutSubitem" />
@@ -17,7 +17,7 @@
             </MenuFlyoutSubItem>
             <MenuFlyoutSubItem Text="Add Another Log To This View">
                 <MenuFlyoutItem Text="File" Clicked="AddFile_Clicked" />
-                <MenuFlyoutSubItem Text="Live Event Log">
+                <MenuFlyoutSubItem Text="Live Event Log" x:Name="AddLiveLogFlyoutSubitem">
                     <MenuFlyoutItem Text="Application" Clicked="AddLiveLog_Clicked" />
                     <MenuFlyoutItem Text="System" Clicked="AddLiveLog_Clicked" />
                     <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" />
