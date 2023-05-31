@@ -1,0 +1,25 @@
+@inherits FluxorComponent
+
+@inject IState<EventLogState> EventLogState
+
+@if (EventLogState.Value.ActiveLogs.Count > 1)
+{
+    <div class="tab-pane">
+        <div class="tab-row">
+            <div>
+                <input type="radio" name="tab" id="log" checked @onclick="() => SetActiveLog(null)" />
+                <label for="log" tabindex="0">Combined</label>
+            </div>
+
+            @for (int i = 0; i < EventLogState.Value.ActiveLogs.Count; i++)
+            {
+                int index = i;
+                <div>
+                    <input type="radio" name="tab" id="@($"log{index}")"
+                        @onclick="() => SetActiveLog(EventLogState.Value.ActiveLogs.ElementAt(index).Key)" />
+                    <label for="@($"log{index}")" tabindex="0">@GetTabName(EventLogState.Value.ActiveLogs.ElementAt(index).Key)</label>
+                </div>
+            }
+        </div>
+    </div>
+}

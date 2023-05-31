@@ -19,7 +19,6 @@ public partial class MainPage : ContentPage
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IEventResolver _resolver;
 
-
     public MainPage(IDispatcher fluxorDispatcher,
         IEventResolver resolver,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
@@ -37,7 +36,7 @@ public partial class MainPage : ContentPage
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
-                Utils.UpdateAppTitle(string.Join(" ", activeLogs.Values.Select(l => l.Name))));
+                Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name))));
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
 

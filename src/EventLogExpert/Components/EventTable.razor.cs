@@ -12,6 +12,7 @@ namespace EventLogExpert.Components;
 
 public partial class EventTable
 {
+    private string? _activeLog;
     private bool _isDateTimeDescending = true;
 
     private string IsDateTimeDescending => _isDateTimeDescending.ToString().ToLower();
@@ -40,11 +41,13 @@ public partial class EventTable
 
     private IList<DisplayEventModel> GetFilteredEvents()
     {
-        var allEventsCombined = EventLogState.Value.ActiveLogs.Values.SelectMany(l => l.Events);
+        IQueryable<DisplayEventModel> filteredEvents = _activeLog is null
+            ? EventLogState.Value.ActiveLogs.Values.SelectMany(l => l.Events).AsQueryable()
+            : EventLogState.Value.ActiveLogs.Values.Where(l => l.Name == _activeLog).SelectMany(l => l.Events)
+                .AsQueryable();
 
         int numberOfFilteredEvents = 0;
-        int initialNumberOfEvents = allEventsCombined.Count();
-        var filteredEvents = allEventsCombined.AsQueryable();
+        int initialNumberOfEvents = filteredEvents.Count();
 
         if (FilterPaneState.Value.FilteredDateRange is not null && FilterPaneState.Value.FilteredDateRange.IsEnabled)
         {
@@ -71,17 +74,19 @@ public partial class EventTable
         {
             filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
         }
-        else if (EventLogState.Value.ActiveLogs.Count > 1)
+        else if (EventLogState.Value.ActiveLogs.Count > 1 && _activeLog is null)
         {
-            // If we only have one log open, the allEventsCombined enumerable already
+            // If we only have one log open, the filteredEvents enumerable already
             // has them all in descending order. However, if there's more than one,
             // we need to order them here.
             filteredEvents = filteredEvents.OrderByDescending(x => x.TimeCreated);
         }
 
-        if (filteredEvents.Count() != initialNumberOfEvents)
+        var returnList = filteredEvents.ToList();
+
+        if (returnList.Count != initialNumberOfEvents)
         {
-            numberOfFilteredEvents = (filteredEvents.Count() - initialNumberOfEvents) + initialNumberOfEvents;
+            numberOfFilteredEvents = returnList.Count - initialNumberOfEvents + initialNumberOfEvents;
         }
 
         if (numberOfFilteredEvents != FilterPaneState.Value.NumberOfFilteredEvents)
@@ -89,7 +94,7 @@ public partial class EventTable
             Dispatcher.Dispatch(new FilterPaneAction.SetNumberOfFilteredEvents(numberOfFilteredEvents));
         }
 
-        return filteredEvents.ToList();
+        return returnList;
     }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));

@@ -152,7 +152,14 @@ internal static class Utils
 
         Version currentVersion = GetCurrentVersion();
 
-        StringBuilder title = new("EventLogExpert ");
+        StringBuilder title = new();
+
+        if (logName is not null)
+        {
+            title.Append($"{logName} - ");
+        }
+
+        title.Append("EventLogExpert ");
 
         if (_isDevBuild)
         {
@@ -165,11 +172,6 @@ internal static class Utils
         else
         {
             title.Append(currentVersion);
-        }
-
-        if (logName is not null)
-        {
-            title.Append($" {logName}");
         }
 
         Application.Current.Windows[0].Title = title.ToString();
