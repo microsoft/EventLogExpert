@@ -6,7 +6,6 @@ using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
-using Microsoft.Maui.ApplicationModel;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using static EventLogExpert.Store.EventLog.EventLogState;
@@ -36,7 +35,16 @@ public partial class MainPage : ContentPage
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
-                Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name))));
+            {
+                if (activeLogs == ImmutableDictionary<string, EventLogData>.Empty)
+                {
+                    Utils.UpdateAppTitle();
+                }
+                else
+                {
+                    Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
+                }
+            });
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
 
@@ -84,9 +92,9 @@ public partial class MainPage : ContentPage
     private void OpenEventLogFile(string fileName)
     {
         _fluxorDispatcher.Dispatch(
-                new EventLogAction.OpenLog(
-                    fileName,
-                    LogType.File));
+            new EventLogAction.OpenLog(
+                fileName,
+                LogType.File));
     }
 
     public async void OpenFile_Clicked(object sender, EventArgs e)
