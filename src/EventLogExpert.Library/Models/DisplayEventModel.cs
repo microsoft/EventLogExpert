@@ -42,43 +42,65 @@ public record DisplayEventModel(
             $"  </System>\r\n" +
             $"  <EventData>\r\n");
 
+            var templateSuccessfullyParsed = false;
+
             if (!string.IsNullOrEmpty(Template))
             {
-                var propertyNames = new List<string>();
-                var index = -1;
-                while (-1 < (index = Template.IndexOf("name=", index + 1)))
+                try
                 {
-                    var nameStart = index + 6;
-                    var nameEnd = Template.IndexOf('"', nameStart);
-                    var name = Template.Substring(nameStart, nameEnd - nameStart);
-                    propertyNames.Add(name);
+                    var templateBuilder = new StringBuilder();
+
+                    var propertyNames = new List<string>();
+                    var index = -1;
+                    while (-1 < (index = Template.IndexOf("name=", index + 1)))
+                    {
+                        var nameStart = index + 6;
+                        var nameEnd = Template.IndexOf('"', nameStart);
+                        var name = Template.Substring(nameStart, nameEnd - nameStart);
+                        propertyNames.Add(name);
+                    }
+
+                    for (var i = 0; i < Properties.Count; i++)
+                    {
+                        if (i >= propertyNames.Count)
+                        {
+                            break;
+                        }
+
+                        if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && Properties[i].Value is byte[] val)
+                        {
+                            // Handle event 7036 from Service Control Manager binary data
+                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
+                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i + 1]}\">{Convert.ToHexString(val)}</Data>\r\n");
+                            i++;
+                        }
+                        else
+                        {
+                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i]}\">{Properties[i].Value}</Data>\r\n");
+                        }
+                    }
+
+                    sb.Append(templateBuilder.ToString());
+                    templateSuccessfullyParsed = true;
                 }
-
-                for (var i = 0; i < Properties.Count; i++)
+                catch
                 {
-                    if (i >= propertyNames.Count)
-                    {
-                        break;
-                    }
-
-                    if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && Properties[i].Value is byte[] val)
-                    {
-                        // Handle event 7036 from Service Control Manager binary data
-                        sb.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
-                        sb.Append($"    <Data Name=\"{propertyNames[i + 1]}\">{Convert.ToHexString(val)}</Data>\r\n");
-                        i++;
-                    }
-                    else
-                    {
-                        sb.Append($"    <Data Name=\"{propertyNames[i]}\">{Properties[i].Value}</Data>\r\n");
-                    }
+                    // No tracer available here
                 }
             }
-            else
+
+            if (!templateSuccessfullyParsed)
             {
                 foreach (var p in Properties)
                 {
-                    sb.Append($"    <Data>{p.Value}</Data>\r\n");
+                    if (p.Value is byte[] bytes)
+                    {
+                        sb.Append($"    <Data>{Convert.ToHexString(bytes)}</Data>\r\n");
+                    }
+                    else
+                    {
+                        sb.Append($"    <Data>{p.Value}</Data>\r\n");
+                    }
                 }
             }
 
