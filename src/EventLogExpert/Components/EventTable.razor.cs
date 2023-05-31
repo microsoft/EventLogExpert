@@ -39,11 +39,11 @@ public partial class EventTable
     private string GetCss(DisplayEventModel @event) => EventLogState.Value.SelectedEvent?.RecordId == @event.RecordId ?
         "table-row selected" : "table-row";
 
-    private IList<DisplayEventModel> GetFilteredEvents()
+    private IList<DisplayEventModel> GetFilteredEvents(string? logName)
     {
-        IQueryable<DisplayEventModel> filteredEvents = _activeLog is null
+        IQueryable<DisplayEventModel> filteredEvents = logName is null
             ? EventLogState.Value.ActiveLogs.Values.SelectMany(l => l.Events).AsQueryable()
-            : EventLogState.Value.ActiveLogs.Values.Where(l => l.Name == _activeLog).SelectMany(l => l.Events)
+            : EventLogState.Value.ActiveLogs.Values.Where(l => l.Name == logName).SelectMany(l => l.Events)
                 .AsQueryable();
 
         int numberOfFilteredEvents = 0;
@@ -75,7 +75,7 @@ public partial class EventTable
         {
             filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
         }
-        else if (EventLogState.Value.ActiveLogs.Count > 1 && _activeLog is null)
+        else if (EventLogState.Value.ActiveLogs.Count > 1 && logName is null)
         {
             // If we only have one log open, the filteredEvents enumerable already
             // has them all in descending order. However, if there's more than one,
