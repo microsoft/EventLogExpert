@@ -19,31 +19,20 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     private List<EventProviderDbContext> dbContexts = new();
 
-    private readonly string _dbFolder;
-
     private Dictionary<string, ProviderDetails?> _providerDetails = new();
 
     private volatile bool _ready = false;
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver(string databaseFolder) : this(databaseFolder, ImmutableArray<string>.Empty, s => { }) { }
+    public EventProviderDatabaseEventResolver() : this(ImmutableArray<string>.Empty, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(string databaseFolder, Action<string> tracer) : this(databaseFolder, ImmutableArray<string>.Empty, tracer) { }
+    public EventProviderDatabaseEventResolver(Action<string> tracer) : this(ImmutableArray<string>.Empty, tracer) { }
 
-    public EventProviderDatabaseEventResolver(string databaseFolder, IEnumerable<string> activeDatabases) : this(databaseFolder, activeDatabases, s => { }) { }
+    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases) : this(activeDatabases, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(string databaseFolder, IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
     {
-        _dbFolder = databaseFolder;
-
-        if (!Directory.Exists(_dbFolder))
-        {
-            Directory.CreateDirectory(_dbFolder);
-        }
-
-        AvailableDatabases = ImmutableArray<string>.Empty;
-
         if (activeDatabases != null && activeDatabases.Any())
         {
             ActiveDatabases = activeDatabases.ToImmutableArray();
@@ -67,18 +56,15 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             context.Dispose();
         }
 
-        var allDbFiles = SortDatabases(Directory.GetFiles(_dbFolder, "*.db").Select(path => Path.GetFileName(path)));
-
-        AvailableDatabases = allDbFiles.ToImmutableArray();
-
-        var databasesToLoad = ActiveDatabases.Any() ? ActiveDatabases.Where(db => allDbFiles.Contains(db)) : allDbFiles;
+        var databasesToLoad = ActiveDatabases.Where(db => File.Exists(db));
+        databasesToLoad = SortDatabases(databasesToLoad);
 
         var contexts = await Task.Run(() =>
         {
             var contexts = new List<EventProviderDbContext>();
             foreach (var file in databasesToLoad)
             {
-                var c = new EventProviderDbContext(Path.Join(_dbFolder, file), readOnly: false, _tracer);
+                var c = new EventProviderDbContext(file, readOnly: false, _tracer);
                 if (c.IsUpgradeNeeded())
                 {
                     UpdateStatus($"Upgrading database {c.Name}. Please wait...");
@@ -112,25 +98,28 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// like Exchange will be checked for matching providers first, and Windows will
     /// be checked last, with newer versions being checked before older versions.
     /// </summary>
-    /// <param name="databaseNames"></param>
+    /// <param name="databasePaths"></param>
     /// <returns></returns>
-    private IEnumerable<string> SortDatabases(IEnumerable<string> databaseNames)
+    private IEnumerable<string> SortDatabases(IEnumerable<string> databasePaths)
     {
-        if (databaseNames == null || !databaseNames.Any())
+        if (!databasePaths.Any())
         {
             return Array.Empty<string>();
         }
 
         var r = new Regex("^(.+) (\\S+)$");
 
-        return databaseNames
-            .Select(name =>
+        return databasePaths
+            .Select(path =>
             {
+                var name = Path.GetFileName(path);
+                var directory = Path.GetDirectoryName(path);
                 var m = r.Match(name);
                 if (m.Success)
                 {
                     return new
                     {
+                        Directory = directory,
                         FirstPart = m.Groups[1].Value + " ",
                         SecondPart = m.Groups[2].Value
                     };
@@ -139,6 +128,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 {
                     return new
                     {
+                        Directory = directory,
                         FirstPart = name,
                         SecondPart = ""
                     };
@@ -146,7 +136,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             })
             .OrderBy(n => n.FirstPart)
             .ThenByDescending(n => n.SecondPart)
-            .Select(n => n.FirstPart + n.SecondPart)
+            .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart))
             .ToList();
     }
 
@@ -263,8 +253,6 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
-
-    public ImmutableArray<string> AvailableDatabases { get; private set; } = ImmutableArray<string>.Empty;
 
     public ImmutableArray<string> ActiveDatabases { get; private set; } = ImmutableArray<string>.Empty;
 }
