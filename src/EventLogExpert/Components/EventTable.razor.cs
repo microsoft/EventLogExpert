@@ -83,7 +83,7 @@ public partial class EventTable
         else
         {
             // AsParallel puts events out of order so make sure we are still in order
-            filteredEvents = filteredEvents.OrderBy(x => x.RecordId);
+            filteredEvents = filteredEvents.OrderByDescending(x => x.RecordId);
         }
 
         var returnList = filteredEvents.ToList();
