@@ -59,9 +59,9 @@ public partial class EventTable
         if (FilterPaneState.Value.CurrentFilters.Any())
         {
             filteredEvents = filteredEvents.AsParallel().Where(e => FilterPaneState.Value.CurrentFilters
-                .Where(filter => filter is { IsEnabled: true, IsEditing: false })
-                .All(filter => filter.Comparison
-                    .Any(comp => comp(e))))
+                    .Where(filter => filter is { IsEnabled: true, IsEditing: false })
+                    .All(filter => filter.Comparison
+                        .Any(comp => comp(e))))
                 .AsQueryable();
         }
 
@@ -75,12 +75,15 @@ public partial class EventTable
         {
             filteredEvents = filteredEvents.OrderBy(x => x.TimeCreated);
         }
-        else if (EventLogState.Value.ActiveLogs.Count > 1 && logName is null)
+        else if (EventLogState.Value.ActiveLogs.Count > 1)
         {
-            // If we only have one log open, the filteredEvents enumerable already
-            // has them all in descending order. However, if there's more than one,
-            // we need to order them here.
+            // If more than one log is loaded we need to make sure they are orderd by date and not record id
             filteredEvents = filteredEvents.OrderByDescending(x => x.TimeCreated);
+        }
+        else
+        {
+            // AsParallel puts events out of order so make sure we are still in order
+            filteredEvents = filteredEvents.OrderBy(x => x.RecordId);
         }
 
         var returnList = filteredEvents.ToList();
