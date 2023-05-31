@@ -29,7 +29,6 @@ public partial class DetailsPane
             {
                 Event = EventLogState.Value.SelectedEvent;
                 _expandMenu = true;
-                _expandXml = false;
             }
         };
     }
