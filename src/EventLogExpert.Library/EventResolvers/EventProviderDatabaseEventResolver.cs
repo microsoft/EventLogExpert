@@ -19,7 +19,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     private List<EventProviderDbContext> dbContexts = new();
 
-    private Dictionary<string, ProviderDetails?> _providerDetails = new();
+    private volatile Dictionary<string, ProviderDetails?> _providerDetails = new();
 
     private volatile bool _ready = false;
 
@@ -51,6 +51,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// </summary>
     private async void LoadDatabases()
     {
+        _providerDetails = new();
+
         foreach (var context in dbContexts)
         {
             context.Dispose();
