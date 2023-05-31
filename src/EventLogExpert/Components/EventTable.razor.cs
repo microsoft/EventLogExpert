@@ -58,7 +58,8 @@ public partial class EventTable
 
         if (FilterPaneState.Value.CurrentFilters.Any())
         {
-            filteredEvents = filteredEvents.AsParallel().Where(e => FilterPaneState.Value.CurrentFilters
+            filteredEvents = filteredEvents.AsParallel()
+                .Where(e => FilterPaneState.Value.CurrentFilters
                     .Where(filter => filter is { IsEnabled: true, IsEditing: false })
                     .All(filter => filter.Comparison
                         .Any(comp => comp(e))))
