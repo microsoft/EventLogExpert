@@ -1,9 +1,12 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
+using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.IO.Compression;
@@ -17,6 +20,10 @@ public partial class SettingsModal
     private SettingsModel _request = new();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    [Inject] private IEventResolver EventResolver { get; set; } = null!;
+
+    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -61,6 +68,8 @@ public partial class SettingsModal
                 })
         };
 
+        var dbResolver = EventResolver as EventProviderDatabaseEventResolver;
+
         try
         {
             var result = (await FilePicker.Default.PickMultipleAsync(options)).ToList();
@@ -69,6 +78,10 @@ public partial class SettingsModal
             if (!result.Any()) { return; }
 
             Directory.CreateDirectory(Utils.DatabasePath);
+
+            // Try to release all database files before potentially
+            // trying to overwrite some of them during the copy.
+            dbResolver?.SetActiveDatabases(Enumerable.Empty<string>());
 
             foreach (var item in result)
             {
@@ -82,24 +95,47 @@ public partial class SettingsModal
                 }
             }
         }
-        catch
-        { // TODO: Log Error
+        catch (Exception ex)
+        {
+            dbResolver?.SetActiveDatabases(SettingsState.Value.LoadedDatabases);
+
+            await Application.Current!.MainPage!.DisplayAlert("Import Failed",
+                $"An exception occurred while importing provider databases: {ex.Message}",
+                "OK");
             return;
         }
 
-        bool answer = await Application.Current!.MainPage!.DisplayAlert("Application Restart Required",
+        Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+
+        if (dbResolver == null)
+        {
+            bool answer = await Application.Current!.MainPage!.DisplayAlert("Application Restart Required",
             "In order to use these databases, a restart of the application is required. Would you like to restart now?",
             "Yes", "No");
 
-        if (!answer)
-        {
-            Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
-            return;
+            if (!answer) return;
+
+            uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+
+            if (res == 0) { Application.Current.Quit(); }
         }
+        else
+        {
+            bool answer = await Application.Current!.MainPage!.DisplayAlert("Reload Open Logs Now?",
+            "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
+            "Yes", "No");
 
-        uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+            if (!answer) return;
 
-        if (res == 0) { Application.Current.Quit(); }
+            var logsToReopen = EventLogState.Value.ActiveLogs.Values;
+
+            Dispatcher.Dispatch(new EventLogAction.CloseAll());
+
+            foreach (var log in logsToReopen)
+            {
+                Dispatcher.Dispatch(new EventLogAction.OpenLog(log.Name, log.Type));
+            }
+        }
     }
 
     private async void RemoveDatabase(string database)
