@@ -72,22 +72,29 @@ internal static class Utils
 
             if (downloadPath is null) { return false; }
 
-            uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
-
-            if (res != 0) { return false; }
+            var result = false;
 
             if (Application.Current?.MainPage is not null)
             {
-                await Application.Current.MainPage.DisplayAlert("Update Available",
-                    "A new version has been detected, app will restart shortly.",
-                    "Ok");
+                result = await Application.Current.MainPage.DisplayAlert("Update Available",
+                    "A new version has been detected, a restart of the application is required. Would you like to restart now?",
+                    "Yes", "No");
             }
 
             PackageManager packageManager = new();
 
-            await packageManager.AddPackageAsync(new Uri(downloadPath),
-                null,
-                DeploymentOptions.ForceTargetApplicationShutdown);
+            if (result)
+            {
+                uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+
+                if (res != 0) { return false; }
+
+                await packageManager.AddPackageAsync(new Uri(downloadPath),
+                    null,
+                    DeploymentOptions.ForceTargetApplicationShutdown);
+            }
+
+            await packageManager.AddPackageAsync(new Uri(downloadPath), null, DeploymentOptions.None);
         }
         catch
         { // TODO: Log Update Failure
