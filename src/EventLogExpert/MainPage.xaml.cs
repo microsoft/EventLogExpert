@@ -197,13 +197,25 @@ public partial class MainPage : ContentPage
 
             if (hasLogInformation)
             {
-                var m = new MenuFlyoutItem { Text = name };
-                m.Clicked += OpenLiveLog_Clicked;
-                OpenOtherLogsFlyoutSubitem.Add(m);
+                var openItem = new MenuFlyoutItem { Text = name };
+                openItem.Clicked += OpenLiveLog_Clicked;
 
-                var addm = new MenuFlyoutItem { Text = name };
-                addm.Clicked += AddLiveLog_Clicked;
-                AddOtherLogsFlyoutSubitem.Add(addm);
+                var addItem = new MenuFlyoutItem { Text = name };
+                addItem.Clicked += AddLiveLog_Clicked;
+
+                if (name == "Security")
+                {
+                    // If we are being run as admin, we can access the Security log.
+                    // Make it a peer of Application and System instead of putting it
+                    // under Other Logs.
+                    OpenLiveLogFlyoutSubitem.Insert(1, openItem);
+                    AddLiveLogFlyoutSubitem.Insert(1, addItem);
+                }
+                else
+                {
+                    OpenOtherLogsFlyoutSubitem.Add(openItem);
+                    AddOtherLogsFlyoutSubitem.Add(addItem);
+                }
             }
         }
     }
