@@ -39,9 +39,20 @@ public class LoggingMiddleware : Middleware
             // We can't serialize a Func.
             _debugLogger.Trace("Action: EventLogAction.FilterEventsAction.");
         }
+        else if (action is EventLogAction.SelectEvent selectEventAction)
+        {
+            _debugLogger.Trace($"Action: EventLogAction.SelectEvent selected {selectEventAction?.SelectedEvent?.Source} event ID {selectEventAction?.SelectedEvent?.Id}.");
+        }
         else
         {
-            _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
+            try
+            {
+                _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
+            }
+            catch
+            {
+                _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
+            }
         }
     }
 
