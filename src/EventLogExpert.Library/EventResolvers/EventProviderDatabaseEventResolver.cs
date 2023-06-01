@@ -11,7 +11,14 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Library.EventResolvers;
 
-public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
+public interface IDatabaseEventResolver
+{
+    public ImmutableArray<string> ActiveDatabases { get; }
+
+    public void SetActiveDatabases(IEnumerable<string> databasePaths);
+}
+
+public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEventResolver, IEventResolver, IDisposable
 {
     public string Status { get; private set; } = string.Empty;
 
