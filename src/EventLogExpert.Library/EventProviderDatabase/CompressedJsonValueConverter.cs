@@ -14,7 +14,7 @@ public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T
       base(v => ConvertToCompressedJson(v), v => ConvertFromCompressedJson(v))
     { }
 
-    private static byte[] ConvertToCompressedJson(T value)
+    public static byte[] ConvertToCompressedJson(T value)
     {
         var json = JsonSerializer.Serialize<T>(value);
         var buffer = Encoding.UTF8.GetBytes(json);
@@ -27,7 +27,7 @@ public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T
         return memoryStream.ToArray();
     }
 
-    private static T ConvertFromCompressedJson(byte[] value)
+    public static T ConvertFromCompressedJson(byte[] value)
     {
         using (MemoryStream memoryStream = new MemoryStream(value))
         {

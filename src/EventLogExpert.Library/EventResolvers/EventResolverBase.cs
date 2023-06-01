@@ -21,7 +21,7 @@ public class EventResolverBase
         _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
     }
 
-    protected string? FormatDescription(IList<EventProperty> properties, string? descriptionTemplate)
+    protected string? FormatDescription(IList<EventProperty> properties, string? descriptionTemplate, List<MessageModel> parameters)
     {
         if (descriptionTemplate == null)
         {
@@ -39,6 +39,7 @@ public class EventResolverBase
             {
                 var sb = new StringBuilder();
                 var lastIndex = 0;
+                var anyParameterStrings = parameters.Any();
                 for (var i = 0; i < matches.Count; i++)
                 {
                     if (matches[i].Value.StartsWith("%%"))
@@ -52,13 +53,31 @@ public class EventResolverBase
 
                     if (propIndex - 1 >= properties.Count) { return "Unable to format description"; }
 
+                    var valueFormatted = false;
                     var propValue = properties[propIndex - 1].Value;
                     if (propValue is DateTime)
                     {
                         // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
                         sb.Append(((DateTime)propValue).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                        valueFormatted = true;
                     }
-                    else
+                    else if (anyParameterStrings && propValue is string propString && propString.StartsWith("%%"))
+                    {
+                        var endParameterId = propString.IndexOf(' ');
+                        var parameterIdString = (endParameterId > 2) ? propString.Substring(2, endParameterId - 2) : propString.Substring(2);
+                        if (int.TryParse(parameterIdString, out var parameterId))
+                        {
+                            var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
+                            if (parameterMessage != null)
+                            {
+                                propString = endParameterId > 2 ? parameterMessage.Text + propString[++endParameterId..] : parameterMessage.Text;
+                                sb.Append(propString);
+                                valueFormatted = true;
+                            }
+                        }
+                    }
+                    
+                    if (!valueFormatted)
                     {
                         sb.Append(propValue);
                     }
@@ -149,7 +168,7 @@ public class EventResolverBase
                 }
                 else
                 {
-                    description = FormatDescription(eventProperties, e.Description);
+                    description = FormatDescription(eventProperties, e.Description, providerDetails.Parameters);
                 }
 
                 template = e.Template;
@@ -159,7 +178,7 @@ public class EventResolverBase
         if (description == null)
         {
             description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
-            description = FormatDescription(eventProperties, description);
+            description = FormatDescription(eventProperties, description, providerDetails.Parameters);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)

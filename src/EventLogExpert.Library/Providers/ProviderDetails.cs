@@ -12,6 +12,9 @@ public class ProviderDetails
     /// <summary>Messages from legacy provider</summary>
     public List<MessageModel> Messages { get; set; } = new List<MessageModel>();
 
+    /// <summary>Parameter strings from legacy provider</summary>
+    public List<MessageModel> Parameters { get; set; } = new List<MessageModel>();
+
     /// <summary>Events and related items from modern provider</summary>
     public List<EventModel> Events { get; set; } = new List<EventModel>();
 

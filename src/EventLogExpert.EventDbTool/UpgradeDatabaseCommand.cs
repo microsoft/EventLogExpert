@@ -45,7 +45,9 @@ public class UpgradeDatabaseCommand : DbToolCommand
 
         using var dbContext = new EventProviderDbContext(file, readOnly: false);
 
-        if (!dbContext.IsUpgradeNeeded())
+        var (needsV2, needsV3) = dbContext.IsUpgradeNeeded();
+
+        if (!(needsV2 || needsV3))
         {
             Console.WriteLine("This database does not need to be upgraded.");
             return;
