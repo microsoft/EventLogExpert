@@ -60,7 +60,7 @@ public class SettingsReducer
 
         config ??= new();
 
-        var preferences = Preferences.Default.Get(DisabledDatabasesPreference, string.Empty);
+        var preferences = Preferences.Default.Get(DisabledDatabasesPreference, "[]");
         var disabledDatabases = JsonSerializer.Deserialize<List<string>>(preferences);
 
         if (disabledDatabases?.Any() is true)
