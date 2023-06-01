@@ -15,8 +15,8 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class SettingsModal
 {
-    private List<string>? _databases;
-    private bool _databasesHasChanged;
+    private List<string> _databases = new();
+    private bool _hasDatabasesChanged;
     private SettingsModel _request = new();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
@@ -40,20 +40,18 @@ public partial class SettingsModal
 
     private void DisableDatabase(string database)
     {
-        _request.DisabledDatabases ??= new List<string>();
+        _request.DisabledDatabases.Add(database);
+        _databases.Remove(database);
 
-        _request.DisabledDatabases?.Add(database);
-        _databases?.Remove(database);
-
-        _databasesHasChanged = true;
+        _hasDatabasesChanged = true;
     }
 
     private void EnableDatabase(string database)
     {
-        _request.DisabledDatabases?.Remove(database);
-        _databases?.Add(database);
+        _request.DisabledDatabases.Remove(database);
+        _databases.Add(database);
 
-        _databasesHasChanged = true;
+        _hasDatabasesChanged = true;
     }
 
     private async void ImportDatabase()
@@ -162,9 +160,8 @@ public partial class SettingsModal
     private void ResetSettingsModel()
     {
         _request = SettingsState.Value.Config with { };
-
         _databases = SettingsState.Value.LoadedDatabases.ToList();
-        _databasesHasChanged = false;
+        _hasDatabasesChanged = false;
 
         StateHasChanged();
     }
@@ -172,7 +169,7 @@ public partial class SettingsModal
     private void Save()
     {
 
-        if (_databasesHasChanged)
+        if (_hasDatabasesChanged)
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
