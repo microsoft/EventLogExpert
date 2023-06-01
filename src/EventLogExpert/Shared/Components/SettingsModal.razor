@@ -19,7 +19,7 @@
         </div>
 
         <div class="database-list">
-            @if (_databases?.Any() is true)
+            @if (_databases.Any())
             {
                 @foreach (var database in _databases)
                 {
@@ -38,7 +38,7 @@
             }
         </div>
         
-        @if (_request.DisabledDatabases?.Any() is true)
+        @if (_request.DisabledDatabases.Any())
         {
             <div class="database-row">
                 <div>Disabled Databases: </div>

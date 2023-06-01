@@ -11,6 +11,8 @@ namespace EventLogExpert.Store.Settings;
 
 public class SettingsReducer
 {
+    private const string DisabledDatabasesPreference = "disabled-databases";
+
     private static readonly ReaderWriterLockSlim ConfigSrwLock = new();
 
     [ReducerMethod(typeof(SettingsAction.LoadDatabases))]
@@ -35,12 +37,17 @@ public class SettingsReducer
 
         if (databases.Count <= 0) { return state; }
 
-        SettingsModel? config = ReadSettingsConfig();
+        var preferences = Preferences.Default.Get(DisabledDatabasesPreference, string.Empty);
 
-        if (config?.DisabledDatabases is not null)
+        if (!string.IsNullOrEmpty(preferences))
         {
-            databases.RemoveAll(enabled => config.DisabledDatabases
-                .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
+            var disabledDatabases = JsonSerializer.Deserialize<List<string>>(preferences);
+
+            if (disabledDatabases?.Any() is true)
+            {
+                databases.RemoveAll(enabled => disabledDatabases
+                    .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
+            }
         }
 
         return state with { LoadedDatabases = SortDatabases(databases).ToImmutableList() };
@@ -51,7 +58,15 @@ public class SettingsReducer
     {
         SettingsModel? config = ReadSettingsConfig();
 
-        if (config is null || string.IsNullOrEmpty(config.TimeZoneId)) { return state; }
+        config ??= new();
+
+        var preferences = Preferences.Default.Get(DisabledDatabasesPreference, string.Empty);
+        var disabledDatabases = JsonSerializer.Deserialize<List<string>>(preferences);
+
+        if (disabledDatabases?.Any() is true)
+        {
+            config.DisabledDatabases = disabledDatabases;
+        }
 
         return state with { Config = config };
     }
@@ -62,6 +77,9 @@ public class SettingsReducer
         var success = WriteSettingsConfig(action.Settings);
 
         if (!success) { return state; }
+
+        var preferences = JsonSerializer.Serialize(action.Settings.DisabledDatabases);
+        Preferences.Default.Set(DisabledDatabasesPreference, preferences);
 
         return state with { Config = action.Settings };
     }
