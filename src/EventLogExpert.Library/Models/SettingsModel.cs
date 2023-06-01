@@ -15,5 +15,6 @@ public record SettingsModel
     [JsonIgnore]
     public IList<string> DisabledDatabases { get; set; } = new List<string>();
 
+    [JsonIgnore]
     public bool IsPrereleaseEnabled { get; set; }
 }
