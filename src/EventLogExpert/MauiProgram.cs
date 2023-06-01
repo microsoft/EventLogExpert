@@ -37,15 +37,11 @@ public static class MauiProgram
 
         Directory.CreateDirectory(Utils.DatabasePath);
 
-        if (Utils.HasProviderDatabases())
-        {
-            builder.Services.AddSingleton<IEventResolver>(
-                new EventProviderDatabaseEventResolver(Utils.Trace));
-        }
-        else
-        {
-            builder.Services.AddSingleton<IEventResolver, LocalProviderEventResolver>();
-        }
+        var dbResolver = new EventProviderDatabaseEventResolver(Utils.Trace);
+        var localResolver = new LocalProviderEventResolver(Utils.Trace);
+        var versEventResolver = new VersatileEventResolver(localResolver, dbResolver, Utils.Trace);
+
+        builder.Services.AddSingleton<IEventResolver>(versEventResolver);
 
         builder.Services.AddSingleton<ILogWatcherService, LiveLogWatcher>();
 

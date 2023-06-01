@@ -66,7 +66,7 @@ public partial class SettingsModal
                 })
         };
 
-        var dbResolver = EventResolver as EventProviderDatabaseEventResolver;
+        var dbResolver = EventResolver as IDatabaseEventResolver;
 
         try
         {
@@ -105,34 +105,24 @@ public partial class SettingsModal
 
         Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
-        if (dbResolver == null)
+        if (!EventLogState.Value.ActiveLogs.Any())
         {
-            bool answer = await Application.Current!.MainPage!.DisplayAlert("Application Restart Required",
-            "In order to use these databases, a restart of the application is required. Would you like to restart now?",
-            "Yes", "No");
-
-            if (!answer) return;
-
-            uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
-
-            if (res == 0) { Application.Current.Quit(); }
+            return;
         }
-        else
+
+        bool answer = await Application.Current!.MainPage!.DisplayAlert("Reload Open Logs Now?",
+        "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
+        "Yes", "No");
+
+        if (!answer) return;
+
+        var logsToReopen = EventLogState.Value.ActiveLogs.Values;
+
+        Dispatcher.Dispatch(new EventLogAction.CloseAll());
+
+        foreach (var log in logsToReopen)
         {
-            bool answer = await Application.Current!.MainPage!.DisplayAlert("Reload Open Logs Now?",
-            "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
-            "Yes", "No");
-
-            if (!answer) return;
-
-            var logsToReopen = EventLogState.Value.ActiveLogs.Values;
-
-            Dispatcher.Dispatch(new EventLogAction.CloseAll());
-
-            foreach (var log in logsToReopen)
-            {
-                Dispatcher.Dispatch(new EventLogAction.OpenLog(log.Name, log.Type));
-            }
+            Dispatcher.Dispatch(new EventLogAction.OpenLog(log.Name, log.Type));
         }
     }
 

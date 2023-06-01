@@ -68,7 +68,7 @@ public partial class MainPage : ContentPage
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
         {
-            if (_resolver is EventProviderDatabaseEventResolver dbResolver)
+            if (_resolver is IDatabaseEventResolver dbResolver)
             {
                 dbResolver.SetActiveDatabases(loadedProviders.Select(path => Path.Join(Utils.DatabasePath, path)));
             }
