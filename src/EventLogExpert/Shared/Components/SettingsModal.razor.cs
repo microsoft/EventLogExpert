@@ -19,11 +19,11 @@ public partial class SettingsModal
     private bool _hasDatabasesChanged;
     private SettingsModel _request = new();
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
 
     [Inject] private IEventResolver EventResolver { get; set; } = null!;
 
-    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -105,6 +105,11 @@ public partial class SettingsModal
 
         Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
+        await ReloadOpenLogs();
+    }
+
+    private async Task ReloadOpenLogs()
+    {
         if (!EventLogState.Value.ActiveLogs.Any())
         {
             return;
@@ -156,13 +161,15 @@ public partial class SettingsModal
         StateHasChanged();
     }
 
-    private void Save()
+    private async void Save()
     {
 
         if (_hasDatabasesChanged)
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+
+            await ReloadOpenLogs();
         }
         else
         {
