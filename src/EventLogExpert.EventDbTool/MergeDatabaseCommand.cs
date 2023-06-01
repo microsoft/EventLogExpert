@@ -108,6 +108,7 @@ public class MergeDatabaseCommand : DbToolCommand
             {
                 ProviderName = provider.ProviderName,
                 Events = provider.Events,
+                Parameters = provider.Parameters,
                 Keywords = provider.Keywords,
                 Messages = provider.Messages,
                 Opcodes = provider.Opcodes,

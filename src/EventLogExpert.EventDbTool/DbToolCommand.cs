@@ -29,8 +29,8 @@ public class DbToolCommand
     {
         var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
         if (maxNameLength < 14) maxNameLength = 14;
-        _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
-        Console.WriteLine(string.Format(_providerDetailFormat, "Provider Name", "Events", "Keywords", "Opcodes", "Tasks", "Messages"));
+        _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
+        Console.WriteLine(string.Format(_providerDetailFormat, "Provider Name", "Events", "Parameters", "Keywords", "Opcodes", "Tasks", "Messages"));
     }
 
     public static void LogProviderDetails(ProviderDetails details)
@@ -39,6 +39,7 @@ public class DbToolCommand
             _providerDetailFormat,
             details.ProviderName,
             details.Events.Count,
+            details.Parameters.Count,
             details.Keywords.Count,
             details.Opcodes.Count,
             details.Tasks.Count,

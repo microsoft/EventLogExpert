@@ -54,6 +54,10 @@ public class EventProviderDbContext : DbContext
             .HasConversion<CompressedJsonValueConverter<List<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
+            .Property(e => e.Parameters)
+            .HasConversion<CompressedJsonValueConverter<List<MessageModel>>>();
+
+        modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Events)
             .HasConversion<CompressedJsonValueConverter<List<EventModel>>>();
 
@@ -70,34 +74,43 @@ public class EventProviderDbContext : DbContext
             .HasConversion<CompressedJsonValueConverter<Dictionary<int, string>>>();
     }
 
-    public bool IsUpgradeNeeded()
+    public (bool needsV2Upgrade, bool needsV3Upgrade) IsUpgradeNeeded()
     {
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
         using var command = connection.CreateCommand();
         command.CommandText = "SELECT * FROM sqlite_schema";
         using var reader = command.ExecuteReader();
-        var needsUpgrade = false;
+        var needsV2Upgrade = false;
+        var needsV3Upgrade = true;
         while (reader.Read())
         {
             var val = reader["sql"]?.ToString();
             if (val?.Contains("\"Messages\" TEXT NOT NULL") ?? false)
             {
-                needsUpgrade = true;
-                break;
+                needsV2Upgrade = true;
+            }
+
+            if (val?.Contains("\"Parameters\" BLOB NOT NULL") ?? false)
+            {
+                needsV3Upgrade = false;
             }
         }
 
         reader.Close();
 
-        _tracer($"EventProviderDbContext.IsUpgradeNeeded() returning {needsUpgrade} for database {Path}");
+        var needsUpgrade = needsV2Upgrade || needsV3Upgrade;
 
-        return needsUpgrade;
+        _tracer($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}");
+
+        return (needsV2Upgrade, needsV3Upgrade);
     }
 
     public void PerformUpgradeIfNeeded()
     {
-        if (!IsUpgradeNeeded())
+        var (needsV2Upgrade, needsV3Upgrade) = IsUpgradeNeeded();
+
+        if (!needsV2Upgrade && !needsV3Upgrade)
         {
             return;
         }
@@ -114,21 +127,45 @@ public class EventProviderDbContext : DbContext
 
         command.CommandText = "SELECT * FROM \"ProviderDetails\"";
         var detailsReader = command.ExecuteReader();
-        while (detailsReader.Read())
-        {
-            var p = new ProviderDetails
-            {
-                ProviderName = (string)detailsReader["ProviderName"],
-                Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]),
-                Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]),
-                Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]),
-                Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]),
-                Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"])
-            };
-            allProviderDetails.Add(p);
-        }
 
-        detailsReader.Close();
+        if (needsV2Upgrade)
+        {
+            while (detailsReader.Read())
+            {
+                var p = new ProviderDetails
+                {
+                    ProviderName = (string)detailsReader["ProviderName"],
+                    Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]) ?? new List<MessageModel>(),
+                    Parameters = new List<MessageModel>(),
+                    Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]) ?? new List<EventModel>(),
+                    Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
+                    Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
+                    Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"]) ?? new Dictionary<int, string>()
+                };
+                allProviderDetails.Add(p);
+            }
+
+            detailsReader.Close();
+        }
+        else
+        {
+            while (detailsReader.Read())
+            {
+                var p = new ProviderDetails
+                {
+                    ProviderName = (string)detailsReader["ProviderName"],
+                    Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])detailsReader["Messages"]) ?? new List<MessageModel>(),
+                    Parameters = new List<MessageModel>(),
+                    Events = CompressedJsonValueConverter<List<EventModel>>.ConvertFromCompressedJson((byte[])detailsReader["Events"]) ?? new List<EventModel>(),
+                    Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
+                    Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
+                    Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Tasks"]) ?? new Dictionary<int, string>()
+                };
+                allProviderDetails.Add(p);
+            }
+
+            detailsReader.Close();
+        }
 
         command.CommandText = "DROP TABLE \"ProviderDetails\"";
         command.ExecuteNonQuery();

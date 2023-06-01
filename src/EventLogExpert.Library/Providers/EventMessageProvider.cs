@@ -52,7 +52,31 @@ public class EventMessageProvider
             provider = new ProviderDetails { ProviderName = _providerName };
         }
 
-        provider.Messages = LoadMessagesFromLegacyProvider(providerMetadata?.MessageFilePath)?.ToList();
+        var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
+
+        if (legacyProviderFiles.Any())
+        {
+            provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
+        }
+        else
+        {
+            if (providerMetadata?.MessageFilePath == null)
+            {
+                _traceAction($"No message files found for provider {_providerName}. Returning null.");
+                provider.Messages = new List<MessageModel>();
+            }
+            else
+            {
+                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.");
+                provider.Messages = LoadMessagesFromDlls(new [] {providerMetadata.MessageFilePath});
+            }
+        }
+
+        if (providerMetadata?.ParameterFilePath != null)
+        {
+            provider.Parameters = LoadMessagesFromDlls(new [] {providerMetadata.ParameterFilePath});
+        }
+
         if (provider.Events == null && provider.Messages == null)
         {
             return null;
@@ -75,26 +99,29 @@ public class EventMessageProvider
     ///     the registry. This information is stored at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
     /// </summary>
     /// <returns></returns>
-    private IEnumerable<MessageModel>? LoadMessagesFromLegacyProvider(string? messageFilePath)
+    private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
     {
-        _traceAction($"LoadMessagesFromLegacyProvider called for provider {_providerName}");
+        _traceAction($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}");
 
-        var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
-
-        if (legacyProviderFiles == null)
+        try
         {
-            if (messageFilePath == null)
-            {
-                _traceAction($"No message files found for provider {_providerName}. Returning null.");
-                return null;
-            }
-            else
-            {
-                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.");
-                legacyProviderFiles = new[] {messageFilePath};
-            }
+            var messages = GetMessages(messageFilePaths, _providerName, _traceAction);
+            _traceAction($"Returning {messages.Count} messages for provider {_providerName}");
+            return messages;
+        }
+        catch (Exception ex)
+        {
+            // Hide the failure. We want to allow the results from the modern provider
+            // to return even if we failed to load the legacy provider.
+            _traceAction($"Failed to load legacy provider data for {_providerName}.");
+            _traceAction(ex.ToString());
         }
 
+        return new List<MessageModel>();
+    }
+
+    public static List<MessageModel> GetMessages(IEnumerable<string> legacyProviderFiles, string providerName, Action<string> _traceAction)
+    {
         var messages = new List<MessageModel>();
 
         foreach (var file in legacyProviderFiles)
@@ -172,7 +199,7 @@ public class EventMessageProvider
                         {
                             Text = text,
                             ShortId = (short)id,
-                            ProviderName = _providerName,
+                            ProviderName = providerName,
                             RawId = id
                         });
 
@@ -184,13 +211,6 @@ public class EventMessageProvider
                     blockPtr = IntPtr.Add(blockPtr, blockSize);
                 }
             }
-            catch (Exception ex)
-            {
-                // Hide the failure. We want to allow the results from the modern provider
-                // to return even if we failed to load the legacy provider.
-                _traceAction($"Failed to load legacy provider data for {_providerName}.");
-                _traceAction(ex.ToString());
-            }
             finally
             {
                 if (hModule != IntPtr.Zero)
@@ -200,11 +220,10 @@ public class EventMessageProvider
             }
         }
 
-        _traceAction($"Returning {messages.Count} messages for provider {_providerName}");
         return messages;
     }
 
-    private bool GetMessagesFromOneResource(IntPtr hModule, string lpszType, IntPtr lParam)
+    private static bool GetMessagesFromOneResource(IntPtr hModule, string lpszType, IntPtr lParam)
     {
         // No need to implement this as long as we can use FindResource instead.
         return true;

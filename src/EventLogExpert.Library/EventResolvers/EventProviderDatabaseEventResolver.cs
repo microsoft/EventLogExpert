@@ -74,7 +74,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
             foreach (var file in databasesToLoad)
             {
                 var c = new EventProviderDbContext(file, readOnly: false, _tracer);
-                if (c.IsUpgradeNeeded())
+                var (needsv2, needsv3) = c.IsUpgradeNeeded();
+                if (needsv2 || needsv3)
                 {
                     UpdateStatus($"Upgrading database {c.Name}. Please wait...");
                     c.PerformUpgradeIfNeeded();

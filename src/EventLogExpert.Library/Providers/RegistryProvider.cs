@@ -103,7 +103,7 @@ public class RegistryProvider
         }
 
         hklm.Close();
-        return null;
+        return new List<string>();
     }
 
     private IEnumerable<string> GetExpandedFilePaths(IEnumerable<string> paths)
