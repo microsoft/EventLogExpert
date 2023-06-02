@@ -227,6 +227,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
                 eventProperties,
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
+                GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.LogName,
                 null,
                 OwningLogName);

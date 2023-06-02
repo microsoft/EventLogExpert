@@ -162,6 +162,7 @@ public class EventResolverTests
 
         var resolvers = new List<IEventResolver>()
         {
+            new EventReaderEventResolver(),
             new LocalProviderEventResolver(),
             /* new EventProviderDatabaseEventResolver(
                 s => {
@@ -169,21 +170,25 @@ public class EventResolverTests
                     Debug.WriteLine(s);
                     Debug.Flush();
                 }) */
-            new EventReaderEventResolver()
         };
 
         EventRecord er;
         HashSet<string> uniqueDescriptions = new();
         HashSet<string> uniqueXml = new();
+        HashSet<string> uniqueKeywords = new();
 
         var totalCount = 0;
         var mismatchCount = 0;
         var xmlMismatchCount = 0;
+        var keywordsMismatchCount = 0;
         var mismatches = new List<List<string>>();
         var xmlMismatches = new List<List<string>>();
+        var keywordMismatches = new List<List<string>>();
         while (null != (er = eventLogReader.ReadEvent()))
         {
             uniqueDescriptions.Clear();
+            uniqueXml.Clear();
+            uniqueKeywords.Clear();
 
             foreach (var r in resolvers)
             {
@@ -197,6 +202,15 @@ public class EventResolverTests
                     .Trim());
 
                 uniqueXml.Add(resolved.Xml);
+
+                if (r is EventReaderEventResolver && resolved.KeywordsDisplayNames.Count() < 1)
+                {
+                    // Don't bother adding it. EventReader fails to resolve a lot of keywords for some reason.
+                }
+                else
+                {
+                    uniqueKeywords.Add(string.Join(" ", resolved.KeywordsDisplayNames.OrderBy(n => n)));
+                }
             }
 
             if (uniqueDescriptions.Count > 1)
@@ -209,6 +223,12 @@ public class EventResolverTests
             {
                 xmlMismatchCount++;
                 xmlMismatches.Add(uniqueXml.ToList());
+            }
+
+            if (uniqueKeywords.Count > 1)
+            {
+                keywordsMismatchCount++;
+                keywordMismatches.Add(uniqueKeywords.ToList());
             }
 
             totalCount++;
