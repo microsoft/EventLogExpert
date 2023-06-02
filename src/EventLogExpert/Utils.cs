@@ -109,7 +109,7 @@ internal static class Utils
                 return;
             }
 
-            Trace($"{nameof(CheckForUpdates)} Could not find latest release.");
+            Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}.");
 
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
