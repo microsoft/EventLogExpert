@@ -67,7 +67,8 @@ internal static class Utils
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
 
-            if (newVersion.CompareTo(currentVersion) <= 0) { return false; }
+            // Setting version to equal allows rollback if a version is pulled
+            if (newVersion.CompareTo(currentVersion) == 0) { return false; }
 
             string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
 
@@ -92,13 +93,21 @@ internal static class Utils
 
                 if (res != 0) { return false; }
 
-                deployment = packageManager.AddPackageAsync(new Uri(downloadPath),
-                    null,
-                    DeploymentOptions.ForceTargetApplicationShutdown);
+                deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
+                    new AddPackageOptions
+                    {
+                        ForceUpdateFromAnyVersion = true,
+                        ForceTargetAppShutdown = true
+                    });
             }
             else
             {
-                deployment = packageManager.AddPackageAsync(new Uri(downloadPath), null, DeploymentOptions.None);
+                deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
+                    new AddPackageOptions
+                    {
+                        DeferRegistrationWhenPackagesAreInUse = true,
+                        ForceUpdateFromAnyVersion = true
+                    });
             }
 
             deployment.Progress = (result, progress) =>
