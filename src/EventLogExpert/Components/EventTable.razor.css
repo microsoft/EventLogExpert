@@ -61,3 +61,11 @@ th, td {
 #task { width: 200px; }
 
 #description { width: 100%; }
+
+.error {
+    color: red;
+}
+
+.warning {
+    color: yellow;
+}

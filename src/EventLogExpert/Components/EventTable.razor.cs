@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
@@ -100,6 +101,21 @@ public partial class EventTable
         }
 
         return returnList;
+    }
+
+    private string GetLevelClass(SeverityLevel? level)
+    {
+        switch (level)
+        {
+            case SeverityLevel.Error:
+                return "bi bi-exclamation-circle error";
+            case SeverityLevel.Warning:
+                return "bi bi-exclamation-triangle warning";
+            case SeverityLevel.Information:
+                return "bi bi-info-circle";
+            default:
+                return "";
+        }
     }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
