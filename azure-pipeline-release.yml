@@ -20,7 +20,7 @@ steps:
 
 - pwsh: |
     $now = [DateTime]::UtcNow
-    $versionString = "$($now.ToString(`"y.M.d`")).$($now.Hour * 60 + $now.Minute)"
+    $versionString = "$($now.ToString(`"y.M.d`")).$(($now.Hour * 60 + $now.Minute).ToString("D4"))"
     Write-Host "##vso[task.setvariable variable=ReleaseVersion]$versionString"
     Write-Host $versionString
   displayName: 'create version string'
