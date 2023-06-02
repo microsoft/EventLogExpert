@@ -53,6 +53,11 @@ public partial class FilterValueSelect
                 }
 
                 break;
+            case FilterType.Keywords :
+                _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
+                    .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
+
+                break;
             case FilterType.Source :
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();

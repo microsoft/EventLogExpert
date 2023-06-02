@@ -41,6 +41,8 @@
 .details-row-xml {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+
+    & .button-primary { width: 6rem; }
 }
 
 .details-xml {

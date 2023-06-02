@@ -21,7 +21,8 @@ public record EventLogState
         ReadOnlyCollection<DisplayEventModel> Events,
         ImmutableHashSet<int> EventIds,
         ImmutableHashSet<string> EventProviderNames,
-        ImmutableHashSet<string> TaskNames
+        ImmutableHashSet<string> TaskNames,
+        ImmutableHashSet<string> KeywordNames
         );
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;

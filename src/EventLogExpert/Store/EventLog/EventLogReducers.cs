@@ -64,7 +64,8 @@ public class EventLogReducers
             action.Events.AsReadOnly(),
             action.AllEventIds.ToImmutableHashSet(),
             action.AllProviderNames.ToImmutableHashSet(),
-            action.AllTaskNames.ToImmutableHashSet()
+            action.AllTaskNames.ToImmutableHashSet(),
+            action.AllKeywords.ToImmutableHashSet()
         ));
 
         return state with { ActiveLogs = newLogsCollection };
@@ -168,7 +169,6 @@ public class EventLogReducers
 
     private static EventLogData AddEventsToLogData(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
     {
-        var newEvents = eventsToAdd.ToList();
         var updatedEvents = eventsToAdd.Concat(logData.Events).ToList().AsReadOnly();
         var updatedEventIds = logData.EventIds.Union(eventsToAdd.Select(e => e.Id));
         var updatedProviderNames = logData.EventProviderNames.Union(eventsToAdd.Select(e => e.Source));
@@ -191,6 +191,7 @@ public class EventLogReducers
             LogType,
             new List<DisplayEventModel>().AsReadOnly(),
             ImmutableHashSet<int>.Empty,
+            ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty);
     }

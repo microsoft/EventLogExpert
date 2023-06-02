@@ -16,6 +16,7 @@ public enum FilterType
 {
     [EnumMember(Value = "Event ID")] EventId,
     Level,
+    Keywords,
     Source,
     Task,
     Description

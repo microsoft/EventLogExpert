@@ -19,6 +19,12 @@
                 <div>Source: @Event.Source</div>
                 <div>Event Id: @Event.Id</div>
                 <div>Level: @Event.Level</div>
+                @if (Event.KeywordsDisplayNames.Any())
+                {
+                    <div>
+                        @GetEventKeywords(Event.KeywordsDisplayNames)
+                    </div>
+                }
                 <div>Date and Time: @Event.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</div>
             </div>
 
@@ -26,10 +32,12 @@
             <p class="details-description">@Event.Description</p>
         </div>
 
-        <div class="details-row-xml">
+        <div class="details-row-xml" @onclick="ToggleXml">
             <div>XML:</div>
-            <button class="button-primary header-center" @onclick="CopyEvent">Copy Event</button>
-            <span class="button-toggle header-justify-right" data-rotate="@_expandXml.ToString().ToLower()" @onclick="ToggleXml">
+            <div class="header-center">
+                <button class="button-primary" @onclick="CopyEvent">Copy Event</button>
+            </div>
+            <span class="button-toggle header-justify-right" data-rotate="@_expandXml.ToString().ToLower()">
                 <i class="bi bi-caret-up"></i>
             </span>
         </div>
