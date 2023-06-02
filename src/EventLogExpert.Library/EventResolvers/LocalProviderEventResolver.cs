@@ -49,6 +49,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.Properties,
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
+                GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.LogName,
                 null,
                 OwningLogName);

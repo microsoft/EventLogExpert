@@ -22,6 +22,15 @@ public class EventReaderEventResolver : IEventResolver
     {
         var desc = eventRecord.FormatDescription();
         var xml = eventRecord.ToXml();
+        IEnumerable<string> keywordsDisplayNames;
+        try
+        {
+            keywordsDisplayNames = eventRecord.KeywordsDisplayNames;
+        }
+        catch
+        {
+            keywordsDisplayNames = Enumerable.Empty<string>();
+        }
 
         return new DisplayEventModel(
             eventRecord.RecordId,
@@ -35,6 +44,7 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.Properties,
             eventRecord.Qualifiers,
             eventRecord.Keywords,
+            keywordsDisplayNames,
             eventRecord.LogName,
             null,
             OwningLogName);

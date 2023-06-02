@@ -19,6 +19,7 @@ public record DisplayEventModel(
     IList<EventProperty> Properties,
     int? Qualifiers,
     long? Keywords,
+    IEnumerable<string> KeywordsDisplayNames,
     string LogName, // This is the log name from the event reader
     string? Template,
     string OwningLog) // This is the name of the log file or the live log, which we use internally

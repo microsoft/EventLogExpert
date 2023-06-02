@@ -218,8 +218,52 @@ public class EventResolverBase
                 eventProperties,
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
+                GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
                 eventRecord.LogName,
                 template,
                 owningLogName);
     }
+
+    protected IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
+    {
+        if (!bitmask.HasValue || bitmask.Value == 0) return Enumerable.Empty<string>();
+        var returnValue = new List<string>();
+        foreach (var k in StandardKeywords.Keys)
+        {
+            if ((bitmask.Value & k) == k) { returnValue.Add(StandardKeywords[k]); }
+        }
+
+        if (providerDetails != null)
+        {
+            // Some providers re-define the standard keywords in their own metadata,
+            // so let's skip those.
+            var lower32 = bitmask.Value & 0xFFFFFFFF;
+            if (lower32 != 0)
+            {
+                foreach (var k in providerDetails.Keywords.Keys)
+                {
+                    if ((lower32 & k) == k) { returnValue.Add(providerDetails.Keywords[k]); }
+                }
+            }
+        }
+
+        return returnValue;
+    }
+
+    /// <summary>
+    /// These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords.
+    /// However, the names there do not match what is normally displayed in Event Viewer. We
+    /// redefine them here so we can use our own strings.
+    /// </summary>
+    private Dictionary<long, string> StandardKeywords = new()
+    {
+        { 0x1000000000000, "Response Time" },
+        { 0x2000000000000, "Wdi Context"},
+        { 0x4000000000000, "Wdi Diag" },
+        { 0x8000000000000, "Sqm" },
+        { 0x10000000000000, "Audit Failure" },
+        { 0x20000000000000, "Audit Success" },
+        { 0x40000000000000, "Correlation Hint" },
+        { 0x80000000000000, "Classic" }
+    };
 }
