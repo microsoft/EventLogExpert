@@ -134,7 +134,7 @@ public partial class MainPage : ContentPage
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
-        await Utils.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled);
+        await Utils.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
     {
