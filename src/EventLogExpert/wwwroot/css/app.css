@@ -196,6 +196,7 @@ a,
     }
 
 div.table-divider {
+    height: 22px;
     width: 8px;
     margin: 0;
     padding: 0;
