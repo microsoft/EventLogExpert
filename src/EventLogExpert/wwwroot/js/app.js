@@ -15,42 +15,27 @@ window.closeSettingsModal = () => {
     }
 };
 
-window.deleteColumnResize = () => {
-    const table = document.getElementById("eventTable");
+window.registerTableColumnResizers = () => {
+    const tables = document.querySelectorAll("table");
+
+    tables.forEach(table => deleteColumnResize(table));
+    tables.forEach(table => enableColumnResize(table));
+}
+
+window.deleteColumnResize = (table) => {
     table.querySelectorAll(".table-divider").forEach(x => x.remove());
 };
 
-window.enableColumnResize = () => {
-    const table = document.getElementById("eventTable");
+window.enableColumnResize = (table) => {
     const columns = table.querySelectorAll("th");
 
     if (columns != null) {
-
-        const calculateTableHeight = function() {
-            let height = 0;
-            const tableRows = table.querySelectorAll("tr");
-
-            tableRows.forEach(x => {
-                const firstColumn = x.querySelector("th:first-child,td:first-child");
-
-                if (firstColumn != null) {
-                    height += firstColumn.offsetHeight;
-                }
-            });
-
-            return height;
-        };
-
-        const actualHeight = calculateTableHeight();
-
         const createResizableColumn = function(column) {
             let x = 0;
             let w = 0;
 
             const divider = document.createElement("div");
             divider.classList.add("table-divider");
-
-            divider.style.height = `${actualHeight}px`;
 
             column.appendChild(divider);
 

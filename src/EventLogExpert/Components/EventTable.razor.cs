@@ -4,9 +4,12 @@
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
+using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Components;
 
@@ -14,6 +17,9 @@ public partial class EventTable
 {
     private string? _activeLog;
     private bool _isDateTimeDescending = true;
+
+    [Inject] private IStateSelection<EventLogState, IImmutableDictionary<string, EventLogData>>
+        ActiveLogState { get; set; } = null!;
 
     private string IsDateTimeDescending => _isDateTimeDescending.ToString().ToLower();
 
@@ -23,7 +29,7 @@ public partial class EventTable
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("enableColumnResize");
+            await JSRuntime.InvokeVoidAsync("registerTableColumnResizers");
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -32,6 +38,13 @@ public partial class EventTable
     protected override void OnInitialized()
     {
         MaximumStateChangedNotificationsPerSecond = 2;
+
+        ActiveLogState.Select(s => s.ActiveLogs);
+
+        ActiveLogState.StateChanged += async (sender, activeLog) =>
+        {
+            await JSRuntime.InvokeVoidAsync("registerTableColumnResizers");
+        };
 
         base.OnInitialized();
     }

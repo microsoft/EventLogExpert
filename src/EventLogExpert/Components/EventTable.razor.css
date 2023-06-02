@@ -46,18 +46,18 @@ th, td {
 
 .table-row { cursor: pointer; }
 
-#logname { width: 100px; }
+.logname { width: 100px; }
 
-#computername { width: 100px; }
+.computername { width: 100px; }
 
-#level { width: 100px; }
+.level { width: 100px; }
 
-#time { width: 165px; }
+.time { width: 165px; }
 
-#source { width: 250px; }
+.source { width: 250px; }
 
-#id { width: 100px; }
+.id { width: 100px; }
 
-#task { width: 200px; }
+.task { width: 200px; }
 
-#description { width: 100%; }
+.description { width: 100%; }

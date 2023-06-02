@@ -7,22 +7,22 @@
 <SplitLogTabPane @bind-ActiveLog="@_activeLog" />
 
 <div class="table-container" hidden="@(_activeLog != null)">
-    <table id="eventTable">
+    <table>
         <thead>
             <tr>
-                <th id="level">Level</th>
-                <th id="time">
+                <th class="level">Level</th>
+                <th class="time">
                     Date and Time
                     <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
                         <i class="bi bi-caret-up"></i>
                     </span>
                 </th>
-                <th id="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
-                <th id="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
-                <th id="source">Source</th>
-                <th id="id">Event ID</th>
-                <th id="task">Task Category</th>
-                <th id="description">Description</th>
+                <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
+                <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
+                <th class="source">Source</th>
+                <th class="id">Event ID</th>
+                <th class="task">Task Category</th>
+                <th class="description">Description</th>
             </tr>
         </thead>
         <tbody>
@@ -47,22 +47,22 @@
     @foreach (var log in EventLogState.Value.ActiveLogs)
     {
         <div class="table-container" hidden="@(_activeLog != log.Key)">
-            <table id="eventTable">
+            <table>
                 <thead>
                     <tr>
-                        <th id="level">Level</th>
-                        <th id="time">
+                        <th class="level">Level</th>
+                        <th class="time">
                             Date and Time
                             <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
                                 <i class="bi bi-caret-up"></i>
                             </span>
                         </th>
-                        <th id="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
-                        <th id="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
-                        <th id="source">Source</th>
-                        <th id="id">Event ID</th>
-                        <th id="task">Task Category</th>
-                        <th id="description">Description</th>
+                        <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
+                        <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
+                        <th class="source">Source</th>
+                        <th class="id">Event ID</th>
+                        <th class="task">Task Category</th>
+                        <th class="description">Description</th>
                     </tr>
                 </thead>
                 <tbody>
