@@ -51,6 +51,7 @@ public class EventLogEffects
                 HashSet<int> eventIdsAll = new();
                 HashSet<string> eventProviderNamesAll = new();
                 HashSet<string> eventTaskNamesAll = new();
+                HashSet<string> eventKeywordNamesAll = new();
                 EventRecord lastEvent = null!;
 
                 while (reader.ReadEvent() is { } e)
@@ -60,6 +61,7 @@ public class EventLogEffects
                     eventIdsAll.Add(resolved.Id);
                     eventProviderNamesAll.Add(resolved.Source);
                     eventTaskNamesAll.Add(resolved.TaskCategory);
+                    eventKeywordNamesAll.UnionWith(resolved.KeywordsDisplayNames);
 
                     events.Add(resolved);
 
@@ -78,7 +80,8 @@ public class EventLogEffects
                     events,
                     eventIdsAll.ToImmutableList(),
                     eventProviderNamesAll.ToImmutableList(),
-                    eventTaskNamesAll.ToImmutableList()));
+                    eventTaskNamesAll.ToImmutableList(),
+                    eventKeywordNamesAll.ToImmutableList()));
 
                 dispatcher.Dispatch(new EventLogAction.SetEventsLoading(0));
 

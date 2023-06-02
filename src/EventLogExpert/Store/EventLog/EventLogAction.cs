@@ -12,20 +12,21 @@ public record EventLogAction
 
     public record LoadEvents(
         string LogName,
-        EventLogState.LogType Type,
+        LogType Type,
         List<DisplayEventModel> Events,
         IEnumerable<int> AllEventIds,
         IEnumerable<string> AllProviderNames,
-        IEnumerable<string> AllTaskNames
+        IEnumerable<string> AllTaskNames,
+        IEnumerable<string> AllKeywords
     ) : EventLogAction;
 
-    public record LoadNewEvents() : EventLogAction;
+    public record LoadNewEvents : EventLogAction;
 
     public record OpenLog(string LogName, LogType LogType) : EventLogAction;
 
     public record CloseLog(string LogName) : EventLogAction;
 
-    public record CloseAll() : EventLogAction;
+    public record CloseAll : EventLogAction;
 
     public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
 

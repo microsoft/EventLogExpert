@@ -69,6 +69,8 @@ public static class FilterMethods
         {
             FilterType.EventId => x => x.Id.ToString().Contains(value),
             FilterType.Level => x => x.Level.ToString()?.Contains(value) is true,
+            FilterType.Keywords => x =>
+                x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Task => x => x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x => x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
@@ -80,6 +82,8 @@ public static class FilterMethods
         {
             FilterType.EventId => int.TryParse(value, out int id) ? x => x.Id == id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level == level : null,
+            FilterType.Keywords => x =>
+                x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Task => x => string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x =>
@@ -92,6 +96,8 @@ public static class FilterMethods
         {
             FilterType.EventId => x => !x.Id.ToString().Contains(value),
             FilterType.Level => x => !x.Level.ToString()?.Contains(value) is true,
+            FilterType.Keywords => x =>
+                !x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => !x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Task => x => !x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x => !x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
@@ -103,6 +109,8 @@ public static class FilterMethods
         {
             FilterType.EventId => int.TryParse(value, out int id) ? x => x.Id != id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level != level : null,
+            FilterType.Keywords => x =>
+                !x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => !string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Task => x => !string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x =>
