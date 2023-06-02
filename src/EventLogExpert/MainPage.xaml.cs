@@ -17,6 +17,7 @@ public partial class MainPage : ContentPage
 {
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IEventResolver _resolver;
+    private readonly IState<SettingsState> _settingsState;
 
     public MainPage(IDispatcher fluxorDispatcher,
         IEventResolver resolver,
@@ -24,12 +25,14 @@ public partial class MainPage : ContentPage
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogNameState,
         IStateSelection<SettingsState, bool> showComputerNameState,
-        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState)
+        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
+        IState<SettingsState> settingsState)
     {
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
         _resolver = resolver;
+        _settingsState = settingsState;
 
         activeLogsState.Select(e => e.ActiveLogs);
 
@@ -130,8 +133,8 @@ public partial class MainPage : ContentPage
         return await FilePicker.Default.PickAsync(options);
     }
 
-    private void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.CheckForUpdates());
+    private async void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
+        await Utils.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled);
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
     {
