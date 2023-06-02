@@ -47,7 +47,7 @@ steps:
 - pwsh: >
     dotnet publish src/EventLogExpert/EventLogExpert.csproj `
     -c Release `
-    -f net6.0-windows10.0.19041.0 `
+    -f net7.0-windows10.0.19041.0 `
     -p:AppxBundle=Never `
     -p:AppInstallerCheckForUpdateFrequency=OnApplicationRun `
     -p:AppInstallerUpdateFrequency=1 `
