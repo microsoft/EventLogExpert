@@ -28,12 +28,16 @@ internal static class Utils
     internal static async Task CheckForUpdates(bool isPrerelease, bool manualScan = false)
     {
         Version currentVersion = GetCurrentVersion();
+
+        Trace($"{nameof(CheckForUpdates)} was called. {nameof(isPrerelease)} is {isPrerelease}. {nameof(manualScan)} is {manualScan}. {nameof(currentVersion)} is {currentVersion}.");
+
         GitReleaseModel? latest = null;
         bool showDialog = Application.Current?.MainPage is not null;
 
         if (currentVersion.Major <= 1)
         {
             _isDevBuild = true;
+            Trace($"{nameof(CheckForUpdates)} {nameof(_isDevBuild)}: {_isDevBuild}. Skipping update check.");
             return;
         }
 
@@ -47,15 +51,18 @@ internal static class Utils
 
         if (response.IsSuccessStatusCode is not true)
         {
+            Trace($"{nameof(CheckForUpdates)} Attempt to retrieve {response?.RequestMessage?.RequestUri} failed: {response?.StatusCode}. {nameof(showDialog)} is {showDialog}.");
             if (showDialog)
             {
                 await Application.Current!.MainPage!.DisplayAlert("Update Failure",
-                    $"Unable to reach download site:\r\n{response.StatusCode}",
+                    $"Unable to reach download site:\r\n{response?.StatusCode}",
                     "Ok");
             }
 
             return;
         }
+
+        Trace($"{nameof(CheckForUpdates)} Attempt to retrieve {response?.RequestMessage?.RequestUri} succeeded: {response?.StatusCode}.");
 
         try
         {
@@ -64,6 +71,7 @@ internal static class Utils
 
             if (content is null)
             {
+                Trace($"{nameof(CheckForUpdates)} Failed to deserialize response stream.");
                 if (showDialog)
                 {
                     await Application.Current!.MainPage!.DisplayAlert("Update Failure",
@@ -78,12 +86,19 @@ internal static class Utils
             // stripping the v off the Version for every release
             var releases = content.OrderByDescending(x => x.ReleaseDate).ToArray();
 
+            Trace($"{nameof(CheckForUpdates)} Found the following releases:");
+            foreach (var release in releases)
+            {
+                Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} ReleaseDate: {release.ReleaseDate} IsPrerelease: {release.IsPrerelease}");
+            }
+
             latest = isPrerelease ?
                 releases.FirstOrDefault() :
                 releases.FirstOrDefault(x => !x.IsPrerelease);
 
             if (latest is null)
             {
+                Trace($"{nameof(CheckForUpdates)} Could not find latest release.");
                 if (showDialog)
                 {
                     await Application.Current!.MainPage!.DisplayAlert("Update Failure",
@@ -94,8 +109,12 @@ internal static class Utils
                 return;
             }
 
+            Trace($"{nameof(CheckForUpdates)} Could not find latest release.");
+
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
+
+            Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion} equals {nameof(currentVersion)} {currentVersion}. {nameof(showDialog)} is {showDialog}. {nameof(manualScan)} is {manualScan}.");
 
             // Setting version to equal allows rollback if a version is pulled
             if (newVersion.CompareTo(currentVersion) == 0)
@@ -112,6 +131,7 @@ internal static class Utils
 
             if (downloadPath is null)
             {
+                Trace($"{nameof(CheckForUpdates)} Could not get asset download path. {nameof(showDialog)} is {showDialog}.");
                 if (showDialog)
                 {
                     await Application.Current!.MainPage!.DisplayAlert("Update Failure",
@@ -131,12 +151,16 @@ internal static class Utils
                     "Yes", "No");
             }
 
+            Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after possible dialog. {nameof(showDialog)} was {showDialog}.");
+
             PackageManager packageManager = new();
 
             IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment;
 
             if (shouldReboot)
             {
+                Trace($"{nameof(CheckForUpdates)} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
+
                 uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
                 if (res != 0) { return; }
@@ -149,6 +173,8 @@ internal static class Utils
             }
             else
             {
+                Trace($"{nameof(CheckForUpdates)} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
+
                 deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
                     new AddPackageOptions
                     {
@@ -241,7 +267,7 @@ internal static class Utils
         };
     }
 
-    internal static void Trace(string message) => System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {message}");
+    internal static void Trace(string message) => System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {Environment.CurrentManagedThreadId} {message}");
 
     internal static void UpdateAppTitle(string? logName = null)
     {
