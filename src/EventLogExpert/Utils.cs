@@ -25,14 +25,16 @@ internal static class Utils
 
     public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
 
-    internal static async Task<bool> CheckForUpdates(bool isPrerelease)
+    internal static async Task CheckForUpdates(bool isPrerelease, bool manualScan = false)
     {
         Version currentVersion = GetCurrentVersion();
+        GitReleaseModel? latest = null;
+        bool showDialog = Application.Current?.MainPage is not null;
 
         if (currentVersion.Major <= 1)
         {
             _isDevBuild = true;
-            return false;
+            return;
         }
 
         HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/"), };
@@ -43,42 +45,88 @@ internal static class Utils
 
         var response = await client.GetAsync("/repos/microsoft/EventLogExpert/releases");
 
-        if (response.IsSuccessStatusCode is not true) { return false; }
+        if (response.IsSuccessStatusCode is not true)
+        {
+            if (showDialog)
+            {
+                await Application.Current!.MainPage!.DisplayAlert("Update Failure",
+                    $"Unable to reach download site:\r\n{response.StatusCode}",
+                    "Ok");
+            }
+
+            return;
+        }
 
         try
         {
             var stream = await response.Content.ReadAsStreamAsync();
             var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
 
-            if (content is null) { return false; }
+            if (content is null)
+            {
+                if (showDialog)
+                {
+                    await Application.Current!.MainPage!.DisplayAlert("Update Failure",
+                        "Failed to serialize GitHub releases",
+                        "Ok");
+                }
+
+                return;
+            }
 
             // Versions are based on current DateTime so this is safer than dealing with
             // stripping the v off the Version for every release
             var releases = content.OrderByDescending(x => x.ReleaseDate).ToArray();
 
-            GitReleaseModel? latest = isPrerelease ?
+            latest = isPrerelease ?
                 releases.FirstOrDefault() :
                 releases.FirstOrDefault(x => !x.IsPrerelease);
 
-            if (latest is null) { return false; }
+            if (latest is null)
+            {
+                if (showDialog)
+                {
+                    await Application.Current!.MainPage!.DisplayAlert("Update Failure",
+                        "Failed to fetch latest release",
+                        "Ok");
+                }
 
-            _isPrereleaseBuild = latest.IsPrerelease;
+                return;
+            }
 
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
 
             // Setting version to equal allows rollback if a version is pulled
-            if (newVersion.CompareTo(currentVersion) == 0) { return false; }
+            if (newVersion.CompareTo(currentVersion) == 0)
+            {
+                if (showDialog && manualScan)
+                {
+                    await Application.Current!.MainPage!.DisplayAlert("No Updates Available",
+                        "You are currently running the latest version.",
+                        "Ok");
+                }
+            }
 
             string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
 
-            if (downloadPath is null) { return false; }
+            if (downloadPath is null)
+            {
+                if (showDialog)
+                {
+                    await Application.Current!.MainPage!.DisplayAlert("Update Failure",
+                        "Failed to fetch latest release",
+                        "Ok");
+                }
+
+                return;
+            }
 
             var shouldReboot = false;
 
-            if (Application.Current?.MainPage is not null)
+            if (showDialog)
             {
-                shouldReboot = await Application.Current.MainPage.DisplayAlert("Update Available",
+                shouldReboot = await Application.Current!.MainPage!.DisplayAlert("Update Available",
                     "A new version has been detected, would you like to install and reload the application?",
                     "Yes", "No");
             }
@@ -91,12 +139,11 @@ internal static class Utils
             {
                 uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
-                if (res != 0) { return false; }
+                if (res != 0) { return; }
 
                 deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
-                    new AddPackageOptions
-                    {
-                        ForceUpdateFromAnyVersion = true,
+                    new AddPackageOptions { 
+                        ForceUpdateFromAnyVersion = true, 
                         ForceTargetAppShutdown = true
                     });
             }
@@ -105,7 +152,7 @@ internal static class Utils
                 deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
                     new AddPackageOptions
                     {
-                        DeferRegistrationWhenPackagesAreInUse = true,
+                        DeferRegistrationWhenPackagesAreInUse = true, 
                         ForceUpdateFromAnyVersion = true
                     });
             }
@@ -119,25 +166,32 @@ internal static class Utils
             {
                 MainThread.InvokeOnMainThreadAsync(() =>
                 {
-                    if (result.Status is AsyncStatus.Error && Application.Current?.MainPage is not null)
+                    if (result.Status is AsyncStatus.Error && showDialog)
                     {
-                        Application.Current.MainPage.DisplayAlert("Update Failure",
+                        Application.Current!.MainPage!.DisplayAlert("Update Failure",
                             $"Update failed to install:\r\n{result.ErrorCode}",
                             "Ok");
-                    }
 
-                    UpdateAppTitle();
+                        UpdateAppTitle();
+                    }
                 });
             };
-
-            await deployment;
         }
-        catch
-        { // TODO: Log Update Failure
-            return false;
+        catch (Exception ex)
+        {
+            if (showDialog)
+            {
+                await Application.Current!.MainPage!.DisplayAlert("Update Failure",
+                    $"Update failed to install:\r\n{ex.Message}",
+                    "Ok");
+            }
         }
+        finally
+        {
+            _isPrereleaseBuild = latest?.IsPrerelease ?? false;
 
-        return true;
+            UpdateAppTitle();
+        }
     }
 
     internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>

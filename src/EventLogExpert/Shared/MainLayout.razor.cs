@@ -20,27 +20,22 @@ public partial class MainLayout : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
+            Utils.UpdateAppTitle();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
-        ActionSubscriber.SubscribeToAction<SettingsAction.CheckForUpdates>(this, CheckForUpdates);
-
-        await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
-        Utils.UpdateAppTitle();
 
         await base.OnInitializedAsync();
-    }
-
-    private async void CheckForUpdates(SettingsAction.CheckForUpdates action)
-    {
-        bool result = await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
-
-        if (result is false && Application.Current?.MainPage is not null)
-        {
-            await Application.Current.MainPage.DisplayAlert("No Updates Available",
-                "You are currently running the latest version.",
-                "Ok");
-        }
     }
 
     private void OpenSettingsModal(SettingsAction.OpenMenu action)
