@@ -193,7 +193,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
         {
             foreach (var dbContext in dbContexts)
             {
-                var providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == eventRecord.ProviderName);
+                var providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
                 if (providerDetails != null)
                 {
                     lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
