@@ -122,7 +122,6 @@ public class EventResolverBase
     protected DisplayEventModel ResolveFromProviderDetails(EventRecord eventRecord, IList<EventProperty> eventProperties, ProviderDetails providerDetails, string owningLogName)
     {
         string? description = null;
-        string? xml = null;
         string? taskName = null;
         string? template = null;
 
@@ -224,7 +223,7 @@ public class EventResolverBase
                 owningLogName);
     }
 
-    protected IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
+    protected static IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
     {
         if (!bitmask.HasValue || bitmask.Value == 0) return Enumerable.Empty<string>();
         var returnValue = new List<string>();
@@ -255,7 +254,7 @@ public class EventResolverBase
     /// However, the names there do not match what is normally displayed in Event Viewer. We
     /// redefine them here so we can use our own strings.
     /// </summary>
-    private Dictionary<long, string> StandardKeywords = new()
+    private static readonly Dictionary<long, string> StandardKeywords = new()
     {
         { 0x1000000000000, "Response Time" },
         { 0x2000000000000, "Wdi Context"},
