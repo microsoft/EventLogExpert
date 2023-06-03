@@ -17,20 +17,21 @@ public interface ILogWatcherService
     void RemoveAll();
 }
 
-public class LiveLogWatcher : ILogWatcherService
+public class LiveLogWatcherService : ILogWatcherService
 {
     private readonly ITraceLogger _debugLogger;
-    private readonly IEventResolver _resolver;
+    private IEventResolver? _resolver = null;
+    private readonly IServiceProvider _serviceProvider;
     private readonly Fluxor.IDispatcher _dispatcher;
     private List<string> _logsToWatch = new();
     private Dictionary<string, EventBookmark?> _bookmarks = new();
     private Dictionary<string, EventLogWatcher> _watchers = new();
 
-    public LiveLogWatcher(ITraceLogger DebugLogger, IEventResolver Resolver, Fluxor.IDispatcher Dispatcher, IStateSelection<EventLogState, bool> bufferFullStateSelection)
+    public LiveLogWatcherService(ITraceLogger DebugLogger, IServiceProvider serviceProvider, Fluxor.IDispatcher Dispatcher, IStateSelection<EventLogState, bool> bufferFullStateSelection)
     {
         _debugLogger = DebugLogger;
-        _resolver = Resolver;
         _dispatcher = Dispatcher;
+        _serviceProvider = serviceProvider;
         bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
         bufferFullStateSelection.SelectedValueChanged += (sender, isFull) =>
         {
@@ -95,13 +96,7 @@ public class LiveLogWatcher : ILogWatcherService
         {
             _logsToWatch.Remove(LogName);
             _bookmarks.Remove(LogName);
-            if (_watchers.ContainsKey(LogName))
-            {
-                var watcher = _watchers[LogName];
-                _watchers.Remove(LogName);
-                watcher.Dispose();
-                _debugLogger.Trace($"Disposed watcher for log {LogName}.");
-            }
+            StopWatching(LogName);
         }
     }
 
@@ -131,6 +126,12 @@ public class LiveLogWatcher : ILogWatcherService
     {
         lock (this)
         {
+            if (_resolver == null)
+            {
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Getting a new IEventResolver so we can start watching.");
+                _resolver = _serviceProvider.GetService<IEventResolver>();
+            }
+
             if (_watchers.ContainsKey(LogName)) return;
 
             var query = new EventLogQuery(LogName, PathType.LogName);
@@ -154,6 +155,12 @@ public class LiveLogWatcher : ILogWatcherService
                 {
                     _debugLogger.Trace("EventRecordWritten callback was called.");
                     _bookmarks[LogName] = eventArgs.EventRecord.Bookmark;
+                    if (_resolver == null)
+                    {
+                        _debugLogger.Trace($"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.");
+                        return;
+                    }
+
                     var resolved = _resolver.Resolve(eventArgs.EventRecord, LogName);
                     _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
                 }
@@ -166,7 +173,7 @@ public class LiveLogWatcher : ILogWatcherService
             {
                 watcher.Enabled = true;
 
-                _debugLogger.Trace($"LiveLogWatcher started watching {LogName}.");
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {LogName}.");
             });
         }
     }
@@ -185,12 +192,22 @@ public class LiveLogWatcher : ILogWatcherService
             _watchers.Remove(LogName);
             Task.Run(() =>
             {
-                oldWatcher.Enabled = false;
                 oldWatcher.Dispose();
-                _debugLogger.Trace($"LiveLogWatcher disposed the old watcher for log {LogName}.");
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {LogName}.");
             });
 
-            _debugLogger.Trace($"LiveLogWatcher dispatched a task to stop the watcher for log {LogName}.");
+            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {LogName}.");
+
+            if (_watchers.Count < 1)
+            {
+                if (_resolver is IDisposable disposableResolver)
+                {
+                    disposableResolver.Dispose();
+                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Disposed the IEventResolver.");
+                }
+
+                _resolver = null;
+            }
         }
     }
 }

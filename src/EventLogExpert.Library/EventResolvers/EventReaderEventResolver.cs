@@ -14,6 +14,8 @@ namespace EventLogExpert.Library.EventResolvers;
 /// </summary>
 public class EventReaderEventResolver : IEventResolver
 {
+    private bool disposedValue;
+
     public string Status { get; private set; } = string.Empty;
 
     public event EventHandler<string>? StatusChanged;
@@ -61,5 +63,19 @@ public class EventReaderEventResolver : IEventResolver
         {
             return default;
         }
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

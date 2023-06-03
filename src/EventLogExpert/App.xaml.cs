@@ -15,7 +15,7 @@ public partial class App : Application
 {
 
     public App(IDispatcher fluxorDispatcher,
-        IEventResolver resolver,
+        IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogState,
@@ -27,7 +27,7 @@ public partial class App : Application
 
         MainPage = new NavigationPage(
             new MainPage(fluxorDispatcher,
-                resolver,
+                databaseCollectionProvider,
                 activeLogsState,
                 continuouslyUpdateState,
                 showLogState,

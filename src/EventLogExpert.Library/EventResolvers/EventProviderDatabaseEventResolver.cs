@@ -6,20 +6,12 @@ using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Library.EventResolvers;
 
-public interface IDatabaseEventResolver
-{
-    public ImmutableArray<string> ActiveDatabases { get; }
-
-    public void SetActiveDatabases(IEnumerable<string> databasePaths);
-}
-
-public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEventResolver, IEventResolver, IDisposable
+public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {
     public string Status { get; private set; } = string.Empty;
 
@@ -29,74 +21,73 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
 
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
-    private readonly ReaderWriterLockSlim _rwlock = new ReaderWriterLockSlim();
+    private readonly SemaphoreSlim _databaseAccessSemaphore = new SemaphoreSlim(1);
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver() : this(ImmutableArray<string>.Empty, s => { }) { }
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, s => { }) { }
 
-    public EventProviderDatabaseEventResolver(Action<string> tracer) : this(ImmutableArray<string>.Empty, tracer) { }
-
-    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases) : this(activeDatabases, s => { }) { }
-
-    public EventProviderDatabaseEventResolver(IEnumerable<string> activeDatabases, Action<string> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string> tracer) : base(tracer)
     {
-        LoadDatabases(activeDatabases);
+        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
+        LoadDatabases(dbCollection.ActiveDatabases);
     }
 
     /// <summary>
     /// Loads the databases. If ActiveDatabases is populated, any databases
     /// not named therein are skipped.
     /// </summary>
-    private async void LoadDatabases(IEnumerable<string>? databasePaths)
+    private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        _rwlock.EnterWriteLock();
-
-        try
+        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
+        foreach (var databasePath in databasePaths)
         {
-            _providerDetails.Clear();
+            _tracer($"  {databasePath}");
+        }
 
-            foreach (var context in dbContexts)
+        _providerDetails.Clear();
+
+        foreach (var context in dbContexts)
+        {
+            context.Dispose();
+        }
+
+        dbContexts.Clear();
+
+        var databasesToLoad = SortDatabases(databasePaths);
+
+        var obsoleteDbs = new List<string>();
+        foreach (var file in databasesToLoad)
+        {
+            if (!File.Exists(file))
             {
-                context.Dispose();
+                throw new FileNotFoundException(file);
+            }
+
+            var c = new EventProviderDbContext(file, readOnly: true, _tracer);
+            var (needsv2, needsv3) = c.IsUpgradeNeeded();
+            if (needsv2 || needsv3)
+            {
+                obsoleteDbs.Add(file);
+                c.Dispose();
+                continue;
+            }
+
+            c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
+            dbContexts.Add(c);
+        }
+
+        if (obsoleteDbs.Any())
+        {
+            foreach (var db in dbContexts)
+            {
+                db.Dispose();
             }
 
             dbContexts.Clear();
 
-            ActiveDatabases = databasePaths?.ToImmutableArray() ?? ImmutableArray<string>.Empty;
-
-            var databasesToLoad = ActiveDatabases.Where(File.Exists);
-            databasesToLoad = SortDatabases(databasesToLoad);
-
-            await Task.Run(() =>
-            {
-                foreach (var file in databasesToLoad)
-                {
-                    var c = new EventProviderDbContext(file, readOnly: false, _tracer);
-                    var (needsv2, needsv3) = c.IsUpgradeNeeded();
-                    if (needsv2 || needsv3)
-                    {
-                        UpdateStatus($"Upgrading database {c.Name}. Please wait...");
-                        c.PerformUpgradeIfNeeded();
-                    }
-
-                    c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
-                    dbContexts.Add(c);
-                }
-
-                UpdateStatus(string.Empty);
-            });
+            throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(db => Path.GetFileName(db))));
         }
-        finally
-        {
-            _rwlock.ExitWriteLock();
-        }
-    }
-
-    private void UpdateStatus(string message)
-    {
-        Status = message;
-        StatusChanged?.Invoke(this, message);
     }
 
     /// <summary>
@@ -148,43 +139,27 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
             .ToList();
     }
 
-    /// <summary>
-    /// Changes the active databases. Note that existing database
-    /// connections are closed and the provider cache is cleared.
-    /// </summary>
-    /// <param name="databaseNames">
-    /// If this value is empty, all available databases are loaded.
-    /// Otherwise, only the databases specified in this value are loaded.
-    /// Also, the order of this value determines the order in which
-    /// we search the databases when attempting to find a matching
-    /// provider.
-    /// </param>
-    public void SetActiveDatabases(IEnumerable<string> databaseNames)
-    {
-        LoadDatabases(databaseNames);
-    }
-
     public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
-        _rwlock.EnterReadLock();
+        DisplayEventModel lastResult = null!;
 
-        try
+        // The Properties getter is expensive, so we only call the getter once,
+        // and we pass this value separately from the eventRecord so it can be reused.
+        var eventProperties = eventRecord.Properties;
+
+        if (_providerDetails.ContainsKey(eventRecord.ProviderName))
         {
-            DisplayEventModel lastResult = null!;
-
-            // The Properties getter is expensive, so we only call the getter once,
-            // and we pass this value separately from the eventRecord so it can be reused.
-            var eventProperties = eventRecord.Properties;
-
-            if (_providerDetails.ContainsKey(eventRecord.ProviderName))
+            _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
+            if (providerDetails != null)
             {
-                _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
-                if (providerDetails != null)
-                {
-                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
-                }
+                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
             }
-            else
+        }
+        else
+        {
+            _databaseAccessSemaphore.Wait();
+
+            try
             {
                 foreach (var dbContext in dbContexts)
                 {
@@ -201,44 +176,44 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
                         }
                     }
                 }
-
-                if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
-                {
-                    _providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
-                }
             }
-
-            if (lastResult == null)
+            finally
             {
-                return new DisplayEventModel(
-                    eventRecord.RecordId,
-                    eventRecord.TimeCreated!.Value.ToUniversalTime(),
-                    eventRecord.Id,
-                    eventRecord.MachineName,
-                    (SeverityLevel?)eventRecord.Level,
-                    eventRecord.ProviderName,
-                    "",
-                    "Description not found. No provider available.",
-                    eventProperties,
-                    eventRecord.Qualifiers,
-                    eventRecord.Keywords,
-                    GetKeywordsFromBitmask(eventRecord.Keywords, null),
-                    eventRecord.LogName,
-                    null,
-                    OwningLogName);
+                _databaseAccessSemaphore.Release();
             }
 
-            if (lastResult.Description == null)
+            if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
             {
-                lastResult = lastResult with { Description = "" };
+                _providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
             }
-
-            return lastResult;
         }
-        finally
+
+        if (lastResult == null)
         {
-            _rwlock.ExitReadLock();
+            return new DisplayEventModel(
+                eventRecord.RecordId,
+                eventRecord.TimeCreated!.Value.ToUniversalTime(),
+                eventRecord.Id,
+                eventRecord.MachineName,
+                (SeverityLevel?)eventRecord.Level,
+                eventRecord.ProviderName,
+                "",
+                "Description not found. No provider available.",
+                eventProperties,
+                eventRecord.Qualifiers,
+                eventRecord.Keywords,
+                GetKeywordsFromBitmask(eventRecord.Keywords, null),
+                eventRecord.LogName,
+                null,
+                OwningLogName);
         }
+
+        if (lastResult.Description == null)
+        {
+            lastResult = lastResult with { Description = "" };
+        }
+
+        return lastResult;
     }
 
     protected virtual void Dispose(bool disposing)
@@ -256,6 +231,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
             _providerDetails.Clear();
 
             disposedValue = true;
+
+            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}");
         }
     }
 
@@ -264,6 +241,4 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IDatabaseEv
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
-
-    public ImmutableArray<string> ActiveDatabases { get; private set; } = ImmutableArray<string>.Empty;
 }
