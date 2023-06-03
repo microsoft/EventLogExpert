@@ -200,12 +200,10 @@ public class LiveLogWatcherService : ILogWatcherService
 
             if (_watchers.Count < 1)
             {
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} That was the last watcher, so we are letting go of the IEventResolver instance.");
-
                 if (_resolver is IDisposable disposableResolver)
                 {
                     disposableResolver.Dispose();
-                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} The IEventResolver was disposable, so we have disposed it.");
+                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Disposed the IEventResolver.");
                 }
 
                 _resolver = null;
