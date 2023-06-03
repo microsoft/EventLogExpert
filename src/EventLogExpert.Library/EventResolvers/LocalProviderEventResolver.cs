@@ -22,6 +22,8 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
+    private bool disposedValue;
+
     public LocalProviderEventResolver() : base(s => Debug.WriteLine(s)) { }
 
     public LocalProviderEventResolver(Action<string> tracer) : base(tracer) { }
@@ -68,5 +70,21 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
         }
 
         return result;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            _providerDetails.Clear();
+
+            disposedValue = true;
+        }
+    }
+
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

@@ -4,7 +4,6 @@
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
-using EventLogExpert.Store.StatusBar;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
@@ -16,11 +15,10 @@ namespace EventLogExpert;
 public partial class MainPage : ContentPage
 {
     private readonly IDispatcher _fluxorDispatcher;
-    private readonly IEventResolver _resolver;
     private readonly IState<SettingsState> _settingsState;
 
     public MainPage(IDispatcher fluxorDispatcher,
-        IEventResolver resolver,
+        IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<SettingsState, bool> showLogNameState,
@@ -31,7 +29,6 @@ public partial class MainPage : ContentPage
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
-        _resolver = resolver;
         _settingsState = settingsState;
 
         activeLogsState.Select(e => e.ActiveLogs);
@@ -70,19 +67,12 @@ public partial class MainPage : ContentPage
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
-        {
-            if (_resolver is IDatabaseEventResolver dbResolver)
-            {
-                dbResolver.SetActiveDatabases(loadedProviders.Select(path => Path.Join(Utils.DatabasePath, path)));
-            }
-        };
+            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path => Path.Join(Utils.DatabasePath, path)));
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
         PopulateOtherLogsMenu();
-
-        ListenForResolverStatus();
 
         var args = Environment.GetCommandLineArgs();
 
@@ -228,19 +218,6 @@ public partial class MainPage : ContentPage
                     AddOtherLogsFlyoutSubitem.Add(addItem);
                 }
             }
-        }
-    }
-
-    private void ListenForResolverStatus()
-    {
-        _resolver.StatusChanged += (sender, status) =>
-        {
-            _fluxorDispatcher.Dispatch(new StatusBarAction.SetResolverStatus(status));
-        };
-
-        if (!string.IsNullOrEmpty(_resolver.Status))
-        {
-            _fluxorDispatcher.Dispatch(new StatusBarAction.SetResolverStatus(_resolver.Status));
         }
     }
 

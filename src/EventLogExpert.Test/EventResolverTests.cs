@@ -32,6 +32,10 @@ public class EventResolverTests
         {
             return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], OwningLog);
         }
+
+        public void Dispose()
+        {
+        }
     }
 
     private readonly ITestOutputHelper _outputHelper;

@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
-using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Library.EventResolvers;
@@ -11,28 +11,26 @@ namespace EventLogExpert.Library.EventResolvers;
 /// This IEventResolver uses event databases if any are
 /// available, and falls back to local providers if not.
 /// </summary>
-public class VersatileEventResolver : IDatabaseEventResolver, IEventResolver, IDisposable
+public class VersatileEventResolver : IEventResolver, IDisposable
 {
     private readonly LocalProviderEventResolver _localResolver;
     private readonly EventProviderDatabaseEventResolver _databaseResolver;
-    private readonly Action<string> _tracer;
+    private readonly ITraceLogger _tracer;
 
     private volatile bool _useDatabaseResolver = false;
     private bool disposedValue = false;
 
     public string Status => _useDatabaseResolver ? _databaseResolver.Status : _localResolver.Status;
 
-    public ImmutableArray<string> ActiveDatabases => _databaseResolver.ActiveDatabases;
-
     public event EventHandler<string>? StatusChanged;
 
-    public VersatileEventResolver(LocalProviderEventResolver localResolver, EventProviderDatabaseEventResolver databaseResolver, Action<string> tracer)
+    public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger tracer)
     {
-        _localResolver = localResolver;
-        _databaseResolver = databaseResolver;
-        _useDatabaseResolver = databaseResolver.ActiveDatabases.Any();
+        _localResolver = new LocalProviderEventResolver(tracer.Trace);
+        _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
+        _useDatabaseResolver = dbCollection.ActiveDatabases.Any();
         _tracer = tracer;
-        _tracer($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
+        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
         _databaseResolver.StatusChanged += (sender, args) => StatusChanged?.Invoke(sender, args);
     }
 
@@ -45,13 +43,6 @@ public class VersatileEventResolver : IDatabaseEventResolver, IEventResolver, ID
     public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
         return _useDatabaseResolver ? _databaseResolver.Resolve(eventRecord, OwningLogName) : _localResolver.Resolve(eventRecord, OwningLogName);
-    }
-
-    public void SetActiveDatabases(IEnumerable<string> databasePaths)
-    {
-        _useDatabaseResolver = databasePaths.Any();
-        _tracer($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} after call to {nameof(SetActiveDatabases)} in {nameof(VersatileEventResolver)}.");
-        _databaseResolver.SetActiveDatabases(databasePaths);
     }
 
     protected virtual void Dispose(bool disposing)

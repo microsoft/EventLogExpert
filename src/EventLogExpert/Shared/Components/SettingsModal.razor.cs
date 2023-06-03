@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
@@ -21,7 +20,7 @@ public partial class SettingsModal
 
     [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
 
-    [Inject] private IEventResolver EventResolver { get; set; } = null!;
+    [Inject] private IDatabaseCollectionProvider DatabaseCollectionProvider { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -66,8 +65,6 @@ public partial class SettingsModal
                 })
         };
 
-        var dbResolver = EventResolver as IDatabaseEventResolver;
-
         try
         {
             var result = (await FilePicker.Default.PickMultipleAsync(options)).ToList();
@@ -76,10 +73,6 @@ public partial class SettingsModal
             if (!result.Any()) { return; }
 
             Directory.CreateDirectory(Utils.DatabasePath);
-
-            // Try to release all database files before potentially
-            // trying to overwrite some of them during the copy.
-            dbResolver?.SetActiveDatabases(Enumerable.Empty<string>());
 
             foreach (var item in result)
             {
@@ -95,8 +88,6 @@ public partial class SettingsModal
         }
         catch (Exception ex)
         {
-            dbResolver?.SetActiveDatabases(SettingsState.Value.LoadedDatabases);
-
             await Application.Current!.MainPage!.DisplayAlert("Import Failed",
                 $"An exception occurred while importing provider databases: {ex.Message}",
                 "OK");
