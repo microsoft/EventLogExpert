@@ -164,8 +164,24 @@ public class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceSetEventsLoading(EventLogState state, EventLogAction.SetEventsLoading action) =>
-        state with { EventsLoading = action.Count };
+    public static EventLogState ReduceSetEventsLoading(EventLogState state, EventLogAction.SetEventsLoading action)
+    {
+        var newEventsLoading = state.EventsLoading;
+
+        if (newEventsLoading.ContainsKey(action.ActivityId))
+        {
+            newEventsLoading = newEventsLoading.Remove(action.ActivityId);
+        }
+
+        if (action.Count == 0)
+        {
+            return state with { EventsLoading = newEventsLoading };
+        }
+        else
+        {
+            return state with { EventsLoading = newEventsLoading.Add(action.ActivityId, action.Count) };
+        }
+    }
 
     private static EventLogData AddEventsToLogData(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
     {

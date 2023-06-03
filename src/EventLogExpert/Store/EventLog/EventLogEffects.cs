@@ -42,53 +42,52 @@ public class EventLogEffects
         // Do this on a background thread so we don't hang the UI
         await Task.Run(() =>
         {
-            lock (_eventResolver)
+            var activityId = Guid.NewGuid();
+
+            var sw = new Stopwatch();
+            sw.Start();
+
+            List<DisplayEventModel> events = new();
+            HashSet<int> eventIdsAll = new();
+            HashSet<string> eventProviderNamesAll = new();
+            HashSet<string> eventTaskNamesAll = new();
+            HashSet<string> eventKeywordNamesAll = new();
+            EventRecord lastEvent = null!;
+
+            while (reader.ReadEvent() is { } e)
             {
-                var sw = new Stopwatch();
-                sw.Start();
+                lastEvent = e;
+                var resolved = _eventResolver.Resolve(e, action.LogName);
+                eventIdsAll.Add(resolved.Id);
+                eventProviderNamesAll.Add(resolved.Source);
+                eventTaskNamesAll.Add(resolved.TaskCategory);
+                eventKeywordNamesAll.UnionWith(resolved.KeywordsDisplayNames);
 
-                List<DisplayEventModel> events = new();
-                HashSet<int> eventIdsAll = new();
-                HashSet<string> eventProviderNamesAll = new();
-                HashSet<string> eventTaskNamesAll = new();
-                HashSet<string> eventKeywordNamesAll = new();
-                EventRecord lastEvent = null!;
+                events.Add(resolved);
 
-                while (reader.ReadEvent() is { } e)
+                if (sw.ElapsedMilliseconds > 1000)
                 {
-                    lastEvent = e;
-                    var resolved = _eventResolver.Resolve(e, action.LogName);
-                    eventIdsAll.Add(resolved.Id);
-                    eventProviderNamesAll.Add(resolved.Source);
-                    eventTaskNamesAll.Add(resolved.TaskCategory);
-                    eventKeywordNamesAll.UnionWith(resolved.KeywordsDisplayNames);
-
-                    events.Add(resolved);
-
-                    if (sw.ElapsedMilliseconds > 1000)
-                    {
-                        sw.Restart();
-                        dispatcher.Dispatch(new EventLogAction.SetEventsLoading(events.Count));
-                    }
+                    sw.Restart();
+                    dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, events.Count));
                 }
+            }
 
-                events.Reverse();
+            events.Reverse();
 
-                dispatcher.Dispatch(new EventLogAction.LoadEvents(
-                    action.LogName,
-                    action.LogType,
-                    events,
-                    eventIdsAll.ToImmutableList(),
-                    eventProviderNamesAll.ToImmutableList(),
-                    eventTaskNamesAll.ToImmutableList(),
-                    eventKeywordNamesAll.ToImmutableList()));
+            dispatcher.Dispatch(new EventLogAction.LoadEvents(
+                action.LogName,
+                action.LogType,
+                events,
+                eventIdsAll.ToImmutableList(),
+                eventProviderNamesAll.ToImmutableList(),
+                eventTaskNamesAll.ToImmutableList(),
+                eventKeywordNamesAll.ToImmutableList()));
 
-                dispatcher.Dispatch(new EventLogAction.SetEventsLoading(0));
+            dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, 0));
 
-                if (action.LogType == EventLogState.LogType.Live)
-                {
-                    _logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
-                }
+            if (action.LogType == EventLogState.LogType.Live)
+            {
+                _logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
             }
         });
     }

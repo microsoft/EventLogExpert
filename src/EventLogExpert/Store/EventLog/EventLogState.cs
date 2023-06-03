@@ -29,7 +29,7 @@ public record EventLogState
 
     public bool ContinuouslyUpdate { get; init; } = false;
 
-    public int EventsLoading { get; set; } = 0;
+    public ImmutableDictionary<Guid, int> EventsLoading { get; set; } = ImmutableDictionary<Guid, int>.Empty;
 
     public ReadOnlyCollection<DisplayEventModel> NewEventBuffer { get; init; } = new List<DisplayEventModel>().AsReadOnly();
 

@@ -5,9 +5,9 @@
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
-    @if (EventLogState.Value.EventsLoading > 0)
+    @foreach (var loadingProgress in EventLogState.Value.EventsLoading)
     {
-        <span>Loading Progress: @EventLogState.Value.EventsLoading</span>
+        <span>Loading: @loadingProgress.Value</span>
     }
     
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>

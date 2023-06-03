@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Library.Providers;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 
@@ -19,7 +20,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
     public event EventHandler<string>? StatusChanged;
 
-    private Dictionary<string, ProviderDetails?> _providerDetails = new();
+    private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
     public LocalProviderEventResolver() : base(s => Debug.WriteLine(s)) { }
 
@@ -30,7 +31,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
         if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
         {
             var provider = new EventMessageProvider(eventRecord.ProviderName, _tracer);
-            _providerDetails.Add(eventRecord.ProviderName, provider.LoadProviderDetails());
+            _providerDetails.TryAdd(eventRecord.ProviderName, provider.LoadProviderDetails());
         }
 
         _providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails);
