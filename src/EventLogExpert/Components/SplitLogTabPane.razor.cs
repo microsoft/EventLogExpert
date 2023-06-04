@@ -30,7 +30,32 @@ public partial class SplitLogTabPane
         base.OnInitialized();
     }
 
-    private static string GetTabName(string path) => Path.GetFileNameWithoutExtension(path);
+    private static IEnumerable<EventLogData> GetLogsTabSorted(Dictionary<string, EventLogData> activeLogs)
+    {
+        return activeLogs.Values
+            .OrderBy(l => l.Events.FirstOrDefault()?.ComputerName)
+            .ThenBy(l => l.Events.FirstOrDefault()?.LogName);
+    }
+
+    private static string GetTabName(EventLogData log)
+    {
+        var firstEvent = log.Events.FirstOrDefault();
+        if (firstEvent != null)
+        {
+            return firstEvent.ComputerName + " - " + firstEvent.LogName;
+        }
+        else
+        {
+            return Path.GetFileNameWithoutExtension(log.Name);
+        }
+    }
+
+    private static string GetTabTooltip(EventLogData log)
+    {
+        return $"{(log.Type == LogType.File ? $"Log File: " : "Live Log: ")} {log.Name}\n" +
+            $"Log Name: {log.Events.FirstOrDefault()?.LogName ?? ""}\n" +
+            $"Computer Name: {log.Events.FirstOrDefault()?.ComputerName ?? ""}";
+    }
 
     private async Task SetActiveLog(string? activeLog)
     {
