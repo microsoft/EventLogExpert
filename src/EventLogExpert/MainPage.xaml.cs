@@ -97,21 +97,26 @@ public partial class MainPage : ContentPage
         if (result != null)
         {
             _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
-            OpenEventLogFile(result.FullPath);
+            foreach (var file in result.Where(f => f is not null))
+            {
+                OpenEventLogFile(file!.FullPath);
+            }
         }
     }
 
     public async void AddFile_Clicked(object sender, EventArgs e)
     {
         var result = await GetFilePickerResult();
-
-        if (result != null)
+        if (result is not null)
         {
-            OpenEventLogFile(result.FullPath);
+            foreach (var file in result.Where(f => f is not null))
+            {
+                OpenEventLogFile(file!.FullPath);
+            }
         }
     }
 
-    private async Task<FileResult?> GetFilePickerResult()
+    private async Task<IEnumerable<FileResult?>> GetFilePickerResult()
     {
         var options = new PickOptions
         {
@@ -120,7 +125,7 @@ public partial class MainPage : ContentPage
             )
         };
 
-        return await FilePicker.Default.PickAsync(options);
+        return await FilePicker.Default.PickMultipleAsync(options);
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
