@@ -11,14 +11,21 @@
                 <label for="log" tabindex="0">Combined</label>
             </div>
 
-            @for (int i = 0; i < EventLogState.Value.ActiveLogs.Count; i++)
-            {
-                int index = i;
-                <div>
-                    <input type="radio" name="tab" id="@($"log{index}")"
-                        @onclick="() => SetActiveLog(EventLogState.Value.ActiveLogs.ElementAt(index).Key)" />
-                    <label for="@($"log{index}")" tabindex="0">@GetTabName(EventLogState.Value.ActiveLogs.ElementAt(index).Key)</label>
-                </div>
+            @{
+                var logsTabSorted = EventLogState.Value.ActiveLogs.Values
+                    .OrderBy(l => l.Events.FirstOrDefault()?.ComputerName)
+                    .ThenBy(l => l.Events.FirstOrDefault()?.LogName)
+                    .ToList();
+            
+                for (int i = 0; i < logsTabSorted.Count; i++)
+                {
+                    var log = logsTabSorted[i];
+                    <div title="@GetTabTooltip(log)">
+                        <input type="radio" name="tab" id="@($"log{i}")"
+                            @onclick="() => SetActiveLog(log.Name)" />
+                        <label for="@($"log{i}")" tabindex="0">@GetTabName(log)</label>
+                    </div>
+                }
             }
         </div>
     </div>
