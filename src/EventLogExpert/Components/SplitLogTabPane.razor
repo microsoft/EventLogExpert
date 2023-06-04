@@ -19,11 +19,11 @@
             
                 for (int i = 0; i < logsTabSorted.Count; i++)
                 {
-                    var log = EventLogState.Value.ActiveLogs.ElementAt(i);
-                    <div title="@GetTabTooltip(log.Value)">
+                    var log = logsTabSorted[i];
+                    <div title="@GetTabTooltip(log)">
                         <input type="radio" name="tab" id="@($"log{i}")"
-                            @onclick="() => SetActiveLog(log.Key)" />
-                        <label for="@($"log{i}")" tabindex="0">@GetTabName(log.Value)</label>
+                            @onclick="() => SetActiveLog(log.Name)" />
+                        <label for="@($"log{i}")" tabindex="0">@GetTabName(log)</label>
                     </div>
                 }
             }
