@@ -18,7 +18,6 @@ public class EventLogEffects
     private readonly ITraceLogger _debugLogger;
     private readonly ILogWatcherService _logWatcherService;
     private readonly IServiceProvider _serviceProvider;
-    private bool disposedValue;
 
     public EventLogEffects(IServiceProvider serviceProvider, ITraceLogger debugLogger, ILogWatcherService logWatcherService)
     {
@@ -93,8 +92,6 @@ public class EventLogEffects
                         dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, events.Count));
                     }
                 }
-
-                events.Reverse();
 
                 dispatcher.Dispatch(new EventLogAction.LoadEvents(
                     action.LogName,

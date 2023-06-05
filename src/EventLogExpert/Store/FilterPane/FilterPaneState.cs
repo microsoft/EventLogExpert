@@ -18,6 +18,4 @@ public record FilterPaneState
     public string AdvancedFilter { get; init; } = string.Empty;
 
     public bool IsAdvancedFilterEnabled { get; set; } = true;
-
-    public int NumberOfFilteredEvents { get; set; }
 }

@@ -13,12 +13,15 @@ public record EventLogState
 {
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
+    public record EventFilter(string? AdvancedFilter, FilterDateModel? DateFilter, IEnumerable<FilterModel>? Filters);
+
     public enum LogType { Live, File }
 
     public record EventLogData(
         string Name,
         LogType Type,
         ReadOnlyCollection<DisplayEventModel> Events,
+        ReadOnlyCollection<DisplayEventModel> FilteredEvents,
         ImmutableHashSet<int> EventIds,
         ImmutableHashSet<string> EventProviderNames,
         ImmutableHashSet<string> TaskNames,
@@ -27,7 +30,11 @@ public record EventLogState
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;
 
+    public EventFilter AppliedFilter { get; init; } = new(null, null, null);
+
     public bool ContinuouslyUpdate { get; init; } = false;
+
+    public ReadOnlyCollection<DisplayEventModel> CombinedEvents { get; init; } = new List<DisplayEventModel>().AsReadOnly();
 
     public ImmutableDictionary<Guid, int> EventsLoading { get; set; } = ImmutableDictionary<Guid, int>.Empty;
 
@@ -36,4 +43,8 @@ public record EventLogState
     public bool NewEventBufferIsFull { get; set; }
 
     public DisplayEventModel? SelectedEvent { get; init; }
+
+    public string? SelectedLogName { get; init; } = null;
+
+    public bool SortDescending { get; init; } = true;
 }

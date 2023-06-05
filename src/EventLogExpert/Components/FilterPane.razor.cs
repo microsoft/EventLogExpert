@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
+using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
 using EventLogExpert.Store.Settings;
 using Fluxor;
@@ -44,6 +45,14 @@ public partial class FilterPane
         TimeZoneState.Select(x => x.Config.TimeZoneId);
         TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
 
+        FilterPaneState.StateChanged += (sender, args) =>
+        {
+            if (sender is State<FilterPaneState> filterPaneState)
+            {
+                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value)));
+            }
+        };
+
         base.OnInitialized();
     }
 
@@ -69,7 +78,7 @@ public partial class FilterPane
             .Select(log => log.Events.First().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
-            .First()
+            .Last()
             .Ticks + hourTicks) / hourTicks))
             .ConvertTimeZone(_model.TimeZoneInfo);
 
@@ -78,7 +87,7 @@ public partial class FilterPane
             .Select(log => log.Events.Last().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
-            .Last()
+            .First()
             .Ticks / hourTicks))
             .ConvertTimeZone(_model.TimeZoneInfo);
 
@@ -177,5 +186,15 @@ public partial class FilterPane
 
         _model.Before = TimeZoneInfo.ConvertTime(_model.Before, temp, _model.TimeZoneInfo);
         _model.After = TimeZoneInfo.ConvertTime(_model.After, temp, _model.TimeZoneInfo);
+    }
+
+    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState)
+    {
+        return new EventLogState.EventFilter
+        (
+            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : null,
+            filterPaneState.FilteredDateRange?.IsEnabled ?? false ? filterPaneState.FilteredDateRange : null,
+            filterPaneState.CurrentFilters.Any(f => f.IsEnabled) ? filterPaneState.CurrentFilters.Where(f => f.IsEnabled) : null
+        );
     }
 }

@@ -30,6 +30,12 @@ public record EventLogAction
 
     public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
 
+    /// <summary>
+    /// This action only has meaning for the UI.
+    /// </summary>
+    /// <param name="LogName"></param>
+    public record SelectLog(string? LogName) : EventLogAction;
+
     public record SetContinouslyUpdate(bool ContinuouslyUpdate) : EventLogAction;
 
     /// <summary>
@@ -41,4 +47,8 @@ public record EventLogAction
     /// </param>
     /// <param name="Count"></param>
     public record SetEventsLoading(Guid ActivityId, int Count) : EventLogAction;
+
+    public record SetFilters(EventFilter EventFilter) : EventLogAction;
+
+    public record SetSortDescending(bool SortDescending) : EventLogAction;
 }

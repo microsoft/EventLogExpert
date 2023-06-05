@@ -4,6 +4,7 @@
 using EventLogExpert.Library.Models;
 using Fluxor;
 using System.Collections.Immutable;
+using System.Linq.Dynamic.Core;
 using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Store.EventLog;
@@ -32,10 +33,12 @@ public class EventLogReducers
 
         if (state.ContinuouslyUpdate)
         {
-            var oldLogData = state.ActiveLogs[action.NewEvent.OwningLog];
-            var updatedLogData = AddEventsToLogData(oldLogData, newEvent);
-            var updatedDictionary = state.ActiveLogs.Remove(action.NewEvent.OwningLog).Add(action.NewEvent.OwningLog, updatedLogData);
-            newState = newState with { ActiveLogs = updatedDictionary };
+            newState = newState with
+            {
+                ActiveLogs = DistributeEventsToManyLogs(newState.ActiveLogs, newEvent, state.AppliedFilter, state.SortDescending),
+                CombinedEvents = AddEventsToCombinedLog(state.CombinedEvents, newEvent, state.AppliedFilter, state.SortDescending)
+                    .ToList().AsReadOnly()
+            };
         }
         else
         {
@@ -57,38 +60,33 @@ public class EventLogReducers
             newLogsCollection = state.ActiveLogs.Remove(action.LogName);
         }
 
+        var filtered = GetFilteredEvents(action.Events, state.AppliedFilter, out var needsSort);
+        // We always sort in LoadEvents, so we don't care about needsSort here.
+        filtered = SortOneLog(filtered, state.SortDescending);
+
         newLogsCollection = newLogsCollection.Add(action.LogName, new EventLogData
         (
             action.LogName,
             action.Type,
-            action.Events.AsReadOnly(),
+            // Events collection is always ordered descending by record id
+            action.Events.OrderByDescending(e => e.RecordId).ToList().AsReadOnly(),
+            // Filtered events reflects both the filter and sort choice.
+            filtered.ToList().AsReadOnly(),
             action.AllEventIds.ToImmutableHashSet(),
             action.AllProviderNames.ToImmutableHashSet(),
             action.AllTaskNames.ToImmutableHashSet(),
             action.AllKeywords.ToImmutableHashSet()
         ));
 
-        return state with { ActiveLogs = newLogsCollection };
+        var newCombinedEvents = CombineLogs(newLogsCollection.Values.Select(l => l.FilteredEvents), state.SortDescending);
+
+        return state with { ActiveLogs = newLogsCollection, CombinedEvents = newCombinedEvents.ToList().AsReadOnly() };
     }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
-        var newState = state with { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty };
-
-        foreach (var log in state.ActiveLogs.Values)
-        {
-            var newLogData = AddEventsToLogData(log, state.NewEventBuffer.Where(e => e.OwningLog == log.Name));
-            newState = newState with { ActiveLogs = newState.ActiveLogs.Add(log.Name, newLogData) };
-        }
-
-        newState = newState with
-        {
-            NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
-            NewEventBufferIsFull = false
-        };
-
-        return newState;
+        return ProcessNewEventBuffer(state);
     }
 
     [ReducerMethod]
@@ -103,11 +101,10 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceCloseLog(EventLogState state, EventLogAction.CloseLog action)
     {
-        // If that was the only open log, do this the easy way
-
         var newState = state with
         {
             ActiveLogs = state.ActiveLogs.Remove(action.LogName),
+            CombinedEvents = state.CombinedEvents.Where(e => e.OwningLog != action.LogName).ToList().AsReadOnly(),
             NewEventBuffer = state.NewEventBuffer
                 .Where(e => e.OwningLog != action.LogName)
                 .ToList().AsReadOnly()
@@ -124,6 +121,7 @@ public class EventLogReducers
         return state with
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            CombinedEvents = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBufferIsFull = false
         };
@@ -138,26 +136,18 @@ public class EventLogReducers
     }
 
     [ReducerMethod]
+    public static EventLogState ReduceSelectLog(EventLogState state, EventLogAction.SelectLog action)
+    {
+        return state with { SelectedLogName = action.LogName };
+    }
+
+    [ReducerMethod]
     public static EventLogState ReduceSetContinouslyUpdate(EventLogState state, EventLogAction.SetContinouslyUpdate action)
     {
         var newState = state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
         if (action.ContinuouslyUpdate)
         {
-            newState = newState with { ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty };
-            foreach (var log in state.ActiveLogs.Values)
-            {
-                newState = newState with
-                {
-                    ActiveLogs = newState.ActiveLogs.Add(log.Name,
-                        AddEventsToLogData(state.ActiveLogs[log.Name], state.NewEventBuffer.Where(e => e.OwningLog == log.Name)))
-                };
-            }
-
-            newState = newState with
-            {
-                NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
-                NewEventBufferIsFull = false
-            };
+            newState = ProcessNewEventBuffer(newState);
         }
 
         return newState;
@@ -183,15 +173,120 @@ public class EventLogReducers
         }
     }
 
-    private static EventLogData AddEventsToLogData(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
+    [ReducerMethod]
+    public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
     {
-        var updatedEvents = eventsToAdd.Concat(logData.Events).ToList().AsReadOnly();
+        var newState = state;
+
+        foreach (var entry in state.ActiveLogs.Values)
+        {
+            EventLogData newLogData;
+            if (action.EventFilter.DateFilter is null && action.EventFilter.AdvancedFilter is null && action.EventFilter.Filters is null)
+            {
+                newLogData = entry with { FilteredEvents = entry.Events };
+            }
+            else
+            {
+                var filteredEvents = GetFilteredEvents(entry.Events, action.EventFilter, out var needsSort);
+                if (needsSort)
+                {
+                    filteredEvents = SortOneLog(filteredEvents, state.SortDescending);
+                }
+
+                newLogData = entry with { FilteredEvents = filteredEvents.ToList().AsReadOnly() };
+            }
+
+            newState = newState with
+            {
+                ActiveLogs = newState.ActiveLogs.Remove(entry.Name).Add(entry.Name, newLogData)
+            };
+        }
+
+        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending);
+
+        newState = newState with
+        {
+            CombinedEvents = newCombinedEvents.ToList().AsReadOnly(),
+            AppliedFilter = action.EventFilter
+        };
+
+        return newState;
+    }
+
+    [ReducerMethod]
+    public static EventLogState ReduceSetSortDescending(EventLogState state, EventLogAction.SetSortDescending action)
+    {
+        if (action.SortDescending == state.SortDescending) return state;
+
+        var newActiveLogs = state.ActiveLogs;
+
+        foreach (var logData in state.ActiveLogs.Values)
+        {
+            newActiveLogs = newActiveLogs.Remove(logData.Name).Add(logData.Name, logData with
+            {
+                FilteredEvents = SortOneLog(logData.FilteredEvents, action.SortDescending).ToList().AsReadOnly()
+            }); ;
+        }
+
+        var newCombinedEvents = CombineLogs(newActiveLogs.Values.Select(l => l.FilteredEvents), action.SortDescending);
+
+        return state with
+        {
+            ActiveLogs = newActiveLogs,
+            CombinedEvents = newCombinedEvents.ToList().AsReadOnly(),
+            SortDescending = action.SortDescending
+        };
+    }
+
+    /// <summary>
+    /// Add new events to a "combined" log view
+    /// </summary>
+    /// <param name="combinedLog"></param>
+    /// <param name="eventsToAdd">
+    ///     It is assumed that these events are already sorted in descending order
+    ///     from newest to oldest. This value should be coming from NewEventBuffer,
+    ///     where new events are inserted at the top of the list as they come in.
+    /// </param>
+    /// <param name="filter"></param>
+    /// <param name="sortDescending"></param>
+    /// <returns></returns>
+    private static IEnumerable<DisplayEventModel> AddEventsToCombinedLog(IEnumerable<DisplayEventModel> combinedLog, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending)
+    {
+        var newEventsMatchingFilter = GetFilteredEvents(eventsToAdd, filter, out var needsSort);
+
+        if (newEventsMatchingFilter.Count() > 1 && needsSort)
+        {
+            newEventsMatchingFilter = sortDescending ? newEventsMatchingFilter.OrderByDescending(e => e.TimeCreated) : newEventsMatchingFilter.OrderBy(e => e.TimeCreated);
+        }
+
+        return sortDescending ? newEventsMatchingFilter.Concat(combinedLog) : combinedLog.Concat(newEventsMatchingFilter);
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="logData">This log should already be sorted appropriately. We do not sort this here.</param>
+    /// <param name="eventsToAdd">These do not need to be sorted already.</param>
+    /// <param name="filter"></param>
+    /// <param name="sortDescending"></param>
+    /// <returns></returns>
+    private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending)
+    {
+        var eventsToAddDescending = eventsToAdd.OrderByDescending(e => e.RecordId);
+
+        var filteredEventsToAdd = GetFilteredEvents(eventsToAdd, filter, out var needsSort);
+        var sortedFilteredEventsToAdd = SortOneLog(filteredEventsToAdd, sortDescending);
+
+        // Events collection is always sorted descending by record ID.
+        var updatedEvents = eventsToAddDescending.Concat(logData.Events);
+        var updatedFilteredEvents = sortDescending ? sortedFilteredEventsToAdd.Concat(logData.FilteredEvents) : logData.FilteredEvents.Concat(sortedFilteredEventsToAdd);
         var updatedEventIds = logData.EventIds.Union(eventsToAdd.Select(e => e.Id));
         var updatedProviderNames = logData.EventProviderNames.Union(eventsToAdd.Select(e => e.Source));
         var updatedTaskNames = logData.TaskNames.Union(eventsToAdd.Select(e => e.TaskCategory));
         var updatedLogData = logData with
         {
-            Events = updatedEvents,
+            Events = updatedEvents.ToList().AsReadOnly(),
+            FilteredEvents = updatedFilteredEvents.ToList().AsReadOnly(),
             EventIds = updatedEventIds,
             EventProviderNames = updatedProviderNames,
             TaskNames = updatedTaskNames
@@ -200,15 +295,152 @@ public class EventLogReducers
         return updatedLogData;
     }
 
+    /// <summary>
+    /// This should be used to combine events from multiple logs into a
+    /// combined log. The sort key changes depending on how many logs are
+    /// present.
+    /// </summary>
+    /// <param name="eventData"></param>
+    /// <param name="sortDescending"></param>
+    /// <returns></returns>
+    private static IEnumerable<DisplayEventModel> CombineLogs(IEnumerable<IEnumerable<DisplayEventModel>> eventData, bool sortDescending)
+    {
+        Utils.Trace($"{nameof(CombineLogs)} was called for {eventData.Count()} logs.");
+
+        if (eventData.Count() == 1)
+        {
+            if (sortDescending)
+            {
+                return eventData.First().OrderByDescending(e => e.RecordId);
+            }
+            else
+            {
+                return eventData.First().OrderBy(e => e.RecordId);
+            }
+        }
+        else
+        {
+            if (sortDescending)
+            {
+                return eventData.SelectMany(l => l).OrderByDescending(e => e.TimeCreated);
+            }
+            else
+            {
+                return eventData.SelectMany(l => l).OrderBy(e => e.TimeCreated);
+            }
+        }
+    }
+
+    private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
+        ImmutableDictionary<string, EventLogData> logsToUpdate, 
+        IEnumerable<DisplayEventModel> eventsToDistribute, 
+        EventFilter filter, 
+        bool sortDescending)
+    {
+        var newLogs = logsToUpdate;
+
+        foreach (var log in logsToUpdate.Values)
+        {
+            var newEventsForThisLog = eventsToDistribute.Where(e => e.OwningLog == log.Name);
+            if (newEventsForThisLog.Any())
+            {
+                var newLogData = AddEventsToOneLog(log, newEventsForThisLog, filter, sortDescending);
+                newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);
+            }
+        }
+
+        return newLogs;
+    }
+
     private static EventLogData GetEmptyLogData(string LogName, LogType LogType)
     {
         return new EventLogData(
             LogName,
             LogType,
             new List<DisplayEventModel>().AsReadOnly(),
+            new List<DisplayEventModel>().AsReadOnly(),
             ImmutableHashSet<int>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty);
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="events"></param>
+    /// <param name="eventFilter"></param>
+    /// <param name="needsSort">
+    ///     Some filters cause a call to AsParallel which jumbles the order of events.
+    ///     This lets the caller know that this has occurred.
+    /// </param>
+    /// <returns></returns>
+    private static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter, out bool needsSort)
+    {
+        Utils.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
+
+        needsSort = false;
+
+        IQueryable<DisplayEventModel> filteredEvents = events.AsQueryable();
+
+        if (eventFilter.DateFilter is not null)
+        {
+            filteredEvents = filteredEvents.Where(e =>
+                e.TimeCreated >= eventFilter.DateFilter.After &&
+                e.TimeCreated <= eventFilter.DateFilter.Before);
+        }
+
+        if (eventFilter.Filters?.Any() ?? false)
+        {
+            filteredEvents = filteredEvents.AsParallel()
+                .Where(e => eventFilter.Filters
+                    .Where(filter => filter is { IsEnabled: true, IsEditing: false })
+                    .All(filter => filter.Comparison
+                        .Any(comp => comp(e))))
+                .AsQueryable();
+
+            needsSort = true;
+        }
+
+        if (!string.IsNullOrEmpty(eventFilter.AdvancedFilter))
+        {
+            filteredEvents = filteredEvents.Where(eventFilter.AdvancedFilter);
+        }
+
+        return filteredEvents;
+    }
+
+    private static EventLogState ProcessNewEventBuffer(EventLogState state)
+    {
+        var newState = state with
+        {
+            ActiveLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer, state.AppliedFilter, state.SortDescending)
+        };
+
+        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending);
+
+        newState = newState with
+        {
+            CombinedEvents = newCombinedEvents.ToList().AsReadOnly(),
+            NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
+            NewEventBufferIsFull = false
+        };
+
+        return newState;
+    }
+
+    /// <summary>
+    /// This should only be used when all events are from the same log.
+    /// </summary>
+    /// <param name="events"></param>
+    /// <param name="sortDescending"></param>
+    /// <returns></returns>
+    private static IEnumerable<DisplayEventModel> SortOneLog(IEnumerable<DisplayEventModel> events, bool sortDescending)
+    {
+        Utils.Trace($"{nameof(SortOneLog)} was called.");
+
+        if (sortDescending) return events.OrderByDescending(e => e.RecordId);
+
+        return events.OrderBy(e => e.RecordId);
     }
 }
