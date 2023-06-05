@@ -5,16 +5,25 @@
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
-    @foreach (var loadingProgress in EventLogState.Value.EventsLoading)
+    @{
+        var eventLogState = EventLogState.Value;
+        var isAnyFilterApplied = 
+            eventLogState.AppliedFilter.AdvancedFilter != null ||
+            eventLogState.AppliedFilter.DateFilter != null ||
+            eventLogState.AppliedFilter.Filters != null;
+    }
+
+    @foreach (var loadingProgress in eventLogState.EventsLoading)
     {
         <span>Loading: @loadingProgress.Value</span>
     }
     
-    <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
-    
-    @if (FilterPaneState.Value.CurrentFilters.Any())
+    <span>Events Loaded: @eventLogState.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
+    @if (isAnyFilterApplied)
     {
-        <span>Filtered Events: @FilterPaneState.Value.NumberOfFilteredEvents</span>
+        var totalEvents = eventLogState.SelectedLogName == null ? eventLogState.ActiveLogs.Values.Sum(l => l.Events.Count) : eventLogState.ActiveLogs[eventLogState.SelectedLogName].Events.Count;
+        var filteredEvents = eventLogState.SelectedLogName == null ? eventLogState.CombinedEvents.Count : eventLogState.ActiveLogs[eventLogState.SelectedLogName].FilteredEvents.Count;
+        <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
     @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == EventLogExpert.Store.EventLog.EventLogState.LogType.Live))
@@ -25,8 +34,8 @@
         }
         else
         {
-            <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
-            @if (EventLogState.Value.NewEventBufferIsFull)
+                <span>New Events: @eventLogState.NewEventBuffer.Count</span>
+                    @if (eventLogState.NewEventBufferIsFull)
             {
                 <span>Buffer Full</span>
             }

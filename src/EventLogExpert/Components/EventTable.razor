@@ -13,7 +13,7 @@
                 <th class="level">Level</th>
                 <th class="time">
                     Date and Time
-                    <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
+                    <span class="button-toggle" data-rotate="@EventLogState.Value.SortDescending.ToString().ToLower()" @onclick="ToggleDateTime">
                         <i class="bi bi-caret-up"></i>
                     </span>
                 </th>
@@ -26,7 +26,7 @@
             </tr>
         </thead>
         <tbody>
-            <Virtualize Items="GetFilteredEvents(null)" Context="evt">
+            <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td>
                         <span class="@GetLevelClass(evt.Level)"></span>
@@ -45,9 +45,9 @@
     </table>
 </div>
 
-@if (EventLogState.Value.ActiveLogs.Count > 1)
+@if (ActiveLogState.Value.Count > 1)
 {
-    @foreach (var log in EventLogState.Value.ActiveLogs)
+    @foreach (var log in ActiveLogState.Value)
     {
         <div class="table-container" hidden="@(_activeLog != log.Key)">
             <table>
@@ -56,7 +56,7 @@
                         <th class="level">Level</th>
                         <th class="time">
                             Date and Time
-                            <span class="button-toggle" data-rotate="@IsDateTimeDescending" @onclick="ToggleDateTime">
+                            <span class="button-toggle" data-rotate="@EventLogState.Value.SortDescending.ToString().ToLower()" @onclick="ToggleDateTime">
                                 <i class="bi bi-caret-up"></i>
                             </span>
                         </th>
@@ -69,7 +69,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <Virtualize Items="GetFilteredEvents(log.Key)" Context="evt">
+                    <Virtualize Items="log.Value.FilteredEvents" Context="evt">
                         <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                             <td>
                                 <span class="@GetLevelClass(evt.Level)"></span>

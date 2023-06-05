@@ -30,13 +30,6 @@ public partial class SplitLogTabPane
         base.OnInitialized();
     }
 
-    private static IEnumerable<EventLogData> GetLogsTabSorted(Dictionary<string, EventLogData> activeLogs)
-    {
-        return activeLogs.Values
-            .OrderBy(l => l.Events.FirstOrDefault()?.ComputerName)
-            .ThenBy(l => l.Events.FirstOrDefault()?.LogName);
-    }
-
     private static string GetTabName(EventLogData log)
     {
         var firstEvent = log.Events.FirstOrDefault();
@@ -61,5 +54,6 @@ public partial class SplitLogTabPane
     {
         ActiveLog = activeLog;
         await ActiveLogChanged.InvokeAsync(ActiveLog);
+        Dispatcher.Dispatch(new EventLogAction.SelectLog(activeLog));
     }
 }
