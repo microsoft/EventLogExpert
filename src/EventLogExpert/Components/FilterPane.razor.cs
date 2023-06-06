@@ -8,6 +8,7 @@ using EventLogExpert.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Linq.Dynamic.Core;
+using System.Linq.Dynamic.Core.CustomTypeProviders;
 
 namespace EventLogExpert.Components;
 
@@ -169,7 +170,7 @@ public partial class FilterPane
 
         try
         {
-            var result = testQueryable.AsQueryable().Where(expression).ToList();
+            var result = testQueryable.AsQueryable().Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression).ToList();
             return true;
         }
         catch (Exception ex)
