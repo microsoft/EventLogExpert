@@ -13,6 +13,7 @@ public partial class DetailsPane
 {
     private bool _expandMenu = false;
     private bool _expandXml = false;
+    private bool _userToggledMenu = false;
 
     private DisplayEventModel? Event { get; set; }
 
@@ -29,7 +30,10 @@ public partial class DetailsPane
             if (v != null)
             {
                 Event = EventLogState.Value.SelectedEvent;
-                _expandMenu = true;
+                if (!_userToggledMenu)
+                {
+                    _expandMenu = true;
+                }
             }
         };
     }
@@ -64,7 +68,11 @@ public partial class DetailsPane
         return sb.ToString();
     }
 
-    private void ToggleMenu() => _expandMenu = !_expandMenu;
+    private void ToggleMenu()
+    {
+        _userToggledMenu = true;
+        _expandMenu = !_expandMenu;
+    }
 
     private void ToggleXml() => _expandXml = !_expandXml;
 }
