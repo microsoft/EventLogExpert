@@ -5,8 +5,11 @@ using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
+using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
+using Windows.ApplicationModel.DataTransfer;
+using Windows.Storage;
 using static EventLogExpert.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -83,6 +86,8 @@ public partial class MainPage : ContentPage
         {
             OpenEventLogFile(args[1]);
         }
+
+        EnableAddLogToViewViaDragAndDrop();
     }
 
     private void OpenEventLogFile(string fileName)
@@ -237,6 +242,60 @@ public partial class MainPage : ContentPage
                 }
             }
         }
+    }
+
+    private void EnableAddLogToViewViaDragAndDrop()
+    {
+        Loaded += (s, e) =>
+        {
+            if (Handler?.MauiContext == null) return;
+
+            var platformElement = WebView.ToPlatform(Handler.MauiContext);
+            platformElement.AllowDrop = true;
+            platformElement.Drop += async (sender, eventArgs) =>
+            {
+                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+                {
+                    var items = await eventArgs.DataView.GetStorageItemsAsync();
+                    foreach (var item in items)
+                    {
+                        if (item is StorageFile file)
+                        {
+                            if (_activeLogsState.Value.Any(l => l.Key == file.Path))
+                            {
+                                return;
+                            }
+
+                            OpenEventLogFile($"{file.Path}");
+                        }
+                    }
+                }
+            };
+
+            platformElement.DragOver += async (sender, eventArgs) =>
+            {
+                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+                {
+                    var deferral = eventArgs.GetDeferral();
+                    var extensions = new List<string> { ".evtx" };
+                    var isAllowed = false;
+                    var items = await eventArgs.DataView.GetStorageItemsAsync();
+                    foreach (var item in items)
+                    {
+                        if (item is StorageFile file && extensions.Contains(file.FileType))
+                        {
+                            isAllowed = true;
+                            break;
+                        }
+                    }
+
+                    eventArgs.AcceptedOperation = isAllowed ? Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy : Windows.ApplicationModel.DataTransfer.DataPackageOperation.None;
+                    deferral.Complete();
+                }
+
+                eventArgs.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.None;
+            };
+        };
     }
 
     private void ShowLogName_Clicked(object? sender, EventArgs e)
