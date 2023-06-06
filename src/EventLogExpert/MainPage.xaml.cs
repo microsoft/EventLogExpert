@@ -16,6 +16,7 @@ public partial class MainPage : ContentPage
 {
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
+    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
 
     public MainPage(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
@@ -30,6 +31,8 @@ public partial class MainPage : ContentPage
 
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
+
+        _activeLogsState = activeLogsState;
 
         activeLogsState.Select(e => e.ActiveLogs);
 
@@ -111,6 +114,11 @@ public partial class MainPage : ContentPage
         {
             foreach (var file in result.Where(f => f is not null))
             {
+                if (_activeLogsState.Value.Any(l => l.Key == file?.FullPath))
+                {
+                    return;
+                }
+
                 OpenEventLogFile(file!.FullPath);
             }
         }
@@ -160,6 +168,11 @@ public partial class MainPage : ContentPage
         if (sender == null) return;
 
         var logName = ((MenuFlyoutItem)sender).Text;
+
+        if (_activeLogsState.Value.Any(l => l.Key == logName))
+        {
+            return;
+        }
 
         _fluxorDispatcher.Dispatch(
             new EventLogAction.OpenLog(
