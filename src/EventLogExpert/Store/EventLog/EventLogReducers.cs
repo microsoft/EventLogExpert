@@ -404,7 +404,7 @@ public class EventLogReducers
 
         if (!string.IsNullOrEmpty(eventFilter.AdvancedFilter))
         {
-            filteredEvents = filteredEvents.Where(eventFilter.AdvancedFilter);
+            filteredEvents = filteredEvents.Where(EventLogExpertCustomTypeProvider.ParsingConfig, eventFilter.AdvancedFilter);
         }
 
         return filteredEvents;
