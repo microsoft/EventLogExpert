@@ -1,13 +1,11 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0-windows10.0.19041.0</TargetFramework>
+    <TargetFramework>net7.0-windows10.0.19041</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-
     <IsPackable>false</IsPackable>
-
-    <Platforms>AnyCPU;x64</Platforms>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Library\EventLogExpert.Library.csproj" />
+    <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
   </ItemGroup>
 
 </Project>

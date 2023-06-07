@@ -3,7 +3,7 @@
 
 using EventLogExpert.Library.Helpers;
 
-namespace EventLogExpert.Library.Models;
+namespace EventLogExpert.UI.Models;
 
 public record SubFilterModel
 {

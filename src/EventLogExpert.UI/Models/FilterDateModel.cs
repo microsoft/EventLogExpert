@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Library.Models;
+namespace EventLogExpert.UI.Models;
 
 public record FilterDateModel
 {

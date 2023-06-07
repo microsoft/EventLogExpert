@@ -8,17 +8,17 @@
     </label>
 
     <div class="dropdown-list" data-toggle="@IsDropDownVisible">
-        @if (typeof(FilterType).IsAssignableFrom(typeof(InputType)))
+        @if (typeof(UI.FilterType).IsAssignableFrom(typeof(InputType)))
         {
-            @foreach (InputType item in Enum.GetValues(typeof(FilterType)))
+            @foreach (InputType item in Enum.GetValues(typeof(UI.FilterType)))
             {
                 <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
             }
         }
 
-        @if (typeof(FilterComparison).IsAssignableFrom(typeof(InputType)))
+        @if (typeof(UI.FilterComparison).IsAssignableFrom(typeof(InputType)))
         {
-            @foreach (InputType item in Enum.GetValues(typeof(FilterComparison)))
+            @foreach (InputType item in Enum.GetValues(typeof(UI.FilterComparison)))
             {
                 <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
             }

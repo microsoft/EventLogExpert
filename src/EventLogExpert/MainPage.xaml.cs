@@ -3,10 +3,10 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
-using EventLogExpert.Options;
-using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Services;
 using Fluxor;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;

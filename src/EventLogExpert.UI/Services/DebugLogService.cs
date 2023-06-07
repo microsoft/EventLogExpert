@@ -2,10 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Helpers;
-using EventLogExpert.Options;
+using EventLogExpert.UI.Options;
 using System.Diagnostics;
 
-namespace EventLogExpert.Services;
+namespace EventLogExpert.UI.Services;
 
 public class DebugLogService : ITraceLogger
 {

@@ -1,10 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
+using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.Store.FilterPane;
 

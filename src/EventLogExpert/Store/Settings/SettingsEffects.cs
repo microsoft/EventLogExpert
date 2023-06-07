@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Options;
+using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Options;
 using Fluxor;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;

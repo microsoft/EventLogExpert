@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
 using EventLogExpert.Store.FilterPane;
+using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;

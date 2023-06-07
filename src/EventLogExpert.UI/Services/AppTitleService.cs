@@ -1,9 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using System.Text;
 
-namespace EventLogExpert.Services;
+namespace EventLogExpert.UI.Services;
 
 public interface IAppTitleService
 {
@@ -18,15 +19,20 @@ public class AppTitleService : IAppTitleService
 {
     private readonly ICurrentVersionProvider _versionProvider;
 
+    private readonly ITitleProvider _titleProvider;
+
     private bool _isPrereleaseBuild = false;
 
     private string? _logName;
 
     private string? _progressString;
 
-    public AppTitleService(ICurrentVersionProvider versionProvider)
+    public AppTitleService(
+        ICurrentVersionProvider versionProvider, 
+        ITitleProvider titleProvider)
     {
         _versionProvider = versionProvider;
+        _titleProvider = titleProvider;
     }
 
     public void SetIsPrerelease(bool isPrerelease) => _isPrereleaseBuild = isPrerelease;
@@ -37,7 +43,7 @@ public class AppTitleService : IAppTitleService
         SetTitle();
     }
 
-    public void SetProgressString( string? progressString)
+    public void SetProgressString(string? progressString)
     {
         _progressString = progressString;
         SetTitle();
@@ -45,8 +51,6 @@ public class AppTitleService : IAppTitleService
 
     private void SetTitle()
     {
-        if (Application.Current?.Windows.Any() is not true) { return; }
-
         StringBuilder title = new();
 
         if (_progressString is not null)
@@ -74,6 +78,6 @@ public class AppTitleService : IAppTitleService
             title.Append(_versionProvider.CurrentVersion);
         }
 
-        Application.Current.Windows[0].Title = title.ToString();
+        _titleProvider.SetTitle(title.ToString());
     }
 }
