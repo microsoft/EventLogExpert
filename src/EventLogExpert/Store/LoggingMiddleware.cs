@@ -21,38 +21,33 @@ public class LoggingMiddleware : Middleware
 
     public override void BeforeDispatch(object action)
     {
-        if (action is EventLogAction.LoadEvents loadEventsAction)
+        switch (action)
         {
-            // We don't want to serialize all the events.
-            _debugLogger.Trace($"Action: EventLogAction.LoadEvents with {loadEventsAction.Events.Count} events.");
-        }
-        else if (action is EventLogAction.AddEvent addEventsAction)
-        {
-            _debugLogger.Trace($"Action: EventLogAction.AddEvent with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
-        }
-        else if (action is FilterPaneAction.SetFilter)
-        {
-            _debugLogger.Trace("Action: EventLogAction.SetFilter.");
-        }
-        else if (action is FilterPaneAction.RemoveFilter)
-        {
-            // We can't serialize a Func.
-            _debugLogger.Trace("Action: EventLogAction.FilterEventsAction.");
-        }
-        else if (action is EventLogAction.SelectEvent selectEventAction)
-        {
-            _debugLogger.Trace($"Action: EventLogAction.SelectEvent selected {selectEventAction?.SelectedEvent?.Source} event ID {selectEventAction?.SelectedEvent?.Id}.");
-        }
-        else
-        {
-            try
-            {
-                _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
-            }
-            catch
-            {
-                _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
-            }
+            case EventLogAction.LoadEvents loadEventsAction:
+                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
+                break;
+            case EventLogAction.AddEvent addEventsAction:
+                _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
+                break;
+            case FilterPaneAction.SetFilter setFilterAction:
+            case EventLogAction.SetFilters setFiltersAction:
+            case FilterPaneAction.RemoveFilter removeFilterAction:
+                _debugLogger.Trace($"Action: {action.GetType()}.");
+                break;
+            case EventLogAction.SelectEvent selectEventAction:
+                _debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected {selectEventAction?.SelectedEvent?.Source} event ID {selectEventAction?.SelectedEvent?.Id}.");
+                break;
+            default:
+                try
+                {
+                    _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
+                }
+                catch
+                {
+                    _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
+                }
+
+                break;
         }
     }
 

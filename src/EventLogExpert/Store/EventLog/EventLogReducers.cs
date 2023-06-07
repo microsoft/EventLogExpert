@@ -176,6 +176,24 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
     {
+        bool filterIsUnchanged = false;
+
+        if (action.EventFilter.AdvancedFilter == state.AppliedFilter.AdvancedFilter &&
+            action.EventFilter.DateFilter == state.AppliedFilter.DateFilter)
+        {
+            var oldFilters = state.AppliedFilter.Filters?.Where(f => f.IsEnabled && !string.IsNullOrEmpty(f.ComparisonString)).OrderBy(f => f.ComparisonString) ?? 
+                Enumerable.Empty<FilterModel>();
+            var newFilters = action.EventFilter.Filters?.Where(f => f.IsEnabled && !string.IsNullOrEmpty(f.ComparisonString)).OrderBy(f => f.ComparisonString) ?? 
+                Enumerable.Empty<FilterModel>();
+
+            filterIsUnchanged = oldFilters.Select(f => f.ComparisonString).SequenceEqual(newFilters.Select(f => f.ComparisonString));
+        }
+
+        if (filterIsUnchanged)
+        {
+            return state;
+        }
+
         var newState = state;
 
         foreach (var entry in state.ActiveLogs.Values)
@@ -394,7 +412,7 @@ public class EventLogReducers
         {
             filteredEvents = filteredEvents.AsParallel()
                 .Where(e => eventFilter.Filters
-                    .Where(filter => filter is { IsEnabled: true, IsEditing: false })
+                    .Where(filter => filter.IsEnabled)
                     .All(filter => filter.Comparison
                         .Any(comp => comp(e))))
                 .AsQueryable();
