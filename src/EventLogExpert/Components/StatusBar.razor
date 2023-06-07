@@ -8,9 +8,9 @@
     @{
         var eventLogState = EventLogState.Value;
         var isAnyFilterApplied = 
-            eventLogState.AppliedFilter.AdvancedFilter != null ||
+            eventLogState.AppliedFilter.AdvancedFilter != "" ||
             eventLogState.AppliedFilter.DateFilter != null ||
-            eventLogState.AppliedFilter.Filters != null;
+            eventLogState.AppliedFilter.Filters.Any();
     }
 
     @foreach (var loadingProgress in eventLogState.EventsLoading)

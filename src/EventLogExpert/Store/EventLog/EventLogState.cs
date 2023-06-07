@@ -13,7 +13,7 @@ public record EventLogState
 {
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
-    public record EventFilter(string? AdvancedFilter, FilterDateModel? DateFilter, IEnumerable<FilterModel>? Filters);
+    public record EventFilter(string AdvancedFilter, FilterDateModel? DateFilter, ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);
 
     public enum LogType { Live, File }
 
@@ -30,7 +30,7 @@ public record EventLogState
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;
 
-    public EventFilter AppliedFilter { get; init; } = new(null, null, null);
+    public EventFilter AppliedFilter { get; init; } = new("", null, ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>>.Empty);
 
     public bool ContinuouslyUpdate { get; init; } = false;
 

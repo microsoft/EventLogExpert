@@ -7,8 +7,8 @@ using EventLogExpert.Store.FilterPane;
 using EventLogExpert.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
-using System.Linq.Dynamic.Core.CustomTypeProviders;
 
 namespace EventLogExpert.Components;
 
@@ -193,9 +193,9 @@ public partial class FilterPane
     {
         return new EventLogState.EventFilter
         (
-            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : null,
+            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : "",
             filterPaneState.FilteredDateRange?.IsEnabled ?? false ? filterPaneState.FilteredDateRange : null,
-            filterPaneState.CurrentFilters.Any(f => f.IsEnabled) ? filterPaneState.CurrentFilters.Where(f => f.IsEnabled) : null
+            filterPaneState.CurrentFilters.Where(f => f.IsEnabled && f.Comparison.Any()).Select(f => f.Comparison.ToImmutableList()).ToImmutableList()
         );
     }
 }
