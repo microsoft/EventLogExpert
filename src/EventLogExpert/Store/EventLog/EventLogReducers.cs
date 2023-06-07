@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.Models;
+using EventLogExpert.Services;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;

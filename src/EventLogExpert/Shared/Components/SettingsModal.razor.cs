@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Models;
+using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
