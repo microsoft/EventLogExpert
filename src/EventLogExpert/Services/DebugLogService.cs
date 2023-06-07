@@ -1,46 +1,35 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
+using EventLogExpert.Options;
 using System.Diagnostics;
 
 namespace EventLogExpert.Services;
 
-internal static class Utils
+public class DebugLogService : ITraceLogger
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
-    public static string DatabasePath => Path.Join(FileSystem.AppDataDirectory, "Databases");
+    private readonly FileLocationOptions _fileLocationOptions;
 
-    public static string LoggingPath => Path.Join(FileSystem.AppDataDirectory, "debug.log");
-
-    public static string SettingsPath => Path.Join(FileSystem.AppDataDirectory, "settings.json");
-
-    internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
-        destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
-
-    internal static bool HasProviderDatabases()
+    public DebugLogService(FileLocationOptions fileLocationOptions)
     {
-        try
-        {
-            return Directory.EnumerateFiles(DatabasePath, "*.db").Any();
-        }
-        catch
-        {
-            return false;
-        }
+        _fileLocationOptions = fileLocationOptions;
+        InitTracing();
     }
 
-    internal static void InitTracing()
+    private void InitTracing()
     {
         // Set up tracing to a file
-        var fileInfo = new FileInfo(LoggingPath);
+        var fileInfo = new FileInfo(_fileLocationOptions.LoggingPath);
 
         if (fileInfo.Exists && fileInfo.Length > _maxLogSize)
         {
             fileInfo.Delete();
         }
 
-        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(LoggingPath, "myListener"));
+        System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(_fileLocationOptions.LoggingPath, "myListener"));
         System.Diagnostics.Trace.AutoFlush = true;
 
         var firstChanceSemaphore = new SemaphoreSlim(1);
@@ -62,6 +51,6 @@ internal static class Utils
         };
     }
 
-    internal static void Trace(string message) =>
+    public void Trace(string message) =>
         System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {Environment.CurrentManagedThreadId} {message}");
 }

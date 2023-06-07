@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using static EventLogExpert.Store.EventLog.EventLogState;
 
@@ -8,7 +9,7 @@ namespace EventLogExpert.Store.EventLog;
 
 public record EventLogAction
 {
-    public record AddEvent(DisplayEventModel NewEvent) : EventLogAction;
+    public record AddEvent(DisplayEventModel NewEvent, ITraceLogger TraceLogger) : EventLogAction;
 
     public record LoadEvents(
         string LogName,
@@ -17,10 +18,11 @@ public record EventLogAction
         IEnumerable<int> AllEventIds,
         IEnumerable<string> AllProviderNames,
         IEnumerable<string> AllTaskNames,
-        IEnumerable<string> AllKeywords
+        IEnumerable<string> AllKeywords,
+        ITraceLogger TraceLogger
     ) : EventLogAction;
 
-    public record LoadNewEvents : EventLogAction;
+    public record LoadNewEvents(ITraceLogger TraceLogger) : EventLogAction;
 
     public record OpenLog(string LogName, LogType LogType) : EventLogAction;
 
@@ -36,7 +38,7 @@ public record EventLogAction
     /// <param name="LogName"></param>
     public record SelectLog(string? LogName) : EventLogAction;
 
-    public record SetContinouslyUpdate(bool ContinuouslyUpdate) : EventLogAction;
+    public record SetContinouslyUpdate(bool ContinuouslyUpdate, ITraceLogger TraceLogger) : EventLogAction;
 
     /// <summary>
     /// Used to indicate the progress of event logs being loaded.
@@ -48,7 +50,7 @@ public record EventLogAction
     /// <param name="Count"></param>
     public record SetEventsLoading(Guid ActivityId, int Count) : EventLogAction;
 
-    public record SetFilters(EventFilter EventFilter) : EventLogAction;
+    public record SetFilters(EventFilter EventFilter, ITraceLogger TraceLogger) : EventLogAction;
 
-    public record SetSortDescending(bool SortDescending) : EventLogAction;
+    public record SetSortDescending(bool SortDescending, ITraceLogger TraceLogger) : EventLogAction;
 }

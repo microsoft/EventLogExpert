@@ -100,7 +100,8 @@ public class EventLogEffects
                     eventIdsAll.ToImmutableList(),
                     eventProviderNamesAll.ToImmutableList(),
                     eventTaskNamesAll.ToImmutableList(),
-                    eventKeywordNamesAll.ToImmutableList()));
+                    eventKeywordNamesAll.ToImmutableList(),
+                    _debugLogger));
 
                 dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, 0));
 

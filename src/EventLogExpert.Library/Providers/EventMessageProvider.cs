@@ -144,7 +144,7 @@ public class EventMessageProvider
 
                 // TODO: Evaulate if there's any need to EnumResourceTypes.
                 // This is an alternative approach to FindResource. Leaving it here until we're sure FindResource is good enough.
-                var result = NativeMethods.EnumResourceTypes(hModule, GetMessagesFromOneResource, IntPtr.Zero);
+                // var result = NativeMethods.EnumResourceTypes(hModule, GetMessagesFromOneResource, IntPtr.Zero);
 
                 var msgTableInfo =
                     NativeMethods.FindResource(hModule, 1, NativeMethods.RT_MESSAGETABLE);

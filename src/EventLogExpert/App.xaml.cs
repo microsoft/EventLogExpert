@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Library.Helpers;
+using EventLogExpert.Options;
 using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
@@ -24,7 +26,9 @@ public partial class App : Application
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
         IState<SettingsState> settingsState,
         IUpdateService updateService,
-        IAppTitleService appTitleService)
+        IAppTitleService appTitleService,
+        FileLocationOptions fileLocationOptions,
+        ITraceLogger traceLogger)
     {
         InitializeComponent();
 
@@ -38,7 +42,9 @@ public partial class App : Application
                 loadedDatabasesState,
                 settingsState,
                 updateService,
-                appTitleService));
+                appTitleService,
+                fileLocationOptions,
+                traceLogger));
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
