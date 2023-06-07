@@ -176,12 +176,39 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
     {
+        var filterChanged = false;
+
+        if (action.EventFilter.AdvancedFilter != state.AppliedFilter.AdvancedFilter ||
+            action.EventFilter.DateFilter != state.AppliedFilter.DateFilter ||
+            action.EventFilter.Filters.Count != state.AppliedFilter.Filters.Count)
+        {
+            filterChanged = true;
+        }
+        else
+        {
+            for (var i = 0; i < action.EventFilter.Filters.Count; i++)
+            {
+                var actionFilterGroup = action.EventFilter.Filters[i];
+                var stateFilterGroup = state.AppliedFilter.Filters[i];
+                if (!actionFilterGroup.SequenceEqual(stateFilterGroup))
+                {
+                    filterChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (!filterChanged)
+        {
+            return state;
+        }
+
         var newState = state;
 
         foreach (var entry in state.ActiveLogs.Values)
         {
             EventLogData newLogData;
-            if (action.EventFilter.DateFilter is null && action.EventFilter.AdvancedFilter is null && action.EventFilter.Filters is null)
+            if (action.EventFilter.DateFilter is null && action.EventFilter.AdvancedFilter == "" && action.EventFilter.Filters is null)
             {
                 newLogData = entry with { FilteredEvents = entry.Events };
             }
@@ -390,12 +417,11 @@ public class EventLogReducers
                 e.TimeCreated <= eventFilter.DateFilter.Before);
         }
 
-        if (eventFilter.Filters?.Any() ?? false)
+        if (eventFilter.Filters.Any())
         {
             filteredEvents = filteredEvents.AsParallel()
                 .Where(e => eventFilter.Filters
-                    .Where(filter => filter is { IsEnabled: true, IsEditing: false })
-                    .All(filter => filter.Comparison
+                    .All(filter => filter
                         .Any(comp => comp(e))))
                 .AsQueryable();
 
