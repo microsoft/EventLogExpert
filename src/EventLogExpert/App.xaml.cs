@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
@@ -21,7 +22,9 @@ public partial class App : Application
         IStateSelection<SettingsState, bool> showLogState,
         IStateSelection<SettingsState, bool> showComputerState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
-        IState<SettingsState> settingsState)
+        IState<SettingsState> settingsState,
+        IUpdateService updateService,
+        IAppTitleService appTitleService)
     {
         InitializeComponent();
 
@@ -33,7 +36,9 @@ public partial class App : Application
                 showLogState,
                 showComputerState,
                 loadedDatabasesState,
-                settingsState));
+                settingsState,
+                updateService,
+                appTitleService));
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
+using EventLogExpert.Services;
 using EventLogExpert.Store;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
@@ -42,6 +43,12 @@ public static class MauiProgram
         builder.Services.AddTransient<IEventResolver, VersatileEventResolver>();
 
         builder.Services.AddSingleton<ILogWatcherService, LiveLogWatcherService>();
+
+        builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
+
+        builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
+
+        builder.Services.AddSingleton<IUpdateService, UpdateService>();
 
         return builder.Build();
     }

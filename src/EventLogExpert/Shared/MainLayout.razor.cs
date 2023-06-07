@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Services;
 using EventLogExpert.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -14,6 +15,10 @@ public partial class MainLayout : IDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
+    [Inject] private IUpdateService UpdateService { get; set; } = null!;
+
+    [Inject] private IAppTitleService AppTitleService { get; set; } = null!;
+
     public void Dispose()
     {
         ActionSubscriber.UnsubscribeFromAllActions(this);
@@ -24,8 +29,8 @@ public partial class MainLayout : IDisposable
     {
         if (firstRender)
         {
-            await Utils.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
-            Utils.UpdateAppTitle();
+            await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
+            AppTitleService.SetLogName(null);
         }
 
         await base.OnAfterRenderAsync(firstRender);

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
@@ -20,6 +21,8 @@ public partial class MainPage : ContentPage
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
+    private readonly IUpdateService _updateService;
+    private readonly IAppTitleService _appTitleService;
 
     public MainPage(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
@@ -28,12 +31,16 @@ public partial class MainPage : ContentPage
         IStateSelection<SettingsState, bool> showLogNameState,
         IStateSelection<SettingsState, bool> showComputerNameState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
-        IState<SettingsState> settingsState)
+        IState<SettingsState> settingsState,
+        IUpdateService updateService,
+        IAppTitleService appTitleService)
     {
         InitializeComponent();
 
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
+        _updateService = updateService;
+        _appTitleService = appTitleService;
 
         _activeLogsState = activeLogsState;
 
@@ -44,11 +51,11 @@ public partial class MainPage : ContentPage
             {
                 if (activeLogs == ImmutableDictionary<string, EventLogData>.Empty)
                 {
-                    Utils.UpdateAppTitle();
+                    _appTitleService.SetLogName(null);
                 }
                 else
                 {
-                    Utils.UpdateAppTitle(string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
+                    _appTitleService.SetLogName(string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
                 }
             });
 
@@ -142,7 +149,7 @@ public partial class MainPage : ContentPage
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
-        await Utils.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
+        await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
     {
