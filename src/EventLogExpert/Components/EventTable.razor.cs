@@ -22,6 +22,8 @@ public partial class EventTable
     [Inject]
     private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; set; } = null!;
 
+    [Inject] ITraceLogger TraceLogger { get; set; } = null!;
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -70,5 +72,5 @@ public partial class EventTable
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 
-    private void ToggleDateTime() => Dispatcher.Dispatch(new EventLogAction.SetSortDescending(!EventLogState.Value.SortDescending));
+    private void ToggleDateTime() => Dispatcher.Dispatch(new EventLogAction.SetSortDescending(!EventLogState.Value.SortDescending, TraceLogger));
 }

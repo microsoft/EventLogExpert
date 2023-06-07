@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
+using EventLogExpert.Library.Helpers;
+using EventLogExpert.Options;
 using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
@@ -23,6 +25,7 @@ public partial class MainPage : ContentPage
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IUpdateService _updateService;
     private readonly IAppTitleService _appTitleService;
+    private readonly ITraceLogger _traceLogger;
 
     public MainPage(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
@@ -33,7 +36,9 @@ public partial class MainPage : ContentPage
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
         IUpdateService updateService,
-        IAppTitleService appTitleService)
+        IAppTitleService appTitleService,
+        FileLocationOptions fileLocationOptions,
+        ITraceLogger traceLogger)
     {
         InitializeComponent();
 
@@ -41,6 +46,7 @@ public partial class MainPage : ContentPage
         _settingsState = settingsState;
         _updateService = updateService;
         _appTitleService = appTitleService;
+        _traceLogger = traceLogger;
 
         _activeLogsState = activeLogsState;
 
@@ -80,7 +86,7 @@ public partial class MainPage : ContentPage
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
-            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path => Path.Join(Utils.DatabasePath, path)));
+            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path => Path.Join(fileLocationOptions.DatabasePath, path)));
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
@@ -155,17 +161,17 @@ public partial class MainPage : ContentPage
     {
         if (((MenuFlyoutItem)sender).Text == "Continuously Update")
         {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true));
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true, _traceLogger));
         }
         else
         {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false));
+            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false, _traceLogger));
         }
     }
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e)
     {
-        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents(_traceLogger));
     }
 
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)

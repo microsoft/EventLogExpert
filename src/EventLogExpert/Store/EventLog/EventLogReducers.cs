@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
 using EventLogExpert.Services;
 using Fluxor;
@@ -36,8 +37,8 @@ public class EventLogReducers
         {
             newState = newState with
             {
-                ActiveLogs = DistributeEventsToManyLogs(newState.ActiveLogs, newEvent, state.AppliedFilter, state.SortDescending),
-                CombinedEvents = AddEventsToCombinedLog(state.CombinedEvents, newEvent, state.AppliedFilter, state.SortDescending)
+                ActiveLogs = DistributeEventsToManyLogs(newState.ActiveLogs, newEvent, state.AppliedFilter, state.SortDescending, action.TraceLogger),
+                CombinedEvents = AddEventsToCombinedLog(state.CombinedEvents, newEvent, state.AppliedFilter, state.SortDescending, action.TraceLogger)
                     .ToList().AsReadOnly()
             };
         }
@@ -61,9 +62,9 @@ public class EventLogReducers
             newLogsCollection = state.ActiveLogs.Remove(action.LogName);
         }
 
-        var filtered = GetFilteredEvents(action.Events, state.AppliedFilter, out var needsSort);
+        var filtered = GetFilteredEvents(action.Events, state.AppliedFilter, out var needsSort, action.TraceLogger);
         // We always sort in LoadEvents, so we don't care about needsSort here.
-        filtered = SortOneLog(filtered, state.SortDescending);
+        filtered = SortOneLog(filtered, state.SortDescending, action.TraceLogger);
 
         newLogsCollection = newLogsCollection.Add(action.LogName, new EventLogData
         (
@@ -79,7 +80,7 @@ public class EventLogReducers
             action.AllKeywords.ToImmutableHashSet()
         ));
 
-        var newCombinedEvents = CombineLogs(newLogsCollection.Values.Select(l => l.FilteredEvents), state.SortDescending);
+        var newCombinedEvents = CombineLogs(newLogsCollection.Values.Select(l => l.FilteredEvents), state.SortDescending, action.TraceLogger);
 
         return state with { ActiveLogs = newLogsCollection, CombinedEvents = newCombinedEvents.ToList().AsReadOnly() };
     }
@@ -87,7 +88,7 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceLoadNewEvents(EventLogState state, EventLogAction.LoadNewEvents action)
     {
-        return ProcessNewEventBuffer(state);
+        return ProcessNewEventBuffer(state, action.TraceLogger);
     }
 
     [ReducerMethod]
@@ -148,7 +149,7 @@ public class EventLogReducers
         var newState = state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
         if (action.ContinuouslyUpdate)
         {
-            newState = ProcessNewEventBuffer(newState);
+            newState = ProcessNewEventBuffer(newState, action.TraceLogger);
         }
 
         return newState;
@@ -215,10 +216,10 @@ public class EventLogReducers
             }
             else
             {
-                var filteredEvents = GetFilteredEvents(entry.Events, action.EventFilter, out var needsSort);
+                var filteredEvents = GetFilteredEvents(entry.Events, action.EventFilter, out var needsSort, action.TraceLogger);
                 if (needsSort)
                 {
-                    filteredEvents = SortOneLog(filteredEvents, state.SortDescending);
+                    filteredEvents = SortOneLog(filteredEvents, state.SortDescending, action.TraceLogger);
                 }
 
                 newLogData = entry with { FilteredEvents = filteredEvents.ToList().AsReadOnly() };
@@ -230,7 +231,7 @@ public class EventLogReducers
             };
         }
 
-        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending);
+        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending, action.TraceLogger);
 
         newState = newState with
         {
@@ -252,11 +253,11 @@ public class EventLogReducers
         {
             newActiveLogs = newActiveLogs.Remove(logData.Name).Add(logData.Name, logData with
             {
-                FilteredEvents = SortOneLog(logData.FilteredEvents, action.SortDescending).ToList().AsReadOnly()
+                FilteredEvents = SortOneLog(logData.FilteredEvents, action.SortDescending, action.TraceLogger).ToList().AsReadOnly()
             }); ;
         }
 
-        var newCombinedEvents = CombineLogs(newActiveLogs.Values.Select(l => l.FilteredEvents), action.SortDescending);
+        var newCombinedEvents = CombineLogs(newActiveLogs.Values.Select(l => l.FilteredEvents), action.SortDescending, action.TraceLogger);
 
         return state with
         {
@@ -278,9 +279,9 @@ public class EventLogReducers
     /// <param name="filter"></param>
     /// <param name="sortDescending"></param>
     /// <returns></returns>
-    private static IEnumerable<DisplayEventModel> AddEventsToCombinedLog(IEnumerable<DisplayEventModel> combinedLog, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending)
+    private static IEnumerable<DisplayEventModel> AddEventsToCombinedLog(IEnumerable<DisplayEventModel> combinedLog, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending, ITraceLogger traceLogger)
     {
-        var newEventsMatchingFilter = GetFilteredEvents(eventsToAdd, filter, out var needsSort);
+        var newEventsMatchingFilter = GetFilteredEvents(eventsToAdd, filter, out var needsSort, traceLogger);
 
         if (newEventsMatchingFilter.Count() > 1 && needsSort)
         {
@@ -298,12 +299,12 @@ public class EventLogReducers
     /// <param name="filter"></param>
     /// <param name="sortDescending"></param>
     /// <returns></returns>
-    private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending)
+    private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd, EventFilter filter, bool sortDescending, ITraceLogger traceLogger)
     {
         var eventsToAddDescending = eventsToAdd.OrderByDescending(e => e.RecordId);
 
-        var filteredEventsToAdd = GetFilteredEvents(eventsToAdd, filter, out var needsSort);
-        var sortedFilteredEventsToAdd = SortOneLog(filteredEventsToAdd, sortDescending);
+        var filteredEventsToAdd = GetFilteredEvents(eventsToAdd, filter, out var needsSort, traceLogger);
+        var sortedFilteredEventsToAdd = SortOneLog(filteredEventsToAdd, sortDescending, traceLogger);
 
         // Events collection is always sorted descending by record ID.
         var updatedEvents = eventsToAddDescending.Concat(logData.Events);
@@ -331,9 +332,9 @@ public class EventLogReducers
     /// <param name="eventData"></param>
     /// <param name="sortDescending"></param>
     /// <returns></returns>
-    private static IEnumerable<DisplayEventModel> CombineLogs(IEnumerable<IEnumerable<DisplayEventModel>> eventData, bool sortDescending)
+    private static IEnumerable<DisplayEventModel> CombineLogs(IEnumerable<IEnumerable<DisplayEventModel>> eventData, bool sortDescending, ITraceLogger traceLogger)
     {
-        Utils.Trace($"{nameof(CombineLogs)} was called for {eventData.Count()} logs.");
+        traceLogger.Trace($"{nameof(CombineLogs)} was called for {eventData.Count()} logs.");
 
         if (eventData.Count() == 1)
         {
@@ -363,7 +364,8 @@ public class EventLogReducers
         ImmutableDictionary<string, EventLogData> logsToUpdate, 
         IEnumerable<DisplayEventModel> eventsToDistribute, 
         EventFilter filter, 
-        bool sortDescending)
+        bool sortDescending,
+        ITraceLogger traceLogger)
     {
         var newLogs = logsToUpdate;
 
@@ -372,7 +374,7 @@ public class EventLogReducers
             var newEventsForThisLog = eventsToDistribute.Where(e => e.OwningLog == log.Name);
             if (newEventsForThisLog.Any())
             {
-                var newLogData = AddEventsToOneLog(log, newEventsForThisLog, filter, sortDescending);
+                var newLogData = AddEventsToOneLog(log, newEventsForThisLog, filter, sortDescending, traceLogger);
                 newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);
             }
         }
@@ -403,9 +405,9 @@ public class EventLogReducers
     ///     This lets the caller know that this has occurred.
     /// </param>
     /// <returns></returns>
-    private static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter, out bool needsSort)
+    private static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter, out bool needsSort, ITraceLogger traceLogger)
     {
-        Utils.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
+        traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
 
         needsSort = false;
 
@@ -437,14 +439,14 @@ public class EventLogReducers
         return filteredEvents;
     }
 
-    private static EventLogState ProcessNewEventBuffer(EventLogState state)
+    private static EventLogState ProcessNewEventBuffer(EventLogState state, ITraceLogger traceLogger)
     {
         var newState = state with
         {
-            ActiveLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer, state.AppliedFilter, state.SortDescending)
+            ActiveLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer, state.AppliedFilter, state.SortDescending, traceLogger)
         };
 
-        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending);
+        var newCombinedEvents = CombineLogs(newState.ActiveLogs.Values.Select(l => l.FilteredEvents), state.SortDescending, traceLogger);
 
         newState = newState with
         {
@@ -462,9 +464,9 @@ public class EventLogReducers
     /// <param name="events"></param>
     /// <param name="sortDescending"></param>
     /// <returns></returns>
-    private static IEnumerable<DisplayEventModel> SortOneLog(IEnumerable<DisplayEventModel> events, bool sortDescending)
+    private static IEnumerable<DisplayEventModel> SortOneLog(IEnumerable<DisplayEventModel> events, bool sortDescending, ITraceLogger traceLogger)
     {
-        Utils.Trace($"{nameof(SortOneLog)} was called.");
+        traceLogger.Trace($"{nameof(SortOneLog)} was called.");
 
         if (sortDescending) return events.OrderByDescending(e => e.RecordId);
 

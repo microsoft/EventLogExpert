@@ -162,7 +162,7 @@ public class LiveLogWatcherService : ILogWatcherService
                     }
 
                     var resolved = _resolver.Resolve(eventArgs.EventRecord, LogName);
-                    _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
+                    _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved, _debugLogger));
                 }
             };
 

@@ -3,7 +3,7 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Models;
-using EventLogExpert.Services;
+using EventLogExpert.Options;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using Fluxor;
@@ -22,6 +22,8 @@ public partial class SettingsModal
     [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
 
     [Inject] private IDatabaseCollectionProvider DatabaseCollectionProvider { get; set; } = null!;
+
+    [Inject] private FileLocationOptions FileLocationOptions { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -73,16 +75,16 @@ public partial class SettingsModal
             // User canceled or no files selected
             if (!result.Any()) { return; }
 
-            Directory.CreateDirectory(Utils.DatabasePath);
+            Directory.CreateDirectory(FileLocationOptions.DatabasePath);
 
             foreach (var item in result)
             {
-                var destination = Path.Join(Utils.DatabasePath, item.FileName);
+                var destination = Path.Join(FileLocationOptions.DatabasePath, item.FileName);
                 File.Copy(item.FullPath, destination, true);
 
                 if (Path.GetExtension(destination) == ".zip")
                 {
-                    ZipFile.ExtractToDirectory(destination, Utils.DatabasePath, overwriteFiles: true);
+                    ZipFile.ExtractToDirectory(destination, FileLocationOptions.DatabasePath, overwriteFiles: true);
                     File.Delete(destination);
                 }
             }
@@ -133,7 +135,7 @@ public partial class SettingsModal
 
         try
         {
-            var destination = Path.Join(Utils.DatabasePath, database);
+            var destination = Path.Join(FileLocationOptions.DatabasePath, database);
             File.Delete(destination);
         }
         catch

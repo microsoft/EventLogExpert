@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
-using EventLogExpert.Services;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
 using EventLogExpert.Store.Settings;
@@ -26,6 +26,8 @@ public partial class FilterPane
     private bool _isAdvancedFilterVisible;
     private bool _isDateFilterVisible;
     private bool _isFilterListVisible;
+
+    [Inject] ITraceLogger TraceLogger { get; set; } = null!;
 
     private string MenuState
     {
@@ -51,7 +53,7 @@ public partial class FilterPane
         {
             if (sender is State<FilterPaneState> filterPaneState)
             {
-                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value)));
+                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value), TraceLogger));
             }
         };
 

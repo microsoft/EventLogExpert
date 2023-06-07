@@ -3,6 +3,7 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
+using EventLogExpert.Options;
 using EventLogExpert.Services;
 using EventLogExpert.Store;
 using EventLogExpert.Store.EventLog;
@@ -14,8 +15,11 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
-        Utils.InitTracing();
+        var fileLocationOptions = new FileLocationOptions();
 
+        // Do this immediately to initialize debug logigng
+        var debugLogService = new DebugLogService(fileLocationOptions);
+        
         var builder = MauiApp.CreateBuilder();
 
         builder
@@ -28,7 +32,7 @@ public static class MauiProgram
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddBlazorWebViewDeveloperTools();
 
-        builder.Services.AddSingleton<ITraceLogger>(new DebugLogger(Utils.Trace));
+        builder.Services.AddSingleton<ITraceLogger>(debugLogService);
 
         builder.Services.AddFluxor(options =>
         {
@@ -36,7 +40,7 @@ public static class MauiProgram
             options.AddMiddleware<LoggingMiddleware>();
         });
 
-        Directory.CreateDirectory(Utils.DatabasePath);
+        Directory.CreateDirectory(fileLocationOptions.DatabasePath);
 
         builder.Services.AddSingleton<IDatabaseCollectionProvider, DatabaseCollectionProvider>();
 
@@ -49,6 +53,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
 
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
+
+        builder.Services.AddSingleton<FileLocationOptions, FileLocationOptions>();
 
         return builder.Build();
     }
