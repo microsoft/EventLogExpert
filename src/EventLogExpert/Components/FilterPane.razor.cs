@@ -6,6 +6,7 @@ using EventLogExpert.Library.Models;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
 using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Models;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;

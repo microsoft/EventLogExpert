@@ -16,6 +16,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Test", "Even
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.EventDbTool", "EventLogExpert.EventDbTool\EventLogExpert.EventDbTool.csproj", "{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.UI", "EventLogExpert.UI\EventLogExpert.UI.csproj", "{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -40,6 +42,10 @@ Global
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Debug|x64.Build.0 = Debug|x64
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Release|x64.ActiveCfg = Release|x64
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Release|x64.Build.0 = Release|x64
+		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Debug|x64.ActiveCfg = Debug|x64
+		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Debug|x64.Build.0 = Debug|x64
+		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Release|x64.ActiveCfg = Release|Any CPU
+		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

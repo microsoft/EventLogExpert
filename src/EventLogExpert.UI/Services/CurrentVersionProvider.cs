@@ -3,7 +3,7 @@
 
 using Windows.ApplicationModel;
 
-namespace EventLogExpert.Services;
+namespace EventLogExpert.UI.Services;
 
 public interface ICurrentVersionProvider
 {

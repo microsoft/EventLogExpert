@@ -1,4 +1,5 @@
 using EventLogExpert.Library.Helpers;
+using EventLogExpert.UI;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
@@ -7,10 +8,10 @@ public partial class FilterValueSelect
 {
     private bool _isDropDownVisible;
     private List<string> _items = new();
-    private FilterType _type;
+    private UI.FilterType _type;
 
     [Parameter]
-    public FilterType Type
+    public UI.FilterType Type
     {
         get => _type;
         set

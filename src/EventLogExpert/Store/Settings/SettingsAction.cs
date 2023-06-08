@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
+using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.Store.Settings;
 

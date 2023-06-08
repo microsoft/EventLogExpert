@@ -3,11 +3,13 @@
 
 using EventLogExpert.Library.EventResolvers;
 using EventLogExpert.Library.Helpers;
-using EventLogExpert.Options;
-using EventLogExpert.Services;
+using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Services;
 using EventLogExpert.Store;
 using EventLogExpert.Store.EventLog;
 using Fluxor;
+using EventLogExpert.Services;
+using EventLogExpert.UI.Interfaces;
 
 namespace EventLogExpert;
 
@@ -15,7 +17,7 @@ public static class MauiProgram
 {
     public static MauiApp CreateMauiApp()
     {
-        var fileLocationOptions = new FileLocationOptions();
+        var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
 
         // Do this immediately to initialize debug logigng
         var debugLogService = new DebugLogService(fileLocationOptions);
@@ -50,11 +52,23 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
 
+        builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
+
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
 
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
 
-        builder.Services.AddSingleton<FileLocationOptions, FileLocationOptions>();
+        builder.Services.AddSingleton<IGitHubService, GitHubService>();
+
+        builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
+
+        builder.Services.AddSingleton<FileLocationOptions>(fileLocationOptions);
+
+        builder.Services.AddSingleton<IMainThreadService>(new MainThreadService(MainThread.InvokeOnMainThreadAsync));
+
+        builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
+            (title, message, cancel) => Application.Current!.MainPage!.DisplayAlert(title, message, cancel),
+            async (title, message, accept, cancel) => await Application.Current!.MainPage!.DisplayAlert(title, message, accept, cancel)));
 
         return builder.Build();
     }

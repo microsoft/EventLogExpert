@@ -1,10 +1,12 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Library.Helpers;
 using EventLogExpert.Library.Models;
+using EventLogExpert.UI.Models;
 using System.Text;
 
-namespace EventLogExpert.Library.Helpers;
+namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {

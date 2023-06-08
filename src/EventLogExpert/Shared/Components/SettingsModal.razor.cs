@@ -2,10 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Options;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Options;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;

@@ -3,14 +3,14 @@
     {
         <div class="filter-content">
             <span>Filter On: </span>
-            <FilterSelect @bind-Value="Value.FilterType" InputType="FilterType" />
+            <FilterSelect @bind-Value="Value.FilterType" InputType="UI.FilterType" />
 
             <span>Comparison: </span>
-            <FilterSelect @bind-Value="Value.FilterComparison" InputType="FilterComparison" />
+            <FilterSelect @bind-Value="Value.FilterComparison" InputType="UI.FilterComparison" />
 
             <span>Value: </span>
             <div>
-                @if (Value.FilterType is FilterType.Description)
+                @if (Value.FilterType is UI.FilterType.Description)
                 {
                     <FilterInput @bind-Value="@Value.FilterValue" />
                 }

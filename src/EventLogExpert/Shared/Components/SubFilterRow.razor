@@ -1,13 +1,13 @@
 ﻿<div class="subfilter-row">
     <div class="filter-content">
         <span>Join On: </span>
-        <FilterSelect @bind-Value="Value.FilterType" InputType="FilterType" />
+        <FilterSelect @bind-Value="Value.FilterType" InputType="UI.FilterType" />
 
         <span>Comparison: </span>
-        <FilterSelect @bind-Value="Value.FilterComparison" InputType="FilterComparison" />
+        <FilterSelect @bind-Value="Value.FilterComparison" InputType="UI.FilterComparison" />
 
         <span>Value: </span>
-        @if (Value.FilterType is FilterType.Description)
+        @if (Value.FilterType is UI.FilterType.Description)
         {
             <FilterInput @bind-Value="@Value.FilterValue" />
         }

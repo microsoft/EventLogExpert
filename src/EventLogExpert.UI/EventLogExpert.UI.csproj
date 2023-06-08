@@ -8,8 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="7.0.5" />
-    <PackageReference Include="System.Diagnostics.EventLog" Version="7.0.0" />
+    <ProjectReference Include="..\EventLogExpert.Library\EventLogExpert.Library.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Services;
 using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Services;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -29,7 +29,7 @@ public partial class MainLayout : IDisposable
     {
         if (firstRender)
         {
-            await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled);
+            await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
             AppTitleService.SetLogName(null);
         }
 

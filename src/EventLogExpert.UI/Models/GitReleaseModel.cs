@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.Models;
+namespace EventLogExpert.UI.Models;
 
 public record GitReleaseModel
 {
