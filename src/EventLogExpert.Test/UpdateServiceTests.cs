@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Test.Services;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;

@@ -1,11 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Library.Providers;
+namespace EventLogExpert.Eventing.Providers;
 
 public class RegistryProvider
 {

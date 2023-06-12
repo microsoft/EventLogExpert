@@ -5,7 +5,7 @@ VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert", "EventLogExpert\EventLogExpert.csproj", "{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Library", "EventLogExpert.Library\EventLogExpert.Library.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Eventing", "EventLogExpert.Eventing\EventLogExpert.Eventing.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5F157DE7-62EB-4577-834B-58EA31AEC78B}"
 	ProjectSection(SolutionItems) = preProject

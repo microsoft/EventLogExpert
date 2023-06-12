@@ -1,9 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
+using EventLogExpert.Eventing.Models;
 
-namespace EventLogExpert.Library.Providers;
+namespace EventLogExpert.Eventing.Providers;
 
 public class ProviderDetails
 {

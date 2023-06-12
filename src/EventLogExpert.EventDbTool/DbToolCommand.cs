@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.Providers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 

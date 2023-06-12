@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using static EventLogExpert.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.Store.EventLog;

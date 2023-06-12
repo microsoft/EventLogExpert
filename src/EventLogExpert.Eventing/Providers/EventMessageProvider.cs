@@ -1,19 +1,19 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Library.Providers;
+namespace EventLogExpert.Eventing.Providers;
 
 /// <summary>
 ///     Represents an event provider from a particular machine.
 /// </summary>
 public class EventMessageProvider
 {
-    private static HashSet<string> _allProviderNames = (new EventLogSession()).GetProviderNames().ToHashSet();
+    private static HashSet<string> _allProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;
     private readonly Action<string> _traceAction;
@@ -68,13 +68,13 @@ public class EventMessageProvider
             else
             {
                 _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.");
-                provider.Messages = LoadMessagesFromDlls(new [] {providerMetadata.MessageFilePath});
+                provider.Messages = LoadMessagesFromDlls(new[] { providerMetadata.MessageFilePath });
             }
         }
 
         if (providerMetadata?.ParameterFilePath != null)
         {
-            provider.Parameters = LoadMessagesFromDlls(new [] {providerMetadata.ParameterFilePath});
+            provider.Parameters = LoadMessagesFromDlls(new[] { providerMetadata.ParameterFilePath });
         }
 
         if (provider.Events == null && provider.Messages == null)
@@ -126,7 +126,7 @@ public class EventMessageProvider
 
         foreach (var file in legacyProviderFiles)
         {
-            var hModule = IntPtr.Zero;
+            var hModule = nint.Zero;
 
             try
             {
@@ -140,7 +140,7 @@ public class EventMessageProvider
                  * issue.
                  */
 
-                hModule = NativeMethods.LoadLibraryEx(file, IntPtr.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+                hModule = NativeMethods.LoadLibraryEx(file, nint.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
 
                 // TODO: Evaulate if there's any need to EnumResourceTypes.
                 // This is an alternative approach to FindResource. Leaving it here until we're sure FindResource is good enough.
@@ -149,7 +149,7 @@ public class EventMessageProvider
                 var msgTableInfo =
                     NativeMethods.FindResource(hModule, 1, NativeMethods.RT_MESSAGETABLE);
 
-                if (msgTableInfo == IntPtr.Zero)
+                if (msgTableInfo == nint.Zero)
                 {
                     _traceAction($"No message table found. Returning 0 messages from file: {file}");
                     continue;
@@ -159,19 +159,19 @@ public class EventMessageProvider
                 var memTable = NativeMethods.LockResource(msgTable);
 
                 var numberOfBlocks = Marshal.ReadInt32(memTable);
-                var blockPtr = IntPtr.Add(memTable, 4);
+                var blockPtr = nint.Add(memTable, 4);
                 var blockSize = Marshal.SizeOf<NativeMethods.MESSAGE_RESOURCE_BLOCK>();
 
                 for (var i = 0; i < numberOfBlocks; i++)
                 {
                     var block = Marshal.PtrToStructure<NativeMethods.MESSAGE_RESOURCE_BLOCK>(blockPtr);
-                    var entryPtr = IntPtr.Add(memTable, block.OffsetToEntries);
+                    var entryPtr = nint.Add(memTable, block.OffsetToEntries);
 
                     for (var id = block.LowId; id <= block.HighId; id++)
                     {
                         var length = Marshal.ReadInt16(entryPtr);
                         var flags = Marshal.ReadInt16(entryPtr, 2);
-                        var textPtr = IntPtr.Add(entryPtr, 4);
+                        var textPtr = nint.Add(entryPtr, 4);
                         string text;
 
                         if (flags == 0)
@@ -204,16 +204,16 @@ public class EventMessageProvider
                         });
 
                         // Advance to the next id
-                        entryPtr = IntPtr.Add(entryPtr, length);
+                        entryPtr = nint.Add(entryPtr, length);
                     }
 
                     // Advance to the next block
-                    blockPtr = IntPtr.Add(blockPtr, blockSize);
+                    blockPtr = nint.Add(blockPtr, blockSize);
                 }
             }
             finally
             {
-                if (hModule != IntPtr.Zero)
+                if (hModule != nint.Zero)
                 {
                     NativeMethods.FreeLibrary(hModule);
                 }
@@ -223,7 +223,7 @@ public class EventMessageProvider
         return messages;
     }
 
-    private static bool GetMessagesFromOneResource(IntPtr hModule, string lpszType, IntPtr lParam)
+    private static bool GetMessagesFromOneResource(nint hModule, string lpszType, nint lParam)
     {
         // No need to implement this as long as we can use FindResource instead.
         return true;
@@ -273,7 +273,7 @@ public class EventMessageProvider
             provider.Keywords = providerMetadata.Keywords
                 .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
                 .ToDictionary(p => p.Key, p => p.Value);
-                
+
         }
         catch (Exception ex)
         {

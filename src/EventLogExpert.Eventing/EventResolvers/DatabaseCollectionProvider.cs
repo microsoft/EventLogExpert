@@ -1,10 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 public class DatabaseCollectionProvider : IDatabaseCollectionProvider
 {

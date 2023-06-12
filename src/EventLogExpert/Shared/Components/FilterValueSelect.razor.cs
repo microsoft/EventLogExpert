@@ -1,4 +1,4 @@
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using Microsoft.AspNetCore.Components;
 

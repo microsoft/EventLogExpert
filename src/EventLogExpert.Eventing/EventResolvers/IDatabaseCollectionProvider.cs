@@ -3,7 +3,7 @@
 
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 public interface IDatabaseCollectionProvider
 {

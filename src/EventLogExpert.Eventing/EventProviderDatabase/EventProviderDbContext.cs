@@ -1,13 +1,13 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
 using Microsoft.EntityFrameworkCore;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 using System.Text.Json;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 
-namespace EventLogExpert.Library.EventProviderDatabase;
+namespace EventLogExpert.Eventing.EventProviderDatabase;
 
 public class EventProviderDbContext : DbContext
 {

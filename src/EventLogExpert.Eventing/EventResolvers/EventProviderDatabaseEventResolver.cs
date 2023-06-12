@@ -1,15 +1,15 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventProviderDatabase;
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {

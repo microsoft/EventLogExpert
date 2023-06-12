@@ -7,13 +7,13 @@ using System.Runtime.InteropServices;
 // We are defining some win32 types in this file, so we
 // are not following the usual C# naming conventions.
 
-namespace EventLogExpert.Library.Helpers;
+namespace EventLogExpert.Eventing.Helpers;
 
 public class NativeMethods
 {
     public const int RT_MESSAGETABLE = 11;
 
-    public delegate bool EnumResTypeProc(IntPtr hModule, string lpszType, IntPtr lParam);
+    public delegate bool EnumResTypeProc(nint hModule, string lpszType, nint lParam);
 
     [Flags]
     public enum LoadLibraryFlags : uint
@@ -33,25 +33,25 @@ public class NativeMethods
     }
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool EnumResourceTypes(IntPtr hModule, EnumResTypeProc lpEnumFunc, IntPtr lParam);
+    public static extern bool EnumResourceTypes(nint hModule, EnumResTypeProc lpEnumFunc, nint lParam);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr FindResource(IntPtr hModule, int lpID, int lpType);
+    public static extern nint FindResource(nint hModule, int lpID, int lpType);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern bool FreeLibrary(IntPtr hModule);
+    public static extern bool FreeLibrary(nint hModule);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr LoadLibrary(string fileName);
+    public static extern nint LoadLibrary(string fileName);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr LoadLibraryEx(string lpFileName, IntPtr hReservedNull, LoadLibraryFlags dwFlags);
+    public static extern nint LoadLibraryEx(string lpFileName, nint hReservedNull, LoadLibraryFlags dwFlags);
 
     [DllImport("kernel32.dll", SetLastError = true)]
-    public static extern IntPtr LoadResource(IntPtr hModule, IntPtr hResInfo);
+    public static extern nint LoadResource(nint hModule, nint hResInfo);
 
     [DllImport("kernel32.dll")]
-    public static extern IntPtr LockResource(IntPtr hResData);
+    public static extern nint LockResource(nint hResData);
 
     [StructLayout(LayoutKind.Sequential)]
     public struct MESSAGE_RESOURCE_BLOCK

@@ -1,14 +1,14 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>
 ///     Resolves event descriptions by using our own logic to look up
