@@ -1,14 +1,14 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 public class EventResolverBase
 {
@@ -64,7 +64,7 @@ public class EventResolverBase
                     else if (anyParameterStrings && propValue is string propString && propString.StartsWith("%%"))
                     {
                         var endParameterId = propString.IndexOf(' ');
-                        var parameterIdString = (endParameterId > 2) ? propString.Substring(2, endParameterId - 2) : propString.Substring(2);
+                        var parameterIdString = endParameterId > 2 ? propString.Substring(2, endParameterId - 2) : propString.Substring(2);
                         if (int.TryParse(parameterIdString, out var parameterId))
                         {
                             var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
@@ -76,7 +76,7 @@ public class EventResolverBase
                             }
                         }
                     }
-                    
+
                     if (!valueFormatted)
                     {
                         sb.Append(propValue);

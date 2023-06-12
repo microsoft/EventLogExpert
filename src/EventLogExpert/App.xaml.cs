@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.Settings;
 using EventLogExpert.UI.Options;

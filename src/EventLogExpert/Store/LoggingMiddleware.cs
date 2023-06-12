@@ -1,4 +1,4 @@
-﻿using EventLogExpert.Library.Helpers;
+﻿using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Store.EventLog;
 using EventLogExpert.Store.FilterPane;
 using Fluxor;

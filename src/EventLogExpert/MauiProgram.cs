@@ -1,8 +1,6 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Helpers;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.Store;
@@ -10,6 +8,8 @@ using EventLogExpert.Store.EventLog;
 using Fluxor;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 
 namespace EventLogExpert;
 

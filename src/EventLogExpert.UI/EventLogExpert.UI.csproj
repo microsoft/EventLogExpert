@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.Library\EventLogExpert.Library.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 
 </Project>

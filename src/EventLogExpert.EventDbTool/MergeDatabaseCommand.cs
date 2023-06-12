@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventProviderDatabase;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.EventProviderDatabase;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;

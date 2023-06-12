@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Library.Helpers;
+namespace EventLogExpert.Eventing.Helpers;
 
 public enum SeverityLevel
 {

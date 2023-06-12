@@ -4,7 +4,7 @@
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Text.Json;
 
-namespace EventLogExpert.Library.EventProviderDatabase;
+namespace EventLogExpert.Eventing.EventProviderDatabase;
 
 public class JsonValueConverter<T> : ValueConverter<T, string> where T : class
 {
@@ -14,7 +14,7 @@ public class JsonValueConverter<T> : ValueConverter<T, string> where T : class
 
     private static string ConvertToJson(T value)
     {
-        return JsonSerializer.Serialize<T>(value);
+        return JsonSerializer.Serialize(value);
     }
 
     private static T ConvertFromJson(string value)

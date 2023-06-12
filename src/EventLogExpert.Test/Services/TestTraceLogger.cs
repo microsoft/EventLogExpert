@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using Xunit.Abstractions;
 
 namespace EventLogExpert.Test.Services;

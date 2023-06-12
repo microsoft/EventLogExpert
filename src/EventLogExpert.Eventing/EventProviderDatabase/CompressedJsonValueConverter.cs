@@ -6,7 +6,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.Json;
 
-namespace EventLogExpert.Library.EventProviderDatabase;
+namespace EventLogExpert.Eventing.EventProviderDatabase;
 
 public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T : class
 {
@@ -16,7 +16,7 @@ public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T
 
     public static byte[] ConvertToCompressedJson(T value)
     {
-        var json = JsonSerializer.Serialize<T>(value);
+        var json = JsonSerializer.Serialize(value);
         var buffer = Encoding.UTF8.GetBytes(json);
         MemoryStream memoryStream = new MemoryStream();
         using (GZipStream gZipStream = new GZipStream(memoryStream, CompressionLevel.SmallestSize))

@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using Moq;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;

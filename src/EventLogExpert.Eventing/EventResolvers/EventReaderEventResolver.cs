@@ -1,11 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using System.Diagnostics.Eventing.Reader;
 
-namespace EventLogExpert.Library.EventResolvers;
+namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>
 ///     Resolves event descriptions using the FormatDescription method

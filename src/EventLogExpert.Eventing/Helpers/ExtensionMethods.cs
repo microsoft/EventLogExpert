@@ -3,7 +3,7 @@
 
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Library.Helpers;
+namespace EventLogExpert.Eventing.Helpers;
 
 public static class ExtensionMethods
 {

@@ -1,9 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventProviderDatabase;
-using EventLogExpert.Library.Models;
-using EventLogExpert.Library.Providers;
+using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.CommandLine;

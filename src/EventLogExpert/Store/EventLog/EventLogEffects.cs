@@ -1,9 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.EventResolvers;
-using EventLogExpert.Library.Helpers;
-using EventLogExpert.Library.Models;
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.Store.StatusBar;
 using Fluxor;
 using System.Collections.Immutable;

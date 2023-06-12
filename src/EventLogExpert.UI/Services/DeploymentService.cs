@@ -1,10 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
 using Windows.Management.Deployment;
 using Windows.Foundation;
 using System.Reflection;
+using EventLogExpert.Eventing.Helpers;
 
 namespace EventLogExpert.UI.Services;
 

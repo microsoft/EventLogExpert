@@ -1,11 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Library.Helpers;
+using EventLogExpert.Eventing.Helpers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 
-namespace EventLogExpert.Library.Models;
+namespace EventLogExpert.Eventing.Models;
 
 public record DisplayEventModel(
     long? RecordId,
@@ -35,7 +35,7 @@ public record DisplayEventModel(
             $"    <EventID{(Qualifiers.HasValue ? $" Qualifiers=\"{Qualifiers.Value}\"" : "")}>{Id}</EventID>\r\n" +
             $"    <Level>{Level}</Level>\r\n" +
             $"    <Task>{TaskCategory}</Task>\r\n" +
-            $"    <Keywords>{(Keywords.HasValue ? ("0x" + Keywords.Value.ToString("X")) : "0x0")}</Keywords>\r\n" +
+            $"    <Keywords>{(Keywords.HasValue ? "0x" + Keywords.Value.ToString("X") : "0x0")}</Keywords>\r\n" +
             $"    <TimeCreated SystemTime=\"{TimeCreated.ToUniversalTime():o}\" />\r\n" +
             $"    <EventRecordID>{RecordId}</EventRecordID>\r\n" +
             $"    <Channel>{LogName}</Channel>\r\n" +
