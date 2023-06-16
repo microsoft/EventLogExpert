@@ -5,7 +5,7 @@ using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Store.FilterPane;
+namespace EventLogExpert.UI.Store.FilterPane;
 
 public class FilterPaneReducers
 {

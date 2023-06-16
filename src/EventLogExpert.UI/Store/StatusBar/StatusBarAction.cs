@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Store.StatusBar;
+namespace EventLogExpert.UI.Store.StatusBar;
 
 public record StatusBarAction
 {

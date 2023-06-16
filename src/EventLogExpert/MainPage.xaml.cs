@@ -3,8 +3,8 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Store.EventLog;
-using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using Fluxor;
@@ -13,7 +13,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using static EventLogExpert.Store.EventLog.EventLogState;
+using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;

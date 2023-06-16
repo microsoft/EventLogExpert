@@ -3,7 +3,7 @@
 
 using Fluxor;
 
-namespace EventLogExpert.Store.StatusBar;
+namespace EventLogExpert.UI.Store.StatusBar;
 
 [FeatureState(MaximumStateChangedNotificationsPerSecond = 1)]
 public record StatusBarState

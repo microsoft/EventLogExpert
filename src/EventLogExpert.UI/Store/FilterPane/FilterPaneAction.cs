@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.Store.FilterPane;
+namespace EventLogExpert.UI.Store.FilterPane;
 
 public record FilterPaneAction
 {
@@ -17,7 +17,7 @@ public record FilterPaneAction
 
     public record RemoveFilter(Guid Id);
 
-    public record AddSubFilter(Guid ParentId, FilterMode? FilterMode = null);
+    public record AddSubFilter(Guid ParentId);
 
     public record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
 

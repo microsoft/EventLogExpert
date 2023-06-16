@@ -4,14 +4,15 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Store.StatusBar;
+using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
+using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Store.EventLog;
+namespace EventLogExpert.UI.Store.EventLog;
 
 public class EventLogEffects
 {

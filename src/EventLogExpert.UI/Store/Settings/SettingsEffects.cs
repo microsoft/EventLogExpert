@@ -2,26 +2,31 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Services;
 using Fluxor;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Store.Settings;
+namespace EventLogExpert.UI.Store.Settings;
 
 public class SettingsEffects
 {
     private readonly ITraceLogger _traceLogger;
     private readonly FileLocationOptions _fileLocationOptions;
-    private const string DisabledDatabasesPreference = "disabled-databases";
-    private const string PrereleasePreference = "prerelease-enabled";
+    private readonly IPreferencesProvider _preferencesProvider;
+    private readonly IAlertDialogService _alertDialogService;
     private static readonly ReaderWriterLockSlim ConfigSrwLock = new();
 
-    public SettingsEffects(ITraceLogger traceLogger, FileLocationOptions fileLocationOptions)
+    public SettingsEffects(ITraceLogger traceLogger, FileLocationOptions fileLocationOptions,
+        IPreferencesProvider preferencesProvider, IAlertDialogService alertDialogService)
     {
         _traceLogger = traceLogger;
         _fileLocationOptions = fileLocationOptions;
+        _preferencesProvider = preferencesProvider;
+        _alertDialogService = alertDialogService;
     }
 
     [EffectMethod]
@@ -47,8 +52,7 @@ public class SettingsEffects
 
         if (databases.Count <= 0) { return; }
 
-        var disabledDatabases =
-            JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabasesPreference, "[]"));
+        var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
 
         if (disabledDatabases?.Any() is true)
         {
@@ -66,15 +70,14 @@ public class SettingsEffects
 
         config ??= new();
 
-        var disabledDatabases =
-            JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabasesPreference, "[]"));
+        var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
 
         if (disabledDatabases?.Any() is true)
         {
             config.DisabledDatabases = disabledDatabases;
         }
 
-        config.IsPrereleaseEnabled = Preferences.Default.Get(PrereleasePreference, false);
+        config.IsPrereleaseEnabled = _preferencesProvider.PrereleasePreference;
 
         dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config));
     }
@@ -86,10 +89,9 @@ public class SettingsEffects
 
         if (!success) { return; }
 
-        var disabledDatabases = JsonSerializer.Serialize(action.Settings.DisabledDatabases);
-        Preferences.Default.Set(DisabledDatabasesPreference, disabledDatabases);
+        _preferencesProvider.DisabledDatabasesPreference = action.Settings.DisabledDatabases;
 
-        Preferences.Default.Set(PrereleasePreference, action.Settings.IsPrereleaseEnabled);
+        _preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
     }
@@ -124,12 +126,9 @@ public class SettingsEffects
         catch (Exception ex)
         {
             _traceLogger.Trace($"{nameof(SettingsEffects)}.{nameof(WriteSettingsConfig)} failed: {ex}");
-            if (Application.Current?.MainPage is not null)
-            {
-                Application.Current.MainPage.DisplayAlert("Failed to save config",
+            _alertDialogService.ShowAlert("Failed to save config",
                     $"An error occured while trying to save the configuration, please try again\r\n{ex.Message}",
                     "Ok");
-            }
 
             return false;
         }

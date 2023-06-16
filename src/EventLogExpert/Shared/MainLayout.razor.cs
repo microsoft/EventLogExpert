@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Services;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

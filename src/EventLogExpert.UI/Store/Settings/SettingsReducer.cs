@@ -5,7 +5,7 @@ using Fluxor;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Store.Settings;
+namespace EventLogExpert.UI.Store.Settings;
 
 public class SettingsReducer
 {

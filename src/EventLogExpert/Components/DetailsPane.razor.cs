@@ -2,8 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Services;
-using EventLogExpert.Store.EventLog;
+using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text;

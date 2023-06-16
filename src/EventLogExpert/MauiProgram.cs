@@ -3,8 +3,8 @@
 
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
-using EventLogExpert.Store;
-using EventLogExpert.Store.EventLog;
+using EventLogExpert.UI.Store;
+using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
@@ -69,6 +69,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
             (title, message, cancel) => Application.Current!.MainPage!.DisplayAlert(title, message, cancel),
             async (title, message, accept, cancel) => await Application.Current!.MainPage!.DisplayAlert(title, message, accept, cancel)));
+
+        builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
 
         return builder.Build();
     }

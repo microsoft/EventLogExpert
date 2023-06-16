@@ -7,7 +7,7 @@ using Fluxor;
 using System.Collections.Immutable;
 using System.Collections.ObjectModel;
 
-namespace EventLogExpert.Store.EventLog;
+namespace EventLogExpert.UI.Store.EventLog;
 
 [FeatureState]
 public record EventLogState

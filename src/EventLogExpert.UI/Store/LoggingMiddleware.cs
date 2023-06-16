@@ -1,11 +1,11 @@
 ﻿using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Store.EventLog;
-using EventLogExpert.Store.FilterPane;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Store;
+namespace EventLogExpert.UI.Store;
 
 public class LoggingMiddleware : Middleware
 {

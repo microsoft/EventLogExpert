@@ -3,12 +3,13 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Store.EventLog;
+using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
-using static EventLogExpert.Store.EventLog.EventLogState;
+using static EventLogExpert.UI.Store.EventLog.EventLogState;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
@@ -25,6 +26,8 @@ public partial class EventTable
     [Inject] ITraceLogger TraceLogger { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

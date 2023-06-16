@@ -2,15 +2,18 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Store.FilterPane;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
 public partial class FilterRow
 {
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
