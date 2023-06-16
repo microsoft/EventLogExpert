@@ -3,14 +3,16 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Store.EventLog;
-using EventLogExpert.Store.FilterPane;
-using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
+using EventLogExpert.UI;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
@@ -29,6 +31,8 @@ public partial class FilterPane
     private bool _isFilterListVisible;
 
     [Inject] ITraceLogger TraceLogger { get; set; } = null!;
+
+    [Inject] IDispatcher Dispatcher { get; set; } = null!;
 
     private string MenuState
     {

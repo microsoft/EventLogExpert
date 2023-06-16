@@ -1,11 +1,12 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Store.EventLog;
+using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
-using static EventLogExpert.Store.EventLog.EventLogState;
+using static EventLogExpert.UI.Store.EventLog.EventLogState;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
@@ -17,6 +18,8 @@ public partial class SplitLogTabPane
 
     [Inject] public IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>>
         ActiveLogState { get; set; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     protected override void OnInitialized()
     {

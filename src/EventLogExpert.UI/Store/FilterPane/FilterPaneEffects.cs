@@ -1,12 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Store.EventLog;
 using Fluxor;
-using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Store.FilterPane;
+namespace EventLogExpert.UI.Store.FilterPane;
 
 public class FilterPaneEffects
 {

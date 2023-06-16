@@ -3,7 +3,7 @@
 
 using Fluxor;
 
-namespace EventLogExpert.Store.StatusBar;
+namespace EventLogExpert.UI.Store.StatusBar;
 
 public class StatusBarReducers
 {

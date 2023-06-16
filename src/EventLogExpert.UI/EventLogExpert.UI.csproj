@@ -8,6 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Fluxor.Blazor.Web" Version="5.9.0" />
+    <PackageReference Include="System.Linq.Dynamic.Core" Version="1.3.2" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 

@@ -4,9 +4,10 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using Fluxor;
+using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.Eventing.Reader;
 
-namespace EventLogExpert.Store.EventLog;
+namespace EventLogExpert.UI.Store.EventLog;
 
 public interface ILogWatcherService
 {

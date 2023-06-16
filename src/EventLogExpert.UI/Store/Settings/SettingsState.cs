@@ -5,7 +5,7 @@ using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Store.Settings;
+namespace EventLogExpert.UI.Store.Settings;
 
 [FeatureState]
 public record SettingsState

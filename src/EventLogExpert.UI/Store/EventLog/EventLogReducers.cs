@@ -3,13 +3,12 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Services;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
-using static EventLogExpert.Store.EventLog.EventLogState;
+using static EventLogExpert.UI.Store.EventLog.EventLogState;
 
-namespace EventLogExpert.Store.EventLog;
+namespace EventLogExpert.UI.Store.EventLog;
 
 public class EventLogReducers
 {

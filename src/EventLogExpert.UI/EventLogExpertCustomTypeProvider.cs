@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Models;
 using System.Linq.Dynamic.Core;
 using System.Linq.Dynamic.Core.CustomTypeProviders;
 
-namespace EventLogExpert;
+namespace EventLogExpert.UI;
 
 public class EventLogExpertCustomTypeProvider : DefaultDynamicLinqCustomTypeProvider
 {

@@ -2,14 +2,15 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.Store.EventLog;
-using EventLogExpert.Store.Settings;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using System.IO.Compression;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
@@ -26,6 +27,8 @@ public partial class SettingsModal
     [Inject] private FileLocationOptions FileLocationOptions { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     protected override void OnInitialized()
     {

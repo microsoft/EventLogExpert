@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.Store.Settings;
+namespace EventLogExpert.UI.Store.Settings;
 
 public record SettingsAction
 {
