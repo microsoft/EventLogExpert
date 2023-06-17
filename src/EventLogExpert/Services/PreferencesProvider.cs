@@ -8,18 +8,32 @@ namespace EventLogExpert.Services;
 
 public class PreferencesProvider : IPreferencesProvider
 {
-    private const string _disabledDatabasesPreference = "disabled-databases";
-    private const string _prereleasePreference = "prerelease-enabled";
+    private const string DisabledDatabases = "disabled-databases";
+    private const string DisplaySelectionEnabled = "display-selection-enabled";
+    private const string PrereleaseEnabled = "prerelease-enabled";
+    private const string TimeZone = "timezone";
 
     public IList<string> DisabledDatabasesPreference
     {
-        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(_disabledDatabasesPreference, "[]")) ?? new List<string>();
-        set => Preferences.Default.Set(_disabledDatabasesPreference, JsonSerializer.Serialize(value));
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabases, "[]")) ?? new List<string>();
+        set => Preferences.Default.Set(DisabledDatabases, JsonSerializer.Serialize(value));
+    }
+
+    public bool DisplayPaneSelectionPreference
+    {
+        get => Preferences.Default.Get(DisplaySelectionEnabled, false);
+        set => Preferences.Default.Set(DisplaySelectionEnabled, value);
     }
 
     public bool PrereleasePreference
     {
-        get => Preferences.Default.Get(_prereleasePreference, false);
-        set => Preferences.Default.Set(_prereleasePreference, value);
+        get => Preferences.Default.Get(PrereleaseEnabled, false);
+        set => Preferences.Default.Set(PrereleaseEnabled, value);
+    }
+
+    public string TimeZonePreference
+    {
+        get => Preferences.Default.Get(TimeZone, TimeZoneInfo.Local.Id);
+        set => Preferences.Default.Set(TimeZone, value);
     }
 }

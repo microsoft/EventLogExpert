@@ -8,16 +8,16 @@
 
 @if (Event is not null)
 {
-    <div class="details-pane" data-toggle="@_expandMenu.ToString().ToLower()">
+    <div class="details-pane" data-toggle="@_isVisible.ToString().ToLower()">
 
         <div class="details-header">
             <div>Details</div>
-            <span class="button-toggle" data-rotate="@_expandMenu.ToString().ToLower()" @onclick="ToggleMenu">
+            <span class="button-toggle" data-rotate="@_isVisible.ToString().ToLower()" @onclick="ToggleMenu">
                 <i class="bi bi-caret-up"></i>
             </span>
         </div>
 
-        <div class="details-group" data-toggle="@_expandXml.ToString().ToLower()">
+        <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
             <div class="details-row">
                 <div>Source: @Event.Source</div>
                 <div>Event Id: @Event.Id</div>
@@ -40,12 +40,12 @@
             <div class="header-center">
                 <button class="button-primary" @onclick="CopyEvent">Copy Event</button>
             </div>
-            <span class="button-toggle header-justify-right" data-rotate="@_expandXml.ToString().ToLower()">
+            <span class="button-toggle header-justify-right" data-rotate="@_isXmlVisible.ToString().ToLower()">
                 <i class="bi bi-caret-up"></i>
             </span>
         </div>
 
-        <p class="details-xml" data-toggle="@_expandXml.ToString().ToLower()">@Event.Xml</p>
+        <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@Event.Xml</p>
 
     </div>
 }

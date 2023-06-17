@@ -11,9 +11,8 @@ namespace EventLogExpert.Components;
 
 public partial class DetailsPane
 {
-    private bool _expandMenu = false;
-    private bool _expandXml = false;
-    private bool _userToggledMenu = false;
+    private bool _isVisible = false;
+    private bool _isXmlVisible = false;
 
     private DisplayEventModel? Event { get; set; }
 
@@ -30,9 +29,9 @@ public partial class DetailsPane
             if (v != null)
             {
                 Event = EventLogState.Value.SelectedEvent;
-                if (!_userToggledMenu)
+                if (SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange)
                 {
-                    _expandMenu = true;
+                    _isVisible = true;
                 }
             }
         };
@@ -68,11 +67,7 @@ public partial class DetailsPane
         return sb.ToString();
     }
 
-    private void ToggleMenu()
-    {
-        _userToggledMenu = true;
-        _expandMenu = !_expandMenu;
-    }
+    private void ToggleMenu() => _isVisible = !_isVisible;
 
-    private void ToggleXml() => _expandXml = !_expandXml;
+    private void ToggleXml() => _isXmlVisible = !_isXmlVisible;
 }
