@@ -12,6 +12,7 @@ namespace EventLogExpert.Components;
 
 public partial class DetailsPane
 {
+    private bool _hasOpened = false;
     private bool _isVisible = false;
     private bool _isXmlVisible = false;
 
@@ -39,10 +40,11 @@ public partial class DetailsPane
 
         SelectedEventSelection.SelectedValueChanged += (s, v) =>
         {
-            if (v != null)
+            if (v is not null)
             {
                 Event = EventLogState.Value.SelectedEvent;
-                if (SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange)
+
+                if (SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange || !_hasOpened)
                 {
                     _isVisible = true;
                 }
@@ -80,7 +82,12 @@ public partial class DetailsPane
         return sb.ToString();
     }
 
-    private void ToggleMenu() => _isVisible = !_isVisible;
+    private void ToggleMenu()
+    {
+        if (!_hasOpened) { _hasOpened = true; }
+
+        _isVisible = !_isVisible;
+    }
 
     private void ToggleXml() => _isXmlVisible = !_isXmlVisible;
 }
