@@ -5,19 +5,32 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Text;
 
 namespace EventLogExpert.Components;
 
 public partial class DetailsPane
 {
-    private bool _expandMenu = false;
-    private bool _expandXml = false;
-    private bool _userToggledMenu = false;
+    private bool _hasOpened = false;
+    private bool _isVisible = false;
+    private bool _isXmlVisible = false;
 
     private DisplayEventModel? Event { get; set; }
 
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("enableDetailsPaneResizer");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
 
     protected override void OnInitialized()
     {
@@ -27,12 +40,13 @@ public partial class DetailsPane
 
         SelectedEventSelection.SelectedValueChanged += (s, v) =>
         {
-            if (v != null)
+            if (v is not null)
             {
                 Event = EventLogState.Value.SelectedEvent;
-                if (!_userToggledMenu)
+
+                if (SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange || !_hasOpened)
                 {
-                    _expandMenu = true;
+                    _isVisible = true;
                 }
             }
         };
@@ -70,9 +84,10 @@ public partial class DetailsPane
 
     private void ToggleMenu()
     {
-        _userToggledMenu = true;
-        _expandMenu = !_expandMenu;
+        if (!_hasOpened) { _hasOpened = true; }
+
+        _isVisible = !_isVisible;
     }
 
-    private void ToggleXml() => _expandXml = !_expandXml;
+    private void ToggleXml() => _isXmlVisible = !_isXmlVisible;
 }

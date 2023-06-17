@@ -16,7 +16,7 @@ dialog {
 
 .tz-row {
     display: flex;
-    margin-bottom: 1rem;
+    margin-bottom: .5rem;
 }
 
 .database-row {
@@ -38,6 +38,14 @@ dialog {
 
 .footer-group {
     display: flex;
+    justify-content: space-between;
+
+    margin-top: .5rem;
+}
+
+.select-group {
+    display: flex;
+    align-items: flex-end;
     justify-content: space-between;
 }
 

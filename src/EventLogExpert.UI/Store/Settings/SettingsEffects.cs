@@ -5,28 +5,23 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
-using EventLogExpert.UI.Services;
 using Fluxor;
-using System.Text.Json;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.Settings;
 
 public class SettingsEffects
 {
-    private readonly ITraceLogger _traceLogger;
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly IPreferencesProvider _preferencesProvider;
-    private readonly IAlertDialogService _alertDialogService;
-    private static readonly ReaderWriterLockSlim ConfigSrwLock = new();
+    private readonly ITraceLogger _traceLogger;
 
-    public SettingsEffects(ITraceLogger traceLogger, FileLocationOptions fileLocationOptions,
-        IPreferencesProvider preferencesProvider, IAlertDialogService alertDialogService)
+    public SettingsEffects(ITraceLogger traceLogger,
+        FileLocationOptions fileLocationOptions,
+        IPreferencesProvider preferencesProvider)
     {
         _traceLogger = traceLogger;
         _fileLocationOptions = fileLocationOptions;
         _preferencesProvider = preferencesProvider;
-        _alertDialogService = alertDialogService;
     }
 
     [EffectMethod]
@@ -66,18 +61,13 @@ public class SettingsEffects
     [EffectMethod]
     public async Task HandleLoadSettings(SettingsAction.LoadSettings action, IDispatcher dispatcher)
     {
-        SettingsModel? config = ReadSettingsConfig();
-
-        config ??= new();
-
-        var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
-
-        if (disabledDatabases?.Any() is true)
+        SettingsModel config = new()
         {
-            config.DisabledDatabases = disabledDatabases;
-        }
-
-        config.IsPrereleaseEnabled = _preferencesProvider.PrereleasePreference;
+            TimeZoneId = _preferencesProvider.TimeZonePreference,
+            DisabledDatabases = _preferencesProvider.DisabledDatabasesPreference,
+            ShowDisplayPaneOnSelectionChange = _preferencesProvider.DisplayPaneSelectionPreference,
+            IsPrereleaseEnabled = _preferencesProvider.PrereleasePreference
+        };
 
         dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config));
     }
@@ -85,53 +75,11 @@ public class SettingsEffects
     [EffectMethod]
     public async Task HandleSave(SettingsAction.Save action, IDispatcher dispatcher)
     {
-        var success = WriteSettingsConfig(action.Settings);
-
-        if (!success) { return; }
-
+        _preferencesProvider.TimeZonePreference = action.Settings.TimeZoneId;
         _preferencesProvider.DisabledDatabasesPreference = action.Settings.DisabledDatabases;
-
+        _preferencesProvider.DisplayPaneSelectionPreference = action.Settings.ShowDisplayPaneOnSelectionChange;
         _preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
-    }
-
-    private SettingsModel? ReadSettingsConfig()
-    {
-        try
-        {
-            ConfigSrwLock.EnterReadLock();
-
-            using FileStream stream = File.OpenRead(_fileLocationOptions.SettingsPath);
-            return JsonSerializer.Deserialize<SettingsModel>(stream);
-        }
-        catch
-        { // File may not exist, can be ignored
-            return null;
-        }
-        finally { ConfigSrwLock.ExitReadLock(); }
-    }
-
-    private bool WriteSettingsConfig(SettingsModel settings)
-    {
-        try
-        {
-            ConfigSrwLock.EnterWriteLock();
-
-            var config = JsonSerializer.Serialize(settings);
-            File.WriteAllText(_fileLocationOptions.SettingsPath, config);
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _traceLogger.Trace($"{nameof(SettingsEffects)}.{nameof(WriteSettingsConfig)} failed: {ex}");
-            _alertDialogService.ShowAlert("Failed to save config",
-                    $"An error occured while trying to save the configuration, please try again\r\n{ex.Message}",
-                    "Ok");
-
-            return false;
-        }
-        finally { ConfigSrwLock.ExitWriteLock(); }
     }
 }
