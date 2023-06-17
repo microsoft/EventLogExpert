@@ -1,22 +1,22 @@
-﻿@using EventLogExpert.Services;
-@using EventLogExpert.UI.Store.EventLog;
-@using EventLogExpert.UI.Store.Settings;
+﻿@using EventLogExpert.UI.Store.EventLog
+@using EventLogExpert.UI.Store.Settings
 @inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
 @inject IState<SettingsState> SettingsState
 
-@if (Event is not null)
-{
-    <div class="details-pane" data-toggle="@_isVisible.ToString().ToLower()">
+<div id="details-pane" data-toggle="@_isVisible.ToString().ToLower()" hidden="@(Event is null)">
+    <div id="details-resizer"></div>
 
-        <div class="details-header">
-            <div>Details</div>
-            <span class="button-toggle" data-rotate="@_isVisible.ToString().ToLower()" @onclick="ToggleMenu">
-                <i class="bi bi-caret-up"></i>
-            </span>
-        </div>
+    <div class="details-header">
+        <div>Details</div>
+        <span class="button-toggle" data-rotate="@_isVisible.ToString().ToLower()" @onclick="ToggleMenu">
+            <i class="bi bi-caret-up"></i>
+        </span>
+    </div>
 
+    @if (Event is not null)
+    {
         <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
             <div class="details-row">
                 <div>Source: @Event.Source</div>
@@ -46,6 +46,5 @@
         </div>
 
         <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@Event.Xml</p>
-
-    </div>
-}
+    }
+</div>

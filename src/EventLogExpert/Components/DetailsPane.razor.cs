@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using System.Text;
 
 namespace EventLogExpert.Components;
@@ -16,7 +17,19 @@ public partial class DetailsPane
 
     private DisplayEventModel? Event { get; set; }
 
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; set; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("enableDetailsPaneResizer");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
 
     protected override void OnInitialized()
     {
