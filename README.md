@@ -1,6 +1,45 @@
 # EventLogExpert
 
-Nothing to see here yet. This tool is in the early stages of development. Please check back later.
+A Windows Event Log viewer for tech support and IT professionals.
+
+![Screenshot showing a filtered combined view of three event logs](docs/.images/EventLogExpert-CombinedView.png)
+
+## Key features
+
+* Quickly load huge .evtx files. File -> Open and select multiple files, or just drag-and-drop them into the view. The tool will happily load multiple .evtx files concurrently.
+* View multiple .evtx files in an interleaved combined view and examine how events line up across multiple servers.
+* See event description previews right in the table without having to open each individual event.
+* Filter using friendly drop-downs, use Advanced Filter and enter a LINQ expression, or combine both.
+* Create an event database to view .evtx files on computers that don't have the same product installed. For example, view Exchange Server or SQL Server logs on a user workstation.
+* Can be used as a replacement for Event Viewer to view live event logs. Choose Continuously Update on the View menu and watch new events appear in real time.
+
+For more information, check our [docs](docs/Home.md).
+
+## Quick Start
+
+### Windows 10 or 11, or Server 2022
+
+Simply download the `EventLogExpert*.msix` file from the latest and run it: [https://github.com/microsoft/EventLogExpert/releases/latest/](https://github.com/microsoft/EventLogExpert/releases/latest/).
+
+### Windows 2019
+
+* Download the `EventLogExpert*.msix`.
+* Windows 2019 will also need the `Microsoft.WindowsAppRuntime*.msix` unless it was already installed by something else. You'll find this file in the release with the `EventLogExpert*.msix`.
+* Enable sideloading:
+
+    `Set-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock -Name AllowAllTrustedApps -Value 1`
+
+* Install the runtime with Add-AppxPackage. Example:
+
+    `Add-AppxPackage $home\Downloads\Microsoft.WindowsAppRuntime.1.2.msix`
+
+* Install EventLogExpert:
+
+    `Add-AppxPackage $home\Downloads\EventLogExpert_23.5.19.1256_x64.msix`
+
+### First time setup
+
+Head over to our [docs](docs/Home.md).
 
 ## Contributing
 
