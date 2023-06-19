@@ -1,7 +1,7 @@
-﻿@using EventLogExpert.Shared.Components
-@using EventLogExpert.UI.Store.EventLog;
-@using EventLogExpert.UI.Store.FilterPane;
-@using EventLogExpert.UI.Store.Settings;
+﻿@using EventLogExpert.Shared.Components.Filters
+@using EventLogExpert.UI.Store.EventLog
+@using EventLogExpert.UI.Store.FilterPane
+@using EventLogExpert.UI.Store.Settings
 @inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
@@ -50,11 +50,11 @@
         {
             <EditForm id="filter-form" Model="_model">
                 <span>
-                    After: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal"
+                    After: <InputDate class="input filter-datetime" Type="InputDateType.DateTimeLocal"
                         @bind-Value="_model.After" disabled="@(!_canEditDate)" />
                 </span>
                 <span>
-                    Before: <InputDate class="input-filter-datetime" Type="InputDateType.DateTimeLocal"
+                    Before: <InputDate class="input filter-datetime" Type="InputDateType.DateTimeLocal"
                         @bind-Value="_model.Before" disabled="@(!_canEditDate)" />
                 </span>
 
@@ -99,7 +99,7 @@
         {
             <div>
                 <span>
-                    Expression: <input class="input-advanced-filter" type="text"
+                    Expression: <input class="input advanced-filter" type="text"
                         placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
                         @oninput="AdvancedFilterChanged" disabled="@(!_canEditAdvancedFilter)" />
                 </span>

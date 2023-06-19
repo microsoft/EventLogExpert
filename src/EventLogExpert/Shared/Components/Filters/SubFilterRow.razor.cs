@@ -6,7 +6,7 @@ using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Shared.Components;
+namespace EventLogExpert.Shared.Components.Filters;
 
 public partial class SubFilterRow
 {

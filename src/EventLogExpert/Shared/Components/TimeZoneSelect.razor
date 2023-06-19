@@ -1,8 +1,9 @@
+@inherits EventLogExpert.Shared.Base.SelectComponent<string>
+
 <div class="input-select">
     <label>
-        <input type="text" class="input-timezone-select" value="@Value" readonly
-        @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
-        <i class="bi bi-caret-up" data-toggle="@IsDropDownVisible"></i>
+        <input type="text" class="input timezone-select" value="@Value" readonly
+            @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
     </label>
 
     <div class="dropdown-list" data-toggle="@IsDropDownVisible">

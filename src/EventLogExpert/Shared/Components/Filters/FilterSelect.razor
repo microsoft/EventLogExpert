@@ -1,24 +1,25 @@
-@typeparam InputType
+@typeparam TInput
+@using EventLogExpert.UI
+@inherits EventLogExpert.Shared.Base.SelectComponent<TInput>
 
 <div class="input-select">
     <label>
-        <input type="text" class="input-filter-dropdown" value="@Value.ToFullString()" readonly
+        <input type="text" class="input filter-dropdown" value="@Value.ToFullString()" readonly
             @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
-        <i class="bi bi-caret-up" data-toggle="@IsDropDownVisible"></i>
     </label>
 
     <div class="dropdown-list" data-toggle="@IsDropDownVisible">
-        @if (typeof(UI.FilterType).IsAssignableFrom(typeof(InputType)))
+        @if (typeof(FilterType).IsAssignableFrom(typeof(TInput)))
         {
-            @foreach (InputType item in Enum.GetValues(typeof(UI.FilterType)))
+            @foreach (TInput item in Enum.GetValues(typeof(FilterType)))
             {
                 <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
             }
         }
 
-        @if (typeof(UI.FilterComparison).IsAssignableFrom(typeof(InputType)))
+        @if (typeof(FilterComparison).IsAssignableFrom(typeof(TInput)))
         {
-            @foreach (InputType item in Enum.GetValues(typeof(UI.FilterComparison)))
+            @foreach (TInput item in Enum.GetValues(typeof(FilterComparison)))
             {
                 <div @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
             }

@@ -94,33 +94,28 @@ a,
 
 .header-justify-right { justify-self: right; }
 
-.input-filter-select,
-.input-filter-dropdown,
-.input-filter-description,
-.input-filter-datetime,
-.input-advanced-filter,
-.input-timezone-select {
+.input {
     background: none;
     border: none;
-    border-bottom: 0.1rem solid var(--clr-lightblue);
+    border-bottom: 1px solid var(--clr-lightblue);
     color: white;
     margin-right: 2rem;
     text-align: left;
     text-align-last: center;
 }
 
-    .input-filter-dropdown,
-    .input-timezone-select {
+    .input.filter-dropdown,
+    .input.timezone-select {
         width: 120px;
         text-align: center;
         cursor: default;
         user-select: none;
     }
 
-    .input-timezone-select { width: 350px; }
+    .input.timezone-select { width: 350px; }
 
-    .input-filter-select,
-    .input-filter-description {
+    .input.filter-select,
+    .input.filter-description {
         width: 250px;
         text-align: center;
     }
@@ -142,24 +137,13 @@ a,
         }
     }
 
-    .input-filter-datetime { width: 200px; }
+    .input.filter-datetime { width: 200px; }
 
-        .input-filter-datetime::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-        }
+        .input.filter-datetime::-webkit-calendar-picker-indicator { filter: invert(1); }
 
-        .input-filter-select:focus-visible,
-        .input-filter-dropdown:focus-visible,
-        .input-filter-description:focus-visible,
-        .input-filter-datetime:focus-visible,
-        .input-advanced-filter:focus-visible,
-        .input-timezone-select:focus-visible {
-            outline: none;
-        }
+        .input:focus-visible { outline: none; }
 
-        .input-filter-description > option {
-            background: var(--background-dark);
-        }
+        .input.filter-description > option { background: var(--background-dark); }
 
 .button-toggle { cursor: pointer; }
 
@@ -215,9 +199,9 @@ div.table-divider {
 
 .dropdown-list {
     user-select: none;
-    border: 1px solid;
+    border: 1px solid var(--clr-lightblue);
     background-color: var(--background-dark);
-    z-index: 99;
+    z-index: 10;
     position: absolute;
     top: 2rem;
     width: 100%;
@@ -229,9 +213,9 @@ div.table-divider {
     &[data-toggle="true"] { visibility: visible; }
 
     & > div {
-        text-align: left;
+        text-align: center;
         margin: 0;
-        padding: 0 0 0 .5rem;
+        padding: 0;
 
         color: #fff;
 

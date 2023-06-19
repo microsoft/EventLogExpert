@@ -69,7 +69,7 @@ public static class FilterMethods
     private static Func<DisplayEventModel, bool>? GetContainsComparison(FilterType filterType, string value) =>
         filterType switch
         {
-            FilterType.EventId => x => x.Id.ToString().Contains(value),
+            FilterType.Id => x => x.Id.ToString().Contains(value),
             FilterType.Level => x => x.Level.ToString()?.Contains(value) is true,
             FilterType.Keywords => x =>
                 x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
@@ -82,7 +82,7 @@ public static class FilterMethods
     private static Func<DisplayEventModel, bool>? GetEqualsComparison(FilterType filterType, string value) =>
         filterType switch
         {
-            FilterType.EventId => int.TryParse(value, out int id) ? x => x.Id == id : null,
+            FilterType.Id => int.TryParse(value, out int id) ? x => x.Id == id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level == level : null,
             FilterType.Keywords => x =>
                 x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
@@ -96,7 +96,7 @@ public static class FilterMethods
     private static Func<DisplayEventModel, bool>? GetNotContainsComparison(FilterType filterType, string value) =>
         filterType switch
         {
-            FilterType.EventId => x => !x.Id.ToString().Contains(value),
+            FilterType.Id => x => !x.Id.ToString().Contains(value),
             FilterType.Level => x => !x.Level.ToString()?.Contains(value) is true,
             FilterType.Keywords => x =>
                 !x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
@@ -109,7 +109,7 @@ public static class FilterMethods
     private static Func<DisplayEventModel, bool>? GetNotEqualsComparison(FilterType filterType, string value) =>
         filterType switch
         {
-            FilterType.EventId => int.TryParse(value, out int id) ? x => x.Id != id : null,
+            FilterType.Id => int.TryParse(value, out int id) ? x => x.Id != id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level != level : null,
             FilterType.Keywords => x =>
                 !x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),

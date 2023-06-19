@@ -7,7 +7,7 @@ namespace EventLogExpert.UI;
 
 public enum FilterType
 {
-    [EnumMember(Value = "Event ID")] EventId,
+    [EnumMember(Value = "Event ID")] Id,
     Level,
     Keywords,
     Source,

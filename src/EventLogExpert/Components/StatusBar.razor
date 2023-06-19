@@ -37,14 +37,12 @@
         }
         else
         {
-                <span>New Events: @eventLogState.NewEventBuffer.Count</span>
-                    @if (eventLogState.NewEventBufferIsFull)
+            <span>New Events: @eventLogState.NewEventBuffer.Count</span>
+            @if (eventLogState.NewEventBufferIsFull)
             {
                 <span>Buffer Full</span>
             }
-
         }
-
     }
 
     @if (!string.IsNullOrEmpty(StatusBarState.Value.ResolverStatus))
