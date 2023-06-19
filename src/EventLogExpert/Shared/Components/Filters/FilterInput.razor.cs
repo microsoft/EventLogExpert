@@ -4,17 +4,13 @@
 using EventLogExpert.Shared.Base;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Shared.Components;
+namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class BooleanSelect : InputComponent<bool>
+public partial class FilterInput : InputComponent<string>
 {
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
-
     protected override async Task UpdateValue(ChangeEventArgs args)
     {
-        if (!bool.TryParse(args.Value?.ToString(), out bool value)) { return; }
-
-        Value = value;
+        Value = args.Value?.ToString() ?? string.Empty;
         await ValueChanged.InvokeAsync(Value);
     }
 }
