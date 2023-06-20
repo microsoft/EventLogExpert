@@ -40,7 +40,6 @@ steps:
     -o "$(build.artifactStagingDirectory)" `
     -p:IncludeNativeLibrariesForSelfExtract=true `
     -p:PublishSingleFile=true `
-    -p:PublishTrimmed=true `
     -p:Version=$(ReleaseVersion)
   displayName: 'dotnet publish EventDbTool'
 
