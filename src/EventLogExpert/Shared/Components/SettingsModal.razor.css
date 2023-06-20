@@ -36,13 +36,6 @@ dialog {
 
     .provider-list > span { margin: 0; }
 
-.footer-group {
-    display: flex;
-    justify-content: space-between;
-
-    margin-top: .5rem;
-}
-
 .select-group {
     display: flex;
     align-items: flex-end;

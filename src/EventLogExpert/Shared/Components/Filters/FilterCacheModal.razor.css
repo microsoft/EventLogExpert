@@ -1,7 +1,27 @@
 dialog {
     height: 60%;
+    min-width: 50rem;
+
+    overflow: hidden;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);
     background-color: var(--background-dark);
+}
+
+.recent-filter-list {
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.favorite-filter-list { border-bottom: solid var(--background-darkgray); }
+
+.cached-filter-row {
+    display: flex;
+    justify-content: space-between;
 }

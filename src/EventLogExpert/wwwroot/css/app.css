@@ -33,6 +33,15 @@ html, body {
     color: var(--clr-lightblue);
 }
 
+.footer-group {
+    display: flex;
+    justify-content: space-between;
+
+    margin-top: .5rem;
+}
+
+    .footer-group.align-right { justify-content: flex-end; }
+
 h1:focus { outline: none; }
 
 a,

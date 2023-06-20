@@ -1,8 +1,46 @@
-@using EventLogExpert.UI.Store.Settings;
+@using EventLogExpert.UI.Store.FilterCache
 @inherits FluxorComponent
 
-@inject IState<SettingsState> SettingsState
+@inject IState<FilterCacheState> FilterCacheState
 
 <dialog id="filterCacheDialog">
-    <button class="button-primary" type="button" @onclick="Close">Exit</button>
+    <div class="recent-filter-list">
+        @if (FilterCacheState.Value.FavoriteFilters.Any())
+        {
+            <p>Favorite Filters</p>
+            <div class="favorite-filter-list">
+                @foreach (var filter in FilterCacheState.Value.FavoriteFilters)
+                {
+                    <div class="cached-filter-row">
+                        <span>@filter</span>
+                        <button class="button-remove" type="button">
+                            <i class="bi bi-dash-circle"></i> Remove
+                        </button>
+                    </div>
+                }
+            </div>
+        }
+
+        @if (FilterCacheState.Value.RecentFilters.Any())
+        {
+            <p>Recent Filters</p>
+            @foreach (var filter in FilterCacheState.Value.RecentFilters)
+            {
+                <div class="cached-filter-row">
+                    <span>@filter</span>
+                    <button class="button-remove" type="button">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+                </div>
+            }
+        }
+        else
+        {
+            <p>No Recent Filters</p>
+        }
+    </div>
+
+    <div class="footer-group align-right">
+        <button class="button-primary" type="button" @onclick="Close">Exit</button>
+    </div>
 </dialog>
