@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Store.FilterCache;
 
 [FeatureState]
-public class FilterCacheState
+public record FilterCacheState
 {
     public ImmutableList<string> FavoriteFilters { get; set; } = ImmutableList<string>.Empty;
 

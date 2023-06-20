@@ -7,13 +7,13 @@
     <div class="recent-filter-list">
         @if (FilterCacheState.Value.FavoriteFilters.Any())
         {
-            <p>Favorite Filters</p>
+            <div>Favorite Filters</div>
             <div class="favorite-filter-list">
                 @foreach (var filter in FilterCacheState.Value.FavoriteFilters)
                 {
                     <div class="cached-filter-row">
                         <span>@filter</span>
-                        <button class="button-remove" type="button">
+                        <button class="button-remove" type="button" @onclick="() => RemoveRecentFilter(filter)">
                             <i class="bi bi-dash-circle"></i> Remove
                         </button>
                     </div>
@@ -23,12 +23,12 @@
 
         @if (FilterCacheState.Value.RecentFilters.Any())
         {
-            <p>Recent Filters</p>
+            <div>Recent Filters</div>
             @foreach (var filter in FilterCacheState.Value.RecentFilters)
             {
                 <div class="cached-filter-row">
                     <span>@filter</span>
-                    <button class="button-remove" type="button">
+                    <button class="button-remove" type="button" @onclick="() => RemoveRecentFilter(filter)">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
                 </div>
