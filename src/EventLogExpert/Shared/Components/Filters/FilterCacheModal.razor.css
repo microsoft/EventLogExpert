@@ -1,0 +1,7 @@
+dialog {
+    height: 60%;
+
+    color: var(--clr-lightblue);
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}

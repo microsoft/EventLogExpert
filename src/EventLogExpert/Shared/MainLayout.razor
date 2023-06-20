@@ -1,12 +1,13 @@
-﻿@using EventLogExpert.Shared.Components
+﻿@using EventLogExpert.UI.Store.Settings
+@using EventLogExpert.Shared.Components
+@using EventLogExpert.Shared.Components.Filters
 @using EventLogExpert.Components
-@using EventLogExpert.UI.Store.Settings;
-
 @inherits LayoutComponentBase
 
 @inject IState<SettingsState> SettingsState
 
 <SettingsModal />
+<FilterCacheModal />
 
 <div class="page">
     <div class="display_layout">

@@ -1,8 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -13,11 +14,11 @@ public partial class MainLayout : IDisposable
 {
     [Inject] private IActionSubscriber ActionSubscriber { get; set; } = null!;
 
+    [Inject] private IAppTitleService AppTitleService { get; set; } = null!;
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     [Inject] private IUpdateService UpdateService { get; set; } = null!;
-
-    [Inject] private IAppTitleService AppTitleService { get; set; } = null!;
 
     public void Dispose()
     {
@@ -39,13 +40,14 @@ public partial class MainLayout : IDisposable
     protected override async Task OnInitializedAsync()
     {
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
+        ActionSubscriber.SubscribeToAction<FilterCacheAction.OpenMenu>(this, OpenFilterCacheModal);
 
         await base.OnInitializedAsync();
     }
 
-    private void OpenSettingsModal(SettingsAction.OpenMenu action)
-    {
+    private void OpenFilterCacheModal(FilterCacheAction.OpenMenu action) =>
+        JSRuntime.InvokeVoidAsync("openFilterCacheModal").AsTask();
 
+    private void OpenSettingsModal(SettingsAction.OpenMenu action) =>
         JSRuntime.InvokeVoidAsync("openSettingsModal").AsTask();
-    }
 }

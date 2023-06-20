@@ -28,6 +28,10 @@
                     <i class="bi bi-plus-circle"></i> Add Advanced Filter
                 </button>
             }
+            
+            <button class="button-primary" @onclick="AddCachedFilter">
+                <i class="bi bi-plus-circle"></i> Add Cached Filter
+            </button>
         </div>
 
         @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
