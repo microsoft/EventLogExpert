@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -14,8 +15,11 @@ public partial class FilterCacheModal
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
+    private void ToggleFavorite(CachedFilterModel filter) =>
+        Dispatcher.Dispatch(new FilterCacheAction.ToggleFavoriteFilter(filter));
+
     private async void Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
 
-    private void RemoveRecentFilter(string filter) =>
+    private void RemoveRecent(CachedFilterModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveRecentFilter(filter));
 }

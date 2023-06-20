@@ -1,17 +1,17 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
+
 namespace EventLogExpert.UI.Store.FilterCache;
 
 public record FilterCacheAction
 {
-    public record AddRecentFilter(string ComparisonString);
+    public record AddRecentFilter(CachedFilterModel Filter);
 
-    public record RemoveRecentFilter(string ComparisonString);
+    public record RemoveRecentFilter(CachedFilterModel Filter);
 
-    public record AddFavoriteFilter(string ComparisonString);
-
-    public record RemoveFavoriteFilter(string ComparisonString);
+    public record ToggleFavoriteFilter(CachedFilterModel Filter);
 
     public record OpenMenu;
 }

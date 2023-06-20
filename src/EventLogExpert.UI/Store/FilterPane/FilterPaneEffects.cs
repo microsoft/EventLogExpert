@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
 using Fluxor;
 
@@ -17,7 +18,8 @@ public class FilterPaneEffects
     {
         if (action.FilterModel?.ComparisonString is not null)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.ComparisonString));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
+                new CachedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
         }
     }
 
@@ -26,7 +28,8 @@ public class FilterPaneEffects
     {
         if (!string.IsNullOrEmpty(action.Expression))
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.Expression));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
+                new CachedFilterModel { ComparisonString = action.Expression }));
         }
     }
 
@@ -35,7 +38,8 @@ public class FilterPaneEffects
     {
         if (action.FilterModel.ComparisonString is not null)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.ComparisonString));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
+                new CachedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
         }
     }
 }

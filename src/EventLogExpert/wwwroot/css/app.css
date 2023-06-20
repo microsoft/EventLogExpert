@@ -6,6 +6,7 @@
     --clr-black: #111111;
     --clr-red: #ee0d0d;
     --clr-green: #0dee0d;
+    --clr-yellow: #eeff0d;
 
     --clr-statusbar: #3C64E7;
 
@@ -160,7 +161,8 @@ a,
 
 .button-primary,
 .button-remove,
-.button-save {
+.button-save,
+.button-favorite {
     color: var(--clr-lightblue);
     border: var(--clr-lightblue);
     background: none;
@@ -176,15 +178,22 @@ a,
     border: var(--clr-green);
 }
 
+.button-favorite {
+    color: var(--clr-yellow);
+    border: var(--clr-yellow);
+}
+
     .button-primary:focus,
     .button-remove:focus,
-    .button-save:focus {
+    .button-save:focus,
+    .button-favorite:focus {
         border: none;
     }
 
     .button-primary:hover,
     .button-remove:hover,
-    .button-save:hover {
+    .button-save:hover,
+    .button-favorite:hover {
         filter: brightness(0.9);
     }
 

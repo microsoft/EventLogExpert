@@ -10,7 +10,9 @@ namespace EventLogExpert.UI.Store.FilterPane;
 [FeatureState]
 public record FilterPaneState
 {
-    public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList.Create<FilterModel>();
+    public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList<FilterModel>.Empty;
+
+    public IImmutableList<CachedFilterModel> CachedFilters { get; init; } = ImmutableList<CachedFilterModel>.Empty;
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 
