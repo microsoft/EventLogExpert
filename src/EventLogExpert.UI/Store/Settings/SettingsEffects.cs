@@ -1,59 +1,30 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Services;
 using Fluxor;
 
 namespace EventLogExpert.UI.Store.Settings;
 
 public class SettingsEffects
 {
-    private readonly FileLocationOptions _fileLocationOptions;
     private readonly IPreferencesProvider _preferencesProvider;
-    private readonly ITraceLogger _traceLogger;
+    private readonly IEnabledDatabaseCollectionProvider _enabledDatabaseCollectionProvider;
 
-    public SettingsEffects(ITraceLogger traceLogger,
-        FileLocationOptions fileLocationOptions,
-        IPreferencesProvider preferencesProvider)
+    public SettingsEffects(
+        IPreferencesProvider preferencesProvider,
+        IEnabledDatabaseCollectionProvider enabledDatabaseCollectionProvider)
     {
-        _traceLogger = traceLogger;
-        _fileLocationOptions = fileLocationOptions;
         _preferencesProvider = preferencesProvider;
+        _enabledDatabaseCollectionProvider = enabledDatabaseCollectionProvider;
     }
 
     [EffectMethod]
     public async Task HandleLoadDatabases(SettingsAction.LoadDatabases action, IDispatcher dispatcher)
     {
-        List<string> databases = new();
-
-        try
-        {
-            if (Directory.Exists(_fileLocationOptions.DatabasePath))
-            {
-                foreach (var item in Directory.EnumerateFiles(_fileLocationOptions.DatabasePath, "*.db"))
-                {
-                    databases.Add(Path.GetFileName(item));
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _traceLogger.Trace($"{nameof(SettingsEffects)}.{nameof(HandleLoadDatabases)} failed: {ex}");
-            return;
-        }
-
-        if (databases.Count <= 0) { return; }
-
-        var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
-
-        if (disabledDatabases?.Any() is true)
-        {
-            databases.RemoveAll(enabled => disabledDatabases
-                .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
-        }
+        var databases = _enabledDatabaseCollectionProvider.GetEnabledDatabases();
 
         dispatcher.Dispatch(new SettingsAction.LoadDatabasesCompleted(databases));
     }
