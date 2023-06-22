@@ -44,7 +44,9 @@ public static class MauiProgram
 
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
 
-        builder.Services.AddSingleton<IDatabaseCollectionProvider, DatabaseCollectionProvider>();
+        builder.Services.AddSingleton<IEnabledDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
+
+        builder.Services.AddSingleton<IDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
 
         builder.Services.AddTransient<IEventResolver, VersatileEventResolver>();
 
