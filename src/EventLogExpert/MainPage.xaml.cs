@@ -15,6 +15,7 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
+using EventLogExpert.UI.Store.FilterCache;
 
 namespace EventLogExpert;
 
@@ -320,4 +321,7 @@ public partial class MainPage : ContentPage
     {
         _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
     }
+
+    private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
 }

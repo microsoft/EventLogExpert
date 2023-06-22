@@ -4,39 +4,46 @@
 @inject IState<FilterCacheState> FilterCacheState
 
 <dialog id="filterCacheDialog">
-    <div class="recent-filter-list">
-        @if (FilterCacheState.Value.Filters.Any())
-        {
-            <div>Recent Filters</div>
-            @foreach (var filter in FilterCacheState.Value.Filters)
+    <div class="dialog-group">
+        <div class="recent-filter-list">
+            @if (FilterCacheState.Value.Filters.Any())
             {
-                <div class="cached-filter-row">
-                    <div>
-                        <button class="button-favorite" type="button" @onclick="() => ToggleFavorite(filter)">
-                            @if (filter.IsFavorite)
-                            {
-                                <i class="bi bi-star-fill"></i>
-                            }
-                            else
-                            {
-                                <i class="bi bi-star"></i>
-                            }
-                        </button>
-                        <span>@filter.ComparisonString</span>
+                <div>Recent Filters</div>
+                @foreach (var filter in FilterCacheState.Value.Filters)
+                {
+                    <div class="cached-filter-row">
+                        <div>
+                            <button class="button-favorite" type="button" @onclick="() => ToggleFavorite(filter)">
+                                @if (filter.IsFavorite)
+                                {
+                                    <i class="bi bi-star-fill"></i>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-star"></i>
+                                }
+                            </button>
+                            <span>@filter.ComparisonString</span>
+                        </div>
+                        <div class="button-group">
+                            <button class="button-save" type="button" @onclick="() => AddFilter(filter)">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                            <button class="button-remove" type="button" @onclick="() => RemoveRecent(filter)">
+                                <i class="bi bi-dash-circle"></i>
+                            </button>
+                        </div>
                     </div>
-                    <button class="button-remove" type="button" @onclick="() => RemoveRecent(filter)">
-                        <i class="bi bi-dash-circle"></i>
-                    </button>
-                </div>
+                }
             }
-        }
-        else
-        {
-            <p>No Recent Filters</p>
-        }
-    </div>
+            else
+            {
+                <p>No Recent Filters</p>
+            }
+        </div>
 
-    <div class="footer-group align-right">
-        <button class="button-primary" type="button" @onclick="Close">Exit</button>
+        <div class="footer-group align-right">
+            <button class="button-primary" type="button" @onclick="Close">Exit</button>
+        </div>
     </div>
 </dialog>

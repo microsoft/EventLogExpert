@@ -7,11 +7,11 @@ namespace EventLogExpert.UI.Store.FilterCache;
 
 public record FilterCacheAction
 {
-    public record AddRecentFilter(CachedFilterModel Filter);
+    public record AddRecentFilter(FilterCacheModel Filter);
 
-    public record RemoveRecentFilter(CachedFilterModel Filter);
+    public record RemoveRecentFilter(FilterCacheModel Filter);
 
-    public record ToggleFavoriteFilter(CachedFilterModel Filter);
+    public record ToggleFavoriteFilter(FilterCacheModel Filter);
 
     public record OpenMenu;
 }

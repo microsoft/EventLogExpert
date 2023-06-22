@@ -69,8 +69,9 @@ public partial class FilterPane
     private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState)
     {
         return new EventLogState.EventFilter(
-            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : "",
+            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : string.Empty,
             filterPaneState.FilteredDateRange?.IsEnabled ?? false ? filterPaneState.FilteredDateRange : null,
+            filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
             filterPaneState.CurrentFilters.Where(f => f.IsEnabled && f.Comparison.Any())
                 .Select(f => f.Comparison.ToImmutableList()).ToImmutableList()
         );

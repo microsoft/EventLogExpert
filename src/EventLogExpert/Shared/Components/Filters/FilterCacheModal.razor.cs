@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 using IDispatcher = Fluxor.IDispatcher;
@@ -15,11 +16,14 @@ public partial class FilterCacheModal
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    private void ToggleFavorite(CachedFilterModel filter) =>
-        Dispatcher.Dispatch(new FilterCacheAction.ToggleFavoriteFilter(filter));
+    private void AddFilter(FilterCacheModel filter) =>
+        Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
 
     private async void Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
 
-    private void RemoveRecent(CachedFilterModel filter) =>
+    private void RemoveRecent(FilterCacheModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveRecentFilter(filter));
+
+    private void ToggleFavorite(FilterCacheModel filter) =>
+        Dispatcher.Dispatch(new FilterCacheAction.ToggleFavoriteFilter(filter));
 }

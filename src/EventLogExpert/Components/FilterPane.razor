@@ -98,6 +98,11 @@
         {
             <FilterRow Value="@item" />
         }
+        
+        @foreach (var item in FilterPaneState.Value.CachedFilters)
+        {
+            <FilterCacheRow Value="@item" />
+        }
 
         @if (_isAdvancedFilterVisible)
         {

@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
+using System.Linq.Dynamic.Core;
 using System.Text;
 
 namespace EventLogExpert.UI;

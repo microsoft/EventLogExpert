@@ -14,7 +14,11 @@ public record EventLogState
 {
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
-    public record EventFilter(string AdvancedFilter, FilterDateModel? DateFilter, ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);
+    public record EventFilter(
+        string AdvancedFilter,
+        FilterDateModel? DateFilter,
+        ImmutableList<FilterCacheModel> CachedFilters,
+        ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);
 
     public enum LogType { Live, File }
 
@@ -27,21 +31,28 @@ public record EventLogState
         ImmutableHashSet<string> EventProviderNames,
         ImmutableHashSet<string> TaskNames,
         ImmutableHashSet<string> KeywordNames
-        );
+    );
 
-    public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } = ImmutableDictionary<string, EventLogData>.Empty;
+    public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
+        ImmutableDictionary<string, EventLogData>.Empty;
 
-    public EventFilter AppliedFilter { get; init; } = new("", null, ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>>.Empty);
+    public EventFilter AppliedFilter { get; init; } = new(
+        string.Empty,
+        null,
+        ImmutableList<FilterCacheModel>.Empty,
+        ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>>.Empty);
 
     public bool ContinuouslyUpdate { get; init; } = false;
 
-    public ReadOnlyCollection<DisplayEventModel> CombinedEvents { get; init; } = new List<DisplayEventModel>().AsReadOnly();
+    public ReadOnlyCollection<DisplayEventModel> CombinedEvents { get; init; } =
+        new List<DisplayEventModel>().AsReadOnly();
 
-    public ImmutableDictionary<Guid, int> EventsLoading { get; set; } = ImmutableDictionary<Guid, int>.Empty;
+    public ImmutableDictionary<Guid, int> EventsLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 
-    public ReadOnlyCollection<DisplayEventModel> NewEventBuffer { get; init; } = new List<DisplayEventModel>().AsReadOnly();
+    public ReadOnlyCollection<DisplayEventModel> NewEventBuffer { get; init; } =
+        new List<DisplayEventModel>().AsReadOnly();
 
-    public bool NewEventBufferIsFull { get; set; }
+    public bool NewEventBufferIsFull { get; init; }
 
     public DisplayEventModel? SelectedEvent { get; init; }
 

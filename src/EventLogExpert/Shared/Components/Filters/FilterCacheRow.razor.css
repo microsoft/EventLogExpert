@@ -1,0 +1,12 @@
+.filter-row {
+    display: flex;
+    justify-content: space-between;
+}
+
+    .filter-row .row-justify-right {
+        justify-self: right;
+    }
+
+.fixed-width {
+    width: 6rem;
+}

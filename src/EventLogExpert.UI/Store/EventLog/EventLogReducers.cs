@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Models;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
+using System.Linq.Expressions;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -181,6 +182,7 @@ public class EventLogReducers
 
         if (action.EventFilter.AdvancedFilter != state.AppliedFilter.AdvancedFilter ||
             action.EventFilter.DateFilter != state.AppliedFilter.DateFilter ||
+            action.EventFilter.CachedFilters != state.AppliedFilter.CachedFilters ||
             action.EventFilter.Filters.Count != state.AppliedFilter.Filters.Count)
         {
             filterChanged = true;
@@ -425,6 +427,15 @@ public class EventLogReducers
                 .Where(e => eventFilter.Filters
                     .All(filter => filter
                         .Any(comp => comp(e))))
+                .AsQueryable();
+
+            needsSort = true;
+        }
+
+        if (eventFilter.CachedFilters.Any())
+        {
+            filteredEvents = filteredEvents.AsParallel()
+                .Where(e => eventFilter.CachedFilters.All(filter => filter.Comparison(e)))
                 .AsQueryable();
 
             needsSort = true;

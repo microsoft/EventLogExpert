@@ -19,7 +19,7 @@ public class FilterPaneEffects
         if (action.FilterModel?.ComparisonString is not null)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new CachedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
+                new FilterCacheModel { ComparisonString = action.FilterModel.ComparisonString }));
         }
     }
 
@@ -29,7 +29,7 @@ public class FilterPaneEffects
         if (!string.IsNullOrEmpty(action.Expression))
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new CachedFilterModel { ComparisonString = action.Expression }));
+                new FilterCacheModel { ComparisonString = action.Expression }));
         }
     }
 
@@ -39,7 +39,7 @@ public class FilterPaneEffects
         if (action.FilterModel.ComparisonString is not null)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new CachedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
+                new FilterCacheModel { ComparisonString = action.FilterModel.ComparisonString }));
         }
     }
 }

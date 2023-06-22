@@ -110,24 +110,20 @@ a,
     border-bottom: 1px solid var(--clr-lightblue);
     color: white;
     margin-right: 2rem;
-    text-align: left;
-    text-align-last: center;
+    text-align: center;
+    cursor: default;
+    user-select: none;
 }
 
-    .input.filter-dropdown,
-    .input.timezone-select {
-        width: 120px;
-        text-align: center;
-        cursor: default;
-        user-select: none;
-    }
+    .input.filter-dropdown { width: 120px; }
 
     .input.timezone-select { width: 350px; }
+
+    .input.cache-dropdown { width: 50rem; }
 
     .input.filter-select,
     .input.filter-description {
         width: 250px;
-        text-align: center;
     }
 
     .input-select {
@@ -136,7 +132,7 @@ a,
 
         & input { margin: 0; }
 
-        & i {
+        & label > i {
             position: absolute;
             right: 2px;
             cursor: pointer;
@@ -213,7 +209,9 @@ div.table-divider {
     /* https://github.com/dotnet/maui/issues/9960 */
     div.table-divider:hover { cursor: e-resize !important; }
 
+i.bi.bi-star { color: var(--clr-yellow); }
 
+i.bi.bi-star-fill { color: var(--clr-yellow); }
 
 .dropdown-list {
     user-select: none;
@@ -231,9 +229,9 @@ div.table-divider {
     &[data-toggle="true"] { visibility: visible; }
 
     & > div {
-        text-align: center;
+        text-align: left;
         margin: 0;
-        padding: 0;
+        padding: 0 5px;
 
         color: #fff;
 

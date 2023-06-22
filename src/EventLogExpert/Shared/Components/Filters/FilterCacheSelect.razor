@@ -1,0 +1,29 @@
+@using EventLogExpert.UI.Models
+@using EventLogExpert.UI.Store.FilterCache
+@inherits EventLogExpert.Shared.Base.SelectComponent<FilterCacheModel>
+
+@inject IState<FilterCacheState> FilterCacheState
+
+<div class="input-select">
+    <label>
+        <input type="text" class="input cache-dropdown" value="@Value.ComparisonString" readonly
+            @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
+    </label>
+
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+        @foreach (var item in FilterCacheState.Value.Filters)
+        {
+            <div @onmousedown="() => UpdateValue(item)">
+                @if (item.IsFavorite)
+                {
+                    <i class="bi bi-star-fill pe-1"></i>
+                }
+                else
+                {
+                    <i class="bi bi-star pe-1"></i>
+                }
+                @item.ComparisonString
+            </div>
+        }
+    </div>
+</div>
