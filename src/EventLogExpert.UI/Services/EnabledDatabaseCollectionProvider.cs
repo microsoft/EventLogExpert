@@ -28,11 +28,15 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         _fileLocationOptions = fileLocationOptions;
         _preferencesProvider = preferencesProvider;
         _traceLogger = traceLogger;
-        SetActiveDatabases(GetEnabledDatabases());
+        SetActiveDatabases(GetEnabledDatabases().Select(d => Path.Join(_fileLocationOptions.DatabasePath, d)));
     }
 
     public ImmutableList<string> ActiveDatabases { get; private set; } = ImmutableList<string>.Empty;
 
+    /// <summary>
+    /// Returns the enabled database file names only.
+    /// </summary>
+    /// <returns></returns>
     public IList<string> GetEnabledDatabases()
     {
         List<string> databases = new();
@@ -63,6 +67,10 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         return databases;
     }
 
+    /// <summary>
+    /// Complete file path must be specified here.
+    /// </summary>
+    /// <param name="activeDatabases"></param>
     public void SetActiveDatabases(IEnumerable<string> activeDatabases)
     {
         _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.");
