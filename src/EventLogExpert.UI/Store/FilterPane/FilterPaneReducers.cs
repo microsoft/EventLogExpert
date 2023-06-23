@@ -100,7 +100,11 @@ public class FilterPaneReducers
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetAdvancedFilter(FilterPaneState state,
-        FilterPaneAction.SetAdvancedFilter action) => state with { AdvancedFilter = action.Expression };
+        FilterPaneAction.SetAdvancedFilter action) => state with
+    {
+        AdvancedFilter = action.Expression,
+        IsAdvancedFilterEnabled = !string.IsNullOrEmpty(action.Expression)
+    };
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)

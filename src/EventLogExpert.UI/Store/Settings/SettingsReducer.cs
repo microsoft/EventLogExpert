@@ -12,13 +12,13 @@ public class SettingsReducer
     [ReducerMethod]
     public static SettingsState ReduceLoadDatabasesCompleted(SettingsState state, SettingsAction.LoadDatabasesCompleted action)
     {
-        return state with { LoadedDatabases = SortDatabases(action.loadedDatabases).ToImmutableList() };
+        return state with { LoadedDatabases = SortDatabases(action.LoadedDatabases).ToImmutableList() };
     }
 
     [ReducerMethod]
     public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettingsCompleted action)
     {
-        return state with { Config = action.config };
+        return state with { Config = action.Config };
     }
 
     [ReducerMethod]

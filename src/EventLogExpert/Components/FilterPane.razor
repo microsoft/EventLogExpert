@@ -34,10 +34,10 @@
             </button>
         </div>
 
-        @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
+        @if (HasFilters)
         {
             <div class="header-center">
-                @if (FilterPaneState.Value.CurrentFilters.Any())
+                @if (GetActiveFilters() > 0)
                 {
                     <span>[Active Filters: @GetActiveFilters()]</span>
                 }

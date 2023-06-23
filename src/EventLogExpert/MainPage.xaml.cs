@@ -91,6 +91,7 @@ public partial class MainPage : ContentPage
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
+        fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
 
         PopulateOtherLogsMenu();
 

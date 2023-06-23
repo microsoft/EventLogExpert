@@ -7,62 +7,27 @@ namespace EventLogExpert.UI.Store.FilterCache;
 
 public class FilterCacheReducers
 {
-    private const int MaxRecentFilterCount = 20;
+    [ReducerMethod]
+    public static FilterCacheState ReduceAddFavoriteFilterCompleted(FilterCacheState state,
+        FilterCacheAction.AddFavoriteFilterCompleted action) => state with { FavoriteFilters = action.Filters };
 
     [ReducerMethod]
-    public static FilterCacheState ReduceAddRecentFilter(FilterCacheState state,
-        FilterCacheAction.AddRecentFilter action)
-    {
-        if (state.RecentFilters.Any(filter =>
-            string.Equals(filter.ComparisonString, action.Filter.ComparisonString, StringComparison.OrdinalIgnoreCase)))
-        {
-            return state;
-        }
-
-        if (state.RecentFilters.Count() >= MaxRecentFilterCount)
-        {
-            return state with { RecentFilters = state.RecentFilters.Dequeue().Enqueue(action.Filter) };
-        }
-
-        return state with { RecentFilters = state.RecentFilters.Enqueue(action.Filter) };
-    }
+    public static FilterCacheState ReduceAddRecentFilterCompleted(FilterCacheState state,
+        FilterCacheAction.AddRecentFilterCompleted action) => state with { RecentFilters = action.Filters };
 
     [ReducerMethod]
-    public static FilterCacheState ReduceAddFavoriteFilter(FilterCacheState state,
-        FilterCacheAction.AddFavoriteFilter action)
+    public static FilterCacheState ReduceLoadFiltersCompleted(FilterCacheState state,
+        FilterCacheAction.LoadFiltersCompleted action) => state with
     {
-        if (state.FavoriteFilters.Contains(action.Filter)) { return state; }
-
-        return state with { FavoriteFilters = state.FavoriteFilters.Add(action.Filter) };
-    }
+        FavoriteFilters = action.FavoriteFilters,
+        RecentFilters = action.RecentFilters
+    };
 
     [ReducerMethod]
-    public static FilterCacheState ReduceRemoveFavoriteFilter(FilterCacheState state,
-        FilterCacheAction.RemoveFavoriteFilter action)
+    public static FilterCacheState ReduceRemoveFavoriteFilterCompleted(FilterCacheState state,
+        FilterCacheAction.RemoveFavoriteFilterCompleted action) => state with
     {
-        if (!state.FavoriteFilters.Contains(action.Filter)) { return state; }
-
-        if (state.RecentFilters.Any(filter =>
-            string.Equals(filter.ComparisonString,
-                action.Filter.ComparisonString,
-                StringComparison.OrdinalIgnoreCase)))
-        {
-            return state with { FavoriteFilters = state.FavoriteFilters.Remove(action.Filter) };
-        }
-
-        if (state.RecentFilters.Count() >= MaxRecentFilterCount)
-        {
-            return state with
-            {
-                FavoriteFilters = state.FavoriteFilters.Remove(action.Filter),
-                RecentFilters = state.RecentFilters.Dequeue().Enqueue(action.Filter)
-            };
-        }
-
-        return state with
-        {
-            FavoriteFilters = state.FavoriteFilters.Remove(action.Filter),
-            RecentFilters = state.RecentFilters.Enqueue(action.Filter)
-        };
-    }
+        FavoriteFilters = action.FavoriteFilters,
+        RecentFilters = action.RecentFilters
+    };
 }

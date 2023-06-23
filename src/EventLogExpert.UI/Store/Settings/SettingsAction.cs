@@ -11,11 +11,11 @@ public record SettingsAction
 
     public record LoadDatabases : SettingsAction;
 
-    public record LoadDatabasesCompleted(IEnumerable<string> loadedDatabases) : SettingsAction;
+    public record LoadDatabasesCompleted(IEnumerable<string> LoadedDatabases) : SettingsAction;
 
     public record LoadSettings : SettingsAction;
 
-    public record LoadSettingsCompleted(SettingsModel config) : SettingsAction;
+    public record LoadSettingsCompleted(SettingsModel Config) : SettingsAction;
 
     public record OpenMenu : SettingsAction;
 

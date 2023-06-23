@@ -10,7 +10,9 @@ public class PreferencesProvider : IPreferencesProvider
 {
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
+    private const string FavoriteFilters = "favorite-filters";
     private const string PrereleaseEnabled = "prerelease-enabled";
+    private const string RecentFilters = "recent-filters";
     private const string TimeZone = "timezone";
 
     public IList<string> DisabledDatabasesPreference
@@ -25,10 +27,22 @@ public class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(DisplaySelectionEnabled, value);
     }
 
+    public IList<string> FavoriteFiltersPreference
+    {
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? new List<string>();
+        set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
+    }
+
     public bool PrereleasePreference
     {
         get => Preferences.Default.Get(PrereleaseEnabled, false);
         set => Preferences.Default.Set(PrereleaseEnabled, value);
+    }
+
+    public IList<string> RecentFiltersPreference
+    {
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? new List<string>();
+        set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
     }
 
     public string TimeZonePreference

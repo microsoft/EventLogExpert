@@ -15,14 +15,20 @@ public record FilterCacheModel
         get => _comparisonString;
         set
         {
-            _comparisonString = value;
+            try
+            {
+                Comparison = DynamicExpressionParser
+                    .ParseLambda<DisplayEventModel, bool>(
+                        EventLogExpertCustomTypeProvider.ParsingConfig,
+                        false,
+                        value)
+                    .Compile();
 
-            Comparison = DynamicExpressionParser
-                .ParseLambda<DisplayEventModel, bool>(
-                    EventLogExpertCustomTypeProvider.ParsingConfig,
-                    false,
-                    _comparisonString)
-                .Compile();
+                _comparisonString = value;
+            }
+            catch
+            { // TODO: Int.Contains works for filtering but not dynamic linq
+            }
         }
     }
 

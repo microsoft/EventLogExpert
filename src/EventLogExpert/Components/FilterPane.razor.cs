@@ -33,18 +33,12 @@ public partial class FilterPane
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
-    private string MenuState
-    {
-        get
-        {
-            if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
-            {
-                return _isFilterListVisible.ToString().ToLower();
-            }
+    private bool HasFilters => FilterPaneState.Value.CurrentFilters.Any() ||
+        FilterPaneState.Value.CachedFilters.Any() ||
+        _isDateFilterVisible ||
+        _isAdvancedFilterVisible;
 
-            return "false";
-        }
-    }
+    private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
 
@@ -161,8 +155,17 @@ public partial class FilterPane
 
     private void EditDateFilter() => _canEditDate = true;
 
-    private int GetActiveFilters() =>
-        FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+    private int GetActiveFilters()
+    {
+        int count = 0;
+
+        count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
+        count += FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+        count += FilterPaneState.Value.CachedFilters.Count(filter => filter is { IsEnabled: true });
+        count += FilterPaneState.Value.IsAdvancedFilterEnabled ? 1 : 0;
+
+        return count;
+    }
 
     private void RemoveAdvancedFilter()
     {
