@@ -91,20 +91,20 @@ public partial class FilterPane
         var hourTicks = TimeSpan.FromHours(1).Ticks;
 
         _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
-                            .Where(log => log.Events.Any())
-                            .Select(log => log.Events.First().TimeCreated)
-                            .OrderBy(t => t)
-                            .DefaultIfEmpty(DateTime.UtcNow)
-                            .Last()
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.First().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .Last()
             .Ticks + hourTicks) / hourTicks))
             .ConvertTimeZone(_model.TimeZoneInfo);
 
         _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
-                        .Where(log => log.Events.Any())
-                        .Select(log => log.Events.Last().TimeCreated)
-                        .OrderBy(t => t)
-                        .DefaultIfEmpty(DateTime.UtcNow)
-                        .First()
+            .Where(log => log.Events.Any())
+            .Select(log => log.Events.Last().TimeCreated)
+            .OrderBy(t => t)
+            .DefaultIfEmpty(DateTime.UtcNow)
+            .First()
             .Ticks / hourTicks))
             .ConvertTimeZone(_model.TimeZoneInfo);
 

@@ -23,6 +23,12 @@ dialog {
     overflow-x: hidden;
 }
 
+.divider {
+    width: 95%;
+    align-self: center;
+    border-top: 3px solid var(--clr-lightblue);
+}
+
 .cached-filter-row {
     display: flex;
     justify-content: space-between;

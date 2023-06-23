@@ -3,10 +3,11 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
@@ -15,7 +16,6 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
-using EventLogExpert.UI.Store.FilterCache;
 
 namespace EventLogExpert;
 

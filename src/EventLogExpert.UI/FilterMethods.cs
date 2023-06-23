@@ -33,11 +33,27 @@ public static class FilterMethods
         {
             case FilterComparison.Equals :
             case FilterComparison.NotEqual :
-                stringBuilder.Append($"\"{filterModel.FilterValue}\"");
+                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"\"{filterModel.FilterValue}\"");
+                }
+
                 break;
             case FilterComparison.Contains :
             case FilterComparison.NotContains :
-                stringBuilder.Append($"(\"{filterModel.FilterValue}\")");
+                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"(\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"(\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase)");
+                }
+
                 break;
             default : return false;
         }
@@ -59,16 +75,24 @@ public static class FilterMethods
 
     private static string GetComparisonString(FilterType type, FilterComparison comparison) => comparison switch
     {
-        FilterComparison.Equals => $"{type} == ",
-        FilterComparison.Contains =>
-            type is FilterType.Id or FilterType.Level ?
-                $"{type}.ToString().Contains" :
-                $"{type}.Contains",
-        FilterComparison.NotEqual => $"{type} != ",
-        FilterComparison.NotContains =>
-            type is FilterType.Id or FilterType.Level ?
-                $"!{type}.ToString().Contains" :
-                $"!{type}.Contains",
+        FilterComparison.Equals => type is FilterType.KeywordsDisplayNames ?
+            $"{type}.Any(e => string.Equals(e, " :
+            $"{type} == ",
+        FilterComparison.Contains => type switch
+        {
+            FilterType.Id or FilterType.Level => $"{type}.ToString().Contains",
+            FilterType.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
+            _ => $"{type}.Contains"
+        },
+        FilterComparison.NotEqual => type is FilterType.KeywordsDisplayNames ?
+            $"!{type}.Any(e => string.Equals(e, " :
+            $"{type} != ",
+        FilterComparison.NotContains => type switch
+        {
+            FilterType.Id or FilterType.Level => $"!{type}.ToString().Contains",
+            FilterType.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
+            _ => $"!{type}.Contains"
+        },
         _ => string.Empty
     };
 
@@ -77,10 +101,10 @@ public static class FilterMethods
         {
             FilterType.Id => x => x.Id.ToString().Contains(value),
             FilterType.Level => x => x.Level.ToString()?.Contains(value) is true,
-            FilterType.Keywords => x =>
+            FilterType.KeywordsDisplayNames => x =>
                 x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Task => x => x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
+            FilterType.TaskCategory => x => x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x => x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
             _ => null
         };
@@ -90,10 +114,10 @@ public static class FilterMethods
         {
             FilterType.Id => int.TryParse(value, out int id) ? x => x.Id == id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level == level : null,
-            FilterType.Keywords => x =>
+            FilterType.KeywordsDisplayNames => x =>
                 x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Task => x => string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
+            FilterType.TaskCategory => x => string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x =>
                 string.Equals(x.Description, value, StringComparison.OrdinalIgnoreCase),
             _ => null
@@ -104,10 +128,10 @@ public static class FilterMethods
         {
             FilterType.Id => x => !x.Id.ToString().Contains(value),
             FilterType.Level => x => !x.Level.ToString()?.Contains(value) is true,
-            FilterType.Keywords => x =>
+            FilterType.KeywordsDisplayNames => x =>
                 !x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => !x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Task => x => !x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
+            FilterType.TaskCategory => x => !x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x => !x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
             _ => null
         };
@@ -117,10 +141,10 @@ public static class FilterMethods
         {
             FilterType.Id => int.TryParse(value, out int id) ? x => x.Id != id : null,
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level != level : null,
-            FilterType.Keywords => x =>
+            FilterType.KeywordsDisplayNames => x =>
                 !x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
             FilterType.Source => x => !string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Task => x => !string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
+            FilterType.TaskCategory => x => !string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
             FilterType.Description => x =>
                 !string.Equals(x.Description, value, StringComparison.OrdinalIgnoreCase),
             _ => null
@@ -137,11 +161,27 @@ public static class FilterMethods
         {
             case FilterComparison.Equals :
             case FilterComparison.NotEqual :
-                stringBuilder.Append($"\"{subFilter.FilterValue}\"");
+                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"\"{subFilter.FilterValue}\"");
+                }
+
                 break;
             case FilterComparison.Contains :
             case FilterComparison.NotContains :
-                stringBuilder.Append($"(\"{subFilter.FilterValue}\")");
+                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"(\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"(\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase)");
+                }
+
                 break;
             default : return null;
         }

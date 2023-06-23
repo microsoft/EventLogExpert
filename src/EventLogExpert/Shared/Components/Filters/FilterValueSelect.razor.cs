@@ -47,7 +47,7 @@ public partial class FilterValueSelect : SelectComponent<string>
                 }
 
                 break;
-            case FilterType.Keywords:
+            case FilterType.KeywordsDisplayNames:
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
@@ -57,7 +57,7 @@ public partial class FilterValueSelect : SelectComponent<string>
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
                 break;
-            case FilterType.Task:
+            case FilterType.TaskCategory:
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
