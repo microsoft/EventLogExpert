@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
-using System.Linq.Dynamic.Core;
 using System.Text;
 
 namespace EventLogExpert.UI;
@@ -61,9 +60,15 @@ public static class FilterMethods
     private static string GetComparisonString(FilterType type, FilterComparison comparison) => comparison switch
     {
         FilterComparison.Equals => $"{type} == ",
-        FilterComparison.Contains => $"{type}.Contains",
+        FilterComparison.Contains =>
+            type is FilterType.Id or FilterType.Level ?
+                $"{type}.ToString().Contains" :
+                $"{type}.Contains",
         FilterComparison.NotEqual => $"{type} != ",
-        FilterComparison.NotContains => $"!{type}.Contains",
+        FilterComparison.NotContains =>
+            type is FilterType.Id or FilterType.Level ?
+                $"!{type}.ToString().Contains" :
+                $"!{type}.Contains",
         _ => string.Empty
     };
 
