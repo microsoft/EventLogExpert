@@ -16,14 +16,17 @@ public partial class FilterCacheModal
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    private void AddFilter(FilterCacheModel filter) =>
+    private void AddFavorite(FilterCacheModel filter) =>
+        Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
+
+    private void AddFilter(FilterCacheModel filter)
+    {
         Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
+        Close();
+    }
 
     private async void Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
 
-    private void RemoveRecent(FilterCacheModel filter) =>
-        Dispatcher.Dispatch(new FilterCacheAction.RemoveRecentFilter(filter));
-
-    private void ToggleFavorite(FilterCacheModel filter) =>
-        Dispatcher.Dispatch(new FilterCacheAction.ToggleFavoriteFilter(filter));
+    private void RemoveFavorite(FilterCacheModel filter) =>
+        Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
 }

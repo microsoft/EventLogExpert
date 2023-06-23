@@ -11,18 +11,17 @@
     </label>
 
     <div class="dropdown-list" data-toggle="@IsDropDownVisible">
-        @foreach (var item in FilterCacheState.Value.Filters)
+        @foreach (var item in FilterCacheState.Value.FavoriteFilters)
         {
             <div @onmousedown="() => UpdateValue(item)">
-                @if (item.IsFavorite)
-                {
-                    <i class="bi bi-star-fill pe-1"></i>
-                }
-                else
-                {
-                    <i class="bi bi-star pe-1"></i>
-                }
-                @item.ComparisonString
+                <i class="bi bi-star-fill pe-1"></i>@item.ComparisonString
+            </div>
+        }
+        
+        @foreach (var item in FilterCacheState.Value.RecentFilters)
+        {
+            <div @onmousedown="() => UpdateValue(item)">
+                <i class="bi bi-star pe-1"></i>@item.ComparisonString
             </div>
         }
     </div>

@@ -28,7 +28,5 @@ public record FilterCacheModel
 
     public Func<DisplayEventModel, bool> Comparison { get; private set; } = null!;
 
-    public bool IsFavorite { get; set; }
-
     public bool IsEnabled { get; set; } = true;
 }

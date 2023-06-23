@@ -2,56 +2,67 @@
 // // Licensed under the MIT License.
 
 using Fluxor;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterCache;
 
 public class FilterCacheReducers
 {
+    private const int MaxRecentFilterCount = 20;
+
     [ReducerMethod]
     public static FilterCacheState ReduceAddRecentFilter(FilterCacheState state,
         FilterCacheAction.AddRecentFilter action)
     {
-        if (state.Filters.Any(filter =>
+        if (state.RecentFilters.Any(filter =>
             string.Equals(filter.ComparisonString, action.Filter.ComparisonString, StringComparison.OrdinalIgnoreCase)))
         {
             return state;
         }
 
-        return state with
+        if (state.RecentFilters.Count() >= MaxRecentFilterCount)
         {
-            Filters = state.Filters.Add(action.Filter).OrderByDescending(x => x.IsFavorite).ToImmutableList()
-        };
+            return state with { RecentFilters = state.RecentFilters.Dequeue().Enqueue(action.Filter) };
+        }
+
+        return state with { RecentFilters = state.RecentFilters.Enqueue(action.Filter) };
     }
 
     [ReducerMethod]
-    public static FilterCacheState ReduceRemoveRecentFilter(FilterCacheState state,
-        FilterCacheAction.RemoveRecentFilter action)
+    public static FilterCacheState ReduceAddFavoriteFilter(FilterCacheState state,
+        FilterCacheAction.AddFavoriteFilter action)
     {
-        if (!state.Filters.Any(filter =>
-            string.Equals(filter.ComparisonString, action.Filter.ComparisonString, StringComparison.OrdinalIgnoreCase)))
+        if (state.FavoriteFilters.Contains(action.Filter)) { return state; }
+
+        return state with { FavoriteFilters = state.FavoriteFilters.Add(action.Filter) };
+    }
+
+    [ReducerMethod]
+    public static FilterCacheState ReduceRemoveFavoriteFilter(FilterCacheState state,
+        FilterCacheAction.RemoveFavoriteFilter action)
+    {
+        if (!state.FavoriteFilters.Contains(action.Filter)) { return state; }
+
+        if (state.RecentFilters.Any(filter =>
+            string.Equals(filter.ComparisonString,
+                action.Filter.ComparisonString,
+                StringComparison.OrdinalIgnoreCase)))
         {
-            return state;
+            return state with { FavoriteFilters = state.FavoriteFilters.Remove(action.Filter) };
+        }
+
+        if (state.RecentFilters.Count() >= MaxRecentFilterCount)
+        {
+            return state with
+            {
+                FavoriteFilters = state.FavoriteFilters.Remove(action.Filter),
+                RecentFilters = state.RecentFilters.Dequeue().Enqueue(action.Filter)
+            };
         }
 
         return state with
         {
-            Filters = state.Filters.Remove(action.Filter).OrderByDescending(x => x.IsFavorite).ToImmutableList()
-        };
-    }
-
-    [ReducerMethod]
-    public static FilterCacheState ReduceToggleFavoriteFilter(FilterCacheState state,
-        FilterCacheAction.ToggleFavoriteFilter action)
-    {
-        if (!state.Filters.Contains(action.Filter)) { return state; }
-
-        return state with
-        {
-            Filters = state.Filters
-                .Remove(action.Filter)
-                .Add(action.Filter with { IsFavorite = !action.Filter.IsFavorite })
-                .OrderByDescending(x => x.IsFavorite).ToImmutableList()
+            FavoriteFilters = state.FavoriteFilters.Remove(action.Filter),
+            RecentFilters = state.RecentFilters.Enqueue(action.Filter)
         };
     }
 }

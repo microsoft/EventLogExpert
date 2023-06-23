@@ -13,6 +13,7 @@
         var isAnyFilterApplied = 
             eventLogState.AppliedFilter.AdvancedFilter != "" ||
             eventLogState.AppliedFilter.DateFilter != null ||
+            eventLogState.AppliedFilter.CachedFilters.Any() ||
             eventLogState.AppliedFilter.Filters.Any();
     }
 

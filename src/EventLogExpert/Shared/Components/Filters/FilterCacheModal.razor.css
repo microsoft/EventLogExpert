@@ -23,8 +23,6 @@ dialog {
     overflow-x: hidden;
 }
 
-.favorite-filter-list { border-bottom: solid var(--background-darkgray); }
-
 .cached-filter-row {
     display: flex;
     justify-content: space-between;

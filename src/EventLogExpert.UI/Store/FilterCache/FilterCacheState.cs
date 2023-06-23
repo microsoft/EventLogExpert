@@ -10,5 +10,7 @@ namespace EventLogExpert.UI.Store.FilterCache;
 [FeatureState]
 public record FilterCacheState
 {
-    public ImmutableList<FilterCacheModel> Filters { get; init; } = ImmutableList<FilterCacheModel>.Empty;
+    public ImmutableList<FilterCacheModel> FavoriteFilters { get; init; } = ImmutableList<FilterCacheModel>.Empty;
+
+    public ImmutableQueue<FilterCacheModel> RecentFilters { get; init; } = ImmutableQueue<FilterCacheModel>.Empty;
 }

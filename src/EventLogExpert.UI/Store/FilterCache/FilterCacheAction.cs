@@ -9,9 +9,9 @@ public record FilterCacheAction
 {
     public record AddRecentFilter(FilterCacheModel Filter);
 
-    public record RemoveRecentFilter(FilterCacheModel Filter);
+    public record AddFavoriteFilter(FilterCacheModel Filter);
 
-    public record ToggleFavoriteFilter(FilterCacheModel Filter);
+    public record RemoveFavoriteFilter(FilterCacheModel Filter);
 
     public record OpenMenu;
 }
