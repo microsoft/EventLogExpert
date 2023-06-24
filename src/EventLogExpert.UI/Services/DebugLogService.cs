@@ -36,6 +36,11 @@ public class DebugLogService : ITraceLogger
         System.Diagnostics.Trace.Listeners.Add(new TextWriterTraceListener(_fileLocationOptions.LoggingPath, "myListener"));
         System.Diagnostics.Trace.AutoFlush = true;
 
+        // Disabling first chance exception logging unless LogLevel is at Trace level
+        // since it is noisy and is logging double information for exceptions that are being handled.
+        // This also saves any potential performance hit for when we aren't worried about tracking first chance exceptions.
+        if (_loggingLevel > LogLevel.Trace) { return; }
+
         var firstChanceSemaphore = new SemaphoreSlim(1);
 
         // Trace all exceptions
@@ -49,7 +54,7 @@ public class DebugLogService : ITraceLogger
             // exception, which we then try to trace, until we hit a stack overflow.
             if (firstChanceSemaphore.Wait(100))
             {
-                Trace($"{args.Exception}");
+                Trace($"{args.Exception}", LogLevel.Trace);
                 firstChanceSemaphore.Release();
             }
         };
@@ -59,6 +64,6 @@ public class DebugLogService : ITraceLogger
     {
         if (level < _loggingLevel) { return; }
 
-        System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {Environment.CurrentManagedThreadId} {level} {message}");
+        System.Diagnostics.Trace.WriteLine($"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}");
     }
 }

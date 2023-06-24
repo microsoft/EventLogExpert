@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using Fluxor;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
@@ -335,7 +336,7 @@ public class EventLogReducers
     /// <returns></returns>
     private static IEnumerable<DisplayEventModel> CombineLogs(IEnumerable<IEnumerable<DisplayEventModel>> eventData, bool sortDescending, ITraceLogger traceLogger)
     {
-        traceLogger.Trace($"{nameof(CombineLogs)} was called for {eventData.Count()} logs.");
+        traceLogger.Trace($"{nameof(CombineLogs)} was called for {eventData.Count()} logs.", LogLevel.Debug);
 
         if (eventData.Count() == 1)
         {
@@ -408,7 +409,7 @@ public class EventLogReducers
     /// <returns></returns>
     private static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter, out bool needsSort, ITraceLogger traceLogger)
     {
-        traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
+        traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.", LogLevel.Debug);
 
         needsSort = false;
 
@@ -476,7 +477,7 @@ public class EventLogReducers
     /// <returns></returns>
     private static IEnumerable<DisplayEventModel> SortOneLog(IEnumerable<DisplayEventModel> events, bool sortDescending, ITraceLogger traceLogger)
     {
-        traceLogger.Trace($"{nameof(SortOneLog)} was called.");
+        traceLogger.Trace($"{nameof(SortOneLog)} was called.", LogLevel.Debug);
 
         if (sortDescending) return events.OrderByDescending(e => e.RecordId);
 

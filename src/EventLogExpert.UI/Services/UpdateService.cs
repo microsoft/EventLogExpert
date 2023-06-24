@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Models;
+using Microsoft.Extensions.Logging;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
@@ -38,13 +39,13 @@ public class UpdateService : IUpdateService
     public async Task CheckForUpdates(bool prereleaseVersionsEnabled, bool manualScan)
     {
         _traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(prereleaseVersionsEnabled)} is {prereleaseVersionsEnabled}. " +
-            $"{nameof(manualScan)} is {manualScan}. {nameof(_versionProvider.CurrentVersion)} is {_versionProvider.CurrentVersion}.");
+            $"{nameof(manualScan)} is {manualScan}. {nameof(_versionProvider.CurrentVersion)} is {_versionProvider.CurrentVersion}.", LogLevel.Trace);
 
         GitReleaseModel? latest = null;
 
         if (_versionProvider.IsDevBuild)
         {
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(_versionProvider.IsDevBuild)}: {_versionProvider.IsDevBuild}. Skipping update check.");
+            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(_versionProvider.IsDevBuild)}: {_versionProvider.IsDevBuild}. Skipping update check.", LogLevel.Debug);
             return;
         }
 
@@ -55,12 +56,12 @@ public class UpdateService : IUpdateService
             var releases = await _gitHubService.GetReleases();
             releases = releases.OrderByDescending(x => x.ReleaseDate).ToArray();
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:");
+            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:", LogLevel.Debug);
 
             foreach (var release in releases)
             {
                 _traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
-                    $"ReleaseDate: {release.ReleaseDate} IsPrerelease: {release.IsPrerelease}");
+                    $"ReleaseDate: {release.ReleaseDate} IsPrerelease: {release.IsPrerelease}", LogLevel.Debug);
             }
 
             latest = prereleaseVersionsEnabled ?
@@ -69,17 +70,17 @@ public class UpdateService : IUpdateService
 
             if (latest is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.");
+                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.", LogLevel.Warning);
 
                 return;
             }
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPrerelease: {latest.IsPrerelease}");
+            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPrerelease: {latest.IsPrerelease}", LogLevel.Debug);
 
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
+            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.", LogLevel.Debug);
 
             // Setting version to equal allows rollback if a version is pulled
             if (newVersion.CompareTo(_versionProvider.CurrentVersion) == 0)
@@ -98,20 +99,16 @@ public class UpdateService : IUpdateService
 
             if (downloadPath is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.");
+                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
 
                 return;
             }
 
-            var shouldReboot = false;
-
-            shouldReboot = await _alertDialogService.ShowAlert("Update Available",
+            bool shouldReboot = await _alertDialogService.ShowAlert("Update Available",
                 "A new version has been detected, would you like to install and reload the application?",
                 "Yes", "No");
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
-
-            PackageManager packageManager = new();
+            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.", LogLevel.Debug);
 
             if (shouldReboot)
             {

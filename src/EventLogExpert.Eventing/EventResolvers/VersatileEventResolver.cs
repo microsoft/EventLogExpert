@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Eventing.EventResolvers;
@@ -30,7 +31,7 @@ public class VersatileEventResolver : IEventResolver, IDisposable
         _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
         _useDatabaseResolver = dbCollection.ActiveDatabases.Any();
         _tracer = tracer;
-        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
+        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.", LogLevel.Trace);
         _databaseResolver.StatusChanged += (sender, args) => StatusChanged?.Invoke(sender, args);
     }
 

@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Services;
@@ -53,7 +54,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         }
         catch (Exception ex)
         {
-            _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(GetEnabledDatabases)} failed: {ex}");
+            _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(GetEnabledDatabases)} failed: {ex}", LogLevel.Warning);
         }
 
         var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
@@ -73,7 +74,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
     /// <param name="activeDatabases"></param>
     public void SetActiveDatabases(IEnumerable<string> activeDatabases)
     {
-        _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.");
+        _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.", LogLevel.Debug);
         ActiveDatabases = activeDatabases.ToImmutableList();
     }
 }
