@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 
@@ -16,14 +17,14 @@ public class EventMessageProvider
     private static HashSet<string> _allProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;
-    private readonly Action<string> _traceAction;
+    private readonly Action<string, LogLevel> _traceAction;
 
-    public EventMessageProvider(string providerName, Action<string> traceAction) : this(providerName,
+    public EventMessageProvider(string providerName, Action<string, LogLevel> traceAction) : this(providerName,
         null,
         traceAction)
     { }
 
-    public EventMessageProvider(string providerName, string computerName, Action<string> traceAction)
+    public EventMessageProvider(string providerName, string computerName, Action<string, LogLevel> traceAction)
     {
         _providerName = providerName;
         _traceAction = traceAction;
@@ -39,7 +40,7 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.");
+            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.", LogLevel.Warning);
         }
 
         ProviderDetails provider;
@@ -62,12 +63,12 @@ public class EventMessageProvider
         {
             if (providerMetadata?.MessageFilePath == null)
             {
-                _traceAction($"No message files found for provider {_providerName}. Returning null.");
+                _traceAction($"No message files found for provider {_providerName}. Returning null.", LogLevel.Debug);
                 provider.Messages = new List<MessageModel>();
             }
             else
             {
-                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.");
+                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.", LogLevel.Debug);
                 provider.Messages = LoadMessagesFromDlls(new[] { providerMetadata.MessageFilePath });
             }
         }
@@ -101,26 +102,26 @@ public class EventMessageProvider
     /// <returns></returns>
     private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
     {
-        _traceAction($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}");
+        _traceAction($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}", LogLevel.Debug);
 
         try
         {
             var messages = GetMessages(messageFilePaths, _providerName, _traceAction);
-            _traceAction($"Returning {messages.Count} messages for provider {_providerName}");
+            _traceAction($"Returning {messages.Count} messages for provider {_providerName}", LogLevel.Debug);
             return messages;
         }
         catch (Exception ex)
         {
             // Hide the failure. We want to allow the results from the modern provider
             // to return even if we failed to load the legacy provider.
-            _traceAction($"Failed to load legacy provider data for {_providerName}.");
-            _traceAction(ex.ToString());
+            _traceAction($"Failed to load legacy provider data for {_providerName}.", LogLevel.Warning);
+            _traceAction(ex.ToString(), LogLevel.Warning);
         }
 
         return new List<MessageModel>();
     }
 
-    public static List<MessageModel> GetMessages(IEnumerable<string> legacyProviderFiles, string providerName, Action<string> _traceAction)
+    public static List<MessageModel> GetMessages(IEnumerable<string> legacyProviderFiles, string providerName, Action<string, LogLevel> _traceAction)
     {
         var messages = new List<MessageModel>();
 
@@ -151,7 +152,7 @@ public class EventMessageProvider
 
                 if (msgTableInfo == nint.Zero)
                 {
-                    _traceAction($"No message table found. Returning 0 messages from file: {file}");
+                    _traceAction($"No message table found. Returning 0 messages from file: {file}", LogLevel.Debug);
                     continue;
                 }
 
@@ -236,13 +237,13 @@ public class EventMessageProvider
     /// <returns></returns>
     private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
     {
-        _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}");
+        _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}", LogLevel.Debug);
 
         var provider = new ProviderDetails { ProviderName = _providerName };
 
         if (!_allProviderNames.Contains(_providerName))
         {
-            _traceAction($"{_providerName} modern provider is not present. Returning empty provider.");
+            _traceAction($"{_providerName} modern provider is not present. Returning empty provider.", LogLevel.Debug);
             return provider;
         }
 
@@ -264,8 +265,8 @@ public class EventMessageProvider
         catch (Exception ex)
         {
             provider.Events = new List<EventModel>();
-            _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:");
-            _traceAction(ex.ToString());
+            _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:", LogLevel.Debug);
+            _traceAction(ex.ToString(), LogLevel.Debug);
         }
 
         try
@@ -278,8 +279,8 @@ public class EventMessageProvider
         catch (Exception ex)
         {
             provider.Keywords = new Dictionary<long, string>();
-            _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:");
-            _traceAction(ex.ToString());
+            _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:", LogLevel.Debug);
+            _traceAction(ex.ToString(), LogLevel.Debug);
         }
 
         try
@@ -291,8 +292,8 @@ public class EventMessageProvider
         catch (Exception ex)
         {
             provider.Opcodes = new Dictionary<int, string>();
-            _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:");
-            _traceAction(ex.ToString());
+            _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:", LogLevel.Debug);
+            _traceAction(ex.ToString(), LogLevel.Debug);
         }
 
         try
@@ -304,11 +305,11 @@ public class EventMessageProvider
         catch (Exception ex)
         {
             provider.Tasks = new Dictionary<int, string>();
-            _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:");
-            _traceAction(ex.ToString());
+            _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:", LogLevel.Debug);
+            _traceAction(ex.ToString(), LogLevel.Debug);
         }
 
-        _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}");
+        _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}", LogLevel.Debug);
         return provider;
     }
 }

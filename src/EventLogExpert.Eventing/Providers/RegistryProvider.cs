@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
 
@@ -9,9 +10,9 @@ namespace EventLogExpert.Eventing.Providers;
 
 public class RegistryProvider
 {
-    private readonly Action<string> _tracer;
+    private readonly Action<string, LogLevel> _tracer;
 
-    public RegistryProvider(string computerName, Action<string> tracer)
+    public RegistryProvider(string computerName, Action<string, LogLevel> tracer)
     {
         _tracer = tracer;
         ComputerName = computerName;
@@ -38,7 +39,7 @@ public class RegistryProvider
     /// <returns></returns>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}");
+        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Debug);
 
         var hklm = string.IsNullOrEmpty(ComputerName)
             ? Registry.LocalMachine
@@ -69,7 +70,7 @@ public class RegistryProvider
                 continue;
             }
 
-            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
+            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Debug);
 
             var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
 

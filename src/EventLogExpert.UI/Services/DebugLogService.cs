@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
 namespace EventLogExpert.UI.Services;
@@ -12,9 +14,11 @@ public class DebugLogService : ITraceLogger
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 
     private readonly FileLocationOptions _fileLocationOptions;
+    private readonly LogLevel _loggingLevel;
 
-    public DebugLogService(FileLocationOptions fileLocationOptions)
+    public DebugLogService(FileLocationOptions fileLocationOptions, IPreferencesProvider preferencesProvider)
     {
+        _loggingLevel = preferencesProvider.LogLevelPreference;
         _fileLocationOptions = fileLocationOptions;
         InitTracing();
     }
@@ -51,6 +55,10 @@ public class DebugLogService : ITraceLogger
         };
     }
 
-    public void Trace(string message) =>
-        System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {Environment.CurrentManagedThreadId} {message}");
+    public void Trace(string message, LogLevel level = LogLevel.Information)
+    {
+        if (level < _loggingLevel) { return; }
+
+        System.Diagnostics.Trace.WriteLine($"{DateTime.Now:o} {Environment.CurrentManagedThreadId} {level} {message}");
+    }
 }

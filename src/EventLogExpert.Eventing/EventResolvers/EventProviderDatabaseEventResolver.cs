@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
@@ -25,11 +26,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, s => { }) { }
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s,log) => { }) { }
 
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string, LogLevel> tracer) : base(tracer)
     {
-        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
+        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}", LogLevel.Debug);
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
@@ -39,10 +40,10 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
+        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Debug);
         foreach (var databasePath in databasePaths)
         {
-            _tracer($"  {databasePath}");
+            _tracer($"  {databasePath}", LogLevel.Debug);
         }
 
         _providerDetails.Clear();
@@ -170,7 +171,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
                         if (lastResult?.Description != null)
                         {
-                            _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
+                            _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Debug);
                             _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
                             return lastResult;
                         }
@@ -232,7 +233,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
             disposedValue = true;
 
-            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}");
+            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Debug);
         }
     }
 

@@ -23,7 +23,7 @@ public class EventResolverTests
 
         private readonly List<ProviderDetails> _providerDetailsList;
 
-        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base(s => Debug.WriteLine(s))
+        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base((s, log) => Debug.WriteLine(s))
         {
             _providerDetailsList = providerDetailsList;
         }

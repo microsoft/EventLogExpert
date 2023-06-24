@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace EventLogExpert.Services;
@@ -11,6 +12,7 @@ public class PreferencesProvider : IPreferencesProvider
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string FavoriteFilters = "favorite-filters";
+    private const string LoggingLevel = "logging-level";
     private const string PrereleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
     private const string TimeZone = "timezone";
@@ -31,6 +33,12 @@ public class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? new List<string>();
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
+    }
+
+    public LogLevel LogLevelPreference
+    {
+        get => Preferences.Default.Get(LoggingLevel, LogLevel.Information);
+        set => Preferences.Default.Set(LoggingLevel, value);
     }
 
     public bool PrereleasePreference

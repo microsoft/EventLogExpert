@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using Microsoft.Extensions.Logging;
+
 namespace EventLogExpert.UI.Interfaces;
 
 public interface IPreferencesProvider
@@ -10,6 +12,8 @@ public interface IPreferencesProvider
     bool DisplayPaneSelectionPreference { get; set; }
 
     IList<string> FavoriteFiltersPreference { get; set; }
+
+    LogLevel LogLevelPreference { get; set; }
 
     bool PrereleasePreference { get; set; }
 
