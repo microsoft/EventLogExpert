@@ -14,10 +14,28 @@ dialog {
     }
 }
 
-.tz-row {
+.settings-list {
     display: flex;
+    flex-direction: column;
+
+    height: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.tz-row,
+.select-group,
+.prerelease-group {
+    display: flex;
+    align-items: center;
+}
+
+.tz-row {
     margin-bottom: .5rem;
 }
+
+.select-group { justify-content: space-between; }
 
 .database-row {
     display: flex;
@@ -35,17 +53,6 @@ dialog {
 }
 
     .provider-list > span { margin: 0; }
-
-.select-group {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-}
-
-.prerelease-group {
-    display: flex;
-    align-items: center;
-}
 
 .button-group {
     display: flex;

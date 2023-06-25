@@ -37,8 +37,9 @@ public class PreferencesProvider : IPreferencesProvider
 
     public LogLevel LogLevelPreference
     {
-        get => Preferences.Default.Get(LoggingLevel, LogLevel.Information);
-        set => Preferences.Default.Set(LoggingLevel, value);
+        get => Enum.TryParse(Preferences.Default.Get(LoggingLevel, LogLevel.Information.ToString()), out LogLevel value) ?
+            value : LogLevel.Information;
+        set => Preferences.Default.Set(LoggingLevel, value.ToString());
     }
 
     public bool PrereleasePreference

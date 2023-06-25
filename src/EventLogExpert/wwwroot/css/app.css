@@ -127,7 +127,8 @@ a,
     }
 
     .input-select {
-        position: relative;
+        display: inline-block;
+        /* position: relative; */
         margin: 0 .5rem;
 
         & input { margin: 0; }
@@ -214,24 +215,26 @@ i.bi.bi-star { color: var(--clr-yellow); }
 i.bi.bi-star-fill { color: var(--clr-yellow); }
 
 .dropdown-list {
+    display: none;
     user-select: none;
     border: 1px solid var(--clr-lightblue);
     background-color: var(--background-dark);
     z-index: 10;
-    position: absolute;
-    top: 2rem;
-    width: 100%;
+    /* position: absolute; */
+    /* top: 2rem; */
+    /* width: 100%; */
     max-height: 240px;
     overflow-y: auto;
-    visibility: hidden;
-    transition: visibility 0.1s linear;
 
-    &[data-toggle="true"] { visibility: visible; }
+    &[data-toggle="true"] { display: block; }
 
     & > div {
         text-align: left;
         margin: 0;
         padding: 0 5px;
+
+        display:block;
+        clear: both;
 
         color: #fff;
 

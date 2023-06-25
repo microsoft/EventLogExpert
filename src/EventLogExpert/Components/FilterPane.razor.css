@@ -4,7 +4,7 @@
 
     margin: 5px;
 
-    /* max-height: 25%; */
+    max-height: 25%;
 }
 
 .filter-header {
@@ -13,7 +13,7 @@
 }
 
 .filter-group {
-    /* overflow: auto; */
+    overflow: auto;
 
     border-bottom: solid var(--background-darkgray);
     transition: all 1s;

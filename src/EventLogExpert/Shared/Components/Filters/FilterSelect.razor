@@ -2,7 +2,7 @@
 @using EventLogExpert.UI
 @inherits EventLogExpert.Shared.Base.SelectComponent<TInput>
 
-<div class="input-select">
+<div class="input-select" @ref="selectComponent">
     <label>
         <input type="text" class="input filter-dropdown" value="@Value.ToFullString()" readonly
             @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />
