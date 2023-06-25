@@ -15,6 +15,22 @@ window.closeSettingsModal = () => {
     }
 };
 
+window.openFilterCacheModal = () => {
+    const filterCacheModal = document.getElementById("filterCacheDialog");
+
+    if (filterCacheModal != null) {
+        filterCacheModal.showModal();
+    }
+};
+
+window.closeFilterCacheModal = () => {
+    const filterCacheModal = document.getElementById("filterCacheDialog");
+
+    if (filterCacheModal != null) {
+        filterCacheModal.close();
+    }
+};
+
 window.enableDetailsPaneResizer = () => {
     const detailsPane = document.getElementById("details-pane");
     const resizer = document.getElementById("details-resizer");

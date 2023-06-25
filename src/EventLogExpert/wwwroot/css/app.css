@@ -6,6 +6,7 @@
     --clr-black: #111111;
     --clr-red: #ee0d0d;
     --clr-green: #0dee0d;
+    --clr-yellow: #eeff0d;
 
     --clr-statusbar: #3C64E7;
 
@@ -32,6 +33,15 @@ html, body {
     background-color: var(--background-dark);
     color: var(--clr-lightblue);
 }
+
+.footer-group {
+    display: flex;
+    justify-content: space-between;
+
+    margin-top: .5rem;
+}
+
+    .footer-group.align-right { justify-content: flex-end; }
 
 h1:focus { outline: none; }
 
@@ -100,24 +110,20 @@ a,
     border-bottom: 1px solid var(--clr-lightblue);
     color: white;
     margin-right: 2rem;
-    text-align: left;
-    text-align-last: center;
+    text-align: center;
+    cursor: default;
+    user-select: none;
 }
 
-    .input.filter-dropdown,
-    .input.timezone-select {
-        width: 120px;
-        text-align: center;
-        cursor: default;
-        user-select: none;
-    }
+    .input.filter-dropdown { width: 120px; }
 
     .input.timezone-select { width: 350px; }
+
+    .input.cache-dropdown { width: 50rem; }
 
     .input.filter-select,
     .input.filter-description {
         width: 250px;
-        text-align: center;
     }
 
     .input-select {
@@ -126,7 +132,7 @@ a,
 
         & input { margin: 0; }
 
-        & i {
+        & label > i {
             position: absolute;
             right: 2px;
             cursor: pointer;
@@ -151,7 +157,8 @@ a,
 
 .button-primary,
 .button-remove,
-.button-save {
+.button-save,
+.button-favorite {
     color: var(--clr-lightblue);
     border: var(--clr-lightblue);
     background: none;
@@ -167,15 +174,22 @@ a,
     border: var(--clr-green);
 }
 
+.button-favorite {
+    color: var(--clr-yellow);
+    border: var(--clr-yellow);
+}
+
     .button-primary:focus,
     .button-remove:focus,
-    .button-save:focus {
+    .button-save:focus,
+    .button-favorite:focus {
         border: none;
     }
 
     .button-primary:hover,
     .button-remove:hover,
-    .button-save:hover {
+    .button-save:hover,
+    .button-favorite:hover {
         filter: brightness(0.9);
     }
 
@@ -195,7 +209,9 @@ div.table-divider {
     /* https://github.com/dotnet/maui/issues/9960 */
     div.table-divider:hover { cursor: e-resize !important; }
 
+i.bi.bi-star { color: var(--clr-yellow); }
 
+i.bi.bi-star-fill { color: var(--clr-yellow); }
 
 .dropdown-list {
     user-select: none;
@@ -213,9 +229,9 @@ div.table-divider {
     &[data-toggle="true"] { visibility: visible; }
 
     & > div {
-        text-align: center;
+        text-align: left;
         margin: 0;
-        padding: 0;
+        padding: 0 5px;
 
         color: #fff;
 

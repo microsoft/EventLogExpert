@@ -3,15 +3,16 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.UI;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
-using EventLogExpert.UI.Models;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
-using EventLogExpert.UI;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
@@ -30,24 +31,18 @@ public partial class FilterPane
     private bool _isDateFilterVisible;
     private bool _isFilterListVisible;
 
-    [Inject] ITraceLogger TraceLogger { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
-    [Inject] IDispatcher Dispatcher { get; set; } = null!;
+    private bool HasFilters => FilterPaneState.Value.CurrentFilters.Any() ||
+        FilterPaneState.Value.CachedFilters.Any() ||
+        _isDateFilterVisible ||
+        _isAdvancedFilterVisible;
 
-    private string MenuState
-    {
-        get
-        {
-            if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
-            {
-                return _isFilterListVisible.ToString().ToLower();
-            }
-
-            return "false";
-        }
-    }
+    private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
+
+    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -65,12 +60,25 @@ public partial class FilterPane
         base.OnInitialized();
     }
 
+    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState)
+    {
+        return new EventLogState.EventFilter(
+            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : string.Empty,
+            filterPaneState.FilteredDateRange?.IsEnabled ?? false ? filterPaneState.FilteredDateRange : null,
+            filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+            filterPaneState.CurrentFilters.Where(f => f.IsEnabled && f.Comparison.Any())
+                .Select(f => f.Comparison.ToImmutableList()).ToImmutableList()
+        );
+    }
+
     private void AddAdvancedFilter()
     {
         _isFilterListVisible = true;
         _canEditAdvancedFilter = true;
         _isAdvancedFilterVisible = true;
     }
+
+    private void AddCachedFilter() => Dispatcher.Dispatch(new FilterCacheAction.OpenMenu());
 
     private void AddDateFilter()
     {
@@ -147,8 +155,17 @@ public partial class FilterPane
 
     private void EditDateFilter() => _canEditDate = true;
 
-    private int GetActiveFilters() =>
-        FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+    private int GetActiveFilters()
+    {
+        int count = 0;
+
+        count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
+        count += FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+        count += FilterPaneState.Value.CachedFilters.Count(filter => filter is { IsEnabled: true });
+        count += FilterPaneState.Value.IsAdvancedFilterEnabled ? 1 : 0;
+
+        return count;
+    }
 
     private void RemoveAdvancedFilter()
     {
@@ -195,15 +212,5 @@ public partial class FilterPane
 
         _model.Before = TimeZoneInfo.ConvertTime(_model.Before, temp, _model.TimeZoneInfo);
         _model.After = TimeZoneInfo.ConvertTime(_model.After, temp, _model.TimeZoneInfo);
-    }
-
-    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState)
-    {
-        return new EventLogState.EventFilter
-        (
-            filterPaneState.IsAdvancedFilterEnabled ? filterPaneState.AdvancedFilter : "",
-            filterPaneState.FilteredDateRange?.IsEnabled ?? false ? filterPaneState.FilteredDateRange : null,
-            filterPaneState.CurrentFilters.Where(f => f.IsEnabled && f.Comparison.Any()).Select(f => f.Comparison.ToImmutableList()).ToImmutableList()
-        );
     }
 }

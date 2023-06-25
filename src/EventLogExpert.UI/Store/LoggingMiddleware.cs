@@ -29,9 +29,10 @@ public class LoggingMiddleware : Middleware
             case EventLogAction.AddEvent addEventsAction:
                 _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
                 break;
-            case FilterPaneAction.SetFilter setFilterAction:
-            case EventLogAction.SetFilters setFiltersAction:
-            case FilterPaneAction.RemoveFilter removeFilterAction:
+            case FilterPaneAction.SetFilter:
+            case EventLogAction.SetFilters:
+            case FilterPaneAction.AddCachedFilter:
+            case FilterPaneAction.RemoveFilter:
                 _debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:

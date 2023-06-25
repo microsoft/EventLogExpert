@@ -29,5 +29,9 @@ public record FilterPaneAction
 
     public record ToggleAdvancedFilter;
 
-    public record SetNumberOfFilteredEvents(int NumberOfFilteredEvents);
+    public record AddCachedFilter(FilterCacheModel CachedFilterModel);
+
+    public record RemoveCachedFilter(FilterCacheModel CachedFilterModel);
+
+    public record ToggleCachedFilter(FilterCacheModel CachedFilterModel);
 }

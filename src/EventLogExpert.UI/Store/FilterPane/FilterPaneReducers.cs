@@ -10,6 +10,17 @@ namespace EventLogExpert.UI.Store.FilterPane;
 public class FilterPaneReducers
 {
     [ReducerMethod]
+    public static FilterPaneState ReduceAddCachedFilter(FilterPaneState state, FilterPaneAction.AddCachedFilter action)
+    {
+        if (state.CachedFilters.Contains(action.CachedFilterModel)) { return state; }
+
+        return state with
+        {
+            CachedFilters = state.CachedFilters.Add(action.CachedFilterModel)
+        };
+    }
+
+    [ReducerMethod]
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
     {
         if (!state.CurrentFilters.Any())
@@ -47,6 +58,17 @@ public class FilterPaneReducers
     }
 
     [ReducerMethod]
+    public static FilterPaneState ReduceRemoveCachedFilter(FilterPaneState state, FilterPaneAction.RemoveCachedFilter action)
+    {
+        if (!state.CachedFilters.Contains(action.CachedFilterModel)) { return state; }
+
+        return state with
+        {
+            CachedFilters = state.CachedFilters.Remove(action.CachedFilterModel)
+        };
+    }
+
+    [ReducerMethod]
     public static FilterPaneState ReduceRemoveFilter(FilterPaneState state, FilterPaneAction.RemoveFilter action)
     {
         var updatedList = state.CurrentFilters.ToList();
@@ -78,7 +100,11 @@ public class FilterPaneReducers
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetAdvancedFilter(FilterPaneState state,
-        FilterPaneAction.SetAdvancedFilter action) => state with { AdvancedFilter = action.Expression };
+        FilterPaneAction.SetAdvancedFilter action) => state with
+    {
+        AdvancedFilter = action.Expression,
+        IsAdvancedFilterEnabled = !string.IsNullOrEmpty(action.Expression)
+    };
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)
@@ -100,6 +126,24 @@ public class FilterPaneReducers
     [ReducerMethod(typeof(FilterPaneAction.ToggleAdvancedFilter))]
     public static FilterPaneState ReduceToggleAdvancedFilter(FilterPaneState state) =>
         state with { IsAdvancedFilterEnabled = !state.IsAdvancedFilterEnabled };
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceToggleCachedFilter(FilterPaneState state, FilterPaneAction.ToggleCachedFilter action)
+    {
+        List<FilterCacheModel> filters = new();
+
+        foreach (var filterModel in state.CachedFilters)
+        {
+            if (filterModel == action.CachedFilterModel)
+            {
+                filterModel.IsEnabled = !filterModel.IsEnabled;
+            }
+
+            filters.Add(filterModel);
+        }
+
+        return state with { CachedFilters = filters.ToImmutableList() };
+    }
 
     [ReducerMethod]
     public static FilterPaneState ReduceToggleEditFilter(FilterPaneState state,

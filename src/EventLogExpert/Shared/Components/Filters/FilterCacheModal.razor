@@ -1,0 +1,62 @@
+@using EventLogExpert.UI.Store.FilterCache
+@inherits FluxorComponent
+
+@inject IState<FilterCacheState> FilterCacheState
+
+<dialog id="filterCacheDialog">
+    <div class="dialog-group">
+        <div class="recent-filter-list">
+            @if (FilterCacheState.Value.FavoriteFilters.Any())
+            {
+                <div>Favorite Filters</div>
+                @foreach (var filter in FilterCacheState.Value.FavoriteFilters)
+                {
+                    <div class="cached-filter-row">
+                        <div>
+                            <button class="button-favorite" type="button" @onclick="() => RemoveFavorite(filter)">
+                                <i class="bi bi-star-fill"></i>
+                            </button>
+                            <span>@filter.ComparisonString</span>
+                        </div>
+                        <div class="button-group">
+                            <button class="button-save" type="button" @onclick="() => AddFilter(filter)">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+
+                <hr class="divider" />
+            }
+
+            @if (FilterCacheState.Value.RecentFilters.Any())
+            {
+                <div>Recent Filters</div>
+                @foreach (var filter in FilterCacheState.Value.RecentFilters)
+                {
+                    <div class="cached-filter-row">
+                        <div>
+                            <button class="button-favorite" type="button" @onclick="() => AddFavorite(filter)">
+                                <i class="bi bi-star"></i>
+                            </button>
+                            <span>@filter.ComparisonString</span>
+                        </div>
+                        <div class="button-group">
+                            <button class="button-save" type="button" @onclick="() => AddFilter(filter)">
+                                <i class="bi bi-plus-circle"></i>
+                            </button>
+                        </div>
+                    </div>
+                }
+            }
+            else
+            {
+                <p>No Recent Filters</p>
+            }
+        </div>
+
+        <div class="footer-group align-right">
+            <button class="button-primary" type="button" @onclick="Close">Exit</button>
+        </div>
+    </div>
+</dialog>

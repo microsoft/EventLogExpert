@@ -9,7 +9,11 @@ public interface IPreferencesProvider
 
     bool DisplayPaneSelectionPreference { get; set; }
 
+    IList<string> FavoriteFiltersPreference { get; set; }
+
     bool PrereleasePreference { get; set; }
+
+    IList<string> RecentFiltersPreference { get; set; }
 
     string TimeZonePreference { get; set; }
 }

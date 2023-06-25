@@ -3,10 +3,11 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
@@ -90,6 +91,7 @@ public partial class MainPage : ContentPage
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
+        fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
 
         PopulateOtherLogsMenu();
 
@@ -320,4 +322,7 @@ public partial class MainPage : ContentPage
     {
         _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
     }
+
+    private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
 }

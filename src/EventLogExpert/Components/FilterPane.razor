@@ -28,12 +28,16 @@
                     <i class="bi bi-plus-circle"></i> Add Advanced Filter
                 </button>
             }
+            
+            <button class="button-primary" @onclick="AddCachedFilter">
+                <i class="bi bi-plus-circle"></i> Add Cached Filter
+            </button>
         </div>
 
-        @if (FilterPaneState.Value.CurrentFilters.Any() || _isDateFilterVisible || _isAdvancedFilterVisible)
+        @if (HasFilters)
         {
             <div class="header-center">
-                @if (FilterPaneState.Value.CurrentFilters.Any())
+                @if (GetActiveFilters() > 0)
                 {
                     <span>[Active Filters: @GetActiveFilters()]</span>
                 }
@@ -93,6 +97,11 @@
         @foreach (var item in FilterPaneState.Value.CurrentFilters)
         {
             <FilterRow Value="@item" />
+        }
+        
+        @foreach (var item in FilterPaneState.Value.CachedFilters)
+        {
+            <FilterCacheRow Value="@item" />
         }
 
         @if (_isAdvancedFilterVisible)

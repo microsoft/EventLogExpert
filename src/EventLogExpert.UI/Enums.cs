@@ -9,9 +9,9 @@ public enum FilterType
 {
     [EnumMember(Value = "Event ID")] Id,
     Level,
-    Keywords,
+    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
     Source,
-    Task,
+    [EnumMember(Value = "Task Category")] TaskCategory,
     Description
 }
 
