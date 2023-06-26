@@ -1,7 +1,7 @@
 @using Microsoft.Extensions.Logging
 @inherits EventLogExpert.Shared.Base.SelectComponent<LogLevel>
 
-<div class="input-select" @ref="selectComponent">
+<div class="dropdown-input" @ref="selectComponent">
     <label>
         <input type="text" class="input filter-dropdown" value="@Value.ToFullString()" readonly
             @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />

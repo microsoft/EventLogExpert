@@ -97,12 +97,42 @@ a,
 
 .status-bar-safe-area { display: none; }
 
-/*Moving these back temporarily until custom filter inputs area created*/
-.filter-text { width: 100px; }
+.text-align-center { text-align: center; }
 
-.header-center { text-align: center; }
+.justify-self-center { justify-self: center; }
 
-.header-justify-right { justify-self: right; }
+.justify-self-right { justify-self: right; }
+
+.flex-center-aligned-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.flex-align-center {
+    display: flex;
+    align-items: center;
+}
+
+.flex-space-between {
+    display: flex;
+    justify-content: space-between;
+}
+
+.flex-end {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.flex-column-scroll {
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+}
 
 .input {
     background: none;
@@ -113,86 +143,59 @@ a,
     text-align: center;
     cursor: default;
     user-select: none;
+    
+    &:focus { outline: none; }
+}
+    
+.input.filter-dropdown { width: 120px; }
+
+.input.timezone-dropdown { width: 350px; }
+
+.input.cache-dropdown,
+.input.advanced-filter {
+    width: 800px;
 }
 
-    .input.filter-dropdown { width: 120px; }
+.input.filter-value-dropdown,
+.input.filter-description {
+    width: 250px;
+}
 
-    .input.timezone-select { width: 350px; }
+    .input.filter-description > option { background: var(--background-dark); }
 
-    .input.cache-dropdown { width: 50rem; }
+.input.filter-datetime { width: 200px; }
 
-    .input.filter-select,
-    .input.filter-description {
-        width: 250px;
-    }
+    .input.filter-datetime::-webkit-calendar-picker-indicator { filter: invert(1); }
 
-    .input-select {
-        display: inline-block;
-        /* position: relative; */
-        margin: 0 .5rem;
+.menu-toggle { cursor: pointer; }
 
-        & input { margin: 0; }
+    .menu-toggle[data-rotate="true"] { transform: translateY(-10%) rotate(-180deg); }
 
-        & label > i {
-            position: absolute;
-            right: 2px;
-            cursor: pointer;
-
-            color: #fff;
-
-            &[data-toggle="true"] { transform: translateY(10%) rotate(-180deg); }
-        }
-    }
-
-    .input.filter-datetime { width: 200px; }
-
-        .input.filter-datetime::-webkit-calendar-picker-indicator { filter: invert(1); }
-
-        .input:focus-visible { outline: none; }
-
-        .input.filter-description > option { background: var(--background-dark); }
-
-.button-toggle { cursor: pointer; }
-
-    .button-toggle[data-rotate="true"] { transform: translateY(-10%) rotate(-180deg); }
-
-.button-primary,
-.button-remove,
-.button-save,
-.button-favorite {
+.button {
     color: var(--clr-lightblue);
     border: var(--clr-lightblue);
     background: none;
+    
+    &:focus { border: none; }
+    
+    &:hover { filter: brightness(0.9); }
 }
 
-.button-remove {
+
+.button.button-red {
     color: var(--clr-red);
     border: var(--clr-red);
 }
 
-.button-save {
+.button.button-green {
     color: var(--clr-green);
     border: var(--clr-green);
 }
 
-.button-favorite {
+.button.button-yellow {
     color: var(--clr-yellow);
     border: var(--clr-yellow);
-}
-
-    .button-primary:focus,
-    .button-remove:focus,
-    .button-save:focus,
-    .button-favorite:focus {
-        border: none;
-    }
-
-    .button-primary:hover,
-    .button-remove:hover,
-    .button-save:hover,
-    .button-favorite:hover {
-        filter: brightness(0.9);
-    }
+}    
 
 div.table-divider {
     height: 22px;
@@ -213,6 +216,24 @@ div.table-divider {
 i.bi.bi-star { color: var(--clr-yellow); }
 
 i.bi.bi-star-fill { color: var(--clr-yellow); }
+
+.dropdown-input {
+    display: inline-block;
+    /* position: relative; */
+    margin: 0 .5rem;
+
+    & input { margin: 0; }
+
+    & label > i {
+        position: absolute;
+        right: 2px;
+        cursor: pointer;
+
+        color: #fff;
+
+        &[data-toggle="true"] { transform: translateY(10%) rotate(-180deg); }
+    }
+}
 
 .dropdown-list {
     display: none;

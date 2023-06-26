@@ -11,39 +11,39 @@
 <div class="filter-pane">
     <div class="filter-header">
         <div>
-            <button class="button-primary" @onclick="AddFilter">
+            <button class="button" @onclick="AddFilter">
                 <i class="bi bi-plus-circle"></i> Add Filter
             </button>
 
             @if (!_isDateFilterVisible)
             {
-                <button class="button-primary" @onclick="AddDateFilter">
+                <button class="button" @onclick="AddDateFilter">
                     <i class="bi bi-plus-circle"></i> Add Date Filter
                 </button>
             }
 
             @if (!_isAdvancedFilterVisible)
             {
-                <button class="button-primary" @onclick="AddAdvancedFilter">
+                <button class="button" @onclick="AddAdvancedFilter">
                     <i class="bi bi-plus-circle"></i> Add Advanced Filter
                 </button>
             }
             
-            <button class="button-primary" @onclick="AddCachedFilter">
+            <button class="button" @onclick="AddCachedFilter">
                 <i class="bi bi-plus-circle"></i> Add Cached Filter
             </button>
         </div>
 
         @if (HasFilters)
         {
-            <div class="header-center">
+            <div class="text-align-center">
                 @if (GetActiveFilters() > 0)
                 {
                     <span>[Active Filters: @GetActiveFilters()]</span>
                 }
             </div>
 
-            <span class="button-toggle header-justify-right" data-rotate="@MenuState" @onclick="ToggleMenu">
+            <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu">
                 <i class="bi bi-caret-up"></i>
             </span>
         }
@@ -52,7 +52,7 @@
     <div class="filter-group" data-toggle="@MenuState">
         @if (_isDateFilterVisible)
         {
-            <EditForm id="filter-form" Model="_model">
+            <EditForm id="filter-form" class="flex-row" Model="_model">
                 <span>
                     After: <InputDate class="input filter-datetime" Type="InputDateType.DateTimeLocal"
                         @bind-Value="_model.After" disabled="@(!_canEditDate)" />
@@ -64,29 +64,29 @@
 
                 @if (_canEditDate)
                 {
-                    <button class="button-save" @onclick="ApplyDateFilter">
+                    <button class="button button-green" @onclick="ApplyDateFilter">
                         <i class="bi bi-check-circle"></i> Apply
                     </button>
 
-                    <button class="button-remove" type="button" @onclick="RemoveDateFilter">
+                    <button class="button button-red" type="button" @onclick="RemoveDateFilter">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
                 }
                 else
                 {
-                    <button class="button-primary" @onclick="EditDateFilter">
+                    <button class="button" @onclick="EditDateFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
                     @if (FilterPaneState.Value.FilteredDateRange!.IsEnabled)
                     {
-                        <button class="button-remove" @onclick="ToggleDateFilter">
+                        <button class="button button-red" @onclick="ToggleDateFilter">
                             <i class="bi bi-dash-circle"></i> Disable
                         </button>
                     }
                     else
                     {
-                        <button class="button-save" @onclick="ToggleDateFilter">
+                        <button class="button button-green" @onclick="ToggleDateFilter">
                             <i class="bi bi-plus-circle"></i> Enable
                         </button>
                     }
@@ -116,30 +116,30 @@
                 {
                     if (_isAdvancedFilterValid)
                     {
-                        <button class="button-save" type="button" @onclick="ApplyAdvancedFilter">
+                        <button class="button button-green" type="button" @onclick="ApplyAdvancedFilter">
                             <i class="bi bi-check-circle"></i> Apply
                         </button>
                     }
 
-                    <button class="button-remove" type="button" @onclick="RemoveAdvancedFilter">
+                    <button class="button button-red" type="button" @onclick="RemoveAdvancedFilter">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
                 }
                 else
                 {
-                    <button class="button-primary" type="button" @onclick="EditAdvancedFilter">
+                    <button class="button" type="button" @onclick="EditAdvancedFilter">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
                     @if (FilterPaneState.Value.IsAdvancedFilterEnabled)
                     {
-                        <button class="button-remove" @onclick="ToggleAdvancedFilter">
+                        <button class="button button-red" @onclick="ToggleAdvancedFilter">
                             <i class="bi bi-dash-circle"></i> Disable
                         </button>
                     }
                     else
                     {
-                        <button class="button-save" @onclick="ToggleAdvancedFilter">
+                        <button class="button button-green" @onclick="ToggleAdvancedFilter">
                             <i class="bi bi-plus-circle"></i> Enable
                         </button>
                     }

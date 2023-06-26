@@ -14,49 +14,6 @@ dialog {
     }
 }
 
-.settings-list {
-    display: flex;
-    flex-direction: column;
+.tz-row { margin-bottom: .5rem; }
 
-    height: 100%;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-.tz-row,
-.select-group,
-.prerelease-group {
-    display: flex;
-    align-items: center;
-}
-
-.tz-row {
-    margin-bottom: .5rem;
-}
-
-.select-group { justify-content: space-between; }
-
-.database-row {
-    display: flex;
-    justify-content: space-between;
-}
-
-.database-list {
-    display: flex;
-    flex-direction: column;
-
-    height: 100%;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-    .provider-list > span { margin: 0; }
-
-.button-group {
-    display: flex;
-    justify-content: flex-end;
-}
-
-    .button-group > button { width: 50px; }
+.fixed-width { width: 50px; }
