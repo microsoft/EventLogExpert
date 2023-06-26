@@ -26,10 +26,10 @@ public class LoggingMiddleware : Middleware
         switch (action)
         {
             case EventLogAction.LoadEvents loadEventsAction:
-                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.", LogLevel.Debug);
+                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
                 break;
             case EventLogAction.AddEvent addEventsAction:
-                _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.", LogLevel.Debug);
+                _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
                 break;
             case FilterCacheAction.AddFavoriteFilter:
             case FilterCacheAction.AddFavoriteFilterCompleted:
@@ -46,19 +46,19 @@ public class LoggingMiddleware : Middleware
             case FilterPaneAction.SetFilter:
             case FilterPaneAction.ToggleCachedFilter:
             case EventLogAction.SetFilters:
-                _debugLogger.Trace($"Action: {action.GetType()}.", LogLevel.Debug);
+                _debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:
-                _debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected {selectEventAction?.SelectedEvent?.Source} event ID {selectEventAction?.SelectedEvent?.Id}.", LogLevel.Debug);
+                _debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected {selectEventAction?.SelectedEvent?.Source} event ID {selectEventAction?.SelectedEvent?.Id}.");
                 break;
             default:
                 try
                 {
-                    _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}", LogLevel.Debug);
+                    _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
                 }
                 catch
                 {
-                    _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.", LogLevel.Debug);
+                    _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
                 }
 
                 break;

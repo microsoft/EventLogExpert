@@ -74,7 +74,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
     /// <param name="activeDatabases"></param>
     public void SetActiveDatabases(IEnumerable<string> activeDatabases)
     {
-        _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.", LogLevel.Debug);
+        _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.");
         ActiveDatabases = activeDatabases.ToImmutableList();
     }
 }

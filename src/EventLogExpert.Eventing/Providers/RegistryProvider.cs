@@ -39,7 +39,7 @@ public class RegistryProvider
     /// <returns></returns>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Debug);
+        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Information);
 
         var hklm = string.IsNullOrEmpty(ComputerName)
             ? Registry.LocalMachine
@@ -70,7 +70,7 @@ public class RegistryProvider
                 continue;
             }
 
-            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Debug);
+            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Information);
 
             var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
 

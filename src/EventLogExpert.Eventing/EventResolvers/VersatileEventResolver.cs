@@ -31,7 +31,7 @@ public class VersatileEventResolver : IEventResolver, IDisposable
         _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
         _useDatabaseResolver = dbCollection.ActiveDatabases.Any();
         _tracer = tracer;
-        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.", LogLevel.Trace);
+        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
         _databaseResolver.StatusChanged += (sender, args) => StatusChanged?.Invoke(sender, args);
     }
 

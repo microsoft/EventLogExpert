@@ -30,7 +30,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string, LogLevel> tracer) : base(tracer)
     {
-        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}", LogLevel.Debug);
+        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}", LogLevel.Information);
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
@@ -40,10 +40,10 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Debug);
+        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
         foreach (var databasePath in databasePaths)
         {
-            _tracer($"  {databasePath}", LogLevel.Debug);
+            _tracer($"  {databasePath}", LogLevel.Information);
         }
 
         _providerDetails.Clear();
@@ -171,7 +171,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
                         if (lastResult?.Description != null)
                         {
-                            _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Debug);
+                            _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
                             _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
                             return lastResult;
                         }
@@ -233,7 +233,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
             disposedValue = true;
 
-            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Debug);
+            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Information);
         }
     }
 

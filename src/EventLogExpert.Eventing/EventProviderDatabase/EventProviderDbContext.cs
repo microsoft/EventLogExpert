@@ -26,7 +26,7 @@ public class EventProviderDbContext : DbContext
             _tracer = (s,log) => { };
         }
 
-        _tracer($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}", LogLevel.Debug);
+        _tracer($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}", LogLevel.Information);
 
         Name = System.IO.Path.GetFileNameWithoutExtension(path);
         Path = path;

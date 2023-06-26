@@ -130,7 +130,7 @@ public class LiveLogWatcherService : ILogWatcherService
         {
             if (_resolver == null)
             {
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Getting a new IEventResolver so we can start watching.", LogLevel.Debug);
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Getting a new IEventResolver so we can start watching.");
                 _resolver = _serviceProvider.GetService<IEventResolver>();
             }
 
@@ -155,11 +155,11 @@ public class LiveLogWatcherService : ILogWatcherService
             {
                 lock (this)
                 {
-                    _debugLogger.Trace("EventRecordWritten callback was called.", LogLevel.Debug);
+                    _debugLogger.Trace("EventRecordWritten callback was called.");
                     _bookmarks[LogName] = eventArgs.EventRecord.Bookmark;
                     if (_resolver == null)
                     {
-                        _debugLogger.Trace($"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.", LogLevel.Debug);
+                        _debugLogger.Trace($"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.");
                         return;
                     }
 
@@ -195,7 +195,7 @@ public class LiveLogWatcherService : ILogWatcherService
             Task.Run(() =>
             {
                 oldWatcher.Dispose();
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {LogName}.", LogLevel.Debug);
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {LogName}.");
             });
 
             _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {LogName}.");
@@ -205,7 +205,7 @@ public class LiveLogWatcherService : ILogWatcherService
                 if (_resolver is IDisposable disposableResolver)
                 {
                     disposableResolver.Dispose();
-                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Disposed the IEventResolver.", LogLevel.Debug);
+                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Disposed the IEventResolver.");
                 }
 
                 _resolver = null;

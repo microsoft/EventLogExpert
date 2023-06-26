@@ -37,7 +37,7 @@ public class DeploymentService : IDeploymentService
 
     public void RestartNowAndUpdate(string downloadPath)
     {
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.", LogLevel.Trace);
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
 
         uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
@@ -45,7 +45,7 @@ public class DeploymentService : IDeploymentService
 
         PackageManager packageManager = new();
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.", LogLevel.Trace);
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
 
         var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
             new AddPackageOptions
@@ -61,7 +61,7 @@ public class DeploymentService : IDeploymentService
     {
         PackageManager packageManager = new();
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.", LogLevel.Trace);
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
 
         var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
             new AddPackageOptions

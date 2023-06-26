@@ -38,7 +38,7 @@ public class GitHubService : IGitHubService
             throw new Exception($"Failed to retrieve GitHub releases. StatusCode: {response.StatusCode}");
         }
 
-        _traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.", LogLevel.Debug);
+        _traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.", LogLevel.Warning);
 
         var stream = await response.Content.ReadAsStreamAsync();
         var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
