@@ -84,8 +84,7 @@ public class UpdateServiceTests
             _gitHubService,
             deploymentService.Object,
             _traceLogger,
-            alertService.Object,
-            mainThreadService);
+            alertService.Object);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
 
@@ -115,8 +114,7 @@ public class UpdateServiceTests
             _gitHubService,
             deploymentService.Object,
             _traceLogger,
-            alertService.Object,
-            mainThreadService);
+            alertService.Object);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
 
@@ -147,8 +145,7 @@ public class UpdateServiceTests
             _gitHubService,
             deploymentService.Object,
             _traceLogger,
-            alertService.Object,
-            mainThreadService);
+            alertService.Object);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
 
@@ -179,8 +176,7 @@ public class UpdateServiceTests
             _gitHubService,
             deploymentService.Object,
             _traceLogger,
-            alertService.Object,
-            mainThreadService);
+            alertService.Object);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
 
@@ -210,8 +206,7 @@ public class UpdateServiceTests
             _gitHubService,
             deploymentService.Object,
             _traceLogger,
-            alertService.Object,
-            mainThreadService);
+            alertService.Object);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: true);
 

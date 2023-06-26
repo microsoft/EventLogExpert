@@ -1,5 +1,5 @@
-﻿<div class="subfilter-row">
-    <div class="filter-content">
+﻿<div class="flex-center-aligned-row px-4">
+    <div class="d-flex">
         <span>Join On: </span>
         <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
 
@@ -18,7 +18,7 @@
 
     </div>
 
-    <button class="button-remove" @onclick="RemoveSubFilter">
+    <button class="button button-red" @onclick="RemoveSubFilter">
         <i class="bi bi-dash-circle"></i> Remove
     </button>
 </div>

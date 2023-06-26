@@ -1,7 +1,7 @@
-﻿<div class="filter-row">
+﻿<div class="flex-space-between">
     @if (Value.IsEditing)
     {
-        <div class="filter-content">
+        <div class="d-flex">
             <span>Filter On: </span>
             <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
 
@@ -30,36 +30,36 @@
         <span>@Value.ComparisonString</span>
     }
 
-    <div class="row-justify-right">
+    <div class="justify-self-right">
         @if (Value.IsEditing)
         {
-            <button class="button-primary" @onclick="AddSubFilter">
+            <button class="button" @onclick="AddSubFilter">
                 <i class="bi bi-plus-circle"></i> Add Sub Filter
             </button>
 
-            <button class="button-save" @onclick="SaveFilter">
+            <button class="button button-green" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
             </button>
 
-            <button class="button-remove fixed-width" @onclick="RemoveFilter">
+            <button class="button button-red fixed-width" @onclick="RemoveFilter">
                 <i class="bi bi-dash-circle"></i> Remove
             </button>
         }
         else
         {
-            <button class="button-primary" @onclick="EditFilter">
+            <button class="button" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
             </button>
 
             @if (Value.IsEnabled)
             {
-                <button class="button-remove fixed-width" @onclick="ToggleFilter">
+                <button class="button button-red fixed-width" @onclick="ToggleFilter">
                     <i class="bi bi-dash-circle"></i> Disable
                 </button>
             }
             else
             {
-                <button class="button-save fixed-width" @onclick="ToggleFilter">
+                <button class="button button-green fixed-width" @onclick="ToggleFilter">
                     <i class="bi bi-plus-circle"></i> Enable
                 </button>
             }
@@ -69,7 +69,7 @@
 
 @if (Value.SubFilters.Any() && Value.IsEditing)
 {
-    <div class="sub-filter-row">
+    <div class="flex-column">
         @foreach (var item in Value.SubFilters)
         {
             <SubFilterRow ParentId="Value.Id" Value="@item" />

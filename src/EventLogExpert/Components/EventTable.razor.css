@@ -62,10 +62,6 @@ th, td {
 
 .description { width: 100%; }
 
-.error {
-    color: red;
-}
+.error { color: var(--clr-red); }
 
-.warning {
-    color: yellow;
-}
+.warning { color: var(--clr-yellow); }
