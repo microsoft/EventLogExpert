@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
@@ -24,9 +25,9 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
     private bool disposedValue;
 
-    public LocalProviderEventResolver() : base(s => Debug.WriteLine(s)) { }
+    public LocalProviderEventResolver() : base((s, log) => Debug.WriteLine(s)) { }
 
-    public LocalProviderEventResolver(Action<string> tracer) : base(tracer) { }
+    public LocalProviderEventResolver(Action<string, LogLevel> tracer) : base(tracer) { }
 
     public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {

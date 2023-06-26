@@ -1,8 +1,0 @@
-﻿.subfilter-row {
-    display: flex;
-    justify-content: space-between;
-
-    padding: 0 20px;
-}
-
-    .subfilter-row .filter-content { display: flex; }

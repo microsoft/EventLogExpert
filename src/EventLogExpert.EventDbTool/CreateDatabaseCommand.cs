@@ -98,7 +98,7 @@ public class CreateDatabaseCommand : DbToolCommand
 
         foreach (var providerName in providerNamesNotSkipped)
         {
-            var provider = new EventMessageProvider(providerName, verboseLogging ? s => Console.WriteLine(s) : s => { });
+            var provider = new EventMessageProvider(providerName, verboseLogging ? (s, log) => Console.WriteLine(s) : (s, log) => { });
             var details = provider.LoadProviderDetails();
             if (details != null)
             {

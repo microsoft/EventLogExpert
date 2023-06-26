@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Models;
+using Microsoft.Extensions.Logging;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
@@ -21,10 +22,14 @@ public class UpdateService : IUpdateService
     private readonly IGitHubService _gitHubService;
     private readonly IDeploymentService _deploymentService;
     private readonly IAlertDialogService _alertDialogService;
-    private readonly IMainThreadService _mainThreadService;
 
-    public UpdateService(ICurrentVersionProvider versionProvider, IAppTitleService appTitleService, IGitHubService githubService,
-        IDeploymentService deploymentService, ITraceLogger traceLogger, IAlertDialogService alertDialogService, IMainThreadService mainThreadService)
+    public UpdateService(
+        ICurrentVersionProvider versionProvider,
+        IAppTitleService appTitleService,
+        IGitHubService githubService,
+        IDeploymentService deploymentService,
+        ITraceLogger traceLogger,
+        IAlertDialogService alertDialogService)
     {
         _versionProvider = versionProvider;
         _appTitleService = appTitleService;
@@ -32,7 +37,6 @@ public class UpdateService : IUpdateService
         _gitHubService = githubService;
         _deploymentService = deploymentService;
         _alertDialogService = alertDialogService;
-        _mainThreadService = mainThreadService;
     }
 
     public async Task CheckForUpdates(bool prereleaseVersionsEnabled, bool manualScan)
@@ -69,7 +73,7 @@ public class UpdateService : IUpdateService
 
             if (latest is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.");
+                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.", LogLevel.Warning);
 
                 return;
             }
@@ -98,20 +102,16 @@ public class UpdateService : IUpdateService
 
             if (downloadPath is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.");
+                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
 
                 return;
             }
 
-            var shouldReboot = false;
-
-            shouldReboot = await _alertDialogService.ShowAlert("Update Available",
+            bool shouldReboot = await _alertDialogService.ShowAlert("Update Available",
                 "A new version has been detected, would you like to install and reload the application?",
                 "Yes", "No");
 
             _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
-
-            PackageManager packageManager = new();
 
             if (shouldReboot)
             {

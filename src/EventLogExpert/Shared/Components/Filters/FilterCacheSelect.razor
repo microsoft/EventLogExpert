@@ -4,7 +4,7 @@
 
 @inject IState<FilterCacheState> FilterCacheState
 
-<div class="input-select">
+<div class="dropdown-input" @ref="selectComponent">
     <label>
         <input type="text" class="input cache-dropdown" value="@Value.ComparisonString" readonly
             @onfocusin="() => SetDropDownVisibility(true)" @onfocusout="() => SetDropDownVisibility(false)" />

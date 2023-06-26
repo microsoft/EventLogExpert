@@ -1,10 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using Windows.Management.Deployment;
-using Windows.Foundation;
-using System.Reflection;
 using EventLogExpert.Eventing.Helpers;
+using Microsoft.Extensions.Logging;
+using System.Reflection;
+using Windows.Foundation;
+using Windows.Management.Deployment;
 
 namespace EventLogExpert.UI.Services;
 
@@ -23,9 +24,9 @@ public class DeploymentService : IDeploymentService
     private readonly IAlertDialogService _alertDialogService;
 
     public DeploymentService(
-        ITraceLogger traceLogger, 
-        IAppTitleService appTitleService, 
-        IMainThreadService mainThreadService, 
+        ITraceLogger traceLogger,
+        IAppTitleService appTitleService,
+        IMainThreadService mainThreadService,
         IAlertDialogService alertDialogService)
     {
         _traceLogger = traceLogger;
@@ -83,13 +84,23 @@ public class DeploymentService : IDeploymentService
         {
             _mainThreadService.InvokeOnMainThread(() =>
             {
-                if (result.Status is AsyncStatus.Error)
+                switch (result.Status)
                 {
-                    _alertDialogService.ShowAlert("Update Failure",
-                        $"Update failed to install:\r\n{result.ErrorCode}",
-                        "Ok");
+                    case AsyncStatus.Error :
+                        _alertDialogService.ShowAlert("Update Failure",
+                            $"Update failed to install:\r\n{result.ErrorCode}",
+                            "Ok");
 
-                    _appTitleService.SetProgressString(null);
+                        _appTitleService.SetProgressString(null);
+                        break;
+                    case AsyncStatus.Completed : 
+                        _appTitleService.SetProgressString("Update Complete");
+                        break;
+                    case AsyncStatus.Canceled :
+                    case AsyncStatus.Started :
+                    default : 
+                        _appTitleService.SetProgressString(null);
+                        break;
                 }
             });
         };

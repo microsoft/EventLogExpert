@@ -1,4 +1,4 @@
-@using EventLogExpert.UI.Store.Settings;
+@using EventLogExpert.UI.Store.Settings
 @inherits FluxorComponent
 
 @inject IState<SettingsState> SettingsState
@@ -6,73 +6,74 @@
 <dialog id="settingsDialog">
 
     <EditForm id="settings-form" Model="_request" OnValidSubmit="Save">
+        <div class="flex-column-scroll">
+            <div class="flex-center-aligned-row tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
 
-        <ValidationSummary />
+            <div class="flex-space-between">
+                <div>Loaded Databases: </div>
 
-        <div class="tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
-
-        <div class="database-row">
-            <div>Loaded Databases: </div>
-
-            <button class="button-primary" type="button" @onclick="ImportDatabase">
-                <i class="bi bi-plus-circle"></i> Add Provider
-            </button>
-        </div>
-
-        <div class="database-list">
-            @if (_databases.Any())
-            {
-                @foreach (var database in _databases)
-                {
-                    <div class="database-row">
-                        <span>@database</span>
-                        <button class="button-remove" type="button" @onclick="() => DisableDatabase(database)">
-                            <i class="bi bi-dash-circle"></i> Disable
-                        </button>
-                    </div>
-
-                }
-            }
-            else
-            {
-                <p>None</p>
-            }
-        </div>
-        
-        @if (_request.DisabledDatabases.Any())
-        {
-            <div class="database-row">
-                <div>Disabled Databases: </div>
+                <button class="button" type="button" @onclick="ImportDatabase">
+                    <i class="bi bi-plus-circle"></i> Add Provider
+                </button>
             </div>
 
-            <div class="database-list">
-                @foreach (var database in _request.DisabledDatabases)
+            <div class="flex-column-scroll">
+                @if (_databases.Any())
                 {
-                    <div class="database-row">
-                        <span>@database</span>
-                        <button class="button-save" type="button" @onclick="() => EnableDatabase(database)">
-                            <i class="bi bi-plus-circle"></i> Enable
-                        </button>
-                    </div>
+                    @foreach (var database in _databases)
+                    {
+                        <div class="flex-space-between">
+                            <span>@database</span>
+                            <button class="button button-red" type="button" @onclick="() => DisableDatabase(database)">
+                                <i class="bi bi-dash-circle"></i> Disable
+                            </button>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <p>None</p>
                 }
             </div>
-        }
-        
-        <div class="select-group">
-            Expand Display Pane On Selection Change: <BooleanSelect @bind-Value="_request.ShowDisplayPaneOnSelectionChange" />
+
+            @if (_request.DisabledDatabases.Any())
+            {
+                <div class="flex-space-between">
+                    <div>Disabled Databases: </div>
+                </div>
+
+                <div class="flex-column-scroll">
+                    @foreach (var database in _request.DisabledDatabases)
+                    {
+                        <div class="flex-space-between">
+                            <span>@database</span>
+                            <button class="button button-green" type="button" @onclick="() => EnableDatabase(database)">
+                                <i class="bi bi-plus-circle"></i> Enable
+                            </button>
+                        </div>
+                    }
+                </div>
+            }
+
+            <div class="flex-center-aligned-row">
+                Expand Display Pane On Selection Change: <BooleanSelect @bind-Value="_request.ShowDisplayPaneOnSelectionChange" />
+            </div>
+
+            <div class="flex-center-aligned-row">
+                Logging Level: <LogLevelSelect @bind-Value="_request.LogLevel" />
+            </div>
         </div>
 
         <div class="footer-group">
-            <div class="prerelease-group">
+            <div class="flex-align-center">
                 Pre-release Builds: <BooleanSelect @bind-Value="_request.IsPrereleaseEnabled" />
             </div>
 
             <div class="button-group">
-                <button class="button-save" type="submit">Save</button>
-                <button class="button-primary" type="button" @onclick="Close">Exit</button>
+                <button class="button button-green" type="submit">Save</button>
+                <button class="button" type="button" @onclick="Close">Exit</button>
             </div>
         </div>
-
     </EditForm>
 
 </dialog>

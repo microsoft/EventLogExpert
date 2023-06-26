@@ -4,7 +4,7 @@
 
     margin: 5px;
 
-    /* max-height: 25%; */
+    max-height: 25%;
 }
 
 .filter-header {
@@ -13,7 +13,7 @@
 }
 
 .filter-group {
-    /* overflow: auto; */
+    overflow: auto;
 
     border-bottom: solid var(--background-darkgray);
     transition: all 1s;
@@ -25,17 +25,6 @@
     border: none;
 }
 
-#filter-form {
-    display: flex;
-    flex-direction: row;
-}
-
 #filter-form > input { color: #fff; }
 
-.input.advanced-filter {
-    width: 800px;
-}
-
-.advanced-filter-error {
-    margin-left: 70px;
-}
+.advanced-filter-error { margin-left: 70px; }

@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.UI.Store.EventLog;

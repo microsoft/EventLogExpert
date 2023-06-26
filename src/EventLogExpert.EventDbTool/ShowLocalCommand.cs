@@ -37,7 +37,7 @@ public class ShowLocalCommand : DbToolCommand
         LogProviderDetailHeader(providerNames);
         foreach (var providerName in providerNames)
         {
-            var provider = new EventMessageProvider(providerName, verbose ? s => Console.WriteLine(s) : s => { });
+            var provider = new EventMessageProvider(providerName, verbose ? (s, log) => Console.WriteLine(s) : (s, log) => { });
             var details = provider.LoadProviderDetails();
             if (details != null)
             {

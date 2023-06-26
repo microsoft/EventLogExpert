@@ -37,6 +37,7 @@ public class SettingsEffects
             TimeZoneId = _preferencesProvider.TimeZonePreference,
             DisabledDatabases = _preferencesProvider.DisabledDatabasesPreference,
             ShowDisplayPaneOnSelectionChange = _preferencesProvider.DisplayPaneSelectionPreference,
+            LogLevel = _preferencesProvider.LogLevelPreference,
             IsPrereleaseEnabled = _preferencesProvider.PrereleasePreference
         };
 
@@ -49,6 +50,7 @@ public class SettingsEffects
         _preferencesProvider.TimeZonePreference = action.Settings.TimeZoneId;
         _preferencesProvider.DisabledDatabasesPreference = action.Settings.DisabledDatabases;
         _preferencesProvider.DisplayPaneSelectionPreference = action.Settings.ShowDisplayPaneOnSelectionChange;
+        _preferencesProvider.LogLevelPreference = action.Settings.LogLevel;
         _preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));

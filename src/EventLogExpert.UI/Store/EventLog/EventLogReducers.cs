@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using Fluxor;
+using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;

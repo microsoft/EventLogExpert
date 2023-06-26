@@ -1,7 +1,9 @@
 ﻿using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -29,10 +31,21 @@ public class LoggingMiddleware : Middleware
             case EventLogAction.AddEvent addEventsAction:
                 _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
                 break;
-            case FilterPaneAction.SetFilter:
-            case EventLogAction.SetFilters:
+            case FilterCacheAction.AddFavoriteFilter:
+            case FilterCacheAction.AddFavoriteFilterCompleted:
+            case FilterCacheAction.AddRecentFilter:
+            case FilterCacheAction.AddRecentFilterCompleted:
+            case FilterCacheAction.RemoveFavoriteFilter:
+            case FilterCacheAction.RemoveFavoriteFilterCompleted:
+            case FilterCacheAction.LoadFiltersCompleted:
+            case FilterPaneAction.AddFilter:
             case FilterPaneAction.AddCachedFilter:
+            case FilterPaneAction.RemoveCachedFilter:
             case FilterPaneAction.RemoveFilter:
+            case FilterPaneAction.SetAdvancedFilter:
+            case FilterPaneAction.SetFilter:
+            case FilterPaneAction.ToggleCachedFilter:
+            case EventLogAction.SetFilters:
                 _debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:

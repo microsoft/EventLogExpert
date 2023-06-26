@@ -15,26 +15,8 @@ dialog {
     height: 100%;
 }
 
-.recent-filter-list {
-    display: flex;
-    flex-direction: column;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
 .divider {
     width: 95%;
     align-self: center;
     border-top: 3px solid var(--clr-lightblue);
-}
-
-.cached-filter-row {
-    display: flex;
-    justify-content: space-between;
-}
-
-.button-group {
-    display: flex;
-    justify-content: flex-end;
 }

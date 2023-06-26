@@ -14,42 +14,6 @@ dialog {
     }
 }
 
-.tz-row {
-    display: flex;
-    margin-bottom: .5rem;
-}
+.tz-row { margin-bottom: .5rem; }
 
-.database-row {
-    display: flex;
-    justify-content: space-between;
-}
-
-.database-list {
-    display: flex;
-    flex-direction: column;
-
-    height: 100%;
-
-    overflow-y: auto;
-    overflow-x: hidden;
-}
-
-    .provider-list > span { margin: 0; }
-
-.select-group {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-}
-
-.prerelease-group {
-    display: flex;
-    align-items: center;
-}
-
-.button-group {
-    display: flex;
-    justify-content: flex-end;
-}
-
-    .button-group > button { width: 50px; }
+.fixed-width { width: 50px; }

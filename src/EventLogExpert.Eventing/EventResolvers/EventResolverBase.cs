@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -12,11 +13,11 @@ namespace EventLogExpert.Eventing.EventResolvers;
 
 public class EventResolverBase
 {
-    protected readonly Action<string> _tracer;
+    protected readonly Action<string, LogLevel> _tracer;
 
     private readonly Regex _formatRegex = new("%+[0-9]+");
 
-    protected EventResolverBase(Action<string> tracer)
+    protected EventResolverBase(Action<string, LogLevel> tracer)
     {
         _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
     }
@@ -94,7 +95,7 @@ public class EventResolverBase
             }
             catch (Exception ex)
             {
-                _tracer($"FormatDescription exception was caught: {ex}");
+                _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
                 return "Unable to format description";
             }
         }
@@ -138,10 +139,10 @@ public class EventResolverBase
             {
                 if (modernEvents.Count > 1)
                 {
-                    _tracer("Ambiguous modern event found:");
+                    _tracer("Ambiguous modern event found:", LogLevel.Information);
                     foreach (var modernEvent in modernEvents)
                     {
-                        _tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} LogName: {modernEvent.LogName} Description: {modernEvent.Description}");
+                        _tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} LogName: {modernEvent.LogName} Description: {modernEvent.Description}", LogLevel.Information);
                     }
                 }
 
@@ -192,10 +193,10 @@ public class EventResolverBase
 
                     if (potentialTaskNames.Count > 1)
                     {
-                        _tracer("More than one matching task ID was found.");
-                        _tracer($"  eventRecord.Task: {eventRecord.Task}");
-                        _tracer("   Potential matches:");
-                        potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}"));
+                        _tracer("More than one matching task ID was found.", LogLevel.Information);
+                        _tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
+                        _tracer("   Potential matches:", LogLevel.Information);
+                        potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
                     }
                 }
                 else
