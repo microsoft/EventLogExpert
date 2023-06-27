@@ -15,3 +15,15 @@ window.toggleDropdown = (root, isVisible) => {
         dropdown.style.width = false;
     }
 }
+
+window.scrollToItem = (elementId) => {
+    const element = document.getElementById(elementId);
+
+    if (element) {
+        const parent = element.parentElement;
+
+        if (parent) {
+            parent.scrollTop = element.offsetTop;
+        }
+    }
+}

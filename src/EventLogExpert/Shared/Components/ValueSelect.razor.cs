@@ -83,5 +83,10 @@ public partial class ValueSelect<T> : BaseComponent<T>
     {
         _isDropDownVisible = !_isDropDownVisible;
         await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
+
+        if (_selectedItem is not null)
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToItem", _selectedItem.ItemId);
+        }
     }
 }
