@@ -224,6 +224,12 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
     & input { margin: 0; }
 
+    & span {
+        display: inherit;
+        user-select: none;
+        margin: 0;
+    }
+
     & label > i {
         position: absolute;
         right: 2px;
@@ -261,6 +267,11 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
         &:hover {
             background-color: var(--background-darkgray);
+        }
+
+        &[selected] {
+            color: var(--background-darkgray) !important;
+            background-color: var(--clr-lightblue) !important;
         }
     }
 }

@@ -1,15 +1,17 @@
-﻿<div class="flex-center-aligned-row px-4">
-    <div class="d-flex">
+﻿@using EventLogExpert.UI
+
+<div class="flex-center-aligned-row px-4">
+    <div class="flex-align-center">
         <span>Join On: </span>
-        <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
+        <EnumSelect CssClass="input filter-dropdown" @bind-Value="Value.FilterType" TInput="FilterType" />
 
         <span>Comparison: </span>
-        <FilterSelect @bind-Value="Value.FilterComparison" TInput="UI.FilterComparison" />
+        <EnumSelect CssClass="input filter-dropdown" @bind-Value="Value.FilterComparison" TInput="FilterComparison" />
 
         <span>Value: </span>
-        @if (Value.FilterType is UI.FilterType.Description)
+        @if (Value.FilterType is FilterType.Description)
         {
-            <FilterInput @bind-Value="@Value.FilterValue" />
+            <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
         }
         else
         {

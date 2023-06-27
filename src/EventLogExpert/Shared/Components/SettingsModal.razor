@@ -1,4 +1,5 @@
 @using EventLogExpert.UI.Store.Settings
+@using Microsoft.Extensions.Logging
 @inherits FluxorComponent
 
 @inject IState<SettingsState> SettingsState
@@ -7,7 +8,15 @@
 
     <EditForm id="settings-form" Model="_request" OnValidSubmit="Save">
         <div class="flex-column-scroll">
-            <div class="flex-center-aligned-row tz-row">Time Zone: <TimeZoneSelect @bind-Value="_request.TimeZoneId" /></div>
+            <div class="flex-center-aligned-row tz-row">
+                Time Zone:
+                <ValueSelect CssClass="input timezone-dropdown" T="string" @bind-Value="_request.TimeZoneId">
+                    @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
+                    {
+                        <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
+                    }
+                </ValueSelect>
+            </div>
 
             <div class="flex-space-between">
                 <div>Loaded Databases: </div>
@@ -60,7 +69,7 @@
             </div>
 
             <div class="flex-center-aligned-row">
-                Logging Level: <LogLevelSelect @bind-Value="_request.LogLevel" />
+                Logging Level: <EnumSelect CssClass="input filter-dropdown" TInput="LogLevel" @bind-Value="_request.LogLevel" />
             </div>
         </div>
 

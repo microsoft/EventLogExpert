@@ -1,0 +1,14 @@
+@typeparam T
+@inherits EventLogExpert.Shared.Base.BaseComponent<T>
+
+<div class="dropdown-input" @ref="_selectComponent">
+    <span class="@CssClass" tabindex="0" @onblur="CloseDropDown" @onclick="ToggleDropDownVisibility" @onkeydown="HandleKeyDown">
+        @Value
+    </span>
+
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+        <CascadingValue Value="this">
+            @ChildContent
+        </CascadingValue>
+    </div>
+</div>

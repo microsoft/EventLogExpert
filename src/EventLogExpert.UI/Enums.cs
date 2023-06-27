@@ -22,3 +22,9 @@ public enum FilterComparison
     [EnumMember(Value = "Not Equal")] NotEqual,
     [EnumMember(Value = "Not Contains")] NotContains
 }
+
+public enum CacheType
+{
+    Favorites,
+    Recent
+}

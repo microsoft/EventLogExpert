@@ -1,0 +1,15 @@
+@typeparam TInput
+@inherits EventLogExpert.Shared.Base.SelectComponent<TInput>
+
+<div class="dropdown-input" @ref="selectComponent">
+    <span class="@CssClass" tabindex="0" @onblur="CloseDropDown" @onclick="ToggleDropDownVisibility">
+        @Value.ToFullString()
+    </span>
+
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+        @foreach (TInput item in Enum.GetValues(typeof(TInput)))
+        {
+            <div selected="@CheckIfSelected(item)" @onmousedown="() => UpdateValue(item)">@item.ToFullString()</div>
+        }
+    </div>
+</div>

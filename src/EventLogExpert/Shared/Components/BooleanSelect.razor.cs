@@ -6,11 +6,11 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class BooleanSelect : InputComponent<bool>
+public partial class BooleanSelect : BaseComponent<bool>
 {
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    protected override async Task UpdateValue(ChangeEventArgs args)
+    private async Task UpdateValue(ChangeEventArgs args)
     {
         if (!bool.TryParse(args.Value?.ToString(), out bool value)) { return; }
 

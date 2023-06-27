@@ -1,7 +1,23 @@
+@using EventLogExpert.UI
+@using EventLogExpert.UI.Models
+
 <div class="flex-space-between">
     @if (_isEditing)
     {
-        <FilterCacheSelect @bind-Value="Value" />
+        <div class="flex-align-center">
+            <span>Cache Type: </span>
+            <EnumSelect CssClass="input filter-dropdown" TInput="CacheType" @bind-Value="_cacheType" />
+
+            <span>Value: </span>
+            @if (_cacheType == CacheType.Favorites)
+            {
+                <ValueSelect CssClass="input cache-dropdown" TInput="FilterCacheModel" @bind-Value="Value" Items="FilterCacheState.Value.FavoriteFilters.ToList()" />
+            }
+            else
+            {
+                <ValueSelect CssClass="input cache-dropdown" TInput="FilterCacheModel" @bind-Value="Value" Items="FilterCacheState.Value.RecentFilters.ToList()" />
+            }
+        </div>
     }
     else
     {

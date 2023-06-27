@@ -1,8 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -10,12 +13,15 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public partial class FilterCacheRow
 {
-    private bool _isEditing;
+    private CacheType _cacheType = CacheType.Favorites;
     private FilterCacheModel _filter = null!;
+    private bool _isEditing;
 
     [Parameter] public FilterCacheModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+
+    [Inject] private IState<FilterCacheState> FilterCacheState { get; set; } = null!;
 
     private void EditFilter()
     {

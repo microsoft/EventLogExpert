@@ -4,11 +4,11 @@
 using EventLogExpert.Shared.Base;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Shared.Components.Filters;
+namespace EventLogExpert.Shared.Components;
 
-public partial class FilterInput : InputComponent<string>
+public partial class TextInput : BaseComponent<string>
 {
-    protected override async Task UpdateValue(ChangeEventArgs args)
+    private async Task UpdateValue(ChangeEventArgs args)
     {
         Value = args.Value?.ToString() ?? string.Empty;
         await ValueChanged.InvokeAsync(Value);

@@ -33,12 +33,12 @@ public partial class FilterValueSelect : SelectComponent<string>
     {
         switch (Type)
         {
-            case FilterType.Id:
+            case FilterType.Id :
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
                     .Distinct().OrderBy(id => id).Select(id => id.ToString()).ToList();
 
                 break;
-            case FilterType.Level:
+            case FilterType.Level :
                 _items = new List<string>();
 
                 foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
@@ -47,23 +47,23 @@ public partial class FilterValueSelect : SelectComponent<string>
                 }
 
                 break;
-            case FilterType.KeywordsDisplayNames:
+            case FilterType.KeywordsDisplayNames :
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
                 break;
-            case FilterType.Source:
+            case FilterType.Source :
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
                 break;
-            case FilterType.TaskCategory:
+            case FilterType.TaskCategory :
                 _items = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
                     .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
 
                 break;
-            case FilterType.Description:
-            default:
+            case FilterType.Description :
+            default :
                 break;
         }
     }

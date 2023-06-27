@@ -1,18 +1,20 @@
-﻿<div class="flex-space-between">
+﻿@using EventLogExpert.UI
+
+<div class="flex-space-between">
     @if (Value.IsEditing)
     {
-        <div class="d-flex">
+        <div class="flex-align-center">
             <span>Filter On: </span>
-            <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
+            <EnumSelect CssClass="input filter-dropdown" TInput="FilterType" @bind-Value="Value.FilterType" />
 
             <span>Comparison: </span>
-            <FilterSelect @bind-Value="Value.FilterComparison" TInput="UI.FilterComparison" />
+            <EnumSelect CssClass="input filter-dropdown" TInput="FilterComparison" @bind-Value="Value.FilterComparison" />
 
             <span>Value: </span>
             <div>
-                @if (Value.FilterType is UI.FilterType.Description)
+                @if (Value.FilterType is FilterType.Description)
                 {
-                    <FilterInput @bind-Value="@Value.FilterValue" />
+                    <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
                 }
                 else
                 {
