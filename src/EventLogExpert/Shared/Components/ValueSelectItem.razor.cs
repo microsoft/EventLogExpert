@@ -12,6 +12,9 @@ public partial class ValueSelectItem<T>
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
+    [Parameter]
+    public bool IsDisabled { get; set; }
+
     public string ItemId { get; } = $"_{Guid.NewGuid().ToString()[..8]}";
 
     [Parameter]
@@ -32,6 +35,8 @@ public partial class ValueSelectItem<T>
 
     private async void SelectItem()
     {
+        if (IsDisabled) return;
+
         await ValueSelect.UpdateValue(this);
         await InvokeAsync(StateHasChanged);
     }

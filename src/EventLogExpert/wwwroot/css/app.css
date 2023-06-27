@@ -252,6 +252,7 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     /* width: 100%; */
     max-height: 240px;
     overflow-y: auto;
+    overflow-x: hidden;
 
     &[data-toggle="true"] { display: block; }
 
@@ -265,9 +266,7 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
         color: #fff;
 
-        &:hover {
-            background-color: var(--background-darkgray);
-        }
+        &:hover { background-color: var(--background-darkgray); }
 
         &[selected] {
             color: var(--background-darkgray) !important;

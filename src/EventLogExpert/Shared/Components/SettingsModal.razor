@@ -69,7 +69,13 @@
             </div>
 
             <div class="flex-center-aligned-row">
-                Logging Level: <EnumSelect CssClass="input filter-dropdown" TInput="LogLevel" @bind-Value="_request.LogLevel" />
+                Logging Level:
+                <ValueSelect CssClass="input filter-dropdown" T="LogLevel" @bind-Value="_request.LogLevel">
+                    @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
+                    {
+                        <ValueSelectItem T="LogLevel" Value="item">@item.ToFullString()</ValueSelectItem>
+                    }
+                </ValueSelect>
             </div>
         </div>
 

@@ -8,21 +8,14 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelect<T> : BaseComponent<T>
+public partial class ValueSelect<T> : SelectComponent<T>
 {
     private readonly List<ValueSelectItem<T>> _items = new();
 
-    private bool _isDropDownVisible;
-    private ElementReference _selectComponent;
     private ValueSelectItem<T>? _selectedItem;
 
     [Parameter]
-    public bool CanInput { get; set; } = false;
-
-    [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
-
-    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -44,10 +37,12 @@ public partial class ValueSelect<T> : BaseComponent<T>
         await ValueChanged.InvokeAsync(Value);
     }
 
-    private async void CloseDropDown()
+    protected override async void ToggleDropDownVisibility()
     {
-        _isDropDownVisible = false;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
+        isDropDownVisible = !isDropDownVisible;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, isDropDownVisible);
+
+        await ScrollToSelectedItem();
     }
 
     private async void HandleKeyDown(KeyboardEventArgs args)
@@ -63,6 +58,22 @@ public partial class ValueSelect<T> : BaseComponent<T>
             case "ArrowDown" :
                 await SelectAdjacentItem(+1);
                 break;
+            case "Enter":
+            case "Escape":
+                CloseDropDown();
+                break;
+            default: 
+                // TODO: Input Filtering will filter here
+                // May also update this to debounce a quick SelectFirst() like a normal select box would work
+                break;
+        }
+    }
+
+    private async Task ScrollToSelectedItem()
+    {
+        if (_selectedItem is not null)
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToItem", _selectedItem.ItemId);
         }
     }
 
@@ -70,23 +81,22 @@ public partial class ValueSelect<T> : BaseComponent<T>
     {
         var index = _items.FindIndex(x => x.ItemId == _selectedItem?.ItemId);
 
-        index += direction;
+        if (direction < 0 && index < 0) { index = 0; }
 
-        if (index < 0) { index = 0; }
-
-        if (index >= _items.Count) { index = _items.Count - 1; }
-
-        await UpdateValue(_items[index]);
-    }
-
-    private async void ToggleDropDownVisibility()
-    {
-        _isDropDownVisible = !_isDropDownVisible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
-
-        if (_selectedItem is not null)
+        for (int i = 0; i < _items.Count; i++)
         {
-            await JSRuntime.InvokeVoidAsync("scrollToItem", _selectedItem.ItemId);
+            index += direction;
+
+            if (index < 0) { index = 0; }
+
+            if (index >= _items.Count) { index = _items.Count - 1; }
+
+            if (_items[index].IsDisabled) { continue; }
+
+            await UpdateValue(_items[index]);
+            break;
         }
+
+        if (isDropDownVisible) { await ScrollToSelectedItem(); }
     }
 }

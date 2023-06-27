@@ -23,6 +23,8 @@ public partial class FilterValueSelect : SelectComponent<string>
 
     private List<string> FilteredItems => _items.Where(x => x.ToLower().Contains(Value.ToLower())).ToList();
 
+    private bool CheckIfSelected(string value) => value.Equals(Value);
+
     private async void OnInputChange(ChangeEventArgs args)
     {
         Value = args.Value?.ToString() ?? string.Empty;
@@ -66,5 +68,11 @@ public partial class FilterValueSelect : SelectComponent<string>
             default :
                 break;
         }
+    }
+
+    private async Task UpdateValue(string value)
+    {
+        Value = value;
+        await ValueChanged.InvokeAsync(Value);
     }
 }
