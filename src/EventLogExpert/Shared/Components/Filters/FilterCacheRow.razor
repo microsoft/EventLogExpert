@@ -9,40 +9,40 @@
             <ValueSelect CssClass="input filter-dropdown" T="CacheType" @bind-Value="_cacheType" ToStringFunc="x => x.ToFullString()">
                 @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
                 {
-                    <ValueSelectItem T="CacheType" Value="item">@item.ToFullString()</ValueSelectItem>
+                    <ValueSelectItem T="CacheType" Value="item" />
                 }
             </ValueSelect>
 
             <span>Value: </span>
             @if (_cacheType == CacheType.Favorites)
             {
-                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "Invalid Filter")">
+                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "None")">
                     @if (FilterCacheState.Value.FavoriteFilters.Any())
                     {
                         @foreach (var item in FilterCacheState.Value.FavoriteFilters)
                         {
-                            <ValueSelectItem T="FilterCacheModel" Value="item">@item.ComparisonString</ValueSelectItem>
+                            <ValueSelectItem T="FilterCacheModel" Value="item" />
                         }
                     }
                     else
                     {
-                        <ValueSelectItem T="FilterCacheModel" IsDisabled>None</ValueSelectItem>
+                        <ValueSelectItem T="FilterCacheModel" IsDisabled />
                     }
                 </ValueSelect>
             }
             else
             {
-                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "Invalid Filter")">
+                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "None")">
                     @if (FilterCacheState.Value.RecentFilters.Any())
                     {
                         @foreach (var item in FilterCacheState.Value.RecentFilters)
                         {
-                            <ValueSelectItem T="FilterCacheModel" Value="item">@item.ComparisonString</ValueSelectItem>
+                            <ValueSelectItem T="FilterCacheModel" Value="item" />
                         }
                     }
                     else
                     {
-                        <ValueSelectItem T="FilterCacheModel" IsDisabled>None</ValueSelectItem>
+                        <ValueSelectItem T="FilterCacheModel" IsDisabled />
                     }
                 </ValueSelect>
             }

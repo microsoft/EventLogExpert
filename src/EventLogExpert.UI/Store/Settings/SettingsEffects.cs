@@ -21,16 +21,16 @@ public class SettingsEffects
         _enabledDatabaseCollectionProvider = enabledDatabaseCollectionProvider;
     }
 
-    [EffectMethod]
-    public async Task HandleLoadDatabases(SettingsAction.LoadDatabases action, IDispatcher dispatcher)
+    [EffectMethod(typeof(SettingsAction.LoadDatabases))]
+    public async Task HandleLoadDatabases(IDispatcher dispatcher)
     {
         var databases = _enabledDatabaseCollectionProvider.GetEnabledDatabases();
 
         dispatcher.Dispatch(new SettingsAction.LoadDatabasesCompleted(databases));
     }
 
-    [EffectMethod]
-    public async Task HandleLoadSettings(SettingsAction.LoadSettings action, IDispatcher dispatcher)
+    [EffectMethod(typeof(SettingsAction.LoadSettings))]
+    public async Task HandleLoadSettings(IDispatcher dispatcher)
     {
         SettingsModel config = new()
         {

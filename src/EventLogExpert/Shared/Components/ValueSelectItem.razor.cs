@@ -10,7 +10,7 @@ public partial class ValueSelectItem<T>
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
-    public RenderFragment ChildContent { get; set; } = null!;
+    public RenderFragment? ChildContent { get; set; }
 
     [Parameter]
     public bool IsDisabled { get; set; }
@@ -19,6 +19,15 @@ public partial class ValueSelectItem<T>
 
     [Parameter]
     public T Value { get; set; } = default!;
+
+    private string? DisplayString
+    {
+        get
+        {
+            var converter = ValueSelect.DisplayConverter;
+            return converter is null ? $"{Value}" : converter.Set(Value);
+        }
+    }
 
     private bool IsSelected => ValueSelect.Value?.Equals(Value) ?? false;
 
@@ -35,7 +44,10 @@ public partial class ValueSelectItem<T>
 
     private async void SelectItem()
     {
-        if (IsDisabled) return;
+        if (IsDisabled)
+        {
+            return;
+        }
 
         await ValueSelect.UpdateValue(this);
         await InvokeAsync(StateHasChanged);

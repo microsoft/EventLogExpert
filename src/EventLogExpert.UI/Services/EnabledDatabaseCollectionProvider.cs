@@ -17,9 +17,9 @@ public interface IEnabledDatabaseCollectionProvider
 
 public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IEnabledDatabaseCollectionProvider
 {
-    private FileLocationOptions _fileLocationOptions;
-    private IPreferencesProvider _preferencesProvider;
-    private ITraceLogger _traceLogger;
+    private readonly FileLocationOptions _fileLocationOptions;
+    private readonly IPreferencesProvider _preferencesProvider;
+    private readonly ITraceLogger _traceLogger;
 
     public EnabledDatabaseCollectionProvider(
         FileLocationOptions fileLocationOptions, 
@@ -59,7 +59,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
 
         var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
 
-        if (disabledDatabases?.Any() is true)
+        if (disabledDatabases.Any())
         {
             databases.RemoveAll(enabled => disabledDatabases
                 .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));

@@ -11,10 +11,11 @@ public abstract class SelectComponent<T> : BaseComponent<T>
 {
     protected ElementReference selectComponent;
 
-    private DisplayConverter<T?, string?>? _converter;
     private Func<T?, string?> _toStringFunc = x => x?.ToString();
 
     private protected bool isDropDownVisible;
+
+    public DisplayConverter<T?, string?>? DisplayConverter { get; private set; }
 
     [Parameter]
     public Func<T?, string?> ToStringFunc
@@ -26,7 +27,7 @@ public abstract class SelectComponent<T> : BaseComponent<T>
 
             _toStringFunc = value;
 
-            _converter = new DisplayConverter<T?, string?> { SetFunc = _toStringFunc };
+            DisplayConverter = new DisplayConverter<T?, string?> { SetFunc = _toStringFunc };
         }
     }
 
@@ -34,7 +35,7 @@ public abstract class SelectComponent<T> : BaseComponent<T>
     {
         get
         {
-            var converter = _converter;
+            var converter = DisplayConverter;
             return converter is null ? $"{Value}" : converter.Set(Value);
         }
     }
