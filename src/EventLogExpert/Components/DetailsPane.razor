@@ -19,6 +19,10 @@
     {
         <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
             <div class="d-flex flex-row">
+                @if (EventLogState.Value.ActiveLogs.Count > 1)
+                {
+                    <div>Log Name: @Event.LogName</div>
+                }
                 <div>Source: @Event.Source</div>
                 <div>Event Id: @Event.Id</div>
                 <div>Level: @Event.Level</div>

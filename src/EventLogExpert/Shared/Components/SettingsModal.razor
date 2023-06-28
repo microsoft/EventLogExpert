@@ -29,7 +29,7 @@
             <div class="flex-column-scroll">
                 @if (_databases.Any())
                 {
-                    @foreach (var database in _databases)
+                    @foreach (var database in _databases.OrderBy(x => x.Key))
                     {
                         <div class="flex-space-between">
                             <span>@database.Key</span>

@@ -24,6 +24,7 @@
                 </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
             <MenuFlyoutItem Text="Close All Open Logs" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
+            <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
