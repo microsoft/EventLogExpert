@@ -3,18 +3,18 @@
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
         <span>Join On: </span>
-        <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.FilterType">
+        <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.FilterType" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
-                <ValueSelectItem T="FilterType" Value="item">@item.ToFullString()</ValueSelectItem>
+                <ValueSelectItem T="FilterType" Value="item" />
             }
         </ValueSelect>
 
         <span>Comparison: </span>
-        <ValueSelect CssClass="input filter-dropdown" T="FilterComparison" @bind-Value="Value.FilterComparison">
+        <ValueSelect CssClass="input filter-dropdown" T="FilterComparison" @bind-Value="Value.FilterComparison" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterComparison item in Enum.GetValues(typeof(FilterComparison)))
             {
-                <ValueSelectItem T="FilterComparison" Value="item">@item.ToFullString()</ValueSelectItem>
+                <ValueSelectItem T="FilterComparison" Value="item" />
             }
         </ValueSelect>
 
