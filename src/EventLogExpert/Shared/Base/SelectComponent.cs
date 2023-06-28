@@ -1,36 +1,57 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Base;
 
-public abstract class SelectComponent<T> : ComponentBase
+public abstract class SelectComponent<T> : BaseComponent<T>
 {
-    public ElementReference selectComponent;
+    protected ElementReference selectComponent;
 
-    private bool _isDropDownVisible;
+    private DisplayConverter<T?, string?>? _converter;
+    private Func<T?, string?> _toStringFunc = x => x?.ToString();
+
+    private protected bool isDropDownVisible;
 
     [Parameter]
-    public T Value { get; set; } = default!;
+    public Func<T?, string?> ToStringFunc
+    {
+        get => _toStringFunc;
+        set
+        {
+            if (_toStringFunc.Equals(value)) { return; }
 
-    [Parameter]
-    public EventCallback<T> ValueChanged { get; set; }
+            _toStringFunc = value;
 
-    protected string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
+            _converter = new DisplayConverter<T?, string?> { SetFunc = _toStringFunc };
+        }
+    }
+
+    protected string? DisplayString
+    {
+        get
+        {
+            var converter = _converter;
+            return converter is null ? $"{Value}" : converter.Set(Value);
+        }
+    }
+
+    protected string IsDropDownVisible => isDropDownVisible.ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    protected async void SetDropDownVisibility(bool visible)
+    protected async void CloseDropDown()
     {
-        _isDropDownVisible = visible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, _isDropDownVisible);
+        isDropDownVisible = false;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, isDropDownVisible);
     }
 
-    protected async Task UpdateValue(T value)
+    protected virtual async void ToggleDropDownVisibility()
     {
-        Value = value;
-        await ValueChanged.InvokeAsync(Value);
+        isDropDownVisible = !isDropDownVisible;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, isDropDownVisible);
     }
 }

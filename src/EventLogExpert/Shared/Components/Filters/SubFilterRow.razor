@@ -1,15 +1,27 @@
-﻿<div class="flex-center-aligned-row px-4">
-    <div class="d-flex">
+﻿@using EventLogExpert.UI
+
+<div class="flex-center-aligned-row px-4">
+    <div class="flex-align-center">
         <span>Join On: </span>
-        <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
+        <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.FilterType">
+            @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+            {
+                <ValueSelectItem T="FilterType" Value="item">@item.ToFullString()</ValueSelectItem>
+            }
+        </ValueSelect>
 
         <span>Comparison: </span>
-        <FilterSelect @bind-Value="Value.FilterComparison" TInput="UI.FilterComparison" />
+        <ValueSelect CssClass="input filter-dropdown" T="FilterComparison" @bind-Value="Value.FilterComparison">
+            @foreach (FilterComparison item in Enum.GetValues(typeof(FilterComparison)))
+            {
+                <ValueSelectItem T="FilterComparison" Value="item">@item.ToFullString()</ValueSelectItem>
+            }
+        </ValueSelect>
 
         <span>Value: </span>
-        @if (Value.FilterType is UI.FilterType.Description)
+        @if (Value.FilterType is FilterType.Description)
         {
-            <FilterInput @bind-Value="@Value.FilterValue" />
+            <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
         }
         else
         {

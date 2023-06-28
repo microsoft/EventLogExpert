@@ -1,17 +1,25 @@
 window.toggleDropdown = (root, isVisible) => {
-    const dropdown = root.getElementsByClassName("dropdown-list");
+    const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     if (isVisible) {
         const bounds = root.getBoundingClientRect();
 
-        dropdown[0].style.position = "fixed";
-        dropdown[0].style.top = `${bounds.bottom + 4}px`;
-        dropdown[0].style.left = `${bounds.left}px`;
-        dropdown[0].style.width = `${bounds.width}px`;
+        dropdown.style.position = "fixed";
+        dropdown.style.top = `${bounds.bottom + 4}px`;
+        dropdown.style.left = `${bounds.left}px`;
+        dropdown.style.width = `${bounds.width}px`;
     } else {
-        dropdown[0].style.position = false;
-        dropdown[0].style.top = false;
-        dropdown[0].style.left = false;
-        dropdown[0].style.width = false;
+        dropdown.style.position = false;
+        dropdown.style.top = false;
+        dropdown.style.left = false;
+        dropdown.style.width = false;
     }
-}
+};
+
+window.scrollToItem = (elementId) => {
+    const element = document.getElementById(elementId);
+
+    if (element) {
+        element.scrollIntoView({ block: "nearest" });
+    }
+};

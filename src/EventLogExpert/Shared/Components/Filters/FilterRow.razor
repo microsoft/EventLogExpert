@@ -1,18 +1,30 @@
-﻿<div class="flex-space-between">
+﻿@using EventLogExpert.UI
+
+<div class="flex-space-between">
     @if (Value.IsEditing)
     {
-        <div class="d-flex">
+        <div class="flex-align-center">
             <span>Filter On: </span>
-            <FilterSelect @bind-Value="Value.FilterType" TInput="UI.FilterType" />
+            <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.FilterType" ToStringFunc="x => x.ToFullString()">
+                @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+                {
+                    <ValueSelectItem T="FilterType" Value="item">@item.ToFullString()</ValueSelectItem>
+                }
+            </ValueSelect>
 
             <span>Comparison: </span>
-            <FilterSelect @bind-Value="Value.FilterComparison" TInput="UI.FilterComparison" />
+            <ValueSelect CssClass="input filter-dropdown" T="FilterComparison" @bind-Value="Value.FilterComparison" ToStringFunc="x => x.ToFullString()">
+                @foreach (FilterComparison item in Enum.GetValues(typeof(FilterComparison)))
+                {
+                    <ValueSelectItem T="FilterComparison" Value="item">@item.ToFullString()</ValueSelectItem>
+                }
+            </ValueSelect>
 
             <span>Value: </span>
             <div>
-                @if (Value.FilterType is UI.FilterType.Description)
+                @if (Value.FilterType is FilterType.Description)
                 {
-                    <FilterInput @bind-Value="@Value.FilterValue" />
+                    <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
                 }
                 else
                 {

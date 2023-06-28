@@ -1,7 +1,52 @@
+@using EventLogExpert.UI
+@using EventLogExpert.UI.Models
+
 <div class="flex-space-between">
     @if (_isEditing)
     {
-        <FilterCacheSelect @bind-Value="Value" />
+        <div class="flex-align-center">
+            <span>Cache Type: </span>
+            <ValueSelect CssClass="input filter-dropdown" T="CacheType" @bind-Value="_cacheType" ToStringFunc="x => x.ToFullString()">
+                @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
+                {
+                    <ValueSelectItem T="CacheType" Value="item">@item.ToFullString()</ValueSelectItem>
+                }
+            </ValueSelect>
+
+            <span>Value: </span>
+            @if (_cacheType == CacheType.Favorites)
+            {
+                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "Invalid Filter")">
+                    @if (FilterCacheState.Value.FavoriteFilters.Any())
+                    {
+                        @foreach (var item in FilterCacheState.Value.FavoriteFilters)
+                        {
+                            <ValueSelectItem T="FilterCacheModel" Value="item">@item.ComparisonString</ValueSelectItem>
+                        }
+                    }
+                    else
+                    {
+                        <ValueSelectItem T="FilterCacheModel" IsDisabled>None</ValueSelectItem>
+                    }
+                </ValueSelect>
+            }
+            else
+            {
+                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "Invalid Filter")">
+                    @if (FilterCacheState.Value.RecentFilters.Any())
+                    {
+                        @foreach (var item in FilterCacheState.Value.RecentFilters)
+                        {
+                            <ValueSelectItem T="FilterCacheModel" Value="item">@item.ComparisonString</ValueSelectItem>
+                        }
+                    }
+                    else
+                    {
+                        <ValueSelectItem T="FilterCacheModel" IsDisabled>None</ValueSelectItem>
+                    }
+                </ValueSelect>
+            }
+        </div>
     }
     else
     {
