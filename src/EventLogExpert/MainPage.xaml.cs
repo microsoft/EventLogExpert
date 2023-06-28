@@ -171,6 +171,8 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private void Exit_Clicked(object sender, EventArgs e) => Application.Current?.CloseWindow(Application.Current.MainPage!.Window);
+
     private void LoadNewEvents_Clicked(object sender, EventArgs e)
     {
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents(_traceLogger));
