@@ -17,7 +17,7 @@ namespace EventLogExpert.Shared.Components;
 public partial class SettingsModal
 {
     private Dictionary<string, bool> _databases = new();
-    private bool _hasDatabasesChanged;
+    private bool _hasDatabasesChanged = false;
     private SettingsModel _request = new();
 
     [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
@@ -157,13 +157,13 @@ public partial class SettingsModal
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+            
+            await ReloadOpenLogs();
         }
         else
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
-
-        await ReloadOpenLogs();
 
         Close();
     }
