@@ -1,11 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -16,19 +16,19 @@ namespace EventLogExpert.Shared.Components;
 
 public partial class SettingsModal
 {
-    private List<string> _databases = new();
+    private Dictionary<string, bool> _databases = new();
     private bool _hasDatabasesChanged;
     private SettingsModel _request = new();
 
-    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
+    [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
 
-    [Inject] private IDatabaseCollectionProvider DatabaseCollectionProvider { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+
+    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
 
     [Inject] private FileLocationOptions FileLocationOptions { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
-
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -41,22 +41,6 @@ public partial class SettingsModal
     {
         await JSRuntime.InvokeVoidAsync("closeSettingsModal");
         ResetSettingsModel();
-    }
-
-    private void DisableDatabase(string database)
-    {
-        _request.DisabledDatabases.Add(database);
-        _databases.Remove(database);
-
-        _hasDatabasesChanged = true;
-    }
-
-    private void EnableDatabase(string database)
-    {
-        _request.DisabledDatabases.Remove(database);
-        _databases.Add(database);
-
-        _hasDatabasesChanged = true;
     }
 
     private async void ImportDatabase()
@@ -94,9 +78,10 @@ public partial class SettingsModal
         }
         catch (Exception ex)
         {
-            await Application.Current!.MainPage!.DisplayAlert("Import Failed",
+            await AlertDialogService.ShowAlert("Import Failed",
                 $"An exception occurred while importing provider databases: {ex.Message}",
                 "OK");
+
             return;
         }
 
@@ -112,11 +97,11 @@ public partial class SettingsModal
             return;
         }
 
-        bool answer = await Application.Current!.MainPage!.DisplayAlert("Reload Open Logs Now?",
-        "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
-        "Yes", "No");
+        bool answer = await AlertDialogService.ShowAlert("Reload Open Logs Now?",
+            "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
+            "Yes", "No");
 
-        if (!answer) return;
+        if (!answer) { return; }
 
         var logsToReopen = EventLogState.Value.ActiveLogs.Values;
 
@@ -130,7 +115,7 @@ public partial class SettingsModal
 
     private async void RemoveDatabase(string database)
     {
-        bool answer = await Application.Current!.MainPage!.DisplayAlert("Remove Database",
+        bool answer = await AlertDialogService.ShowAlert("Remove Database",
             "Are you sure you want to remove this database?",
             "Yes", "No");
 
@@ -152,27 +137,53 @@ public partial class SettingsModal
     private void ResetSettingsModel()
     {
         _request = SettingsState.Value.Config with { };
-        _databases = SettingsState.Value.LoadedDatabases.ToList();
-        _hasDatabasesChanged = false;
+
+        foreach (var database in SettingsState.Value.LoadedDatabases)
+        {
+            _databases.TryAdd(database, _request.DisabledDatabases.Contains(database) is false);
+        }
+
+        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
+        {
+            _databases.TryAdd(database, false);
+        }
 
         StateHasChanged();
     }
 
     private async void Save()
     {
-
         if (_hasDatabasesChanged)
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
-
-            await ReloadOpenLogs();
         }
         else
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
+        await ReloadOpenLogs();
+
         Close();
+    }
+
+    private void ToggleDatabase(string database)
+    {
+        _databases[database] = !_databases[database];
+
+        bool isDisabled = _request.DisabledDatabases.Contains(database);
+
+        switch (_databases[database])
+        {
+            case true when isDisabled : 
+                _request.DisabledDatabases.Remove(database);
+                _hasDatabasesChanged = true;
+                break;
+            case false when !isDisabled : 
+                _request.DisabledDatabases.Add(database);
+                _hasDatabasesChanged = true;
+                break;
+        }
     }
 }

@@ -7,8 +7,6 @@ namespace EventLogExpert.UI.Store.Settings;
 
 public record SettingsAction
 {
-    public record CheckForUpdates : SettingsAction;
-
     public record LoadDatabases : SettingsAction;
 
     public record LoadDatabasesCompleted(IEnumerable<string> LoadedDatabases) : SettingsAction;
@@ -23,7 +21,7 @@ public record SettingsAction
 
     public record SaveCompleted(SettingsModel Settings) : SettingsAction;
 
-    public record ToggleShowLogName() : SettingsAction;
+    public record ToggleShowLogName : SettingsAction;
 
-    public record ToggleShowComputerName() : SettingsAction;
+    public record ToggleShowComputerName : SettingsAction;
 }

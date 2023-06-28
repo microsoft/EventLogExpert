@@ -1,3 +1,12 @@
 @typeparam T
 
-<div id="@ItemId" selected="@IsSelected" @onmousedown="SelectItem">@ChildContent</div>
+<div id="@ItemId" selected="@IsSelected" @onmousedown="SelectItem">
+    @if (ChildContent is not null)
+    {
+        @ChildContent
+    }
+    else
+    {
+        @DisplayString
+    }
+</div>
