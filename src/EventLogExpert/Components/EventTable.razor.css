@@ -20,6 +20,7 @@ th {
     top: 0;
     background-color: var(--background-darkgray);
     cursor: default;
+    user-select: none;
 
     & > span {
         position: absolute;

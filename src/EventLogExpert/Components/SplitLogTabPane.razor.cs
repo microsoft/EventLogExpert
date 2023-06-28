@@ -36,19 +36,15 @@ public partial class SplitLogTabPane
     private static string GetTabName(EventLogData log)
     {
         var firstEvent = log.Events.FirstOrDefault();
-        if (firstEvent != null)
-        {
-            return firstEvent.ComputerName + " - " + firstEvent.LogName;
-        }
-        else
-        {
-            return Path.GetFileNameWithoutExtension(log.Name);
-        }
+
+        return firstEvent is not null ?
+            $"{firstEvent.LogName} - {firstEvent.ComputerName}" :
+            Path.GetFileNameWithoutExtension(log.Name);
     }
 
     private static string GetTabTooltip(EventLogData log)
     {
-        return $"{(log.Type == LogType.File ? $"Log File: " : "Live Log: ")} {log.Name}\n" +
+        return $"{(log.Type == LogType.File ? "Log File: " : "Live Log: ")} {log.Name}\n" +
             $"Log Name: {log.Events.FirstOrDefault()?.LogName ?? ""}\n" +
             $"Computer Name: {log.Events.FirstOrDefault()?.ComputerName ?? ""}";
     }
