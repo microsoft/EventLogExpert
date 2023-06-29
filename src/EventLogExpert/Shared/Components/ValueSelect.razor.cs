@@ -2,20 +2,54 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
+using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelect<T> : SelectComponent<T>
+public partial class ValueSelect<T> : BaseComponent<T>
 {
     private readonly List<ValueSelectItem<T>> _items = new();
 
+    private bool _isDropDownVisible;
+    private ElementReference _selectComponent;
     private ValueSelectItem<T>? _selectedItem;
+    private Func<T?, string?> _toStringFunc = x => x?.ToString();
 
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
+
+    public DisplayConverter<T?, string?>? DisplayConverter { get; private set; }
+
+    [Parameter]
+    public bool IsInput { get; set; } = false;
+
+    [Parameter]
+    public Func<T?, string?> ToStringFunc
+    {
+        get => _toStringFunc;
+        set
+        {
+            if (_toStringFunc.Equals(value)) { return; }
+
+            _toStringFunc = value;
+
+            DisplayConverter = new DisplayConverter<T?, string?> { SetFunc = _toStringFunc };
+        }
+    }
+
+    private string? DisplayString
+    {
+        get
+        {
+            var converter = DisplayConverter;
+            return converter is null ? $"{Value}" : converter.Set(Value);
+        }
+    }
+
+    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -30,6 +64,8 @@ public partial class ValueSelect<T> : SelectComponent<T>
         if (Value?.Equals(item.Value) is true) { _selectedItem = item; }
     }
 
+    public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
+
     public async Task UpdateValue(ValueSelectItem<T> item)
     {
         _selectedItem = item;
@@ -37,12 +73,18 @@ public partial class ValueSelect<T> : SelectComponent<T>
         await ValueChanged.InvokeAsync(Value);
     }
 
-    protected override async void ToggleDropDownVisibility()
+    protected async void ToggleDropDownVisibility()
     {
-        isDropDownVisible = !isDropDownVisible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, isDropDownVisible);
+        _isDropDownVisible = !_isDropDownVisible;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
 
         await ScrollToSelectedItem();
+    }
+
+    private async void CloseDropDown()
+    {
+        _isDropDownVisible = false;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
     }
 
     private async void HandleKeyDown(KeyboardEventArgs args)
@@ -50,7 +92,8 @@ public partial class ValueSelect<T> : SelectComponent<T>
         switch (args.Code)
         {
             case "Space" :
-                ToggleDropDownVisibility();
+                if (!IsInput) { ToggleDropDownVisibility(); }
+
                 break;
             case "ArrowUp" :
                 await SelectAdjacentItem(-1);
@@ -58,15 +101,17 @@ public partial class ValueSelect<T> : SelectComponent<T>
             case "ArrowDown" :
                 await SelectAdjacentItem(+1);
                 break;
-            case "Enter":
-            case "Escape":
+            case "Enter" :
+            case "Escape" :
                 CloseDropDown();
                 break;
-            default: 
-                // TODO: Input Filtering will filter here
-                // May also update this to debounce a quick SelectFirst() like a normal select box would work
-                break;
         }
+    }
+
+    private async void OnInputChange(ChangeEventArgs args)
+    {
+        Value = (T)Convert.ChangeType(args.Value, typeof(T))!;
+        await ValueChanged.InvokeAsync(Value);
     }
 
     private async Task ScrollToSelectedItem()
@@ -97,6 +142,6 @@ public partial class ValueSelect<T> : SelectComponent<T>
             break;
         }
 
-        if (isDropDownVisible) { await ScrollToSelectedItem(); }
+        if (_isDropDownVisible) { await ScrollToSelectedItem(); }
     }
 }

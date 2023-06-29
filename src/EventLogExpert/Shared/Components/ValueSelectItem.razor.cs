@@ -2,11 +2,13 @@
 // // Licensed under the MIT License.
 
 using Microsoft.AspNetCore.Components;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelectItem<T>
+public partial class ValueSelectItem<T> : IDisposable
 {
+    private bool _disposed = false;
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
@@ -42,12 +44,14 @@ public partial class ValueSelectItem<T>
         }
     }
 
+    [SuppressMessage("Usage",
+        "CA1816:Dispose methods should call SuppressFinalize",
+        Justification = "Not a redundant GC call since actual item is just removed from parent list")]
+    public void Dispose() => ValueSelect.RemoveItem(this);
+
     private async void SelectItem()
     {
-        if (IsDisabled)
-        {
-            return;
-        }
+        if (IsDisabled) { return; }
 
         await ValueSelect.UpdateValue(this);
         await InvokeAsync(StateHasChanged);

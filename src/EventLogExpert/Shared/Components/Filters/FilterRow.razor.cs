@@ -2,9 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -12,9 +13,16 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public partial class FilterRow
 {
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    private List<string> _filterItems = new();
 
     [Parameter] public FilterModel Value { get; set; } = null!;
+
+    [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+
+    private List<string> FilteredItems =>
+        _filterItems.Where(x => x.ToLower().Contains(Value.FilterValue.ToLower())).ToList();
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 
@@ -28,12 +36,9 @@ public partial class FilterRow
 
         if (!FilterMethods.TryParse(newModel, out string? comparisonString))
         {
-            if (Application.Current?.MainPage is not null)
-            {
-                await Application.Current.MainPage.DisplayAlert("Invalid Filter",
-                    "The filter you have created is an invalid filter, please adjust and try again.",
-                    "Ok");
-            }
+            await AlertDialogService.ShowAlert("Invalid Filter",
+                "The filter you have created is an invalid filter, please adjust and try again.",
+                "Ok");
 
             return;
         }
@@ -57,12 +62,9 @@ public partial class FilterRow
 
                 if (comparison is null)
                 {
-                    if (Application.Current?.MainPage is not null)
-                    {
-                        await Application.Current.MainPage.DisplayAlert("Invalid Filter",
-                            "The sub filter you have created is an invalid filter, please adjust and try again.",
-                            "Ok");
-                    }
+                    await AlertDialogService.ShowAlert("Invalid Filter",
+                        "The sub filter you have created is an invalid filter, please adjust and try again.",
+                        "Ok");
 
                     return;
                 }
