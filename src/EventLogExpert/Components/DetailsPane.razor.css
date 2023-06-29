@@ -3,7 +3,7 @@
     flex-direction: column;
     position: relative;
 
-    margin: 5px;
+    margin: 0 5px;
     height: 30%;
     min-height: 20%;
     overflow: hidden;
@@ -52,6 +52,7 @@
 }
 
 .details-xml {
+    margin: 0;
     height: 100%;
     overflow-y: auto;
     white-space: pre-wrap;
