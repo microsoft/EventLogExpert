@@ -94,7 +94,7 @@ public class DeploymentService : IDeploymentService
                         _appTitleService.SetProgressString(null);
                         break;
                     case AsyncStatus.Completed : 
-                        _appTitleService.SetProgressString("Update Complete");
+                        _appTitleService.SetProgressString("Relaunch to Apply Update");
                         break;
                     case AsyncStatus.Canceled :
                     case AsyncStatus.Started :

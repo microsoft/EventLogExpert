@@ -55,7 +55,7 @@ public class AppTitleService : IAppTitleService
 
         if (_progressString is not null)
         {
-            title.Append(_progressString);
+            title.Append($"{_progressString} - ");
         }
 
         if (_logName is not null)
