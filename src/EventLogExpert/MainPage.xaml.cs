@@ -26,6 +26,7 @@ public partial class MainPage : ContentPage
     private readonly IState<SettingsState> _settingsState;
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IUpdateService _updateService;
+    private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IAppTitleService _appTitleService;
     private readonly ITraceLogger _traceLogger;
 
@@ -38,6 +39,7 @@ public partial class MainPage : ContentPage
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
         IUpdateService updateService,
+        ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger)
@@ -47,6 +49,7 @@ public partial class MainPage : ContentPage
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
         _updateService = updateService;
+        _currentVersionProvider = currentVersionProvider;
         _appTitleService = appTitleService;
         _traceLogger = traceLogger;
 
@@ -159,7 +162,7 @@ public partial class MainPage : ContentPage
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
     {
-        if (DeviceInfo.Version.CompareTo(new Version(10, 0, 19041, 0)) < 0)
+        if (!_currentVersionProvider.IsSupportedOS(DeviceInfo.Version))
         {
             _traceLogger.Trace("Update API does not work on versions older than 10.0.19041.0", LogLevel.Warning);
             return;

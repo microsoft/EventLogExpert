@@ -26,6 +26,7 @@ public partial class App : Application
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
         IState<SettingsState> settingsState,
         IUpdateService updateService,
+        ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger)
@@ -42,6 +43,7 @@ public partial class App : Application
                 loadedDatabasesState,
                 settingsState,
                 updateService,
+                currentVersionProvider,
                 appTitleService,
                 fileLocationOptions,
                 traceLogger));
