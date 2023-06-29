@@ -9,6 +9,7 @@ using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
+using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
@@ -156,8 +157,16 @@ public partial class MainPage : ContentPage
         return await FilePicker.Default.PickMultipleAsync(options);
     }
 
-    private async void CheckForUpdates_Clicked(object? sender, EventArgs e) =>
+    private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
+    {
+        if (DeviceInfo.Version.CompareTo(new Version(10, 0, 19041, 0)) < 0)
+        {
+            _traceLogger.Trace("Update API does not work on versions older than 10.0.19041.0", LogLevel.Warning);
+            return;
+        }
+
         await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
+    }
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
     {

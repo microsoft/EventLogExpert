@@ -30,7 +30,11 @@ public partial class MainLayout : IDisposable
     {
         if (firstRender)
         {
-            await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
+            if (DeviceInfo.Version.CompareTo(new Version(10, 0, 19041, 0)) > 0)
+            {
+                await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
+            }
+
             AppTitleService.SetLogName(null);
         }
 
