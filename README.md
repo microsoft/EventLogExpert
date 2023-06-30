@@ -17,11 +17,13 @@ For more information, check our [docs](docs/Home.md).
 
 ## Quick Start
 
-### Windows 10 or 11, or Server 2022
+### Windows 10 or 11
 
 Simply download the `EventLogExpert*.msix` file from the latest and run it: [https://github.com/microsoft/EventLogExpert/releases/latest/](https://github.com/microsoft/EventLogExpert/releases/latest/).
 
-### Windows 2019
+### Windows Server 2019 or 2022
+
+Note: Auto-updates do not work on 2019.
 
 * Download the `EventLogExpert*.msix`.
 * Windows 2019 will also need the `Microsoft.WindowsAppRuntime*.msix` unless it was already installed by something else. You'll find this file in the release with the `EventLogExpert*.msix`.
