@@ -158,6 +158,8 @@ input[type="text" i].input { padding: 0; }
     width: 800px;
 }
 
+.input.filter-multiselect-dropdown { width: 600px; }
+
 .input.filter-value-dropdown,
 .input.filter-description {
     width: 300px;

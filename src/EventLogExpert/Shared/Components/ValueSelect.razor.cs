@@ -116,14 +116,6 @@ public partial class ValueSelect<T> : BaseComponent<T>
         }
     }
 
-    protected async void ToggleDropDownVisibility()
-    {
-        _isDropDownVisible = !_isDropDownVisible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
-
-        await ScrollToSelectedItem();
-    }
-
     private async void HandleKeyDown(KeyboardEventArgs args)
     {
         switch (args.Code)
@@ -133,14 +125,26 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
                 break;
             case "ArrowUp" :
-                if (!_isDropDownVisible) { ToggleDropDownVisibility(); }
+                if (!_isDropDownVisible)
+                {
+                    ToggleDropDownVisibility();
+                }
+                else
+                {
+                    await SelectAdjacentItem(-1);
+                }
 
-                await SelectAdjacentItem(-1);
                 break;
             case "ArrowDown" :
-                if (!_isDropDownVisible) { ToggleDropDownVisibility(); }
+                if (!_isDropDownVisible)
+                {
+                    ToggleDropDownVisibility();
+                }
+                else
+                {
+                    await SelectAdjacentItem(+1);
+                }
 
-                await SelectAdjacentItem(+1);
                 break;
             case "Enter" :
             case "Escape" :
@@ -192,5 +196,13 @@ public partial class ValueSelect<T> : BaseComponent<T>
         }
 
         if (_isDropDownVisible) { await ScrollToSelectedItem(); }
+    }
+
+    private async void ToggleDropDownVisibility()
+    {
+        _isDropDownVisible = !_isDropDownVisible;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
+
+        await ScrollToSelectedItem();
     }
 }

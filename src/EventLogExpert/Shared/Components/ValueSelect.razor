@@ -1,7 +1,8 @@
 @typeparam T
 @inherits EventLogExpert.Shared.Base.BaseComponent<T>
 
-<div class="dropdown-input" @ref="_selectComponent" @onblur="CloseDropDown" @onkeydown="HandleKeyDown">
+<div class="dropdown-input" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)"
+    @onkeydown="HandleKeyDown" @onblur="CloseDropDown">
     @if (IsInput && !IsMultiSelect)
     {
         <input type="text" class="@CssClass" value="@DisplayString" tabindex="0"
@@ -9,7 +10,7 @@
     }
     else
     {
-        <span class="@CssClass" tabindex="0" @onclick="ToggleDropDownVisibility">
+        <span class="@CssClass" @onclick="ToggleDropDownVisibility">
             @DisplayString
         </span>
     }
