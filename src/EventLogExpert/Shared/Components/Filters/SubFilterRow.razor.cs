@@ -18,6 +18,9 @@ public partial class SubFilterRow
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
+    private List<string> FilteredItems =>
+        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
+
     private List<string> Items
     {
         get
@@ -51,9 +54,6 @@ public partial class SubFilterRow
             }
         }
     }
-
-    private List<string> FilteredItems =>
-        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
 
     private void RemoveSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveSubFilter(ParentId, Value.Id));
 }

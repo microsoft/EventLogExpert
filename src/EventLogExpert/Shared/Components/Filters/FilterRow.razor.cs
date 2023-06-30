@@ -20,6 +20,9 @@ public partial class FilterRow
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
+    private List<string> FilteredItems =>
+        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
+
     private List<string> Items
     {
         get
@@ -54,9 +57,6 @@ public partial class FilterRow
         }
     }
 
-    private List<string> FilteredItems =>
-        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
-
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 
     private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleEditFilter(Value.Id));
@@ -79,7 +79,11 @@ public partial class FilterRow
         List<Func<DisplayEventModel, bool>> comparisons = new();
 
         var comparison =
-            FilterMethods.GetComparison(newModel.FilterComparison, newModel.FilterType, newModel.FilterValue);
+            FilterMethods.GetComparison(
+                newModel.FilterComparison,
+                newModel.FilterType,
+                newModel.FilterValue,
+                newModel.FilterValues);
 
         if (comparison is null) { return; }
 
@@ -89,9 +93,11 @@ public partial class FilterRow
         {
             foreach (var subFilter in Value.SubFilters)
             {
-                comparison = FilterMethods.GetComparison(subFilter.FilterComparison,
+                comparison = FilterMethods.GetComparison(
+                    subFilter.FilterComparison,
                     subFilter.FilterType,
-                    subFilter.FilterValue);
+                    subFilter.FilterValue,
+                    subFilter.FilterValues);
 
                 if (comparison is null)
                 {
