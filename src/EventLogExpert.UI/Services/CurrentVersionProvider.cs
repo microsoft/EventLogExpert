@@ -10,6 +10,8 @@ public interface ICurrentVersionProvider
     Version CurrentVersion { get; }
 
     bool IsDevBuild { get; }
+
+    bool IsSupportedOS(Version currentVersion);
 }
 
 public class CurrentVersionProvider : ICurrentVersionProvider
@@ -23,4 +25,6 @@ public class CurrentVersionProvider : ICurrentVersionProvider
     public Version CurrentVersion { get; init; }
 
     public bool IsDevBuild => CurrentVersion.Major <= 1;
+
+    public bool IsSupportedOS(Version currentVersion) => currentVersion.CompareTo(new Version(10, 0, 19041, 0)) > 0;
 }

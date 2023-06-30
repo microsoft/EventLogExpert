@@ -16,6 +16,8 @@ public partial class MainLayout : IDisposable
 
     [Inject] private IAppTitleService AppTitleService { get; set; } = null!;
 
+    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; set; } = null!;
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     [Inject] private IUpdateService UpdateService { get; set; } = null!;
@@ -30,7 +32,11 @@ public partial class MainLayout : IDisposable
     {
         if (firstRender)
         {
-            await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
+            if (CurrentVersionProvider.IsSupportedOS(DeviceInfo.Version))
+            {
+                await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
+            }
+
             AppTitleService.SetLogName(null);
         }
 
