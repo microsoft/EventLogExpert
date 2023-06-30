@@ -28,46 +28,22 @@
                 {
                     <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
                 }
+                else if (Value.FilterComparison == FilterComparison.MultiSelect)
+                {
+                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Values="Value.FilterValues" IsMultiSelect
+                        ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
+                        <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
+                        @foreach (var item in FilteredItems)
+                        {
+                            <ValueSelectItem T="string" Value="item" />
+                        }
+                    </ValueSelect>
+                }
                 else
                 {
-                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.FilterValue" IsInput>
-                        <ValueSelectItem T="string" Value="string.Empty">All</ValueSelectItem>
-
-                        @switch (Value.FilterType)
-                        {
-                            case FilterType.Id :
-                                _filterItems = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
-                                    .Distinct().OrderBy(id => id).Select(id => id.ToString()).ToList();
-                                break;
-                            case FilterType.Level :
-                                _filterItems = new List<string>();
-
-                                foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
-                                {
-                                    _filterItems.Add(item.ToString());
-                                }
-
-                                break;
-                            case FilterType.KeywordsDisplayNames :
-                                _filterItems = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
-                                    .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-
-                                break;
-                            case FilterType.Source :
-                                _filterItems = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames)
-                                    .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-
-                                break;
-                            case FilterType.TaskCategory :
-                                _filterItems = EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
-                                    .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-
-                                break;
-                            case FilterType.Description :
-                            default :
-                                break;
-                        }
-
+                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.FilterValue" IsInput
+                        ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
+                        <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in FilteredItems)
                         {
                             <ValueSelectItem T="string" Value="item" />

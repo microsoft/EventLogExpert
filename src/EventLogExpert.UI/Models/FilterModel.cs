@@ -25,13 +25,16 @@ public record FilterModel
         set
         {
             _filterType = value;
-            FilterValue = string.Empty;
+            FilterValue = null;
+            FilterValues.Clear();
         }
     }
 
     public FilterComparison FilterComparison { get; set; }
 
-    public string FilterValue { get; set; } = string.Empty;
+    public string? FilterValue { get; set; }
+
+    public List<string> FilterValues { get; set; } = new();
 
     public List<SubFilterModel> SubFilters { get; set; } = new();
 }

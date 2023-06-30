@@ -2,9 +2,9 @@
 @inherits EventLogExpert.Shared.Base.BaseComponent<T>
 
 <div class="dropdown-input" @ref="_selectComponent">
-    @if (IsInput)
+    @if (IsInput && !IsMultiSelect)
     {
-        <input type="text" class="@CssClass" value="@Value" tabindex="0" @oninput="OnInputChange"
+        <input type="text" class="@CssClass" value="@DisplayString" tabindex="0" @oninput="OnInputChange"
             @onblur="CloseDropDown" @onclick="ToggleDropDownVisibility" @onkeydown="HandleKeyDown" />
     }
     else

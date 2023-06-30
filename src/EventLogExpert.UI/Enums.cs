@@ -20,7 +20,8 @@ public enum FilterComparison
     Equals,
     Contains,
     [EnumMember(Value = "Not Equal")] NotEqual,
-    [EnumMember(Value = "Not Contains")] NotContains
+    [EnumMember(Value = "Not Contains")] NotContains,
+    [EnumMember(Value = "Multi Select")] MultiSelect
 }
 
 public enum CacheType

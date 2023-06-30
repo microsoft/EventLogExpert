@@ -1,7 +1,6 @@
 ﻿.tab-pane {
     margin: 0 5px;
     height: 33px;
-    border-bottom: 1px solid var(--background-dark);
 }
 
 .tab-row {

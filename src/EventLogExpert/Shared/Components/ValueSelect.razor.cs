@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
-using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
@@ -12,40 +11,36 @@ namespace EventLogExpert.Shared.Components;
 public partial class ValueSelect<T> : BaseComponent<T>
 {
     private readonly List<ValueSelectItem<T>> _items = new();
+    private readonly HashSet<T> _selectedValues = new();
 
     private bool _isDropDownVisible;
     private ElementReference _selectComponent;
-    private ValueSelectItem<T>? _selectedItem;
-    private Func<T?, string?> _toStringFunc = x => x?.ToString();
 
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
-    public DisplayConverter<T?, string?>? DisplayConverter { get; private set; }
+    [Parameter]
+    public bool IsInput { get; set; }
 
     [Parameter]
-    public bool IsInput { get; set; } = false;
-
-    [Parameter]
-    public Func<T?, string?> ToStringFunc
-    {
-        get => _toStringFunc;
-        set
-        {
-            if (_toStringFunc.Equals(value)) { return; }
-
-            _toStringFunc = value;
-
-            DisplayConverter = new DisplayConverter<T?, string?> { SetFunc = _toStringFunc };
-        }
-    }
+    public bool IsMultiSelect { get; set; } = false;
 
     private string? DisplayString
     {
         get
         {
             var converter = DisplayConverter;
-            return converter is null ? $"{Value}" : converter.Set(Value);
+
+            if (!IsMultiSelect)
+            {
+                return converter is null ? $"{Value}" : converter.Set(Value);
+            }
+
+            if (!Values.Any()) { return "Empty"; }
+
+            return converter is null ?
+                string.Join(", ", Values.Select(x => $"{x}")) :
+                string.Join(", ", Values.Select(converter.Set));
         }
     }
 
@@ -53,24 +48,66 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    public void AddItem(ValueSelectItem<T>? item)
+    public bool AddItem(ValueSelectItem<T> item)
     {
-        if (item is null) { return; }
-
-        if (_items.Select(x => x.Value).Contains(item.Value)) { return; }
+        if (_items.Select(x => x.Value).Contains(item.Value))
+        {
+            return _selectedValues.Contains(item.Value);
+        }
 
         _items.Add(item);
 
-        if (Value?.Equals(item.Value) is true) { _selectedItem = item; }
+        if (IsMultiSelect && Values.Contains(item.Value))
+        {
+            _selectedValues.Add(item.Value);
+            return true;
+        }
+
+        if (Value?.Equals(item.Value) is not true) { return false; }
+
+        _selectedValues.Clear();
+        _selectedValues.Add(item.Value);
+
+        return true;
     }
+
+    public void ClearSelected() => _selectedValues.Clear();
 
     public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 
-    public async Task UpdateValue(ValueSelectItem<T> item)
+    public async Task UpdateValue(T item)
     {
-        _selectedItem = item;
-        Value = item.Value;
-        await ValueChanged.InvokeAsync(Value);
+        if (IsMultiSelect)
+        {
+            if (item is null)
+            {
+                Values.Clear();
+            }
+            else if (_selectedValues.Contains(item))
+            {
+                _selectedValues.Remove(item);
+                Values.Remove(item);
+            }
+            else
+            {
+                _selectedValues.Add(item);
+                Values.Add(item);
+            }
+
+            await ValuesChanged.InvokeAsync(Values);
+        }
+        else
+        {
+            _selectedValues.Clear();
+
+            if (item is not null)
+            {
+                _selectedValues.Add(item);
+            }
+
+            Value = item;
+            await ValueChanged.InvokeAsync(Value);
+        }
     }
 
     protected async void ToggleDropDownVisibility()
@@ -96,9 +133,13 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
                 break;
             case "ArrowUp" :
+                if (!_isDropDownVisible) { ToggleDropDownVisibility(); }
+
                 await SelectAdjacentItem(-1);
                 break;
             case "ArrowDown" :
+                if (!_isDropDownVisible) { ToggleDropDownVisibility(); }
+
                 await SelectAdjacentItem(+1);
                 break;
             case "Enter" :
@@ -116,15 +157,20 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
     private async Task ScrollToSelectedItem()
     {
-        if (_selectedItem is not null)
-        {
-            await JSRuntime.InvokeVoidAsync("scrollToItem", _selectedItem.ItemId);
-        }
+        var item = _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true);
+
+        if (item is null) { return; }
+
+        await JSRuntime.InvokeVoidAsync("scrollToItem", item.ItemId);
     }
 
     private async Task SelectAdjacentItem(int direction)
     {
-        var index = _items.FindIndex(x => x.ItemId == _selectedItem?.ItemId);
+        // TODO: Should highlight next line but not change selection
+        if (IsMultiSelect || IsInput) { return; }
+
+        var index = _items.FindIndex(x => x.ItemId.Equals(
+            _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)?.ItemId));
 
         if (direction < 0 && index < 0) { index = 0; }
 
@@ -138,7 +184,10 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
             if (_items[index].IsDisabled) { continue; }
 
-            await UpdateValue(_items[index]);
+            _selectedValues.Clear();
+            _selectedValues.Add(_items[index].Value);
+            await UpdateValue(_items[index].Value);
+
             break;
         }
 
