@@ -1,15 +1,15 @@
 @typeparam T
 @inherits EventLogExpert.Shared.Base.BaseComponent<T>
 
-<div class="dropdown-input" @ref="_selectComponent">
+<div class="dropdown-input" @ref="_selectComponent" @onblur="CloseDropDown" @onkeydown="HandleKeyDown">
     @if (IsInput && !IsMultiSelect)
     {
-        <input type="text" class="@CssClass" value="@DisplayString" tabindex="0" @oninput="OnInputChange"
-            @onblur="CloseDropDown" @onclick="ToggleDropDownVisibility" @onkeydown="HandleKeyDown" />
+        <input type="text" class="@CssClass" value="@DisplayString" tabindex="0"
+            @oninput="OnInputChange" @onclick="ToggleDropDownVisibility" />
     }
     else
     {
-        <span class="@CssClass" tabindex="0" @onblur="CloseDropDown" @onclick="ToggleDropDownVisibility" @onkeydown="HandleKeyDown">
+        <span class="@CssClass" tabindex="0" @onclick="ToggleDropDownVisibility">
             @DisplayString
         </span>
     }

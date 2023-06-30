@@ -60,6 +60,8 @@ public partial class ValueSelectItem<T> : IDisposable
 
         if (ClearItem) { ValueSelect.ClearSelected(); }
 
+        if (!ValueSelect.IsMultiSelect) { ValueSelect.CloseDropDown(); }
+
         await ValueSelect.UpdateValue(Value);
         await InvokeAsync(StateHasChanged);
     }

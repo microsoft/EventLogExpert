@@ -73,6 +73,12 @@ public partial class ValueSelect<T> : BaseComponent<T>
 
     public void ClearSelected() => _selectedValues.Clear();
 
+    public async void CloseDropDown()
+    {
+        _isDropDownVisible = false;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
+    }
+
     public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 
     public async Task UpdateValue(T item)
@@ -116,12 +122,6 @@ public partial class ValueSelect<T> : BaseComponent<T>
         await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
 
         await ScrollToSelectedItem();
-    }
-
-    private async void CloseDropDown()
-    {
-        _isDropDownVisible = false;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
     }
 
     private async void HandleKeyDown(KeyboardEventArgs args)
