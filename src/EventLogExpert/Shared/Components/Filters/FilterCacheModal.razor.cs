@@ -16,16 +16,25 @@ public partial class FilterCacheModal
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
+    protected override void OnInitialized()
+    {
+        SubscribeToAction<FilterCacheAction.OpenMenu>(action => Open().AndForget());
+
+        base.OnInitialized();
+    }
+
     private void AddFavorite(FilterCacheModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
 
     private void AddFilter(FilterCacheModel filter)
     {
         Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
-        Close();
+        Close().AndForget();
     }
 
-    private async void Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
+    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
+
+    private async Task Open() => await JSRuntime.InvokeVoidAsync("openFilterCacheModal");
 
     private void RemoveFavorite(FilterCacheModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));

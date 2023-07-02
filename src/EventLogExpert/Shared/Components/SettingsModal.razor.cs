@@ -46,7 +46,7 @@ public partial class SettingsModal : IDisposable
         base.OnInitializedAsync();
     }
 
-    private async void Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
+    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
 
     private async void ImportDatabase()
     {
@@ -87,7 +87,7 @@ public partial class SettingsModal : IDisposable
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 
-            Close();
+            Close().AndForget();
         }
         catch (Exception ex)
         {
@@ -146,7 +146,7 @@ public partial class SettingsModal : IDisposable
         }
     }
 
-    private async void Save()
+    private async Task Save()
     {
         if (_hasDatabasesChanged)
         {
@@ -160,7 +160,7 @@ public partial class SettingsModal : IDisposable
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
-        Close();
+        await Close();
     }
 
     private void ToggleDatabase(string database)
