@@ -41,7 +41,7 @@ public partial class SettingsModal : IDisposable
 
     protected override void OnInitialized()
     {
-        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => ResetSettingsModel().AndForget());
+        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open().AndForget());
 
         base.OnInitializedAsync();
     }
@@ -103,6 +103,29 @@ public partial class SettingsModal : IDisposable
         await ReloadOpenLogs();
     }
 
+    private async Task Open()
+    {
+        _request = SettingsState.Value.Config with { DisabledDatabases = new List<string>() };
+
+        _databases.Clear();
+
+        foreach (var database in SettingsState.Value.LoadedDatabases)
+        {
+            _databases.TryAdd(database, SettingsState.Value.Config.DisabledDatabases.Contains(database) is false);
+        }
+
+        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
+        {
+            _databases.TryAdd(database, false);
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+        await OpenModal();
+    }
+
+    private async Task OpenModal() => await JSRuntime.InvokeVoidAsync("openSettingsModal");
+
     private async Task ReloadOpenLogs()
     {
         if (!EventLogState.Value.ActiveLogs.Any()) { return; }
@@ -121,25 +144,6 @@ public partial class SettingsModal : IDisposable
         {
             Dispatcher.Dispatch(new EventLogAction.OpenLog(log.Name, log.Type));
         }
-    }
-
-    private async Task ResetSettingsModel()
-    {
-        _request = SettingsState.Value.Config with { DisabledDatabases = new List<string>() };
-
-        _databases.Clear();
-
-        foreach (var database in SettingsState.Value.LoadedDatabases)
-        {
-            _databases.TryAdd(database, SettingsState.Value.Config.DisabledDatabases.Contains(database) is false);
-        }
-
-        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
-        {
-            _databases.TryAdd(database, false);
-        }
-
-        await InvokeAsync(StateHasChanged);
     }
 
     private async void Save()

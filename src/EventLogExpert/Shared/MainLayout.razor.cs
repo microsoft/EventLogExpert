@@ -45,7 +45,6 @@ public partial class MainLayout : IDisposable
 
     protected override async Task OnInitializedAsync()
     {
-        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, OpenSettingsModal);
         ActionSubscriber.SubscribeToAction<FilterCacheAction.OpenMenu>(this, OpenFilterCacheModal);
 
         await base.OnInitializedAsync();
@@ -53,7 +52,4 @@ public partial class MainLayout : IDisposable
 
     private void OpenFilterCacheModal(FilterCacheAction.OpenMenu action) =>
         JSRuntime.InvokeVoidAsync("openFilterCacheModal").AsTask();
-
-    private void OpenSettingsModal(SettingsAction.OpenMenu action) =>
-        JSRuntime.InvokeVoidAsync("openSettingsModal").AsTask();
 }
