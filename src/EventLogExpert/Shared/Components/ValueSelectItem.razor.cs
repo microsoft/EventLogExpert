@@ -49,10 +49,7 @@ public partial class ValueSelectItem<T> : IDisposable
     [SuppressMessage("Usage",
         "CA1816:Dispose methods should call SuppressFinalize",
         Justification = "Not a redundant GC call since actual item is just removed from parent list")]
-    public void Dispose()
-    {
-        ValueSelect.RemoveItem(this);
-    }
+    public void Dispose() => ValueSelect.RemoveItem(this);
 
     private async void SelectItem()
     {
@@ -63,6 +60,5 @@ public partial class ValueSelectItem<T> : IDisposable
         if (!ValueSelect.IsMultiSelect) { ValueSelect.CloseDropDown(); }
 
         await ValueSelect.UpdateValue(Value);
-        await InvokeAsync(StateHasChanged);
     }
 }
