@@ -1,6 +1,5 @@
 @using EventLogExpert.UI.Store.Settings
 @using Microsoft.Extensions.Logging
-@inherits FluxorComponent
 
 @inject IState<SettingsState> SettingsState
 
@@ -19,10 +18,10 @@
             </div>
 
             <div class="flex-space-between">
-                <div>Imported Databases:</div>
+                <div>Databases:</div>
 
                 <button class="button" type="button" @onclick="ImportDatabase">
-                    <i class="bi bi-plus-circle"></i> Add Database
+                    <i class="bi bi-plus-circle"></i> Import Database
                 </button>
             </div>
 

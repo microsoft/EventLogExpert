@@ -9,16 +9,20 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class SettingsModal
+public partial class SettingsModal : IDisposable
 {
-    private Dictionary<string, bool> _databases = new();
+    private readonly Dictionary<string, bool> _databases = new();
+
     private bool _hasDatabasesChanged = false;
     private SettingsModel _request = new();
+
+    [Inject] private IActionSubscriber ActionSubscriber { get; set; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
 
@@ -30,18 +34,19 @@ public partial class SettingsModal
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
+    [SuppressMessage("Usage",
+        "CA1816:Dispose methods should call SuppressFinalize",
+        Justification = "Not a redundant GC call since we are just calling unsubscribe")]
+    public void Dispose() => ActionSubscriber.UnsubscribeFromAllActions(this);
+
     protected override void OnInitialized()
     {
-        SettingsState.StateChanged += (s, e) => ResetSettingsModel();
+        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open().AndForget());
 
-        base.OnInitialized();
+        base.OnInitializedAsync();
     }
 
-    private async void Close()
-    {
-        await JSRuntime.InvokeVoidAsync("closeSettingsModal");
-        ResetSettingsModel();
-    }
+    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
 
     private async void ImportDatabase()
     {
@@ -75,6 +80,14 @@ public partial class SettingsModal
                     File.Delete(destination);
                 }
             }
+
+            var message = result.Count > 1 ?
+                $"{result.Count} databases have successfully been imported" :
+                $"{result.First().FileName} has successfully been imported";
+
+            await AlertDialogService.ShowAlert("Import Successful", message, "OK");
+
+            Close().AndForget();
         }
         catch (Exception ex)
         {
@@ -90,12 +103,32 @@ public partial class SettingsModal
         await ReloadOpenLogs();
     }
 
+    private async Task Open()
+    {
+        _request = SettingsState.Value.Config with { DisabledDatabases = new List<string>() };
+
+        _databases.Clear();
+
+        foreach (var database in SettingsState.Value.LoadedDatabases)
+        {
+            _databases.TryAdd(database, SettingsState.Value.Config.DisabledDatabases.Contains(database) is false);
+        }
+
+        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
+        {
+            _databases.TryAdd(database, false);
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+        await OpenModal();
+    }
+
+    private async Task OpenModal() => await JSRuntime.InvokeVoidAsync("openSettingsModal");
+
     private async Task ReloadOpenLogs()
     {
-        if (!EventLogState.Value.ActiveLogs.Any())
-        {
-            return;
-        }
+        if (!EventLogState.Value.ActiveLogs.Any()) { return; }
 
         bool answer = await AlertDialogService.ShowAlert("Reload Open Logs Now?",
             "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
@@ -113,51 +146,13 @@ public partial class SettingsModal
         }
     }
 
-    private async void RemoveDatabase(string database)
-    {
-        bool answer = await AlertDialogService.ShowAlert("Remove Database",
-            "Are you sure you want to remove this database?",
-            "Yes", "No");
-
-        if (!answer) { return; }
-
-        try
-        {
-            var destination = Path.Join(FileLocationOptions.DatabasePath, database);
-            File.Delete(destination);
-        }
-        catch
-        { // TODO: Log Error
-            return;
-        }
-
-        Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
-    }
-
-    private void ResetSettingsModel()
-    {
-        _request = SettingsState.Value.Config with { };
-
-        foreach (var database in SettingsState.Value.LoadedDatabases)
-        {
-            _databases.TryAdd(database, _request.DisabledDatabases.Contains(database) is false);
-        }
-
-        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
-        {
-            _databases.TryAdd(database, false);
-        }
-
-        StateHasChanged();
-    }
-
-    private async void Save()
+    private async Task Save()
     {
         if (_hasDatabasesChanged)
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
-            
+
             await ReloadOpenLogs();
         }
         else
@@ -165,7 +160,7 @@ public partial class SettingsModal
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
-        Close();
+        await Close();
     }
 
     private void ToggleDatabase(string database)
@@ -176,11 +171,11 @@ public partial class SettingsModal
 
         switch (_databases[database])
         {
-            case true when isDisabled : 
+            case true when isDisabled :
                 _request.DisabledDatabases.Remove(database);
                 _hasDatabasesChanged = true;
                 break;
-            case false when !isDisabled : 
+            case false when !isDisabled :
                 _request.DisabledDatabases.Add(database);
                 _hasDatabasesChanged = true;
                 break;
