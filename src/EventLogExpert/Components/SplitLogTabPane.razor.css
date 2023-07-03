@@ -1,10 +1,12 @@
 ﻿.tab-pane {
     margin: 0 5px;
     height: 33px;
+    margin-bottom: 1px;
 }
 
 .tab-row {
     display: flex;
+    align-items: flex-end;
 
     text-align: left;
     width: 250px;
@@ -27,11 +29,11 @@ label {
     display: block;
     margin: 0 1px 0 0;
     padding: 4px 22px;
-    border-radius: 6px 6px 0 0;
-    border: 1px solid var(--background-darkgray);
+    border-radius: 3px 3px 0 0;
 
     max-width: calc(100vw / 5);
     overflow: hidden;
+    user-select: none;
     text-overflow: ellipsis;
     white-space: nowrap;
 
@@ -39,14 +41,11 @@ label {
     cursor: pointer;
     position: relative;
     top: 2px;
-    transition: all 0.2s ease-in-out;
-
-    &:hover { border: 1px solid var(--clr-lightblue); }
+    transition: all 0.1s ease-in-out;
 }
 
+label:hover,
 [id^="log"]:checked + label {
-    top: 0;
     padding-top: 6px;
-    border: 1px solid var(--clr-lightblue);
-    background: var(--background-dark);
+    border-top: 2px solid var(--clr-lightblue);
 }
