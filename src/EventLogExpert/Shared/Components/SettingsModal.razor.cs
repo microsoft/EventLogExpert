@@ -41,12 +41,12 @@ public partial class SettingsModal : IDisposable
 
     protected override void OnInitialized()
     {
-        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open().AndForget());
+        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open());
 
         base.OnInitializedAsync();
     }
 
-    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
+    private void Close() => JSRuntime.InvokeVoidAsync("closeSettingsModal");
 
     private async void ImportDatabase()
     {
@@ -87,7 +87,7 @@ public partial class SettingsModal : IDisposable
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 
-            Close().AndForget();
+            Close();
         }
         catch (Exception ex)
         {
@@ -103,7 +103,7 @@ public partial class SettingsModal : IDisposable
         await ReloadOpenLogs();
     }
 
-    private async Task Open()
+    private void Open()
     {
         _request = SettingsState.Value.Config with { DisabledDatabases = new List<string>() };
 
@@ -119,12 +119,12 @@ public partial class SettingsModal : IDisposable
             _databases.TryAdd(database, false);
         }
 
-        await InvokeAsync(StateHasChanged);
+        InvokeAsync(StateHasChanged);
 
-        await OpenModal();
+        OpenModal();
     }
 
-    private async Task OpenModal() => await JSRuntime.InvokeVoidAsync("openSettingsModal");
+    private void OpenModal() => JSRuntime.InvokeVoidAsync("openSettingsModal");
 
     private async Task ReloadOpenLogs()
     {
@@ -160,7 +160,7 @@ public partial class SettingsModal : IDisposable
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
-        await Close();
+        Close();
     }
 
     private void ToggleDatabase(string database)
