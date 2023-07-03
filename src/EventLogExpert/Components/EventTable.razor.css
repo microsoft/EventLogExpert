@@ -4,6 +4,7 @@
     padding: 0 5px;
     background-color: var(--background-dark);
     color: var(--clr-lightblue);
+    border-top: 1px solid var(--background-dark);
 }
 
 table {

@@ -1,12 +1,18 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
+using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelectItem<T>
+public partial class ValueSelectItem<T> : IDisposable
 {
+    [Parameter]
+    public bool ClearItem { get; set; } = false;
+
+    private bool _isSelected = false;
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
@@ -24,12 +30,10 @@ public partial class ValueSelectItem<T>
     {
         get
         {
-            var converter = ValueSelect.DisplayConverter;
+            DisplayConverter<T?, string>? converter = ValueSelect.DisplayConverter;
             return converter is null ? $"{Value}" : converter.Set(Value);
         }
     }
-
-    private bool IsSelected => ValueSelect.Value?.Equals(Value) ?? false;
 
     [CascadingParameter]
     private ValueSelect<T> ValueSelect
@@ -38,18 +42,27 @@ public partial class ValueSelectItem<T>
         set
         {
             _parent = value;
-            _parent.AddItem(this);
+            _isSelected = _parent.AddItem(this);
         }
+    }
+
+    [SuppressMessage("Usage",
+        "CA1816:Dispose methods should call SuppressFinalize",
+        Justification = "Not a redundant GC call since actual item is just removed from parent list")]
+    public void Dispose()
+    {
+        ValueSelect.RemoveItem(this);
     }
 
     private async void SelectItem()
     {
-        if (IsDisabled)
-        {
-            return;
-        }
+        if (IsDisabled) { return; }
 
-        await ValueSelect.UpdateValue(this);
+        if (ClearItem) { ValueSelect.ClearSelected(); }
+
+        if (!ValueSelect.IsMultiSelect) { ValueSelect.CloseDropDown(); }
+
+        await ValueSelect.UpdateValue(Value);
         await InvokeAsync(StateHasChanged);
     }
 }

@@ -1,4 +1,6 @@
-﻿@using EventLogExpert.UI
+﻿@using EventLogExpert.UI.Store.EventLog
+@using EventLogExpert.UI
+@inject IState<EventLogState> EventLogState
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
@@ -23,9 +25,26 @@
         {
             <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
         }
+        else if (Value.FilterComparison == FilterComparison.MultiSelect)
+        {
+            <ValueSelect CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.FilterValues" IsMultiSelect
+                ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
+                <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
+                @foreach (var item in Items)
+                {
+                    <ValueSelectItem T="string" Value="item" />
+                }
+            </ValueSelect>
+        }
         else
         {
-            <FilterValueSelect @bind-Value="@Value.FilterValue" Type="Value.FilterType" />
+            <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.FilterValue" IsInput>
+                <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
+                @foreach (var item in FilteredItems)
+                {
+                    <ValueSelectItem T="string" Value="item" />
+                }
+            </ValueSelect>
         }
 
     </div>

@@ -8,41 +8,112 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelect<T> : SelectComponent<T>
+public partial class ValueSelect<T> : BaseComponent<T>
 {
     private readonly List<ValueSelectItem<T>> _items = new();
+    private readonly HashSet<T> _selectedValues = new();
 
-    private ValueSelectItem<T>? _selectedItem;
+    private bool _isDropDownVisible;
+    private ElementReference _selectComponent;
 
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
+    [Parameter]
+    public bool IsInput { get; set; }
+
+    [Parameter]
+    public bool IsMultiSelect { get; set; } = false;
+
+    private string? DisplayString
+    {
+        get
+        {
+            var converter = DisplayConverter;
+
+            if (!IsMultiSelect)
+            {
+                return converter is null ? $"{Value}" : converter.Set(Value);
+            }
+
+            if (!Values.Any()) { return "Empty"; }
+
+            return converter is null ?
+                string.Join(", ", Values.Select(x => $"{x}")) :
+                string.Join(", ", Values.Select(converter.Set));
+        }
+    }
+
+    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    public void AddItem(ValueSelectItem<T>? item)
+    public bool AddItem(ValueSelectItem<T> item)
     {
-        if (item is null) { return; }
-
-        if (_items.Select(x => x.Value).Contains(item.Value)) { return; }
+        if (_items.Select(x => x.Value).Contains(item.Value))
+        {
+            return _selectedValues.Contains(item.Value);
+        }
 
         _items.Add(item);
 
-        if (Value?.Equals(item.Value) is true) { _selectedItem = item; }
+        if (IsMultiSelect && Values.Contains(item.Value))
+        {
+            _selectedValues.Add(item.Value);
+            return true;
+        }
+
+        if (Value?.Equals(item.Value) is not true) { return false; }
+
+        _selectedValues.Clear();
+        _selectedValues.Add(item.Value);
+
+        return true;
     }
 
-    public async Task UpdateValue(ValueSelectItem<T> item)
+    public void ClearSelected() => _selectedValues.Clear();
+
+    public async void CloseDropDown()
     {
-        _selectedItem = item;
-        Value = item.Value;
-        await ValueChanged.InvokeAsync(Value);
+        _isDropDownVisible = false;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
     }
 
-    protected override async void ToggleDropDownVisibility()
-    {
-        isDropDownVisible = !isDropDownVisible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", selectComponent, isDropDownVisible);
+    public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 
-        await ScrollToSelectedItem();
+    public async Task UpdateValue(T item)
+    {
+        if (IsMultiSelect)
+        {
+            if (item is null)
+            {
+                Values.Clear();
+            }
+            else if (_selectedValues.Contains(item))
+            {
+                _selectedValues.Remove(item);
+                Values.Remove(item);
+            }
+            else
+            {
+                _selectedValues.Add(item);
+                Values.Add(item);
+            }
+
+            await ValuesChanged.InvokeAsync(Values);
+        }
+        else
+        {
+            _selectedValues.Clear();
+
+            if (item is not null)
+            {
+                _selectedValues.Add(item);
+            }
+
+            Value = item;
+            await ValueChanged.InvokeAsync(Value);
+        }
     }
 
     private async void HandleKeyDown(KeyboardEventArgs args)
@@ -50,36 +121,60 @@ public partial class ValueSelect<T> : SelectComponent<T>
         switch (args.Code)
         {
             case "Space" :
-                ToggleDropDownVisibility();
+                if (!IsInput) { ToggleDropDownVisibility(); }
+
                 break;
             case "ArrowUp" :
-                await SelectAdjacentItem(-1);
+                if (!_isDropDownVisible)
+                {
+                    ToggleDropDownVisibility();
+                }
+                else
+                {
+                    await SelectAdjacentItem(-1);
+                }
+
                 break;
             case "ArrowDown" :
-                await SelectAdjacentItem(+1);
+                if (!_isDropDownVisible)
+                {
+                    ToggleDropDownVisibility();
+                }
+                else
+                {
+                    await SelectAdjacentItem(+1);
+                }
+
                 break;
-            case "Enter":
-            case "Escape":
+            case "Enter" :
+            case "Escape" :
                 CloseDropDown();
                 break;
-            default: 
-                // TODO: Input Filtering will filter here
-                // May also update this to debounce a quick SelectFirst() like a normal select box would work
-                break;
         }
+    }
+
+    private async void OnInputChange(ChangeEventArgs args)
+    {
+        Value = (T)Convert.ChangeType(args.Value, typeof(T))!;
+        await ValueChanged.InvokeAsync(Value);
     }
 
     private async Task ScrollToSelectedItem()
     {
-        if (_selectedItem is not null)
-        {
-            await JSRuntime.InvokeVoidAsync("scrollToItem", _selectedItem.ItemId);
-        }
+        var item = _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true);
+
+        if (item is null) { return; }
+
+        await JSRuntime.InvokeVoidAsync("scrollToItem", item.ItemId);
     }
 
     private async Task SelectAdjacentItem(int direction)
     {
-        var index = _items.FindIndex(x => x.ItemId == _selectedItem?.ItemId);
+        // TODO: Should highlight next line but not change selection
+        if (IsMultiSelect || IsInput) { return; }
+
+        var index = _items.FindIndex(x => x.ItemId.Equals(
+            _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)?.ItemId));
 
         if (direction < 0 && index < 0) { index = 0; }
 
@@ -93,10 +188,21 @@ public partial class ValueSelect<T> : SelectComponent<T>
 
             if (_items[index].IsDisabled) { continue; }
 
-            await UpdateValue(_items[index]);
+            _selectedValues.Clear();
+            _selectedValues.Add(_items[index].Value);
+            await UpdateValue(_items[index].Value);
+
             break;
         }
 
-        if (isDropDownVisible) { await ScrollToSelectedItem(); }
+        if (_isDropDownVisible) { await ScrollToSelectedItem(); }
+    }
+
+    private async void ToggleDropDownVisibility()
+    {
+        _isDropDownVisible = !_isDropDownVisible;
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
+
+        await ScrollToSelectedItem();
     }
 }

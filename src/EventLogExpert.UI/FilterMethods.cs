@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using System.Text;
+using static EventLogExpert.UI.Store.FilterPane.FilterPaneAction;
 
 namespace EventLogExpert.UI;
 
@@ -12,12 +13,14 @@ public static class FilterMethods
 {
     public static Func<DisplayEventModel, bool>? GetComparison(FilterComparison comparison,
         FilterType type,
-        string value) => comparison switch
+        string value,
+        List<string> values) => comparison switch
     {
         FilterComparison.Equals => GetEqualsComparison(type, value),
         FilterComparison.Contains => GetContainsComparison(type, value),
         FilterComparison.NotEqual => GetNotEqualsComparison(type, value),
         FilterComparison.NotContains => GetNotContainsComparison(type, value),
+        FilterComparison.MultiSelect => GetMultiSelectComparison(type, values),
         _ => null
     };
 
@@ -25,9 +28,19 @@ public static class FilterMethods
     {
         comparison = null;
 
-        if (string.IsNullOrWhiteSpace(filterModel.FilterValue)) { return false; }
+        if (string.IsNullOrWhiteSpace(filterModel.FilterValue) &&
+            filterModel.FilterComparison != FilterComparison.MultiSelect) { return false; }
 
-        StringBuilder stringBuilder = new(GetComparisonString(filterModel.FilterType, filterModel.FilterComparison));
+        if (!filterModel.FilterValues.Any() &&
+            filterModel.FilterComparison == FilterComparison.MultiSelect) { return false; }
+
+        StringBuilder stringBuilder = new();
+
+        if (filterModel.FilterComparison != FilterComparison.MultiSelect ||
+            filterModel.FilterType is FilterType.KeywordsDisplayNames)
+        {
+            stringBuilder.Append(GetComparisonString(filterModel.FilterType, filterModel.FilterComparison));
+        }
 
         switch (filterModel.FilterComparison)
         {
@@ -55,7 +68,24 @@ public static class FilterMethods
                 }
 
                 break;
+            case FilterComparison.MultiSelect :
+                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.FilterValues)}\"}}).Contains(e))");
+                }
+                else
+                {
+                    stringBuilder.Append(
+                        $"(new[] {{\"{string.Join("\", \"", filterModel.FilterValues)}\"}}).Contains(");
+                }
+
+                break;
             default : return false;
+        }
+
+        if (filterModel is { FilterComparison: FilterComparison.MultiSelect, FilterType: not FilterType.KeywordsDisplayNames })
+        {
+            stringBuilder.Append(GetComparisonString(filterModel.FilterType, filterModel.FilterComparison));
         }
 
         if (filterModel.SubFilters.Count > 0)
@@ -92,6 +122,12 @@ public static class FilterMethods
             FilterType.Id or FilterType.Level => $"!{type}.ToString().Contains",
             FilterType.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
             _ => $"!{type}.Contains"
+        },
+        FilterComparison.MultiSelect => type switch
+        {
+            FilterType.Id or FilterType.Level => $"{type}.ToString())",
+            FilterType.KeywordsDisplayNames => $"{type}.Any",
+            _ => $"{type})"
         },
         _ => string.Empty
     };
@@ -150,12 +186,33 @@ public static class FilterMethods
             _ => null
         };
 
+    private static Func<DisplayEventModel, bool>? GetMultiSelectComparison(FilterType filterType,
+        ICollection<string> values) => filterType switch
+    {
+        FilterType.Id => x => values.Contains(x.Id.ToString()),
+        FilterType.Level => x => values.Contains(x.Level?.ToString() ?? string.Empty),
+        FilterType.KeywordsDisplayNames => x => x.KeywordsDisplayNames.Any(values.Contains),
+        FilterType.Source => x => values.Contains(x.Source),
+        FilterType.TaskCategory => x => values.Contains(x.TaskCategory),
+        FilterType.Description => x => values.Contains(x.Description),
+        _ => null
+    };
+
     private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
     {
-        if (string.IsNullOrWhiteSpace(subFilter.FilterValue)) { return null; }
+        if (string.IsNullOrWhiteSpace(subFilter.FilterValue) &&
+            subFilter.FilterComparison != FilterComparison.MultiSelect) { return null; }
+
+        if (!subFilter.FilterValues.Any() &&
+            subFilter.FilterComparison == FilterComparison.MultiSelect) { return null; }
 
         StringBuilder stringBuilder = new(" || ");
-        stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
+
+        if (subFilter.FilterComparison != FilterComparison.MultiSelect ||
+            subFilter.FilterType is FilterType.KeywordsDisplayNames)
+        {
+            stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
+        }
 
         switch (subFilter.FilterComparison)
         {
@@ -183,7 +240,23 @@ public static class FilterMethods
                 }
 
                 break;
+            case FilterComparison.MultiSelect :
+                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+                {
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.FilterValues)}\"}}).Contains(e))");
+                }
+                else
+                {
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", subFilter.FilterValues)}\"}}).Contains(");
+                }
+
+                break;
             default : return null;
+        }
+
+        if (subFilter is { FilterComparison: FilterComparison.MultiSelect, FilterType: not FilterType.KeywordsDisplayNames })
+        {
+            stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
         }
 
         return stringBuilder.ToString();
