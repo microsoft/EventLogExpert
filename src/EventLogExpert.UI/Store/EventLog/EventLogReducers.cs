@@ -407,13 +407,19 @@ public class EventLogReducers
     ///     This lets the caller know that this has occurred.
     /// </param>
     /// <returns></returns>
-    private static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter, out bool needsSort, ITraceLogger traceLogger)
+    private static IEnumerable<DisplayEventModel> GetFilteredEvents(
+        IEnumerable<DisplayEventModel> events,
+        EventFilter eventFilter,
+        out bool needsSort,
+        ITraceLogger traceLogger)
     {
         traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
 
         needsSort = false;
 
         IQueryable<DisplayEventModel> filteredEvents = events.AsQueryable();
+        // TODO: We could combine each filter into single a Func and run AsParallel for a large perf gain on Date/Advanced
+        // filtering, unless there is a reason that events should not be sorted with these enabled
 
         if (eventFilter.DateFilter is not null)
         {

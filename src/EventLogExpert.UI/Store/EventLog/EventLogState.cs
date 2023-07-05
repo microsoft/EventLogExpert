@@ -15,7 +15,7 @@ public record EventLogState
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
     public record EventFilter(
-        string AdvancedFilter,
+        string? AdvancedFilter,
         FilterDateModel? DateFilter,
         ImmutableList<FilterCacheModel> CachedFilters,
         ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);

@@ -15,14 +15,14 @@
                 <i class="bi bi-plus-circle"></i> Add Filter
             </button>
 
-            @if (!_isDateFilterVisible)
+            @if (!IsDateFilterVisible)
             {
                 <button class="button" @onclick="AddDateFilter">
                     <i class="bi bi-plus-circle"></i> Add Date Filter
                 </button>
             }
 
-            @if (!_isAdvancedFilterVisible)
+            @if (!IsAdvancedFilterVisible)
             {
                 <button class="button" @onclick="AddAdvancedFilter">
                     <i class="bi bi-plus-circle"></i> Add Advanced Filter
@@ -50,7 +50,7 @@
     </div>
 
     <div class="filter-group" data-toggle="@MenuState">
-        @if (_isDateFilterVisible)
+        @if (IsDateFilterVisible)
         {
             <EditForm id="filter-form" class="flex-row" Model="_model">
                 <span>
@@ -78,7 +78,7 @@
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
-                    @if (FilterPaneState.Value.FilteredDateRange!.IsEnabled)
+                    @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
                     {
                         <button class="button button-red" @onclick="ToggleDateFilter">
                             <i class="bi bi-dash-circle"></i> Disable
@@ -104,7 +104,7 @@
             <FilterCacheRow Value="@item" />
         }
 
-        @if (_isAdvancedFilterVisible)
+        @if (IsAdvancedFilterVisible)
         {
             <div>
                 <span>

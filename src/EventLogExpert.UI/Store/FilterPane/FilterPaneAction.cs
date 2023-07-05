@@ -25,7 +25,7 @@ public record FilterPaneAction
 
     public record ToggleFilterDate;
 
-    public record SetAdvancedFilter(string Expression);
+    public record SetAdvancedFilter(string? Expression);
 
     public record ToggleAdvancedFilter;
 
@@ -34,4 +34,6 @@ public record FilterPaneAction
     public record RemoveCachedFilter(FilterCacheModel CachedFilterModel);
 
     public record ToggleCachedFilter(FilterCacheModel CachedFilterModel);
+
+    public record ClearAllFilters();
 }

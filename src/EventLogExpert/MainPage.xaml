@@ -26,6 +26,9 @@
             <MenuFlyoutItem Text="Close All Open Logs" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
             <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
         </MenuBarItem>
+        <MenuBarItem Text="Edit">
+            <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
+        </MenuBarItem>
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
