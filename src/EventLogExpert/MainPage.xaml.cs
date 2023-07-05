@@ -7,6 +7,7 @@ using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.Logging;
@@ -170,6 +171,9 @@ public partial class MainPage : ContentPage
 
         await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
     }
+
+    private void ClearAllFilters_Clicked(object? sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterPaneAction.ClearAllFilters());
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
     {

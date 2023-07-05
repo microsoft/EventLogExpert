@@ -57,6 +57,9 @@ public class FilterPaneReducers
         return state with { CurrentFilters = updatedList.ToImmutableList() };
     }
 
+    [ReducerMethod(typeof(FilterPaneAction.ClearAllFilters))]
+    public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new();
+
     [ReducerMethod]
     public static FilterPaneState ReduceRemoveCachedFilter(FilterPaneState state, FilterPaneAction.RemoveCachedFilter action)
     {
