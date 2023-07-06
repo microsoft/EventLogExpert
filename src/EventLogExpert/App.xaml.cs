@@ -16,7 +16,6 @@ namespace EventLogExpert;
 
 public partial class App : Application
 {
-
     public App(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,

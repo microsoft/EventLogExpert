@@ -52,6 +52,22 @@ public class FilterCacheEffects
     }
 
     [EffectMethod]
+    public async Task HandleImportFavorites(FilterCacheAction.ImportFavorites action, IDispatcher dispatcher)
+    {
+        List<FilterCacheModel> newFilters = _state.Value.FavoriteFilters.ToList();
+
+        foreach (FilterCacheModel filter in
+            action.Filters.Where(filter => !newFilters.Any(x => filter.ComparisonString.Equals(x.ComparisonString))))
+        {
+            newFilters.Add(filter);
+        }
+
+        _preferencesProvider.FavoriteFiltersPreference = newFilters.Select(filter => filter.ComparisonString).ToList();
+
+        dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilterCompleted(newFilters.ToImmutableList()));
+    }
+
+    [EffectMethod]
     public async Task HandleLoadFilters(FilterCacheAction.LoadFilters action, IDispatcher dispatcher)
     {
         var favoritesPreference = _preferencesProvider.FavoriteFiltersPreference;

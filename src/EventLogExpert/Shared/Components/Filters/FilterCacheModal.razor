@@ -52,9 +52,14 @@
                 <p>No Recent Filters</p>
             }
         </div>
+        
+        <div class="footer-group">
+            <div>
+                <button class="button" @onclick="ImportFavorites">Import</button>
+                <button class="button" @onclick="ExportFavorites">Export</button>
+            </div>
 
-        <div class="footer-group align-right">
-            <button class="button" type="button" @onclick="Close">Exit</button>
+            <button class="button" @onclick="Close">Exit</button>
         </div>
     </div>
 </dialog>

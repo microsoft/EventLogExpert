@@ -26,5 +26,7 @@ public record FilterCacheAction
     public record LoadFiltersCompleted(ImmutableList<FilterCacheModel> FavoriteFilters,
         ImmutableQueue<FilterCacheModel> RecentFilters);
 
+    public record ImportFavorites(List<FilterCacheModel> Filters);
+
     public record OpenMenu;
 }
