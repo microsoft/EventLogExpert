@@ -105,7 +105,10 @@ public partial class SettingsModal : IDisposable
 
     private async Task Open()
     {
-        _request = SettingsState.Value.Config with { DisabledDatabases = new List<string>() };
+        _request = SettingsState.Value.Config with
+        {
+            DisabledDatabases = SettingsState.Value.Config.DisabledDatabases.Select(x => x).ToList()
+        };
 
         _databases.Clear();
 
