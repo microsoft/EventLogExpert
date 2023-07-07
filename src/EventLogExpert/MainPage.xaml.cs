@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
@@ -14,27 +15,33 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
+using System.Text;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
+using Clipboard = Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard;
+using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
 public partial class MainPage : ContentPage
 {
+    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
+    private readonly IAppTitleService _appTitleService;
+    private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
-    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
-    private readonly IUpdateService _updateService;
-    private readonly ICurrentVersionProvider _currentVersionProvider;
-    private readonly IAppTitleService _appTitleService;
     private readonly ITraceLogger _traceLogger;
+    private readonly IUpdateService _updateService;
+
+    private DisplayEventModel? _selectedEvent;
 
     public MainPage(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, bool> showLogNameState,
         IStateSelection<SettingsState, bool> showComputerNameState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
@@ -47,28 +54,22 @@ public partial class MainPage : ContentPage
     {
         InitializeComponent();
 
+        _activeLogsState = activeLogsState;
+        _appTitleService = appTitleService;
+        _currentVersionProvider = currentVersionProvider;
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
-        _updateService = updateService;
-        _currentVersionProvider = currentVersionProvider;
-        _appTitleService = appTitleService;
         _traceLogger = traceLogger;
-
-        _activeLogsState = activeLogsState;
+        _updateService = updateService;
 
         activeLogsState.Select(e => e.ActiveLogs);
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
             {
-                if (activeLogs == ImmutableDictionary<string, EventLogData>.Empty)
-                {
-                    _appTitleService.SetLogName(null);
-                }
-                else
-                {
-                    _appTitleService.SetLogName(string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
-                }
+                _appTitleService.SetLogName(
+                    activeLogs == ImmutableDictionary<string, EventLogData>.Empty ?
+                        null : string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
             });
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
@@ -76,6 +77,10 @@ public partial class MainPage : ContentPage
         continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}");
+
+        selectedEventState.Select(e => e.SelectedEvent!);
+
+        selectedEventState.SelectedValueChanged += (sender, selectedEvent) => { _selectedEvent = selectedEvent; };
 
         showLogNameState.Select(e => e.ShowLogName);
 
@@ -92,7 +97,8 @@ public partial class MainPage : ContentPage
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
-            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path => Path.Join(fileLocationOptions.DatabasePath, path)));
+            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
+                Path.Join(fileLocationOptions.DatabasePath, path)));
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
@@ -110,55 +116,48 @@ public partial class MainPage : ContentPage
         EnableAddLogToViewViaDragAndDrop();
     }
 
-    private void OpenEventLogFile(string fileName)
-    {
-        _fluxorDispatcher.Dispatch(
-            new EventLogAction.OpenLog(
-                fileName,
-                LogType.File));
-    }
-
-    public async void OpenFile_Clicked(object sender, EventArgs e)
-    {
-        var result = await GetFilePickerResult();
-
-        if (result != null)
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
-            foreach (var file in result.Where(f => f is not null))
-            {
-                OpenEventLogFile(file!.FullPath);
-            }
-        }
-    }
-
-    public async void AddFile_Clicked(object sender, EventArgs e)
-    {
-        var result = await GetFilePickerResult();
-        if (result is not null)
-        {
-            foreach (var file in result.Where(f => f is not null))
-            {
-                if (_activeLogsState.Value.Any(l => l.Key == file?.FullPath))
-                {
-                    return;
-                }
-
-                OpenEventLogFile(file!.FullPath);
-            }
-        }
-    }
-
-    private async Task<IEnumerable<FileResult?>> GetFilePickerResult()
+    private static async Task<IEnumerable<FileResult?>> GetFilePickerResult()
     {
         var options = new PickOptions
         {
             FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, new[] { ".evtx" } } }
+                new Dictionary<DevicePlatform, IEnumerable<string>>
+                {
+                    { DevicePlatform.WinUI, new[] { ".evtx" } }
+                }
             )
         };
 
         return await FilePicker.Default.PickMultipleAsync(options);
+    }
+
+    private async void AddFile_Clicked(object sender, EventArgs e)
+    {
+        var result = await GetFilePickerResult();
+
+        foreach (var file in result.Where(f => f is not null))
+        {
+            if (_activeLogsState.Value.Any(l => l.Key == file?.FullPath))
+            {
+                return;
+            }
+
+            OpenEventLogFile(file!.FullPath);
+        }
+    }
+
+    private void AddLiveLog_Clicked(object? sender, EventArgs e)
+    {
+        if (sender is null) { return; }
+
+        var logName = ((MenuFlyoutItem)sender).Text;
+
+        if (_activeLogsState.Value.Any(l => l.Key == logName)) { return; }
+
+        _fluxorDispatcher.Dispatch(
+            new EventLogAction.OpenLog(
+                logName,
+                LogType.Live));
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -175,23 +174,133 @@ public partial class MainPage : ContentPage
     private void ClearAllFilters_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterPaneAction.ClearAllFilters());
 
-    private void ContinuouslyUpdate_Clicked(object sender, EventArgs e)
+    private void CloseAll_Clicked(object? sender, EventArgs e)
     {
-        if (((MenuFlyoutItem)sender).Text == "Continuously Update")
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(true, _traceLogger));
-        }
-        else
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.SetContinouslyUpdate(false, _traceLogger));
-        }
+        if (sender is null) { return; }
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
 
-    private void Exit_Clicked(object sender, EventArgs e) => Application.Current?.CloseWindow(Application.Current.MainPage!.Window);
+    private void ContinuouslyUpdate_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(((MenuFlyoutItem)sender).Text == "Continuously Update" ?
+            new EventLogAction.SetContinouslyUpdate(true, _traceLogger) :
+            new EventLogAction.SetContinouslyUpdate(false, _traceLogger));
 
-    private void LoadNewEvents_Clicked(object sender, EventArgs e)
+    private void CopyMultiLine_Clicked(object sender, EventArgs e)
     {
+        StringBuilder stringToCopy = new();
+
+        stringToCopy.AppendLine($"Log Name: {_selectedEvent?.LogName}");
+        stringToCopy.AppendLine($"Source: {_selectedEvent?.Source}");
+        stringToCopy.AppendLine($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
+        stringToCopy.AppendLine($"Event ID: {_selectedEvent?.Id}");
+        stringToCopy.AppendLine($"Task Category: {_selectedEvent?.TaskCategory}");
+        stringToCopy.AppendLine($"Level: {_selectedEvent?.Level}");
+        stringToCopy.AppendLine(_selectedEvent?.KeywordsDisplayNames.GetEventKeywords());
+        stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
+        stringToCopy.AppendLine($"Computer: {_selectedEvent?.ComputerName}");
+        stringToCopy.AppendLine("Description:");
+        stringToCopy.AppendLine(_selectedEvent?.Description);
+        stringToCopy.AppendLine("Event Xml:");
+        stringToCopy.AppendLine(_selectedEvent?.Xml);
+
+        Clipboard.SetTextAsync(stringToCopy.ToString());
+    }
+
+    private void CopySingleLine_Clicked(object sender, EventArgs e)
+    {
+        StringBuilder stringToCopy = new();
+
+        stringToCopy.Append($"Level: {_selectedEvent?.Level} ");
+        stringToCopy.Append($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)} ");
+        stringToCopy.Append($"Source: {_selectedEvent?.Source} ");
+        stringToCopy.Append($"Event ID: {_selectedEvent?.Id} ");
+        stringToCopy.Append($"Description: {_selectedEvent?.Description}");
+
+        Clipboard.SetTextAsync(stringToCopy.ToString());
+    }
+
+    private void CopyXML_Clicked(object sender, EventArgs e) => Clipboard.SetTextAsync(_selectedEvent?.Xml);
+
+    private void EnableAddLogToViewViaDragAndDrop()
+    {
+        Loaded += (s, e) =>
+        {
+            if (Handler?.MauiContext == null) { return; }
+
+            var platformElement = WebView.ToPlatform(Handler.MauiContext);
+            platformElement.AllowDrop = true;
+
+            platformElement.Drop += async (sender, eventArgs) =>
+            {
+                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+                {
+                    var items = await eventArgs.DataView.GetStorageItemsAsync();
+
+                    foreach (var item in items)
+                    {
+                        if (item is StorageFile file)
+                        {
+                            if (_activeLogsState.Value.Any(l => l.Key == file.Path))
+                            {
+                                return;
+                            }
+
+                            OpenEventLogFile($"{file.Path}");
+                        }
+                    }
+                }
+            };
+
+            platformElement.DragOver += async (sender, eventArgs) =>
+            {
+                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+                {
+                    var deferral = eventArgs.GetDeferral();
+                    var extensions = new List<string> { ".evtx" };
+                    var isAllowed = false;
+                    var items = await eventArgs.DataView.GetStorageItemsAsync();
+
+                    foreach (var item in items)
+                    {
+                        if (item is StorageFile file && extensions.Contains(file.FileType))
+                        {
+                            isAllowed = true;
+                            break;
+                        }
+                    }
+
+                    eventArgs.AcceptedOperation = isAllowed ?
+                        DataPackageOperation.Copy :
+                        DataPackageOperation.None;
+
+                    deferral.Complete();
+                }
+
+                eventArgs.AcceptedOperation = DataPackageOperation.None;
+            };
+        };
+    }
+
+    private void Exit_Clicked(object sender, EventArgs e) =>
+        Application.Current?.CloseWindow(Application.Current.MainPage!.Window);
+
+    private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents(_traceLogger));
+
+    private void OpenEventLogFile(string fileName) =>
+        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File));
+
+    private async void OpenFile_Clicked(object sender, EventArgs e)
+    {
+        var result = await GetFilePickerResult();
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+
+        foreach (var file in result.Where(f => f is not null))
+        {
+            OpenEventLogFile(file!.FullPath);
+        }
     }
 
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
@@ -201,36 +310,17 @@ public partial class MainPage : ContentPage
         AddLiveLog_Clicked(sender, e);
     }
 
-    private void AddLiveLog_Clicked(object? sender, EventArgs e)
-    {
-        if (sender == null) return;
-
-        var logName = ((MenuFlyoutItem)sender).Text;
-
-        if (_activeLogsState.Value.Any(l => l.Key == logName))
-        {
-            return;
-        }
-
-        _fluxorDispatcher.Dispatch(
-            new EventLogAction.OpenLog(
-                logName,
-                LogType.Live));
-    }
-
-    private void CloseAll_Clicked(object? sender, EventArgs e)
-    {
-        if (sender == null) return;
-
-        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
-    }
-
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
 
     private async void PopulateOtherLogsMenu()
     {
-        var logsThatAlreadyHaveMenuItems = new[] { "Application", "System" };
+        var logsThatAlreadyHaveMenuItems = new[]
+        {
+            "Application",
+            "System"
+        };
+
         var session = new EventLogSession();
 
         var names = session.GetLogNames()
@@ -277,69 +367,11 @@ public partial class MainPage : ContentPage
         }
     }
 
-    private void EnableAddLogToViewViaDragAndDrop()
-    {
-        Loaded += (s, e) =>
-        {
-            if (Handler?.MauiContext == null) return;
-
-            var platformElement = WebView.ToPlatform(Handler.MauiContext);
-            platformElement.AllowDrop = true;
-            platformElement.Drop += async (sender, eventArgs) =>
-            {
-                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
-                {
-                    var items = await eventArgs.DataView.GetStorageItemsAsync();
-                    foreach (var item in items)
-                    {
-                        if (item is StorageFile file)
-                        {
-                            if (_activeLogsState.Value.Any(l => l.Key == file.Path))
-                            {
-                                return;
-                            }
-
-                            OpenEventLogFile($"{file.Path}");
-                        }
-                    }
-                }
-            };
-
-            platformElement.DragOver += async (sender, eventArgs) =>
-            {
-                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
-                {
-                    var deferral = eventArgs.GetDeferral();
-                    var extensions = new List<string> { ".evtx" };
-                    var isAllowed = false;
-                    var items = await eventArgs.DataView.GetStorageItemsAsync();
-                    foreach (var item in items)
-                    {
-                        if (item is StorageFile file && extensions.Contains(file.FileType))
-                        {
-                            isAllowed = true;
-                            break;
-                        }
-                    }
-
-                    eventArgs.AcceptedOperation = isAllowed ? Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy : Windows.ApplicationModel.DataTransfer.DataPackageOperation.None;
-                    deferral.Complete();
-                }
-
-                eventArgs.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.None;
-            };
-        };
-    }
-
-    private void ShowLogName_Clicked(object? sender, EventArgs e)
-    {
-        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowLogName());
-    }
-
-    private void ShowComputerName_Clicked(object? sender, EventArgs e)
-    {
+    private void ShowComputerName_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
-    }
+
+    private void ShowLogName_Clicked(object? sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowLogName());
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());

@@ -3,10 +3,11 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
@@ -20,6 +21,7 @@ public partial class App : Application
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, bool> showLogState,
         IStateSelection<SettingsState, bool> showComputerState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
@@ -37,6 +39,7 @@ public partial class App : Application
                 databaseCollectionProvider,
                 activeLogsState,
                 continuouslyUpdateState,
+                selectedEventState,
                 showLogState,
                 showComputerState,
                 loadedDatabasesState,

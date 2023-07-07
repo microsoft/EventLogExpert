@@ -29,7 +29,7 @@
                 @if (Event.KeywordsDisplayNames.Any())
                 {
                     <div>
-                        @GetEventKeywords(Event.KeywordsDisplayNames)
+                        @Event.KeywordsDisplayNames.GetEventKeywords()
                     </div>
                 }
                 <div>Date and Time: @Event.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</div>
