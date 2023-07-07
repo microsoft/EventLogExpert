@@ -211,11 +211,11 @@ public partial class MainPage : ContentPage
     {
         StringBuilder stringToCopy = new();
 
-        stringToCopy.Append($"Level: {_selectedEvent?.Level} ");
-        stringToCopy.Append($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)} ");
-        stringToCopy.Append($"Source: {_selectedEvent?.Source} ");
-        stringToCopy.Append($"Event ID: {_selectedEvent?.Id} ");
-        stringToCopy.Append($"Description: {_selectedEvent?.Description}");
+        stringToCopy.Append($"\"{_selectedEvent?.Level}\" ");
+        stringToCopy.Append($"\"{_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+        stringToCopy.Append($"\"{_selectedEvent?.Source}\" ");
+        stringToCopy.Append($"\"{_selectedEvent?.Id}\" ");
+        stringToCopy.Append($"\"{_selectedEvent?.Description}\"");
 
         Clipboard.SetTextAsync(stringToCopy.ToString());
     }
