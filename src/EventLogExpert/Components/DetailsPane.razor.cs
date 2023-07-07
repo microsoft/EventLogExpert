@@ -62,7 +62,7 @@ public partial class DetailsPane
         stringToCopy.AppendLine($"Event ID: {Event?.Id}");
         stringToCopy.AppendLine($"Task Category: {Event?.TaskCategory}");
         stringToCopy.AppendLine($"Level: {Event?.Level}");
-        stringToCopy.AppendLine(GetEventKeywords(Event?.KeywordsDisplayNames!));
+        stringToCopy.AppendLine(Event?.KeywordsDisplayNames.GetEventKeywords());
         stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
         stringToCopy.AppendLine($"Computer: {Event?.ComputerName}");
         stringToCopy.AppendLine("Description:");
@@ -71,15 +71,6 @@ public partial class DetailsPane
         stringToCopy.AppendLine(Event?.Xml);
 
         Clipboard.SetTextAsync(stringToCopy.ToString());
-    }
-
-    private string GetEventKeywords(IEnumerable<string> keywords)
-    {
-        StringBuilder sb = new("Keywords:");
-
-        foreach (var keyword in keywords) { sb.Append($" {keyword}"); }
-
-        return sb.ToString();
     }
 
     private void ToggleMenu()

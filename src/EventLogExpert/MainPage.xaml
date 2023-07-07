@@ -27,6 +27,11 @@
             <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="Edit">
+            <MenuFlyoutSubItem Text="Copy Selected Event">
+                <MenuFlyoutItem Text="Single Line" Clicked="CopySingleLine_Clicked" />
+                <MenuFlyoutItem Text="Multi Line" Clicked="CopyMultiLine_Clicked" />
+                <MenuFlyoutItem Text="XML" Clicked="CopyXML_Clicked" />
+            </MenuFlyoutSubItem>
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
