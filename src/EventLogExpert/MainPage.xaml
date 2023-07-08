@@ -2,6 +2,7 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:EventLogExpert"
+             xmlns:ui="clr-namespace:EventLogExpert.UI;assembly=EventLogExpert.UI"
              x:Class="EventLogExpert.MainPage"
              BackgroundColor="{DynamicResource PageBackgroundColor}">
 
@@ -27,11 +28,9 @@
             <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="Edit">
-            <MenuFlyoutSubItem Text="Copy Selected Event">
-                <MenuFlyoutItem Text="Single Line" Clicked="CopySingleLine_Clicked" />
-                <MenuFlyoutItem Text="Multi Line" Clicked="CopyMultiLine_Clicked" />
-                <MenuFlyoutItem Text="XML" Clicked="CopyXML_Clicked" />
-            </MenuFlyoutSubItem>
+            <MenuFlyoutItem Text="Copy Selected" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
+            <MenuFlyoutItem Text="Copy Selected (Simple)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
+            <MenuFlyoutItem Text="Copy Selected (XML)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
