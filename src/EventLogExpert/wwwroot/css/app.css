@@ -58,6 +58,8 @@ a,
 
 .content { padding-top: 1.1rem; }
 
+.advanced-filter-error { margin-left: 70px; }
+
 /*.valid.modified:not([type=checkbox]) {
     outline: 1px solid #26b050;
 }

@@ -14,38 +14,19 @@
             </ValueSelect>
 
             <span>Value: </span>
-            @if (_cacheType == CacheType.Favorites)
-            {
-                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "None")">
-                    @if (FilterCacheState.Value.FavoriteFilters.Any())
+            <ValueSelect CssClass="input cache-dropdown" T="string" @bind-Value="_filterValue" IsInput>
+                @if (Items.Any())
+                {
+                    @foreach (var item in Items)
                     {
-                        @foreach (var item in FilterCacheState.Value.FavoriteFilters)
-                        {
-                            <ValueSelectItem T="FilterCacheModel" Value="item" />
-                        }
+                        <ValueSelectItem T="string" Value="item" />
                     }
-                    else
-                    {
-                        <ValueSelectItem T="FilterCacheModel" IsDisabled />
-                    }
-                </ValueSelect>
-            }
-            else
-            {
-                <ValueSelect CssClass="input cache-dropdown" T="FilterCacheModel" @bind-Value="Value" ToStringFunc="@(x => x?.ComparisonString ?? "None")">
-                    @if (FilterCacheState.Value.RecentFilters.Any())
-                    {
-                        @foreach (var item in FilterCacheState.Value.RecentFilters)
-                        {
-                            <ValueSelectItem T="FilterCacheModel" Value="item" />
-                        }
-                    }
-                    else
-                    {
-                        <ValueSelectItem T="FilterCacheModel" IsDisabled />
-                    }
-                </ValueSelect>
-            }
+                }
+                else
+                {
+                    <ValueSelectItem T="string" IsDisabled />
+                }
+            </ValueSelect>
         </div>
     }
     else
@@ -85,3 +66,8 @@
         }
     </div>
 </div>
+
+@if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <span class="advanced-filter-error">@_errorMessage</span>
+}
