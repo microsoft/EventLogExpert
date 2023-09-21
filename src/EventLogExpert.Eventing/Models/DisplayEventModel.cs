@@ -68,12 +68,9 @@ public record DisplayEventModel(
                             break;
                         }
 
-                        if (propertyNames[i] == "__binLength" && propertyNames[i + 1] == "BinaryData" && Properties[i].Value is byte[] val)
+                        if (Properties[i].Value is byte[] val)
                         {
-                            // Handle event 7036 from Service Control Manager binary data
-                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i]}\">{val.Length}</Data>\r\n");
-                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i + 1]}\">{Convert.ToHexString(val)}</Data>\r\n");
-                            i++;
+                            templateBuilder.Append($"    <Data Name=\"{propertyNames[i]}\">{Convert.ToHexString(val)}</Data>\r\n");
                         }
                         else
                         {

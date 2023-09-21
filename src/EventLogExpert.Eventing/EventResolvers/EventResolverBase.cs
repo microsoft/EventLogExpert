@@ -80,7 +80,14 @@ public class EventResolverBase
 
                     if (!valueFormatted)
                     {
-                        sb.Append(propValue);
+                        if (propValue is byte[] bytes)
+                        {
+                            sb.Append(Convert.ToHexString(bytes));
+                        }
+                        else
+                        {
+                            sb.Append(propValue);
+                        }
                     }
 
                     lastIndex = matches[i].Index + matches[i].Length;
