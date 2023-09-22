@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 
@@ -18,7 +19,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     public event EventHandler<string>? StatusChanged;
 
-    private readonly ConcurrentBag<EventProviderDbContext> dbContexts = new();
+    private ImmutableArray<EventProviderDbContext> dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
 
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
@@ -53,11 +54,12 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             context.Dispose();
         }
 
-        dbContexts.Clear();
+        dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
 
         var databasesToLoad = SortDatabases(databasePaths);
 
         var obsoleteDbs = new List<string>();
+        var newContexts = new List<EventProviderDbContext>();
         foreach (var file in databasesToLoad)
         {
             if (!File.Exists(file))
@@ -75,8 +77,10 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             }
 
             c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
-            dbContexts.Add(c);
+            newContexts.Add(c);
         }
+
+        dbContexts = newContexts.ToImmutableArray();
 
         if (obsoleteDbs.Any())
         {
@@ -85,7 +89,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 db.Dispose();
             }
 
-            dbContexts.Clear();
+            dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
 
             throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(db => Path.GetFileName(db))));
         }
