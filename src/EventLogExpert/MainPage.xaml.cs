@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
@@ -186,41 +187,47 @@ public partial class MainPage : ContentPage
             new EventLogAction.SetContinouslyUpdate(true, _traceLogger) :
             new EventLogAction.SetContinouslyUpdate(false, _traceLogger));
 
-    private void CopyMultiLine_Clicked(object sender, EventArgs e)
+    private void CopySelected_Clicked(object sender, EventArgs e)
     {
+        var item = sender as MenuFlyoutItem;
+        var param = item?.CommandParameter as CopyType?;
+
         StringBuilder stringToCopy = new();
 
-        stringToCopy.AppendLine($"Log Name: {_selectedEvent?.LogName}");
-        stringToCopy.AppendLine($"Source: {_selectedEvent?.Source}");
-        stringToCopy.AppendLine($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
-        stringToCopy.AppendLine($"Event ID: {_selectedEvent?.Id}");
-        stringToCopy.AppendLine($"Task Category: {_selectedEvent?.TaskCategory}");
-        stringToCopy.AppendLine($"Level: {_selectedEvent?.Level}");
-        stringToCopy.AppendLine(_selectedEvent?.KeywordsDisplayNames.GetEventKeywords());
-        stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
-        stringToCopy.AppendLine($"Computer: {_selectedEvent?.ComputerName}");
-        stringToCopy.AppendLine("Description:");
-        stringToCopy.AppendLine(_selectedEvent?.Description);
-        stringToCopy.AppendLine("Event Xml:");
-        stringToCopy.AppendLine(_selectedEvent?.Xml);
+        switch (param)
+        {
+            case CopyType.Simple :
+                stringToCopy.Append($"\"{_selectedEvent?.Level}\" ");
+                stringToCopy.Append($"\"{_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                stringToCopy.Append($"\"{_selectedEvent?.Source}\" ");
+                stringToCopy.Append($"\"{_selectedEvent?.Id}\" ");
+                stringToCopy.Append($"\"{_selectedEvent?.Description}\"");
 
-        Clipboard.SetTextAsync(stringToCopy.ToString());
+                Clipboard.SetTextAsync(stringToCopy.ToString());
+                break;
+            case CopyType.Xml:
+                Clipboard.SetTextAsync(_selectedEvent?.Xml);
+                break;
+            case CopyType.Full :
+            default :
+                stringToCopy.AppendLine($"Log Name: {_selectedEvent?.LogName}");
+                stringToCopy.AppendLine($"Source: {_selectedEvent?.Source}");
+                stringToCopy.AppendLine($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
+                stringToCopy.AppendLine($"Event ID: {_selectedEvent?.Id}");
+                stringToCopy.AppendLine($"Task Category: {_selectedEvent?.TaskCategory}");
+                stringToCopy.AppendLine($"Level: {_selectedEvent?.Level}");
+                stringToCopy.AppendLine(_selectedEvent?.KeywordsDisplayNames.GetEventKeywords());
+                stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
+                stringToCopy.AppendLine($"Computer: {_selectedEvent?.ComputerName}");
+                stringToCopy.AppendLine("Description:");
+                stringToCopy.AppendLine(_selectedEvent?.Description);
+                stringToCopy.AppendLine("Event Xml:");
+                stringToCopy.AppendLine(_selectedEvent?.Xml);
+
+                Clipboard.SetTextAsync(stringToCopy.ToString());
+                break;
+        }
     }
-
-    private void CopySingleLine_Clicked(object sender, EventArgs e)
-    {
-        StringBuilder stringToCopy = new();
-
-        stringToCopy.Append($"Level: {_selectedEvent?.Level} ");
-        stringToCopy.Append($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)} ");
-        stringToCopy.Append($"Source: {_selectedEvent?.Source} ");
-        stringToCopy.Append($"Event ID: {_selectedEvent?.Id} ");
-        stringToCopy.Append($"Description: {_selectedEvent?.Description}");
-
-        Clipboard.SetTextAsync(stringToCopy.ToString());
-    }
-
-    private void CopyXML_Clicked(object sender, EventArgs e) => Clipboard.SetTextAsync(_selectedEvent?.Xml);
 
     private void EnableAddLogToViewViaDragAndDrop()
     {

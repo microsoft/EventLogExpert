@@ -29,3 +29,10 @@ public enum CacheType
     Favorites,
     Recent
 }
+
+public enum CopyType
+{
+    Full,
+    Simple,
+    Xml
+}
