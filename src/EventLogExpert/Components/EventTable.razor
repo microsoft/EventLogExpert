@@ -29,7 +29,7 @@
                 <th class="description">Description</th>
             </tr>
         </thead>
-        <tbody>
+        <tbody @oncontextmenu="InvokeContextMenu">
             <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td>

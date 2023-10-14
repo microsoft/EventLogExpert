@@ -145,12 +145,12 @@ a,
     text-align: center;
     cursor: default;
     user-select: none;
-    
+
     &:focus { outline: none; }
 }
 
 input[type="text" i].input { padding: 0; }
-    
+
 .input.filter-dropdown { width: 120px; }
 
 .input.timezone-dropdown { width: 350px; }
@@ -181,9 +181,9 @@ input[type="text" i].input { padding: 0; }
     color: var(--clr-lightblue);
     border: var(--clr-lightblue);
     background: none;
-    
+
     &:focus { border: none; }
-    
+
     &:hover { filter: brightness(0.9); }
 }
 
@@ -201,7 +201,7 @@ input[type="text" i].input { padding: 0; }
 .button.button-yellow {
     color: var(--clr-yellow);
     border: var(--clr-yellow);
-}    
+}
 
 div.table-divider {
     height: 22px;

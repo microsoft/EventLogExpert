@@ -1,0 +1,33 @@
+﻿#context-menu {
+    display: none;
+    user-select: none;
+    color: #fff;
+    border: 1px solid var(--clr-lightblue);
+    background-color: var(--background-dark);
+    z-index: 10;
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    &.active {
+        display: block;
+        position: fixed;
+    }
+
+    & > div {
+        text-align: left;
+        margin: 0;
+        padding: 0 5px;
+        display: block;
+        clear: both;
+
+        &:hover {
+            background-color: var(--background-darkgray);
+        }
+
+        &[selected] {
+            color: var(--background-darkgray) !important;
+            background-color: var(--clr-lightblue) !important;
+        }
+    }
+}
