@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
@@ -16,11 +17,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
-using System.Text;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
-using Clipboard = Microsoft.Maui.ApplicationModel.DataTransfer.Clipboard;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -30,6 +29,7 @@ public partial class MainPage : ContentPage
 {
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IAppTitleService _appTitleService;
+    private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
@@ -47,6 +47,7 @@ public partial class MainPage : ContentPage
         IStateSelection<SettingsState, bool> showComputerNameState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
+        IClipboardService clipboardService,
         IUpdateService updateService,
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
@@ -57,6 +58,7 @@ public partial class MainPage : ContentPage
 
         _activeLogsState = activeLogsState;
         _appTitleService = appTitleService;
+        _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
@@ -192,41 +194,7 @@ public partial class MainPage : ContentPage
         var item = sender as MenuFlyoutItem;
         var param = item?.CommandParameter as CopyType?;
 
-        StringBuilder stringToCopy = new();
-
-        switch (param)
-        {
-            case CopyType.Simple :
-                stringToCopy.Append($"\"{_selectedEvent?.Level}\" ");
-                stringToCopy.Append($"\"{_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
-                stringToCopy.Append($"\"{_selectedEvent?.Source}\" ");
-                stringToCopy.Append($"\"{_selectedEvent?.Id}\" ");
-                stringToCopy.Append($"\"{_selectedEvent?.Description}\"");
-
-                Clipboard.SetTextAsync(stringToCopy.ToString());
-                break;
-            case CopyType.Xml:
-                Clipboard.SetTextAsync(_selectedEvent?.Xml);
-                break;
-            case CopyType.Full :
-            default :
-                stringToCopy.AppendLine($"Log Name: {_selectedEvent?.LogName}");
-                stringToCopy.AppendLine($"Source: {_selectedEvent?.Source}");
-                stringToCopy.AppendLine($"Date: {_selectedEvent?.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
-                stringToCopy.AppendLine($"Event ID: {_selectedEvent?.Id}");
-                stringToCopy.AppendLine($"Task Category: {_selectedEvent?.TaskCategory}");
-                stringToCopy.AppendLine($"Level: {_selectedEvent?.Level}");
-                stringToCopy.AppendLine(_selectedEvent?.KeywordsDisplayNames.GetEventKeywords());
-                stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
-                stringToCopy.AppendLine($"Computer: {_selectedEvent?.ComputerName}");
-                stringToCopy.AppendLine("Description:");
-                stringToCopy.AppendLine(_selectedEvent?.Description);
-                stringToCopy.AppendLine("Event Xml:");
-                stringToCopy.AppendLine(_selectedEvent?.Xml);
-
-                Clipboard.SetTextAsync(stringToCopy.ToString());
-                break;
-        }
+        _clipboardService.CopySelectedEvent(_selectedEvent, param);
     }
 
     private void EnableAddLogToViewViaDragAndDrop()

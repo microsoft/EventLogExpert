@@ -1,5 +1,9 @@
+@using EventLogExpert.UI;
+
 <div id="context-menu">
-    <div>Context Menu</div>
-    <div>Copy</div>
+    <div @onclick="() => CopySelected(CopyType.Full)">Copy Selected</div>
+    <div @onclick="() => CopySelected(CopyType.Simple)">Copy Selected (Simple)</div>
+    <div @onclick="() => CopySelected(CopyType.Xml)">Copy Selected (XML)</div>
+    <hr />
     <div>Filter</div>
 </div>
