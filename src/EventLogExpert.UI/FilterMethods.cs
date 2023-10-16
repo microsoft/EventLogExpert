@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using System.Text;
-using static EventLogExpert.UI.Store.FilterPane.FilterPaneAction;
 
 namespace EventLogExpert.UI;
 

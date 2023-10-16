@@ -1,0 +1,18 @@
+@using EventLogExpert.UI;
+
+<div id="context-menu">
+    <div @onclick="() => CopySelected(CopyType.Full)">Copy Selected</div>
+    <div @onclick="() => CopySelected(CopyType.Simple)">Copy Selected (Simple)</div>
+    <div @onclick="() => CopySelected(CopyType.Xml)">Copy Selected (XML)</div>
+    <hr />
+    @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+    {
+        <div class="sub-menu">
+            <div>Filter On @item.ToFullString()</div>
+            <ul>
+                <li @onclick="() => FilterEvent(item, FilterComparison.Equals)">Include</li>
+                <li @onclick="() => FilterEvent(item, FilterComparison.NotEqual)">Exclude</li>
+            </ul>
+        </div>
+    }
+</div>

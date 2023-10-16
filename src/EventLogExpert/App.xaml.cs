@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
@@ -26,6 +27,7 @@ public partial class App : Application
         IStateSelection<SettingsState, bool> showComputerState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
         IState<SettingsState> settingsState,
+        IClipboardService clipboardService,
         IUpdateService updateService,
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
@@ -44,6 +46,7 @@ public partial class App : Application
                 showComputerState,
                 loadedDatabasesState,
                 settingsState,
+                clipboardService,
                 updateService,
                 currentVersionProvider,
                 appTitleService,
