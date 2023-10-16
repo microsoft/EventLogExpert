@@ -71,6 +71,7 @@ public class EventLogEffects
 
                 List<DisplayEventModel> events = new();
                 HashSet<int> eventIdsAll = new();
+                HashSet<Guid?> eventActivityIdsAll = new();
                 HashSet<string> eventProviderNamesAll = new();
                 HashSet<string> eventTaskNamesAll = new();
                 HashSet<string> eventKeywordNamesAll = new();
@@ -81,6 +82,7 @@ public class EventLogEffects
                     lastEvent = e;
                     var resolved = eventResolver.Resolve(e, action.LogName);
                     eventIdsAll.Add(resolved.Id);
+                    eventActivityIdsAll.Add(resolved.ActivityId);
                     eventProviderNamesAll.Add(resolved.Source);
                     eventTaskNamesAll.Add(resolved.TaskCategory);
                     eventKeywordNamesAll.UnionWith(resolved.KeywordsDisplayNames);
@@ -99,6 +101,7 @@ public class EventLogEffects
                     action.LogType,
                     events,
                     eventIdsAll.ToImmutableList(),
+                    eventActivityIdsAll.ToImmutableList(),
                     eventProviderNamesAll.ToImmutableList(),
                     eventTaskNamesAll.ToImmutableList(),
                     eventKeywordNamesAll.ToImmutableList(),

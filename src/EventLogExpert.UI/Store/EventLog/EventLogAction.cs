@@ -16,6 +16,7 @@ public record EventLogAction
         LogType Type,
         List<DisplayEventModel> Events,
         IEnumerable<int> AllEventIds,
+        IEnumerable<Guid?> AllActivityIds,
         IEnumerable<string> AllProviderNames,
         IEnumerable<string> AllTaskNames,
         IEnumerable<string> AllKeywords,

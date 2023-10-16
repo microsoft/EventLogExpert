@@ -40,6 +40,7 @@ public partial class ContextMenu
         string filterValue = filterType switch
         {
             FilterType.Id => SelectedEventState.Value.Id.ToString(),
+            FilterType.ActivityId => SelectedEventState.Value.ActivityId.ToString()!,
             FilterType.Level => SelectedEventState.Value.Level.ToString()!,
             FilterType.KeywordsDisplayNames => SelectedEventState.Value.KeywordsDisplayNames.GetEventKeywords(),
             FilterType.Source => SelectedEventState.Value.Source,

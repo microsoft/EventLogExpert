@@ -28,6 +28,7 @@ public record EventLogState
         ReadOnlyCollection<DisplayEventModel> Events,
         ReadOnlyCollection<DisplayEventModel> FilteredEvents,
         ImmutableHashSet<int> EventIds,
+        ImmutableHashSet<Guid?> EventActivityIds,
         ImmutableHashSet<string> EventProviderNames,
         ImmutableHashSet<string> TaskNames,
         ImmutableHashSet<string> KeywordNames

@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace EventLogExpert.UI;
@@ -109,7 +110,7 @@ public static class FilterMethods
             $"{type} == ",
         FilterComparison.Contains => type switch
         {
-            FilterType.Id or FilterType.Level => $"{type}.ToString().Contains",
+            FilterType.Id or FilterType.Level or FilterType.ActivityId => $"{type}.ToString().Contains",
             FilterType.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
             _ => $"{type}.Contains"
         },
@@ -118,7 +119,7 @@ public static class FilterMethods
             $"{type} != ",
         FilterComparison.NotContains => type switch
         {
-            FilterType.Id or FilterType.Level => $"!{type}.ToString().Contains",
+            FilterType.Id or FilterType.Level or FilterType.ActivityId => $"!{type}.ToString().Contains",
             FilterType.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
             _ => $"!{type}.Contains"
         },
@@ -135,6 +136,7 @@ public static class FilterMethods
         filterType switch
         {
             FilterType.Id => x => x.Id.ToString().Contains(value),
+            FilterType.ActivityId => x => x.ActivityId.ToString()?.Contains(value) is true,
             FilterType.Level => x => x.Level.ToString()?.Contains(value) is true,
             FilterType.KeywordsDisplayNames => x =>
                 x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
@@ -148,6 +150,7 @@ public static class FilterMethods
         filterType switch
         {
             FilterType.Id => int.TryParse(value, out int id) ? x => x.Id == id : null,
+            FilterType.ActivityId => x => string.Equals(x.ActivityId.ToString(), value, StringComparison.OrdinalIgnoreCase),
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level == level : null,
             FilterType.KeywordsDisplayNames => x =>
                 x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
@@ -162,6 +165,7 @@ public static class FilterMethods
         filterType switch
         {
             FilterType.Id => x => !x.Id.ToString().Contains(value),
+            FilterType.ActivityId => x => !x.ActivityId.ToString()?.Contains(value) is true,
             FilterType.Level => x => !x.Level.ToString()?.Contains(value) is true,
             FilterType.KeywordsDisplayNames => x =>
                 !x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
@@ -175,6 +179,7 @@ public static class FilterMethods
         filterType switch
         {
             FilterType.Id => int.TryParse(value, out int id) ? x => x.Id != id : null,
+            FilterType.ActivityId => x => !string.Equals(x.ActivityId.ToString(), value, StringComparison.OrdinalIgnoreCase),
             FilterType.Level => Enum.TryParse(value, out SeverityLevel level) ? x => x.Level != level : null,
             FilterType.KeywordsDisplayNames => x =>
                 !x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
@@ -189,6 +194,7 @@ public static class FilterMethods
         ICollection<string> values) => filterType switch
     {
         FilterType.Id => x => values.Contains(x.Id.ToString()),
+        FilterType.ActivityId => x => values.Contains(x.ActivityId?.ToString() ?? string.Empty),
         FilterType.Level => x => values.Contains(x.Level?.ToString() ?? string.Empty),
         FilterType.KeywordsDisplayNames => x => x.KeywordsDisplayNames.Any(values.Contains),
         FilterType.Source => x => values.Contains(x.Source),
