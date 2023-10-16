@@ -48,6 +48,8 @@ th, td {
 
 .table-row { cursor: pointer; }
 
+.activity-id { width: 270px; }
+
 .logname { width: 100px; }
 
 .computername { width: 100px; }

@@ -21,7 +21,9 @@ public record SettingsAction
 
     public record SaveCompleted(SettingsModel Settings) : SettingsAction;
 
-    public record ToggleShowLogName : SettingsAction;
+    public record ToggleShowActivityId : SettingsAction;
 
     public record ToggleShowComputerName : SettingsAction;
+
+    public record ToggleShowLogName : SettingsAction;
 }

@@ -36,6 +36,7 @@ public class EventReaderEventResolver : IEventResolver
 
         return new DisplayEventModel(
             eventRecord.RecordId,
+            eventRecord.ActivityId,
             eventRecord.TimeCreated!.Value.ToUniversalTime(),
             eventRecord.Id,
             eventRecord.MachineName,
@@ -47,6 +48,8 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.Qualifiers,
             eventRecord.Keywords,
             keywordsDisplayNames,
+            eventRecord.ProcessId,
+            eventRecord.ThreadId,
             eventRecord.LogName,
             null,
             OwningLogName);

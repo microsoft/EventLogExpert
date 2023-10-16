@@ -14,7 +14,9 @@ public record SettingsState
 
     public IImmutableList<string> LoadedDatabases { get; init; } = ImmutableList<string>.Empty;
 
-    public bool ShowLogName { get; init; }
+    public bool ShowActivityId { get; init; }
 
     public bool ShowComputerName { get; init; }
+
+    public bool ShowLogName { get; init; }
 }

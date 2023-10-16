@@ -342,6 +342,9 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private void ShowActivityId_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowActivityId());
+
     private void ShowComputerName_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
 

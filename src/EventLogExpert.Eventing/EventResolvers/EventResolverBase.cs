@@ -215,6 +215,7 @@ public class EventResolverBase
 
         return new DisplayEventModel(
                 eventRecord.RecordId,
+                eventRecord.ActivityId,
                 eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
@@ -226,6 +227,8 @@ public class EventResolverBase
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
+                eventRecord.ProcessId,
+                eventRecord.ThreadId,
                 eventRecord.LogName,
                 template,
                 owningLogName);

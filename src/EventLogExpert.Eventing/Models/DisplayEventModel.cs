@@ -9,6 +9,7 @@ namespace EventLogExpert.Eventing.Models;
 
 public record DisplayEventModel(
     long? RecordId,
+    Guid? ActivityId,
     DateTime TimeCreated,
     int Id,
     string ComputerName,
@@ -20,6 +21,8 @@ public record DisplayEventModel(
     int? Qualifiers,
     long? Keywords,
     IEnumerable<string> KeywordsDisplayNames,
+    int? ProcessId,
+    int? ThreadId,
     string LogName, // This is the log name from the event reader
     string? Template,
     string OwningLog) // This is the name of the log file or the live log, which we use internally
@@ -37,9 +40,18 @@ public record DisplayEventModel(
             $"    <Task>{TaskCategory}</Task>\r\n" +
             $"    <Keywords>{(Keywords.HasValue ? "0x" + Keywords.Value.ToString("X") : "0x0")}</Keywords>\r\n" +
             $"    <TimeCreated SystemTime=\"{TimeCreated.ToUniversalTime():o}\" />\r\n" +
-            $"    <EventRecordID>{RecordId}</EventRecordID>\r\n" +
+            $"    <EventRecordID>{RecordId}</EventRecordID>\r\n");
+
+            if (ActivityId is not null)
+            {
+                sb.Append($"    <ActivityID>{ActivityId}</ActivityID>\r\n");
+            }
+            
+            sb.Append(
             $"    <Channel>{LogName}</Channel>\r\n" +
             $"    <Computer>{ComputerName}</Computer>\r\n" +
+            $"    <ProcessID>{ProcessId}</ProcessID>\r\n" +
+            $"    <ThreadID>{ThreadId}</ThreadID>\r\n" +
             $"  </System>\r\n" +
             $"  <EventData>\r\n");
 

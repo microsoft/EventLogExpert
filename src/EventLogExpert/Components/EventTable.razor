@@ -21,6 +21,7 @@
                         <i class="bi bi-caret-up"></i>
                     </span>
                 </th>
+                <th class="activity-id" hidden="@(!SettingsState.Value.ShowActivityId)">Activity Id</th>
                 <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
                 <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
                 <th class="source">Source</th>
@@ -37,6 +38,7 @@
                         @evt.Level
                     </td>
                     <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
+                    <td hidden="@(!SettingsState.Value.ShowActivityId)">@evt.ActivityId</td>
                     <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog.Split("\\").Last()</td>
                     <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
                     <td>@evt.Source</td>
@@ -64,6 +66,7 @@
                                 <i class="bi bi-caret-up"></i>
                             </span>
                         </th>
+                        <th class="activity-id" hidden="@(!SettingsState.Value.ShowActivityId)">Activity Id</th>
                         <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
                         <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
                         <th class="source">Source</th>
@@ -80,7 +83,8 @@
                                 @evt.Level
                             </td>
                             <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
-                            <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog</td>
+                            <td hidden="@(!SettingsState.Value.ShowActivityId)">@evt.ActivityId</td>
+                            <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog.Split("\\").Last()</td>
                             <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
                             <td>@evt.Source</td>
                             <td>@evt.Id</td>
