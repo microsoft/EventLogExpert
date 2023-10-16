@@ -15,5 +15,5 @@ window.addEventListener("click", function(e) {
     contextMenu.style.top = false;
     contextMenu.style.left = false;
 
-    contextMenu.classList.remove("active")
+    contextMenu.classList.remove("active");
 });
