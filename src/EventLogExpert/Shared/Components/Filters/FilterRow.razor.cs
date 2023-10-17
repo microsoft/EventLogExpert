@@ -32,6 +32,9 @@ public partial class FilterRow
                 case FilterType.Id :
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
                         .Distinct().OrderBy(id => id).Select(id => id.ToString()).ToList();
+                case FilterType.ActivityId:
+                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
+                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList();
                 case FilterType.Level :
                     var items = new List<string>();
 

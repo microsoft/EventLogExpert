@@ -197,6 +197,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         {
             return new DisplayEventModel(
                 eventRecord.RecordId,
+                eventRecord.ActivityId,
                 eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
@@ -208,6 +209,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
+                eventRecord.ProcessId,
+                eventRecord.ThreadId,
                 eventRecord.LogName,
                 null,
                 OwningLogName);

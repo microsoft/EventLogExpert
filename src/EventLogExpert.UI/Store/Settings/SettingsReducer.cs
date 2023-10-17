@@ -10,29 +10,30 @@ namespace EventLogExpert.UI.Store.Settings;
 public class SettingsReducer
 {
     [ReducerMethod]
-    public static SettingsState ReduceLoadDatabasesCompleted(SettingsState state, SettingsAction.LoadDatabasesCompleted action)
+    public static SettingsState ReduceLoadDatabasesCompleted(SettingsState state,
+        SettingsAction.LoadDatabasesCompleted action) => state with
     {
-        return state with { LoadedDatabases = SortDatabases(action.LoadedDatabases).ToImmutableList() };
-    }
+        LoadedDatabases = SortDatabases(action.LoadedDatabases).ToImmutableList()
+    };
 
     [ReducerMethod]
-    public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettingsCompleted action)
-    {
-        return state with { Config = action.Config };
-    }
+    public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettingsCompleted action) =>
+        state with { Config = action.Config };
 
     [ReducerMethod]
-    public static SettingsState ReduceSave(SettingsState state, SettingsAction.SaveCompleted action)
-    {
-        return state with { Config = action.Settings };
-    }
+    public static SettingsState ReduceSave(SettingsState state, SettingsAction.SaveCompleted action) =>
+        state with { Config = action.Settings };
 
-    [ReducerMethod]
-    public static SettingsState ReduceToggleShowComputerName(SettingsState state,
-        SettingsAction.ToggleShowComputerName action) => state with { ShowComputerName = !state.ShowComputerName };
+    [ReducerMethod(typeof(SettingsAction.ToggleShowActivityId))]
+    public static SettingsState ReduceToggleShowActivityId(SettingsState state) =>
+        state with { ShowActivityId = !state.ShowActivityId };
 
-    [ReducerMethod]
-    public static SettingsState ReduceToggleShowLogName(SettingsState state, SettingsAction.ToggleShowLogName action) =>
+    [ReducerMethod(typeof(SettingsAction.ToggleShowComputerName))]
+    public static SettingsState ReduceToggleShowComputerName(SettingsState state) =>
+        state with { ShowComputerName = !state.ShowComputerName };
+
+    [ReducerMethod(typeof(SettingsAction.ToggleShowLogName))]
+    public static SettingsState ReduceToggleShowLogName(SettingsState state) =>
         state with { ShowLogName = !state.ShowLogName };
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)

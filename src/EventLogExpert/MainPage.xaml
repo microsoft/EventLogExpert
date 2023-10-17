@@ -36,6 +36,7 @@
         <MenuBarItem Text="View">
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
+            <MenuFlyoutItem Text="Show Activity Id Column" Clicked="ShowActivityId_Clicked" x:Name="ShowActivityIdMenuItem" />
             <MenuFlyoutItem Text="Show Log Name Column" Clicked="ShowLogName_Clicked" x:Name="ShowLogNameMenuItem" />
             <MenuFlyoutItem Text="Show Computer Name Column" Clicked="ShowComputerName_Clicked" x:Name="ShowComputerNameMenuItem" />
             <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />

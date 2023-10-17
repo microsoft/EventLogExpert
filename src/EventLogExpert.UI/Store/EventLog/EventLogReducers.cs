@@ -76,6 +76,7 @@ public class EventLogReducers
             // Filtered events reflects both the filter and sort choice.
             filtered.ToList().AsReadOnly(),
             action.AllEventIds.ToImmutableHashSet(),
+            action.AllActivityIds.ToImmutableHashSet(),
             action.AllProviderNames.ToImmutableHashSet(),
             action.AllTaskNames.ToImmutableHashSet(),
             action.AllKeywords.ToImmutableHashSet()
@@ -392,6 +393,7 @@ public class EventLogReducers
             new List<DisplayEventModel>().AsReadOnly(),
             new List<DisplayEventModel>().AsReadOnly(),
             ImmutableHashSet<int>.Empty,
+            ImmutableHashSet<Guid?>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty,
             ImmutableHashSet<string>.Empty);

@@ -43,6 +43,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
         {
             return new DisplayEventModel(
                 eventRecord.RecordId,
+                eventRecord.ActivityId,
                 eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
@@ -54,6 +55,8 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.Qualifiers,
                 eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
+                eventRecord.ProcessId,
+                eventRecord.ThreadId,
                 eventRecord.LogName,
                 null,
                 OwningLogName);
