@@ -38,11 +38,17 @@
         justify-content: space-between;
         transition: 0.1s ease;
 
+        & > div {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
         & > ul {
             margin: 0;
             padding: 0 5px;
             position: absolute;
-            right: -4em;
+            right: -7em;
             border: 1px solid var(--clr-lightblue);
             background-color: var(--background-dark);
 
