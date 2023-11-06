@@ -12,13 +12,24 @@ public class SettingsEffects
 {
     private readonly IPreferencesProvider _preferencesProvider;
     private readonly IEnabledDatabaseCollectionProvider _enabledDatabaseCollectionProvider;
+    private readonly IEventTableColumnProvider _eventTableColumnProvider;
 
     public SettingsEffects(
         IPreferencesProvider preferencesProvider,
-        IEnabledDatabaseCollectionProvider enabledDatabaseCollectionProvider)
+        IEnabledDatabaseCollectionProvider enabledDatabaseCollectionProvider,
+        IEventTableColumnProvider eventTableColumnProvider)
     {
         _preferencesProvider = preferencesProvider;
         _enabledDatabaseCollectionProvider = enabledDatabaseCollectionProvider;
+        _eventTableColumnProvider = eventTableColumnProvider;
+    }
+
+    [EffectMethod(typeof(SettingsAction.LoadColumns))]
+    public async Task HandleLoadColumns(IDispatcher dispatcher)
+    {
+        var columns = _eventTableColumnProvider.GetColumns();
+
+        dispatcher.Dispatch(new SettingsAction.LoadColumnsCompleted(columns));
     }
 
     [EffectMethod(typeof(SettingsAction.LoadDatabases))]
@@ -54,5 +65,40 @@ public class SettingsEffects
         _preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
+    }
+
+    [EffectMethod]
+    public async Task HandleToggleColumn(SettingsAction.ToggleColumn action, IDispatcher dispatcher)
+    {
+        switch (action.ColumnName)
+        {
+            case ColumnName.Level :
+                _preferencesProvider.LevelColumnPreference = !_preferencesProvider.LevelColumnPreference;
+                break;
+            case ColumnName.DateAndTime :
+                _preferencesProvider.DateAndTimeColumnPreference = !_preferencesProvider.DateAndTimeColumnPreference;
+                break;
+            case ColumnName.ActivityId :
+                _preferencesProvider.ActivityIdColumnPreference = !_preferencesProvider.ActivityIdColumnPreference;
+                break;
+            case ColumnName.LogName :
+                _preferencesProvider.LogNameColumnPreference = !_preferencesProvider.LogNameColumnPreference;
+                break;
+            case ColumnName.ComputerName :
+                _preferencesProvider.ComputerNameColumnPreference = !_preferencesProvider.ComputerNameColumnPreference;
+                break;
+            case ColumnName.Source :
+                _preferencesProvider.SourceColumnPreference = !_preferencesProvider.SourceColumnPreference;
+                break;
+            case ColumnName.EventId :
+                _preferencesProvider.EventIdColumnPreference = !_preferencesProvider.EventIdColumnPreference;
+                break;
+            case ColumnName.TaskCategory :
+                _preferencesProvider.TaskCategoryColumnPreference = !_preferencesProvider.TaskCategoryColumnPreference;
+                break;
+            case ColumnName.Description :
+                _preferencesProvider.DescriptionColumnPreference = !_preferencesProvider.DescriptionColumnPreference;
+                break;
+        }
     }
 }

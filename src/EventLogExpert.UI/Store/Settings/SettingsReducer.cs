@@ -10,6 +10,13 @@ namespace EventLogExpert.UI.Store.Settings;
 public class SettingsReducer
 {
     [ReducerMethod]
+    public static SettingsState ReduceLoadColumnsComleted(SettingsState state,
+        SettingsAction.LoadColumnsCompleted action) => state with
+    {
+        EventTableColumns = action.LoadedColumns.ToImmutableDictionary()
+    };
+
+    [ReducerMethod]
     public static SettingsState ReduceLoadDatabasesCompleted(SettingsState state,
         SettingsAction.LoadDatabasesCompleted action) => state with
     {
@@ -23,18 +30,6 @@ public class SettingsReducer
     [ReducerMethod]
     public static SettingsState ReduceSave(SettingsState state, SettingsAction.SaveCompleted action) =>
         state with { Config = action.Settings };
-
-    [ReducerMethod(typeof(SettingsAction.ToggleShowActivityId))]
-    public static SettingsState ReduceToggleShowActivityId(SettingsState state) =>
-        state with { ShowActivityId = !state.ShowActivityId };
-
-    [ReducerMethod(typeof(SettingsAction.ToggleShowComputerName))]
-    public static SettingsState ReduceToggleShowComputerName(SettingsState state) =>
-        state with { ShowComputerName = !state.ShowComputerName };
-
-    [ReducerMethod(typeof(SettingsAction.ToggleShowLogName))]
-    public static SettingsState ReduceToggleShowLogName(SettingsState state) =>
-        state with { ShowLogName = !state.ShowLogName };
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {

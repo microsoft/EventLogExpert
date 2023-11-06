@@ -2,6 +2,7 @@
 @using EventLogExpert.UI.Store.EventLog;
 @using EventLogExpert.UI.Store.FilterPane;
 @using EventLogExpert.UI.Store.Settings;
+@using EventLogExpert.UI;
 @inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
@@ -12,39 +13,41 @@
 
 <div class="table-container" hidden="@(_activeLog != null)">
     <table>
-        <thead>
+        <thead @oncontextmenu="InvokeTableColumnMenu">
             <tr>
-                <th class="level">Level</th>
-                <th class="time">
+                <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">Level</th>
+                <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
                     Date and Time
                     <span class="menu-toggle" data-rotate="@EventLogState.Value.SortDescending.ToString().ToLower()" @onclick="ToggleDateTime">
                         <i class="bi bi-caret-up"></i>
                     </span>
                 </th>
-                <th class="activity-id" hidden="@(!SettingsState.Value.ShowActivityId)">Activity Id</th>
-                <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
-                <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
-                <th class="source">Source</th>
-                <th class="id">Event ID</th>
-                <th class="task">Task Category</th>
-                <th class="description">Description</th>
+                <th class="activity-id" hidden="@(IsColumnHidden(ColumnName.ActivityId))">Activity ID</th>
+                <th class="logname" hidden="@(IsColumnHidden(ColumnName.LogName))">Log Name</th>
+                <th class="computername" hidden="@(IsColumnHidden(ColumnName.ComputerName))">Computer</th>
+                <th class="source" hidden="@(IsColumnHidden(ColumnName.Source))">Source</th>
+                <th class="id" hidden="@(IsColumnHidden(ColumnName.EventId))">Event ID</th>
+                <th class="task" hidden="@(IsColumnHidden(ColumnName.TaskCategory))">Task Category</th>
+                <th class="description" hidden="@(IsColumnHidden(ColumnName.Description))">Description</th>
             </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu">
             <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
                 <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                    <td>
+                    <td hidden="@(IsColumnHidden(ColumnName.Level))">
                         <span class="@GetLevelClass(evt.Level)"></span>
                         @evt.Level
                     </td>
-                    <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
-                    <td hidden="@(!SettingsState.Value.ShowActivityId)">@evt.ActivityId</td>
-                    <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog.Split("\\").Last()</td>
-                    <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
-                    <td>@evt.Source</td>
-                    <td>@evt.Id</td>
-                    <td>@evt.TaskCategory</td>
-                    <td>@evt.Description</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
+                        @evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)
+                    </td>
+                    <td hidden="@(IsColumnHidden(ColumnName.ActivityId))">@evt.ActivityId</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.LogName))">@evt.OwningLog.Split("\\").Last()</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.ComputerName))">@evt.ComputerName</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.Source))">@evt.Source</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.EventId))">@evt.Id</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.TaskCategory))">@evt.TaskCategory</td>
+                    <td hidden="@(IsColumnHidden(ColumnName.Description))">@evt.Description</td>
                 </tr>
             </Virtualize>
         </tbody>
@@ -57,39 +60,41 @@
     {
         <div class="table-container" hidden="@(_activeLog != log.Key)">
             <table>
-                <thead>
+                <thead @oncontextmenu="InvokeTableColumnMenu">
                     <tr>
-                        <th class="level">Level</th>
-                        <th class="time">
+                        <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">Level</th>
+                        <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
                             Date and Time
-                            <span class="button-toggle" data-rotate="@EventLogState.Value.SortDescending.ToString().ToLower()" @onclick="ToggleDateTime">
+                            <span class="menu-toggle" data-rotate="@EventLogState.Value.SortDescending.ToString().ToLower()" @onclick="ToggleDateTime">
                                 <i class="bi bi-caret-up"></i>
                             </span>
                         </th>
-                        <th class="activity-id" hidden="@(!SettingsState.Value.ShowActivityId)">Activity Id</th>
-                        <th class="logname" hidden="@(!SettingsState.Value.ShowLogName)">Log Name</th>
-                        <th class="computername" hidden="@(!SettingsState.Value.ShowComputerName)">Computer</th>
-                        <th class="source">Source</th>
-                        <th class="id">Event ID</th>
-                        <th class="task">Task Category</th>
-                        <th class="description">Description</th>
+                        <th class="activity-id" hidden="@(IsColumnHidden(ColumnName.ActivityId))">Activity ID</th>
+                        <th class="logname" hidden="@(IsColumnHidden(ColumnName.LogName))">Log Name</th>
+                        <th class="computername" hidden="@(IsColumnHidden(ColumnName.ComputerName))">Computer</th>
+                        <th class="source" hidden="@(IsColumnHidden(ColumnName.Source))">Source</th>
+                        <th class="id" hidden="@(IsColumnHidden(ColumnName.EventId))">Event ID</th>
+                        <th class="task" hidden="@(IsColumnHidden(ColumnName.TaskCategory))">Task Category</th>
+                        <th class="description" hidden="@(IsColumnHidden(ColumnName.Description))">Description</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <Virtualize Items="log.Value.FilteredEvents" Context="evt">
+                <tbody @oncontextmenu="InvokeContextMenu">
+                    <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
                         <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                            <td>
+                            <td hidden="@(IsColumnHidden(ColumnName.Level))">
                                 <span class="@GetLevelClass(evt.Level)"></span>
                                 @evt.Level
                             </td>
-                            <td>@evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</td>
-                            <td hidden="@(!SettingsState.Value.ShowActivityId)">@evt.ActivityId</td>
-                            <td hidden="@(!SettingsState.Value.ShowLogName)">@evt.OwningLog.Split("\\").Last()</td>
-                            <td hidden="@(!SettingsState.Value.ShowComputerName)">@evt.ComputerName</td>
-                            <td>@evt.Source</td>
-                            <td>@evt.Id</td>
-                            <td>@evt.TaskCategory</td>
-                            <td>@evt.Description</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
+                                @evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)
+                            </td>
+                            <td hidden="@(IsColumnHidden(ColumnName.ActivityId))">@evt.ActivityId</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.LogName))">@evt.OwningLog.Split("\\").Last()</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.ComputerName))">@evt.ComputerName</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.Source))">@evt.Source</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.EventId))">@evt.Id</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.TaskCategory))">@evt.TaskCategory</td>
+                            <td hidden="@(IsColumnHidden(ColumnName.Description))">@evt.Description</td>
                         </tr>
                     </Virtualize>
                 </tbody>

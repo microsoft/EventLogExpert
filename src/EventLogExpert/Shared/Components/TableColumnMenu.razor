@@ -1,0 +1,14 @@
+@inherits FluxorComponent
+
+<div id="table-column-menu">
+    @foreach (var column in EventTableColumnsState.Value)
+    {
+        <div @onclick="() => ToggleColumn(column.Key)">
+            @column.Key.ToFullString()
+            @if (column.Value)
+            {
+                <i class="bi bi-check"></i>
+            }
+        </div>
+    }
+</div>
