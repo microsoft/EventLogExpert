@@ -85,24 +85,13 @@ public partial class MainPage : ContentPage
 
         selectedEventState.SelectedValueChanged += (sender, selectedEvent) => { _selectedEvent = selectedEvent; };
 
-        showLogNameState.Select(e => e.ShowLogName);
-
-        showLogNameState.SelectedValueChanged += (sender, showLogName) =>
-            MainThread.InvokeOnMainThreadAsync(() =>
-                ShowLogNameMenuItem.Text = $"Show Log Name{(showLogName ? " ✓" : "")}");
-
-        showComputerNameState.Select(e => e.ShowComputerName);
-
-        showComputerNameState.SelectedValueChanged += (sender, showComputerName) =>
-            MainThread.InvokeOnMainThreadAsync(() =>
-                ShowComputerNameMenuItem.Text = $"Show Computer Name{(showComputerName ? " ✓" : "")}");
-
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
                 Path.Join(fileLocationOptions.DatabasePath, path)));
 
+        fluxorDispatcher.Dispatch(new SettingsAction.LoadColumns());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
@@ -341,15 +330,6 @@ public partial class MainPage : ContentPage
             }
         }
     }
-
-    private void ShowActivityId_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowActivityId());
-
-    private void ShowComputerName_Clicked(object? sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowComputerName());
-
-    private void ShowLogName_Clicked(object? sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.ToggleShowLogName());
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());

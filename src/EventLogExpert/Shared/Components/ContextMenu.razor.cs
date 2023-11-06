@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -55,7 +54,8 @@ public partial class ContextMenu
 
         List<Func<DisplayEventModel, bool>> comparisons = new() { comparison };
 
-        FilterModel filter = new() {
+        FilterModel filter = new()
+        {
             Comparison = comparisons,
             IsEditing = false,
             FilterType = filterType,

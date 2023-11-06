@@ -1,0 +1,33 @@
+﻿#table-column-menu {
+    display: none;
+    width: 12em;
+    user-select: none;
+    color: #fff;
+    border: 1px solid var(--clr-lightblue);
+    background-color: var(--background-dark);
+    z-index: 10;
+
+    &.active {
+        display: block;
+        position: fixed;
+    }
+
+    & > div {
+        display: flex;
+        justify-content: space-between;
+        text-align: left;
+        margin: 0;
+        padding: 0 5px;
+        clear: both;
+        width: 100%;
+
+        &:hover {
+            background-color: var(--background-darkgray);
+        }
+
+        &[selected] {
+            color: var(--background-darkgray) !important;
+            background-color: var(--clr-lightblue) !important;
+        }
+    }
+}

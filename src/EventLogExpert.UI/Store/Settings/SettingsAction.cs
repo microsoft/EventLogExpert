@@ -7,6 +7,10 @@ namespace EventLogExpert.UI.Store.Settings;
 
 public record SettingsAction
 {
+    public record LoadColumns : SettingsAction;
+
+    public record LoadColumnsCompleted(IDictionary<ColumnName, bool> LoadedColumns) : SettingsAction;
+
     public record LoadDatabases : SettingsAction;
 
     public record LoadDatabasesCompleted(IEnumerable<string> LoadedDatabases) : SettingsAction;
@@ -21,9 +25,5 @@ public record SettingsAction
 
     public record SaveCompleted(SettingsModel Settings) : SettingsAction;
 
-    public record ToggleShowActivityId : SettingsAction;
-
-    public record ToggleShowComputerName : SettingsAction;
-
-    public record ToggleShowLogName : SettingsAction;
+    public record ToggleColumn(ColumnName ColumnName) : SettingsAction;
 }

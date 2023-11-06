@@ -9,13 +9,46 @@ namespace EventLogExpert.Services;
 
 public class PreferencesProvider : IPreferencesProvider
 {
+    private const string ActivityIdColumn = "activity-id-column";
+    private const string ComputerNameColumn = "computer-name-column";
+    private const string DateAndTimeColumn = "date-and-time-column";
+    private const string DescriptionColumn = "description-column";
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
+    private const string EventIdColumn = "event-id-column";
     private const string FavoriteFilters = "favorite-filters";
+    private const string LevelColumn = "level-column";
     private const string LoggingLevel = "logging-level";
+    private const string LogNameColumn = "log-name-column";
     private const string PrereleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
+    private const string SourceColumn = "source-column";
+    private const string TaskCategoryColumn = "task-category-column";
     private const string TimeZone = "timezone";
+
+    public bool ActivityIdColumnPreference
+    {
+        get => Preferences.Default.Get(ActivityIdColumn, false);
+        set => Preferences.Default.Set(ActivityIdColumn, value);
+    }
+
+    public bool ComputerNameColumnPreference
+    {
+        get => Preferences.Default.Get(ComputerNameColumn, false);
+        set => Preferences.Default.Set(ComputerNameColumn, value);
+    }
+
+    public bool DateAndTimeColumnPreference
+    {
+        get => Preferences.Default.Get(DateAndTimeColumn, true);
+        set => Preferences.Default.Set(DateAndTimeColumn, value);
+    }
+
+    public bool DescriptionColumnPreference
+    {
+        get => Preferences.Default.Get(DescriptionColumn, true);
+        set => Preferences.Default.Set(DescriptionColumn, value);
+    }
 
     public IList<string> DisabledDatabasesPreference
     {
@@ -29,17 +62,36 @@ public class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(DisplaySelectionEnabled, value);
     }
 
+    public bool EventIdColumnPreference
+    {
+        get => Preferences.Default.Get(EventIdColumn, true);
+        set => Preferences.Default.Set(EventIdColumn, value);
+    }
+
     public IList<string> FavoriteFiltersPreference
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? new List<string>();
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
     }
 
+    public bool LevelColumnPreference
+    {
+        get => Preferences.Default.Get(LevelColumn, true);
+        set => Preferences.Default.Set(LevelColumn, value);
+    }
+
     public LogLevel LogLevelPreference
     {
-        get => Enum.TryParse(Preferences.Default.Get(LoggingLevel, LogLevel.Information.ToString()), out LogLevel value) ?
+        get => Enum.TryParse(Preferences.Default.Get(LoggingLevel, LogLevel.Information.ToString()),
+            out LogLevel value) ?
             value : LogLevel.Information;
         set => Preferences.Default.Set(LoggingLevel, value.ToString());
+    }
+
+    public bool LogNameColumnPreference
+    {
+        get => Preferences.Default.Get(LogNameColumn, false);
+        set => Preferences.Default.Set(LogNameColumn, value);
     }
 
     public bool PrereleasePreference
@@ -52,6 +104,18 @@ public class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? new List<string>();
         set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
+    }
+
+    public bool SourceColumnPreference
+    {
+        get => Preferences.Default.Get(SourceColumn, true);
+        set => Preferences.Default.Set(SourceColumn, value);
+    }
+
+    public bool TaskCategoryColumnPreference
+    {
+        get => Preferences.Default.Get(TaskCategoryColumn, true);
+        set => Preferences.Default.Set(TaskCategoryColumn, value);
     }
 
     public string TimeZonePreference

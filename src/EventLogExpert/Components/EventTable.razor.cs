@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -69,6 +70,16 @@ public partial class EventTable
 
     private async Task InvokeContextMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeContextMenu", args.ClientX, args.ClientY);
+
+    private async Task InvokeTableColumnMenu(MouseEventArgs args) =>
+        await JSRuntime.InvokeVoidAsync("invokeTableColumnMenu", args.ClientX, args.ClientY);
+
+    private bool IsColumnHidden(ColumnName columnName)
+    {
+        if (!SettingsState.Value.EventTableColumns.TryGetValue(columnName, out var enabled)) { return true; }
+
+        return !enabled;
+    }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 

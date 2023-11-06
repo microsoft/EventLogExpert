@@ -37,3 +37,16 @@ public enum CopyType
     Simple,
     Xml
 }
+
+public enum ColumnName
+{
+    Level,
+    [EnumMember(Value = "Date and Time")] DateAndTime,
+    [EnumMember(Value = "Activity ID")] ActivityId,
+    [EnumMember(Value = "Log Name")] LogName,
+    [EnumMember(Value = "Computer Name")] ComputerName,
+    Source,
+    [EnumMember(Value = "Event ID")] EventId,
+    [EnumMember(Value = "Task Category")] TaskCategory,
+    Description
+}
