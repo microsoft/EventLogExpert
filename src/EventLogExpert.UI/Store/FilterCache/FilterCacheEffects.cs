@@ -42,7 +42,7 @@ public class FilterCacheEffects
             return;
         }
 
-        ImmutableQueue<FilterCacheModel> newFilters = _state.Value.RecentFilters.Count() >= MaxRecentFilterCount
+        ImmutableQueue<AdvancedFilterModel> newFilters = _state.Value.RecentFilters.Count() >= MaxRecentFilterCount
             ? _state.Value.RecentFilters.Dequeue().Enqueue(action.Filter)
             : _state.Value.RecentFilters.Enqueue(action.Filter);
 
@@ -54,9 +54,9 @@ public class FilterCacheEffects
     [EffectMethod]
     public async Task HandleImportFavorites(FilterCacheAction.ImportFavorites action, IDispatcher dispatcher)
     {
-        List<FilterCacheModel> newFilters = _state.Value.FavoriteFilters.ToList();
+        List<AdvancedFilterModel> newFilters = _state.Value.FavoriteFilters.ToList();
 
-        foreach (FilterCacheModel filter in
+        foreach (AdvancedFilterModel filter in
             action.Filters.Where(filter => !newFilters.Any(x => filter.ComparisonString.Equals(x.ComparisonString))))
         {
             newFilters.Add(filter);
@@ -73,17 +73,17 @@ public class FilterCacheEffects
         var favoritesPreference = _preferencesProvider.FavoriteFiltersPreference;
         var recentPreference = _preferencesProvider.RecentFiltersPreference;
 
-        List<FilterCacheModel> favorites = new();
-        List<FilterCacheModel> recent = new();
+        List<AdvancedFilterModel> favorites = new();
+        List<AdvancedFilterModel> recent = new();
 
         foreach (var filter in favoritesPreference)
         {
-            favorites.Add(new FilterCacheModel { ComparisonString = filter });
+            favorites.Add(new AdvancedFilterModel { ComparisonString = filter });
         }
 
         foreach (var filter in recentPreference)
         {
-            recent.Add(new FilterCacheModel { ComparisonString = filter });
+            recent.Add(new AdvancedFilterModel { ComparisonString = filter });
         }
 
         dispatcher.Dispatch(
@@ -97,8 +97,8 @@ public class FilterCacheEffects
     {
         if (!_state.Value.FavoriteFilters.Contains(action.Filter)) { return; }
 
-        ImmutableList<FilterCacheModel> favorites;
-        ImmutableQueue<FilterCacheModel> recent;
+        ImmutableList<AdvancedFilterModel> favorites;
+        ImmutableQueue<AdvancedFilterModel> recent;
 
         if (_state.Value.RecentFilters.Any(filter =>
             string.Equals(filter.ComparisonString,

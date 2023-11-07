@@ -1,14 +1,12 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using System.Linq.Dynamic.Core;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
@@ -16,12 +14,12 @@ namespace EventLogExpert.Shared.Components.Filters;
 public partial class FilterCacheRow
 {
     private CacheType _cacheType = CacheType.Favorites;
-    private FilterCacheModel _filter = null!;
+    private AdvancedFilterModel _filter = null!;
     private string _filterValue = null!;
     private bool _isEditing;
     private string? _errorMessage;
 
-    [Parameter] public FilterCacheModel Value { get; set; } = null!;
+    [Parameter] public AdvancedFilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
@@ -47,27 +45,6 @@ public partial class FilterCacheRow
         _filter = Value with { };
     }
 
-    private static bool TryParseExpression(string? expression, out string error)
-    {
-        error = string.Empty;
-
-        if (string.IsNullOrEmpty(expression)) { return false; }
-
-        try
-        {
-            var _ = new List<DisplayEventModel>().AsQueryable()
-                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression)
-                .ToList();
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            error = ex.Message;
-            return false;
-        }
-    }
-
     private void RemoveFilter()
     {
         // TODO: This is bugged and will not delete the cache entry unless the Value is in the filter list
@@ -78,7 +55,7 @@ public partial class FilterCacheRow
 
     private void SaveFilter()
     {
-        if (!TryParseExpression(_filterValue, out _errorMessage)) { return; }
+        if (!FilterMethods.TryParseExpression(_filterValue, out _errorMessage)) { return; }
 
         _isEditing = false;
 

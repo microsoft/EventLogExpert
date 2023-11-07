@@ -79,7 +79,7 @@
                     </tr>
                 </thead>
                 <tbody @oncontextmenu="InvokeContextMenu">
-                    <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
+                    <Virtualize Items="log.Value.FilteredEvents" Context="evt">
                         <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
                             <td hidden="@(IsColumnHidden(ColumnName.Level))">
                                 <span class="@GetLevelClass(evt.Level)"></span>

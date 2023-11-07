@@ -25,15 +25,15 @@ public record FilterPaneAction
 
     public record ToggleFilterDate;
 
-    public record SetAdvancedFilter(string? Expression);
+    public record SetAdvancedFilter(AdvancedFilterModel? AdvancedFilterModel);
 
     public record ToggleAdvancedFilter;
 
-    public record AddCachedFilter(FilterCacheModel CachedFilterModel);
+    public record AddCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
-    public record RemoveCachedFilter(FilterCacheModel CachedFilterModel);
+    public record RemoveCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
-    public record ToggleCachedFilter(FilterCacheModel CachedFilterModel);
+    public record ToggleCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
     public record ClearAllFilters();
 }

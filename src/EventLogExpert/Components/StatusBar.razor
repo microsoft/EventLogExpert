@@ -11,8 +11,8 @@
     @{
         var eventLogState = EventLogState.Value;
         var isAnyFilterApplied = 
-            eventLogState.AppliedFilter.AdvancedFilter != "" ||
-            eventLogState.AppliedFilter.DateFilter != null ||
+            eventLogState.AppliedFilter.AdvancedFilter is not null ||
+            eventLogState.AppliedFilter.DateFilter is not null ||
             eventLogState.AppliedFilter.CachedFilters.Any() ||
             eventLogState.AppliedFilter.Filters.Any();
     }

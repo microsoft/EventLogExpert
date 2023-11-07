@@ -12,11 +12,9 @@ public record FilterPaneState
 {
     public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList<FilterModel>.Empty;
 
-    public IImmutableList<FilterCacheModel> CachedFilters { get; init; } = ImmutableList<FilterCacheModel>.Empty;
+    public IImmutableList<AdvancedFilterModel> CachedFilters { get; init; } = ImmutableList<AdvancedFilterModel>.Empty;
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 
-    public string? AdvancedFilter { get; init; } = null;
-
-    public bool IsAdvancedFilterEnabled { get; init; } = false;
+    public AdvancedFilterModel? AdvancedFilter { get; init; } = null;
 }

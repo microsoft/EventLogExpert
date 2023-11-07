@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
-using System.Security.Cryptography.X509Certificates;
+using System.Linq.Dynamic.Core;
 using System.Text;
 
 namespace EventLogExpert.UI;
@@ -22,6 +22,31 @@ public static class FilterMethods
         FilterComparison.NotContains => GetNotContainsComparison(type, value),
         FilterComparison.MultiSelect => GetMultiSelectComparison(type, values),
         _ => null
+    };
+
+    /// <summary>Sorts events by RecordId if no order is specified</summary>
+    public static IEnumerable<DisplayEventModel> SortEvents(
+        this IEnumerable<DisplayEventModel> events,
+        ColumnName? orderBy = null,
+        bool isDescending = false) => orderBy switch
+    {
+        ColumnName.Level => isDescending ? events.OrderByDescending(e => e.Level) : events.OrderBy(e => e.Level),
+        ColumnName.DateAndTime => isDescending ?
+            events.OrderByDescending(e => e.TimeCreated) :
+            events.OrderBy(e => e.TimeCreated),
+        ColumnName.ActivityId => isDescending ?
+            events.OrderByDescending(e => e.ActivityId) :
+            events.OrderBy(e => e.ActivityId),
+        ColumnName.LogName => isDescending ? events.OrderByDescending(e => e.LogName) : events.OrderBy(e => e.LogName),
+        ColumnName.ComputerName => isDescending ?
+            events.OrderByDescending(e => e.ComputerName) :
+            events.OrderBy(e => e.ComputerName),
+        ColumnName.Source => isDescending ? events.OrderByDescending(e => e.Source) : events.OrderBy(e => e.Source),
+        ColumnName.EventId => isDescending ? events.OrderByDescending(e => e.Id) : events.OrderBy(e => e.Id),
+        ColumnName.TaskCategory => isDescending ?
+            events.OrderByDescending(e => e.TaskCategory) :
+            events.OrderBy(e => e.TaskCategory),
+        _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
     };
 
     public static bool TryParse(FilterModel filterModel, out string? comparison)
@@ -103,6 +128,27 @@ public static class FilterMethods
         return true;
     }
 
+    public static bool TryParseExpression(string? expression, out string error)
+    {
+        error = string.Empty;
+
+        if (string.IsNullOrEmpty(expression)) { return false; }
+
+        try
+        {
+            var _ = new List<DisplayEventModel>().AsQueryable()
+                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression)
+                .ToList();
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return false;
+        }
+    }
+
     private static string GetComparisonString(FilterType type, FilterComparison comparison) => comparison switch
     {
         FilterComparison.Equals => type is FilterType.KeywordsDisplayNames ?
@@ -161,6 +207,19 @@ public static class FilterMethods
             _ => null
         };
 
+    private static Func<DisplayEventModel, bool>? GetMultiSelectComparison(FilterType filterType,
+        ICollection<string> values) => filterType switch
+    {
+        FilterType.Id => x => values.Contains(x.Id.ToString()),
+        FilterType.ActivityId => x => values.Contains(x.ActivityId?.ToString() ?? string.Empty),
+        FilterType.Level => x => values.Contains(x.Level?.ToString() ?? string.Empty),
+        FilterType.KeywordsDisplayNames => x => x.KeywordsDisplayNames.Any(values.Contains),
+        FilterType.Source => x => values.Contains(x.Source),
+        FilterType.TaskCategory => x => values.Contains(x.TaskCategory),
+        FilterType.Description => x => values.Contains(x.Description),
+        _ => null
+    };
+
     private static Func<DisplayEventModel, bool>? GetNotContainsComparison(FilterType filterType, string value) =>
         filterType switch
         {
@@ -189,19 +248,6 @@ public static class FilterMethods
                 !string.Equals(x.Description, value, StringComparison.OrdinalIgnoreCase),
             _ => null
         };
-
-    private static Func<DisplayEventModel, bool>? GetMultiSelectComparison(FilterType filterType,
-        ICollection<string> values) => filterType switch
-    {
-        FilterType.Id => x => values.Contains(x.Id.ToString()),
-        FilterType.ActivityId => x => values.Contains(x.ActivityId?.ToString() ?? string.Empty),
-        FilterType.Level => x => values.Contains(x.Level?.ToString() ?? string.Empty),
-        FilterType.KeywordsDisplayNames => x => x.KeywordsDisplayNames.Any(values.Contains),
-        FilterType.Source => x => values.Contains(x.Source),
-        FilterType.TaskCategory => x => values.Contains(x.TaskCategory),
-        FilterType.Description => x => values.Contains(x.Description),
-        _ => null
-    };
 
     private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
     {
