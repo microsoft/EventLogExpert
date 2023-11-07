@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
@@ -12,7 +11,6 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
-using System.Linq.Dynamic.Core;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
@@ -20,10 +18,10 @@ namespace EventLogExpert.Components;
 public partial class FilterPane
 {
     private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
-
+    
+    private AdvancedFilterModel? _advancedFilter = null;
     private Timer? _advancedFilterDebounceTimer = null;
     private string _advancedFilterErrorMessage = string.Empty;
-    private string? _advancedFilterValue = null;
     private bool _canEditAdvancedFilter = true;
     private bool _canEditDate;
     private bool _isAdvancedFilterValid;
@@ -38,7 +36,7 @@ public partial class FilterPane
         IsAdvancedFilterVisible;
 
     private bool IsAdvancedFilterVisible =>
-        _advancedFilterValue is not null || FilterPaneState.Value.AdvancedFilter is not null;
+        _advancedFilter is not null || FilterPaneState.Value.AdvancedFilter is not null;
 
     private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
 
@@ -54,7 +52,7 @@ public partial class FilterPane
         {
             _advancedFilterDebounceTimer = null;
             _advancedFilterErrorMessage = string.Empty;
-            _advancedFilterValue = null;
+            _advancedFilter = null;
             _isAdvancedFilterValid = false;
 
             _canEditDate = false;
@@ -85,32 +83,11 @@ public partial class FilterPane
         );
     }
 
-    private static bool TryParseExpression(string? expression, out string message)
-    {
-        message = string.Empty;
-
-        if (string.IsNullOrEmpty(expression)) { return false; }
-
-        try
-        {
-            var _ = new List<DisplayEventModel>().AsQueryable()
-                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression)
-                .ToList();
-
-            return true;
-        }
-        catch (Exception ex)
-        {
-            message = ex.Message;
-            return false;
-        }
-    }
-
     private void AddAdvancedFilter()
     {
         _isFilterListVisible = true;
         _canEditAdvancedFilter = true;
-        _advancedFilterValue = string.Empty;
+        _advancedFilter = new AdvancedFilterModel();
     }
 
     private void AddCachedFilter() => Dispatcher.Dispatch(new FilterCacheAction.OpenMenu());
@@ -152,24 +129,28 @@ public partial class FilterPane
 
     private void AdvancedFilterChanged(ChangeEventArgs e)
     {
-        _advancedFilterValue = e.Value as string;
-
         _advancedFilterDebounceTimer?.Dispose();
 
-        _advancedFilterDebounceTimer = new(s =>
+        _advancedFilterDebounceTimer = new Timer(s =>
             {
-                _isAdvancedFilterValid = TryParseExpression(s as string, out var message);
+                _isAdvancedFilterValid = FilterMethods.TryParseExpression(s?.ToString(), out var message);
                 _advancedFilterErrorMessage = message;
+
+                if (_isAdvancedFilterValid && _advancedFilter is not null)
+                {
+                    _advancedFilter.ComparisonString = s?.ToString()!;
+                }
+
                 InvokeAsync(StateHasChanged);
-            }, e.Value as string, 250, 0);
+            }, e.Value, 250, 0);
     }
 
     private void ApplyAdvancedFilter()
     {
-        if (!TryParseExpression(_advancedFilterValue, out _)) { return; }
+        if (!FilterMethods.TryParseExpression(_advancedFilter?.ComparisonString, out _)) { return; }
 
         _canEditAdvancedFilter = false;
-        Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(_advancedFilterValue));
+        Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(_advancedFilter));
     }
 
     private void ApplyDateFilter()
@@ -194,14 +175,14 @@ public partial class FilterPane
         count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
         count += FilterPaneState.Value.CurrentFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
         count += FilterPaneState.Value.CachedFilters.Count(filter => filter is { IsEnabled: true });
-        count += FilterPaneState.Value.IsAdvancedFilterEnabled ? 1 : 0;
+        count += FilterPaneState.Value.AdvancedFilter?.IsEnabled is true ? 1 : 0;
 
         return count;
     }
 
     private void RemoveAdvancedFilter()
     {
-        _advancedFilterValue = null;
+        _advancedFilter = null;
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(null));
     }
 

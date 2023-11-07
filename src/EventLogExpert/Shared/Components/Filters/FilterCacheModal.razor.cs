@@ -29,10 +29,10 @@ public partial class FilterCacheModal
         base.OnInitialized();
     }
 
-    private void AddFavorite(FilterCacheModel filter) =>
+    private void AddFavorite(AdvancedFilterModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
 
-    private void AddFilter(FilterCacheModel filter)
+    private void AddFilter(AdvancedFilterModel filter)
     {
         Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
         Close().AndForget();
@@ -106,7 +106,7 @@ public partial class FilterCacheModal
 
             if (json is null) { return; }
 
-            var filters = json.Select(x => new FilterCacheModel { ComparisonString = x }).ToList();
+            var filters = json.Select(x => new AdvancedFilterModel { ComparisonString = x }).ToList();
 
             Dispatcher.Dispatch(new FilterCacheAction.ImportFavorites(filters));
         }
@@ -120,6 +120,6 @@ public partial class FilterCacheModal
 
     private async Task Open() => await JSRuntime.InvokeVoidAsync("openFilterCacheModal");
 
-    private void RemoveFavorite(FilterCacheModel filter) =>
+    private void RemoveFavorite(AdvancedFilterModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
 }

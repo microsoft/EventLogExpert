@@ -131,7 +131,7 @@
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
-                    @if (FilterPaneState.Value.IsAdvancedFilterEnabled)
+                    @if (FilterPaneState.Value.AdvancedFilter?.IsEnabled is true)
                     {
                         <button class="button button-red" @onclick="ToggleAdvancedFilter">
                             <i class="bi bi-dash-circle"></i> Disable

@@ -15,9 +15,9 @@ public record EventLogState
     public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
     public record EventFilter(
-        string? AdvancedFilter,
+        AdvancedFilterModel? AdvancedFilter,
         FilterDateModel? DateFilter,
-        ImmutableList<FilterCacheModel> CachedFilters,
+        ImmutableList<AdvancedFilterModel> CachedFilters,
         ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);
 
     public enum LogType { Live, File }
@@ -38,9 +38,9 @@ public record EventLogState
         ImmutableDictionary<string, EventLogData>.Empty;
 
     public EventFilter AppliedFilter { get; init; } = new(
-        string.Empty,
         null,
-        ImmutableList<FilterCacheModel>.Empty,
+        null,
+        ImmutableList<AdvancedFilterModel>.Empty,
         ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>>.Empty);
 
     public bool ContinuouslyUpdate { get; init; } = false;
