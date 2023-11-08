@@ -94,21 +94,25 @@ public class EventLogReducers
             newLogsCollection = state.ActiveLogs.Remove(action.LogName);
         }
 
-        var filtered = GetFilteredEvents(
-            action.Events,
-            state.AppliedFilter,
-            action.TraceLogger,
-            isDescending: state.SortDescending);
+        // Events collection is always ordered descending by record id
+        var sortedEvents = action.Events.OrderByDescending(e => e.RecordId).ToList();
+        // Filtered events reflects both the filter and sort choice.
+        var filtered = IsFilteringEnabled(state.AppliedFilter) ?
+            GetFilteredEvents(
+                    sortedEvents,
+                    state.AppliedFilter,
+                    action.TraceLogger,
+                    isDescending: state.SortDescending)
+                .ToList() :
+            sortedEvents;
 
         newLogsCollection = newLogsCollection.Add(
             action.LogName,
             new EventLogData(
                 action.LogName,
                 action.Type,
-                // Events collection is always ordered descending by record id
-                action.Events.OrderByDescending(e => e.RecordId).ToList().AsReadOnly(),
-                // Filtered events reflects both the filter and sort choice.
-                filtered.ToList().AsReadOnly(),
+                sortedEvents.AsReadOnly(),
+                filtered.AsReadOnly(),
                 action.AllEventIds.ToImmutableHashSet(),
                 action.AllActivityIds.ToImmutableHashSet(),
                 action.AllProviderNames.ToImmutableHashSet(),
@@ -261,17 +265,30 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetSortDescending(EventLogState state, EventLogAction.SetSortDescending action)
     {
-        if (action.SortDescending == state.SortDescending)
+        if (action.SortDescending == state.SortDescending) { return state; }
+
+        var newActiveLogs = state.ActiveLogs;
+
+        foreach (var logData in state.ActiveLogs.Values)
         {
-            return state;
+            newActiveLogs = newActiveLogs
+                .Remove(logData.Name)
+                .Add(logData.Name,
+                    logData with
+                    {
+                        FilteredEvents = logData.FilteredEvents
+                            .SortEvents(isDescending: action.SortDescending)
+                            .ToList()
+                            .AsReadOnly()
+                    });
         }
+
+        var newCombinedEvents = CombineLogs(newActiveLogs.Values.Select(l => l.FilteredEvents), action.SortDescending, action.TraceLogger);
 
         return state with
         {
-            CombinedEvents = state.CombinedEvents
-                .SortEvents(ColumnName.DateAndTime, action.SortDescending)
-                .ToList()
-                .AsReadOnly(),
+            ActiveLogs = newActiveLogs,
+            CombinedEvents = newCombinedEvents.ToList().AsReadOnly(),
             SortDescending = action.SortDescending
         };
     }
@@ -450,6 +467,12 @@ public class EventLogReducers
                 .SortEvents(orderBy, isDescending) :
             eventsToFilter;
     }
+
+    private static bool IsFilteringEnabled(EventFilter eventFilter) =>
+        eventFilter.AdvancedFilter?.IsEnabled is true ||
+        eventFilter.CachedFilters.Any() ||
+        eventFilter.DateFilter?.IsEnabled is true ||
+        eventFilter.Filters.Any();
 
     private static EventLogState ProcessNewEventBuffer(EventLogState state, ITraceLogger traceLogger)
     {
