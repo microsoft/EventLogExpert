@@ -5,9 +5,9 @@
 
 @if (EventLogState.Value.ActiveLogs.Count > 1)
 {
-    <div class="tab-pane">
+    <div id="tab-pane">
         <div class="tab-row">
-            <div>
+            <div style="max-width: @GetTabWidth()">
                 <input type="radio" name="tab" id="log" checked @onclick="() => SetActiveLog(null)" />
                 <label for="log" tabindex="0">Combined</label>
             </div>
@@ -21,7 +21,7 @@
                 for (int i = 0; i < logsTabSorted.Count; i++)
                 {
                     var log = logsTabSorted[i];
-                    <div title="@GetTabTooltip(log)">
+                    <div style="max-width: @GetTabWidth()" title="@GetTabTooltip(log)">
                         <input type="radio" name="tab" id="@($"log{i}")"
                             @onclick="() => SetActiveLog(log.Name)" />
                         <label for="@($"log{i}")" tabindex="0">@GetTabName(log)</label>

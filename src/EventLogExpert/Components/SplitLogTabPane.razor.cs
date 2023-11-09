@@ -49,6 +49,13 @@ public partial class SplitLogTabPane
             $"Computer Name: {log.Events.FirstOrDefault()?.ComputerName ?? ""}";
     }
 
+    private string GetTabWidth()
+    {
+        var logCount = EventLogState.Value.ActiveLogs.Count;
+
+        return logCount > 4 ? $"{100 / (logCount + 1)}vw" : "20vw";
+    }
+
     private async Task SetActiveLog(string? activeLog)
     {
         ActiveLog = activeLog;
