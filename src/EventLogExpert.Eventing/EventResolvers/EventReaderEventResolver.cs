@@ -40,7 +40,7 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.TimeCreated!.Value.ToUniversalTime(),
             eventRecord.Id,
             eventRecord.MachineName,
-            (SeverityLevel?)eventRecord.Level,
+            Severity.GetString(eventRecord.Level),
             eventRecord.ProviderName,
             eventRecord.Task is 0 or null ? "None" : TryGetValue(() => eventRecord.TaskDisplayName),
             string.IsNullOrEmpty(desc) ? string.Empty : desc,

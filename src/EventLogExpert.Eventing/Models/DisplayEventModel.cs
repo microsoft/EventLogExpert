@@ -13,7 +13,7 @@ public record DisplayEventModel(
     DateTime TimeCreated,
     int Id,
     string ComputerName,
-    SeverityLevel? Level,
+    string Level,
     string Source,
     string TaskCategory,
     string Description,

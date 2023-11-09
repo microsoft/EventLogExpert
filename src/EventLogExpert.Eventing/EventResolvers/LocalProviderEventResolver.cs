@@ -47,7 +47,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
-                (SeverityLevel?)eventRecord.Level,
+                Severity.GetString(eventRecord.Level),
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",

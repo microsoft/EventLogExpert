@@ -57,12 +57,12 @@ public partial class EventTable
         base.OnInitialized();
     }
 
-    private static string GetLevelClass(SeverityLevel? level) => level switch
+    private static string GetLevelClass(string level) => level switch
     {
-        SeverityLevel.Error => "bi bi-exclamation-circle error",
-        SeverityLevel.Warning => "bi bi-exclamation-triangle warning",
-        SeverityLevel.Information => "bi bi-info-circle",
-        _ => "",
+        nameof(SeverityLevel.Error) => "bi bi-exclamation-circle error",
+        nameof(SeverityLevel.Warning) => "bi bi-exclamation-triangle warning",
+        nameof(SeverityLevel.Information) => "bi bi-info-circle",
+        _ => string.Empty,
     };
 
     private string GetCss(DisplayEventModel @event) => SelectedEventState.Value?.RecordId == @event.RecordId ?
