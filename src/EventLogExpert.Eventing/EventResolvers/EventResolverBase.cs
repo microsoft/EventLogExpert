@@ -219,7 +219,7 @@ public class EventResolverBase
                 eventRecord.TimeCreated!.Value.ToUniversalTime(),
                 eventRecord.Id,
                 eventRecord.MachineName,
-                (SeverityLevel?)eventRecord.Level,
+                Severity.GetString(eventRecord.Level),
                 eventRecord.ProviderName,
                 taskName,
                 description,
