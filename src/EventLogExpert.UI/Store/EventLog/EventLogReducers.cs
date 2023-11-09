@@ -430,16 +430,22 @@ public class EventLogReducers
         ColumnName? orderBy = null,
         bool isDescending = false)
     {
-        IQueryable<DisplayEventModel> eventsToFilter = events.AsQueryable();
+        traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {events.Count()} events.");
 
-        traceLogger.Trace($"{nameof(GetFilteredEvents)} was called to filter {eventsToFilter.Count()} events.");
+        IQueryable<DisplayEventModel> filteredEvents = events.AsQueryable();
 
         List<Func<DisplayEventModel, bool>> filters = new();
 
         if (eventFilter.DateFilter?.IsEnabled is true)
         {
-            filters.Add(e => e.TimeCreated >= eventFilter.DateFilter.After &&
+            filteredEvents = filteredEvents.Where(e =>
+                e.TimeCreated >= eventFilter.DateFilter.After &&
                 e.TimeCreated <= eventFilter.DateFilter.Before);
+        }
+
+        if (eventFilter.AdvancedFilter?.IsEnabled is true)
+        {
+            filteredEvents = filteredEvents.Where(e => eventFilter.AdvancedFilter.Comparison(e));
         }
 
         if (eventFilter.Filters.Any())
@@ -455,17 +461,13 @@ public class EventLogReducers
                 .All(filter => filter.Comparison(e)));
         }
 
-        if (eventFilter.AdvancedFilter?.IsEnabled is true)
-        {
-            filters.Add(e => eventFilter.AdvancedFilter.Comparison(e));
-        }
-
+        // Only sort if we have to, due to use of AsParallel
         return filters.Any() ?
-            eventsToFilter.AsParallel()
+            filteredEvents.AsParallel()
                 .Where(e => filters
                     .All(filter => filter(e)))
                 .SortEvents(orderBy, isDescending) :
-            eventsToFilter;
+            filteredEvents;
     }
 
     private static bool IsFilteringEnabled(EventFilter eventFilter) =>
