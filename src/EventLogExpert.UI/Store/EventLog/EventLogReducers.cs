@@ -412,14 +412,14 @@ public class EventLogReducers
 
         if (eventFilter.DateFilter?.IsEnabled is true)
         {
-            filteredEvents = filteredEvents.Where(e =>
+            filters.Add(e =>
                 e.TimeCreated >= eventFilter.DateFilter.After &&
                 e.TimeCreated <= eventFilter.DateFilter.Before);
         }
 
         if (eventFilter.AdvancedFilter?.IsEnabled is true)
         {
-            filteredEvents = filteredEvents.Where(e => eventFilter.AdvancedFilter.Comparison(e));
+            filters.Add(e => eventFilter.AdvancedFilter.Comparison(e));
         }
 
         if (eventFilter.Filters.Any())
@@ -434,7 +434,6 @@ public class EventLogReducers
                 .All(filter => filter.Comparison(e)));
         }
 
-        // Only sort if we have to, due to use of AsParallel
         return filters.Any() ?
             filteredEvents.AsParallel()
                 .Where(e => filters
