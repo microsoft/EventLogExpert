@@ -352,7 +352,7 @@ public class EventLogReducers
         }
 
         // If we only have one log open, the events are already sorted.
-        return events.First();
+        return events.FirstOrDefault() ?? Enumerable.Empty<DisplayEventModel>();
     }
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
