@@ -376,9 +376,8 @@ public class EventLogReducers
                 events.SelectMany(l => l).OrderBy(e => e.TimeCreated);
         }
 
-        return isDescending ?
-            events.First().OrderByDescending(e => e.RecordId) :
-            events.First().OrderBy(e => e.RecordId);
+        // If we only have one log open, the events are already sorted.
+        return events.First();
     }
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
