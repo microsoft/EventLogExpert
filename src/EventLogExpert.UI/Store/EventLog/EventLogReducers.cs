@@ -186,31 +186,10 @@ public class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
     {
-        var filterChanged = false;
-
-        if (action.EventFilter.AdvancedFilter != state.AppliedFilter.AdvancedFilter ||
-            action.EventFilter.DateFilter != state.AppliedFilter.DateFilter ||
-            action.EventFilter.CachedFilters != state.AppliedFilter.CachedFilters ||
-            action.EventFilter.Filters.Count != state.AppliedFilter.Filters.Count)
+        if (!HasFilteringChanged(action.EventFilter, state.AppliedFilter))
         {
-            filterChanged = true;
+            return state;
         }
-        else
-        {
-            for (var i = 0; i < action.EventFilter.Filters.Count; i++)
-            {
-                var actionFilterGroup = action.EventFilter.Filters[i];
-                var stateFilterGroup = state.AppliedFilter.Filters[i];
-
-                if (!actionFilterGroup.SequenceEqual(stateFilterGroup))
-                {
-                    filterChanged = true;
-                    break;
-                }
-            }
-        }
-
-        if (!filterChanged) { return state; }
 
         var newState = state;
 
@@ -468,6 +447,12 @@ public class EventLogReducers
                 .SortEvents(orderBy, isDescending) :
             filteredEvents;
     }
+
+    private static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
+        updated.AdvancedFilter?.Equals(original.AdvancedFilter) is false ||
+        updated.DateFilter?.Equals(original.DateFilter) is false ||
+        updated.CachedFilters.Equals(original.CachedFilters) is false ||
+        updated.Filters.Equals(original.Filters) is false;
 
     private static bool IsFilteringEnabled(EventFilter eventFilter) =>
         eventFilter.AdvancedFilter?.IsEnabled is true ||
