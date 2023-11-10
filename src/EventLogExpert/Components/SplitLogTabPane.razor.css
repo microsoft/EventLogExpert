@@ -1,7 +1,7 @@
-﻿.tab-pane {
+﻿#tab-pane {
     margin: 0 5px;
     height: 33px;
-    margin-bottom: 1px;
+    overflow: hidden;
 }
 
 .tab-row {
@@ -9,7 +9,6 @@
     align-items: flex-end;
 
     text-align: left;
-    width: 250px;
     float: none;
     position: relative;
 }
@@ -31,7 +30,7 @@ label {
     padding: 4px 22px;
     border-radius: 3px 3px 0 0;
 
-    max-width: calc(100vw / 5);
+    /* max-width: calc(100vw / 5); */
     overflow: hidden;
     user-select: none;
     text-overflow: ellipsis;
