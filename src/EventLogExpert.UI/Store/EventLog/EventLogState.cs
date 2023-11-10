@@ -18,7 +18,7 @@ public record EventLogState
         AdvancedFilterModel? AdvancedFilter,
         FilterDateModel? DateFilter,
         ImmutableList<AdvancedFilterModel> CachedFilters,
-        ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>> Filters);
+        ImmutableList<FilterModel> Filters);
 
     public enum LogType { Live, File }
 
@@ -41,7 +41,7 @@ public record EventLogState
         null,
         null,
         ImmutableList<AdvancedFilterModel>.Empty,
-        ImmutableList<ImmutableList<Func<DisplayEventModel, bool>>>.Empty);
+        ImmutableList<FilterModel>.Empty);
 
     public bool ContinuouslyUpdate { get; init; } = false;
 

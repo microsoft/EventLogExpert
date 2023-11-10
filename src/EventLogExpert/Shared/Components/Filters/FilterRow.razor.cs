@@ -79,47 +79,11 @@ public partial class FilterRow
             return;
         }
 
-        List<Func<DisplayEventModel, bool>> comparisons = new();
-
-        var comparison =
-            FilterMethods.GetComparison(
-                newModel.FilterComparison,
-                newModel.FilterType,
-                newModel.FilterValue,
-                newModel.FilterValues);
-
-        if (comparison is null) { return; }
-
-        comparisons.Add(comparison);
-
-        if (Value.SubFilters.Count > 0)
-        {
-            foreach (var subFilter in Value.SubFilters)
-            {
-                comparison = FilterMethods.GetComparison(
-                    subFilter.FilterComparison,
-                    subFilter.FilterType,
-                    subFilter.FilterValue,
-                    subFilter.FilterValues);
-
-                if (comparison is null)
-                {
-                    await AlertDialogService.ShowAlert("Invalid Filter",
-                        "The sub filter you have created is an invalid filter, please adjust and try again.",
-                        "Ok");
-
-                    return;
-                }
-
-                comparisons.Add(comparison);
-            }
-        }
-
-        newModel.ComparisonString = comparisonString;
-        newModel.Comparison = comparisons;
+        newModel.ComparisonString = comparisonString!;
+        newModel.IsEditing = false;
+        newModel.IsEnabled = true;
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleEditFilter(newModel.Id));
     }
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleEnableFilter(Value.Id));

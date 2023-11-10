@@ -48,16 +48,10 @@ public partial class ContextMenu
             _ => string.Empty,
         };
 
-        var comparison = FilterMethods.GetComparison(filterComparison, filterType, filterValue, new List<string>());
-
-        if (comparison is null) { return; }
-
-        List<Func<DisplayEventModel, bool>> comparisons = new() { comparison };
-
         FilterModel filter = new()
         {
-            Comparison = comparisons,
             IsEditing = false,
+            IsEnabled = true,
             FilterType = filterType,
             FilterComparison = filterComparison,
             FilterValue = filterValue
@@ -65,7 +59,7 @@ public partial class ContextMenu
 
         if (!FilterMethods.TryParse(filter, out string? comparisonString)) { return; }
 
-        filter.ComparisonString = comparisonString;
+        filter.ComparisonString = comparisonString!;
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }
