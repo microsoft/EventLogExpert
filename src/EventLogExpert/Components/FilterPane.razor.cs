@@ -164,7 +164,12 @@ public partial class FilterPane
         _canEditDate = false;
     }
 
-    private void EditAdvancedFilter() => _canEditAdvancedFilter = true;
+    private void EditAdvancedFilter()
+    {
+        if (_advancedFilter is not null) { _advancedFilter = _advancedFilter with { }; }
+
+        _canEditAdvancedFilter = true;
+    }
 
     private void EditDateFilter() => _canEditDate = true;
 
