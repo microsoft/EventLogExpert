@@ -72,16 +72,12 @@ public partial class FilterPane
         base.OnInitialized();
     }
 
-    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState)
-    {
-        return new EventLogState.EventFilter(
-            filterPaneState.AdvancedFilter,
-            filterPaneState.FilteredDateRange,
-            filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-            filterPaneState.CurrentFilters.Where(f => f.IsEnabled && f.Comparison.Any())
-                .Select(f => f.Comparison.ToImmutableList()).ToImmutableList()
-        );
-    }
+    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
+        filterPaneState.AdvancedFilter,
+        filterPaneState.FilteredDateRange,
+        filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+        filterPaneState.CurrentFilters.Where(f => f.IsEnabled).ToImmutableList()
+    );
 
     private void AddAdvancedFilter()
     {

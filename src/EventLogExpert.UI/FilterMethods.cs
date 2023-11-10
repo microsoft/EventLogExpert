@@ -10,19 +10,6 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
-    public static Func<DisplayEventModel, bool>? GetComparison(FilterComparison comparison,
-        FilterType type,
-        string value,
-        List<string> values) => comparison switch
-    {
-        FilterComparison.Equals => GetEqualsComparison(type, value),
-        FilterComparison.Contains => GetContainsComparison(type, value),
-        FilterComparison.NotEqual => GetNotEqualsComparison(type, value),
-        FilterComparison.NotContains => GetNotContainsComparison(type, value),
-        FilterComparison.MultiSelect => GetMultiSelectComparison(type, values),
-        _ => null
-    };
-
     /// <summary>Sorts events by RecordId if no order is specified</summary>
     public static IEnumerable<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,
@@ -175,77 +162,6 @@ public static class FilterMethods
         },
         _ => string.Empty
     };
-
-    private static Func<DisplayEventModel, bool>? GetContainsComparison(FilterType filterType, string value) =>
-        filterType switch
-        {
-            FilterType.Id => x => x.Id.ToString().Contains(value),
-            FilterType.ActivityId => x => x.ActivityId.ToString()?.Contains(value) is true,
-            FilterType.Level => x => x.Level.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.KeywordsDisplayNames => x =>
-                x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
-            FilterType.Source => x => x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.TaskCategory => x => x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Description => x => x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
-            _ => null
-        };
-
-    private static Func<DisplayEventModel, bool>? GetEqualsComparison(FilterType filterType, string value) =>
-        filterType switch
-        {
-            FilterType.Id => int.TryParse(value, out int id) ? x => x.Id == id : null,
-            FilterType.ActivityId => x => string.Equals(x.ActivityId.ToString(), value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Level => x => string.Equals(x.Level, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.KeywordsDisplayNames => x =>
-                x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
-            FilterType.Source => x => string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.TaskCategory => x => string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Description => x =>
-                string.Equals(x.Description, value, StringComparison.OrdinalIgnoreCase),
-            _ => null
-        };
-
-    private static Func<DisplayEventModel, bool>? GetMultiSelectComparison(FilterType filterType,
-        ICollection<string> values) => filterType switch
-    {
-        FilterType.Id => x => values.Contains(x.Id.ToString()),
-        FilterType.ActivityId => x => values.Contains(x.ActivityId?.ToString() ?? string.Empty),
-        FilterType.Level => x => values.Contains(x.Level),
-        FilterType.KeywordsDisplayNames => x => x.KeywordsDisplayNames.Any(values.Contains),
-        FilterType.Source => x => values.Contains(x.Source),
-        FilterType.TaskCategory => x => values.Contains(x.TaskCategory),
-        FilterType.Description => x => values.Contains(x.Description),
-        _ => null
-    };
-
-    private static Func<DisplayEventModel, bool>? GetNotContainsComparison(FilterType filterType, string value) =>
-        filterType switch
-        {
-            FilterType.Id => x => !x.Id.ToString().Contains(value),
-            FilterType.ActivityId => x => !x.ActivityId.ToString()?.Contains(value) is true,
-            FilterType.Level => x => !x.Level.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.KeywordsDisplayNames => x =>
-                !x.KeywordsDisplayNames.Any(e => e.Contains(value, StringComparison.OrdinalIgnoreCase)),
-            FilterType.Source => x => !x.Source.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.TaskCategory => x => !x.TaskCategory.Contains(value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Description => x => !x.Description.Contains(value, StringComparison.OrdinalIgnoreCase),
-            _ => null
-        };
-
-    private static Func<DisplayEventModel, bool>? GetNotEqualsComparison(FilterType filterType, string value) =>
-        filterType switch
-        {
-            FilterType.Id => int.TryParse(value, out int id) ? x => x.Id != id : null,
-            FilterType.ActivityId => x => !string.Equals(x.ActivityId.ToString(), value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Level => x => !string.Equals(x.Level, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.KeywordsDisplayNames => x =>
-                !x.KeywordsDisplayNames.Any(e => string.Equals(e, value, StringComparison.OrdinalIgnoreCase)),
-            FilterType.Source => x => !string.Equals(x.Source, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.TaskCategory => x => !string.Equals(x.TaskCategory, value, StringComparison.OrdinalIgnoreCase),
-            FilterType.Description => x =>
-                !string.Equals(x.Description, value, StringComparison.OrdinalIgnoreCase),
-            _ => null
-        };
 
     private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
     {

@@ -197,11 +197,7 @@ public class EventLogReducers
         {
             EventLogData newLogData;
 
-            // No filtering applied to log
-            if (action.EventFilter.DateFilter?.IsEnabled is not true &&
-                action.EventFilter.AdvancedFilter?.IsEnabled is not true &&
-                action.EventFilter.CachedFilters.IsEmpty &&
-                action.EventFilter.Filters.IsEmpty)
+            if (!IsFilteringEnabled(action.EventFilter))
             {
                 newLogData = entry with { FilteredEvents = entry.Events };
             }
@@ -429,8 +425,7 @@ public class EventLogReducers
         if (eventFilter.Filters.Any())
         {
             filters.Add(e => eventFilter.Filters
-                .All(filter => filter
-                    .Any(comp => comp(e))));
+                .All(filter => filter.Comparison(e)));
         }
 
         if (eventFilter.CachedFilters.Any())
