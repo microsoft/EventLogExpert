@@ -96,9 +96,6 @@ public class SettingsEffects
             case ColumnName.TaskCategory :
                 _preferencesProvider.TaskCategoryColumnPreference = !_preferencesProvider.TaskCategoryColumnPreference;
                 break;
-            case ColumnName.Description :
-                _preferencesProvider.DescriptionColumnPreference = !_preferencesProvider.DescriptionColumnPreference;
-                break;
         }
     }
 }

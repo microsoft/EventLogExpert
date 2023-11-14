@@ -47,6 +47,5 @@ public enum ColumnName
     [EnumMember(Value = "Computer Name")] ComputerName,
     Source,
     [EnumMember(Value = "Event ID")] EventId,
-    [EnumMember(Value = "Task Category")] TaskCategory,
-    Description
+    [EnumMember(Value = "Task Category")] TaskCategory
 }

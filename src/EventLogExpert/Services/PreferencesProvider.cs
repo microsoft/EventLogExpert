@@ -12,7 +12,6 @@ public class PreferencesProvider : IPreferencesProvider
     private const string ActivityIdColumn = "activity-id-column";
     private const string ComputerNameColumn = "computer-name-column";
     private const string DateAndTimeColumn = "date-and-time-column";
-    private const string DescriptionColumn = "description-column";
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string EventIdColumn = "event-id-column";
@@ -42,12 +41,6 @@ public class PreferencesProvider : IPreferencesProvider
     {
         get => Preferences.Default.Get(DateAndTimeColumn, true);
         set => Preferences.Default.Set(DateAndTimeColumn, value);
-    }
-
-    public bool DescriptionColumnPreference
-    {
-        get => Preferences.Default.Get(DescriptionColumn, true);
-        set => Preferences.Default.Set(DescriptionColumn, value);
     }
 
     public IList<string> DisabledDatabasesPreference

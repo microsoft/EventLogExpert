@@ -11,4 +11,22 @@
             }
         </div>
     }
+
+    <hr />
+
+    <div class="sub-menu">
+        <div>Order By <i class="bi bi-caret-right"></i></div>
+        <ul>
+            @foreach (var column in EventTableColumnsState.Value)
+            {
+                <li @onclick="() => OrderColumn(column.Key)">
+                    @column.Key.ToFullString()
+                    @if (EventLogState.Value.OrderBy.Equals(column.Key))
+                    {
+                        <i class="bi bi-check"></i>
+                    }
+                </li>
+            }
+        </ul>
+    </div>
 </div>
