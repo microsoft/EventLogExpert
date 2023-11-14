@@ -26,7 +26,6 @@ public class EventTableColumnProvider : IEventTableColumnProvider
         { ColumnName.ComputerName, _preferencesProvider.ComputerNameColumnPreference },
         { ColumnName.Source, _preferencesProvider.SourceColumnPreference },
         { ColumnName.EventId, _preferencesProvider.EventIdColumnPreference },
-        { ColumnName.TaskCategory, _preferencesProvider.TaskCategoryColumnPreference },
-        { ColumnName.Description, _preferencesProvider.DescriptionColumnPreference }
+        { ColumnName.TaskCategory, _preferencesProvider.TaskCategoryColumnPreference }
     };
 }

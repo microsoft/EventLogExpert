@@ -83,6 +83,6 @@ public partial class EventTable
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 
-    private void ToggleDateTime() =>
-        Dispatcher.Dispatch(new EventLogAction.SetSortDescending(!EventLogState.Value.SortDescending, TraceLogger));
+    private void ToggleSorting() =>
+        Dispatcher.Dispatch(new EventLogAction.ToggleSorting(TraceLogger));
 }

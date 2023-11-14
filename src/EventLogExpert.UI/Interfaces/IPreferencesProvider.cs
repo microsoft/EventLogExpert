@@ -13,8 +13,6 @@ public interface IPreferencesProvider
 
     bool DateAndTimeColumnPreference { get; set; }
 
-    bool DescriptionColumnPreference { get; set; }
-
     IList<string> DisabledDatabasesPreference { get; set; }
 
     bool DisplayPaneSelectionPreference { get; set; }

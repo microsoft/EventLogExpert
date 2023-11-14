@@ -48,7 +48,7 @@
             margin: 0;
             padding: 0 5px;
             position: absolute;
-            right: -7em;
+            right: -10em;
             border: 1px solid var(--clr-lightblue);
             background-color: var(--background-dark);
 
@@ -56,6 +56,7 @@
             pointer-events: none;
 
             & > li {
+                width: 9em;
                 list-style: none;
 
                 &:hover {

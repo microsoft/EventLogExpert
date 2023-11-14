@@ -59,5 +59,7 @@ public record EventLogState
 
     public string? SelectedLogName { get; init; } = null;
 
-    public bool SortDescending { get; init; } = true;
+    public ColumnName? OrderBy { get; init; }
+
+    public bool IsDescending { get; init; } = true;
 }

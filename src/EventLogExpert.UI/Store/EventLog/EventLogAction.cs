@@ -53,5 +53,7 @@ public record EventLogAction
 
     public record SetFilters(EventFilter EventFilter, ITraceLogger TraceLogger) : EventLogAction;
 
-    public record SetSortDescending(bool SortDescending, ITraceLogger TraceLogger) : EventLogAction;
+    public record SetOrderBy(ColumnName? OrderBy, ITraceLogger TraceLogger) : EventLogAction;
+
+    public record ToggleSorting(ITraceLogger TraceLogger) : EventLogAction;
 }
