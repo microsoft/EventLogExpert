@@ -43,8 +43,6 @@ public partial class MainPage : ContentPage
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
-        IStateSelection<SettingsState, bool> showLogNameState,
-        IStateSelection<SettingsState, bool> showComputerNameState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
         IClipboardService clipboardService,
