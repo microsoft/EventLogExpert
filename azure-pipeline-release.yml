@@ -9,7 +9,7 @@ steps:
 - task: UseDotNet@2
   displayName: 'Install .NET SDK'
   inputs:
-    version: '7.x'
+    version: '8.x'
     performMultiLevelLookup: true
 
 - script: dotnet workload restore src/EventLogExpert.sln
@@ -46,7 +46,7 @@ steps:
 - pwsh: >
     dotnet publish src/EventLogExpert/EventLogExpert.csproj `
     -c Release `
-    -f net7.0-windows10.0.19041.0 `
+    -f net8.0-windows10.0.19041.0 `
     -p:AppxBundle=Never `
     -p:AppInstallerCheckForUpdateFrequency=OnApplicationRun `
     -p:AppInstallerUpdateFrequency=1 `
