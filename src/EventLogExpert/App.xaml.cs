@@ -42,8 +42,6 @@ public partial class App : Application
                 activeLogsState,
                 continuouslyUpdateState,
                 selectedEventState,
-                showLogState,
-                showComputerState,
                 loadedDatabasesState,
                 settingsState,
                 clipboardService,
@@ -59,6 +57,12 @@ public partial class App : Application
         var window = base.CreateWindow(activationState);
 
         window.Title = "EventLogExpert";
+
+        // Ultrawide monitors create a window that is way too wide
+        if (DeviceDisplay.Current.MainDisplayInfo.Width >= 2048)
+        {
+            window.Width = 2000;
+        }
 
         return window;
     }
