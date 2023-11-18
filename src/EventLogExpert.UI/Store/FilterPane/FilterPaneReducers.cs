@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterPane;
 
-public class FilterPaneReducers
+public sealed class FilterPaneReducers
 {
     [ReducerMethod]
     public static FilterPaneState ReduceAddCachedFilter(FilterPaneState state, FilterPaneAction.AddCachedFilter action)
@@ -50,7 +50,7 @@ public class FilterPaneReducers
         var updatedList = state.CurrentFilters.ToList();
         var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
 
-        if (parentFilter is null) { return state; } // If not parent filter, something went wrong and bail
+        if (parentFilter is null) { return state; } // If no parent filter, something went wrong and bail
 
         parentFilter.SubFilters.Add(new SubFilterModel());
 
@@ -138,7 +138,7 @@ public class FilterPaneReducers
     [ReducerMethod]
     public static FilterPaneState ReduceToggleCachedFilter(FilterPaneState state, FilterPaneAction.ToggleCachedFilter action)
     {
-        List<AdvancedFilterModel> filters = new();
+        List<AdvancedFilterModel> filters = [];
 
         foreach (var filterModel in state.CachedFilters)
         {
@@ -157,7 +157,7 @@ public class FilterPaneReducers
     public static FilterPaneState ReduceToggleEditFilter(FilterPaneState state,
         FilterPaneAction.ToggleEditFilter action)
     {
-        List<FilterModel> filters = new();
+        List<FilterModel> filters = [];
 
         foreach (var filterModel in state.CurrentFilters)
         {
@@ -176,7 +176,7 @@ public class FilterPaneReducers
     public static FilterPaneState ReduceToggleEnableFilter(FilterPaneState state,
         FilterPaneAction.ToggleEnableFilter action)
     {
-        List<FilterModel> filters = new();
+        List<FilterModel> filters = [];
 
         foreach (var filterModel in state.CurrentFilters)
         {

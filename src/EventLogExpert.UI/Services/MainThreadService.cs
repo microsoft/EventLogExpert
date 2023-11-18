@@ -8,17 +8,7 @@ public interface IMainThreadService
     Task InvokeOnMainThread(Action action);
 }
 
-public class MainThreadService : IMainThreadService
+public sealed class MainThreadService(Func<Action, Task> mainThreadInvoker) : IMainThreadService
 {
-    private readonly Func<Action, Task> _mainThreadInvoker;
-
-    public MainThreadService(Func<Action, Task> mainThreadInvoker)
-    {
-        _mainThreadInvoker = mainThreadInvoker;
-    }
-
-    public async Task InvokeOnMainThread(Action action)
-    {
-        await _mainThreadInvoker(action);
-    }
+    public Task InvokeOnMainThread(Action action) => mainThreadInvoker(action);
 }

@@ -8,11 +8,11 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Store.FilterPane;
 
 [FeatureState]
-public record FilterPaneState
+public sealed record FilterPaneState
 {
-    public IImmutableList<FilterModel> CurrentFilters { get; init; } = ImmutableList<FilterModel>.Empty;
+    public IImmutableList<FilterModel> CurrentFilters { get; init; } = [];
 
-    public IImmutableList<AdvancedFilterModel> CachedFilters { get; init; } = ImmutableList<AdvancedFilterModel>.Empty;
+    public IImmutableList<AdvancedFilterModel> CachedFilters { get; init; } = [];
 
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 

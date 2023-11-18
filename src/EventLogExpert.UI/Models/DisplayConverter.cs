@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Models;
 
-public class DisplayConverter<T, U>
+public sealed class DisplayConverter<T, U>
 {
     public Func<U?, T?>? GetFunc { get; set; }
 

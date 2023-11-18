@@ -15,7 +15,7 @@ public interface IEnabledDatabaseCollectionProvider
     IList<string> GetEnabledDatabases();
 }
 
-public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IEnabledDatabaseCollectionProvider
+public sealed class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IEnabledDatabaseCollectionProvider
 {
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly IPreferencesProvider _preferencesProvider;
@@ -32,7 +32,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         SetActiveDatabases(GetEnabledDatabases().Select(d => Path.Join(_fileLocationOptions.DatabasePath, d)));
     }
 
-    public ImmutableList<string> ActiveDatabases { get; private set; } = ImmutableList<string>.Empty;
+    public ImmutableList<string> ActiveDatabases { get; private set; } = [];
 
     /// <summary>
     /// Returns the enabled database file names only.
@@ -40,7 +40,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
     /// <returns></returns>
     public IList<string> GetEnabledDatabases()
     {
-        List<string> databases = new();
+        List<string> databases = [];
 
         try
         {

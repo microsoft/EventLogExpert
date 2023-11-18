@@ -9,10 +9,10 @@ using static EventLogExpert.UI.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
-public class EventLogReducers
+public sealed class EventLogReducers
 {
     /// <summary>The maximum number of new events we will hold in the state before we turn off the watcher.</summary>
-    private static readonly int MaxNewEvents = 1000;
+    private const int MaxNewEvents = 1000;
 
     [ReducerMethod]
     public static EventLogState ReduceAddEvent(EventLogState state, EventLogAction.AddEvent action)
@@ -342,7 +342,7 @@ public class EventLogReducers
         {
             var newEventsForThisLog = events.Where(e => e.OwningLog == log.Name).ToList();
 
-            if (newEventsForThisLog.Any())
+            if (newEventsForThisLog.Count > 0)
             {
                 var newLogData = AddEventsToOneLog(log, newEventsForThisLog, filter, orderBy, isDescending, traceLogger);
                 newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);
@@ -380,7 +380,7 @@ public class EventLogReducers
             return false;
         }
 
-        List<Func<DisplayEventModel, bool>> filters = new();
+        List<Func<DisplayEventModel, bool>> filters = [];
 
         if (eventFilter.DateFilter?.IsEnabled is true)
         {
@@ -394,13 +394,13 @@ public class EventLogReducers
             filters.Add(e => eventFilter.AdvancedFilter.Comparison(e));
         }
 
-        if (eventFilter.Filters.Any())
+        if (!eventFilter.Filters.IsEmpty)
         {
             filters.Add(e => eventFilter.Filters
                 .All(filter => filter.Comparison(e)));
         }
 
-        if (eventFilter.CachedFilters.Any())
+        if (!eventFilter.CachedFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.CachedFilters
                 .All(filter => filter.Comparison(e)));
@@ -422,9 +422,9 @@ public class EventLogReducers
 
     private static bool IsFilteringEnabled(EventFilter eventFilter) =>
         eventFilter.AdvancedFilter?.IsEnabled is true ||
-        eventFilter.CachedFilters.Any() ||
+        eventFilter.CachedFilters.IsEmpty is false ||
         eventFilter.DateFilter?.IsEnabled is true ||
-        eventFilter.Filters.Any();
+        eventFilter.Filters.IsEmpty is false;
 
     private static EventLogState OrderAndSortActiveLogs(
         EventLogState state,

@@ -6,7 +6,7 @@ using System.Linq.Dynamic.Core;
 
 namespace EventLogExpert.UI.Models;
 
-public record FilterModel
+public sealed record FilterModel
 {
     private string _comparisonString = string.Empty;
     private FilterType _filterType;
@@ -50,7 +50,7 @@ public record FilterModel
 
     public string? FilterValue { get; set; }
 
-    public List<string> FilterValues { get; set; } = new();
+    public List<string> FilterValues { get; set; } = [];
 
-    public List<SubFilterModel> SubFilters { get; set; } = new();
+    public List<SubFilterModel> SubFilters { get; set; } = [];
 }

@@ -14,12 +14,12 @@ public interface ICurrentVersionProvider
     bool IsSupportedOS(Version currentVersion);
 }
 
-public class CurrentVersionProvider : ICurrentVersionProvider
+public sealed class CurrentVersionProvider : ICurrentVersionProvider
 {
     public CurrentVersionProvider()
     {
         PackageVersion packageVersion = Package.Current.Id.Version;
-        CurrentVersion = new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
+        CurrentVersion = new Version($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
     }
 
     public Version CurrentVersion { get; init; }

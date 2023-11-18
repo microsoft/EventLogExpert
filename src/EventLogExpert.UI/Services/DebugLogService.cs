@@ -9,7 +9,7 @@ using System.Diagnostics;
 
 namespace EventLogExpert.UI.Services;
 
-public class DebugLogService : ITraceLogger
+public sealed class DebugLogService : ITraceLogger
 {
     private static readonly long _maxLogSize = 10 * 1024 * 1024;
 

@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using Microsoft.Extensions.Logging;
 using System.Reflection;
 using Windows.Foundation;
 using Windows.Management.Deployment;
@@ -16,28 +15,15 @@ public interface IDeploymentService
     void UpdateOnNextRestart(string downloadPath);
 }
 
-public class DeploymentService : IDeploymentService
+public sealed class DeploymentService(
+    ITraceLogger traceLogger,
+    IAppTitleService appTitleService,
+    IMainThreadService mainThreadService,
+    IAlertDialogService alertDialogService) : IDeploymentService
 {
-    private readonly ITraceLogger _traceLogger;
-    private readonly IAppTitleService _appTitleService;
-    private readonly IMainThreadService _mainThreadService;
-    private readonly IAlertDialogService _alertDialogService;
-
-    public DeploymentService(
-        ITraceLogger traceLogger,
-        IAppTitleService appTitleService,
-        IMainThreadService mainThreadService,
-        IAlertDialogService alertDialogService)
-    {
-        _traceLogger = traceLogger;
-        _appTitleService = appTitleService;
-        _mainThreadService = mainThreadService;
-        _alertDialogService = alertDialogService;
-    }
-
     public void RestartNowAndUpdate(string downloadPath)
     {
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
+        traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
 
         uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
 
@@ -45,7 +31,7 @@ public class DeploymentService : IDeploymentService
 
         PackageManager packageManager = new();
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
+        traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
 
         var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
             new AddPackageOptions
@@ -61,7 +47,7 @@ public class DeploymentService : IDeploymentService
     {
         PackageManager packageManager = new();
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
+        traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
 
         var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
             new AddPackageOptions
@@ -77,29 +63,29 @@ public class DeploymentService : IDeploymentService
     {
         deployment.Progress = (result, progress) =>
         {
-            _mainThreadService.InvokeOnMainThread(() => _appTitleService.SetProgressString($"Installing: {progress.percentage}%"));
+            mainThreadService.InvokeOnMainThread(() => appTitleService.SetProgressString($"Installing: {progress.percentage}%"));
         };
 
         deployment.Completed = (result, progress) =>
         {
-            _mainThreadService.InvokeOnMainThread(() =>
+            mainThreadService.InvokeOnMainThread(() =>
             {
                 switch (result.Status)
                 {
                     case AsyncStatus.Error :
-                        _alertDialogService.ShowAlert("Update Failure",
+                        alertDialogService.ShowAlert("Update Failure",
                             $"Update failed to install:\r\n{result.ErrorCode}",
                             "Ok");
 
-                        _appTitleService.SetProgressString(null);
+                        appTitleService.SetProgressString(null);
                         break;
                     case AsyncStatus.Completed : 
-                        _appTitleService.SetProgressString("Relaunch to Apply Update");
+                        appTitleService.SetProgressString("Relaunch to Apply Update");
                         break;
                     case AsyncStatus.Canceled :
                     case AsyncStatus.Started :
                     default : 
-                        _appTitleService.SetProgressString(null);
+                        appTitleService.SetProgressString(null);
                         break;
                 }
             });

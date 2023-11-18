@@ -7,11 +7,11 @@ using static EventLogExpert.UI.Store.EventLog.EventLogState;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
-public record EventLogAction
+public sealed record EventLogAction
 {
-    public record AddEvent(DisplayEventModel NewEvent, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record AddEvent(DisplayEventModel NewEvent, ITraceLogger TraceLogger);
 
-    public record LoadEvents(
+    public sealed record LoadEvents(
         string LogName,
         LogType Type,
         List<DisplayEventModel> Events,
@@ -21,25 +21,22 @@ public record EventLogAction
         IEnumerable<string> AllTaskNames,
         IEnumerable<string> AllKeywords,
         ITraceLogger TraceLogger
-    ) : EventLogAction;
+    );
 
-    public record LoadNewEvents(ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record LoadNewEvents(ITraceLogger TraceLogger);
 
-    public record OpenLog(string LogName, LogType LogType) : EventLogAction;
+    public sealed record OpenLog(string LogName, LogType LogType);
 
-    public record CloseLog(string LogName) : EventLogAction;
+    public sealed record CloseLog(string LogName);
 
-    public record CloseAll : EventLogAction;
+    public sealed record CloseAll;
 
-    public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
+    public sealed record SelectEvent(DisplayEventModel? SelectedEvent);
 
-    /// <summary>
-    /// This action only has meaning for the UI.
-    /// </summary>
-    /// <param name="LogName"></param>
-    public record SelectLog(string? LogName) : EventLogAction;
+    /// <summary>This action only has meaning for the UI.</summary>
+    public sealed record SelectLog(string? LogName);
 
-    public record SetContinouslyUpdate(bool ContinuouslyUpdate, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record SetContinouslyUpdate(bool ContinuouslyUpdate, ITraceLogger TraceLogger);
 
     /// <summary>
     /// Used to indicate the progress of event logs being loaded.
@@ -49,11 +46,11 @@ public record EventLogAction
     ///     Application will be common and many file names will be the same.
     /// </param>
     /// <param name="Count"></param>
-    public record SetEventsLoading(Guid ActivityId, int Count) : EventLogAction;
+    public sealed record SetEventsLoading(Guid ActivityId, int Count);
 
-    public record SetFilters(EventFilter EventFilter, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record SetFilters(EventFilter EventFilter, ITraceLogger TraceLogger);
 
-    public record SetOrderBy(ColumnName? OrderBy, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record SetOrderBy(ColumnName? OrderBy, ITraceLogger TraceLogger);
 
-    public record ToggleSorting(ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record ToggleSorting(ITraceLogger TraceLogger);
 }

@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.UI.Models;
 
-public record GitReleaseModel
+public sealed record GitReleaseModel
 {
     [JsonPropertyName("name")] public string Version { get; set; } = null!;
 
@@ -16,7 +16,7 @@ public record GitReleaseModel
     [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
 }
 
-public record GitReleaseAsset
+public sealed record GitReleaseAsset
 {
     [JsonPropertyName("name")] public string Name { get; set; } = null!;
 

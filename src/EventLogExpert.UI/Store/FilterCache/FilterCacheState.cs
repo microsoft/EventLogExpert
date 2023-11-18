@@ -8,9 +8,9 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Store.FilterCache;
 
 [FeatureState]
-public record FilterCacheState
+public sealed record FilterCacheState
 {
-    public ImmutableList<AdvancedFilterModel> FavoriteFilters { get; init; } = ImmutableList<AdvancedFilterModel>.Empty;
+    public ImmutableList<AdvancedFilterModel> FavoriteFilters { get; init; } = [];
 
-    public ImmutableQueue<AdvancedFilterModel> RecentFilters { get; init; } = ImmutableQueue<AdvancedFilterModel>.Empty;
+    public ImmutableQueue<AdvancedFilterModel> RecentFilters { get; init; } = [];
 }

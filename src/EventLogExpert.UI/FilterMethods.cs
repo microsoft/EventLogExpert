@@ -168,7 +168,7 @@ public static class FilterMethods
         if (string.IsNullOrWhiteSpace(subFilter.FilterValue) &&
             subFilter.FilterComparison != FilterComparison.MultiSelect) { return null; }
 
-        if (!subFilter.FilterValues.Any() &&
+        if (subFilter.FilterValues.Count < 1 &&
             subFilter.FilterComparison == FilterComparison.MultiSelect) { return null; }
 
         StringBuilder stringBuilder = new(" || ");

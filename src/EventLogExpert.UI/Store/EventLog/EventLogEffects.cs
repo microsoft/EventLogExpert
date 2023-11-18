@@ -14,32 +14,18 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
-public class EventLogEffects
+public sealed class EventLogEffects(
+    IServiceProvider serviceProvider,
+    ITraceLogger debugLogger,
+    ILogWatcherService logWatcherService)
 {
-    private readonly ITraceLogger _debugLogger;
-    private readonly ILogWatcherService _logWatcherService;
-    private readonly IServiceProvider _serviceProvider;
-
-    public EventLogEffects(IServiceProvider serviceProvider, ITraceLogger debugLogger, ILogWatcherService logWatcherService)
-    {
-        _serviceProvider = serviceProvider;
-        _debugLogger = debugLogger;
-        _logWatcherService = logWatcherService;
-    }
-
     [EffectMethod]
     public async Task HandleOpenLogAction(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        EventLogReader reader;
-
-        if (action.LogType == EventLogState.LogType.Live)
-        {
-            reader = new EventLogReader(action.LogName, PathType.LogName);
-        }
-        else
-        {
-            reader = new EventLogReader(action.LogName, PathType.FilePath);
-        }
+        EventLogReader reader =
+            action.LogType == EventLogState.LogType.Live ?
+                new EventLogReader(action.LogName, PathType.LogName) :
+                new EventLogReader(action.LogName, PathType.FilePath);
 
         // Do this on a background thread so we don't hang the UI
         await Task.Run(() =>
@@ -48,7 +34,7 @@ public class EventLogEffects
 
             try
             {
-                eventResolver = _serviceProvider.GetService<IEventResolver>();
+                eventResolver = serviceProvider.GetService<IEventResolver>();
             }
             catch (Exception ex)
             {
@@ -69,12 +55,12 @@ public class EventLogEffects
                 var sw = new Stopwatch();
                 sw.Start();
 
-                List<DisplayEventModel> events = new();
-                HashSet<int> eventIdsAll = new();
-                HashSet<Guid?> eventActivityIdsAll = new();
-                HashSet<string> eventProviderNamesAll = new();
-                HashSet<string> eventTaskNamesAll = new();
-                HashSet<string> eventKeywordNamesAll = new();
+                List<DisplayEventModel> events = [];
+                HashSet<int> eventIdsAll = [];
+                HashSet<Guid?> eventActivityIdsAll = [];
+                HashSet<string> eventProviderNamesAll = [];
+                HashSet<string> eventTaskNamesAll = [];
+                HashSet<string> eventKeywordNamesAll = [];
                 EventRecord lastEvent = null!;
 
                 while (reader.ReadEvent() is { } e)
@@ -105,31 +91,35 @@ public class EventLogEffects
                     eventProviderNamesAll.ToImmutableList(),
                     eventTaskNamesAll.ToImmutableList(),
                     eventKeywordNamesAll.ToImmutableList(),
-                    _debugLogger));
+                    debugLogger));
 
                 dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, 0));
 
                 if (action.LogType == EventLogState.LogType.Live)
                 {
-                    _logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
+                    logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
                 }
             }
             finally
             {
                 eventResolver.Dispose();
             }
-        });
+        }, new CancellationToken());
     }
 
     [EffectMethod]
-    public async Task HandleCloseLogAction(EventLogAction.CloseLog action, IDispatcher dispatcher)
+    public Task HandleCloseLogAction(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        _logWatcherService.RemoveLog(action.LogName);
+        logWatcherService.RemoveLog(action.LogName);
+
+        return Task.CompletedTask;
     }
 
-    [EffectMethod]
-    public async Task HandleCloseAllAction(EventLogAction.CloseAll action, IDispatcher dispatcher)
+    [EffectMethod(typeof(EventLogAction.CloseAll))]
+    public Task HandleCloseAllAction(IDispatcher dispatcher)
     {
-        _logWatcherService.RemoveAll();
+        logWatcherService.RemoveAll();
+
+        return Task.CompletedTask;
     }
 }

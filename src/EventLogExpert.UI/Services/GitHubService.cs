@@ -13,15 +13,8 @@ public interface IGitHubService
     Task<IEnumerable<GitReleaseModel>> GetReleases();
 }
 
-public class GitHubService : IGitHubService
+public sealed class GitHubService(ITraceLogger traceLogger) : IGitHubService
 {
-    private readonly ITraceLogger _traceLogger;
-
-    public GitHubService(ITraceLogger traceLogger)
-    {
-        _traceLogger = traceLogger;
-    }
-
     public async Task<IEnumerable<GitReleaseModel>> GetReleases()
     {
         HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/"), };
@@ -34,21 +27,19 @@ public class GitHubService : IGitHubService
 
         if (response.IsSuccessStatusCode is not true)
         {
-            _traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} failed: {response.StatusCode}.", LogLevel.Warning);
+            traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} failed: {response.StatusCode}.", LogLevel.Warning);
             throw new Exception($"Failed to retrieve GitHub releases. StatusCode: {response.StatusCode}");
         }
 
-        _traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.", LogLevel.Warning);
+        traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.", LogLevel.Warning);
 
         var stream = await response.Content.ReadAsStreamAsync();
         var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
 
-        if (content is null)
-        {
-            _traceLogger.Trace($"{nameof(GetReleases)} Failed to deserialize response stream.", LogLevel.Warning);
-            throw new Exception($"{nameof(GetReleases)} Failed to deserialize response stream.");
-        }
+        if (content is not null) { return content; }
 
-        return content;
+        traceLogger.Trace($"{nameof(GetReleases)} Failed to deserialize response stream.", LogLevel.Warning);
+        throw new Exception($"{nameof(GetReleases)} Failed to deserialize response stream.");
+
     }
 }

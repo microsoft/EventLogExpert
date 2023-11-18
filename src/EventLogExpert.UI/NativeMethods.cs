@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.UI;
 
-public class NativeMethods
+public sealed partial class NativeMethods
 {
     /// <summary>Flags for the RegisterApplicationRestart function</summary>
     [Flags]
@@ -42,6 +42,6 @@ public class NativeMethods
     ///     This function returns S_OK on success or one of the following error codes: E_FAIL for internal error.
     ///     E_INVALIDARG if rhe specified command line is too long.
     /// </returns>
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    public static extern uint RegisterApplicationRestart(string? pwzCommandLine, RestartFlags dwFlags);
+    [LibraryImport("kernel32.dll", StringMarshalling = StringMarshalling.Utf16)]
+    public static partial uint RegisterApplicationRestart(string? pwzCommandLine, RestartFlags dwFlags);
 }

@@ -5,7 +5,7 @@ using Fluxor;
 
 namespace EventLogExpert.UI.Store.StatusBar;
 
-public class StatusBarReducers
+public sealed class StatusBarReducers
 {
     [ReducerMethod]
     public static StatusBarState ReduceSetResolverStatus(StatusBarState state, StatusBarAction.SetResolverStatus action) =>

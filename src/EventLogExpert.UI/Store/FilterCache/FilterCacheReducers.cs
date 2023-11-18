@@ -5,7 +5,7 @@ using Fluxor;
 
 namespace EventLogExpert.UI.Store.FilterCache;
 
-public class FilterCacheReducers
+public sealed class FilterCacheReducers
 {
     [ReducerMethod]
     public static FilterCacheState ReduceAddFavoriteFilterCompleted(FilterCacheState state,

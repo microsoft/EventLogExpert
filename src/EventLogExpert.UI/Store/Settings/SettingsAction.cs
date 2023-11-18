@@ -5,25 +5,25 @@ using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Store.Settings;
 
-public record SettingsAction
+public sealed record SettingsAction
 {
-    public record LoadColumns : SettingsAction;
+    public sealed record LoadColumns;
 
-    public record LoadColumnsCompleted(IDictionary<ColumnName, bool> LoadedColumns) : SettingsAction;
+    public sealed record LoadColumnsCompleted(IDictionary<ColumnName, bool> LoadedColumns);
 
-    public record LoadDatabases : SettingsAction;
+    public sealed record LoadDatabases;
 
-    public record LoadDatabasesCompleted(IEnumerable<string> LoadedDatabases) : SettingsAction;
+    public sealed record LoadDatabasesCompleted(IEnumerable<string> LoadedDatabases);
 
-    public record LoadSettings : SettingsAction;
+    public sealed record LoadSettings;
 
-    public record LoadSettingsCompleted(SettingsModel Config) : SettingsAction;
+    public sealed record LoadSettingsCompleted(SettingsModel Config);
 
-    public record OpenMenu : SettingsAction;
+    public sealed record OpenMenu;
 
-    public record Save(SettingsModel Settings) : SettingsAction;
+    public sealed record Save(SettingsModel Settings);
 
-    public record SaveCompleted(SettingsModel Settings) : SettingsAction;
+    public sealed record SaveCompleted(SettingsModel Settings);
 
-    public record ToggleColumn(ColumnName ColumnName) : SettingsAction;
+    public sealed record ToggleColumn(ColumnName ColumnName);
 }

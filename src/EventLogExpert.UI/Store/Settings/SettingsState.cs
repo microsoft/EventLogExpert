@@ -8,12 +8,12 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Store.Settings;
 
 [FeatureState]
-public record SettingsState
+public sealed record SettingsState
 {
     public SettingsModel Config { get; init; } = new();
 
     public IImmutableDictionary<ColumnName, bool> EventTableColumns { get; init; } =
         ImmutableDictionary<ColumnName, bool>.Empty;
 
-    public IImmutableList<string> LoadedDatabases { get; init; } = ImmutableList<string>.Empty;
+    public IImmutableList<string> LoadedDatabases { get; init; } = [];
 }

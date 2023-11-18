@@ -10,11 +10,11 @@ using System.Collections.ObjectModel;
 namespace EventLogExpert.UI.Store.EventLog;
 
 [FeatureState]
-public record EventLogState
+public sealed record EventLogState
 {
-    public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
+    public sealed record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
 
-    public record EventFilter(
+    public sealed record EventFilter(
         AdvancedFilterModel? AdvancedFilter,
         FilterDateModel? DateFilter,
         ImmutableList<AdvancedFilterModel> CachedFilters,
@@ -22,7 +22,7 @@ public record EventLogState
 
     public enum LogType { Live, File }
 
-    public record EventLogData(
+    public sealed record EventLogData(
         string Name,
         LogType Type,
         ReadOnlyCollection<DisplayEventModel> Events,
@@ -37,11 +37,7 @@ public record EventLogState
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
         ImmutableDictionary<string, EventLogData>.Empty;
 
-    public EventFilter AppliedFilter { get; init; } = new(
-        null,
-        null,
-        ImmutableList<AdvancedFilterModel>.Empty,
-        ImmutableList<FilterModel>.Empty);
+    public EventFilter AppliedFilter { get; init; } = new(null, null, [], []);
 
     public bool ContinuouslyUpdate { get; init; } = false;
 

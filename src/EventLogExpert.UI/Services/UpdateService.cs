@@ -14,41 +14,24 @@ public interface IUpdateService
     Task CheckForUpdates(bool isPrereleaseEnabled, bool manualScan);
 }
 
-public class UpdateService : IUpdateService
+public sealed class UpdateService(
+    ICurrentVersionProvider versionProvider,
+    IAppTitleService appTitleService,
+    IGitHubService githubService,
+    IDeploymentService deploymentService,
+    ITraceLogger traceLogger,
+    IAlertDialogService alertDialogService) : IUpdateService
 {
-    private readonly ICurrentVersionProvider _versionProvider;
-    private readonly IAppTitleService _appTitleService;
-    private readonly ITraceLogger _traceLogger;
-    private readonly IGitHubService _gitHubService;
-    private readonly IDeploymentService _deploymentService;
-    private readonly IAlertDialogService _alertDialogService;
-
-    public UpdateService(
-        ICurrentVersionProvider versionProvider,
-        IAppTitleService appTitleService,
-        IGitHubService githubService,
-        IDeploymentService deploymentService,
-        ITraceLogger traceLogger,
-        IAlertDialogService alertDialogService)
-    {
-        _versionProvider = versionProvider;
-        _appTitleService = appTitleService;
-        _traceLogger = traceLogger;
-        _gitHubService = githubService;
-        _deploymentService = deploymentService;
-        _alertDialogService = alertDialogService;
-    }
-
     public async Task CheckForUpdates(bool prereleaseVersionsEnabled, bool manualScan)
     {
-        _traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(prereleaseVersionsEnabled)} is {prereleaseVersionsEnabled}. " +
-            $"{nameof(manualScan)} is {manualScan}. {nameof(_versionProvider.CurrentVersion)} is {_versionProvider.CurrentVersion}.");
+        traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(prereleaseVersionsEnabled)} is {prereleaseVersionsEnabled}. " +
+            $"{nameof(manualScan)} is {manualScan}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
 
         GitReleaseModel? latest = null;
 
-        if (_versionProvider.IsDevBuild)
+        if (versionProvider.IsDevBuild)
         {
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(_versionProvider.IsDevBuild)}: {_versionProvider.IsDevBuild}. Skipping update check.");
+            traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(versionProvider.IsDevBuild)}: {versionProvider.IsDevBuild}. Skipping update check.");
             return;
         }
 
@@ -56,14 +39,14 @@ public class UpdateService : IUpdateService
         {
             // Versions are based on current DateTime so this is safer than dealing with
             // stripping the v off the Version for every release
-            var releases = await _gitHubService.GetReleases();
+            var releases = await githubService.GetReleases();
             releases = releases.OrderByDescending(x => x.ReleaseDate).ToArray();
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:");
+            traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:");
 
             foreach (var release in releases)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
+                traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
                     $"ReleaseDate: {release.ReleaseDate} IsPrerelease: {release.IsPrerelease}");
             }
 
@@ -73,24 +56,24 @@ public class UpdateService : IUpdateService
 
             if (latest is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.", LogLevel.Warning);
+                traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.", LogLevel.Warning);
 
                 return;
             }
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPrerelease: {latest.IsPrerelease}");
+            traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPrerelease: {latest.IsPrerelease}");
 
             // Need to drop the v off the version number provided by GitHub
             var newVersion = new Version(latest.Version.TrimStart('v'));
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
+            traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
 
             // Setting version to equal allows rollback if a version is pulled
-            if (newVersion.CompareTo(_versionProvider.CurrentVersion) == 0)
+            if (newVersion.CompareTo(versionProvider.CurrentVersion) == 0)
             {
                 if (manualScan)
                 {
-                    await _alertDialogService.ShowAlert("No Updates Available",
+                    await alertDialogService.ShowAlert("No Updates Available",
                         "You are currently running the latest version.",
                         "Ok");
                 }
@@ -102,37 +85,37 @@ public class UpdateService : IUpdateService
 
             if (downloadPath is null)
             {
-                _traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
+                traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
 
                 return;
             }
 
-            bool shouldReboot = await _alertDialogService.ShowAlert("Update Available",
+            bool shouldReboot = await alertDialogService.ShowAlert("Update Available",
                 "A new version has been detected, would you like to install and reload the application?",
                 "Yes", "No");
 
-            _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
+            traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
 
             if (shouldReboot)
             {
-                _deploymentService.RestartNowAndUpdate(downloadPath);
+                deploymentService.RestartNowAndUpdate(downloadPath);
             }
             else
             {
-                _deploymentService.UpdateOnNextRestart(downloadPath);
+                deploymentService.UpdateOnNextRestart(downloadPath);
             }
         }
         catch (Exception ex)
         {
-            await _alertDialogService.ShowAlert("Update Failure",
+            await alertDialogService.ShowAlert("Update Failure",
                 $"Update failed to install:\r\n{ex.Message}",
                 "Ok");
         }
         finally
         {
-            _appTitleService.SetIsPrerelease(latest?.IsPrerelease ?? false);
+            appTitleService.SetIsPrerelease(latest?.IsPrerelease ?? false);
 
-            _appTitleService.SetProgressString(null);
+            appTitleService.SetProgressString(null);
         }
     }
 }

@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Store.StatusBar;
 
-public record StatusBarAction
+public sealed record StatusBarAction
 {
-    public record SetResolverStatus(string ResolverStatus);
+    public sealed record SetResolverStatus(string ResolverStatus);
 }
