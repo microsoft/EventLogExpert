@@ -7,17 +7,7 @@ using Xunit.Abstractions;
 
 namespace EventLogExpert.Test.Services;
 
-public class TestTraceLogger : ITraceLogger
+public class TestTraceLogger(ITestOutputHelper outputHelper) : ITraceLogger
 {
-    private ITestOutputHelper _outputHelper;
-
-    public TestTraceLogger(ITestOutputHelper outputHelper)
-    {
-        _outputHelper = outputHelper;
-    }
-
-    public void Trace(string message, LogLevel level)
-    {
-        _outputHelper.WriteLine(message);
-    }
+    public void Trace(string message, LogLevel level) => outputHelper.WriteLine(message);
 }

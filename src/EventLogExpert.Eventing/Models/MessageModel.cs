@@ -11,6 +11,19 @@ namespace EventLogExpert.Eventing.Models;
 /// </summary>
 public sealed class MessageModel
 {
+    public MessageModel() { }
+
+    public MessageModel(string? logLink, string providerName, long rawId, short shortId, string? tag, string? template, string text)
+    {
+        LogLink = logLink;
+        ProviderName = providerName;
+        RawId = rawId;
+        ShortId = shortId;
+        Tag = tag;
+        Template = template;
+        Text = text;
+    }
+
     /// <summary>
     ///     The log name that this event will appear in.
     /// </summary>

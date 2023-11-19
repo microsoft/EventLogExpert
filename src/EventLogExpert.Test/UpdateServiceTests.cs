@@ -33,28 +33,28 @@ public class UpdateServiceTests
                 Version = "v23.1.1.3",
                 IsPrerelease = true,
                 ReleaseDate = DateTime.Now,
-                Assets = new List<GitReleaseAsset>
-                {
-                    new()
+                Assets =
+                [
+                    new GitReleaseAsset
                     {
                         Name = "EventLogExpert_23.1.1.3_x64.msix",
                         Uri = "https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.3/EventLogExpert_23.1.1.3_x64.msix"
                     }
-                }
+                ]
             },
             new()
             {
                 Version = "v23.1.1.2",
                 IsPrerelease = false,
                 ReleaseDate = DateTime.Now.AddDays(-1),
-                Assets = new List<GitReleaseAsset>
-                {
-                    new()
+                Assets =
+                [
+                    new GitReleaseAsset
                     {
                         Name = "EventLogExpert_23.1.1.2_x64.msix",
                         Uri = "https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix"
                     }
-                }
+                ]
             }
         };
 
@@ -68,12 +68,6 @@ public class UpdateServiceTests
         var versionProvider = new Mock<ICurrentVersionProvider>();
         versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
         versionProvider.Setup(v => v.IsDevBuild).Returns(false);
-
-        var titleProvider = new TestTitleProvider();
-
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
-
-        var mainThreadService = new TestMainThreadService();
 
         var deploymentService = new Mock<IDeploymentService>();
         var alertService = new Mock<IAlertDialogService>();
@@ -99,12 +93,6 @@ public class UpdateServiceTests
         versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
         versionProvider.Setup(v => v.IsDevBuild).Returns(false);
 
-        var titleProvider = new TestTitleProvider();
-
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
-
-        var mainThreadService = new TestMainThreadService();
-
         var deploymentService = new Mock<IDeploymentService>();
         var alertService = new Mock<IAlertDialogService>();
 
@@ -128,12 +116,6 @@ public class UpdateServiceTests
         var versionProvider = new Mock<ICurrentVersionProvider>();
         versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
         versionProvider.Setup(v => v.IsDevBuild).Returns(false);
-
-        var titleProvider = new TestTitleProvider();
-
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
-
-        var mainThreadService = new TestMainThreadService();
 
         var deploymentService = new Mock<IDeploymentService>();
         var alertService = new Mock<IAlertDialogService>();
@@ -160,12 +142,6 @@ public class UpdateServiceTests
         versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
         versionProvider.Setup(v => v.IsDevBuild).Returns(false);
 
-        var titleProvider = new TestTitleProvider();
-
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
-
-        var mainThreadService = new TestMainThreadService();
-
         var deploymentService = new Mock<IDeploymentService>();
         var alertService = new Mock<IAlertDialogService>();
         alertService.Setup(a => a.ShowAlert(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
@@ -190,12 +166,6 @@ public class UpdateServiceTests
         var versionProvider = new Mock<ICurrentVersionProvider>();
         versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.2"));
         versionProvider.Setup(v => v.IsDevBuild).Returns(false);
-
-        var titleProvider = new TestTitleProvider();
-
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
-
-        var mainThreadService = new TestMainThreadService();
 
         var deploymentService = new Mock<IDeploymentService>();
         var alertService = new Mock<IAlertDialogService>();
