@@ -108,7 +108,7 @@ public class UpdateService : IUpdateService
             }
 
             string alertContent = "A new version has been detected, would you like to install and reload the application?";
-            if (string.IsNullOrEmpty(latest.Changes))
+            if (string.IsNullOrEmpty(latest.Changes) is not true)
             {
                 alertContent += $"{Environment.NewLine}{latest.Changes}";
             }
