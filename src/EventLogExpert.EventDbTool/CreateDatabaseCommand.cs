@@ -7,7 +7,7 @@ using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public class CreateDatabaseCommand : DbToolCommand
+public sealed class CreateDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
@@ -35,11 +35,7 @@ public class CreateDatabaseCommand : DbToolCommand
         createDatabaseCommand.AddOption(filterOption);
         createDatabaseCommand.AddOption(skipProvidersInFileOption);
         createDatabaseCommand.AddOption(verboseOption);
-        createDatabaseCommand.SetHandler((fileOptionValue, filterOptionValue, verboseOptionValue, skipProvidersInFileOption) =>
-        {
-            CreateDatabase(fileOptionValue, filterOptionValue, verboseOptionValue, skipProvidersInFileOption);
-        },
-        fileArgument, filterOption, verboseOption, skipProvidersInFileOption);
+        createDatabaseCommand.SetHandler(CreateDatabase, fileArgument, filterOption, verboseOption, skipProvidersInFileOption);
 
         return createDatabaseCommand;
     }
@@ -60,16 +56,18 @@ public class CreateDatabaseCommand : DbToolCommand
 
         var skipProviderNames = new HashSet<string>();
 
-        if (skipProvidersInFile != null)
+        if (!File.Exists(skipProvidersInFile))
         {
-            if (!File.Exists(skipProvidersInFile))
-            {
-                Console.WriteLine($"File not found: {skipProvidersInFile}");
-            }
+            Console.WriteLine($"File not found: {skipProvidersInFile}");
+        }
 
-            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
+        using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
+
+        if (skipDbContext.ProviderDetails is not null)
+        {
             foreach (var provider in skipDbContext.ProviderDetails)
             {
+
                 skipProviderNames.Add(provider.ProviderName);
             }
 
@@ -78,7 +76,8 @@ public class CreateDatabaseCommand : DbToolCommand
         }
 
         var providerNames = GetLocalProviderNames(filter);
-        if (!providerNames.Any())
+
+        if (providerNames.Count <= 0)
         {
             Console.WriteLine($"No providers found matching filter {filter}.");
             return;
@@ -100,13 +99,12 @@ public class CreateDatabaseCommand : DbToolCommand
         {
             var provider = new EventMessageProvider(providerName, verboseLogging ? (s, log) => Console.WriteLine(s) : (s, log) => { });
             var details = provider.LoadProviderDetails();
+
             if (details != null)
             {
-                dbContext.ProviderDetails.Add(details);
+                dbContext.ProviderDetails?.Add(details);
 
                 LogProviderDetails(details);
-
-                details = null;
             }
         }
 

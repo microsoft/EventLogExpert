@@ -2,14 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Providers;
-using System;
-using System.Collections.Generic;
 using System.CommandLine;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -32,11 +26,7 @@ public class ShowDatabaseCommand : DbToolCommand
         showDatabaseCommand.AddArgument(fileArgument);
         showDatabaseCommand.AddOption(filterOption);
         showDatabaseCommand.AddOption(verboseOption);
-        showDatabaseCommand.SetHandler((fileArgumentValue, filterOptionValue, verboseOptionValue) =>
-        {
-            ShowProviderInfo(fileArgumentValue, filterOptionValue, verboseOptionValue);
-        },
-        fileArgument, filterOption, verboseOption);
+        showDatabaseCommand.SetHandler(ShowProviderInfo, fileArgument, filterOption, verboseOption);
 
         return showDatabaseCommand;
     }
@@ -51,19 +41,21 @@ public class ShowDatabaseCommand : DbToolCommand
 
         using var dbContext = new EventProviderDbContext(file, readOnly: true);
 
-        var providerNames = dbContext.ProviderDetails.Select(p => p.ProviderName).OrderBy(name => name).ToList();
+        var providerNames = dbContext.ProviderDetails?.Select(p => p.ProviderName).OrderBy(name => name).ToList();
 
         if (!string.IsNullOrEmpty(filter))
         {
             var regex = new Regex(filter);
-            providerNames = providerNames.Where(p => regex.IsMatch(p)).ToList();
+            providerNames = providerNames?.Where(p => regex.IsMatch(p)).ToList();
         }
+
+        if (providerNames is null) { return; }
 
         LogProviderDetailHeader(providerNames);
 
         foreach (var name in providerNames)
         {
-            LogProviderDetails(dbContext.ProviderDetails.First(p => p.ProviderName == name));
+            LogProviderDetails(dbContext.ProviderDetails?.First(p => p.ProviderName == name));
         }
     }
 }

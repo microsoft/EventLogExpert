@@ -2,16 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Providers;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using System.CommandLine;
-using System.Text.Json;
 
 namespace EventLogExpert.EventDbTool;
 
-public class UpgradeDatabaseCommand : DbToolCommand
+public sealed class UpgradeDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
@@ -26,11 +21,7 @@ public class UpgradeDatabaseCommand : DbToolCommand
             description: "Verbose logging. May be useful for troubleshooting.");
         upgradeDatabaseCommand.AddArgument(fileArgument);
         upgradeDatabaseCommand.AddOption(verboseOption);
-        upgradeDatabaseCommand.SetHandler((fileArgumentValue, verboseOptionValue) =>
-        {
-            UpgradeDatabase(fileArgumentValue, verboseOptionValue);
-        },
-        fileArgument, verboseOption);
+        upgradeDatabaseCommand.SetHandler(UpgradeDatabase, fileArgument, verboseOption);
 
         return upgradeDatabaseCommand;
     }
@@ -45,7 +36,7 @@ public class UpgradeDatabaseCommand : DbToolCommand
 
         using var dbContext = new EventProviderDbContext(file, readOnly: false);
 
-        var (needsV2, needsV3) = dbContext.IsUpgradeNeeded();
+        (bool needsV2, bool needsV3) = dbContext.IsUpgradeNeeded();
 
         if (!(needsV2 || needsV3))
         {

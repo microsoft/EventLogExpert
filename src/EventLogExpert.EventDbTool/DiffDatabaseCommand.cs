@@ -31,11 +31,7 @@ public class DiffDatabaseCommand : DbToolCommand
         diffDatababaseCommand.AddArgument(dbTwoArgument);
         diffDatababaseCommand.AddArgument(newDbArgument);
         diffDatababaseCommand.AddOption(verboseOption);
-        diffDatababaseCommand.SetHandler((dbOneArgValue, dbTwoArgValue, newDbArgValue, verboseOptionValue) =>
-        {
-            DiffDatabase(dbOneArgValue, dbTwoArgValue, newDbArgValue, verboseOptionValue);
-        },
-        dbOneArgument, dbTwoArgument, newDbArgument, verboseOption);
+        diffDatababaseCommand.SetHandler(DiffDatabase, dbOneArgument, dbTwoArgument, newDbArgument, verboseOption);
 
         return diffDatababaseCommand;
     }
@@ -67,7 +63,7 @@ public class DiffDatabaseCommand : DbToolCommand
 
         using (var dbOneContext = new EventProviderDbContext(dbOne, readOnly: true))
         {
-            dbOneContext.ProviderDetails.Select(p => p.ProviderName).ToList().ForEach(name => dbOneProviderNames.Add(name));
+            dbOneContext.ProviderDetails?.Select(p => p.ProviderName).ToList().ForEach(name => dbOneProviderNames.Add(name));
         }
 
         var providersCopied = new List<ProviderDetails>();
@@ -75,18 +71,19 @@ public class DiffDatabaseCommand : DbToolCommand
         using var dbTwoContext = new EventProviderDbContext(dbTwo, readOnly: true);
         using var newDbContext = new EventProviderDbContext(newDb, readOnly: false);
 
-        foreach (var details in dbTwoContext.ProviderDetails)
+        if (dbTwoContext.ProviderDetails is not null)
         {
-            if (dbOneProviderNames.Contains(details.ProviderName))
+            foreach (var details in dbTwoContext.ProviderDetails)
             {
-                if (verbose) Console.WriteLine($"Skipping {details.ProviderName} because it is present in both databases.");
-                continue;
-            }
-            else
-            {
+                if (dbOneProviderNames.Contains(details.ProviderName))
+                {
+                    if (verbose) Console.WriteLine($"Skipping {details.ProviderName} because it is present in both databases.");
+                    continue;
+                }
+
                 if (verbose) Console.WriteLine($"Copying {details.ProviderName} because it is present in second db but not first db.");
 
-                newDbContext.ProviderDetails.Add(new ProviderDetails
+                newDbContext.ProviderDetails?.Add(new ProviderDetails
                 {
                     ProviderName = details.ProviderName,
                     Events = details.Events,
@@ -102,15 +99,14 @@ public class DiffDatabaseCommand : DbToolCommand
 
         newDbContext.SaveChanges();
 
-        if (providersCopied.Count > 0)
+        if (providersCopied.Count <= 0) { return; }
+
+        Console.WriteLine("Providers copied to new database:");
+        Console.WriteLine();
+        LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
+        foreach (var provider in providersCopied)
         {
-            Console.WriteLine("Providers copied to new database:");
-            Console.WriteLine();
-            LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
-            foreach (var provider in providersCopied)
-            {
-                LogProviderDetails(provider);
-            }
+            LogProviderDetails(provider);
         }
     }
 }

@@ -31,11 +31,7 @@ public class MergeDatabaseCommand : DbToolCommand
         mergeDatabaseCommand.AddArgument(targetDatabaseArgument);
         mergeDatabaseCommand.AddOption(overwriteOption);
         mergeDatabaseCommand.AddOption(verboseOption);
-        mergeDatabaseCommand.SetHandler((sourceArgumentValue, targetArgumentValue, overwriteOptionValue, verboseOptionValue) =>
-        {
-            MergeDatabase(sourceArgumentValue, targetArgumentValue, overwriteOptionValue, verboseOptionValue);
-        },
-        sourceDatabaseArgument, targetDatabaseArgument, overwriteOption, verboseOption);
+        mergeDatabaseCommand.SetHandler(MergeDatabase, sourceDatabaseArgument, targetDatabaseArgument, overwriteOption, verboseOption);
 
         return mergeDatabaseCommand;
     }
@@ -55,7 +51,7 @@ public class MergeDatabaseCommand : DbToolCommand
 
         using (var sourceContext = new EventProviderDbContext(sourceFile, readOnly: true))
         {
-            sourceProviders.AddRange(sourceContext.ProviderDetails.ToList());
+            sourceProviders.AddRange(sourceContext.ProviderDetails?.ToList() ?? []);
         }
 
         using var targetContext = new EventProviderDbContext(targetFile, readOnly: false);
@@ -64,7 +60,7 @@ public class MergeDatabaseCommand : DbToolCommand
 
         foreach (var sourceProviderDetails in sourceProviders)
         {
-            var existingProviderInTarget = targetContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == sourceProviderDetails.ProviderName);
+            var existingProviderInTarget = targetContext.ProviderDetails?.FirstOrDefault(p => p.ProviderName == sourceProviderDetails.ProviderName);
             if (existingProviderInTarget != null)
             {
                 providersAlreadyInTarget.Add(existingProviderInTarget.ProviderName, existingProviderInTarget);
@@ -104,7 +100,7 @@ public class MergeDatabaseCommand : DbToolCommand
                 continue;
             }
 
-            targetContext.ProviderDetails.Add(new ProviderDetails
+            targetContext.ProviderDetails?.Add(new ProviderDetails
             {
                 ProviderName = provider.ProviderName,
                 Events = provider.Events,

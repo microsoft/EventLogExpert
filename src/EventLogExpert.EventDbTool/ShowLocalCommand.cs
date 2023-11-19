@@ -6,7 +6,7 @@ using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public class ShowLocalCommand : DbToolCommand
+public sealed class ShowLocalCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
@@ -21,11 +21,7 @@ public class ShowLocalCommand : DbToolCommand
             description: "Verbose logging. May be useful for troubleshooting.");
         showProvidersCommand.AddOption(filterOption);
         showProvidersCommand.AddOption(verboseOption);
-        showProvidersCommand.SetHandler((filterOptionValue, verboseOptionValue) =>
-        {
-            ShowProviderInfo(filterOptionValue, verboseOptionValue);
-        },
-        filterOption, verboseOption);
+        showProvidersCommand.SetHandler(ShowProviderInfo, filterOption, verboseOption);
 
         return showProvidersCommand;
     }
@@ -39,11 +35,10 @@ public class ShowLocalCommand : DbToolCommand
         {
             var provider = new EventMessageProvider(providerName, verbose ? (s, log) => Console.WriteLine(s) : (s, log) => { });
             var details = provider.LoadProviderDetails();
+            
             if (details != null)
             {
                 LogProviderDetails(details);
-
-                details = null;
             }
         }
     }
