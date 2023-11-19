@@ -25,7 +25,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
-public partial class MainPage : ContentPage
+public sealed partial class MainPage : ContentPage
 {
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IAppTitleService _appTitleService;
@@ -245,7 +245,7 @@ public partial class MainPage : ContentPage
     }
 
     private void Exit_Clicked(object sender, EventArgs e) =>
-        Application.Current?.CloseWindow(Application.Current.MainPage!.Window);
+        Application.Current?.CloseWindow(Application.Current.MainPage!.Window!);
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents(_traceLogger));

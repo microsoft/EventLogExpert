@@ -13,7 +13,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ContextMenu
+public sealed partial class ContextMenu
 {
     [Inject] private IClipboardService ClipboardService { get; set; } = null!;
 
@@ -40,7 +40,7 @@ public partial class ContextMenu
         {
             FilterType.Id => SelectedEventState.Value.Id.ToString(),
             FilterType.ActivityId => SelectedEventState.Value.ActivityId.ToString()!,
-            FilterType.Level => SelectedEventState.Value.Level.ToString()!,
+            FilterType.Level => SelectedEventState.Value.Level,
             FilterType.KeywordsDisplayNames => SelectedEventState.Value.KeywordsDisplayNames.GetEventKeywords(),
             FilterType.Source => SelectedEventState.Value.Source,
             FilterType.TaskCategory => SelectedEventState.Value.TaskCategory,
@@ -57,9 +57,9 @@ public partial class ContextMenu
             FilterValue = filterValue
         };
 
-        if (!FilterMethods.TryParse(filter, out string? comparisonString)) { return; }
+        if (!FilterMethods.TryParse(filter, out var comparisonString)) { return; }
 
-        filter.ComparisonString = comparisonString!;
+        filter.ComparisonString = comparisonString;
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }

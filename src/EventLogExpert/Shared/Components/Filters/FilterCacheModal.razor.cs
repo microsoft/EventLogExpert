@@ -14,7 +14,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class FilterCacheModal
+public sealed partial class FilterCacheModal
 {
     [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
 
@@ -47,7 +47,7 @@ public partial class FilterCacheModal
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "Saved Filters"
         };
 
-        picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+        picker.FileTypeChoices.Add("JSON", [".json"]);
 
         if (Application.Current?.Windows[0].Handler?.PlatformView is not MauiWinUIWindow window)
         {
@@ -86,12 +86,7 @@ public partial class FilterCacheModal
             FileTypes = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    {
-                        DevicePlatform.WinUI, new[]
-                        {
-                            ".json"
-                        }
-                    }
+                    { DevicePlatform.WinUI, [".json"] }
                 })
         };
 

@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
@@ -12,7 +11,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class FilterRow
+public sealed partial class FilterRow
 {
     [Parameter] public FilterModel Value { get; set; } = null!;
 
@@ -21,7 +20,7 @@ public partial class FilterRow
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     private List<string> FilteredItems =>
-        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
+        Items.Where(x => x.Contains(Value.FilterValue?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase)).ToList();
 
     private List<string> Items
     {
@@ -55,7 +54,7 @@ public partial class FilterRow
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
                 case FilterType.Description :
                 default :
-                    return new List<string>();
+                    return [];
             }
         }
     }

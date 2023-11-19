@@ -15,7 +15,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public partial class FilterPane
+public sealed partial class FilterPane
 {
     private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
     
@@ -96,7 +96,7 @@ public partial class FilterPane
         var hourTicks = TimeSpan.FromHours(1).Ticks;
 
         _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Any())
+            .Where(log => log.Events.Count > 0)
             .Select(log => log.Events.First().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
@@ -105,7 +105,7 @@ public partial class FilterPane
             .ConvertTimeZone(_model.TimeZoneInfo);
 
         _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Any())
+            .Where(log => log.Events.Count > 0)
             .Select(log => log.Events.Last().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)

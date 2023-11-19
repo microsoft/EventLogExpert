@@ -12,7 +12,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class TableColumnMenu
+public sealed partial class TableColumnMenu
 {
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 

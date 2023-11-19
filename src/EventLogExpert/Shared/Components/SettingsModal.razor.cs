@@ -9,15 +9,14 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class SettingsModal : IDisposable
+public sealed partial class SettingsModal : IDisposable
 {
-    private readonly Dictionary<string, bool> _databases = new();
+    private readonly Dictionary<string, bool> _databases = [];
 
     private bool _hasDatabasesChanged = false;
     private SettingsModel _request = new();
@@ -34,16 +33,13 @@ public partial class SettingsModal : IDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    [SuppressMessage("Usage",
-        "CA1816:Dispose methods should call SuppressFinalize",
-        Justification = "Not a redundant GC call since we are just calling unsubscribe")]
     public void Dispose() => ActionSubscriber.UnsubscribeFromAllActions(this);
 
     protected override void OnInitialized()
     {
         ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open().AndForget());
 
-        base.OnInitializedAsync();
+        base.OnInitialized();
     }
 
     private async Task Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
@@ -56,7 +52,7 @@ public partial class SettingsModal : IDisposable
             FileTypes = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.WinUI, new[] { ".db", ".zip" } }
+                    { DevicePlatform.WinUI, [".db", ".zip"] }
                 })
         };
 
@@ -65,7 +61,7 @@ public partial class SettingsModal : IDisposable
             var result = (await FilePicker.Default.PickMultipleAsync(options)).ToList();
 
             // User canceled or no files selected
-            if (!result.Any()) { return; }
+            if (result.Count <= 0) { return; }
 
             Directory.CreateDirectory(FileLocationOptions.DatabasePath);
 
@@ -131,7 +127,7 @@ public partial class SettingsModal : IDisposable
 
     private async Task ReloadOpenLogs()
     {
-        if (!EventLogState.Value.ActiveLogs.Any()) { return; }
+        if (EventLogState.Value.ActiveLogs.IsEmpty) { return; }
 
         bool answer = await AlertDialogService.ShowAlert("Reload Open Logs Now?",
             "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",

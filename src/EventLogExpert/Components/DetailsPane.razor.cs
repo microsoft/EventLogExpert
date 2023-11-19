@@ -10,7 +10,7 @@ using System.Text;
 
 namespace EventLogExpert.Components;
 
-public partial class DetailsPane
+public sealed partial class DetailsPane
 {
     private bool _hasOpened = false;
     private bool _isVisible = false;

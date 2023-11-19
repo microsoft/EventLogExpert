@@ -16,7 +16,9 @@ public abstract class BaseComponent<T> : ComponentBase
     public DisplayConverter<T?, string>? DisplayConverter { get; protected set; }
 
     [Parameter]
+#pragma warning disable BL0007 // Component parameters should be auto properties
     public Func<T?, string> ToStringFunc
+#pragma warning restore BL0007 // Component parameters should be auto properties
     {
         get => _toStringFunc;
         set

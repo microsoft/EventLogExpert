@@ -10,7 +10,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public partial class SplitLogTabPane
+public sealed partial class SplitLogTabPane
 {
     [Parameter] public string? ActiveLog { get; set; }
 

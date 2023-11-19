@@ -15,7 +15,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public partial class EventTable
+public sealed partial class EventTable
 {
     private string? _activeLog;
 

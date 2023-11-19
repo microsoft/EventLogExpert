@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class TextInput : BaseComponent<string>
+public sealed partial class TextInput : BaseComponent<string>
 {
     private async Task UpdateValue(ChangeEventArgs args)
     {

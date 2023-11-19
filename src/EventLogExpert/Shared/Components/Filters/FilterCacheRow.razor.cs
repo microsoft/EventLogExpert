@@ -11,7 +11,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class FilterCacheRow
+public sealed partial class FilterCacheRow
 {
     private CacheType _cacheType = CacheType.Favorites;
     private AdvancedFilterModel _filter = null!;
@@ -29,7 +29,7 @@ public partial class FilterCacheRow
     {
         CacheType.Favorites => FilterCacheState.Value.FavoriteFilters.Select(x => x.ComparisonString).ToList(),
         CacheType.Recent => FilterCacheState.Value.RecentFilters.Select(x => x.ComparisonString).ToList(),
-        _ => new List<string>(),
+        _ => [],
     };
 
     protected override void OnInitialized()

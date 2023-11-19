@@ -14,12 +14,8 @@ public interface IClipboardService
     void CopySelectedEvent(DisplayEventModel? @event, CopyType? copyType);
 }
 
-public class ClipboardService : IClipboardService
+public sealed class ClipboardService(IState<SettingsState> settingsState) : IClipboardService
 {
-    private readonly IState<SettingsState> _settingsState;
-
-    public ClipboardService(IState<SettingsState> settingsState) => _settingsState = settingsState;
-
     public void CopySelectedEvent(DisplayEventModel? @event, CopyType? copyType)
     {
         if (@event is null) { return; }
@@ -30,7 +26,7 @@ public class ClipboardService : IClipboardService
         {
             case CopyType.Simple :
                 stringToCopy.Append($"\"{@event.Level}\" ");
-                stringToCopy.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                stringToCopy.Append($"\"{@event.TimeCreated.ConvertTimeZone(settingsState.Value.Config.TimeZoneInfo)}\" ");
                 stringToCopy.Append($"\"{@event.Source}\" ");
                 stringToCopy.Append($"\"{@event.Id}\" ");
                 stringToCopy.Append($"\"{@event.Description}\"");
@@ -44,7 +40,7 @@ public class ClipboardService : IClipboardService
             default :
                 stringToCopy.AppendLine($"Log Name: {@event.LogName}");
                 stringToCopy.AppendLine($"Source: {@event.Source}");
-                stringToCopy.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
+                stringToCopy.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(settingsState.Value.Config.TimeZoneInfo)}");
                 stringToCopy.AppendLine($"Event ID: {@event.Id}");
                 stringToCopy.AppendLine($"Task Category: {@event.TaskCategory}");
                 stringToCopy.AppendLine($"Level: {@event.Level}");

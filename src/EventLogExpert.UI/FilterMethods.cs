@@ -35,14 +35,14 @@ public static class FilterMethods
         _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
     };
 
-    public static bool TryParse(FilterModel filterModel, out string? comparison)
+    public static bool TryParse(FilterModel filterModel, out string comparison)
     {
-        comparison = null;
+        comparison = string.Empty;
 
         if (string.IsNullOrWhiteSpace(filterModel.FilterValue) &&
             filterModel.FilterComparison != FilterComparison.MultiSelect) { return false; }
 
-        if (!filterModel.FilterValues.Any() &&
+        if (filterModel.FilterValues.Count <= 0 &&
             filterModel.FilterComparison == FilterComparison.MultiSelect) { return false; }
 
         StringBuilder stringBuilder = new();
