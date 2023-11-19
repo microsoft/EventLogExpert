@@ -107,9 +107,13 @@ public class UpdateService : IUpdateService
                 return;
             }
 
-            bool shouldReboot = await _alertDialogService.ShowAlert("Update Available",
-                "A new version has been detected, would you like to install and reload the application?",
-                "Yes", "No");
+            string alertContent = "A new version has been detected, would you like to install and reload the application?";
+            if (string.IsNullOrEmpty(latest.Changes))
+            {
+                alertContent += $"{Environment.NewLine}{latest.Changes}";
+            }
+
+            bool shouldReboot = await _alertDialogService.ShowAlert("Update Available", alertContent,"Yes", "No");
 
             _traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(shouldReboot)} is {shouldReboot} after dialog.");
 
