@@ -9,7 +9,7 @@ namespace EventLogExpert.Eventing.Models;
 ///     for more about Message Files). This could be an Event, a Task (category),
 ///     or something else.
 /// </summary>
-public class MessageModel
+public sealed class MessageModel
 {
     /// <summary>
     ///     The log name that this event will appear in.
@@ -19,7 +19,7 @@ public class MessageModel
     /// <summary>
     ///     The provider name for this message
     /// </summary>
-    public string ProviderName { get; set; }
+    public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>
     ///     For raw ID format, see https://msdn.microsoft.com/en-us/library/windows/desktop/aa363651(v=vs.85).aspx
@@ -48,5 +48,5 @@ public class MessageModel
     /// <summary>
     ///     The text of the message
     /// </summary>
-    public string Text { get; set; }
+    public string Text { get; set; } = string.Empty;
 }

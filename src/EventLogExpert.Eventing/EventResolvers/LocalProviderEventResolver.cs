@@ -15,25 +15,21 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Resolves event descriptions by using our own logic to look up
 ///     message strings in the providers available on the local machine.
 /// </summary>
-public class LocalProviderEventResolver : EventResolverBase, IEventResolver
+public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
 {
     public string Status { get; private set; } = string.Empty;
 
-    public event EventHandler<string>? StatusChanged;
-
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
-    private bool disposedValue;
+    private bool _disposedValue;
 
-    public LocalProviderEventResolver() : base((s, log) => Debug.WriteLine(s)) { }
+    public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
-    public LocalProviderEventResolver(Action<string, LogLevel> tracer) : base(tracer) { }
-
-    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
     {
         if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
         {
-            var provider = new EventMessageProvider(eventRecord.ProviderName, _tracer);
+            var provider = new EventMessageProvider(eventRecord.ProviderName, tracer);
             _providerDetails.TryAdd(eventRecord.ProviderName, provider.LoadProviderDetails());
         }
 
@@ -59,30 +55,25 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ThreadId,
                 eventRecord.LogName,
                 null,
-                OwningLogName);
+                owningLogName);
         }
 
         // The Properties getter is expensive, so we only call the getter once,
         // and we pass this value separately from the eventRecord so it can be reused.
         var eventProperties = eventRecord.Properties;
 
-        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
-
-        if (result.Description == null)
-        {
-            result = result with { Description = "" };
-        }
+        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, owningLogName);
 
         return result;
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
             _providerDetails.Clear();
 
-            disposedValue = true;
+            _disposedValue = true;
         }
     }
 

@@ -14,16 +14,14 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public class EventReaderEventResolver : IEventResolver
 {
-    private bool disposedValue;
+    private bool _disposedValue;
 
     public string Status { get; private set; } = string.Empty;
 
-    public event EventHandler<string>? StatusChanged;
-
-    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
     {
         var desc = eventRecord.FormatDescription();
-        var xml = eventRecord.ToXml();
+        
         IEnumerable<string> keywordsDisplayNames;
         try
         {
@@ -31,7 +29,7 @@ public class EventReaderEventResolver : IEventResolver
         }
         catch
         {
-            keywordsDisplayNames = Enumerable.Empty<string>();
+            keywordsDisplayNames = [];
         }
 
         return new DisplayEventModel(
@@ -52,7 +50,7 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.ThreadId,
             eventRecord.LogName,
             null,
-            OwningLogName);
+            owningLogName);
     }
 
     private static T TryGetValue<T>(Func<T> func)
@@ -64,15 +62,15 @@ public class EventReaderEventResolver : IEventResolver
         }
         catch
         {
-            return default;
+            return default!;
         }
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
-            disposedValue = true;
+            _disposedValue = true;
         }
     }
 

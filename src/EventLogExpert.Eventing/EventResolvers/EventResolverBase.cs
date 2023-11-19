@@ -11,16 +11,14 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public class EventResolverBase
+public partial class EventResolverBase
 {
-    protected readonly Action<string, LogLevel> _tracer;
+    protected readonly Action<string, LogLevel> tracer;
 
-    private readonly Regex _formatRegex = new("%+[0-9]+");
+    private readonly Regex _formatRegex = FormatRegex();
 
-    protected EventResolverBase(Action<string, LogLevel> tracer)
-    {
-        _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
-    }
+    protected EventResolverBase(Action<string, LogLevel> tracer) =>
+        this.tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
 
     protected string? FormatDescription(IList<EventProperty> properties, string? descriptionTemplate, List<MessageModel> parameters)
     {
@@ -40,7 +38,7 @@ public class EventResolverBase
             {
                 var sb = new StringBuilder();
                 var lastIndex = 0;
-                var anyParameterStrings = parameters.Any();
+                var anyParameterStrings = parameters.Count > 0;
                 for (var i = 0; i < matches.Count; i++)
                 {
                     if (matches[i].Value.StartsWith("%%"))
@@ -50,22 +48,22 @@ public class EventResolverBase
                     }
 
                     sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
-                    var propIndex = int.Parse(matches[i].Value.Trim(new[] { '{', '}', '%' }));
+                    var propIndex = int.Parse(matches[i].Value.Trim(['{', '}', '%']));
 
                     if (propIndex - 1 >= properties.Count) { return "Unable to format description"; }
 
                     var valueFormatted = false;
                     var propValue = properties[propIndex - 1].Value;
-                    if (propValue is DateTime)
+                    if (propValue is DateTime time)
                     {
                         // Exactly match the format produced by EventRecord.FormatMessage(). I have no idea why it includes Unicode LRM marks, but it does.
-                        sb.Append(((DateTime)propValue).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                        sb.Append(time.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
                         valueFormatted = true;
                     }
                     else if (anyParameterStrings && propValue is string propString && propString.StartsWith("%%"))
                     {
                         var endParameterId = propString.IndexOf(' ');
-                        var parameterIdString = endParameterId > 2 ? propString.Substring(2, endParameterId - 2) : propString.Substring(2);
+                        var parameterIdString = endParameterId > 2 ? propString[2..endParameterId] : propString[2..];
                         if (int.TryParse(parameterIdString, out var parameterId))
                         {
                             var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
@@ -95,14 +93,14 @@ public class EventResolverBase
 
                 if (lastIndex < description.Length)
                 {
-                    sb.Append(description.Substring(lastIndex));
+                    sb.Append(description[lastIndex..]);
                 }
 
                 description = sb.ToString();
             }
             catch (Exception ex)
             {
-                _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
+                tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
                 return "Unable to format description";
             }
         }
@@ -133,23 +131,23 @@ public class EventResolverBase
         string? taskName = null;
         string? template = null;
 
-        if (eventRecord.Version != null && eventRecord.LogName != null)
+        if (eventRecord is { Version: not null, LogName: not null })
         {
             var modernEvents = providerDetails.Events?.Where(e => e.Id == eventRecord.Id && e.Version == eventRecord.Version && e.LogName == eventRecord.LogName).ToList();
-            if (modernEvents != null && modernEvents.Count == 0)
+            if (modernEvents is { Count: 0 })
             {
                 // Try again forcing the long to a short and with no log name. This is needed for providers such as Microsoft-Windows-Complus
                 modernEvents = providerDetails.Events?.Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version).ToList();
             }
 
-            if (modernEvents != null && modernEvents.Any())
+            if (modernEvents is { Count: > 0 })
             {
                 if (modernEvents.Count > 1)
                 {
-                    _tracer("Ambiguous modern event found:", LogLevel.Information);
+                    tracer("Ambiguous modern event found:", LogLevel.Information);
                     foreach (var modernEvent in modernEvents)
                     {
-                        _tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} LogName: {modernEvent.LogName} Description: {modernEvent.Description}", LogLevel.Information);
+                        tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} LogName: {modernEvent.LogName} Description: {modernEvent.Description}", LogLevel.Information);
                     }
                 }
 
@@ -194,16 +192,16 @@ public class EventResolverBase
             if (taskName == null)
             {
                 var potentialTaskNames = providerDetails.Messages?.Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName).ToList();
-                if (potentialTaskNames != null && potentialTaskNames.Any())
+                if (potentialTaskNames is { Count: > 0 })
                 {
                     taskName = potentialTaskNames[0].Text;
 
                     if (potentialTaskNames.Count > 1)
                     {
-                        _tracer("More than one matching task ID was found.", LogLevel.Information);
-                        _tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
-                        _tracer("   Potential matches:", LogLevel.Information);
-                        potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
+                        tracer("More than one matching task ID was found.", LogLevel.Information);
+                        tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
+                        tracer("   Potential matches:", LogLevel.Information);
+                        potentialTaskNames.ForEach(t => tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
                     }
                 }
                 else
@@ -214,30 +212,30 @@ public class EventResolverBase
         }
 
         return new DisplayEventModel(
-                eventRecord.RecordId,
-                eventRecord.ActivityId,
-                eventRecord.TimeCreated!.Value.ToUniversalTime(),
-                eventRecord.Id,
-                eventRecord.MachineName,
-                Severity.GetString(eventRecord.Level),
-                eventRecord.ProviderName,
-                taskName,
-                description,
-                eventProperties,
-                eventRecord.Qualifiers,
-                eventRecord.Keywords,
-                GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
-                eventRecord.ProcessId,
-                eventRecord.ThreadId,
-                eventRecord.LogName,
-                template,
-                owningLogName);
+            eventRecord.RecordId,
+            eventRecord.ActivityId,
+            eventRecord.TimeCreated!.Value.ToUniversalTime(),
+            eventRecord.Id,
+            eventRecord.MachineName,
+            Severity.GetString(eventRecord.Level),
+            eventRecord.ProviderName,
+            taskName ?? string.Empty,
+            description ?? string.Empty,
+            eventProperties,
+            eventRecord.Qualifiers,
+            eventRecord.Keywords,
+            GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
+            eventRecord.ProcessId,
+            eventRecord.ThreadId,
+            eventRecord.LogName ?? string.Empty,
+            template,
+            owningLogName);
     }
 
     protected static IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
     {
-        if (!bitmask.HasValue || bitmask.Value == 0) return Enumerable.Empty<string>();
-        var returnValue = new List<string>();
+        if (bitmask is null or 0) return [];
+        List<string> returnValue = [];
         foreach (var k in StandardKeywords.Keys)
         {
             if ((bitmask.Value & k) == k) { returnValue.Add(StandardKeywords[k]); }
@@ -276,4 +274,7 @@ public class EventResolverBase
         { 0x40000000000000, "Correlation Hint" },
         { 0x80000000000000, "Classic" }
     };
+
+    [GeneratedRegex("%+[0-9]+")]
+    private static partial Regex FormatRegex();
 }

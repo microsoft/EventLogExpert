@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
-public class EventProviderDbContext : DbContext
+public sealed class EventProviderDbContext : DbContext
 {
     private readonly bool _readOnly;
 
@@ -17,14 +17,7 @@ public class EventProviderDbContext : DbContext
 
     public EventProviderDbContext(string path, bool readOnly, Action<string, LogLevel>? tracer = null)
     {
-        if (tracer != null)
-        {
-            _tracer = tracer;
-        }
-        else
-        {
-            _tracer = (s,log) => { };
-        }
+        _tracer = tracer ?? ((s,log) => { });
 
         _tracer($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}", LogLevel.Information);
 
@@ -39,7 +32,7 @@ public class EventProviderDbContext : DbContext
 
     public string Path { get; }
 
-    public DbSet<ProviderDetails> ProviderDetails { get; set; }
+    public DbSet<ProviderDetails>? ProviderDetails { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder options)
         => options.UseSqlite($"Data Source={Path};Mode={(_readOnly ? "ReadOnly" : "ReadWriteCreate")}");
@@ -85,7 +78,7 @@ public class EventProviderDbContext : DbContext
         var needsV3Upgrade = true;
         while (reader.Read())
         {
-            var val = reader["sql"]?.ToString();
+            var val = reader["sql"].ToString();
             if (val?.Contains("\"Messages\" TEXT NOT NULL") ?? false)
             {
                 needsV2Upgrade = true;
@@ -99,8 +92,6 @@ public class EventProviderDbContext : DbContext
 
         reader.Close();
 
-        var needsUpgrade = needsV2Upgrade || needsV3Upgrade;
-
         _tracer($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}", LogLevel.Information);
 
         return (needsV2Upgrade, needsV3Upgrade);
@@ -108,7 +99,7 @@ public class EventProviderDbContext : DbContext
 
     public void PerformUpgradeIfNeeded()
     {
-        var (needsV2Upgrade, needsV3Upgrade) = IsUpgradeNeeded();
+        (bool needsV2Upgrade, bool needsV3Upgrade) = IsUpgradeNeeded();
 
         if (!needsV2Upgrade && !needsV3Upgrade)
         {
@@ -135,12 +126,12 @@ public class EventProviderDbContext : DbContext
                 var p = new ProviderDetails
                 {
                     ProviderName = (string)detailsReader["ProviderName"],
-                    Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]) ?? new List<MessageModel>(),
-                    Parameters = new List<MessageModel>(),
-                    Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]) ?? new List<EventModel>(),
-                    Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
-                    Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
-                    Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"]) ?? new Dictionary<int, string>()
+                    Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]) ?? [],
+                    Parameters = [],
+                    Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]) ?? [],
+                    Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]) ?? [],
+                    Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]) ?? [],
+                    Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"]) ?? []
                 };
                 allProviderDetails.Add(p);
             }
@@ -154,12 +145,12 @@ public class EventProviderDbContext : DbContext
                 var p = new ProviderDetails
                 {
                     ProviderName = (string)detailsReader["ProviderName"],
-                    Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])detailsReader["Messages"]) ?? new List<MessageModel>(),
-                    Parameters = new List<MessageModel>(),
-                    Events = CompressedJsonValueConverter<List<EventModel>>.ConvertFromCompressedJson((byte[])detailsReader["Events"]) ?? new List<EventModel>(),
-                    Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
-                    Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
-                    Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Tasks"]) ?? new Dictionary<int, string>()
+                    Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])detailsReader["Messages"]) ?? [],
+                    Parameters = [],
+                    Events = CompressedJsonValueConverter<List<EventModel>>.ConvertFromCompressedJson((byte[])detailsReader["Events"]) ?? [],
+                    Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])detailsReader["Keywords"]) ?? [],
+                    Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Opcodes"]) ?? [],
+                    Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Tasks"]) ?? []
                 };
                 allProviderDetails.Add(p);
             }
@@ -176,7 +167,7 @@ public class EventProviderDbContext : DbContext
 
         foreach (var p in allProviderDetails)
         {
-            ProviderDetails.Add(p);
+            ProviderDetails?.Add(p);
         }
 
         SaveChanges();

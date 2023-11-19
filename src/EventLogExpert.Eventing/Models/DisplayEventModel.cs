@@ -1,13 +1,12 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using System.Diagnostics.Eventing.Reader;
 using System.Text;
 
 namespace EventLogExpert.Eventing.Models;
 
-public record DisplayEventModel(
+public sealed record DisplayEventModel(
     long? RecordId,
     Guid? ActivityId,
     DateTime TimeCreated,
@@ -65,11 +64,11 @@ public record DisplayEventModel(
 
                     var propertyNames = new List<string>();
                     var index = -1;
-                    while (-1 < (index = Template.IndexOf("name=", index + 1)))
+                    while (-1 < (index = Template.IndexOf("name=", index + 1, StringComparison.OrdinalIgnoreCase)))
                     {
                         var nameStart = index + 6;
                         var nameEnd = Template.IndexOf('"', nameStart);
-                        var name = Template.Substring(nameStart, nameEnd - nameStart);
+                        var name = Template[nameStart..nameEnd];
                         propertyNames.Add(name);
                     }
 
@@ -90,7 +89,7 @@ public record DisplayEventModel(
                         }
                     }
 
-                    sb.Append(templateBuilder.ToString());
+                    sb.Append(templateBuilder);
                     templateSuccessfullyParsed = true;
                 }
                 catch

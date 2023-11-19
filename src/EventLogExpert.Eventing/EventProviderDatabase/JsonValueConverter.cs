@@ -6,19 +6,10 @@ using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
-public class JsonValueConverter<T> : ValueConverter<T, string> where T : class
+public sealed class JsonValueConverter<T>() : ValueConverter<T, string>(v => ConvertToJson(v), v => ConvertFromJson(v)!)
+    where T : class
 {
-    public JsonValueConverter() :
-      base(v => ConvertToJson(v), v => ConvertFromJson(v))
-    { }
+    private static string ConvertToJson(T value) => JsonSerializer.Serialize(value);
 
-    private static string ConvertToJson(T value)
-    {
-        return JsonSerializer.Serialize(value);
-    }
-
-    private static T ConvertFromJson(string value)
-    {
-        return JsonSerializer.Deserialize<T>(value);
-    }
+    private static T? ConvertFromJson(string value) => JsonSerializer.Deserialize<T>(value);
 }

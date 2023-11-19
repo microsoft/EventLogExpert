@@ -8,26 +8,19 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Providers;
 
-public class RegistryProvider
+public partial class RegistryProvider(string? computerName, Action<string, LogLevel> tracer)
 {
-    private readonly Action<string, LogLevel> _tracer;
+    public string? ComputerName { get; } = computerName;
 
-    public RegistryProvider(string computerName, Action<string, LogLevel> tracer)
-    {
-        _tracer = tracer;
-        ComputerName = computerName;
-    }
-
-    public string ComputerName { get; }
-
-    public string GetSystemRoot()
+    public string? GetSystemRoot()
     {
         var hklm = string.IsNullOrEmpty(ComputerName)
             ? Registry.LocalMachine
             : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, ComputerName);
 
-        var currentVersion = hklm.OpenSubKey("Software\\Microsoft\\Windows NT\\CurrentVersion");
-        var systemRoot = (string)currentVersion?.GetValue("SystemRoot");
+        var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
+        var systemRoot = (string?)currentVersion?.GetValue("SystemRoot");
+
         return systemRoot;
     }
 
@@ -39,18 +32,14 @@ public class RegistryProvider
     /// <returns></returns>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Information);
+        tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Information);
 
         var hklm = string.IsNullOrEmpty(ComputerName)
             ? Registry.LocalMachine
             : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, ComputerName);
 
-        var eventLogKey = hklm.OpenSubKey("SYSTEM\\CurrentControlSet\\Services\\EventLog");
-
-        if (eventLogKey == null)
-        {
+        var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
             throw new OpenEventLogRegistryKeyFailedException(ComputerName);
-        }
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
@@ -63,16 +52,12 @@ public class RegistryProvider
             var logSubKey = eventLogKey.OpenSubKey(logSubKeyName);
             var providerSubKey = logSubKey?.OpenSubKey(providerName);
 
-            var eventMessageFilePath = providerSubKey?.GetValue("EventMessageFile") as string;
-
-            if (eventMessageFilePath == null)
+            if (providerSubKey?.GetValue("EventMessageFile") is not string eventMessageFilePath)
             {
                 continue;
             }
 
-            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Information);
-
-            var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
+            tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Information);
 
             // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
             // and trying to load that causes an access violation.
@@ -80,12 +65,12 @@ public class RegistryProvider
 
             var messageFiles = eventMessageFilePath
                 .Split(';')
-                .Where(path => path != null && supportedExtensions.Contains(Path.GetExtension(path).ToLower()))
+                .Where(path => supportedExtensions.Contains(Path.GetExtension(path).ToLower()))
                 .ToList();
 
             IEnumerable<string> files;
 
-            if (categoryMessageFilePath != null)
+            if (providerSubKey.GetValue("CategoryMessageFile") is string categoryMessageFilePath)
             {
                 var fileList = new List<string> { categoryMessageFilePath };
                 fileList.AddRange(messageFiles.Where(f => f != categoryMessageFilePath));
@@ -107,6 +92,9 @@ public class RegistryProvider
         return new List<string>();
     }
 
+    [GeneratedRegex("^[A-Z]:")]
+    private static partial Regex ReplaceDriveRoot();
+
     private IEnumerable<string> GetExpandedFilePaths(IEnumerable<string> paths)
     {
         if (string.IsNullOrEmpty(ComputerName))
@@ -117,13 +105,8 @@ public class RegistryProvider
 
         // For remote computer, get SystemRoot from the registry
         // TODO: Support variables other than SystemRoot?
-        var systemRoot = GetSystemRoot();
-
-        if (systemRoot == null)
-        {
-            throw new ExpandFilePathsFailedException(
-                $"Could not get SystemRoot from remote registry: {ComputerName}");
-        }
+        var systemRoot = GetSystemRoot() ??
+            throw new ExpandFilePathsFailedException($"Could not get SystemRoot from remote registry: {ComputerName}");
 
         paths = paths.Select(p =>
         {
@@ -131,11 +114,11 @@ public class RegistryProvider
             var newPath = p.ReplaceCaseInsensitiveFind("%SystemRoot%", systemRoot);
 
             // Now replace any drive root references with \\computername\drive$
-            var match = Regex.Match(newPath, "^[A-Z]:");
+            var match = ReplaceDriveRoot().Match(newPath);
 
             if (match.Success)
             {
-                newPath = $"\\\\{ComputerName}\\{match.Value[0]}${newPath.Substring(2)}";
+                newPath = $@"\\{ComputerName}\{match.Value[0]}${newPath[2..]}";
             }
 
             return newPath;
@@ -144,13 +127,7 @@ public class RegistryProvider
         return paths;
     }
 
-    private class ExpandFilePathsFailedException : Exception
-    {
-        public ExpandFilePathsFailedException(string msg) : base(msg) { }
-    }
+    private class ExpandFilePathsFailedException(string msg) : Exception(msg);
 
-    private class OpenEventLogRegistryKeyFailedException : Exception
-    {
-        public OpenEventLogRegistryKeyFailedException(string msg) : base(msg) { }
-    }
+    private class OpenEventLogRegistryKeyFailedException(string? msg) : Exception(msg);
 }

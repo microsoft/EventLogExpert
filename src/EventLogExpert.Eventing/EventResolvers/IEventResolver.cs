@@ -4,17 +4,14 @@
 using EventLogExpert.Eventing.Models;
 using System.Diagnostics.Eventing.Reader;
 
-namespace EventLogExpert.Eventing.EventResolvers
+namespace EventLogExpert.Eventing.EventResolvers;
+
+/// <summary>
+/// Turns a System.Diagnostics.Eventing.Reader.EventRecord into an EventLogExpert.Library.Models.DisplayEventModel.
+/// </summary>
+public interface IEventResolver : IDisposable
 {
-    /// <summary>
-    /// Turns a System.Diagnostics.Eventing.Reader.EventRecord into an EventLogExpert.Library.Models.DisplayEventModel.
-    /// </summary>
-    public interface IEventResolver : IDisposable
-    {
-        public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName);
+    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName);
 
-        public string Status { get; }
-
-        public event EventHandler<string>? StatusChanged;
-    }
+    public string Status { get; }
 }

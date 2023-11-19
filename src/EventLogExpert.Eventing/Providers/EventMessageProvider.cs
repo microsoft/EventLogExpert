@@ -9,22 +9,19 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Providers;
 
-/// <summary>
-///     Represents an event provider from a particular machine.
-/// </summary>
+/// <summary>Represents an event provider from a particular machine.</summary>
 public class EventMessageProvider
 {
-    private static HashSet<string> _allProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
+    private static readonly HashSet<string> AllProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
+
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;
     private readonly Action<string, LogLevel> _traceAction;
 
-    public EventMessageProvider(string providerName, Action<string, LogLevel> traceAction) : this(providerName,
-        null,
-        traceAction)
-    { }
+    public EventMessageProvider(string providerName, Action<string, LogLevel> traceAction) :
+        this(providerName, null, traceAction) { }
 
-    public EventMessageProvider(string providerName, string computerName, Action<string, LogLevel> traceAction)
+    public EventMessageProvider(string providerName, string? computerName, Action<string, LogLevel> traceAction)
     {
         _providerName = providerName;
         _traceAction = traceAction;
@@ -33,7 +30,8 @@ public class EventMessageProvider
 
     public ProviderDetails? LoadProviderDetails()
     {
-        ProviderMetadata providerMetadata = null;
+        ProviderMetadata? providerMetadata = null;
+
         try
         {
             providerMetadata = new ProviderMetadata(_providerName);
@@ -43,15 +41,9 @@ public class EventMessageProvider
             _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.", LogLevel.Information);
         }
 
-        ProviderDetails provider;
-        if (providerMetadata != null)
-        {
-            provider = LoadMessagesFromModernProvider(providerMetadata);
-        }
-        else
-        {
-            provider = new ProviderDetails { ProviderName = _providerName };
-        }
+        ProviderDetails provider = providerMetadata is not null ?
+            LoadMessagesFromModernProvider(providerMetadata) :
+            new ProviderDetails { ProviderName = _providerName };
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
@@ -64,42 +56,36 @@ public class EventMessageProvider
             if (providerMetadata?.MessageFilePath == null)
             {
                 _traceAction($"No message files found for provider {_providerName}. Returning null.", LogLevel.Information);
-                provider.Messages = new List<MessageModel>();
+
+                provider.Messages = [];
             }
             else
             {
-                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.", LogLevel.Information);
-                provider.Messages = LoadMessagesFromDlls(new[] { providerMetadata.MessageFilePath });
+                _traceAction(
+                    $"No message files found for provider {_providerName}. Using message file from modern provider.",
+                    LogLevel.Information);
+
+                provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
             }
         }
 
         if (providerMetadata?.ParameterFilePath != null)
         {
-            provider.Parameters = LoadMessagesFromDlls(new[] { providerMetadata.ParameterFilePath });
+            provider.Parameters = LoadMessagesFromDlls([providerMetadata.ParameterFilePath]);
         }
 
-        if (provider.Events == null && provider.Messages == null)
+        if (provider.Events.Count <= 0 && provider.Messages.Count <= 0)
         {
             return null;
         }
-        else
-        {
-            // We got some sort of data back, so make sure all the collections are there
-            provider.Messages ??= new List<MessageModel>();
-            provider.Events ??= new List<EventModel>();
-            provider.Keywords ??= new Dictionary<long, string>();
-            provider.Opcodes ??= new Dictionary<int, string>();
-            provider.Tasks ??= new Dictionary<int, string>();
 
-            return provider;
-        }
+        return provider;
     }
 
     /// <summary>
-    ///     Loads the messages for a legacy provider from the files specified in
-    ///     the registry. This information is stored at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
+    ///     Loads the messages for a legacy provider from the files specified in the registry. This information is stored
+    ///     at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
     /// </summary>
-    /// <returns></returns>
     private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
     {
         _traceAction($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}", LogLevel.Information);
@@ -118,10 +104,10 @@ public class EventMessageProvider
             _traceAction(ex.ToString(), LogLevel.Information);
         }
 
-        return new List<MessageModel>();
+        return [];
     }
 
-    public static List<MessageModel> GetMessages(IEnumerable<string> legacyProviderFiles, string providerName, Action<string, LogLevel> _traceAction)
+    public static List<MessageModel> GetMessages(IEnumerable<string> legacyProviderFiles, string providerName, Action<string, LogLevel> traceAction)
     {
         var messages = new List<MessageModel>();
 
@@ -152,7 +138,7 @@ public class EventMessageProvider
 
                 if (msgTableInfo == nint.Zero)
                 {
-                    _traceAction($"No message table found. Returning 0 messages from file: {file}", LogLevel.Information);
+                    traceAction($"No message table found. Returning 0 messages from file: {file}", LogLevel.Information);
                     continue;
                 }
 
@@ -173,32 +159,19 @@ public class EventMessageProvider
                         var length = Marshal.ReadInt16(entryPtr);
                         var flags = Marshal.ReadInt16(entryPtr, 2);
                         var textPtr = nint.Add(entryPtr, 4);
-                        string text;
 
-                        if (flags == 0)
+                        string? text = flags switch
                         {
-                            text = Marshal.PtrToStringAnsi(textPtr);
-                        }
-                        else if (flags == 1)
-                        {
-                            text = Marshal.PtrToStringUni(textPtr);
-                        }
-                        else if (flags == 2)
-                        {
-                            // All the ESE messages are a single-byte character set
-                            // but have flags of 2, which is not defined. So just
-                            // treat it as ANSI I guess?
-                            text = Marshal.PtrToStringAnsi(textPtr);
-                        }
-                        else
-                        {
-                            text = "Error: Bad flags. Could not get text.";
-                        }
+                            0 => Marshal.PtrToStringAnsi(textPtr),
+                            1 => Marshal.PtrToStringUni(textPtr),
+                            2 => Marshal.PtrToStringAnsi(textPtr),
+                            _ => "Error: Bad flags. Could not get text."
+                        };
 
                         // This is an event
                         messages.Add(new MessageModel
                         {
-                            Text = text,
+                            Text = text ?? string.Empty,
                             ShortId = (short)id,
                             ProviderName = providerName,
                             RawId = id
@@ -241,7 +214,7 @@ public class EventMessageProvider
 
         var provider = new ProviderDetails { ProviderName = _providerName };
 
-        if (!_allProviderNames.Contains(_providerName))
+        if (!AllProviderNames.Contains(_providerName))
         {
             _traceAction($"{_providerName} modern provider is not present. Returning empty provider.", LogLevel.Information);
             return provider;
@@ -264,7 +237,7 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            provider.Events = new List<EventModel>();
+            provider.Events = [];
             _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:", LogLevel.Information);
             _traceAction(ex.ToString(), LogLevel.Information);
         }
@@ -278,7 +251,7 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            provider.Keywords = new Dictionary<long, string>();
+            provider.Keywords = [];
             _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:", LogLevel.Information);
             _traceAction(ex.ToString(), LogLevel.Information);
         }
@@ -291,7 +264,7 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            provider.Opcodes = new Dictionary<int, string>();
+            provider.Opcodes = [];
             _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:", LogLevel.Information);
             _traceAction(ex.ToString(), LogLevel.Information);
         }
@@ -304,12 +277,13 @@ public class EventMessageProvider
         }
         catch (Exception ex)
         {
-            provider.Tasks = new Dictionary<int, string>();
+            provider.Tasks = [];
             _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:", LogLevel.Information);
             _traceAction(ex.ToString(), LogLevel.Information);
         }
 
-        _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}", LogLevel.Information);
+        _traceAction($"Returning {provider.Events.Count} events for provider {_providerName}", LogLevel.Information);
+
         return provider;
     }
 }

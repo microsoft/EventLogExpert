@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Eventing.Models;
 
-public class EventModel
+public sealed class EventModel
 {
     public long Id { get; set; }
 
@@ -17,7 +17,7 @@ public class EventModel
 
     public int Task { get; set; }
 
-    public long[] Keywords { get; set; }
+    public long[] Keywords { get; set; } = null!;
 
     public string? Template { get; set; }
 
