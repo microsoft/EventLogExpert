@@ -289,6 +289,8 @@ public partial class MainPage : ContentPage
             .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
             .OrderBy(n => n);
 
+        CancellationToken token = new();
+
         foreach (var name in names)
         {
             // Do this in the background to improve startup time.
@@ -302,29 +304,28 @@ public partial class MainPage : ContentPage
                 {
                     return false;
                 }
-            });
+            }, token);
 
-            if (hasLogInformation)
+            if (!hasLogInformation || token.IsCancellationRequested) { continue; }
+
+            var openItem = new MenuFlyoutItem { Text = name };
+            openItem.Clicked += OpenLiveLog_Clicked;
+
+            var addItem = new MenuFlyoutItem { Text = name };
+            addItem.Clicked += AddLiveLog_Clicked;
+
+            if (name == "Security")
             {
-                var openItem = new MenuFlyoutItem { Text = name };
-                openItem.Clicked += OpenLiveLog_Clicked;
-
-                var addItem = new MenuFlyoutItem { Text = name };
-                addItem.Clicked += AddLiveLog_Clicked;
-
-                if (name == "Security")
-                {
-                    // If we are being run as admin, we can access the Security log.
-                    // Make it a peer of Application and System instead of putting it
-                    // under Other Logs.
-                    OpenLiveLogFlyoutSubitem.Insert(1, openItem);
-                    AddLiveLogFlyoutSubitem.Insert(1, addItem);
-                }
-                else
-                {
-                    OpenOtherLogsFlyoutSubitem.Add(openItem);
-                    AddOtherLogsFlyoutSubitem.Add(addItem);
-                }
+                // If we are being run as admin, we can access the Security log.
+                // Make it a peer of Application and System instead of putting it
+                // under Other Logs.
+                OpenLiveLogFlyoutSubitem.Insert(1, openItem);
+                AddLiveLogFlyoutSubitem.Insert(1, addItem);
+            }
+            else
+            {
+                OpenOtherLogsFlyoutSubitem.Add(openItem);
+                AddOtherLogsFlyoutSubitem.Add(addItem);
             }
         }
     }
