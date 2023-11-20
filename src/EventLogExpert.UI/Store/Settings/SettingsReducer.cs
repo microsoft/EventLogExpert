@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Store.Settings;
 
-public class SettingsReducer
+public sealed partial class SettingsReducer
 {
     [ReducerMethod]
     public static SettingsState ReduceLoadColumnsComleted(SettingsState state,
@@ -33,7 +33,7 @@ public class SettingsReducer
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {
-        var r = new Regex("^(.+) (\\S+)$");
+        var r = SplitFileName();
 
         return databases
             .Select(name =>
@@ -46,7 +46,9 @@ public class SettingsReducer
             })
             .OrderBy(n => n.FirstPart)
             .ThenByDescending(n => n.SecondPart)
-            .Select(n => n.FirstPart + n.SecondPart)
-            .ToList();
+            .Select(n => n.FirstPart + n.SecondPart);
     }
+
+    [GeneratedRegex("^(.+) (\\S+)$")]
+    private static partial Regex SplitFileName();
 }

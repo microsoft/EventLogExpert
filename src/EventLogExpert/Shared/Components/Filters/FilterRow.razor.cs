@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
@@ -12,16 +11,17 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class FilterRow
+public sealed partial class FilterRow
 {
     [Parameter] public FilterModel Value { get; set; } = null!;
 
-    [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private List<string> FilteredItems =>
-        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
+    private List<string> FilteredItems => Items
+        .Where(x => x.Contains(Value.FilterValue ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
+        .ToList();
 
     private List<string> Items
     {
@@ -36,7 +36,7 @@ public partial class FilterRow
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
                         .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList();
                 case FilterType.Level :
-                    var items = new List<string>();
+                    List<string> items = [];
 
                     foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
                     {
@@ -55,7 +55,7 @@ public partial class FilterRow
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
                 case FilterType.Description :
                 default :
-                    return new List<string>();
+                    return [];
             }
         }
     }

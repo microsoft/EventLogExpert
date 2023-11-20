@@ -10,16 +10,17 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class SubFilterRow
+public sealed partial class SubFilterRow
 {
     [Parameter] public Guid ParentId { get; set; }
 
     [Parameter] public SubFilterModel Value { get; set; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private List<string> FilteredItems =>
-        Items.Where(x => x.ToLower().Contains(Value.FilterValue?.ToLower() ?? string.Empty)).ToList();
+    private List<string> FilteredItems => Items
+        .Where(x => x.Contains(Value.FilterValue?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
+        .ToList();
 
     private List<string> Items
     {
@@ -48,9 +49,12 @@ public partial class SubFilterRow
                 case FilterType.TaskCategory :
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
+                case FilterType.ActivityId :
+                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
+                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList(); ;
                 case FilterType.Description :
                 default :
-                    return new List<string>();
+                    return [];
             }
         }
     }
