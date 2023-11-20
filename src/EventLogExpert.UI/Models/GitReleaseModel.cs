@@ -16,7 +16,8 @@ public record GitReleaseModel
 
     [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
 
-    [JsonPropertyName("body")] public string Changes { get { return ParseChanges(); } set { Changes = value; } }
+    [JsonPropertyName("body")] public string RawChanges { get; set; } = null!;
+    public string Changes { get { return ParseChanges(); } }
 
     private string ParseChanges()
     {
@@ -25,7 +26,7 @@ public record GitReleaseModel
         // Use regular expression to match lines starting with '*'
         string pattern = @"^\*\s(.+)$";
         Regex regex = new Regex(pattern, RegexOptions.Multiline);
-        MatchCollection matches = regex.Matches(this.Changes);
+        MatchCollection matches = regex.Matches(this.RawChanges);
 
         foreach (Match match in matches)
         {
