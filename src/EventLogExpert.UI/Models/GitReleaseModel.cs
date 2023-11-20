@@ -17,7 +17,7 @@ public record GitReleaseModel
     [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
 
     [JsonPropertyName("body")] public string RawChanges { get; set; } = null!;
-    public string Changes { get { return ParseChanges(); } }
+    public string Changes => ParseChanges();
 
     private string ParseChanges()
     {
