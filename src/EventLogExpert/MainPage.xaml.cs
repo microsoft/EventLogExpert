@@ -332,4 +332,26 @@ public partial class MainPage : ContentPage
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
+
+    private async void Docs_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {}
+    }
+
+    private async void Feedback_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/issues/new");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        { }
+    }
 }
