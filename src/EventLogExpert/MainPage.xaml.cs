@@ -63,7 +63,6 @@ public partial class MainPage : ContentPage
         _settingsState = settingsState;
         _traceLogger = traceLogger;
         _updateService = updateService;
-        _urlOpenService = urlOpenService;
 
         activeLogsState.Select(e => e.ActiveLogs);
 
