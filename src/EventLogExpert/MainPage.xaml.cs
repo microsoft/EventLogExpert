@@ -36,7 +36,6 @@ public partial class MainPage : ContentPage
     private readonly IState<SettingsState> _settingsState;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
-    private readonly IUrlOpenService _urlOpenService;
 
     private DisplayEventModel? _selectedEvent;
 
@@ -52,7 +51,6 @@ public partial class MainPage : ContentPage
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
-        IUrlOpenService urlOpenService,
         ITraceLogger traceLogger)
     {
         InitializeComponent();
@@ -339,11 +337,23 @@ public partial class MainPage : ContentPage
 
     private void Docs_Clicked(object sender, EventArgs e)
     {
-        _urlOpenService.OpenUrl("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
+        try
+        {
+            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {}
     }
 
     private void Feedback_Clicked(object sender, EventArgs e)
     {
-        _urlOpenService.OpenUrl("https://github.com/microsoft/EventLogExpert/issues/new");
+        try
+        {
+            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/issues/new");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        { }
     }
 }
