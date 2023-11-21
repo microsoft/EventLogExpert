@@ -2,7 +2,7 @@
 @inherits EventLogExpert.Shared.Base.BaseComponent<T>
 
 <div class="dropdown-input" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)"
-    @onkeydown="HandleKeyDown" @onblur="CloseDropDown">
+    @onkeydown="HandleKeyDown" @onblur="CloseDropDown" @onfocusout="CloseDropDown">
     @if (IsInput && !IsMultiSelect)
     {
         <input type="text" class="@CssClass" value="@DisplayString" tabindex="0"
