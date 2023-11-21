@@ -30,6 +30,7 @@ public sealed partial class App : Application
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
+        IUrlOpenService urlOpenService,
         ITraceLogger traceLogger)
     {
         InitializeComponent();
@@ -47,6 +48,7 @@ public sealed partial class App : Application
                 currentVersionProvider,
                 appTitleService,
                 fileLocationOptions,
+                urlOpenService,
                 traceLogger));
     }
 
