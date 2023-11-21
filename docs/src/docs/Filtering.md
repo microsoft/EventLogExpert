@@ -1,6 +1,8 @@
-# [EventLogExpert](Home.md)
-
-## Filtering
+---
+title: Filtering - How to use the various filter options.
+index: 2
+published: true
+---
 
 There are three ways to filter. All filters apply to all logs open in that window.
 
@@ -35,5 +37,3 @@ TimeCreated|DateTime
 Xml|string
 
 Note that Xml is generated when requested, so filters against Xml may be slower than filters against other properties.
-
-[Docs home](Home.md)

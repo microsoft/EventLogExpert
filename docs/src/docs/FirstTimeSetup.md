@@ -1,6 +1,8 @@
-# [EventLogExpert](Home.md)
-
-## First time setup
+---
+title: First time setup
+index: 1
+published: true
+---
 
 After installing EventLogExpert, there are a few settings you may want to change.
 
@@ -18,6 +20,4 @@ By default, the Description pane at the bottom will pop open the first time an e
 
 ### Import provider databases
 
-If you have created event databases, they can be imported in Tools -> Options. See [Provider Databases](ProviderDatabases.md).
-
-[Docs home](Home.md)
+If you have created event databases, they can be imported in Tools -> Options. See [Provider Databases](#ProviderDatabases).

@@ -1,4 +1,8 @@
-# [EventLogExpert](Home.md)
+---
+title: Provider databases
+index: 4
+published: true
+---
 
 ## Provider databases
 
@@ -21,5 +25,3 @@ By default, EventLogExpert will simply use the event provider DLLs available on 
 * Go to Tools -> Settings -> Add Provider and choose the database to import.
 
 As long as at least one database is enabled in Tools -> Options, EventLogExpert will only use those databases for event resolution and will ignore any provider DLLs on the local machine. To switch back to local machine providers, disable all the databases in Tools -> Options.
-
-[Docs home](Home.md)

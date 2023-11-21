@@ -1,5 +1,9 @@
-# [EventLogExpert](Home.md)
-
+---
+title: Viewing events
+index: 3
+published: true
+---
+Things to know about viewing, selecting, scrolling, and reading events.
 ## Selecting, scrolling, and reading events
 
 * Events can be selected with a mouse click.
@@ -24,5 +28,3 @@
 * When a live log is open, new events arriving from that log will be stored in a buffer. This is indicated by the New Events number shown in the status bar at the bottom of the window.
 * From the View menu, choose Load New Events to add those new events to the view.
 * Choosing Continuously Update from the View menu will cause those events to be added to the view immediately as they arrive.
-
-[Docs home](Home.md)
