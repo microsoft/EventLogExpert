@@ -44,6 +44,8 @@
         </MenuBarItem>
         <MenuBarItem Text="Help">
             <MenuFlyoutItem Text="Check for Updates" Clicked="CheckForUpdates_Clicked" />
+            <MenuFlyoutItem Text="Feedback" Clicked="Feedback_Clicked" />
+            <MenuFlyoutItem Text="Docs" Clicked="Docs_Clicked" />
         </MenuBarItem>
     </ContentPage.MenuBarItems>
 

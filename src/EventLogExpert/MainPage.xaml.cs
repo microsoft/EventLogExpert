@@ -16,6 +16,7 @@ using Fluxor;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -331,4 +332,14 @@ public partial class MainPage : ContentPage
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
+
+    private void Docs_Clicked(object sender, EventArgs e)
+    {
+        Process.Start("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
+    }
+
+    private void Feedback_Clicked(object sender, EventArgs e)
+    {
+        Process.Start("https://github.com/microsoft/EventLogExpert/issues");
+    }
 }
