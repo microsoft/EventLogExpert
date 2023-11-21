@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Models;
 
-public record GitReleaseModel
+public sealed partial record GitReleaseModel
 {
     [JsonPropertyName("name")] public string Version { get; set; } = null!;
 
@@ -17,35 +17,39 @@ public record GitReleaseModel
     [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
 
     [JsonPropertyName("body")] public string RawChanges { get; set; } = null!;
-    public string Changes => ParseChanges();
 
-    private string ParseChanges()
+    public List<string> Changes
     {
-        List<string> changes = new List<string>();
-
-        // Use regular expression to match lines starting with '*'
-        string pattern = @"^\*\s(.+)$";
-        Regex regex = new Regex(pattern, RegexOptions.Multiline);
-        MatchCollection matches = regex.Matches(this.RawChanges);
-
-        foreach (Match match in matches)
+        get
         {
-            string changeDescription = match.Groups[1].Value.Trim();
+            List<string> changes = [];
 
-            // https://www.shellhacks.com/git-get-short-hash-sha-1-from-long-hash-head-log
-            if (changeDescription.Length > 40)
+            Regex regex = SplitChangeLog();
+            MatchCollection matches = regex.Matches(RawChanges);
+
+            foreach (var match in matches.Cast<Match>())
             {
-                changeDescription = changeDescription.Substring(40).Trim();
+                string changeDescription = match.Groups[1].Value.Trim();
+
+                // https://www.shellhacks.com/git-get-short-hash-sha-1-from-long-hash-head-log
+                if (changeDescription.Length > 40)
+                {
+                    changeDescription = changeDescription[40..].Trim();
+                }
+
+                changes.Add(changeDescription);
             }
 
-            changes.Add(changeDescription);
+            return changes;
         }
-
-        return String.Join(Environment.NewLine, changes);
     }
+
+    /// <summary>Use regular expression to match lines starting with '*'</summary>
+    [GeneratedRegex(@"^\*\s(.+)$", RegexOptions.Multiline)]
+    private static partial Regex SplitChangeLog();
 }
 
-public record GitReleaseAsset
+public sealed record GitReleaseAsset
 {
     [JsonPropertyName("name")] public string Name { get; set; } = null!;
 

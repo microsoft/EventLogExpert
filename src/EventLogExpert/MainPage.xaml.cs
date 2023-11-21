@@ -25,7 +25,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
-public partial class MainPage : ContentPage
+public sealed partial class MainPage : ContentPage
 {
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IAppTitleService _appTitleService;
@@ -33,6 +33,7 @@ public partial class MainPage : ContentPage
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
+    private readonly IAlertDialogService _dialogService;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
@@ -45,6 +46,7 @@ public partial class MainPage : ContentPage
         IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
+        IAlertDialogService dialogService,
         IClipboardService clipboardService,
         IUpdateService updateService,
         ICurrentVersionProvider currentVersionProvider,
@@ -60,6 +62,7 @@ public partial class MainPage : ContentPage
         _currentVersionProvider = currentVersionProvider;
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
+        _dialogService = dialogService;
         _traceLogger = traceLogger;
         _updateService = updateService;
 
@@ -182,6 +185,19 @@ public partial class MainPage : ContentPage
         var param = item?.CommandParameter as CopyType?;
 
         _clipboardService.CopySelectedEvent(_selectedEvent, param);
+    }
+
+    private async void Docs_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            Uri uri = new("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowAlert("Failed to launch browser", ex.Message, "Ok");
+        }
     }
 
     private void EnableAddLogToViewViaDragAndDrop()
@@ -330,28 +346,24 @@ public partial class MainPage : ContentPage
         }
     }
 
+    private async void ReleaseNotes_Clicked(object sender, EventArgs e)
+    {
+        await _updateService.GetReleaseNotes();
+    }
+
+    private async void SubmitAnIssue_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            Uri uri = new("https://github.com/microsoft/EventLogExpert/issues/new");
+            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowAlert("Failed to launch browser", ex.Message, "Ok");
+        }
+    }
+
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
-
-    private async void Docs_Clicked(object sender, EventArgs e)
-    {
-        try
-        {
-            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
-            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-        }
-        catch (Exception ex)
-        {}
-    }
-
-    private async void Feedback_Clicked(object sender, EventArgs e)
-    {
-        try
-        {
-            Uri uri = new Uri("https://github.com/microsoft/EventLogExpert/issues/new");
-            await Browser.Default.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
-        }
-        catch (Exception ex)
-        { }
-    }
 }
