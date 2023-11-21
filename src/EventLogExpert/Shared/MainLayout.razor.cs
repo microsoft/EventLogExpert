@@ -6,13 +6,13 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared;
 
-public partial class MainLayout
+public sealed partial class MainLayout
 {
-    [Inject] private IAppTitleService AppTitleService { get; set; } = null!;
+    [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
 
-    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; set; } = null!;
+    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
 
-    [Inject] private IUpdateService UpdateService { get; set; } = null!;
+    [Inject] private IUpdateService UpdateService { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

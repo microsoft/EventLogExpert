@@ -16,15 +16,13 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
-public partial class App : Application
+public sealed partial class App : Application
 {
     public App(IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
-        IStateSelection<SettingsState, bool> showLogState,
-        IStateSelection<SettingsState, bool> showComputerState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
         IState<SettingsState> settingsState,
         IClipboardService clipboardService,
