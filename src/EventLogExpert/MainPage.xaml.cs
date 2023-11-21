@@ -16,8 +16,6 @@ using Fluxor;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using static EventLogExpert.UI.Store.EventLog.EventLogState;
