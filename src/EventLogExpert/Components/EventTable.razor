@@ -12,7 +12,7 @@
 <SplitLogTabPane @bind-ActiveLog="@_activeLog" />
 
 <div class="table-container" hidden="@(_activeLog != null)">
-    <table>
+    <table @onkeyup="HandleKeyUp">
         <thead @oncontextmenu="InvokeTableColumnMenu">
             <tr>
                 <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">

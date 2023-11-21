@@ -41,6 +41,7 @@ public sealed class SettingsEffects(
             TimeZoneId = preferencesProvider.TimeZonePreference,
             DisabledDatabases = preferencesProvider.DisabledDatabasesPreference,
             ShowDisplayPaneOnSelectionChange = preferencesProvider.DisplayPaneSelectionPreference,
+            CopyType = preferencesProvider.KeyboardCopyTypePreference,
             LogLevel = preferencesProvider.LogLevelPreference,
             IsPrereleaseEnabled = preferencesProvider.PrereleasePreference
         };
@@ -56,6 +57,7 @@ public sealed class SettingsEffects(
         preferencesProvider.TimeZonePreference = action.Settings.TimeZoneId;
         preferencesProvider.DisabledDatabasesPreference = action.Settings.DisabledDatabases;
         preferencesProvider.DisplayPaneSelectionPreference = action.Settings.ShowDisplayPaneOnSelectionChange;
+        preferencesProvider.KeyboardCopyTypePreference = action.Settings.CopyType;
         preferencesProvider.LogLevelPreference = action.Settings.LogLevel;
         preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
 

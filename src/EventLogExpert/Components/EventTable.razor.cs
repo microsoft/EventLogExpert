@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
@@ -15,21 +16,23 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public partial class EventTable
+public sealed partial class EventTable
 {
     private string? _activeLog;
 
     [Inject]
-    private IStateSelection<EventLogState, IImmutableDictionary<string, EventLogData>> ActiveLogState { get; set; } = null!;
+    private IStateSelection<EventLogState, IImmutableDictionary<string, EventLogData>> ActiveLogState { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     [Inject]
-    private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; set; } = null!;
+    private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -67,6 +70,14 @@ public partial class EventTable
 
     private string GetCss(DisplayEventModel @event) => SelectedEventState.Value?.RecordId == @event.RecordId ?
         "table-row selected" : "table-row";
+
+    private void HandleKeyUp(KeyboardEventArgs args)
+    {
+        if (args is { CtrlKey: true, Code: "KeyC" })
+        {
+            ClipboardService.CopySelectedEvent(SelectedEventState.Value, SettingsState.Value.Config.CopyType);
+        }
+    }
 
     private async Task InvokeContextMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeContextMenu", args.ClientX, args.ClientY);

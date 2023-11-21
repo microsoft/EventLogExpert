@@ -21,6 +21,8 @@ public interface IPreferencesProvider
 
     IList<string> FavoriteFiltersPreference { get; set; }
 
+    CopyType KeyboardCopyTypePreference { get; set; }
+
     bool LevelColumnPreference { get; set; }
 
     LogLevel LogLevelPreference { get; set; }
