@@ -9,7 +9,6 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using System.Diagnostics.CodeAnalysis;
 using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 

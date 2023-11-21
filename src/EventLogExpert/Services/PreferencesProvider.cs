@@ -1,13 +1,14 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace EventLogExpert.Services;
 
-public class PreferencesProvider : IPreferencesProvider
+public sealed class PreferencesProvider : IPreferencesProvider
 {
     private const string ActivityIdColumn = "activity-id-column";
     private const string ComputerNameColumn = "computer-name-column";
@@ -16,6 +17,7 @@ public class PreferencesProvider : IPreferencesProvider
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string EventIdColumn = "event-id-column";
     private const string FavoriteFilters = "favorite-filters";
+    private const string KeyboardCopyType = "keyboard-copy-type";
     private const string LevelColumn = "level-column";
     private const string LoggingLevel = "logging-level";
     private const string LogNameColumn = "log-name-column";
@@ -45,7 +47,7 @@ public class PreferencesProvider : IPreferencesProvider
 
     public IList<string> DisabledDatabasesPreference
     {
-        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabases, "[]")) ?? new List<string>();
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabases, "[]")) ?? [];
         set => Preferences.Default.Set(DisabledDatabases, JsonSerializer.Serialize(value));
     }
 
@@ -63,8 +65,15 @@ public class PreferencesProvider : IPreferencesProvider
 
     public IList<string> FavoriteFiltersPreference
     {
-        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? new List<string>();
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? [];
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
+    }
+
+    public CopyType KeyboardCopyTypePreference {
+        get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyType, CopyType.Full.ToString()),
+            out CopyType value) ?
+            value : CopyType.Full;
+        set => Preferences.Default.Set(KeyboardCopyType, value.ToString());
     }
 
     public bool LevelColumnPreference
@@ -95,7 +104,7 @@ public class PreferencesProvider : IPreferencesProvider
 
     public IList<string> RecentFiltersPreference
     {
-        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? new List<string>();
+        get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? [];
         set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
     }
 

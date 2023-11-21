@@ -1,5 +1,6 @@
 @using EventLogExpert.UI.Store.Settings
 @using Microsoft.Extensions.Logging
+@using EventLogExpert.UI
 
 @inject IState<SettingsState> SettingsState
 
@@ -44,6 +45,16 @@
 
             <div class="flex-center-aligned-row">
                 Expand Display Pane On Selection Change: <BooleanSelect @bind-Value="_request.ShowDisplayPaneOnSelectionChange" />
+            </div>
+            
+            <div class="flex-center-aligned-row">
+                Keyboard Copy Behavior:
+                <ValueSelect CssClass="input filter-dropdown" T="CopyType" @bind-Value="_request.CopyType">
+                    @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))
+                    {
+                        <ValueSelectItem T="CopyType" Value="item" />
+                    }
+                </ValueSelect>
             </div>
 
             <div class="flex-center-aligned-row">
