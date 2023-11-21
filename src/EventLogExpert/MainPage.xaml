@@ -43,9 +43,10 @@
             <!-- Option to export providers? -->
         </MenuBarItem>
         <MenuBarItem Text="Help">
-            <MenuFlyoutItem Text="Check for Updates" Clicked="CheckForUpdates_Clicked" />
-            <MenuFlyoutItem Text="Feedback" Clicked="Feedback_Clicked" />
             <MenuFlyoutItem Text="Docs" Clicked="Docs_Clicked" />
+            <MenuFlyoutItem Text="Submit an Issue" Clicked="SubmitAnIssue_Clicked" />
+            <MenuFlyoutItem Text="Check for Updates" Clicked="CheckForUpdates_Clicked" />
+            <MenuFlyoutItem Text="Release Notes" Clicked="ReleaseNotes_Clicked" />
         </MenuBarItem>
     </ContentPage.MenuBarItems>
 
