@@ -333,7 +333,7 @@ public partial class MainPage : ContentPage
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
 
-    private void Docs_Clicked(object sender, EventArgs e)
+    private async void Docs_Clicked(object sender, EventArgs e)
     {
         try
         {
@@ -344,7 +344,7 @@ public partial class MainPage : ContentPage
         {}
     }
 
-    private void Feedback_Clicked(object sender, EventArgs e)
+    private async void Feedback_Clicked(object sender, EventArgs e)
     {
         try
         {
