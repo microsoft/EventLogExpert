@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Test.Services;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
-using Moq;
+using NSubstitute;
 using Xunit.Abstractions;
 
 namespace EventLogExpert.Test;
@@ -25,10 +25,10 @@ public class UpdateServiceTests
         _outputHelper = outputHelper;
         _traceLogger = new TestTraceLogger(outputHelper);
 
-        var appTitleService = new Mock<IAppTitleService>();
-        _appTitleService = appTitleService.Object;
+        var appTitleService = Substitute.For<IAppTitleService>();
+        _appTitleService = appTitleService;
 
-        var gitHubService = new Mock<IGitHubService>();
+        var gitHubService = Substitute.For<IGitHubService>();
         var releases = new List<GitReleaseModel>
         {
             new()
@@ -63,164 +63,162 @@ public class UpdateServiceTests
             }
         };
 
-        gitHubService.Setup(g => g.GetReleases()).Returns(Task.FromResult(releases.AsEnumerable()));
-        _gitHubService = gitHubService.Object;
+        gitHubService.GetReleases().Returns(Task.FromResult(releases.AsEnumerable()));
+        _gitHubService = gitHubService;
     }
 
     [Fact]
     public async void ShouldUpdateToPrereleaseOnNextRestart()
     {
-        var versionProvider = new Mock<ICurrentVersionProvider>();
-        versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
-        versionProvider.Setup(v => v.IsDevBuild).Returns(false);
+        var versionProvider = Substitute.For<ICurrentVersionProvider>();
+        versionProvider.CurrentVersion.Returns(new Version("23.1.1.1"));
+        versionProvider.IsDevBuild.Returns(false);
 
         var titleProvider = new TestTitleProvider();
 
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
+        var appTitleService = new AppTitleService(versionProvider, titleProvider);
 
         var mainThreadService = new TestMainThreadService();
 
-        var deploymentService = new Mock<IDeploymentService>();
-        var alertService = new Mock<IAlertDialogService>();
+        var deploymentService = Substitute.For<IDeploymentService>();
+        var alertService = Substitute.For<IAlertDialogService>();
 
         var updateService = new UpdateService(
-            versionProvider.Object,
+            versionProvider,
             _appTitleService,
             _gitHubService,
-            deploymentService.Object,
+            deploymentService,
             _traceLogger,
-            alertService.Object);
+            alertService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
 
-        deploymentService.Verify(d =>
-            d.UpdateOnNextRestart("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.3/EventLogExpert_23.1.1.3_x64.msix"), Times.Once());
+        deploymentService.Received(1)
+            .UpdateOnNextRestart("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.3/EventLogExpert_23.1.1.3_x64.msix");
     }
 
     [Fact]
     public async void ShouldUpdateToLatestOnNextRestart()
     {
-        var versionProvider = new Mock<ICurrentVersionProvider>();
-        versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
-        versionProvider.Setup(v => v.IsDevBuild).Returns(false);
+        var versionProvider = Substitute.For<ICurrentVersionProvider>();
+        versionProvider.CurrentVersion.Returns(new Version("23.1.1.1"));
+        versionProvider.IsDevBuild.Returns(false);
 
         var titleProvider = new TestTitleProvider();
 
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
+        var appTitleService = new AppTitleService(versionProvider, titleProvider);
 
         var mainThreadService = new TestMainThreadService();
 
-        var deploymentService = new Mock<IDeploymentService>();
-        var alertService = new Mock<IAlertDialogService>();
+        var deploymentService = Substitute.For<IDeploymentService>();
+        var alertService = Substitute.For<IAlertDialogService>();
 
         var updateService = new UpdateService(
-            versionProvider.Object,
+            versionProvider,
             _appTitleService,
             _gitHubService,
-            deploymentService.Object,
+            deploymentService,
             _traceLogger,
-            alertService.Object);
+            alertService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
 
-        deploymentService.Verify(d =>
-            d.UpdateOnNextRestart("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix"), Times.Once());
+        deploymentService.Received(1)
+            .UpdateOnNextRestart("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix");
     }
 
     [Fact]
     public async void ShouldUpdateToPrereleaseImmediately()
     {
-        var versionProvider = new Mock<ICurrentVersionProvider>();
-        versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
-        versionProvider.Setup(v => v.IsDevBuild).Returns(false);
+        var versionProvider = Substitute.For<ICurrentVersionProvider>();
+        versionProvider.CurrentVersion.Returns(new Version("23.1.1.1"));
+        versionProvider.IsDevBuild.Returns(false);
 
         var titleProvider = new TestTitleProvider();
 
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
+        var appTitleService = new AppTitleService(versionProvider, titleProvider);
 
         var mainThreadService = new TestMainThreadService();
 
-        var deploymentService = new Mock<IDeploymentService>();
-        var alertService = new Mock<IAlertDialogService>();
-        alertService.Setup(a => a.ShowAlert(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var deploymentService = Substitute.For<IDeploymentService>();
+        var alertService = Substitute.For<IAlertDialogService>();
+        alertService.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
+            .Returns(Task.FromResult(true));
 
         var updateService = new UpdateService(
-            versionProvider.Object,
+            versionProvider,
             _appTitleService,
             _gitHubService,
-            deploymentService.Object,
+            deploymentService,
             _traceLogger,
-            alertService.Object);
+            alertService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
 
-        deploymentService.Verify(d =>
-            d.RestartNowAndUpdate("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.3/EventLogExpert_23.1.1.3_x64.msix"), Times.Once());
+        deploymentService.Received(1)
+            .RestartNowAndUpdate("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.3/EventLogExpert_23.1.1.3_x64.msix");
     }
 
     [Fact]
     public async void ShouldUpdateToLatestImmediately()
     {
-        var versionProvider = new Mock<ICurrentVersionProvider>();
-        versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.1"));
-        versionProvider.Setup(v => v.IsDevBuild).Returns(false);
+        var versionProvider = Substitute.For<ICurrentVersionProvider>();
+        versionProvider.CurrentVersion.Returns(new Version("23.1.1.1"));
+        versionProvider.IsDevBuild.Returns(false);
 
         var titleProvider = new TestTitleProvider();
 
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
+        var appTitleService = new AppTitleService(versionProvider, titleProvider);
 
         var mainThreadService = new TestMainThreadService();
 
-        var deploymentService = new Mock<IDeploymentService>();
-        var alertService = new Mock<IAlertDialogService>();
-        alertService.Setup(a => a.ShowAlert(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>())).ReturnsAsync(true);
+        var deploymentService = Substitute.For<IDeploymentService>();
+        var alertService = Substitute.For<IAlertDialogService>();
+        alertService.ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>()).Returns(Task.FromResult(true));
 
         var updateService = new UpdateService(
-            versionProvider.Object,
+            versionProvider,
             _appTitleService,
             _gitHubService,
-            deploymentService.Object,
+            deploymentService,
             _traceLogger,
-            alertService.Object);
+            alertService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
 
-        deploymentService.Verify(d =>
-            d.RestartNowAndUpdate("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix"), Times.Once());
+        deploymentService.Received(1)
+            .RestartNowAndUpdate("https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix");
     }
 
     [Fact]
     public async void ShouldAlertNoUpdatesAvailable()
     {
-        var versionProvider = new Mock<ICurrentVersionProvider>();
-        versionProvider.Setup(v => v.CurrentVersion).Returns(new Version("23.1.1.2"));
-        versionProvider.Setup(v => v.IsDevBuild).Returns(false);
+        var versionProvider = Substitute.For<ICurrentVersionProvider>();
+        versionProvider.CurrentVersion.Returns(new Version("23.1.1.2"));
+        versionProvider.IsDevBuild.Returns(false);
 
         var titleProvider = new TestTitleProvider();
 
-        var appTitleService = new AppTitleService(versionProvider.Object, titleProvider);
+        var appTitleService = new AppTitleService(versionProvider, titleProvider);
 
         var mainThreadService = new TestMainThreadService();
 
-        var deploymentService = new Mock<IDeploymentService>();
-        var alertService = new Mock<IAlertDialogService>();
+        var deploymentService = Substitute.For<IDeploymentService>();
+        var alertService = Substitute.For<IAlertDialogService>();
 
         var updateService = new UpdateService(
-            versionProvider.Object,
+            versionProvider,
             _appTitleService,
             _gitHubService,
-            deploymentService.Object,
+            deploymentService,
             _traceLogger,
-            alertService.Object);
+            alertService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: true);
 
-        deploymentService.Verify(d =>
-            d.RestartNowAndUpdate(It.IsAny<string>()), Times.Never);
-        deploymentService.Verify(d =>
-            d.UpdateOnNextRestart(It.IsAny<string>()), Times.Never);
-        alertService.Verify(a =>
-            a.ShowAlert(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()), Times.Once());
+        deploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>());
+        deploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>());
+        await alertService.Received(1).ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
