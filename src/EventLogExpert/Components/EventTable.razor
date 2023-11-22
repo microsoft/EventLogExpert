@@ -92,7 +92,7 @@
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu">
             <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
-                <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
+                <tr class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td hidden="@(IsColumnHidden(ColumnName.Level))">
                         <span class="@GetLevelClass(evt.Level)"></span>
                         @evt.Level
@@ -198,7 +198,7 @@
                 </thead>
                 <tbody @oncontextmenu="InvokeContextMenu">
                     <Virtualize Items="log.Value.FilteredEvents" Context="evt">
-                        <tr class="@GetCss(evt)" @key="evt.RecordId" @onfocus="() => SelectEvent(evt)" tabindex="0">
+                        <tr class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
                             <td hidden="@(IsColumnHidden(ColumnName.Level))">
                                 <span class="@GetLevelClass(evt.Level)"></span>
                                 @evt.Level
