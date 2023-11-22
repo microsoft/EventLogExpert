@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using Moq;
+using NSubstitute;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using System.Reflection;
@@ -13,7 +13,7 @@ using Xunit.Abstractions;
 
 namespace EventLogExpert.Test;
 
-public class EventResolverTests
+public class EventResolverTests(ITestOutputHelper outputHelper)
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
@@ -38,19 +38,14 @@ public class EventResolverTests
         }
     }
 
-    private readonly ITestOutputHelper _outputHelper;
-
-    public EventResolverTests(ITestOutputHelper outputHelper)
-    {
-        _outputHelper = outputHelper;
-    }
+    private readonly ITestOutputHelper _outputHelper = outputHelper;
 
     [Fact]
     public void CanResolveMSExchangeRepl4114()
     {
         // This event has a message in the legacy provider, but a task in the modern provider.
 
-        List<string> properties = new() { "SERVER1", "4", "Lots of copy status text", "False" };
+        List<string> properties = ["SERVER1", "4", "Lots of copy status text", "False"];
         var propList = new List<EventProperty>();
         var constructors = typeof(EventProperty).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance);
         foreach (var p in properties)
@@ -59,29 +54,29 @@ public class EventResolverTests
             propList.Add(eventProperty);
         }
 
-        var eventRecord = new Mock<EventRecord>();
-        eventRecord.Setup(e => e.Id).Returns(4114);
-        eventRecord.Setup(e => e.Keywords).Returns(36028797018963968);
-        eventRecord.Setup(e => e.Level).Returns(4);
-        eventRecord.Setup(e => e.LogName).Returns("Application");
-        eventRecord.Setup(e => e.Opcode).Returns<short?>(null);
-        eventRecord.Setup(e => e.Properties).Returns(propList);
-        eventRecord.Setup(e => e.ProviderId).Returns<Guid?>(null);
-        eventRecord.Setup(e => e.ProviderName).Returns("MSExchangeRepl");
-        eventRecord.Setup(e => e.Qualifiers).Returns(16388);
-        eventRecord.Setup(e => e.RecordId).Returns(9518530);
-        eventRecord.Setup(e => e.RelatedActivityId).Returns<Guid?>(null);
-        eventRecord.Setup(e => e.Task).Returns(1);
-        eventRecord.Setup(e => e.TimeCreated).Returns(DateTime.Parse("1/7/2023 10:02:00 AM"));
-        eventRecord.Setup(e => e.UserId).Returns<SecurityIdentifier>(null);
-        eventRecord.Setup(e => e.Version).Returns<byte?>(null);
+        var eventRecord = Substitute.For<EventRecord>();
+        eventRecord.Id.Returns(4114);
+        eventRecord.Keywords.Returns(36028797018963968);
+        eventRecord.Level.Returns((byte)4);
+        eventRecord.LogName.Returns("Application");
+        eventRecord.Opcode.Returns(i => null);
+        eventRecord.Properties.Returns(propList);
+        eventRecord.ProviderId.Returns(i => null);
+        eventRecord.ProviderName.Returns("MSExchangeRepl");
+        eventRecord.Qualifiers.Returns(16388);
+        eventRecord.RecordId.Returns(9518530);
+        eventRecord.RelatedActivityId.Returns(i => null);
+        eventRecord.Task.Returns(1);
+        eventRecord.TimeCreated.Returns(DateTime.Parse("1/7/2023 10:02:00 AM"));
+        eventRecord.UserId.Returns(i => null);
+        eventRecord.Version.Returns(i => null);
 
         var providerDetails = new ProviderDetails
         {
-            Events = new List<EventModel>(),
-            Keywords = new Dictionary<long, string>(),
-            Messages = new List<MessageModel>
-            {
+            Events = [],
+            Keywords = [],
+            Messages =
+            [
                 new MessageModel
                 {
                     LogLink = null,
@@ -92,8 +87,8 @@ public class EventResolverTests
                     Template = null,
                     Text = "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
                 }
-            },
-            Opcodes = new Dictionary<int, string>(),
+            ],
+            Opcodes = [],
             ProviderName = "MSExchangeRepl",
             Tasks = new Dictionary<int, string>
             {
@@ -106,8 +101,8 @@ public class EventResolverTests
             }
         };
 
-        var resolver = new UnitTestEventResolver(new List<ProviderDetails> { providerDetails });
-        var result = resolver.Resolve(eventRecord.Object, "Test");
+        var resolver = new UnitTestEventResolver([providerDetails]);
+        var result = resolver.Resolve(eventRecord, "Test");
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
         Assert.Equal(expectedDescription, result.Description);
@@ -177,9 +172,9 @@ public class EventResolverTests
         };
 
         EventRecord er;
-        HashSet<string> uniqueDescriptions = new();
-        HashSet<string> uniqueXml = new();
-        HashSet<string> uniqueKeywords = new();
+        HashSet<string> uniqueDescriptions = [];
+        HashSet<string> uniqueXml = [];
+        HashSet<string> uniqueKeywords = [];
 
         var totalCount = 0;
         var mismatchCount = 0;
