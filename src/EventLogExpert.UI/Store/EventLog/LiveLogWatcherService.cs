@@ -5,36 +5,40 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
 public interface ILogWatcherService
 {
-    void AddLog(string LogName, EventBookmark? Bookmark);
-
-    void RemoveLog(string LogName);
+    void AddLog(string logName, EventBookmark? bookmark);
 
     void RemoveAll();
+
+    void RemoveLog(string logName);
 }
 
-public class LiveLogWatcherService : ILogWatcherService
+public sealed class LiveLogWatcherService : ILogWatcherService
 {
+    private readonly Dictionary<string, EventBookmark?> _bookmarks = [];
     private readonly ITraceLogger _debugLogger;
-    private IEventResolver? _resolver = null;
+    private readonly IDispatcher _dispatcher;
+    private readonly List<string> _logsToWatch = [];
     private readonly IServiceProvider _serviceProvider;
-    private readonly Fluxor.IDispatcher _dispatcher;
-    private List<string> _logsToWatch = new();
-    private Dictionary<string, EventBookmark?> _bookmarks = new();
-    private Dictionary<string, EventLogWatcher> _watchers = new();
+    private readonly Dictionary<string, EventLogWatcher> _watchers = [];
 
-    public LiveLogWatcherService(ITraceLogger DebugLogger, IServiceProvider serviceProvider, Fluxor.IDispatcher Dispatcher, IStateSelection<EventLogState, bool> bufferFullStateSelection)
+    private IEventResolver? _resolver;
+
+    public LiveLogWatcherService(ITraceLogger debugLogger,
+        IServiceProvider serviceProvider,
+        IDispatcher dispatcher,
+        IStateSelection<EventLogState, bool> bufferFullStateSelection)
     {
-        _debugLogger = DebugLogger;
-        _dispatcher = Dispatcher;
+        _debugLogger = debugLogger;
+        _dispatcher = dispatcher;
         _serviceProvider = serviceProvider;
         bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
+
         bufferFullStateSelection.SelectedValueChanged += (sender, isFull) =>
         {
             if (isFull)
@@ -48,25 +52,18 @@ public class LiveLogWatcherService : ILogWatcherService
         };
     }
 
-    public bool IsWatching()
+    public void AddLog(string logName, EventBookmark? bookmark)
     {
         lock (this)
         {
-            return _watchers.Keys.Any();
-        }
-    }
-
-    public void AddLog(string LogName, EventBookmark? Bookmark)
-    {
-        lock (this)
-        {
-            if (_logsToWatch.Contains(LogName))
+            if (_logsToWatch.Contains(logName))
             {
-                throw new InvalidOperationException($"Attempted to add log {LogName} which is already present in LiveLogWatcher.");
+                throw new InvalidOperationException(
+                    $"Attempted to add log {logName} which is already present in LiveLogWatcher.");
             }
 
-            _logsToWatch.Add(LogName);
-            _bookmarks.Add(LogName, Bookmark);
+            _logsToWatch.Add(logName);
+            _bookmarks.Add(logName, bookmark);
 
             // If this is the first log added, or if we're already watching
             // other logs, then we need to start watching this one.
@@ -76,8 +73,16 @@ public class LiveLogWatcherService : ILogWatcherService
             // start watching the new log.
             if (_logsToWatch.Count == 1 || IsWatching())
             {
-                StartWatching(LogName);
+                StartWatching(logName);
             }
+        }
+    }
+
+    public bool IsWatching()
+    {
+        lock (this)
+        {
+            return _watchers.Keys.Count > 0;
         }
     }
 
@@ -85,20 +90,20 @@ public class LiveLogWatcherService : ILogWatcherService
     {
         lock (this)
         {
-            while (_logsToWatch.Count > 0 )
+            while (_logsToWatch.Count > 0)
             {
                 RemoveLog(_logsToWatch[0]);
             }
         }
     }
 
-    public void RemoveLog(string LogName)
+    public void RemoveLog(string logName)
     {
         lock (this)
         {
-            _logsToWatch.Remove(LogName);
-            _bookmarks.Remove(LogName);
-            StopWatching(LogName);
+            _logsToWatch.Remove(logName);
+            _bookmarks.Remove(logName);
+            StopWatching(logName);
         }
     }
 
@@ -124,47 +129,44 @@ public class LiveLogWatcherService : ILogWatcherService
         }
     }
 
-    private void StartWatching(string LogName)
+    private void StartWatching(string logName)
     {
         lock (this)
         {
             if (_resolver == null)
             {
                 _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Getting a new IEventResolver so we can start watching.");
+
                 _resolver = _serviceProvider.GetService<IEventResolver>();
             }
 
-            if (_watchers.ContainsKey(LogName)) return;
+            if (_watchers.ContainsKey(logName)) { return; }
 
-            var query = new EventLogQuery(LogName, PathType.LogName);
+            var query = new EventLogQuery(logName, PathType.LogName);
 
-            EventLogWatcher watcher;
+            EventLogWatcher watcher = _bookmarks[logName] != null ?
+                new EventLogWatcher(query, _bookmarks[logName]) :
+                new EventLogWatcher(query);
 
-            if (_bookmarks[LogName] != null)
-            {
-                watcher = new EventLogWatcher(query, _bookmarks[LogName]);
-            }
-            else
-            {
-                watcher = new EventLogWatcher(query);
-            }
+            _watchers.Add(logName, watcher);
 
-            _watchers.Add(LogName, watcher);
-
-            watcher.EventRecordWritten += (watcher, eventArgs) =>
+            watcher.EventRecordWritten += (sender, eventArgs) =>
             {
                 lock (this)
                 {
                     _debugLogger.Trace("EventRecordWritten callback was called.");
-                    _bookmarks[LogName] = eventArgs.EventRecord.Bookmark;
+                    _bookmarks[logName] = eventArgs.EventRecord.Bookmark;
+
                     if (_resolver == null)
                     {
-                        _debugLogger.Trace($"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.");
+                        _debugLogger.Trace(
+                            $"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.");
+
                         return;
                     }
 
-                    var resolved = _resolver.Resolve(eventArgs.EventRecord, LogName);
-                    _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved, _debugLogger));
+                    var resolved = _resolver.Resolve(eventArgs.EventRecord, logName);
+                    _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
                 }
             };
 
@@ -175,30 +177,31 @@ public class LiveLogWatcherService : ILogWatcherService
             {
                 watcher.Enabled = true;
 
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {LogName}.");
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {logName}.");
             });
         }
     }
 
-    private void StopWatching(string LogName)
+    private void StopWatching(string logName)
     {
         lock (this)
         {
-            if (!_watchers.ContainsKey(LogName)) return;
+            if (!_watchers.Remove(logName, out var watcher))
+            {
+                return;
+            }
 
             // Always do this on a background thread to avoid a deadlock
             // if this is called on the UI thread. EventLogWatcher.Enabled = false
             // will cause the thread to block until all outstanding callbacks
             // have completed.
-            var oldWatcher = _watchers[LogName];
-            _watchers.Remove(LogName);
             Task.Run(() =>
             {
-                oldWatcher.Dispose();
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {LogName}.");
+                watcher.Dispose();
+                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
             });
 
-            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {LogName}.");
+            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
 
             if (_watchers.Count < 1)
             {

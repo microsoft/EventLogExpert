@@ -10,43 +10,17 @@ using System.Collections.ObjectModel;
 namespace EventLogExpert.UI.Store.EventLog;
 
 [FeatureState]
-public record EventLogState
+public sealed record EventLogState
 {
-    public record EventBuffer(ReadOnlyCollection<DisplayEventModel> Events, bool IsBufferFull);
-
-    public record EventFilter(
-        AdvancedFilterModel? AdvancedFilter,
-        FilterDateModel? DateFilter,
-        ImmutableList<AdvancedFilterModel> CachedFilters,
-        ImmutableList<FilterModel> Filters);
-
-    public enum LogType { Live, File }
-
-    public record EventLogData(
-        string Name,
-        LogType Type,
-        ReadOnlyCollection<DisplayEventModel> Events,
-        ReadOnlyCollection<DisplayEventModel> FilteredEvents,
-        ImmutableHashSet<int> EventIds,
-        ImmutableHashSet<Guid?> EventActivityIds,
-        ImmutableHashSet<string> EventProviderNames,
-        ImmutableHashSet<string> TaskNames,
-        ImmutableHashSet<string> KeywordNames
-    );
+    /// <summary>The maximum number of new events we will hold in the state before we turn off the watcher.</summary>
+    public int MaxNewEvents { get; } = 1000;
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
         ImmutableDictionary<string, EventLogData>.Empty;
 
-    public EventFilter AppliedFilter { get; init; } = new(
-        null,
-        null,
-        ImmutableList<AdvancedFilterModel>.Empty,
-        ImmutableList<FilterModel>.Empty);
+    public EventFilter AppliedFilter { get; init; } = new(null, null, [], []);
 
     public bool ContinuouslyUpdate { get; init; } = false;
-
-    public ReadOnlyCollection<DisplayEventModel> CombinedEvents { get; init; } =
-        new List<DisplayEventModel>().AsReadOnly();
 
     public ImmutableDictionary<Guid, int> EventsLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 
@@ -56,10 +30,4 @@ public record EventLogState
     public bool NewEventBufferIsFull { get; init; }
 
     public DisplayEventModel? SelectedEvent { get; init; }
-
-    public string? SelectedLogName { get; init; } = null;
-
-    public ColumnName? OrderBy { get; init; }
-
-    public bool IsDescending { get; init; } = true;
 }

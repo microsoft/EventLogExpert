@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
+using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Text;
 
@@ -10,6 +11,69 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
+    public static Dictionary<string, IEnumerable<DisplayEventModel>> FilterActiveLogs(
+        ImmutableDictionary<string, EventLogData> activeLogs,
+        EventFilter eventFilter)
+    {
+        Dictionary<string, IEnumerable<DisplayEventModel>> activeLogsFiltered = [];
+
+        foreach (var activeLog in activeLogs)
+        {
+            activeLogsFiltered.Add(activeLog.Key, GetFilteredEvents(activeLog.Value.Events, eventFilter));
+        }
+
+        return activeLogsFiltered;
+    }
+
+    public static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter)
+    {
+        List<Func<DisplayEventModel, bool>> filters = [];
+
+        if (eventFilter.DateFilter?.IsEnabled is true)
+        {
+            filters.Add(e =>
+                e.TimeCreated >= eventFilter.DateFilter.After &&
+                e.TimeCreated <= eventFilter.DateFilter.Before);
+        }
+
+        if (eventFilter.AdvancedFilter?.IsEnabled is true)
+        {
+            filters.Add(e => eventFilter.AdvancedFilter.Comparison(e));
+        }
+
+        if (!eventFilter.Filters.IsEmpty)
+        {
+            filters.Add(e => eventFilter.Filters
+                .All(filter => filter.Comparison(e)));
+        }
+
+        if (!eventFilter.CachedFilters.IsEmpty)
+        {
+            filters.Add(e => eventFilter.CachedFilters
+                .All(filter => filter.Comparison(e)));
+        }
+
+        return events.AsParallel()
+            .Where(e => filters
+                .All(filter => filter(e)));
+    }
+
+    public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
+        updated.AdvancedFilter?.Equals(original.AdvancedFilter) is false ||
+        updated.DateFilter?.Equals(original.DateFilter) is false ||
+        updated.CachedFilters.Equals(original.CachedFilters) is false ||
+        updated.Filters.Equals(original.Filters) is false;
+
+    public static bool HasIsDescendingChanged(bool updated, bool original) => updated.Equals(original);
+
+    public static bool HasOrderByChanged(ColumnName? updated, ColumnName? original) => updated.Equals(original);
+
+    public static bool IsFilteringEnabled(EventFilter eventFilter) =>
+        eventFilter.AdvancedFilter?.IsEnabled is true ||
+        eventFilter.CachedFilters.IsEmpty is false ||
+        eventFilter.DateFilter?.IsEnabled is true ||
+        eventFilter.Filters.IsEmpty is false;
+
     /// <summary>Sorts events by RecordId if no order is specified</summary>
     public static IEnumerable<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,

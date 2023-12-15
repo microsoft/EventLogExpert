@@ -5,13 +5,13 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
-using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;

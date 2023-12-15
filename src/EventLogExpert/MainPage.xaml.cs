@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
@@ -19,7 +20,6 @@ using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
-using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -176,8 +176,8 @@ public sealed partial class MainPage : ContentPage
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(((MenuFlyoutItem)sender).Text == "Continuously Update" ?
-            new EventLogAction.SetContinouslyUpdate(true, _traceLogger) :
-            new EventLogAction.SetContinouslyUpdate(false, _traceLogger));
+            new EventLogAction.SetContinouslyUpdate(true) :
+            new EventLogAction.SetContinouslyUpdate(false));
 
     private void CopySelected_Clicked(object sender, EventArgs e)
     {
@@ -261,10 +261,10 @@ public sealed partial class MainPage : ContentPage
     }
 
     private void Exit_Clicked(object sender, EventArgs e) =>
-        Application.Current?.CloseWindow(Application.Current.MainPage!.Window);
+        Application.Current?.CloseWindow(Application.Current.MainPage!.Window!);
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents(_traceLogger));
+        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
 
     private void OpenEventLogFile(string fileName) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File));
@@ -322,7 +322,9 @@ public sealed partial class MainPage : ContentPage
                 }
             }, token);
 
-            if (!hasLogInformation || token.IsCancellationRequested) { continue; }
+            if (token.IsCancellationRequested) { return; }
+
+            if (!hasLogInformation) { continue; }
 
             var openItem = new MenuFlyoutItem { Text = name };
             openItem.Clicked += OpenLiveLog_Clicked;
