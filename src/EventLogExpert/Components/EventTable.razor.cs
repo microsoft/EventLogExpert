@@ -6,53 +6,42 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using System.Collections.Immutable;
-using static EventLogExpert.UI.Store.EventLog.EventLogState;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
-    private string? _activeLog;
+    [Inject] private IClipboardService ClipboardService { get; set; } = null!;
 
-    [Inject]
-    private IStateSelection<EventLogState, IImmutableDictionary<string, EventLogData>> ActiveLogState { get; init; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
-    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
+    [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
-    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; set; } = null!;
 
-    [Inject]
-    private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
-
-    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await JSRuntime.InvokeVoidAsync("registerTableColumnResizers");
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
-    }
+    [Inject] private IState<SettingsState> SettingsState { get; set; } = null!;
 
     protected override void OnInitialized()
     {
-        MaximumStateChangedNotificationsPerSecond = 2;
-
-        ActiveLogState.Select(s => s.ActiveLogs);
-
-        ActiveLogState.StateChanged += async (sender, activeLog) =>
+        EventTableState.StateChanged += async (state, args) =>
         {
-            await JSRuntime.InvokeVoidAsync("registerTableColumnResizers");
+            if (state is not IState<EventTableState> tableState) { return; }
+
+            foreach (var table in tableState.Value.EventTables)
+            {
+                if (table.ElementReference is null) { continue; }
+
+                await JSRuntime.InvokeVoidAsync("registerTableEvents", table.ElementReference);
+            }
         };
 
         SelectedEventState.Select(s => s.SelectedEvent);
@@ -73,9 +62,12 @@ public sealed partial class EventTable
 
     private void HandleKeyUp(KeyboardEventArgs args)
     {
-        if (args is { CtrlKey: true, Code: "KeyC" })
+        // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+        switch (args)
         {
-            ClipboardService.CopySelectedEvent(SelectedEventState.Value, SettingsState.Value.Config.CopyType);
+            case { CtrlKey: true, Code: "KeyC" } :
+                ClipboardService.CopySelectedEvent(SelectedEventState.Value, SettingsState.Value.Config.CopyType);
+                break;
         }
     }
 
@@ -92,8 +84,26 @@ public sealed partial class EventTable
         return !enabled;
     }
 
+    //private void SelectAdjacentEvent(int direction)
+    //{
+    //    if (selectedEventState.Value is null) { return; }
+
+    //    var filteredList = _activeLog is not null && activeLogState.Value.TryGetValue(_activeLog, out var data) ?
+    //        data.FilteredEvents :
+    //        EventLogState.Value.CombinedEvents;
+
+    //    var index = filteredList.IndexOf(selectedEventState.Value);
+
+    //    index += direction;
+
+    //    if (index < 0) { index = 0; }
+
+    //    if (index >= filteredList.Count) { index = filteredList.Count - 1; }
+
+    //    SelectEvent(filteredList[index]);
+    //}
+
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 
-    private void ToggleSorting() =>
-        Dispatcher.Dispatch(new EventLogAction.ToggleSorting(TraceLogger));
+    private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());
 }

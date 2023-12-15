@@ -1,30 +1,34 @@
-@using EventLogExpert.UI.Store.EventLog;
 @inherits FluxorComponent
 
-@inject IState<EventLogState> EventLogState
-
-@if (EventLogState.Value.ActiveLogs.Count > 1)
+@if (EventTableState.Value.EventTables.Count > 1)
 {
     <div id="tab-pane">
         <div class="tab-row">
             <div style="max-width: @GetTabWidth()">
-                <input type="radio" name="tab" id="log" checked @onclick="() => SetActiveLog(null)" />
+                <input type="radio" name="tab" id="log" checked
+                    @onclick="() => SetActiveLog(EventTableState.Value.EventTables.First(table => table.IsCombined))" />
                 <label for="log" tabindex="0">Combined</label>
             </div>
 
             @{
-                var logsTabSorted = EventLogState.Value.ActiveLogs.Values
-                    .OrderBy(l => l.Events.FirstOrDefault()?.ComputerName)
-                    .ThenBy(l => l.Events.FirstOrDefault()?.LogName)
+                var logsTabSorted = EventTableState.Value.EventTables
+                    .Where(l => l.IsCombined is false)
+                    .OrderBy(l => l.ComputerName)
+                    .ThenBy(l => l.LogName)
                     .ToList();
-            
+
                 for (int i = 0; i < logsTabSorted.Count; i++)
                 {
                     var log = logsTabSorted[i];
                     <div style="max-width: @GetTabWidth()" title="@GetTabTooltip(log)">
-                        <input type="radio" name="tab" id="@($"log{i}")"
-                            @onclick="() => SetActiveLog(log.Name)" />
-                        <label for="@($"log{i}")" tabindex="0">@GetTabName(log)</label>
+                        <input type="radio" name="tab" id="@($"log{i}")" @onclick="() => SetActiveLog(log)" disabled="@log.IsLoading" />
+                        <label for="@($"log{i}")" tabindex="0">
+                            @if (log.IsLoading)
+                            {
+                                <i class="spinner-border" role="status"></i>
+                            }
+                            @GetTabName(log)
+                        </label>
                     </div>
                 }
             }

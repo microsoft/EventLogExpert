@@ -1,9 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
-using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -12,17 +11,15 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class TableColumnMenu
+public sealed partial class TableColumnMenu
 {
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
-    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
+    [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
 
     [Inject]
     private IStateSelection<SettingsState, IImmutableDictionary<ColumnName, bool>>
         EventTableColumnsState { get; set; } = null!;
-
-    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -31,8 +28,7 @@ public partial class TableColumnMenu
         base.OnInitialized();
     }
 
-    private void OrderColumn(ColumnName columnName) =>
-        Dispatcher.Dispatch(new EventLogAction.SetOrderBy(columnName, TraceLogger));
+    private void OrderColumn(ColumnName columnName) => Dispatcher.Dispatch(new EventTableAction.SetOrderBy(columnName));
 
     private void ToggleColumn(ColumnName columnName)
     {

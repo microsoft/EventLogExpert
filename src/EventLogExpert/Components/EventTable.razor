@@ -1,98 +1,92 @@
-﻿@using EventLogExpert.Services;
-@using EventLogExpert.UI.Store.EventLog;
-@using EventLogExpert.UI.Store.FilterPane;
-@using EventLogExpert.UI.Store.Settings;
-@using EventLogExpert.UI;
+﻿@using EventLogExpert.UI
 @inherits FluxorComponent
 
-@inject IState<EventLogState> EventLogState
-@inject IState<FilterPaneState> FilterPaneState
-@inject IState<SettingsState> SettingsState
+<SplitLogTabPane />
 
-<SplitLogTabPane @bind-ActiveLog="@_activeLog" />
-
-<div class="table-container" hidden="@(_activeLog != null)">
-    <table @onkeyup="HandleKeyUp">
-        <thead @oncontextmenu="InvokeTableColumnMenu">
+@foreach (var table in EventTableState.Value.EventTables)
+{
+    <div class="table-container" hidden="@(!EventTableState.Value.ActiveTable.Id.Equals(table.Id))">
+        <table @ref="table.ElementReference" @onkeyup="HandleKeyUp">
+            <thead @oncontextmenu="InvokeTableColumnMenu">
             <tr>
                 <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">
                     Level
-                    @if (EventLogState.Value.OrderBy == ColumnName.Level)
+                    @if (EventTableState.Value.OrderBy == ColumnName.Level)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
                     Date and Time
-                    @if (EventLogState.Value.OrderBy == ColumnName.DateAndTime)
+                    @if (EventTableState.Value.OrderBy == ColumnName.DateAndTime)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="activity-id" hidden="@(IsColumnHidden(ColumnName.ActivityId))">
                     Activity ID
-                    @if (EventLogState.Value.OrderBy == ColumnName.ActivityId)
+                    @if (EventTableState.Value.OrderBy == ColumnName.ActivityId)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="logname" hidden="@(IsColumnHidden(ColumnName.LogName))">
                     Log Name
-                    @if (EventLogState.Value.OrderBy == ColumnName.LogName)
+                    @if (EventTableState.Value.OrderBy == ColumnName.LogName)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="computername" hidden="@(IsColumnHidden(ColumnName.ComputerName))">
                     Computer
-                    @if (EventLogState.Value.OrderBy == ColumnName.ComputerName)
+                    @if (EventTableState.Value.OrderBy == ColumnName.ComputerName)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="source" hidden="@(IsColumnHidden(ColumnName.Source))">
                     Source
-                    @if (EventLogState.Value.OrderBy == ColumnName.Source)
+                    @if (EventTableState.Value.OrderBy == ColumnName.Source)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="id" hidden="@(IsColumnHidden(ColumnName.EventId))">
                     Event ID
-                    @if (EventLogState.Value.OrderBy == ColumnName.EventId)
+                    @if (EventTableState.Value.OrderBy == ColumnName.EventId)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="task" hidden="@(IsColumnHidden(ColumnName.TaskCategory))">
                     Task Category
-                    @if (EventLogState.Value.OrderBy == ColumnName.TaskCategory)
+                    @if (EventTableState.Value.OrderBy == ColumnName.TaskCategory)
                     {
-                        <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
                 </th>
                 <th class="description">Description</th>
             </tr>
-        </thead>
-        <tbody @oncontextmenu="InvokeContextMenu">
-            <Virtualize Items="EventLogState.Value.CombinedEvents" Context="evt">
-                <tr class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
+            </thead>
+            <tbody @oncontextmenu="InvokeContextMenu">
+            <Virtualize Items="table.DisplayedEvents" Context="evt">
+                <tr @key="@($"{table.Id}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td hidden="@(IsColumnHidden(ColumnName.Level))">
                         <span class="@GetLevelClass(evt.Level)"></span>
                         @evt.Level
@@ -109,114 +103,7 @@
                     <td>@evt.Description</td>
                 </tr>
             </Virtualize>
-        </tbody>
-    </table>
-</div>
-
-@if (ActiveLogState.Value.Count > 1)
-{
-    @foreach (var log in ActiveLogState.Value)
-    {
-        <div class="table-container" hidden="@(_activeLog != log.Key)">
-            <table>
-                <thead @oncontextmenu="InvokeTableColumnMenu">
-                    <tr>
-                        <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">
-                            Level
-                            @if (EventLogState.Value.OrderBy == ColumnName.Level)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                            Date and Time
-                            @if (EventLogState.Value.OrderBy == ColumnName.DateAndTime)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="activity-id" hidden="@(IsColumnHidden(ColumnName.ActivityId))">
-                            Activity ID
-                            @if (EventLogState.Value.OrderBy == ColumnName.ActivityId)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="logname" hidden="@(IsColumnHidden(ColumnName.LogName))">
-                            Log Name
-                            @if (EventLogState.Value.OrderBy == ColumnName.LogName)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="computername" hidden="@(IsColumnHidden(ColumnName.ComputerName))">
-                            Computer
-                            @if (EventLogState.Value.OrderBy == ColumnName.ComputerName)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="source" hidden="@(IsColumnHidden(ColumnName.Source))">
-                            Source
-                            @if (EventLogState.Value.OrderBy == ColumnName.Source)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="id" hidden="@(IsColumnHidden(ColumnName.EventId))">
-                            Event ID
-                            @if (EventLogState.Value.OrderBy == ColumnName.EventId)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="task" hidden="@(IsColumnHidden(ColumnName.TaskCategory))">
-                            Task Category
-                            @if (EventLogState.Value.OrderBy == ColumnName.TaskCategory)
-                            {
-                                <span class="menu-toggle" data-rotate="@EventLogState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                                    <i class="bi bi-caret-up"></i>
-                                </span>
-                            }
-                        </th>
-                        <th class="description">Description</th>
-                    </tr>
-                </thead>
-                <tbody @oncontextmenu="InvokeContextMenu">
-                    <Virtualize Items="log.Value.FilteredEvents" Context="evt">
-                        <tr class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                            <td hidden="@(IsColumnHidden(ColumnName.Level))">
-                                <span class="@GetLevelClass(evt.Level)"></span>
-                                @evt.Level
-                            </td>
-                            <td hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                                @evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)
-                            </td>
-                            <td hidden="@(IsColumnHidden(ColumnName.ActivityId))">@evt.ActivityId</td>
-                            <td hidden="@(IsColumnHidden(ColumnName.LogName))">@evt.OwningLog.Split("\\").Last()</td>
-                            <td hidden="@(IsColumnHidden(ColumnName.ComputerName))">@evt.ComputerName</td>
-                            <td hidden="@(IsColumnHidden(ColumnName.Source))">@evt.Source</td>
-                            <td hidden="@(IsColumnHidden(ColumnName.EventId))">@evt.Id</td>
-                            <td hidden="@(IsColumnHidden(ColumnName.TaskCategory))">@evt.TaskCategory</td>
-                            <td>@evt.Description</td>
-                        </tr>
-                    </Virtualize>
-                </tbody>
-            </table>
-        </div>
-    }
+            </tbody>
+        </table>
+    </div>
 }

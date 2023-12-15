@@ -5,6 +5,12 @@ using System.Runtime.Serialization;
 
 namespace EventLogExpert.UI;
 
+public enum LogType
+{
+    Live,
+    File
+}
+
 public enum FilterType
 {
     [EnumMember(Value = "Event ID")] Id,

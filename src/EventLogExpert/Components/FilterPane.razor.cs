@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
@@ -44,8 +43,6 @@ public partial class FilterPane
 
     [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
-
     protected override void OnInitialized()
     {
         SubscribeToAction<FilterPaneAction.ClearAllFilters>(action =>
@@ -65,14 +62,14 @@ public partial class FilterPane
         {
             if (sender is State<FilterPaneState> filterPaneState)
             {
-                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value), TraceLogger));
+                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value)));
             }
         };
 
         base.OnInitialized();
     }
 
-    private static EventLogState.EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
+    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
         filterPaneState.AdvancedFilter,
         filterPaneState.FilteredDateRange,
         filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),

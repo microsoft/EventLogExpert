@@ -1,36 +1,35 @@
-﻿@using EventLogExpert.UI.Store.EventLog;
-@using EventLogExpert.UI.Store.FilterPane;
-@using EventLogExpert.UI.Store.StatusBar;
+﻿@using EventLogExpert.UI.Store.EventLog
+@using EventLogExpert.UI.Store.EventTable
+@using EventLogExpert.UI.Store.FilterPane
+@using EventLogExpert.UI.Store.StatusBar
+@using EventLogExpert.UI
 @inherits FluxorComponent
 
 @inject IState<EventLogState> EventLogState
+@inject IState<EventTableState> EventTableState
 @inject IState<FilterPaneState> FilterPaneState
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
-    @{
-        var eventLogState = EventLogState.Value;
-        var isAnyFilterApplied = 
-            eventLogState.AppliedFilter.AdvancedFilter is not null ||
-            eventLogState.AppliedFilter.DateFilter is not null ||
-            eventLogState.AppliedFilter.CachedFilters.Any() ||
-            eventLogState.AppliedFilter.Filters.Any();
-    }
-
-    @foreach (var loadingProgress in eventLogState.EventsLoading)
+    @foreach (var loadingProgress in EventLogState.Value.EventsLoading)
     {
         <span>Loading: @loadingProgress.Value</span>
     }
-    
-    <span>Events Loaded: @eventLogState.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
-    @if (isAnyFilterApplied)
+
+    <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
+
+    @if (FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
     {
-        var totalEvents = eventLogState.SelectedLogName == null ? eventLogState.ActiveLogs.Values.Sum(l => l.Events.Count) : eventLogState.ActiveLogs[eventLogState.SelectedLogName].Events.Count;
-        var filteredEvents = eventLogState.SelectedLogName == null ? eventLogState.CombinedEvents.Count : eventLogState.ActiveLogs[eventLogState.SelectedLogName].FilteredEvents.Count;
+        var totalEvents = EventTableState.Value.ActiveTable.IsCombined ?
+            EventLogState.Value.ActiveLogs.Sum(l => l.Value.Events.Count) :
+            EventLogState.Value.ActiveLogs[EventTableState.Value.ActiveTable.LogName].Events.Count;
+
+        var filteredEvents = EventTableState.Value.ActiveTable.DisplayedEvents.Count;
+
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
-    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == EventLogExpert.UI.Store.EventLog.EventLogState.LogType.Live))
+    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == LogType.Live))
     {
         @if (EventLogState.Value.ContinuouslyUpdate)
         {
@@ -38,8 +37,9 @@
         }
         else
         {
-            <span>New Events: @eventLogState.NewEventBuffer.Count</span>
-            @if (eventLogState.NewEventBufferIsFull)
+            <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
+
+            @if (EventLogState.Value.NewEventBufferIsFull)
             {
                 <span>Buffer Full</span>
             }

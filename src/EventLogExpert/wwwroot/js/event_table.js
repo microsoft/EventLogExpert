@@ -1,8 +1,8 @@
-window.registerTableColumnResizers = () => {
-    const tables = document.querySelectorAll("table");
+window.registerTableEvents = (ref) => {
+    deleteColumnResize(ref);
+    enableColumnResize(ref);
 
-    tables.forEach(table => deleteColumnResize(table));
-    tables.forEach(table => enableColumnResize(table));
+    registerKeyHandler(ref);
 };
 
 window.deleteColumnResize = (table) => {
@@ -53,4 +53,18 @@ window.enableColumnResize = (table) => {
             createResizableColumn(columns[i]);
         }
     }
+};
+
+window.registerKeyHandler = (table) => {
+    const keyUpHandler = function (e) {
+        if (e.key === "ArrowUp") {
+            e.preventDefault();
+        }
+
+        if (e.key === "ArrowDown") {
+            e.preventDefault();
+        }
+    }
+
+    table.addEventListener("keydown", keyUpHandler);
 };

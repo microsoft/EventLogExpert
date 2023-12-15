@@ -1,17 +1,26 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using static EventLogExpert.UI.Store.EventLog.EventLogState;
+using EventLogExpert.UI.Models;
+using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
-public record EventLogAction
+public sealed record EventLogAction
 {
-    public record AddEvent(DisplayEventModel NewEvent, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record AddEvent(DisplayEventModel NewEvent);
 
-    public record LoadEvents(
+    public sealed record AddEventBuffered(ReadOnlyCollection<DisplayEventModel> UpdatedBuffer, bool IsFull);
+
+    public sealed record AddEventSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
+
+    public sealed record CloseAll;
+
+    public sealed record CloseLog(string LogName);
+
+    public sealed record LoadEvents(
         string LogName,
         LogType Type,
         List<DisplayEventModel> Events,
@@ -19,41 +28,27 @@ public record EventLogAction
         IEnumerable<Guid?> AllActivityIds,
         IEnumerable<string> AllProviderNames,
         IEnumerable<string> AllTaskNames,
-        IEnumerable<string> AllKeywords,
-        ITraceLogger TraceLogger
-    ) : EventLogAction;
+        IEnumerable<string> AllKeywords);
 
-    public record LoadNewEvents(ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record LoadEventsSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
 
-    public record OpenLog(string LogName, LogType LogType) : EventLogAction;
+    public sealed record LoadNewEvents;
 
-    public record CloseLog(string LogName) : EventLogAction;
+    public sealed record OpenLog(string LogName, LogType LogType);
 
-    public record CloseAll : EventLogAction;
+    public sealed record SelectEvent(DisplayEventModel? SelectedEvent);
 
-    public record SelectEvent(DisplayEventModel? SelectedEvent) : EventLogAction;
+    public sealed record SetContinouslyUpdate(bool ContinuouslyUpdate);
 
-    /// <summary>
-    /// This action only has meaning for the UI.
-    /// </summary>
-    /// <param name="LogName"></param>
-    public record SelectLog(string? LogName) : EventLogAction;
-
-    public record SetContinouslyUpdate(bool ContinuouslyUpdate, ITraceLogger TraceLogger) : EventLogAction;
-
-    /// <summary>
-    /// Used to indicate the progress of event logs being loaded.
-    /// </summary>
+    /// <summary>Used to indicate the progress of event logs being loaded.</summary>
     /// <param name="ActivityId">
     ///     A unique id that distinguishes this loading activity from others, since log names such as
     ///     Application will be common and many file names will be the same.
     /// </param>
     /// <param name="Count"></param>
-    public record SetEventsLoading(Guid ActivityId, int Count) : EventLogAction;
+    public sealed record SetEventsLoading(Guid ActivityId, int Count);
 
-    public record SetFilters(EventFilter EventFilter, ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record SetFilters(EventFilter EventFilter);
 
-    public record SetOrderBy(ColumnName? OrderBy, ITraceLogger TraceLogger) : EventLogAction;
-
-    public record ToggleSorting(ITraceLogger TraceLogger) : EventLogAction;
+    public sealed record SetFiltersSuccess(EventFilter EventFilter);
 }
