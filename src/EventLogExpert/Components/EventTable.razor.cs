@@ -84,25 +84,6 @@ public sealed partial class EventTable
         return !enabled;
     }
 
-    //private void SelectAdjacentEvent(int direction)
-    //{
-    //    if (selectedEventState.Value is null) { return; }
-
-    //    var filteredList = _activeLog is not null && activeLogState.Value.TryGetValue(_activeLog, out var data) ?
-    //        data.FilteredEvents :
-    //        EventLogState.Value.CombinedEvents;
-
-    //    var index = filteredList.IndexOf(selectedEventState.Value);
-
-    //    index += direction;
-
-    //    if (index < 0) { index = 0; }
-
-    //    if (index >= filteredList.Count) { index = filteredList.Count - 1; }
-
-    //    SelectEvent(filteredList[index]);
-    //}
-
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
 
     private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());
