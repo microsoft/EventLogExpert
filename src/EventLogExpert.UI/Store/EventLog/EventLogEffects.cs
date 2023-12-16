@@ -234,14 +234,8 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
-        if (!FilterMethods.HasFilteringChanged(action.EventFilter, eventLogState.Value.AppliedFilter))
-        {
-            return Task.CompletedTask;
-        }
-
         var filteredActiveLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, action.EventFilter);
 
-        dispatcher.Dispatch(new EventLogAction.SetFiltersSuccess(action.EventFilter));
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
 
         return Task.CompletedTask;

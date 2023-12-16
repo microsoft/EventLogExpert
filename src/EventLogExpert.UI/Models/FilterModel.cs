@@ -6,7 +6,7 @@ using System.Linq.Dynamic.Core;
 
 namespace EventLogExpert.UI.Models;
 
-public record FilterModel
+public sealed record FilterModel
 {
     private string _comparisonString = string.Empty;
     private FilterType _filterType;

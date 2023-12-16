@@ -9,15 +9,14 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public partial class FilterPane
+public sealed partial class FilterPane
 {
     private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
-    
+
     private AdvancedFilterModel? _advancedFilter = null;
     private Timer? _advancedFilterDebounceTimer = null;
     private string _advancedFilterErrorMessage = string.Empty;
@@ -28,8 +27,11 @@ public partial class FilterPane
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
-    private bool HasFilters =>
-        FilterPaneState.Value.CurrentFilters.Any() ||
+    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
+
+    [Inject] private IState<FilterPaneState> FilterPaneState { get; set; } = null!;
+
+    private bool HasFilters => FilterPaneState.Value.CurrentFilters.Any() ||
         FilterPaneState.Value.CachedFilters.Any() ||
         IsDateFilterVisible ||
         IsAdvancedFilterVisible;
@@ -40,6 +42,8 @@ public partial class FilterPane
     private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
 
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
+
+    [Inject] private IState<SettingsState> SettingsState { get; set; } = null!;
 
     [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
 
@@ -58,23 +62,8 @@ public partial class FilterPane
         TimeZoneState.Select(x => x.Config.TimeZoneId);
         TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
 
-        FilterPaneState.StateChanged += (sender, args) =>
-        {
-            if (sender is State<FilterPaneState> filterPaneState)
-            {
-                Dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState.Value)));
-            }
-        };
-
         base.OnInitialized();
     }
-
-    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
-        filterPaneState.AdvancedFilter,
-        filterPaneState.FilteredDateRange,
-        filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-        filterPaneState.CurrentFilters.Where(f => f.IsEnabled).ToImmutableList()
-    );
 
     private void AddAdvancedFilter()
     {
@@ -93,7 +82,7 @@ public partial class FilterPane
         var hourTicks = TimeSpan.FromHours(1).Ticks;
 
         _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Any())
+            .Where(log => log.Events.Count > 0)
             .Select(log => log.Events.First().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)
@@ -102,7 +91,7 @@ public partial class FilterPane
             .ConvertTimeZone(_model.TimeZoneInfo);
 
         _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Any())
+            .Where(log => log.Events.Count > 0)
             .Select(log => log.Events.Last().TimeCreated)
             .OrderBy(t => t)
             .DefaultIfEmpty(DateTime.UtcNow)

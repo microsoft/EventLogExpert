@@ -48,9 +48,3 @@ label:hover,
     padding-top: 6px;
     border-top: 2px solid var(--clr-lightblue);
 }
-
-.spinner-border {
-    font-size: 0.85em;
-    height: 0.95em;
-    width: 0.95em;
-}

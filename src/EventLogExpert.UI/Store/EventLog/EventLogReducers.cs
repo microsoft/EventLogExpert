@@ -85,8 +85,15 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceSetFiltersSuccess(EventLogState state, EventLogAction.SetFiltersSuccess action) =>
-        state with { AppliedFilter = action.EventFilter };
+    public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
+    {
+        if (!FilterMethods.HasFilteringChanged(action.EventFilter, state.AppliedFilter))
+        {
+            return state;
+        }
+
+        return state with { AppliedFilter = action.EventFilter };
+    }
 
     private static EventLogData GetEmptyLogData(string logName, LogType logType) => new(
         logName,

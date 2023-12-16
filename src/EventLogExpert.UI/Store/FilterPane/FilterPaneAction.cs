@@ -5,35 +5,37 @@ using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Store.FilterPane;
 
-public record FilterPaneAction
+public sealed record FilterPaneAction
 {
-    public record AddFilter(FilterModel? FilterModel = null);
+    public sealed record AddCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
-    public record SetFilter(FilterModel FilterModel);
+    public sealed record AddFilter(FilterModel? FilterModel = null);
 
-    public record ToggleEnableFilter(Guid Id);
+    public sealed record AddSubFilter(Guid ParentId);
 
-    public record ToggleEditFilter(Guid Id);
+    public sealed record ClearAllFilters;
 
-    public record RemoveFilter(Guid Id);
+    public sealed record RemoveCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
-    public record AddSubFilter(Guid ParentId);
+    public sealed record RemoveFilter(Guid Id);
 
-    public record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
+    public sealed record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
 
-    public record SetFilterDateRange(FilterDateModel? FilterDateModel);
+    public sealed record SetAdvancedFilter(AdvancedFilterModel? AdvancedFilterModel);
 
-    public record ToggleFilterDate;
+    public sealed record SetFilter(FilterModel FilterModel);
 
-    public record SetAdvancedFilter(AdvancedFilterModel? AdvancedFilterModel);
+    public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
-    public record ToggleAdvancedFilter;
+    public sealed record ToggleAdvancedFilter;
 
-    public record AddCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record ToggleCachedFilter(AdvancedFilterModel AdvancedFilterModel);
 
-    public record RemoveCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record ToggleEnableFilter(Guid Id);
 
-    public record ToggleCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record ToggleEditFilter(Guid Id);
 
-    public record ClearAllFilters();
+    public sealed record ToggleFilterDate;
+
+    public sealed record ToggleIsLoading;
 }

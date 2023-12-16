@@ -49,6 +49,4 @@ public sealed record EventLogAction
     public sealed record SetEventsLoading(Guid ActivityId, int Count);
 
     public sealed record SetFilters(EventFilter EventFilter);
-
-    public sealed record SetFiltersSuccess(EventFilter EventFilter);
 }
