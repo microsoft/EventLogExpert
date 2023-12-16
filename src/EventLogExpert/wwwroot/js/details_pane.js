@@ -6,18 +6,18 @@ window.enableDetailsPaneResizer = () => {
 
     let y, h = 0;
 
-    const mouseMoveHandler = function (e) {
+    const mouseMoveHandler = function(e) {
         const distance = e.clientY - y;
 
         detailsPane.style.height = `${h - distance}px`;
     };
 
-    const mouseUpHandler = function () {
+    const mouseUpHandler = function() {
         document.removeEventListener("mousemove", mouseMoveHandler);
         document.removeEventListener("mouseup", mouseUpHandler);
     };
 
-    const mouseDownHandler = function (e) {
+    const mouseDownHandler = function(e) {
         y = e.clientY;
 
         const styles = window.getComputedStyle(detailsPane);
