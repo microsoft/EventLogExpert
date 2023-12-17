@@ -82,29 +82,36 @@ public sealed class EventTableReducers
     public static EventTableState ReduceUpdateDisplayedEvents(EventTableState state,
         EventTableAction.UpdateDisplayedEvents action)
     {
-        var updatedTables = state.EventTables;
+        var newState = state;
 
-        foreach (var log in action.ActiveLogs)
+        foreach (var logData in newState.EventTables)
         {
-            var table = updatedTables.First(table => table.LogName.Equals(log.Key));
-
-            var readOnlyList = log.Value.ToList().AsReadOnly();
-
-            updatedTables = updatedTables
-                .Remove(table)
-                .Add(table with {DisplayedEvents = log.Value.ToList().AsReadOnly()});
+            newState = newState with
+            {
+                EventTables = newState.EventTables
+                    .Remove(logData)
+                    .Add(logData with
+                    {
+                        DisplayedEvents = (logData.IsCombined ?
+                            GetCombinedEvents(action.ActiveLogs.Values.Select(l => l)) :
+                            action.ActiveLogs.First(log => logData.LogName.Equals(log.Key)).Value)
+                        .SortEvents(state.OrderBy, state.IsDescending)
+                        .ToList()
+                        .AsReadOnly()
+                    })
+            };
         }
-
-        return SortDisplayEvents(state with { EventTables = updatedTables }, state.OrderBy, state.IsDescending);
+        
+        return newState;
     }
 
-    private static IEnumerable<DisplayEventModel> GetCombinedEvents(EventTableState state)
+    private static IEnumerable<DisplayEventModel> GetCombinedEvents(IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
     {
         IEnumerable<DisplayEventModel> combinedEvents = [];
 
-        foreach (var log in state.EventTables.Where(table => table.IsCombined is false))
+        foreach (var eventList in eventLists)
         {
-            combinedEvents = combinedEvents.Concat(log.DisplayedEvents);
+            combinedEvents = combinedEvents.Concat(eventList);
         }
 
         return combinedEvents;
@@ -122,10 +129,10 @@ public sealed class EventTableReducers
                     .Remove(logData)
                     .Add(logData with
                     {
-                        DisplayedEvents = (logData.IsCombined ? GetCombinedEvents(newState) : logData.DisplayedEvents)
-                        .SortEvents(orderBy, isDescending)
-                        .ToList()
-                        .AsReadOnly()
+                        DisplayedEvents = logData.DisplayedEvents
+                            .SortEvents(orderBy, isDescending)
+                            .ToList()
+                            .AsReadOnly()
                     })
             };
         }

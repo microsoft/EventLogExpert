@@ -30,8 +30,6 @@ public sealed record EventLogAction
         IEnumerable<string> AllTaskNames,
         IEnumerable<string> AllKeywords);
 
-    public sealed record LoadEventsSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
-
     public sealed record LoadNewEvents;
 
     public sealed record OpenLog(string LogName, LogType LogType);

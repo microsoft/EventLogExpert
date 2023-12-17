@@ -44,8 +44,31 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceLoadEventsSuccess(EventLogState state, EventLogAction.LoadEventsSuccess action) =>
-        state with { ActiveLogs = action.ActiveLogs };
+    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
+    {
+        var newLogsCollection = state.ActiveLogs;
+
+        if (newLogsCollection.ContainsKey(action.LogName))
+        {
+            newLogsCollection = newLogsCollection.Remove(action.LogName);
+        }
+
+        return state with
+        {
+            ActiveLogs = newLogsCollection.Add(
+                action.LogName,
+                new EventLogData(
+                    action.LogName,
+                    action.Type,
+                    action.Events.AsReadOnly(),
+                    action.AllEventIds.ToImmutableHashSet(),
+                    action.AllActivityIds.ToImmutableHashSet(),
+                    action.AllProviderNames.ToImmutableHashSet(),
+                    action.AllTaskNames.ToImmutableHashSet(),
+                    action.AllKeywords.ToImmutableHashSet()
+                ))
+        };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) => state with

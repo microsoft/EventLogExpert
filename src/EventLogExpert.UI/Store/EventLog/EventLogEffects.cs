@@ -84,36 +84,13 @@ public sealed class EventLogEffects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod]
-    public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
+    [EffectMethod(typeof(EventLogAction.LoadEvents))]
+    public Task HandleLoadEvents(IDispatcher dispatcher)
     {
-        var newLogsCollection = eventLogState.Value.ActiveLogs;
+        var activeLogs =
+            FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, eventLogState.Value.AppliedFilter);
 
-        if (newLogsCollection.ContainsKey(action.LogName))
-        {
-            newLogsCollection = newLogsCollection.Remove(action.LogName);
-        }
-
-        // Events collection is always ordered descending by record id
-        var sortedEvents = action.Events.SortEvents().ToList();
-
-        newLogsCollection = newLogsCollection.Add(
-            action.LogName,
-            new EventLogData(
-                action.LogName,
-                action.Type,
-                sortedEvents.AsReadOnly(),
-                action.AllEventIds.ToImmutableHashSet(),
-                action.AllActivityIds.ToImmutableHashSet(),
-                action.AllProviderNames.ToImmutableHashSet(),
-                action.AllTaskNames.ToImmutableHashSet(),
-                action.AllKeywords.ToImmutableHashSet()
-            ));
-
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(newLogsCollection, eventLogState.Value.AppliedFilter);
-
-        dispatcher.Dispatch(new EventLogAction.LoadEventsSuccess(newLogsCollection));
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
 
         return Task.CompletedTask;
     }
@@ -290,8 +267,8 @@ public sealed class EventLogEffects(
 
         var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs, state.AppliedFilter);
 
-        dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+        dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventBuffered(new List<DisplayEventModel>().AsReadOnly(), false));
     }
 }

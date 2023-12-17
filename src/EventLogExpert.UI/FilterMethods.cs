@@ -27,6 +27,8 @@ public static class FilterMethods
 
     public static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter)
     {
+        if (!IsFilteringEnabled(eventFilter)) { return events; }
+
         List<Func<DisplayEventModel, bool>> filters = [];
 
         if (eventFilter.DateFilter?.IsEnabled is true)
@@ -63,10 +65,6 @@ public static class FilterMethods
         updated.DateFilter?.Equals(original.DateFilter) is false ||
         updated.CachedFilters.Equals(original.CachedFilters) is false ||
         updated.Filters.Equals(original.Filters) is false;
-
-    public static bool HasIsDescendingChanged(bool updated, bool original) => updated.Equals(original);
-
-    public static bool HasOrderByChanged(ColumnName? updated, ColumnName? original) => updated.Equals(original);
 
     public static bool IsFilteringEnabled(EventFilter eventFilter) =>
         eventFilter.AdvancedFilter?.IsEnabled is true ||
