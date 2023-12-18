@@ -53,6 +53,9 @@ public sealed class EventLogReducers
             newLogsCollection = newLogsCollection.Remove(action.LogName);
         }
 
+        // Events collection is always ordered descending by record id
+        var sortedEvents = action.Events.SortEvents(null, true).ToList();
+
         return state with
         {
             ActiveLogs = newLogsCollection.Add(
@@ -60,7 +63,7 @@ public sealed class EventLogReducers
                 new EventLogData(
                     action.LogName,
                     action.Type,
-                    action.Events.AsReadOnly(),
+                    sortedEvents.AsReadOnly(),
                     action.AllEventIds.ToImmutableHashSet(),
                     action.AllActivityIds.ToImmutableHashSet(),
                     action.AllProviderNames.ToImmutableHashSet(),

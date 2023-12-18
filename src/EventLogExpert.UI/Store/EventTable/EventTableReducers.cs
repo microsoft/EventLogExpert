@@ -84,25 +84,46 @@ public sealed class EventTableReducers
     {
         var newState = state;
 
-        foreach (var logData in newState.EventTables)
+        for (var i = 0; i < newState.EventTables.Count; i++)
         {
+            if (newState.EventTables[i].IsCombined) { continue; }
+
+            var currentActiveLog = action.ActiveLogs.First(log => newState.EventTables[i].LogName.Equals(log.Key)).Value;
+
+            if (newState.EventTables[i].DisplayedEvents.Count == currentActiveLog.Count()) { continue; }
+
             newState = newState with
             {
                 EventTables = newState.EventTables
-                    .Remove(logData)
-                    .Add(logData with
+                    .Remove(newState.EventTables[i])
+                    .Add(newState.EventTables[i] with
                     {
-                        DisplayedEvents = (logData.IsCombined ?
-                            GetCombinedEvents(action.ActiveLogs.Values.Select(l => l)) :
-                            action.ActiveLogs.First(log => logData.LogName.Equals(log.Key)).Value)
-                        .SortEvents(state.OrderBy, state.IsDescending)
-                        .ToList()
-                        .AsReadOnly()
+                        DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
+                            .ToList()
+                            .AsReadOnly()
                     })
             };
         }
-        
-        return newState;
+
+        if (newState.EventTables.Count <= 1)
+        {
+            return newState;
+        }
+
+        var table = newState.EventTables.First(table => table.IsCombined);
+
+        return newState with
+        {
+            EventTables = newState.EventTables
+                .Remove(table)
+                .Add(table with
+                {
+                    DisplayedEvents = GetCombinedEvents(action.ActiveLogs.Values.Select(log => log))
+                        .SortEvents((state.OrderBy ?? ColumnName.DateAndTime), state.IsDescending)
+                        .ToList()
+                        .AsReadOnly()
+                })
+        };
     }
 
     private static IEnumerable<DisplayEventModel> GetCombinedEvents(IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
