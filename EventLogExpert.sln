@@ -3,20 +3,22 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31611.283
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert", "EventLogExpert\EventLogExpert.csproj", "{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert", "src\EventLogExpert\EventLogExpert.csproj", "{4AF4EFE3-97D4-42BA-8026-595ED9A9F3AE}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Eventing", "EventLogExpert.Eventing\EventLogExpert.Eventing.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Eventing", "src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj", "{2524E3CE-D95D-4C70-9614-47906411FBD7}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5F157DE7-62EB-4577-834B-58EA31AEC78B}"
 	ProjectSection(SolutionItems) = preProject
 		.editorconfig = .editorconfig
 	EndProjectSection
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Test", "EventLogExpert.Test\EventLogExpert.Test.csproj", "{E5D3A2A2-6001-452F-8ECE-7263D72C9438}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.EventDbTool", "src\EventLogExpert.EventDbTool\EventLogExpert.EventDbTool.csproj", "{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.EventDbTool", "EventLogExpert.EventDbTool\EventLogExpert.EventDbTool.csproj", "{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.UI", "src\EventLogExpert.UI\EventLogExpert.UI.csproj", "{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.UI", "EventLogExpert.UI\EventLogExpert.UI.csproj", "{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.Eventing.UnitTests", "tests\UnitTests\EventLogExpert.Eventing.UnitTests\EventLogExpert.Eventing.UnitTests.csproj", "{C29B552F-0778-46F9-9532-216DB4C0F811}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "EventLogExpert.UI.UnitTests", "tests\UnitTests\EventLogExpert.UI.UnitTests\EventLogExpert.UI.UnitTests.csproj", "{866DFEE5-FDC4-4CAE-A573-7ED1210FF593}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -34,10 +36,6 @@ Global
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2524E3CE-D95D-4C70-9614-47906411FBD7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{E5D3A2A2-6001-452F-8ECE-7263D72C9438}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6A61AA06-463F-4BB8-AF82-69F8E43A64ED}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -46,6 +44,14 @@ Global
 		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{71C03ABA-CCF1-4CE7-9F46-7BE33357BE88}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C29B552F-0778-46F9-9532-216DB4C0F811}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C29B552F-0778-46F9-9532-216DB4C0F811}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C29B552F-0778-46F9-9532-216DB4C0F811}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C29B552F-0778-46F9-9532-216DB4C0F811}.Release|Any CPU.Build.0 = Release|Any CPU
+		{866DFEE5-FDC4-4CAE-A573-7ED1210FF593}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{866DFEE5-FDC4-4CAE-A573-7ED1210FF593}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{866DFEE5-FDC4-4CAE-A573-7ED1210FF593}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{866DFEE5-FDC4-4CAE-A573-7ED1210FF593}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
