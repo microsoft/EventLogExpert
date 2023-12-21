@@ -50,7 +50,7 @@ public sealed record FilterModel
 
     public string? FilterValue { get; set; }
 
-    public List<string> FilterValues { get; set; } = new();
+    public List<string> FilterValues { get; set; } = [];
 
-    public List<SubFilterModel> SubFilters { get; set; } = new();
+    public List<SubFilterModel> SubFilters { get; set; } = [];
 }
