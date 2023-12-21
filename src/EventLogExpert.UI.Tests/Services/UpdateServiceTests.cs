@@ -27,7 +27,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async void CheckForUpdates_Latest_ShouldUpdateImmediately()
     {
-        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
+        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         _mockAlertDialogService
@@ -50,7 +50,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async void CheckForUpdates_Latest_ShouldUpdateOnNextRestart()
     {
-        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
+        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var updateService = new UpdateService(
@@ -90,7 +90,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async void CheckForUpdates_Prerelease_ShouldUpdateImmediately()
     {
-        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
+        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         _mockAlertDialogService
@@ -113,7 +113,7 @@ public sealed class UpdateServiceTests
     [Fact]
     public async void CheckForUpdates_Prerelease_ShouldUpdateOnNextRestart()
     {
-        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
+        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var updateService = new UpdateService(

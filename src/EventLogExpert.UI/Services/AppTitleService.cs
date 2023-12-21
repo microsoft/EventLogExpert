@@ -15,25 +15,13 @@ public interface IAppTitleService
     void SetProgressString(string? progressString);
 }
 
-public class AppTitleService : IAppTitleService
+public sealed class AppTitleService(
+    ICurrentVersionProvider versionProvider,
+    ITitleProvider titleProvider) : IAppTitleService
 {
-    private readonly ICurrentVersionProvider _versionProvider;
-
-    private readonly ITitleProvider _titleProvider;
-
-    private bool _isPrereleaseBuild = false;
-
+    private bool _isPrereleaseBuild;
     private string? _logName;
-
     private string? _progressString;
-
-    public AppTitleService(
-        ICurrentVersionProvider versionProvider, 
-        ITitleProvider titleProvider)
-    {
-        _versionProvider = versionProvider;
-        _titleProvider = titleProvider;
-    }
 
     public void SetIsPrerelease(bool isPrerelease) => _isPrereleaseBuild = isPrerelease;
 
@@ -63,21 +51,21 @@ public class AppTitleService : IAppTitleService
             title.Append($"{_logName} - ");
         }
 
-        title.Append("EventLogExpert ");
+        title.Append("EventLogExpert");
 
-        if (_versionProvider.IsDevBuild)
+        if (versionProvider.IsDevBuild)
         {
-            title.Append("(Development)");
+            title.Append(" (Development)");
         }
         else if (_isPrereleaseBuild)
         {
-            title.Append($"(Preview) {_versionProvider.CurrentVersion}");
+            title.Append($" (Preview) {versionProvider.CurrentVersion}");
         }
         else
         {
-            title.Append(_versionProvider.CurrentVersion);
+            title.Append($" {versionProvider.CurrentVersion}");
         }
 
-        _titleProvider.SetTitle(title.ToString());
+        titleProvider.SetTitle(title.ToString());
     }
 }
