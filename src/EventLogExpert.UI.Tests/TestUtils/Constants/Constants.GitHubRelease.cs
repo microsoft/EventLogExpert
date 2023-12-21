@@ -2,12 +2,12 @@
 
 public sealed partial class Constants
 {
+    public const string AppInstalledVersion = "23.1.1.1";
+
     public const string GitHubLatestName = "EventLogExpert_23.1.1.2_x64.msix";
     public const string GitHubLatestUri =
         "https://github.com/microsoft/EventLogExpert/releases/download/v23.1.1.2/EventLogExpert_23.1.1.2_x64.msix";
     public const string GitHubLatestVersion = "v23.1.1.2";
-
-    public const string GitHubOldVersion = "23.1.1.1";
 
     public const string GitHubPrereleaseName = "EventLogExpert_23.1.1.3_x64.msix";
     public const string GitHubPrereleaseUri =
