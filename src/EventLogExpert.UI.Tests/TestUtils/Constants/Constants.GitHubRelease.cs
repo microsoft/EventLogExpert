@@ -1,4 +1,4 @@
-﻿namespace EventLogExpert.UI.UnitTests.TestUtils.Constants;
+﻿namespace EventLogExpert.UI.Tests.TestUtils.Constants;
 
 public sealed partial class Constants
 {

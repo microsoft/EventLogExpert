@@ -10,7 +10,7 @@ using EventLogExpert.Eventing.Providers;
 using NSubstitute;
 using Xunit.Abstractions;
 
-namespace EventLogExpert.Eventing.UnitTests.EventResolvers;
+namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
 public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
@@ -77,8 +77,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
                     ShortId = 4114,
                     Tag = null,
                     Template = null,
-                    Text =
-                        "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
+                    Text = "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
                 }
             ],
             Opcodes = [],
@@ -97,8 +96,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         var resolver = new UnitTestEventResolver([providerDetails]);
         var result = resolver.Resolve(eventRecord, "Test");
 
-        var expectedDescription =
-            "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
+        var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 
         Assert.Equal(expectedDescription, result.Description);
         Assert.Equal("Service", result.TaskCategory);
@@ -193,10 +191,10 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
                 var resolved = r.Resolve(er, "Test");
 
                 uniqueDescriptions.Add(resolved.Description
-                    .Replace("\r", "") // I can't figure out the logic of FormatMessage() for when it leaves
-                    .Replace("\n", "") // CRLFs and spaces in or takes them out, so I'm just giving up for now.
-                    .Replace(" ", "") // If we're this close to matching FormatMessage() then we're close enough.
-                    .Replace("\u200E", "") // Remove LRM marks from dates.
+                    .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
+                    .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
+                    .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
+                    .Replace("\u200E", "")  // Remove LRM marks from dates.
                     .Trim());
 
                 uniqueXml.Add(resolved.Xml);

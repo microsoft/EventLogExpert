@@ -1,11 +1,11 @@
 ﻿using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.UnitTests.TestUtils;
-using EventLogExpert.UI.UnitTests.TestUtils.Constants;
+using EventLogExpert.UI.Tests.TestUtils;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
 using NSubstitute;
 
-namespace EventLogExpert.UI.UnitTests.Services;
+namespace EventLogExpert.UI.Tests.Services;
 
 public sealed class UpdateServiceTests
 {
@@ -30,9 +30,7 @@ public sealed class UpdateServiceTests
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
-        var alertDialogService = Substitute.For<IAlertDialogService>();
-
-        alertDialogService
+        _mockAlertDialogService
             .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(Task.FromResult(true));
 
@@ -42,7 +40,7 @@ public sealed class UpdateServiceTests
             _mockGitHubService,
             _mockDeploymentService,
             _mockTraceLogger,
-            alertDialogService);
+            _mockAlertDialogService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
 
@@ -95,9 +93,7 @@ public sealed class UpdateServiceTests
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubOldVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
-        var alertDialogService = Substitute.For<IAlertDialogService>();
-
-        alertDialogService
+        _mockAlertDialogService
             .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>())
             .Returns(Task.FromResult(true));
 
@@ -107,7 +103,7 @@ public sealed class UpdateServiceTests
             _mockGitHubService,
             _mockDeploymentService,
             _mockTraceLogger,
-            alertDialogService);
+            _mockAlertDialogService);
 
         await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
 

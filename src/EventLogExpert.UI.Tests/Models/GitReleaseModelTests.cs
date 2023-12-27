@@ -1,6 +1,6 @@
-﻿using EventLogExpert.UI.UnitTests.TestUtils;
+﻿using EventLogExpert.UI.Tests.TestUtils;
 
-namespace EventLogExpert.UI.UnitTests.Models;
+namespace EventLogExpert.UI.Tests.Models;
 
 public sealed class GitReleaseModelTests
 {

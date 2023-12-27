@@ -1,3 +1,3 @@
-﻿namespace EventLogExpert.UI.UnitTests.Models;
+﻿namespace EventLogExpert.UI.Tests.Models;
 
 public sealed class AdvancedFilterModelTests { }

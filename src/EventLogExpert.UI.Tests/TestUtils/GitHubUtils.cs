@@ -1,7 +1,7 @@
 ﻿using EventLogExpert.UI.Models;
-using static EventLogExpert.UI.UnitTests.TestUtils.Constants.Constants;
+using static EventLogExpert.UI.Tests.TestUtils.Constants.Constants;
 
-namespace EventLogExpert.UI.UnitTests.TestUtils;
+namespace EventLogExpert.UI.Tests.TestUtils;
 
 public static class GitHubUtils
 {
