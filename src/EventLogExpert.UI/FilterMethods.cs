@@ -183,9 +183,8 @@ public static class FilterMethods
 
         try
         {
-            _ = new List<DisplayEventModel>().AsQueryable()
-                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression)
-                .ToList();
+            _ = Enumerable.Empty<DisplayEventModel>().AsQueryable()
+                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression);
 
             return true;
         }

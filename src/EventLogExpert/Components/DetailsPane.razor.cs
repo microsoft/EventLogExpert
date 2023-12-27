@@ -18,6 +18,8 @@ public partial class DetailsPane
 
     private DisplayEventModel? Event { get; set; }
 
+    private string IsVisible => (EventLogState.Value.SelectedEvent is not null && _isVisible).ToString().ToLower();
+
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; set; } = null!;
