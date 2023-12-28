@@ -31,9 +31,9 @@ public sealed partial class MainPage : ContentPage
     private readonly IAppTitleService _appTitleService;
     private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
+    private readonly IAlertDialogService _dialogService;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
-    private readonly IAlertDialogService _dialogService;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
@@ -55,6 +55,7 @@ public sealed partial class MainPage : ContentPage
         ITraceLogger traceLogger)
     {
         InitializeComponent();
+        PopulateOtherLogsMenu();
 
         _activeLogsState = activeLogsState;
         _appTitleService = appTitleService;
@@ -97,8 +98,6 @@ public sealed partial class MainPage : ContentPage
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
 
-        PopulateOtherLogsMenu();
-
         var args = Environment.GetCommandLineArgs();
 
         if (args.Length > 1)
@@ -139,7 +138,7 @@ public sealed partial class MainPage : ContentPage
         }
     }
 
-    private void AddLiveLog_Clicked(object? sender, EventArgs e)
+    private async void AddLiveLog_Clicked(object? sender, EventArgs e)
     {
         if (sender is null) { return; }
 
@@ -147,10 +146,37 @@ public sealed partial class MainPage : ContentPage
 
         if (_activeLogsState.Value.Any(l => l.Key == logName)) { return; }
 
-        _fluxorDispatcher.Dispatch(
-            new EventLogAction.OpenLog(
-                logName,
-                LogType.Live));
+        using EventLogSession session = new();
+
+        EventLogInformation? eventLogInformation;
+
+        try
+        {
+            eventLogInformation = session.GetLogInformation(logName, PathType.LogName);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            await _dialogService.ShowAlert("Log requires elevation",
+                "Please relaunch with \"Run as Administrator\" to open this log",
+                "Ok");
+
+            return;
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
+
+            return;
+        }
+
+        if (eventLogInformation?.RecordCount is null or <= 0)
+        {
+            await _dialogService.ShowAlert("Empty log", "Log contains no events", "Ok");
+
+            return;
+        }
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logName, LogType.Live));
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -273,9 +299,13 @@ public sealed partial class MainPage : ContentPage
     {
         var result = await GetFilePickerResult();
 
+        var logs = result.Where(f => f is not null).ToList();
+
+        if (logs.Count <= 0) { return; }
+
         _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
 
-        foreach (var file in result.Where(f => f is not null))
+        foreach (var file in logs)
         {
             OpenEventLogFile(file!.FullPath);
         }
@@ -291,58 +321,31 @@ public sealed partial class MainPage : ContentPage
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
 
-    private async void PopulateOtherLogsMenu(CancellationToken token = default)
+    private void PopulateOtherLogsMenu()
     {
+        using EventLogSession session = new();
+
         var logsThatAlreadyHaveMenuItems = new[]
         {
             "Application",
-            "System"
+            "System",
+            "Security"
         };
-
-        var session = new EventLogSession();
 
         var names = session.GetLogNames()
             .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
-            .OrderBy(n => n);
+            .Order();
 
         foreach (var name in names)
         {
-            // Do this in the background to improve startup time.
-            var hasLogInformation = await Task.Run(() =>
-            {
-                try
-                {
-                    return session.GetLogInformation(name, PathType.LogName).CreationTime.HasValue;
-                }
-                catch
-                {
-                    return false;
-                }
-            }, token);
-
-            if (token.IsCancellationRequested) { return; }
-
-            if (!hasLogInformation) { continue; }
-
             var openItem = new MenuFlyoutItem { Text = name };
             openItem.Clicked += OpenLiveLog_Clicked;
 
             var addItem = new MenuFlyoutItem { Text = name };
             addItem.Clicked += AddLiveLog_Clicked;
 
-            if (name == "Security")
-            {
-                // If we are being run as admin, we can access the Security log.
-                // Make it a peer of Application and System instead of putting it
-                // under Other Logs.
-                OpenLiveLogFlyoutSubitem.Insert(1, openItem);
-                AddLiveLogFlyoutSubitem.Insert(1, addItem);
-            }
-            else
-            {
-                OpenOtherLogsFlyoutSubitem.Add(openItem);
-                AddOtherLogsFlyoutSubitem.Add(addItem);
-            }
+            OpenOtherLogsFlyoutSubitem.Add(openItem);
+            AddOtherLogsFlyoutSubitem.Add(addItem);
         }
     }
 
