@@ -163,7 +163,7 @@ public sealed class EventLogEffects(
 
                         events.Add(resolved);
 
-                        if (sw.ElapsedMilliseconds > 2000)
+                        if (sw.ElapsedMilliseconds > 1000)
                         {
                             sw.Restart();
                             dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, events.Count));
