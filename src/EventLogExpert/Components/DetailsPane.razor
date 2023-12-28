@@ -5,12 +5,12 @@
 @inject IState<EventLogState> EventLogState
 @inject IState<SettingsState> SettingsState
 
-<div id="details-pane" data-toggle="@_isVisible.ToString().ToLower()" hidden="@(Event is null)">
+<div id="details-pane" data-toggle="@IsVisible" hidden="@(EventLogState.Value.SelectedEvent is null)">
     <div id="details-resizer"></div>
 
     <div id="details-header" class="flex-space-between">
         <div>Details</div>
-        <span class="menu-toggle" data-rotate="@_isVisible.ToString().ToLower()" @onclick="ToggleMenu">
+        <span class="menu-toggle" data-rotate="@IsVisible" @onclick="ToggleMenu">
             <i class="bi bi-caret-up"></i>
         </span>
     </div>

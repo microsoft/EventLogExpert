@@ -1,19 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
+using System.Reflection;
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using NSubstitute;
-using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using System.Reflection;
-using System.Security.Principal;
 using Xunit.Abstractions;
 
-namespace EventLogExpert.Test;
+namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
-public class EventResolverTests(ITestOutputHelper outputHelper)
+public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
@@ -23,19 +22,11 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
 
         private readonly List<ProviderDetails> _providerDetailsList;
 
-        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base((s, log) => Debug.WriteLine(s))
-        {
-            _providerDetailsList = providerDetailsList;
-        }
+        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base((s, log) => Debug.WriteLine(s)) => _providerDetailsList = providerDetailsList;
 
-        public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLog)
-        {
-            return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], OwningLog);
-        }
+        public DisplayEventModel Resolve(EventRecord eventRecord, string owningLog) => ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], owningLog);
 
-        public void Dispose()
-        {
-        }
+        public void Dispose() { }
     }
 
     private readonly ITestOutputHelper _outputHelper = outputHelper;
@@ -48,6 +39,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         List<string> properties = ["SERVER1", "4", "Lots of copy status text", "False"];
         var propList = new List<EventProperty>();
         var constructors = typeof(EventProperty).GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance);
+
         foreach (var p in properties)
         {
             var eventProperty = (EventProperty)constructors[0].Invoke(new[] { p });
@@ -105,6 +97,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         var result = resolver.Resolve(eventRecord, "Test");
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
+
         Assert.Equal(expectedDescription, result.Description);
         Assert.Equal("Service", result.TaskCategory);
     }
@@ -117,6 +110,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         var eventLogReader = new EventLogReader("Application", PathType.LogName);
         var resolver = new LocalProviderEventResolver();
         EventRecord er;
+
         while (null != (er = eventLogReader.ReadEvent()))
         {
             resolver.Resolve(er, "Test");
@@ -136,6 +130,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         EventRecord er;
 
         sw.Start();
+
         while (null != (er = eventLogReader.ReadEvent()))
         {
             eventRecords.Add(er);
@@ -145,6 +140,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         Debug.WriteLine("Reading events took " + sw.ElapsedMilliseconds);
 
         sw.Restart();
+
         foreach (var record in eventRecords)
         {
             resolver.Resolve(record, "Test");
@@ -159,7 +155,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
     {
         var eventLogReader = new EventLogReader("Application", PathType.LogName);
 
-        var resolvers = new List<IEventResolver>()
+        var resolvers = new List<IEventResolver>
         {
             new EventReaderEventResolver(),
             new LocalProviderEventResolver(),
@@ -183,6 +179,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
         var mismatches = new List<List<string>>();
         var xmlMismatches = new List<List<string>>();
         var keywordMismatches = new List<List<string>>();
+
         while (null != (er = eventLogReader.ReadEvent()))
         {
             uniqueDescriptions.Clear();
@@ -194,10 +191,10 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
                 var resolved = r.Resolve(er, "Test");
 
                 uniqueDescriptions.Add(resolved.Description
-                    .Replace("\r", "")  // I can't figure out the logic of FormatMessage() for when it leaves
-                    .Replace("\n", "")  // CRLFs and spaces in or takes them out, so I'm just giving up for now.
-                    .Replace(" ", "")   // If we're this close to matching FormatMessage() then we're close enough.
-                    .Replace("\u200E", "") // Remove LRM marks from dates.
+                    .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
+                    .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
+                    .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
+                    .Replace("\u200E", "")  // Remove LRM marks from dates.
                     .Trim());
 
                 uniqueXml.Add(resolved.Xml);
@@ -235,7 +232,7 @@ public class EventResolverTests(ITestOutputHelper outputHelper)
 
         foreach (var resolver in resolvers)
         {
-            (resolver as IDisposable)?.Dispose();
+            resolver?.Dispose();
         }
 
         var mismatchPercent = mismatchCount / totalCount * 100;

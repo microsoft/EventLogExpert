@@ -7,7 +7,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterPane;
 
-public class FilterPaneReducers
+public sealed class FilterPaneReducers
 {
     [ReducerMethod]
     public static FilterPaneState ReduceAddCachedFilter(FilterPaneState state, FilterPaneAction.AddCachedFilter action)
@@ -19,6 +19,10 @@ public class FilterPaneReducers
             CachedFilters = state.CachedFilters.Add(action.AdvancedFilterModel)
         };
     }
+
+    [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
+    public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
+        state with { IsLoading = !state.IsLoading };
 
     [ReducerMethod]
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
@@ -176,7 +180,7 @@ public class FilterPaneReducers
     public static FilterPaneState ReduceToggleEnableFilter(FilterPaneState state,
         FilterPaneAction.ToggleEnableFilter action)
     {
-        List<FilterModel> filters = new();
+        List<FilterModel> filters = [];
 
         foreach (var filterModel in state.CurrentFilters)
         {

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
@@ -82,29 +82,57 @@ public sealed class EventTableReducers
     public static EventTableState ReduceUpdateDisplayedEvents(EventTableState state,
         EventTableAction.UpdateDisplayedEvents action)
     {
-        var updatedTables = state.EventTables;
+        var newState = state;
 
-        foreach (var log in action.ActiveLogs)
+        for (var i = 0; i < newState.EventTables.Count; i++)
         {
-            var table = updatedTables.First(table => table.LogName.Equals(log.Key));
+            if (newState.EventTables[i].IsCombined) { continue; }
 
-            var readOnlyList = log.Value.ToList().AsReadOnly();
+            var currentActiveLog = action.ActiveLogs.First(log => newState.EventTables[i].LogName.Equals(log.Key)).Value;
 
-            updatedTables = updatedTables
-                .Remove(table)
-                .Add(table with {DisplayedEvents = log.Value.ToList().AsReadOnly()});
+            if (newState.EventTables[i].DisplayedEvents.Count == currentActiveLog.Count()) { continue; }
+
+            newState = newState with
+            {
+                EventTables = newState.EventTables
+                    .Remove(newState.EventTables[i])
+                    .Add(newState.EventTables[i] with
+                    {
+                        DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
+                            .ToList()
+                            .AsReadOnly()
+                    })
+            };
         }
 
-        return SortDisplayEvents(state with { EventTables = updatedTables }, state.OrderBy, state.IsDescending);
+        if (newState.EventTables.Count <= 1)
+        {
+            return newState;
+        }
+
+        var table = newState.EventTables.First(table => table.IsCombined);
+
+        return newState with
+        {
+            EventTables = newState.EventTables
+                .Remove(table)
+                .Add(table with
+                {
+                    DisplayedEvents = GetCombinedEvents(action.ActiveLogs.Values.Select(log => log))
+                        .SortEvents((state.OrderBy ?? ColumnName.DateAndTime), state.IsDescending)
+                        .ToList()
+                        .AsReadOnly()
+                })
+        };
     }
 
-    private static IEnumerable<DisplayEventModel> GetCombinedEvents(EventTableState state)
+    private static IEnumerable<DisplayEventModel> GetCombinedEvents(IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
     {
         IEnumerable<DisplayEventModel> combinedEvents = [];
 
-        foreach (var log in state.EventTables.Where(table => table.IsCombined is false))
+        foreach (var eventList in eventLists)
         {
-            combinedEvents = combinedEvents.Concat(log.DisplayedEvents);
+            combinedEvents = combinedEvents.Concat(eventList);
         }
 
         return combinedEvents;
@@ -122,10 +150,10 @@ public sealed class EventTableReducers
                     .Remove(logData)
                     .Add(logData with
                     {
-                        DisplayedEvents = (logData.IsCombined ? GetCombinedEvents(newState) : logData.DisplayedEvents)
-                        .SortEvents(orderBy, isDescending)
-                        .ToList()
-                        .AsReadOnly()
+                        DisplayedEvents = logData.DisplayedEvents
+                            .SortEvents(orderBy, isDescending)
+                            .ToList()
+                            .AsReadOnly()
                     })
             };
         }

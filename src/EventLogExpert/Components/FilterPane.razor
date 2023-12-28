@@ -1,12 +1,5 @@
 ﻿@using EventLogExpert.Shared.Components.Filters
-@using EventLogExpert.UI.Store.EventLog
-@using EventLogExpert.UI.Store.FilterPane
-@using EventLogExpert.UI.Store.Settings
 @inherits FluxorComponent
-
-@inject IState<EventLogState> EventLogState
-@inject IState<FilterPaneState> FilterPaneState
-@inject IState<SettingsState> SettingsState
 
 <div class="filter-pane">
     <div class="filter-header">
@@ -28,20 +21,29 @@
                     <i class="bi bi-plus-circle"></i> Add Advanced Filter
                 </button>
             }
-            
+
             <button class="button" @onclick="AddCachedFilter">
                 <i class="bi bi-plus-circle"></i> Add Cached Filter
             </button>
         </div>
 
-        @if (HasFilters)
+        @if (HasFilters || FilterPaneState.Value.IsLoading)
         {
-            <div class="text-align-center">
-                @if (GetActiveFilters() > 0)
-                {
-                    <span>[Active Filters: @GetActiveFilters()]</span>
-                }
-            </div>
+            @if (FilterPaneState.Value.IsLoading)
+            {
+                <div class="text-align-center">
+                    <span>[<i class="spinner-border" role="status"></i> Applying Filters]</span>
+                </div>
+            }
+            else
+            {
+                <div class="text-align-center">
+                    @if (GetActiveFilters() > 0)
+                    {
+                        <span>[Active Filters: @GetActiveFilters()]</span>
+                    }
+                </div>
+            }
 
             <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu">
                 <i class="bi bi-caret-up"></i>
@@ -98,7 +100,7 @@
         {
             <FilterRow Value="@item" />
         }
-        
+
         @foreach (var item in FilterPaneState.Value.CachedFilters)
         {
             <FilterCacheRow Value="@item" />

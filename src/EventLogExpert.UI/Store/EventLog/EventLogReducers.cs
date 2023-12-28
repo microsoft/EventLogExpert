@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
@@ -44,8 +44,34 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceLoadEventsSuccess(EventLogState state, EventLogAction.LoadEventsSuccess action) =>
-        state with { ActiveLogs = action.ActiveLogs };
+    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
+    {
+        var newLogsCollection = state.ActiveLogs;
+
+        if (newLogsCollection.ContainsKey(action.LogName))
+        {
+            newLogsCollection = newLogsCollection.Remove(action.LogName);
+        }
+
+        // Events collection is always ordered descending by record id
+        var sortedEvents = action.Events.SortEvents(null, true).ToList();
+
+        return state with
+        {
+            ActiveLogs = newLogsCollection.Add(
+                action.LogName,
+                new EventLogData(
+                    action.LogName,
+                    action.Type,
+                    sortedEvents.AsReadOnly(),
+                    action.AllEventIds.ToImmutableHashSet(),
+                    action.AllActivityIds.ToImmutableHashSet(),
+                    action.AllProviderNames.ToImmutableHashSet(),
+                    action.AllTaskNames.ToImmutableHashSet(),
+                    action.AllKeywords.ToImmutableHashSet()
+                ))
+        };
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) => state with
@@ -85,8 +111,15 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceSetFiltersSuccess(EventLogState state, EventLogAction.SetFiltersSuccess action) =>
-        state with { AppliedFilter = action.EventFilter };
+    public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
+    {
+        if (!FilterMethods.HasFilteringChanged(action.EventFilter, state.AppliedFilter))
+        {
+            return state;
+        }
+
+        return state with { AppliedFilter = action.EventFilter };
+    }
 
     private static EventLogData GetEmptyLogData(string logName, LogType logType) => new(
         logName,

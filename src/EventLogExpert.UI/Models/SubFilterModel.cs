@@ -1,11 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
-
 namespace EventLogExpert.UI.Models;
 
-public record SubFilterModel
+public sealed record SubFilterModel
 {
     private FilterType _filterType;
 
@@ -26,5 +24,5 @@ public record SubFilterModel
 
     public string? FilterValue { get; set; }
 
-    public List<string> FilterValues { get; set; } = new();
+    public List<string> FilterValues { get; set; } = [];
 }

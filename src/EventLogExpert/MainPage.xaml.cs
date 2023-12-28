@@ -291,7 +291,7 @@ public sealed partial class MainPage : ContentPage
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
 
-    private async void PopulateOtherLogsMenu()
+    private async void PopulateOtherLogsMenu(CancellationToken token = default)
     {
         var logsThatAlreadyHaveMenuItems = new[]
         {
@@ -304,8 +304,6 @@ public sealed partial class MainPage : ContentPage
         var names = session.GetLogNames()
             .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
             .OrderBy(n => n);
-
-        CancellationToken token = new();
 
         foreach (var name in names)
         {

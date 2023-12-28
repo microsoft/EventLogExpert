@@ -56,6 +56,12 @@ a,
     border-color: #1861ac;
 }
 
+.spinner-border {
+    font-size: 0.85em;
+    height: 0.95em;
+    width: 0.95em;
+}
+
 .content { padding-top: 1.1rem; }
 
 .advanced-filter-error { margin-left: 70px; }

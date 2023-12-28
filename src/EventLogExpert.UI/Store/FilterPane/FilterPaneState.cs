@@ -17,4 +17,6 @@ public record FilterPaneState
     public FilterDateModel? FilteredDateRange { get; init; } = null;
 
     public AdvancedFilterModel? AdvancedFilter { get; init; } = null;
+
+    public bool IsLoading { get; init; }
 }

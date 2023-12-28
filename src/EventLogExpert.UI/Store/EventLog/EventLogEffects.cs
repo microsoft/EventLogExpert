@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
@@ -84,36 +84,13 @@ public sealed class EventLogEffects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod]
-    public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
+    [EffectMethod(typeof(EventLogAction.LoadEvents))]
+    public Task HandleLoadEvents(IDispatcher dispatcher)
     {
-        var newLogsCollection = eventLogState.Value.ActiveLogs;
+        var activeLogs =
+            FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, eventLogState.Value.AppliedFilter);
 
-        if (newLogsCollection.ContainsKey(action.LogName))
-        {
-            newLogsCollection = newLogsCollection.Remove(action.LogName);
-        }
-
-        // Events collection is always ordered descending by record id
-        var sortedEvents = action.Events.SortEvents().ToList();
-
-        newLogsCollection = newLogsCollection.Add(
-            action.LogName,
-            new EventLogData(
-                action.LogName,
-                action.Type,
-                sortedEvents.AsReadOnly(),
-                action.AllEventIds.ToImmutableHashSet(),
-                action.AllActivityIds.ToImmutableHashSet(),
-                action.AllProviderNames.ToImmutableHashSet(),
-                action.AllTaskNames.ToImmutableHashSet(),
-                action.AllKeywords.ToImmutableHashSet()
-            ));
-
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(newLogsCollection, eventLogState.Value.AppliedFilter);
-
-        dispatcher.Dispatch(new EventLogAction.LoadEventsSuccess(newLogsCollection));
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
 
         return Task.CompletedTask;
     }
@@ -186,7 +163,7 @@ public sealed class EventLogEffects(
 
                         events.Add(resolved);
 
-                        if (sw.ElapsedMilliseconds > 2000)
+                        if (sw.ElapsedMilliseconds > 1000)
                         {
                             sw.Restart();
                             dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, events.Count));
@@ -234,14 +211,8 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
-        if (!FilterMethods.HasFilteringChanged(action.EventFilter, eventLogState.Value.AppliedFilter))
-        {
-            return Task.CompletedTask;
-        }
-
         var filteredActiveLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, action.EventFilter);
 
-        dispatcher.Dispatch(new EventLogAction.SetFiltersSuccess(action.EventFilter));
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
 
         return Task.CompletedTask;
@@ -296,8 +267,8 @@ public sealed class EventLogEffects(
 
         var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs, state.AppliedFilter);
 
-        dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+        dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventBuffered(new List<DisplayEventModel>().AsReadOnly(), false));
     }
 }
