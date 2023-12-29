@@ -1,5 +1,5 @@
 @typeparam T
-@inherits EventLogExpert.Shared.Base.BaseComponent<T>
+@inherits Base.BaseComponent<T>
 
 <div class="dropdown-input" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)"
     @onkeydown="HandleKeyDown" @onblur="CloseDropDown" @onfocusout="CloseDropDown">
