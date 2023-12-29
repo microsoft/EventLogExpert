@@ -8,10 +8,10 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class ValueSelect<T> : BaseComponent<T>
+public sealed partial class ValueSelect<T> : BaseComponent<T>
 {
-    private readonly List<ValueSelectItem<T>> _items = new();
-    private readonly HashSet<T> _selectedValues = new();
+    private readonly List<ValueSelectItem<T>> _items = [];
+    private readonly HashSet<T> _selectedValues = [];
 
     private bool _isDropDownVisible;
     private ElementReference _selectComponent;
@@ -36,7 +36,7 @@ public partial class ValueSelect<T> : BaseComponent<T>
                 return converter is null ? $"{Value}" : converter.Set(Value);
             }
 
-            if (!Values.Any()) { return "Empty"; }
+            if (Values.Count <= 0) { return "Empty"; }
 
             return converter is null ?
                 string.Join(", ", Values.Select(x => $"{x}")) :
@@ -89,9 +89,8 @@ public partial class ValueSelect<T> : BaseComponent<T>
             {
                 Values.Clear();
             }
-            else if (_selectedValues.Contains(item))
+            else if (_selectedValues.Remove(item))
             {
-                _selectedValues.Remove(item);
                 Values.Remove(item);
             }
             else

@@ -155,7 +155,7 @@ a,
     &:focus { outline: none; }
 }
 
-input[type="text" i].input { padding: 0; }
+input[type="text"].input { padding: 0; }
 
 .input.filter-dropdown { width: 120px; }
 
@@ -231,6 +231,9 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
 .dropdown-input {
     display: inline-block;
+    margin: 0 0.5rem;
+
+    & > .input { margin: 0; }
 
     & span {
         display: inherit;
