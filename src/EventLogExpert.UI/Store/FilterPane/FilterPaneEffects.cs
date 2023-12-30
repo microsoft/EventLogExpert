@@ -18,10 +18,10 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     [EffectMethod]
     public async Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
     {
-        if (action.FilterModel?.ComparisonString is not null)
+        if (action.FilterModel?.Comparison.Value is not null)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new AdvancedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
+            dispatcher.Dispatch(
+                new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
         }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
@@ -42,10 +42,9 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     [EffectMethod]
     public async Task HandleSetAdvancedFilter(FilterPaneAction.SetAdvancedFilter action, IDispatcher dispatcher)
     {
-        if (action.AdvancedFilterModel is not null)
+        if (action.FilterModel is not null)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new AdvancedFilterModel { ComparisonString = action.AdvancedFilterModel.ComparisonString }));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
         }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
@@ -54,10 +53,9 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     [EffectMethod]
     public async Task HandleSetFilter(FilterPaneAction.SetFilter action, IDispatcher dispatcher)
     {
-        if (!string.IsNullOrEmpty(action.FilterModel.ComparisonString))
+        if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(
-                new AdvancedFilterModel { ComparisonString = action.FilterModel.ComparisonString }));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
         }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);

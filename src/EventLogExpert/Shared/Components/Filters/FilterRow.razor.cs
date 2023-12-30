@@ -20,14 +20,14 @@ public sealed partial class FilterRow
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     private List<string> FilteredItems => Items
-        .Where(x => x.Contains(Value.FilterValue ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
+        .Where(x => x.Contains(Value.Data.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
 
     private List<string> Items
     {
         get
         {
-            switch (Value.FilterType)
+            switch (Value.Data.Type)
             {
                 case FilterType.Id :
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
@@ -70,7 +70,7 @@ public sealed partial class FilterRow
     {
         FilterModel newModel = Value with { };
 
-        if (!FilterMethods.TryParse(newModel, out string? comparisonString))
+        if (!FilterMethods.TryParse(newModel, out string comparisonString))
         {
             await AlertDialogService.ShowAlert("Invalid Filter",
                 "The filter you have created is an invalid filter, please adjust and try again.",
@@ -79,7 +79,7 @@ public sealed partial class FilterRow
             return;
         }
 
-        newModel.ComparisonString = comparisonString!;
+        newModel.Comparison.Value = comparisonString;
         newModel.IsEditing = false;
         newModel.IsEnabled = true;
 

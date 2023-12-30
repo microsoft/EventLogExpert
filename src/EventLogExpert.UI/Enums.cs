@@ -5,10 +5,45 @@ using System.Runtime.Serialization;
 
 namespace EventLogExpert.UI;
 
-public enum LogType
+public enum CacheType
 {
-    Live,
-    File
+    Favorites,
+    Recent
+}
+
+public enum ColumnName
+{
+    Level,
+    [EnumMember(Value = "Date and Time")] DateAndTime,
+    [EnumMember(Value = "Activity ID")] ActivityId,
+    [EnumMember(Value = "Log Name")] LogName,
+    [EnumMember(Value = "Computer Name")] ComputerName,
+    Source,
+    [EnumMember(Value = "Event ID")] EventId,
+    [EnumMember(Value = "Task Category")] TaskCategory
+}
+
+public enum CopyType
+{
+    Full,
+    Simple,
+    Xml
+}
+
+public enum FilterColors {
+    None,
+    FilterBlue,
+    FilterGreen,
+    FilterRed
+}
+
+public enum FilterEvaluator
+{
+    Equals,
+    Contains,
+    [EnumMember(Value = "Not Equal")] NotEqual,
+    [EnumMember(Value = "Not Contains")] NotContains,
+    [EnumMember(Value = "Multi Select")] MultiSelect
 }
 
 public enum FilterType
@@ -22,36 +57,8 @@ public enum FilterType
     Description
 }
 
-public enum FilterComparison
+public enum LogType
 {
-    Equals,
-    Contains,
-    [EnumMember(Value = "Not Equal")] NotEqual,
-    [EnumMember(Value = "Not Contains")] NotContains,
-    [EnumMember(Value = "Multi Select")] MultiSelect
-}
-
-public enum CacheType
-{
-    Favorites,
-    Recent
-}
-
-public enum CopyType
-{
-    Full,
-    Simple,
-    Xml
-}
-
-public enum ColumnName
-{
-    Level,
-    [EnumMember(Value = "Date and Time")] DateAndTime,
-    [EnumMember(Value = "Activity ID")] ActivityId,
-    [EnumMember(Value = "Log Name")] LogName,
-    [EnumMember(Value = "Computer Name")] ComputerName,
-    Source,
-    [EnumMember(Value = "Event ID")] EventId,
-    [EnumMember(Value = "Task Category")] TaskCategory
+    Live,
+    File
 }

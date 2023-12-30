@@ -12,7 +12,7 @@
         <ul>
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
-                <li @onclick="() => FilterEvent(item, FilterComparison.Equals)">@item.ToFullString()</li>
+                <li @onclick="() => FilterEvent(item, FilterEvaluator.Equals)">@item.ToFullString()</li>
             }
         </ul>
     </div>
@@ -22,7 +22,7 @@
         <ul>
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
-                <li @onclick="() => FilterEvent(item, FilterComparison.NotEqual)">@item.ToFullString()</li>
+                <li @onclick="() => FilterEvent(item, FilterEvaluator.NotEqual)">@item.ToFullString()</li>
             }
         </ul>
     </div>

@@ -40,19 +40,19 @@ public static class FilterMethods
 
         if (eventFilter.AdvancedFilter?.IsEnabled is true)
         {
-            filters.Add(e => eventFilter.AdvancedFilter.Comparison(e));
+            filters.Add(e => eventFilter.AdvancedFilter.Comparison.Expression(e));
         }
 
         if (!eventFilter.Filters.IsEmpty)
         {
             filters.Add(e => eventFilter.Filters
-                .All(filter => filter.Comparison(e)));
+                .All(filter => filter.Comparison.Expression(e)));
         }
 
         if (!eventFilter.CachedFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.CachedFilters
-                .All(filter => filter.Comparison(e)));
+                .All(filter => filter.Comparison.Expression(e)));
         }
 
         return events.AsParallel()
@@ -101,66 +101,68 @@ public static class FilterMethods
     {
         comparison = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(filterModel.FilterValue) &&
-            filterModel.FilterComparison != FilterComparison.MultiSelect) { return false; }
+        if (filterModel.Data is null) { return false; }
 
-        if (filterModel.FilterValues.Count <= 0 &&
-            filterModel.FilterComparison == FilterComparison.MultiSelect) { return false; }
+        if (string.IsNullOrWhiteSpace(filterModel.Data.Value) &&
+            filterModel.Data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
+
+        if (filterModel.Data.Values.Count <= 0 &&
+            filterModel.Data.Evaluator == FilterEvaluator.MultiSelect) { return false; }
 
         StringBuilder stringBuilder = new();
 
-        if (filterModel.FilterComparison != FilterComparison.MultiSelect ||
-            filterModel.FilterType is FilterType.KeywordsDisplayNames)
+        if (filterModel.Data.Evaluator != FilterEvaluator.MultiSelect ||
+            filterModel.Data.Type is FilterType.KeywordsDisplayNames)
         {
-            stringBuilder.Append(GetComparisonString(filterModel.FilterType, filterModel.FilterComparison));
+            stringBuilder.Append(GetComparisonString(filterModel.Data.Type, filterModel.Data.Evaluator));
         }
 
-        switch (filterModel.FilterComparison)
+        switch (filterModel.Data.Evaluator)
         {
-            case FilterComparison.Equals :
-            case FilterComparison.NotEqual :
-                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Equals :
+            case FilterEvaluator.NotEqual :
+                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{filterModel.FilterValue}\"");
+                    stringBuilder.Append($"\"{filterModel.Data.Value}\"");
                 }
 
                 break;
-            case FilterComparison.Contains :
-            case FilterComparison.NotContains :
-                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Contains :
+            case FilterEvaluator.NotContains :
+                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{filterModel.FilterValue}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
-            case FilterComparison.MultiSelect :
-                if (filterModel.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.MultiSelect :
+                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.FilterValues)}\"}}).Contains(e))");
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.Data.Values)}\"}}).Contains(e))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", filterModel.FilterValues)}\"}}).Contains(");
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", filterModel.Data.Values)}\"}}).Contains(");
                 }
 
                 break;
             default : return false;
         }
 
-        if (filterModel is { FilterComparison: FilterComparison.MultiSelect, FilterType: not FilterType.KeywordsDisplayNames })
+        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Type: not FilterType.KeywordsDisplayNames })
         {
-            stringBuilder.Append(GetComparisonString(filterModel.FilterType, filterModel.FilterComparison));
+            stringBuilder.Append(GetComparisonString(filterModel.Data.Type, filterModel.Data.Evaluator));
         }
 
-        if (filterModel.SubFilters.Count > 0)
+        if (filterModel.SubFilters?.Count > 0)
         {
             foreach (var subFilter in filterModel.SubFilters)
             {
@@ -195,27 +197,27 @@ public static class FilterMethods
         }
     }
 
-    private static string GetComparisonString(FilterType type, FilterComparison comparison) => comparison switch
+    private static string GetComparisonString(FilterType type, FilterEvaluator evaluator) => evaluator switch
     {
-        FilterComparison.Equals => type is FilterType.KeywordsDisplayNames ?
+        FilterEvaluator.Equals => type is FilterType.KeywordsDisplayNames ?
             $"{type}.Any(e => string.Equals(e, " :
             $"{type} == ",
-        FilterComparison.Contains => type switch
+        FilterEvaluator.Contains => type switch
         {
             FilterType.Id or FilterType.ActivityId => $"{type}.ToString().Contains",
             FilterType.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
             _ => $"{type}.Contains"
         },
-        FilterComparison.NotEqual => type is FilterType.KeywordsDisplayNames ?
+        FilterEvaluator.NotEqual => type is FilterType.KeywordsDisplayNames ?
             $"!{type}.Any(e => string.Equals(e, " :
             $"{type} != ",
-        FilterComparison.NotContains => type switch
+        FilterEvaluator.NotContains => type switch
         {
             FilterType.Id or FilterType.ActivityId => $"!{type}.ToString().Contains",
             FilterType.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
             _ => $"!{type}.Contains"
         },
-        FilterComparison.MultiSelect => type switch
+        FilterEvaluator.MultiSelect => type switch
         {
             FilterType.Id or FilterType.Level => $"{type}.ToString())",
             FilterType.KeywordsDisplayNames => $"{type}.Any",
@@ -224,65 +226,67 @@ public static class FilterMethods
         _ => string.Empty
     };
 
-    private static string? GetSubFilterComparisonString(SubFilterModel subFilter)
+    private static string? GetSubFilterComparisonString(FilterModel subFilter)
     {
-        if (string.IsNullOrWhiteSpace(subFilter.FilterValue) &&
-            subFilter.FilterComparison != FilterComparison.MultiSelect) { return null; }
+        if (subFilter.Data is null) { return null; }
 
-        if (subFilter.FilterValues.Count <= 0 &&
-            subFilter.FilterComparison == FilterComparison.MultiSelect) { return null; }
+        if (string.IsNullOrWhiteSpace(subFilter.Data.Value) &&
+            subFilter.Data.Evaluator != FilterEvaluator.MultiSelect) { return null; }
+
+        if (subFilter.Data.Values.Count <= 0 &&
+            subFilter.Data.Evaluator == FilterEvaluator.MultiSelect) { return null; }
 
         StringBuilder stringBuilder = new(" || ");
 
-        if (subFilter.FilterComparison != FilterComparison.MultiSelect ||
-            subFilter.FilterType is FilterType.KeywordsDisplayNames)
+        if (subFilter.Data.Evaluator != FilterEvaluator.MultiSelect ||
+            subFilter.Data.Type is FilterType.KeywordsDisplayNames)
         {
-            stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
+            stringBuilder.Append(GetComparisonString(subFilter.Data.Type, subFilter.Data.Evaluator));
         }
 
-        switch (subFilter.FilterComparison)
+        switch (subFilter.Data.Evaluator)
         {
-            case FilterComparison.Equals :
-            case FilterComparison.NotEqual :
-                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Equals :
+            case FilterEvaluator.NotEqual :
+                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{subFilter.FilterValue}\"");
+                    stringBuilder.Append($"\"{subFilter.Data.Value}\"");
                 }
 
                 break;
-            case FilterComparison.Contains :
-            case FilterComparison.NotContains :
-                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Contains :
+            case FilterEvaluator.NotContains :
+                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{subFilter.FilterValue}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
-            case FilterComparison.MultiSelect :
-                if (subFilter.FilterType is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.MultiSelect :
+                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.FilterValues)}\"}}).Contains(e))");
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.Data.Values)}\"}}).Contains(e))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", subFilter.FilterValues)}\"}}).Contains(");
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", subFilter.Data.Values)}\"}}).Contains(");
                 }
 
                 break;
             default : return null;
         }
 
-        if (subFilter is { FilterComparison: FilterComparison.MultiSelect, FilterType: not FilterType.KeywordsDisplayNames })
+        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Type: not FilterType.KeywordsDisplayNames })
         {
-            stringBuilder.Append(GetComparisonString(subFilter.FilterType, subFilter.FilterComparison));
+            stringBuilder.Append(GetComparisonString(subFilter.Data.Type, subFilter.Data.Evaluator));
         }
 
         return stringBuilder.ToString();
