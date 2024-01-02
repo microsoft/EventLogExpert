@@ -7,7 +7,7 @@ namespace EventLogExpert.UI.Store.FilterPane;
 
 public sealed record FilterPaneAction
 {
-    public sealed record AddCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record AddCachedFilter(FilterModel FilterModel);
 
     public sealed record AddFilter(FilterModel? FilterModel = null);
 
@@ -15,13 +15,13 @@ public sealed record FilterPaneAction
 
     public sealed record ClearAllFilters;
 
-    public sealed record RemoveCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record RemoveCachedFilter(FilterModel FilterModel);
 
     public sealed record RemoveFilter(Guid Id);
 
     public sealed record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
 
-    public sealed record SetAdvancedFilter(AdvancedFilterModel? AdvancedFilterModel);
+    public sealed record SetAdvancedFilter(FilterModel? FilterModel);
 
     public sealed record SetFilter(FilterModel FilterModel);
 
@@ -29,7 +29,7 @@ public sealed record FilterPaneAction
 
     public sealed record ToggleAdvancedFilter;
 
-    public sealed record ToggleCachedFilter(AdvancedFilterModel AdvancedFilterModel);
+    public sealed record ToggleCachedFilter(FilterModel FilterModel);
 
     public sealed record ToggleEnableFilter(Guid Id);
 

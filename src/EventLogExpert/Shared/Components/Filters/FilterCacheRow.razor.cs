@@ -14,12 +14,12 @@ namespace EventLogExpert.Shared.Components.Filters;
 public sealed partial class FilterCacheRow
 {
     private CacheType _cacheType = CacheType.Favorites;
-    private AdvancedFilterModel _filter = null!;
+    private FilterModel _filter = null!;
     private string _filterValue = null!;
     private bool _isEditing;
     private string? _errorMessage;
 
-    [Parameter] public AdvancedFilterModel Value { get; set; } = null!;
+    [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
@@ -27,14 +27,14 @@ public sealed partial class FilterCacheRow
 
     private List<string> Items => _cacheType switch
     {
-        CacheType.Favorites => FilterCacheState.Value.FavoriteFilters.Select(x => x.ComparisonString).ToList(),
-        CacheType.Recent => FilterCacheState.Value.RecentFilters.Select(x => x.ComparisonString).ToList(),
+        CacheType.Favorites => FilterCacheState.Value.FavoriteFilters.Select(x => x.Comparison.Value).ToList(),
+        CacheType.Recent => FilterCacheState.Value.RecentFilters.Select(x => x.Comparison.Value).ToList(),
         _ => [],
     };
 
     protected override void OnInitialized()
     {
-        _filterValue = Value.ComparisonString;
+        _filterValue = Value.Comparison.Value;
 
         base.OnInitialized();
     }
@@ -59,11 +59,11 @@ public sealed partial class FilterCacheRow
 
         _isEditing = false;
 
-        if (string.Equals(Value.ComparisonString, _filterValue, StringComparison.OrdinalIgnoreCase)) { return; }
+        if (string.Equals(Value.Comparison.Value, _filterValue, StringComparison.OrdinalIgnoreCase)) { return; }
 
         try
         {
-            _filter.ComparisonString = _filterValue;
+            _filter.Comparison.Value = _filterValue;
 
             Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value));
             Dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(_filter));

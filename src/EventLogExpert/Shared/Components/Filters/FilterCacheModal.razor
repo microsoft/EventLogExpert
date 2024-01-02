@@ -16,7 +16,7 @@
                             <button class="button button-yellow" type="button" @onclick="() => RemoveFavorite(filter)">
                                 <i class="bi bi-star-fill"></i>
                             </button>
-                            <span>@filter.ComparisonString</span>
+                            <span>@filter.Comparison.Value</span>
                         </div>
 
                         <button class="button button-green" type="button" @onclick="() => AddFilter(filter)">
@@ -38,7 +38,7 @@
                             <button class="button button-yellow" type="button" @onclick="() => AddFavorite(filter)">
                                 <i class="bi bi-star"></i>
                             </button>
-                            <span>@filter.ComparisonString</span>
+                            <span>@filter.Comparison.Value</span>
                         </div>
 
                         <button class="button button-green" type="button" @onclick="() => AddFilter(filter)">

@@ -14,7 +14,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public partial class FilterCacheModal
+public sealed partial class FilterCacheModal
 {
     [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
 
@@ -29,10 +29,10 @@ public partial class FilterCacheModal
         base.OnInitialized();
     }
 
-    private void AddFavorite(AdvancedFilterModel filter) =>
+    private void AddFavorite(FilterModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
 
-    private void AddFilter(AdvancedFilterModel filter)
+    private void AddFilter(FilterModel filter)
     {
         Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
         Close().AndForget();
@@ -64,7 +64,7 @@ public partial class FilterCacheModal
         {
             using var stream = new MemoryStream(
                 JsonSerializer.SerializeToUtf8Bytes(
-                    FilterCacheState.Value.FavoriteFilters.Select(x => x.ComparisonString)));
+                    FilterCacheState.Value.FavoriteFilters.Select(x => x.Comparison.Value)));
 
             await using var fileStream = await result.OpenStreamForWriteAsync();
 
@@ -86,12 +86,7 @@ public partial class FilterCacheModal
             FileTypes = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    {
-                        DevicePlatform.WinUI, new[]
-                        {
-                            ".json"
-                        }
-                    }
+                    { DevicePlatform.WinUI, [".json"] }
                 })
         };
 
@@ -106,7 +101,9 @@ public partial class FilterCacheModal
 
             if (json is null) { return; }
 
-            var filters = json.Select(x => new AdvancedFilterModel { ComparisonString = x }).ToList();
+            var filters = json
+                .Select(x => new FilterModel { Comparison = new FilterComparison { Value = x } })
+                .ToList();
 
             Dispatcher.Dispatch(new FilterCacheAction.ImportFavorites(filters));
         }
@@ -120,6 +117,6 @@ public partial class FilterCacheModal
 
     private async Task Open() => await JSRuntime.InvokeVoidAsync("openFilterCacheModal");
 
-    private void RemoveFavorite(AdvancedFilterModel filter) =>
+    private void RemoveFavorite(FilterModel filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
 }

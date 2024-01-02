@@ -6,27 +6,29 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterCache;
 
-public record FilterCacheAction
+public sealed record FilterCacheAction
 {
-    public record AddRecentFilter(AdvancedFilterModel Filter);
+    public sealed record AddFavoriteFilter(FilterModel Filter);
 
-    public record AddRecentFilterCompleted(ImmutableQueue<AdvancedFilterModel> Filters);
+    public sealed record AddFavoriteFilterCompleted(ImmutableList<FilterModel> Filters);
 
-    public record AddFavoriteFilter(AdvancedFilterModel Filter);
+    public sealed record AddRecentFilter(FilterModel Filter);
 
-    public record AddFavoriteFilterCompleted(ImmutableList<AdvancedFilterModel> Filters);
+    public sealed record AddRecentFilterCompleted(ImmutableQueue<FilterModel> Filters);
 
-    public record RemoveFavoriteFilter(AdvancedFilterModel Filter);
+    public sealed record ImportFavorites(List<FilterModel> Filters);
 
-    public record RemoveFavoriteFilterCompleted(ImmutableList<AdvancedFilterModel> FavoriteFilters,
-        ImmutableQueue<AdvancedFilterModel> RecentFilters);
+    public sealed record LoadFilters;
 
-    public record LoadFilters;
+    public sealed record LoadFiltersCompleted(
+        ImmutableList<FilterModel> FavoriteFilters,
+        ImmutableQueue<FilterModel> RecentFilters);
 
-    public record LoadFiltersCompleted(ImmutableList<AdvancedFilterModel> FavoriteFilters,
-        ImmutableQueue<AdvancedFilterModel> RecentFilters);
+    public sealed record OpenMenu;
 
-    public record ImportFavorites(List<AdvancedFilterModel> Filters);
+    public sealed record RemoveFavoriteFilter(FilterModel Filter);
 
-    public record OpenMenu;
+    public sealed record RemoveFavoriteFilterCompleted(
+        ImmutableList<FilterModel> FavoriteFilters,
+        ImmutableQueue<FilterModel> RecentFilters);
 }

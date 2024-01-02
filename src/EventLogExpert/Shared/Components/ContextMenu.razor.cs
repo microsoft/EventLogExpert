@@ -32,7 +32,7 @@ public sealed partial class ContextMenu
     private void CopySelected(CopyType? copyType) =>
         ClipboardService.CopySelectedEvent(SelectedEventState.Value, copyType);
 
-    private void FilterEvent(FilterType filterType, FilterComparison filterComparison)
+    private void FilterEvent(FilterType filterType, FilterEvaluator filterEvaluator)
     {
         if (SelectedEventState.Value is null) { return; }
 
@@ -50,16 +50,19 @@ public sealed partial class ContextMenu
 
         FilterModel filter = new()
         {
+            Data = new FilterData
+            {
+                Type = filterType,
+                Value = filterValue,
+                Evaluator = filterEvaluator
+            },
             IsEditing = false,
-            IsEnabled = true,
-            FilterType = filterType,
-            FilterComparison = filterComparison,
-            FilterValue = filterValue
+            IsEnabled = true
         };
 
         if (!FilterMethods.TryParse(filter, out var comparisonString)) { return; }
 
-        filter.ComparisonString = comparisonString;
+        filter.Comparison.Value = comparisonString;
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }

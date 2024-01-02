@@ -14,19 +14,19 @@ public sealed partial class SubFilterRow
 {
     [Parameter] public Guid ParentId { get; set; }
 
-    [Parameter] public SubFilterModel Value { get; set; } = null!;
+    [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     private List<string> FilteredItems => Items
-        .Where(x => x.Contains(Value.FilterValue?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
+        .Where(x => x.Contains(Value.Data.Value?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
 
     private List<string> Items
     {
         get
         {
-            switch (Value.FilterType)
+            switch (Value.Data.Type)
             {
                 case FilterType.Id :
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)

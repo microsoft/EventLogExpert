@@ -17,7 +17,7 @@ public sealed partial class FilterPane
 {
     private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
 
-    private AdvancedFilterModel? _advancedFilter = null;
+    private FilterModel? _advancedFilter = null;
     private Timer? _advancedFilterDebounceTimer = null;
     private string _advancedFilterErrorMessage = string.Empty;
     private bool _canEditAdvancedFilter = true;
@@ -69,7 +69,7 @@ public sealed partial class FilterPane
     {
         _isFilterListVisible = true;
         _canEditAdvancedFilter = true;
-        _advancedFilter = new AdvancedFilterModel();
+        _advancedFilter = new FilterModel();
     }
 
     private void AddCachedFilter() => Dispatcher.Dispatch(new FilterCacheAction.OpenMenu());
@@ -120,7 +120,7 @@ public sealed partial class FilterPane
 
                 if (_isAdvancedFilterValid && _advancedFilter is not null)
                 {
-                    _advancedFilter.ComparisonString = s?.ToString()!;
+                    _advancedFilter.Comparison.Value = s?.ToString()!;
                 }
 
                 InvokeAsync(StateHasChanged);
@@ -129,7 +129,7 @@ public sealed partial class FilterPane
 
     private void ApplyAdvancedFilter()
     {
-        if (!FilterMethods.TryParseExpression(_advancedFilter?.ComparisonString, out _)) { return; }
+        if (!FilterMethods.TryParseExpression(_advancedFilter?.Comparison.Value, out _)) { return; }
 
         _canEditAdvancedFilter = false;
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(_advancedFilter));

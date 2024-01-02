@@ -7,7 +7,7 @@
     {
         <div class="flex-align-center">
             <span>Filter On: </span>
-            <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.FilterType" ToStringFunc="x => x.ToFullString()">
+            <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.Data.Type" ToStringFunc="x => x.ToFullString()">
                 @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
                 {
                     <ValueSelectItem T="FilterType" Value="item" />
@@ -15,22 +15,22 @@
             </ValueSelect>
 
             <span>Comparison: </span>
-            <ValueSelect CssClass="input filter-dropdown" T="FilterComparison" @bind-Value="Value.FilterComparison" ToStringFunc="x => x.ToFullString()">
-                @foreach (FilterComparison item in Enum.GetValues(typeof(FilterComparison)))
+            <ValueSelect CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
+                @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
                 {
-                    <ValueSelectItem T="FilterComparison" Value="item" />
+                    <ValueSelectItem T="FilterEvaluator" Value="item" />
                 }
             </ValueSelect>
 
             <span>Value: </span>
             <div>
-                @if (Value.FilterType is FilterType.Description)
+                @if (Value.Data.Type is FilterType.Description)
                 {
-                    <TextInput CssClass="input filter-description" @bind-Value="@Value.FilterValue" />
+                    <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
                 }
-                else if (Value.FilterComparison == FilterComparison.MultiSelect)
+                else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
                 {
-                    <ValueSelect CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.FilterValues" IsMultiSelect
+                    <ValueSelect CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
                         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
                         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in Items)
@@ -41,7 +41,7 @@
                 }
                 else
                 {
-                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.FilterValue" IsInput>
+                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
                     <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in FilteredItems)
                         {
@@ -52,13 +52,13 @@
             </div>
         </div>
     }
-    else if (string.IsNullOrWhiteSpace(Value.ComparisonString))
+    else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
     {
         <span>No Filter Specified</span>
     }
     else
     {
-        <span>@Value.ComparisonString</span>
+        <span>@Value.Comparison.Value</span>
     }
 
     <div class="justify-self-right">
