@@ -29,12 +29,15 @@ public sealed partial class FilterCacheModal
         base.OnInitialized();
     }
 
-    private void AddFavorite(FilterModel filter) =>
+    private void AddFavorite(string filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
 
-    private void AddFilter(FilterModel filter)
+    private void AddFilter(string filter)
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(filter));
+        Dispatcher.Dispatch(
+            new FilterPaneAction.AddCachedFilter(
+                new FilterModel { Comparison = new FilterComparison { Value = filter } }));
+
         Close().AndForget();
     }
 
@@ -64,7 +67,7 @@ public sealed partial class FilterCacheModal
         {
             using var stream = new MemoryStream(
                 JsonSerializer.SerializeToUtf8Bytes(
-                    FilterCacheState.Value.FavoriteFilters.Select(x => x.Comparison.Value)));
+                    FilterCacheState.Value.FavoriteFilters));
 
             await using var fileStream = await result.OpenStreamForWriteAsync();
 
@@ -97,13 +100,9 @@ public sealed partial class FilterCacheModal
         try
         {
             await using var stream = File.OpenRead(result.FullPath);
-            var json = await JsonSerializer.DeserializeAsync<List<string>>(stream);
+            var filters = await JsonSerializer.DeserializeAsync<List<string>>(stream);
 
-            if (json is null) { return; }
-
-            var filters = json
-                .Select(x => new FilterModel { Comparison = new FilterComparison { Value = x } })
-                .ToList();
+            if (filters is null) { return; }
 
             Dispatcher.Dispatch(new FilterCacheAction.ImportFavorites(filters));
         }
@@ -117,6 +116,6 @@ public sealed partial class FilterCacheModal
 
     private async Task Open() => await JSRuntime.InvokeVoidAsync("openFilterCacheModal");
 
-    private void RemoveFavorite(FilterModel filter) =>
+    private void RemoveFavorite(string filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
 }

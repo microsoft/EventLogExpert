@@ -19,7 +19,7 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
 
         var newFilters = state.Value.FavoriteFilters.Add(action.Filter);
 
-        preferencesProvider.FavoriteFiltersPreference = newFilters.Select(filter => filter.Comparison.Value).ToList();
+        preferencesProvider.FavoriteFiltersPreference = newFilters;
 
         dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilterCompleted(newFilters));
 
@@ -30,16 +30,16 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
     public Task HandleAddRecentFilter(FilterCacheAction.AddRecentFilter action, IDispatcher dispatcher)
     {
         if (state.Value.RecentFilters.Any(filter =>
-            string.Equals(filter.Comparison.Value, action.Filter.Comparison.Value, StringComparison.OrdinalIgnoreCase)))
+            string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)))
         {
             return Task.CompletedTask;
         }
 
-        ImmutableQueue<FilterModel> newFilters = state.Value.RecentFilters.Count() >= MaxRecentFilterCount
+        ImmutableQueue<string> newFilters = state.Value.RecentFilters.Count() >= MaxRecentFilterCount
             ? state.Value.RecentFilters.Dequeue().Enqueue(action.Filter)
             : state.Value.RecentFilters.Enqueue(action.Filter);
 
-        preferencesProvider.RecentFiltersPreference = newFilters.Select(filter => filter.Comparison.Value).ToList();
+        preferencesProvider.RecentFiltersPreference = newFilters.ToList();
 
         dispatcher.Dispatch(new FilterCacheAction.AddRecentFilterCompleted(newFilters));
 
@@ -49,15 +49,16 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
     [EffectMethod]
     public Task HandleImportFavorites(FilterCacheAction.ImportFavorites action, IDispatcher dispatcher)
     {
-        List<FilterModel> newFilters = [.. state.Value.FavoriteFilters];
+        List<string> newFilters = [.. state.Value.FavoriteFilters];
 
         foreach (var filter in
-            action.Filters.Where(filter => !newFilters.Any(x => filter.Comparison.Value.Equals(x.Comparison.Value))))
+            action.Filters.Where(filter =>
+                !newFilters.Any(x => string.Equals(filter, x, StringComparison.OrdinalIgnoreCase))))
         {
             newFilters.Add(filter);
         }
 
-        preferencesProvider.FavoriteFiltersPreference = newFilters.Select(filter => filter.Comparison.Value).ToList();
+        preferencesProvider.FavoriteFiltersPreference = newFilters;
 
         dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilterCompleted([.. newFilters]));
 
@@ -70,17 +71,17 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
         var favoritesPreference = preferencesProvider.FavoriteFiltersPreference;
         var recentPreference = preferencesProvider.RecentFiltersPreference;
 
-        List<FilterModel> favorites = [];
-        List<FilterModel> recent = [];
+        List<string> favorites = [];
+        List<string> recent = [];
 
         foreach (var filter in favoritesPreference)
         {
-            favorites.Add(new FilterModel { Comparison = new FilterComparison { Value = filter } });
+            favorites.Add(filter);
         }
 
         foreach (var filter in recentPreference)
         {
-            recent.Add(new FilterModel { Comparison = new FilterComparison { Value = filter } });
+            recent.Add(filter);
         }
 
         dispatcher.Dispatch(
@@ -94,14 +95,11 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
     {
         if (!state.Value.FavoriteFilters.Contains(action.Filter)) { return Task.CompletedTask; }
 
-        ImmutableList<FilterModel> favorites;
-        ImmutableQueue<FilterModel> recent;
+        ImmutableList<string> favorites;
+        ImmutableQueue<string> recent;
 
         if (state.Value.RecentFilters.Any(filter =>
-            string.Equals(
-                filter.Comparison.Value,
-                action.Filter.Comparison.Value,
-                StringComparison.OrdinalIgnoreCase)))
+            string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)))
         {
             favorites = state.Value.FavoriteFilters.Remove(action.Filter);
             recent = state.Value.RecentFilters;
@@ -117,8 +115,8 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
             recent = state.Value.RecentFilters.Enqueue(action.Filter);
         }
 
-        preferencesProvider.FavoriteFiltersPreference = favorites.Select(filter => filter.Comparison.Value).ToList();
-        preferencesProvider.RecentFiltersPreference = recent.Select(filter => filter.Comparison.Value).ToList();
+        preferencesProvider.FavoriteFiltersPreference = favorites;
+        preferencesProvider.RecentFiltersPreference = recent.ToList();
 
         dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilterCompleted(favorites, recent));
 

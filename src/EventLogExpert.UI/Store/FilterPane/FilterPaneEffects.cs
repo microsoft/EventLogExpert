@@ -6,7 +6,6 @@ using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterColor;
 using Fluxor;
-using System;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterPane;
@@ -29,7 +28,7 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         if (action.FilterModel?.Comparison.Value is not null)
         {
             dispatcher.Dispatch(
-                new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
+                new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
 
         if (action.FilterModel?.IsEnabled is true)
@@ -89,7 +88,7 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
 
         if (action.FilterModel is not null)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
     }
 
@@ -100,7 +99,7 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
 
         if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel with { }));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
 
         UpdateFilterColors(action.FilterModel, dispatcher);

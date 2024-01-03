@@ -27,8 +27,8 @@ public sealed partial class FilterCacheRow
 
     private List<string> Items => _cacheType switch
     {
-        CacheType.Favorites => FilterCacheState.Value.FavoriteFilters.Select(x => x.Comparison.Value).ToList(),
-        CacheType.Recent => FilterCacheState.Value.RecentFilters.Select(x => x.Comparison.Value).ToList(),
+        CacheType.Favorites => [.. FilterCacheState.Value.FavoriteFilters],
+        CacheType.Recent => [.. FilterCacheState.Value.RecentFilters],
         _ => [],
     };
 
@@ -66,7 +66,7 @@ public sealed partial class FilterCacheRow
             _filter.Comparison.Value = _filterValue;
 
             Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value));
-            Dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(_filter));
+            Dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(_filterValue));
             Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(_filter));
         }
         catch (Exception ex)
