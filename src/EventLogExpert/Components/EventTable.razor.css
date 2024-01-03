@@ -49,18 +49,38 @@ th, td {
 .table-row { cursor: pointer; }
 
 .table-row.blue {
-    background-color: var(--clr-statusbar) !important;
-    color: var(--background-darkgray) !important;
+    background-color: rgb(36 92 146) !important;
+    color: rgb(164 185 192) !important;
 }
 
 .table-row.green {
-    background-color: var(--clr-green) !important;
-    color: var(--background-darkgray) !important;
+    background-color: rgb(21 146 21) !important;
+    color: rgb(164 185 192) !important;
 }
 
 .table-row.red {
-    background-color: var(--clr-red) !important;
-    color: var(--background-darkgray) !important;
+    background-color: rgb(146 21 21) !important;
+    color: rgb(164 185 192) !important;
+}
+
+.table-row.yellow {
+    background-color: rgb(146 146 21) !important;
+    color: rgb(164 185 192) !important;
+}
+
+.table-row.maroon {
+    background-color: rgb(146 21 146) !important;
+    color: rgb(164 185 192) !important;
+}
+
+.table-row.orange {
+    background-color: rgb(146 102 21) !important;
+    color: rgb(164 185 192) !important;
+}
+
+.table-row.pink {
+    background-color: rgb(138 85 138) !important;
+    color: rgb(164 185 192) !important;
 }
 
 .activity-id { width: 270px; }
