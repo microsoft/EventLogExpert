@@ -18,5 +18,7 @@ public sealed record FilterPaneState
 
     public FilterModel? AdvancedFilter { get; init; }
 
+    public bool IsEnabled { get; init; } = true;
+
     public bool IsLoading { get; init; }
 }

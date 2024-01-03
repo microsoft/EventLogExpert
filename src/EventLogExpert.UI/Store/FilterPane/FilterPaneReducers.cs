@@ -22,10 +22,6 @@ public sealed class FilterPaneReducers
         };
     }
 
-    [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
-    public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
-        state with { IsLoading = !state.IsLoading };
-
     [ReducerMethod]
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
     {
@@ -113,8 +109,8 @@ public sealed class FilterPaneReducers
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceSetAdvancedFilter(FilterPaneState state,
-        FilterPaneAction.SetAdvancedFilter action) => state with
+    public static FilterPaneState ReduceSetAdvancedFilterSuccess(FilterPaneState state,
+        FilterPaneAction.SetAdvancedFilterCompleted action) => state with
     {
         AdvancedFilter = action.FilterModel
     };
@@ -212,4 +208,12 @@ public sealed class FilterPaneReducers
             FilteredDateRange = state.FilteredDateRange with { IsEnabled = !state.FilteredDateRange.IsEnabled }
         };
     }
+
+    [ReducerMethod(typeof(FilterPaneAction.ToggleIsEnabled))]
+    public static FilterPaneState ReduceToggleIsEnabled(FilterPaneState state) =>
+        state with { IsEnabled = !state.IsEnabled };
+
+    [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
+    public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
+        state with { IsLoading = !state.IsLoading };
 }

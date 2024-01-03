@@ -6,6 +6,13 @@
     @if (Value.IsEditing)
     {
         <div class="flex-align-center">
+            <ValueSelect CssClass="input filter-dropdown" T="FilterColor" @bind-Value="Value.Color">
+                @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                {
+                    <ValueSelectItem T="FilterColor" Value="item" />
+                }
+            </ValueSelect>
+
             <span>Filter On: </span>
             <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.Data.Type" ToStringFunc="x => x.ToFullString()">
                 @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))

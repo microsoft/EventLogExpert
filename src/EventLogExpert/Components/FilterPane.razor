@@ -1,4 +1,6 @@
 ﻿@using EventLogExpert.Shared.Components.Filters
+@using EventLogExpert.Shared.Components
+@using EventLogExpert.UI
 @inherits FluxorComponent
 
 <div class="filter-pane">
@@ -109,6 +111,12 @@
         @if (IsAdvancedFilterVisible)
         {
             <div>
+                <ValueSelect CssClass="input filter-dropdown" T="FilterColor" @bind-Value="_advancedFilter!.Color">
+                    @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                    {
+                        <ValueSelectItem T="FilterColor" Value="item" />
+                    }
+                </ValueSelect>
                 <span>
                     Expression: <input class="input advanced-filter" type="text"
                         placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
