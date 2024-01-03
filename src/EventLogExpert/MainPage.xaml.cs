@@ -43,6 +43,7 @@ public sealed partial class MainPage : ContentPage
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
         IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
@@ -82,6 +83,12 @@ public sealed partial class MainPage : ContentPage
         continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}");
+
+        filterPaneIsEnabledState.Select(e => e.IsEnabled);
+
+        filterPaneIsEnabledState.SelectedValueChanged += (sender, isEnabled) =>
+            MainThread.InvokeOnMainThreadAsync(() =>
+                ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
 
         selectedEventState.Select(e => e.SelectedEvent!);
 
@@ -199,6 +206,9 @@ public sealed partial class MainPage : ContentPage
 
         _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
+
+    private void ShowAllEvents_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(((MenuFlyoutItem)sender).Text == "Continuously Update" ?

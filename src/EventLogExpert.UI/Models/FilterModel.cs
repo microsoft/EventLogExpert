@@ -7,6 +7,8 @@ public sealed record FilterModel
 {
     public Guid Id { get; } = Guid.NewGuid();
 
+    public FilterColor Color { get; set; } = FilterColor.None;
+
     public FilterComparison Comparison { get; set; } = new();
 
     public FilterData Data { get; set; } = new();

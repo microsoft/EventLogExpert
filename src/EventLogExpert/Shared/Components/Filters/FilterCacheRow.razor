@@ -5,6 +5,13 @@
     @if (_isEditing)
     {
         <div class="flex-align-center">
+            <ValueSelect CssClass="input filter-dropdown" T="FilterColor" @bind-Value="Value.Color">
+                @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                {
+                    <ValueSelectItem T="FilterColor" Value="item" />
+                }
+            </ValueSelect>
+
             <span>Cache Type: </span>
             <ValueSelect CssClass="input filter-dropdown" T="CacheType" @bind-Value="_cacheType" ToStringFunc="x => x.ToFullString()">
                 @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))

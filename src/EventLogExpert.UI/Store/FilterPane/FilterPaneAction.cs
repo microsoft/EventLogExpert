@@ -23,6 +23,8 @@ public sealed record FilterPaneAction
 
     public sealed record SetAdvancedFilter(FilterModel? FilterModel);
 
+    public sealed record SetAdvancedFilterCompleted(FilterModel? FilterModel);
+
     public sealed record SetFilter(FilterModel FilterModel);
 
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
@@ -36,6 +38,8 @@ public sealed record FilterPaneAction
     public sealed record ToggleEditFilter(Guid Id);
 
     public sealed record ToggleFilterDate;
+
+    public sealed record ToggleIsEnabled;
 
     public sealed record ToggleIsLoading;
 }

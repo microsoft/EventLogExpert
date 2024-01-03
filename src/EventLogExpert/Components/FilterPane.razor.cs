@@ -132,6 +132,8 @@ public sealed partial class FilterPane
         if (!FilterMethods.TryParseExpression(_advancedFilter?.Comparison.Value, out _)) { return; }
 
         _canEditAdvancedFilter = false;
+        _advancedFilter!.IsEnabled = true;
+
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(_advancedFilter));
     }
 

@@ -5,8 +5,10 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.FilterColor;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -23,6 +25,8 @@ public sealed partial class EventTable
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
 
     [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
+
+    [Inject] private IState<FilterColorState> FilterColorState { get; set; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
@@ -58,7 +62,17 @@ public sealed partial class EventTable
     };
 
     private string GetCss(DisplayEventModel @event) => SelectedEventState.Value?.RecordId == @event.RecordId ?
-        "table-row selected" : "table-row";
+        "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
+
+    private string GetHighlightedColor(DisplayEventModel @event)
+    {
+        foreach (var filter in FilterColorState.Value.Filters.Where(filter => filter.Comparison.Expression(@event)))
+        {
+            return filter.Color.Equals(FilterColor.None) ? string.Empty : filter.Color.ToString().ToLower();
+        }
+
+        return string.Empty;
+    }
 
     private void HandleKeyUp(KeyboardEventArgs args)
     {

@@ -9,6 +9,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
@@ -22,6 +23,7 @@ public sealed partial class App : Application
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
+        IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
         IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
         IState<SettingsState> settingsState,
@@ -40,6 +42,7 @@ public sealed partial class App : Application
                 databaseCollectionProvider,
                 activeLogsState,
                 continuouslyUpdateState,
+                filterPaneIsEnabledState,
                 selectedEventState,
                 loadedDatabasesState,
                 settingsState,

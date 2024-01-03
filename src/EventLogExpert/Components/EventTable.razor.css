@@ -48,6 +48,21 @@ th, td {
 
 .table-row { cursor: pointer; }
 
+.table-row.blue {
+    background-color: var(--clr-statusbar) !important;
+    color: var(--background-darkgray) !important;
+}
+
+.table-row.green {
+    background-color: var(--clr-green) !important;
+    color: var(--background-darkgray) !important;
+}
+
+.table-row.red {
+    background-color: var(--clr-red) !important;
+    color: var(--background-darkgray) !important;
+}
+
 .activity-id { width: 270px; }
 
 .logname { width: 100px; }
