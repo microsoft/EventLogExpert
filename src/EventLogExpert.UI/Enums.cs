@@ -34,7 +34,11 @@ public enum FilterColor {
     None,
     Blue,
     Green,
-    Red
+    Red,
+    Yellow,
+    Maroon,
+    Orange,
+    Pink
 }
 
 public enum FilterEvaluator
