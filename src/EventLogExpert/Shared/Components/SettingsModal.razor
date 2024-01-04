@@ -1,10 +1,9 @@
 @using EventLogExpert.UI.Store.Settings
 @using Microsoft.Extensions.Logging
 @using EventLogExpert.UI
+@inherits Base.BaseModal
 
-@inject IState<SettingsState> SettingsState
-
-<dialog id="settingsDialog">
+<dialog id="settingsDialog" @ref="ElementReference">
 
     <EditForm id="settings-form" Model="_request" OnValidSubmit="Save">
         <div class="flex-column-scroll">

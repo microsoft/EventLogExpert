@@ -1,9 +1,9 @@
 @using EventLogExpert.UI.Store.FilterCache
-@inherits FluxorComponent
+@inherits Base.BaseModal
 
 @inject IState<FilterCacheState> FilterCacheState
 
-<dialog id="filterCacheDialog">
+<dialog id="filterCacheDialog" @ref="ElementReference">
     <div class="dialog-group">
         <div class="flex-column-scroll">
             @if (FilterCacheState.Value.FavoriteFilters.Any())

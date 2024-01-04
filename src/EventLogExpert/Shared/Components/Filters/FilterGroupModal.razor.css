@@ -1,0 +1,22 @@
+﻿dialog {
+    height: 60%;
+    min-width: 50rem;
+
+    color: var(--clr-lightblue);
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}
+
+.dialog-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    
+    height: 100%;
+}
+
+.divider {
+    width: 95%;
+    align-self: center;
+    border-top: 3px solid var(--clr-lightblue);
+}

@@ -6,7 +6,6 @@ using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 using System.Text.Json;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -19,8 +18,6 @@ public sealed partial class FilterCacheModal
     [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; set; } = null!;
-
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
 
     protected override void OnInitialized()
     {
@@ -40,8 +37,6 @@ public sealed partial class FilterCacheModal
 
         Close().AndForget();
     }
-
-    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeFilterCacheModal");
 
     private async Task ExportFavorites()
     {
@@ -113,8 +108,6 @@ public sealed partial class FilterCacheModal
                 "OK");
         }
     }
-
-    private async Task Open() => await JSRuntime.InvokeVoidAsync("openFilterCacheModal");
 
     private void RemoveFavorite(string filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
