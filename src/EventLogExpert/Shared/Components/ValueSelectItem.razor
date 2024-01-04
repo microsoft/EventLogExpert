@@ -1,6 +1,6 @@
 @typeparam T
 
-<div id="@ItemId" selected="@_isSelected" @onmousedown="SelectItem">
+<div id="@ItemId" class="@CssClass" selected="@_isSelected" @onmousedown="SelectItem">
     @if (ChildContent is not null)
     {
         @ChildContent
