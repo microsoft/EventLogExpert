@@ -6,10 +6,10 @@
     @if (Value.IsEditing)
     {
         <div class="flex-align-center">
-            <ValueSelect CssClass="input filter-dropdown" T="FilterColor" @bind-Value="Value.Color">
+            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="FilterColor" @bind-Value="Value.Color">
                 @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
                 {
-                    <ValueSelectItem T="FilterColor" Value="item" />
+                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="FilterColor" Value="item" />
                 }
             </ValueSelect>
 

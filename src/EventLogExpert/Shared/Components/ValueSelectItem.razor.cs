@@ -3,20 +3,22 @@
 
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
-using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Shared.Components;
 
 public sealed partial class ValueSelectItem<T> : IDisposable
 {
-    [Parameter]
-    public bool ClearItem { get; set; } = false;
-
     private bool _isSelected = false;
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
+
+    [Parameter]
+    public bool ClearItem { get; set; } = false;
+
+    [Parameter]
+    public string CssClass { get; set; } = string.Empty;
 
     [Parameter]
     public bool IsDisabled { get; set; }

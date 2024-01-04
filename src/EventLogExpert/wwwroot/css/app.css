@@ -3,6 +3,7 @@
 
 :root {
     --clr-lightblue: #9CDCFE;
+    --clr-lightgray: rgb(164 185 192);
     --clr-black: #111111;
     --clr-red: #ee0d0d;
     --clr-green: #0dee0d;
@@ -12,6 +13,14 @@
 
     --background-dark: #222222;
     --background-darkgray: #353535;
+
+    --highlight-blue: rgb(36 92 146);
+    --highlight-green: rgb(21 146 21);
+    --highlight-red: rgb(146 21 21);
+    --highlight-yellow: rgb(146 146 21);
+    --highlight-maroon: rgb(146 21 146);
+    --highlight-orange: rgb(146 102 21);
+    --highlight-pink: rgb(138 85 138);
 }
 
 ::-webkit-scrollbar {
@@ -193,7 +202,6 @@ input[type="text"].input { padding: 0; }
     &:hover { filter: brightness(0.9); }
 }
 
-
 .button.button-red {
     color: var(--clr-red);
     border: var(--clr-red);
@@ -279,10 +287,45 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
         &:hover { background-color: var(--background-darkgray); }
 
         &[selected] {
-            color: var(--background-darkgray) !important;
-            background-color: var(--clr-lightblue) !important;
+            color: var(--background-darkgray);
+            background-color: var(--clr-lightblue);
         }
     }
+}
+
+.input.color-dropdown,
+.color-dropdown-item {
+    width: 25px;
+    height: 22px;
+    display: inline-block;
+    text-align: center;
+    border-bottom: 0;
+    border: 1px solid var(--clr-lightblue);
+    text-indent: -9999px;
+
+    &.none { background-color: var(--background-dark) !important; }
+
+    &.blue { background-color: var(--highlight-blue) !important; }
+
+    &.green { background-color: var(--highlight-green) !important; }
+
+    &.red { background-color: var(--highlight-red) !important; }
+
+    &.yellow { background-color: var(--highlight-yellow) !important; }
+
+    &.maroon { background-color: var(--highlight-maroon) !important; }
+
+    &.orange { background-color: var(--highlight-orange) !important; }
+
+    &.pink { background-color: var(--highlight-pink) !important; }
+}
+
+.color-dropdown-item {
+    border: none;
+
+    &:hover { filter: brightness(0.9); }
+
+    &[selected] { filter: brightness(0.9); }
 }
 
 /*@supports (-webkit-touch-callout: none) {

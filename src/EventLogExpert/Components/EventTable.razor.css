@@ -49,38 +49,38 @@ th, td {
 .table-row { cursor: pointer; }
 
 .table-row.blue {
-    background-color: rgb(36 92 146) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-blue) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.green {
-    background-color: rgb(21 146 21) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-green) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.red {
-    background-color: rgb(146 21 21) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-red) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.yellow {
-    background-color: rgb(146 146 21) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-yellow) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.maroon {
-    background-color: rgb(146 21 146) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-maroon) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.orange {
-    background-color: rgb(146 102 21) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-orange) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .table-row.pink {
-    background-color: rgb(138 85 138) !important;
-    color: rgb(164 185 192) !important;
+    background-color: var(--highlight-pink) !important;
+    color: var(--clr-lightgray) !important;
 }
 
 .activity-id { width: 270px; }
