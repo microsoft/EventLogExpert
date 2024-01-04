@@ -21,9 +21,9 @@ public sealed partial class FilterCacheRow
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<FilterCacheState> FilterCacheState { get; set; } = null!;
+    [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
     private List<string> Items => _cacheType switch
     {

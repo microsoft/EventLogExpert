@@ -12,9 +12,9 @@ namespace EventLogExpert.Components;
 
 public sealed partial class SplitLogTabPane
 {
-    [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
+    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     private static string GetTabName(EventTableModel table) =>
         table.LogType is LogType.File ?

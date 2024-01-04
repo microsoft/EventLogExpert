@@ -15,9 +15,9 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class FilterCacheModal
 {
-    [Inject] private IAlertDialogService AlertDialogService { get; set; } = null!;
+    [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     protected override void OnInitialized()
     {

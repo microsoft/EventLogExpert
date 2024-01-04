@@ -11,7 +11,7 @@ public abstract class BaseModal : FluxorComponent
 {
     protected ElementReference ElementReference { get; set; }
 
-    [Inject] protected IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] protected IJSRuntime JSRuntime { get; init; } = null!;
 
     protected async Task Close() => await JSRuntime.InvokeVoidAsync("closeModal", ElementReference);
 

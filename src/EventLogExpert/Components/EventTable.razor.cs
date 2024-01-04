@@ -20,19 +20,19 @@ namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
-    [Inject] private IClipboardService ClipboardService { get; set; } = null!;
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
+    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
-    [Inject] private IState<FilterColorState> FilterColorState { get; set; } = null!;
+    [Inject] private IState<FilterColorState> FilterColorState { get; init; } = null!;
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; set; } = null!;
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
 
-    [Inject] private IState<SettingsState> SettingsState { get; set; } = null!;
+    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
     protected override void OnInitialized()
     {

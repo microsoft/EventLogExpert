@@ -25,11 +25,11 @@ public sealed partial class FilterPane
     private bool _isAdvancedFilterValid;
     private bool _isFilterListVisible;
 
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventLogState> EventLogState { get; set; } = null!;
+    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
-    [Inject] private IState<FilterPaneState> FilterPaneState { get; set; } = null!;
+    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     private bool HasFilters => FilterPaneState.Value.CurrentFilters.Any() ||
         FilterPaneState.Value.CachedFilters.Any() ||
@@ -43,9 +43,9 @@ public sealed partial class FilterPane
 
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
-    [Inject] private IState<SettingsState> SettingsState { get; set; } = null!;
+    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
-    [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; set; } = null!;
+    [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; init; } = null!;
 
     protected override void OnInitialized()
     {

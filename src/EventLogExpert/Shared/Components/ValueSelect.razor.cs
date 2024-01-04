@@ -46,7 +46,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     public bool AddItem(ValueSelectItem<T> item)
     {
