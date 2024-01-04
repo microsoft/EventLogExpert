@@ -40,6 +40,7 @@
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
             <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem" />
             <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />
+            <MenuFlyoutItem Text="Show Filter Groups" Clicked="ViewFilterGroups_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="Tools">
             <MenuFlyoutItem Text="Settings" Clicked="OpenSettingsModal_Clicked" />

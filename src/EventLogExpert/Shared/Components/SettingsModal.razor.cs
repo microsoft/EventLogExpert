@@ -8,20 +8,17 @@ using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.JSInterop;
 using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class SettingsModal : IDisposable
+public sealed partial class SettingsModal
 {
     private readonly Dictionary<string, bool> _databases = [];
 
     private bool _hasDatabasesChanged = false;
     private SettingsModel _request = new();
-
-    [Inject] private IActionSubscriber ActionSubscriber { get; init; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -31,18 +28,14 @@ public sealed partial class SettingsModal : IDisposable
 
     [Inject] private FileLocationOptions FileLocationOptions { get; init; } = null!;
 
-    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
-
-    public void Dispose() => ActionSubscriber.UnsubscribeFromAllActions(this);
+    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
-        ActionSubscriber.SubscribeToAction<SettingsAction.OpenMenu>(this, action => Open().AndForget());
+        SubscribeToAction<SettingsAction.OpenMenu>(action => Load().AndForget());
 
         base.OnInitialized();
     }
-
-    private async Task Close() => await JSRuntime.InvokeVoidAsync("closeSettingsModal");
 
     private async void ImportDatabase()
     {
@@ -99,7 +92,7 @@ public sealed partial class SettingsModal : IDisposable
         await ReloadOpenLogs();
     }
 
-    private async Task Open()
+    private async Task Load()
     {
         _request = SettingsState.Value.Config with
         {
@@ -120,10 +113,8 @@ public sealed partial class SettingsModal : IDisposable
 
         await InvokeAsync(StateHasChanged);
 
-        await OpenModal();
+        await Open();
     }
-
-    private async Task OpenModal() => await JSRuntime.InvokeVoidAsync("openSettingsModal");
 
     private async Task ReloadOpenLogs()
     {

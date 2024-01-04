@@ -11,6 +11,7 @@ using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
@@ -207,9 +208,6 @@ public sealed partial class MainPage : ContentPage
         _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
 
-    private void ShowAllEvents_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
-
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(((MenuFlyoutItem)sender).Text == "Continuously Update" ?
             new EventLogAction.SetContinouslyUpdate(true) :
@@ -364,6 +362,9 @@ public sealed partial class MainPage : ContentPage
         await _updateService.GetReleaseNotes();
     }
 
+    private void ShowAllEvents_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
+
     private async void SubmitAnIssue_Clicked(object sender, EventArgs e)
     {
         try
@@ -376,6 +377,9 @@ public sealed partial class MainPage : ContentPage
             await _dialogService.ShowAlert("Failed to launch browser", ex.Message, "Ok");
         }
     }
+
+    private void ViewFilterGroups_Clicked(object? sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new FilterGroupAction.OpenMenu());
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());

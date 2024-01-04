@@ -1,0 +1,18 @@
+@inherits Base.BaseModal
+
+<dialog id="filterGroupDialog" @ref="ElementReference">
+    <div class="dialog-group">
+        <div class="flex-column-scroll">
+            
+        </div>
+
+        <div class="footer-group">
+            <div>
+                <button class="button" @onclick="Import">Import</button>
+                <button class="button" @onclick="Export">Export</button>
+            </div>
+
+            <button class="button" @onclick="Close">Exit</button>
+        </div>
+    </div>
+</dialog>
