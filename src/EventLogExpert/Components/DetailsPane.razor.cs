@@ -10,7 +10,7 @@ using System.Text;
 
 namespace EventLogExpert.Components;
 
-public partial class DetailsPane
+public sealed partial class DetailsPane
 {
     private bool _hasOpened = false;
     private bool _isVisible = false;
@@ -20,9 +20,9 @@ public partial class DetailsPane
 
     private string IsVisible => (EventLogState.Value.SelectedEvent is not null && _isVisible).ToString().ToLower();
 
-    [Inject] private IJSRuntime JSRuntime { get; set; } = null!;
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; set; } = null!;
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

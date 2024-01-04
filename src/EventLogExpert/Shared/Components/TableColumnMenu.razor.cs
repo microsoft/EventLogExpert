@@ -13,13 +13,13 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class TableColumnMenu
 {
-    [Inject] private IDispatcher Dispatcher { get; set; } = null!;
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventTableState> EventTableState { get; set; } = null!;
+    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
     [Inject]
     private IStateSelection<SettingsState, IImmutableDictionary<ColumnName, bool>>
-        EventTableColumnsState { get; set; } = null!;
+        EventTableColumnsState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
