@@ -33,6 +33,7 @@
             <MenuFlyoutItem Text="Copy Selected" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
             <MenuFlyoutItem Text="Copy Selected (Simple)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
             <MenuFlyoutItem Text="Copy Selected (XML)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
+            <MenuFlyoutItem Text="Save All Filters" Clicked="SaveAllFilters_Clicked" />
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">

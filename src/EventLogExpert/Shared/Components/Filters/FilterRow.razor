@@ -1,11 +1,9 @@
-﻿@using EventLogExpert.UI.Store.EventLog
-@using EventLogExpert.UI
-@inject IState<EventLogState> EventLogState
+﻿@using EventLogExpert.UI
 
 <div class="flex-space-between">
-    @if (Value.IsEditing)
-    {
-        <div class="flex-align-center">
+    <div class="flex-align-center">
+        @if (Value.IsEditing)
+        {
             <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="FilterColor" @bind-Value="Value.Color">
                 @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
                 {
@@ -57,18 +55,22 @@
                     </ValueSelect>
                 }
             </div>
-        </div>
-    }
-    else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
-    {
-        <span>No Filter Specified</span>
-    }
-    else
-    {
-        <span>@Value.Comparison.Value</span>
-    }
+        }
+        else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
+        {
+            <span>No Filter Specified</span>
+        }
+        else
+        {
+            @if (Value.Color != FilterColor.None)
+            {
+                <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
+            }
+            <span>@Value.Comparison.Value</span>
+        }
+     </div>
 
-    <div class="justify-self-right">
+    <div>
         @if (Value.IsEditing)
         {
             <button class="button" @onclick="AddSubFilter">
@@ -105,7 +107,7 @@
     </div>
 </div>
 
-@if (Value.SubFilters.Any() && Value.IsEditing)
+@if (Value.SubFilters.Count > 0 && Value.IsEditing)
 {
     <div class="flex-column">
         @foreach (var item in Value.SubFilters)

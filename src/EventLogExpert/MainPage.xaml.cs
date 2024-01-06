@@ -357,9 +357,15 @@ public sealed partial class MainPage : ContentPage
         }
     }
 
-    private async void ReleaseNotes_Clicked(object sender, EventArgs e)
+    private async void ReleaseNotes_Clicked(object sender, EventArgs e) => await _updateService.GetReleaseNotes();
+
+    private async void SaveAllFilters_Clicked(object sender, EventArgs e)
     {
-        await _updateService.GetReleaseNotes();
+        var groupName = await _dialogService.DisplayPrompt("Group Name", "What would you like to name this group?");
+
+        if (string.IsNullOrEmpty(groupName)) { return; }
+
+        _fluxorDispatcher.Dispatch(new FilterPaneAction.SaveFilterGroup(groupName));
     }
 
     private void ShowAllEvents_Clicked(object sender, EventArgs e) =>

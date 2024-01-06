@@ -64,6 +64,6 @@ public sealed partial class ContextMenu
 
         filter.Comparison.Value = comparisonString;
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
+        Dispatcher.Dispatch(new FilterPaneAction.SetBasicFilter(filter));
     }
 }

@@ -6,8 +6,8 @@
 <div class="filter-pane">
     <div class="filter-header">
         <div>
-            <button class="button" @onclick="AddFilter">
-                <i class="bi bi-plus-circle"></i> Add Filter
+            <button class="button" @onclick="AddBasicFilter">
+                <i class="bi bi-plus-circle"></i> Add Basic Filter
             </button>
 
             @if (!IsDateFilterVisible)
@@ -17,12 +17,9 @@
                 </button>
             }
 
-            @if (!IsAdvancedFilterVisible)
-            {
-                <button class="button" @onclick="AddAdvancedFilter">
-                    <i class="bi bi-plus-circle"></i> Add Advanced Filter
-                </button>
-            }
+            <button class="button" @onclick="AddAdvancedFilter">
+                <i class="bi bi-plus-circle"></i> Add Advanced Filter
+            </button>
 
             <button class="button" @onclick="AddCachedFilter">
                 <i class="bi bi-plus-circle"></i> Add Cached Filter
@@ -98,71 +95,19 @@
             </EditForm>
         }
 
-        @foreach (var item in FilterPaneState.Value.CurrentFilters)
+        @foreach (var item in FilterPaneState.Value.BasicFilters)
         {
             <FilterRow Value="@item" />
+        }
+
+        @foreach (var item in FilterPaneState.Value.AdvancedFilters)
+        {
+            <AdvancedFilterRow Value="@item" />
         }
 
         @foreach (var item in FilterPaneState.Value.CachedFilters)
         {
             <FilterCacheRow Value="@item" />
-        }
-
-        @if (IsAdvancedFilterVisible)
-        {
-            <div>
-                <ValueSelect CssClass="@($"input color-dropdown {_advancedFilter!.Color.ToString().ToLower()}")"
-                    T="FilterColor" @bind-Value="_advancedFilter.Color">
-                    @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
-                    {
-                        <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="FilterColor" Value="item" />
-                    }
-                </ValueSelect>
-                <span>
-                    Expression: <input class="input advanced-filter" type="text"
-                        placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-                        @oninput="AdvancedFilterChanged" disabled="@(!_canEditAdvancedFilter)" />
-                </span>
-                @if (_canEditAdvancedFilter)
-                {
-                    if (_isAdvancedFilterValid)
-                    {
-                        <button class="button button-green" type="button" @onclick="ApplyAdvancedFilter">
-                            <i class="bi bi-check-circle"></i> Apply
-                        </button>
-                    }
-
-                    <button class="button button-red" type="button" @onclick="RemoveAdvancedFilter">
-                        <i class="bi bi-dash-circle"></i> Remove
-                    </button>
-                }
-                else
-                {
-                    <button class="button" type="button" @onclick="EditAdvancedFilter">
-                        <i class="bi bi-funnel"></i> Edit
-                    </button>
-
-                    @if (FilterPaneState.Value.AdvancedFilter?.IsEnabled is true)
-                    {
-                        <button class="button button-red" @onclick="ToggleAdvancedFilter">
-                            <i class="bi bi-dash-circle"></i> Disable
-                        </button>
-                    }
-                    else
-                    {
-                        <button class="button button-green" @onclick="ToggleAdvancedFilter">
-                            <i class="bi bi-plus-circle"></i> Enable
-                        </button>
-                    }
-                }
-
-                @if (!_isAdvancedFilterValid)
-                {
-                    <div hidden="@(string.IsNullOrWhiteSpace(_advancedFilterErrorMessage))">
-                        <span class="advanced-filter-error">@_advancedFilterErrorMessage</span>
-                    </div>
-                }
-            </div>
         }
     </div>
 </div>

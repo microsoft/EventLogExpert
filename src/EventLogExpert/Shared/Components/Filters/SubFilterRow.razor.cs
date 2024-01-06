@@ -4,7 +4,9 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -17,6 +19,8 @@ public sealed partial class SubFilterRow
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     private List<string> FilteredItems => Items
         .Where(x => x.Contains(Value.Data.Value?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
@@ -51,7 +55,7 @@ public sealed partial class SubFilterRow
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
                 case FilterType.ActivityId :
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
-                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList(); ;
+                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList();
                 case FilterType.Description :
                 default :
                     return [];

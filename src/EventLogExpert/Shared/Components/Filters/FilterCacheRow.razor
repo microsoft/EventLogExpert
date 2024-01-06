@@ -2,9 +2,9 @@
 @using EventLogExpert.UI.Models
 
 <div class="flex-space-between">
-    @if (_isEditing)
-    {
-        <div class="flex-align-center">
+    <div class="flex-align-center">
+        @if (_isEditing)
+        {
             <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="FilterColor" @bind-Value="Value.Color">
                 @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
                 {
@@ -34,12 +34,16 @@
                     <ValueSelectItem T="string" IsDisabled />
                 }
             </ValueSelect>
-        </div>
-    }
-    else
-    {
-        <span>@Value.Comparison.Value</span>
-    }
+        }
+        else
+        {
+            @if (Value.Color != FilterColor.None)
+            {
+                <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
+            }
+            <span>@Value.Comparison.Value</span>
+        }
+    </div>
 
     <div class="justify-self-right">
         @if (_isEditing)

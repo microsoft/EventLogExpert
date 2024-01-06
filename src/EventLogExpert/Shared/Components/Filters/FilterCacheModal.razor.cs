@@ -5,6 +5,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 using Windows.Storage.Pickers;
@@ -18,6 +19,8 @@ public sealed partial class FilterCacheModal
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
     protected override void OnInitialized()
     {

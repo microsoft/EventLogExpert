@@ -50,7 +50,7 @@ public sealed partial class FilterCacheRow
         // TODO: This is bugged and will not delete the cache entry unless the Value is in the filter list
         _isEditing = false;
 
-        Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value));
+        Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
     }
 
     private void SaveFilter()
@@ -65,7 +65,7 @@ public sealed partial class FilterCacheRow
         {
             _filter.Comparison.Value = _filterValue;
 
-            Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value));
+            Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
             Dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(_filterValue));
             Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(_filter));
         }
@@ -75,5 +75,5 @@ public sealed partial class FilterCacheRow
         }
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilter(Value));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilter(Value.Id));
 }

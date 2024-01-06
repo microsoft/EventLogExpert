@@ -151,6 +151,20 @@ a,
     overflow-x: hidden;
 }
 
+.dialog-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    height: 100%;
+}
+
+.divider {
+    width: 95%;
+    align-self: center;
+    border-top: 3px solid var(--clr-lightblue);
+}
+
 .input {
     background: none;
     border: none;
@@ -294,7 +308,8 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 }
 
 .input.color-dropdown,
-.color-dropdown-item {
+.color-dropdown-item,
+.color-box {
     width: 25px;
     height: 22px;
     display: inline-block;
