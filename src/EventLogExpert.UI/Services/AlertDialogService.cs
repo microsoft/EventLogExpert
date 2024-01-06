@@ -8,26 +8,20 @@ public interface IAlertDialogService
     Task ShowAlert(string title, string message, string cancel);
 
     Task<bool> ShowAlert(string title, string message, string accept, string cancel);
+
+    Task<string> DisplayPrompt(string title, string mesage);
 }
 
-public class AlertDialogService : IAlertDialogService
+public sealed class AlertDialogService(
+    Func<string, string, string, Task> oneButtonAlert,
+    Func<string, string, string, string, Task<bool>> twoButtonAlert,
+    Func<string, string, Task<string>> promptAlert) : IAlertDialogService
 {
-    private readonly Func<string, string, string, Task> _oneButtonAlert;
-    private readonly Func<string, string, string, string, Task<bool>> _twoButtonAlert;
+    public async Task ShowAlert(string title, string message, string cancel) =>
+        await oneButtonAlert(title, message, cancel);
 
-    public AlertDialogService(Func<string, string, string, Task> oneButtonAlert, Func<string, string, string, string, Task<bool>> twoButtonAlert)
-    {
-        _oneButtonAlert = oneButtonAlert;
-        _twoButtonAlert = twoButtonAlert;
-    }
+    public async Task<bool> ShowAlert(string title, string message, string accept, string cancel) =>
+        await twoButtonAlert(title, message, accept, cancel);
 
-    public async Task ShowAlert(string title, string message, string cancel)
-    {
-        await _oneButtonAlert(title, message, cancel);
-    }
-
-    public async Task<bool> ShowAlert(string title, string message, string accept, string cancel)
-    {
-        return await _twoButtonAlert(title, message, accept, cancel);
-    }
+    public async Task<string> DisplayPrompt(string title, string message) => await promptAlert(title, message);
 }

@@ -5,7 +5,9 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
+using Fluxor;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -18,6 +20,8 @@ public sealed partial class FilterRow
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     private List<string> FilteredItems => Items
         .Where(x => x.Contains(Value.Data.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
@@ -62,9 +66,9 @@ public sealed partial class FilterRow
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleEditFilter(Value.Id));
+    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleBasicFilterEditing(Value.Id));
 
-    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveBasicFilter(Value.Id));
 
     private async void SaveFilter()
     {
@@ -83,8 +87,8 @@ public sealed partial class FilterRow
         newModel.IsEditing = false;
         newModel.IsEnabled = true;
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
+        Dispatcher.Dispatch(new FilterPaneAction.SetBasicFilter(newModel));
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleEnableFilter(Value.Id));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleBasicFilterEnabled(Value.Id));
 }

@@ -1,9 +1,37 @@
-@inherits Base.BaseModal
+@using EventLogExpert.Shared.Base
+@using EventLogExpert.UI
+@inherits BaseModal
 
 <dialog id="filterGroupDialog" @ref="ElementReference">
     <div class="dialog-group">
         <div class="flex-column-scroll">
-            
+            @foreach (var group in FilterGroupState.Value.Groups)
+            {
+                <div>
+                    <div class="flex-space-between">
+                        <div>@group.Name</div>
+
+                        <button class="button" type="button" @onclick="() => ApplyFilters(group)">
+                            <i class="bi bi-plus-circle"></i> Apply Filters
+                        </button>
+                    </div>
+
+                    @foreach (var filter in group.Filters)
+                    {
+                        <div class="flex-align-center">
+                            @if (filter.Color != FilterColor.None)
+                            {
+                                <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
+                            }
+                            <div>@filter.Comparison.Value</div>
+                        </div>
+                    }
+                </div>
+            }
+
+            <button class="button" @onclick="CreateGroup">
+                <i class="bi bi-plus-circle"></i> Create Group
+            </button>
         </div>
 
         <div class="footer-group">

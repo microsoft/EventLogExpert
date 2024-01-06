@@ -11,7 +11,7 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
-    public static Dictionary<string, IEnumerable<DisplayEventModel>> FilterActiveLogs(
+    public static IDictionary<string, IEnumerable<DisplayEventModel>> FilterActiveLogs(
         ImmutableDictionary<string, EventLogData> activeLogs,
         EventFilter eventFilter)
     {
@@ -38,14 +38,15 @@ public static class FilterMethods
                 e.TimeCreated <= eventFilter.DateFilter.Before);
         }
 
-        if (eventFilter.AdvancedFilter?.IsEnabled is true)
+        if (!eventFilter.AdvancedFilters.IsEmpty)
         {
-            filters.Add(e => eventFilter.AdvancedFilter.Comparison.Expression(e));
+            filters.Add(e => eventFilter.AdvancedFilters
+                .All(filter => filter.Comparison.Expression(e)));
         }
 
-        if (!eventFilter.Filters.IsEmpty)
+        if (!eventFilter.BasicFilters.IsEmpty)
         {
-            filters.Add(e => eventFilter.Filters
+            filters.Add(e => eventFilter.BasicFilters
                 .All(filter => filter.Comparison.Expression(e)));
         }
 
@@ -61,16 +62,16 @@ public static class FilterMethods
     }
 
     public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
-        updated.AdvancedFilter?.Equals(original.AdvancedFilter) is false ||
         updated.DateFilter?.Equals(original.DateFilter) is false ||
-        updated.CachedFilters.Equals(original.CachedFilters) is false ||
-        updated.Filters.Equals(original.Filters) is false;
+        updated.AdvancedFilters.Equals(original.AdvancedFilters) is false ||
+        updated.BasicFilters.Equals(original.BasicFilters) is false ||
+        updated.CachedFilters.Equals(original.CachedFilters) is false;
 
     public static bool IsFilteringEnabled(EventFilter eventFilter) =>
-        eventFilter.AdvancedFilter?.IsEnabled is true ||
-        eventFilter.CachedFilters.IsEmpty is false ||
         eventFilter.DateFilter?.IsEnabled is true ||
-        eventFilter.Filters.IsEmpty is false;
+        eventFilter.AdvancedFilters.IsEmpty is false ||
+        eventFilter.BasicFilters.IsEmpty is false ||
+        eventFilter.CachedFilters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified</summary>
     public static IEnumerable<DisplayEventModel> SortEvents(
@@ -100,8 +101,6 @@ public static class FilterMethods
     public static bool TryParse(FilterModel filterModel, out string comparison)
     {
         comparison = string.Empty;
-
-        if (filterModel.Data is null) { return false; }
 
         if (string.IsNullOrWhiteSpace(filterModel.Data.Value) &&
             filterModel.Data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
@@ -228,8 +227,6 @@ public static class FilterMethods
 
     private static string? GetSubFilterComparisonString(FilterModel subFilter)
     {
-        if (subFilter.Data is null) { return null; }
-
         if (string.IsNullOrWhiteSpace(subFilter.Data.Value) &&
             subFilter.Data.Evaluator != FilterEvaluator.MultiSelect) { return null; }
 

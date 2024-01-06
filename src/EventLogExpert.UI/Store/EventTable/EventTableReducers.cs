@@ -9,11 +9,8 @@ namespace EventLogExpert.UI.Store.EventTable;
 
 public sealed class EventTableReducers
 {
-    [ReducerMethod(typeof(EventTableAction.CloseAll))]
-    public static EventTableState ReduceCloseAll(EventTableState state) => state with { EventTables = [] };
-
     [ReducerMethod]
-    public static EventTableState ReduceNewTable(EventTableState state, EventTableAction.NewTable action)
+    public static EventTableState ReduceAddTable(EventTableState state, EventTableAction.AddTable action)
     {
         var newTable = new EventTableModel
         {
@@ -45,6 +42,9 @@ public sealed class EventTableReducers
             ActiveTable = combinedTable
         };
     }
+
+    [ReducerMethod(typeof(EventTableAction.CloseAll))]
+    public static EventTableState ReduceCloseAll(EventTableState state) => state with { EventTables = [] };
 
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
@@ -128,11 +128,11 @@ public sealed class EventTableReducers
 
     private static IEnumerable<DisplayEventModel> GetCombinedEvents(IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
     {
-        IEnumerable<DisplayEventModel> combinedEvents = [];
+        List<DisplayEventModel> combinedEvents = [];
 
         foreach (var eventList in eventLists)
         {
-            combinedEvents = combinedEvents.Concat(eventList);
+            combinedEvents.AddRange(eventList);
         }
 
         return combinedEvents;

@@ -63,9 +63,9 @@ public static class MauiProgram
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
-            (title, message, cancel) => Application.Current!.MainPage!.DisplayAlert(title, message, cancel),
-            async (title, message, accept, cancel) =>
-                await Application.Current!.MainPage!.DisplayAlert(title, message, accept, cancel)));
+            async (title, message, cancel) => await Application.Current!.MainPage!.DisplayAlert(title, message, cancel),
+            async (title, message, accept, cancel) => await Application.Current!.MainPage!.DisplayAlert(title, message, accept, cancel),
+            async (title, message) => await Application.Current!.MainPage!.DisplayPromptAsync(title, message)));
 
         return builder.Build();
     }

@@ -110,7 +110,7 @@ public sealed class EventLogEffects(
             new EventLogReader(action.LogName, PathType.LogName) :
             new EventLogReader(action.LogName, PathType.FilePath);
 
-        dispatcher.Dispatch(new EventTableAction.NewTable(
+        dispatcher.Dispatch(new EventTableAction.AddTable(
             action.LogType == LogType.Live ? null : action.LogName,
             action.LogName,
             action.LogType));

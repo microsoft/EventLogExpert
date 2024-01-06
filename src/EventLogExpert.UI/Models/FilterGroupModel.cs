@@ -5,7 +5,9 @@ namespace EventLogExpert.UI.Models;
 
 public sealed record FilterGroupModel
 {
-    public string Name { get; set; } = string.Empty;
+    public Guid Id { get; } = Guid.NewGuid();
 
-    public IEnumerable<string> Filters { get; set; } = [];
+    public string Name { get; set; } = "New Filter Group";
+
+    public IEnumerable<FilterModel> Filters { get; set; } = [];
 }
