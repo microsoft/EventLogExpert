@@ -12,4 +12,6 @@ public sealed record FilterColorAction
     public sealed record RemoveFilter(Guid Id);
 
     public sealed record SetFilter(FilterModel Filter);
+
+    public sealed record SetFilters(IEnumerable<FilterModel> Filters);
 }

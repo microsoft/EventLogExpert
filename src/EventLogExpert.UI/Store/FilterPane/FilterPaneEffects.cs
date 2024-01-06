@@ -55,6 +55,15 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         dispatcher.Dispatch(new FilterColorAction.SetFilter(action.FilterModel));
     }
 
+    [EffectMethod(typeof(FilterPaneAction.ApplyFilterGroup))]
+    public async Task HandleApplyFilterGroup(IDispatcher dispatcher)
+    {
+        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+
+        dispatcher.Dispatch(new FilterColorAction.SetFilters(
+            filterPaneState.Value.AdvancedFilters.Where(filter => filter is { IsEditing: false, IsEnabled: true })));
+    }
+
     [EffectMethod(typeof(FilterPaneAction.ClearAllFilters))]
     public async Task HandleClearAllFilters(IDispatcher dispatcher)
     {
