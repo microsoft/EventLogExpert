@@ -44,4 +44,54 @@ public sealed class FilterColorReducers
                 })
         };
     }
+
+    [ReducerMethod]
+    public static FilterColorState ReduceSetFilters(FilterColorState state, FilterColorAction.SetFilters action)
+    {
+        if (state.Filters.IsEmpty)
+        {
+            return state with
+            {
+                Filters = state.Filters.AddRange(
+                    action.Filters.Select(filter =>
+                        new FilterColorModel
+                        {
+                            Id = filter.Id,
+                            Color = filter.Color,
+                            Comparison = filter.Comparison with { }
+                        }))
+            };
+        }
+
+        var updatedFilters = state.Filters;
+
+        foreach (var newFilter in action.Filters)
+        {
+            foreach (var filter in state.Filters)
+            {
+                if (filter.Id == newFilter.Id)
+                {
+                    updatedFilters = updatedFilters
+                        .Remove(filter)
+                        .Add(filter with
+                        {
+                            Color = newFilter.Color,
+                            Comparison = newFilter.Comparison with { }
+                        });
+                }
+                else
+                {
+                    updatedFilters = updatedFilters.Add(
+                        new FilterColorModel
+                        {
+                            Id = newFilter.Id,
+                            Color = newFilter.Color,
+                            Comparison = newFilter.Comparison with { }
+                        });
+                }
+            }
+        }
+
+        return state with { Filters = updatedFilters };
+    }
 }

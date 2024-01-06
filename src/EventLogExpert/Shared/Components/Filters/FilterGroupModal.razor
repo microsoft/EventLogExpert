@@ -1,5 +1,4 @@
 @using EventLogExpert.Shared.Base
-@using EventLogExpert.UI
 @inherits BaseModal
 
 <dialog id="filterGroupDialog" @ref="ElementReference">
@@ -19,10 +18,7 @@
                     @foreach (var filter in group.Filters)
                     {
                         <div class="flex-align-center">
-                            @if (filter.Color != FilterColor.None)
-                            {
-                                <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
-                            }
+                            <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
                             <div>@filter.Comparison.Value</div>
                         </div>
                     }

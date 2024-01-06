@@ -23,8 +23,11 @@ public sealed partial class FilterGroupModal
         base.OnInitialized();
     }
 
-    private void ApplyFilters(FilterGroupModel model) =>
+    private void ApplyFilters(FilterGroupModel model)
+    {
         Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(model));
+        Close().AndForget();
+    }
 
     private void CreateGroup() => Dispatcher.Dispatch(new FilterGroupAction.AddGroup());
 

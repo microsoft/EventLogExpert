@@ -64,8 +64,23 @@ public sealed class FilterPaneReducers
         return state with { BasicFilters = [.. updatedList] };
     }
 
+    [ReducerMethod]
+    public static FilterPaneState ReduceApplyFilterGroup(FilterPaneState state, FilterPaneAction.ApplyFilterGroup action)
+    {
+        if (!action.FilterGroup.Filters.Any()) { return state; }
+
+        List<FilterModel> updatedList = [];
+
+        foreach (var filter in action.FilterGroup.Filters)
+        {
+            updatedList.Add(filter with { IsEnabled = true });
+        }
+
+        return state with { AdvancedFilters = state.AdvancedFilters.AddRange(updatedList) };
+    }
+
     [ReducerMethod(typeof(FilterPaneAction.ClearAllFilters))]
-    public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new();
+    public static FilterPaneState ReduceClearFilters(FilterPaneState state) => new() { IsEnabled = state.IsEnabled };
 
     [ReducerMethod]
     public static FilterPaneState ReduceRemoveAdvancedFilter(
@@ -265,19 +280,4 @@ public sealed class FilterPaneReducers
     [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
     public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
         state with { IsLoading = !state.IsLoading };
-
-    [ReducerMethod]
-    public FilterPaneState ReduceApplyFilterGroup(FilterPaneState state, FilterPaneAction.ApplyFilterGroup action)
-    {
-        if (!action.FilterGroup.Filters.Any()) { return state; }
-
-        List<FilterModel> updatedList = [];
-
-        foreach (var filter in action.FilterGroup.Filters)
-        {
-            updatedList.Add(filter);
-        }
-
-        return state with { AdvancedFilters = state.AdvancedFilters.AddRange(updatedList) };
-    }
 }
