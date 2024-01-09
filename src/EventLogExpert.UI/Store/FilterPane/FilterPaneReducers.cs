@@ -73,7 +73,12 @@ public sealed class FilterPaneReducers
 
         foreach (var filter in action.FilterGroup.Filters)
         {
-            updatedList.Add(filter with { IsEnabled = true });
+            updatedList.Add(new FilterModel
+            {
+                Color = filter.Color,
+                Comparison = filter.Comparison with { },
+                IsEnabled = true
+            });
         }
 
         return state with { AdvancedFilters = state.AdvancedFilters.AddRange(updatedList) };

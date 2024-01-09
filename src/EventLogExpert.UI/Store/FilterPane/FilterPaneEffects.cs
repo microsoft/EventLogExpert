@@ -104,7 +104,16 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
             .Concat(filterPaneState.Value.AdvancedFilters);
 
         dispatcher.Dispatch(
-            new FilterGroupAction.AddGroup(new FilterGroupModel { Name = action.Name, Filters = filters }));
+            new FilterGroupAction.AddGroup(
+                new FilterGroupModel
+                {
+                    Name = action.Name,
+                    Filters = filters.Select(filter =>
+                        new FilterModel {
+                            Color = filter.Color,
+                            Comparison = filter.Comparison with { }
+                        })
+                }));
 
         return Task.CompletedTask;
     }

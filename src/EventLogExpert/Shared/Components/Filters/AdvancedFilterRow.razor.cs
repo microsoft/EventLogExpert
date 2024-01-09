@@ -19,7 +19,15 @@ public sealed partial class AdvancedFilterRow
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEditing(Value.Id));
+    private void EditFilter()
+    {
+        // Check isn't necessary (should never return false)
+        // but we want save button to be visible when applied from filter group
+        _isAdvancedFilterValid = FilterMethods.TryParseExpression(Value.Comparison.Value, out var message);
+        _advancedFilterErrorMessage = message;
+
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEditing(Value.Id));
+    }
 
     private void OnInputChanged(ChangeEventArgs e)
     {
