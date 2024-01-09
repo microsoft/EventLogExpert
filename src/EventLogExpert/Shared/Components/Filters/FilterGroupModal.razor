@@ -8,11 +8,22 @@
             {
                 <div>
                     <div class="flex-space-between">
-                        <div>@group.Name</div>
+                        <div class="flex-space-between">
+                            <div>@group.Name</div>
+                            <button class="button" type="button" @onclick="() => RenameGroup(group)">
+                                <i class="bi bi-pencil-square"></i>
+                            </button>
+                        </div>
 
-                        <button class="button" type="button" @onclick="() => ApplyFilters(group)">
-                            <i class="bi bi-plus-circle"></i> Apply Filters
-                        </button>
+                        <div>
+                            <button class="button" type="button" @onclick="() => ApplyFilters(group)">
+                                <i class="bi bi-plus-circle"></i> Apply Filters
+                            </button>
+
+                            <button class="button button-red" type="button" @onclick="() => RemoveGroup(group.Id)">
+                                <i class="bi bi-dash-circle"></i> Remove Group
+                            </button>
+                        </div>
                     </div>
 
                     @foreach (var filter in group.Filters)

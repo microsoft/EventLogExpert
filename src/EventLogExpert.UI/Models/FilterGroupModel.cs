@@ -10,4 +10,6 @@ public sealed record FilterGroupModel
     public string Name { get; set; } = "New Filter Group";
 
     public IEnumerable<FilterModel> Filters { get; set; } = [];
+
+    public bool IsEditing { get; set; }
 }

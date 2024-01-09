@@ -72,9 +72,7 @@ public sealed partial class FilterRow
 
     private async void SaveFilter()
     {
-        FilterModel newModel = Value with { };
-
-        if (!FilterMethods.TryParse(newModel, out string comparisonString))
+        if (!FilterMethods.TryParse(Value, out string comparisonString))
         {
             await AlertDialogService.ShowAlert("Invalid Filter",
                 "The filter you have created is an invalid filter, please adjust and try again.",
@@ -83,9 +81,12 @@ public sealed partial class FilterRow
             return;
         }
 
-        newModel.Comparison.Value = comparisonString;
-        newModel.IsEditing = false;
-        newModel.IsEnabled = true;
+        FilterModel newModel = Value with
+        {
+            Comparison = new FilterComparison { Value = comparisonString },
+            IsEditing = false,
+            IsEnabled = true
+        };
 
         Dispatcher.Dispatch(new FilterPaneAction.SetBasicFilter(newModel));
     }
