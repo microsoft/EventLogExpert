@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
 using Fluxor;
 
 namespace EventLogExpert.UI.Store.FilterGroup;
@@ -12,6 +13,14 @@ public sealed class FilterGroupEffects(
 {
     [EffectMethod(typeof(FilterGroupAction.AddGroup))]
     public Task HandleAddGroup(IDispatcher dispatcher)
+    {
+        preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod(typeof(FilterGroupAction.ImportGroups))]
+    public Task HandleImportGroups(IDispatcher dispatcher)
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
 

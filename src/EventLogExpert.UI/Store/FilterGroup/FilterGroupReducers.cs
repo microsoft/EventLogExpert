@@ -28,6 +28,10 @@ public sealed class FilterGroupReducers
         state with { Groups = state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()) };
 
     [ReducerMethod]
+    public static FilterGroupState ReducerImportGroups(FilterGroupState state, FilterGroupAction.ImportGroups action) =>
+        state with { Groups = state.Groups.AddRange(action.Groups) };
+
+    [ReducerMethod]
     public static FilterGroupState ReducerLoadGroupsSuccess(
         FilterGroupState state,
         FilterGroupAction.LoadGroupsSuccess action) => state with { Groups = [.. action.Groups] };

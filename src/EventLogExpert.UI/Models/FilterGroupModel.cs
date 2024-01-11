@@ -7,6 +7,7 @@ namespace EventLogExpert.UI.Models;
 
 public sealed record FilterGroupModel
 {
+    [JsonIgnore]
     public Guid Id { get; } = Guid.NewGuid();
 
     public string Name { get; set; } = "New Filter Group";
