@@ -108,11 +108,11 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
                 new FilterGroupModel
                 {
                     Name = action.Name,
-                    Filters = filters.Select(filter =>
+                    Filters = [.. filters.Select(filter =>
                         new FilterModel {
                             Color = filter.Color,
                             Comparison = filter.Comparison with { }
-                        })
+                        })]
                 }));
 
         return Task.CompletedTask;

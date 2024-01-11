@@ -37,9 +37,9 @@
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
+            <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem" />
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
-            <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem" />
             <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />
             <MenuFlyoutItem Text="Show Filter Groups" Clicked="ViewFilterGroups_Clicked" />
         </MenuBarItem>

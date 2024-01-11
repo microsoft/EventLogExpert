@@ -26,9 +26,11 @@ public sealed partial class FilterGroupModal
         base.OnInitialized();
     }
 
-    private void ApplyFilters(FilterGroupModel model)
+    private void AddFilter(FilterGroupModel group) => Dispatcher.Dispatch(new FilterGroupAction.AddFilter(group.Id));
+
+    private void ApplyFilters(FilterGroupModel group)
     {
-        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(model));
+        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(group));
         Close().AndForget();
     }
 
@@ -51,4 +53,16 @@ public sealed partial class FilterGroupModal
 
         Dispatcher.Dispatch(new FilterGroupAction.SetGroup(model));
     }
+
+    private void SaveGroup(FilterGroupModel group)
+    {
+        foreach (var filter in group.Filters)
+        {
+            if (filter.IsEditing) { return; }
+        }
+
+        Dispatcher.Dispatch(new FilterGroupAction.SetGroup(group));
+    }
+
+    private void ToggleGroup(Guid id) => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(id));
 }
