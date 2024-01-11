@@ -11,6 +11,8 @@ public sealed record FilterGroupAction
 
     public sealed record AddGroup(FilterGroupModel? FilterGroup = null);
 
+    public sealed record ImportGroups(IEnumerable<FilterGroupModel> Groups);
+
     public sealed record LoadGroups;
 
     public sealed record LoadGroupsSuccess(IEnumerable<FilterGroupModel> Groups);
