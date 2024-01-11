@@ -46,8 +46,15 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterColorAction.ClearAllFilters :
             case FilterColorAction.RemoveFilter :
             case FilterColorAction.SetFilter :
+            case FilterGroupAction.AddFilter :
             case FilterGroupAction.AddGroup :
             case FilterGroupAction.OpenMenu :
+            case FilterGroupAction.RemoveFilter :
+            case FilterGroupAction.RemoveGroup :
+            case FilterGroupAction.SetFilter :
+            case FilterGroupAction.SetGroup :
+            case FilterGroupAction.ToggleFilter :
+            case FilterGroupAction.ToggleGroup :
             case FilterPaneAction.AddAdvancedFilter :
             case FilterPaneAction.AddBasicFilter :
             case FilterPaneAction.AddCachedFilter :

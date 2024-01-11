@@ -1,0 +1,49 @@
+@using EventLogExpert.UI
+
+<div class="filter-group-row">
+    <div class="flex-align-center">
+        @if (Value.IsEditing)
+        {
+            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="FilterColor" @bind-Value="Value.Color">
+                @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                {
+                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")"
+                        T="FilterColor" Value="item" />
+                }
+            </ValueSelect>
+        }
+        else if (Value.Color != FilterColor.None)
+        {
+            <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
+        }
+
+        <span>
+            Expression:
+            <input class="input advanced-filter" type="text"
+                placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
+                value="@Value.Comparison.Value" @oninput="OnInputChanged" disabled="@(!Value.IsEditing)" />
+        </span>
+
+        @if (Value.IsEditing)
+        {
+            if (_isFilterValid)
+            {
+                <button class="button button-green" type="button" @onclick="SaveFilter">
+                    <i class="bi bi-check-circle"></i> Apply
+                </button>
+            }
+
+            <button class="button button-red" type="button" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
+            </button>
+        }
+        else
+        {
+            <button class="button" type="button" @onclick="EditFilter">
+                <i class="bi bi-funnel"></i> Edit
+            </button>
+        }
+    </div>
+
+    <div class="error-row" hidden="@(string.IsNullOrWhiteSpace(_errorMessage))">@_errorMessage</div>
+</div>

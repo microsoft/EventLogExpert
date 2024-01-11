@@ -7,11 +7,21 @@ namespace EventLogExpert.UI.Store.FilterGroup;
 
 public sealed record FilterGroupAction
 {
+    public sealed record AddFilter(Guid ParentId);
+
     public sealed record AddGroup(FilterGroupModel? FilterGroup = null);
+
+    public sealed record RemoveFilter(Guid ParentId, Guid Id);
 
     public sealed record RemoveGroup(Guid Id);
 
+    public sealed record SetFilter(Guid ParentId, FilterModel Filter);
+
     public sealed record SetGroup(FilterGroupModel FilterGroup);
+
+    public sealed record ToggleFilter(Guid ParentId, Guid Id);
+
+    public sealed record ToggleGroup(Guid Id);
 
     public sealed record OpenMenu;
 }

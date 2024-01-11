@@ -1,0 +1,11 @@
+﻿.filter-group-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.error-row {
+    text-align: center;
+    /* TODO: Parent element doesn't respect this */
+    width: 75%;
+}

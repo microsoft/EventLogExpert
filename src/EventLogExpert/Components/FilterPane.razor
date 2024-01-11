@@ -97,17 +97,17 @@
 
         @foreach (var item in FilterPaneState.Value.BasicFilters)
         {
-            <FilterRow Value="@item" />
+            <FilterRow Value="item" />
         }
 
         @foreach (var item in FilterPaneState.Value.AdvancedFilters)
         {
-            <AdvancedFilterRow Value="@item" />
+            <AdvancedFilterRow Value="item" />
         }
 
         @foreach (var item in FilterPaneState.Value.CachedFilters)
         {
-            <FilterCacheRow Value="@item" />
+            <FilterCacheRow Value="item" />
         }
     </div>
 </div>

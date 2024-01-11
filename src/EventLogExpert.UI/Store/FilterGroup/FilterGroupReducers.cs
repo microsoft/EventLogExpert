@@ -9,8 +9,42 @@ namespace EventLogExpert.UI.Store.FilterGroup;
 public sealed class FilterGroupReducers
 {
     [ReducerMethod]
+    public static FilterGroupState ReducerAddFilter(FilterGroupState state, FilterGroupAction.AddFilter action)
+    {
+        var group = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
+
+        if (group is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(group)
+                .Add(group with { Filters = group.Filters.Concat([new FilterModel { IsEditing = true }]) })
+        };
+    }
+
+    [ReducerMethod]
     public static FilterGroupState ReducerAddGroup(FilterGroupState state, FilterGroupAction.AddGroup action) =>
         state with { Groups = state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()) };
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerRemoveFilter(FilterGroupState state, FilterGroupAction.RemoveFilter action)
+    {
+        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
+
+        if (parent is null) { return state; }
+
+        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Id);
+
+        if (filter is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(parent)
+                .Add(parent with { Filters = [.. parent.Filters.Where(x => x.Id != action.Id)] })
+        };
+    }
 
     [ReducerMethod]
     public static FilterGroupState ReducerRemoveGroup(FilterGroupState state, FilterGroupAction.RemoveGroup action)
@@ -20,6 +54,37 @@ public sealed class FilterGroupReducers
         if (group is null) { return state; }
 
         return state with { Groups = state.Groups.Remove(group) };
+    }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerSetFilter(FilterGroupState state, FilterGroupAction.SetFilter action)
+    {
+        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
+
+        if (parent is null) { return state; }
+
+        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Filter.Id);
+
+        if (filter is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(parent)
+                .Add(parent with
+                {
+                    Filters =
+                    [
+                        .. parent.Filters.Where(x => x.Id != action.Filter.Id),
+                        new FilterModel
+                        {
+                            Color = action.Filter.Color,
+                            Comparison = action.Filter.Comparison with { },
+                            IsEditing = false
+                        }
+                    ]
+                })
+        };
     }
 
     [ReducerMethod]
@@ -37,8 +102,49 @@ public sealed class FilterGroupReducers
                 {
                     Name = action.FilterGroup.Name,
                     Filters = action.FilterGroup.Filters,
-                    IsEditing = action.FilterGroup.IsEditing
+                    IsEditing = false
                 })
+        };
+    }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerToggleFilter(FilterGroupState state, FilterGroupAction.ToggleFilter action)
+    {
+        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
+
+        if (parent is null) { return state; }
+
+        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Id);
+
+        if (filter is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(parent)
+                .Add(parent with
+                {
+                    Filters =
+                    [
+                        .. parent.Filters.Where(x => x.Id != action.Id),
+                        filter with { IsEditing = !filter.IsEditing }
+                    ]
+                })
+        };
+    }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerToggleGroup(FilterGroupState state, FilterGroupAction.ToggleGroup action)
+    {
+        var group = state.Groups.FirstOrDefault(x => x.Id == action.Id);
+
+        if (group is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(group)
+                .Add(group with { IsEditing = !group.IsEditing })
         };
     }
 }
