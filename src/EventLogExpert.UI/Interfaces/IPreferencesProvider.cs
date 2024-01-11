@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Interfaces;
@@ -32,6 +33,8 @@ public interface IPreferencesProvider
     bool PrereleasePreference { get; set; }
 
     IList<string> RecentFiltersPreference { get; set; }
+
+    IList<FilterGroupModel> SavedFiltersPreference { get; set; }
 
     bool SourceColumnPreference { get; set; }
 

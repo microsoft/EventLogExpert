@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 namespace EventLogExpert.UI.Models;
 
 public sealed record FilterGroupModel
@@ -11,5 +13,6 @@ public sealed record FilterGroupModel
 
     public IEnumerable<FilterModel> Filters { get; set; } = [];
 
+    [JsonIgnore]
     public bool IsEditing { get; set; }
 }

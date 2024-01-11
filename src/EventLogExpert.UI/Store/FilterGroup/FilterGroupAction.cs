@@ -11,6 +11,12 @@ public sealed record FilterGroupAction
 
     public sealed record AddGroup(FilterGroupModel? FilterGroup = null);
 
+    public sealed record LoadGroups;
+
+    public sealed record LoadGroupsSuccess(IEnumerable<FilterGroupModel> Groups);
+
+    public sealed record OpenMenu;
+
     public sealed record RemoveFilter(Guid ParentId, Guid Id);
 
     public sealed record RemoveGroup(Guid Id);
@@ -22,6 +28,4 @@ public sealed record FilterGroupAction
     public sealed record ToggleFilter(Guid ParentId, Guid Id);
 
     public sealed record ToggleGroup(Guid Id);
-
-    public sealed record OpenMenu;
 }

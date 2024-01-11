@@ -105,6 +105,7 @@ public sealed partial class MainPage : ContentPage
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
+        fluxorDispatcher.Dispatch(new FilterGroupAction.LoadGroups());
 
         var args = Environment.GetCommandLineArgs();
 

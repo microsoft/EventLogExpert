@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Models;
 using System.Linq.Dynamic.Core;
+using System.Text.Json.Serialization;
 
 namespace EventLogExpert.UI.Models;
 
@@ -23,5 +24,6 @@ public sealed record FilterComparison
         }
     }
 
+    [JsonIgnore]
     public Func<DisplayEventModel, bool> Expression { get; private set; } = null!;
 }
