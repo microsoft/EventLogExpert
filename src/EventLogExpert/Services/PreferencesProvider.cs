@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
@@ -23,6 +24,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string LogNameColumn = "log-name-column";
     private const string PrereleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
+    private const string SavedFilters = "saved-filters";
     private const string SourceColumn = "source-column";
     private const string TaskCategoryColumn = "task-category-column";
     private const string TimeZone = "timezone";
@@ -106,6 +108,12 @@ public sealed class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? [];
         set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
+    }
+
+    public IList<FilterGroupModel> SavedFiltersPreference
+    {
+        get => JsonSerializer.Deserialize<List<FilterGroupModel>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
+        set => Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value));
     }
 
     public bool SourceColumnPreference

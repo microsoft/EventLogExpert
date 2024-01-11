@@ -21,7 +21,15 @@ public sealed partial class FilterGroupRow
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterGroupAction.ToggleFilter(ParentId, Value.Id));
+    private void EditFilter()
+    {
+        // Check isn't necessary (should never return false)
+        // but we want save button to be visible when applied from filter group
+        _isFilterValid = FilterMethods.TryParseExpression(Value.Comparison.Value, out var message);
+        _errorMessage = message;
+
+        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilter(ParentId, Value.Id));
+    }
 
     private void OnInputChanged(ChangeEventArgs e)
     {
