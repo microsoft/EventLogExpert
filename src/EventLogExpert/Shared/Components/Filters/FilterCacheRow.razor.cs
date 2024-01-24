@@ -47,7 +47,6 @@ public sealed partial class FilterCacheRow
 
     private void RemoveFilter()
     {
-        // TODO: This is bugged and will not delete the cache entry unless the Value is in the filter list
         _isEditing = false;
 
         Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));

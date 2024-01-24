@@ -12,7 +12,7 @@ public sealed record EventTableState
 {
     public ImmutableList<EventTableModel> EventTables { get; init; } = [];
 
-    public EventTableModel ActiveTable { get; init; } = null!;
+    public EventTableModel? ActiveTable { get; init; }
 
     public ColumnName? OrderBy { get; init; }
 
