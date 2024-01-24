@@ -19,10 +19,10 @@ public sealed class FilterPaneReducers
 
         if (action.FilterModel is null)
         {
-            return state with { AdvancedFilters = [.. state.BasicFilters, new FilterModel { IsEditing = true }] };
+            return state with { AdvancedFilters = [.. state.AdvancedFilters, new FilterModel { IsEditing = true }] };
         }
 
-        return state with { AdvancedFilters = [.. state.BasicFilters, action.FilterModel] };
+        return state with { AdvancedFilters = [.. state.AdvancedFilters, action.FilterModel] };
     }
 
     [ReducerMethod]
