@@ -19,6 +19,8 @@ public sealed record FilterModel
 
     public List<FilterModel> SubFilters { get; set; } = [];
 
+    public bool ShouldCompareAny { get; set; }
+
     [JsonIgnore]
     public bool IsEditing { get; set; }
 

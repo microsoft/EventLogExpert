@@ -6,9 +6,15 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class BooleanSelect : BaseComponent<bool>
+public sealed partial class BooleanSelect : BaseComponent<bool>
 {
+    [Parameter] public string DisabledString { get; set; } = "Disabled";
+
+    [Parameter] public string EnabledString { get; set; } = "Enabled";
+
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    [Parameter] public bool IsSingleColor { get; set; }
 
     private async Task UpdateValue(ChangeEventArgs args)
     {

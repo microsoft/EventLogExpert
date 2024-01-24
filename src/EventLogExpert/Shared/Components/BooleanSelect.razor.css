@@ -24,6 +24,7 @@
     border: 1px solid rgba(0, 0, 0, 0.2);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px rgba(255, 255, 255, 0.1);
     transition: all 0.1s ease-in-out;
+    min-width: 4rem;
 }
 
 .toggle label:hover { cursor: pointer; }
@@ -33,6 +34,11 @@
     box-shadow: none;
     color: #fff;
     opacity: 0.75;
+
+    &[data-single-color="true"] {
+        background-color: var(--clr-lightblue);
+        color: var(--clr-black);
+    }
 }
 
 .toggle input:checked + label:last-of-type {
@@ -40,6 +46,8 @@
     box-shadow: none;
     color: var(--clr-black);
     opacity: 0.75;
+
+    &[data-single-color="true"] { background-color: var(--clr-lightblue); }
 }
 
 .toggle label:first-of-type { border-radius: 4px 0 0 4px; }
