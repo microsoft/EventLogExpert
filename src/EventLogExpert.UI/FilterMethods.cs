@@ -41,24 +41,24 @@ public static class FilterMethods
         if (!eventFilter.AdvancedFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.AdvancedFilters
-                .All(filter => filter.Comparison.Expression(e)));
+                .Any(filter => filter.Comparison.Expression(e)));
         }
 
         if (!eventFilter.BasicFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.BasicFilters
-                .All(filter => filter.Comparison.Expression(e)));
+                .Any(filter => filter.Comparison.Expression(e)));
         }
 
         if (!eventFilter.CachedFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.CachedFilters
-                .All(filter => filter.Comparison.Expression(e)));
+                .Any(filter => filter.Comparison.Expression(e)));
         }
 
         return events.AsParallel()
             .Where(e => filters
-                .All(filter => filter(e)));
+                .Any(filter => filter(e)));
     }
 
     public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
@@ -233,7 +233,7 @@ public static class FilterMethods
         if (subFilter.Data.Values.Count <= 0 &&
             subFilter.Data.Evaluator == FilterEvaluator.MultiSelect) { return null; }
 
-        StringBuilder stringBuilder = new(" || ");
+        StringBuilder stringBuilder = new(subFilter.ShouldCompareAny ? " || " : " && ");
 
         if (subFilter.Data.Evaluator != FilterEvaluator.MultiSelect ||
             subFilter.Data.Type is FilterType.KeywordsDisplayNames)

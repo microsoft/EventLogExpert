@@ -2,8 +2,8 @@
 
 <div class="toggle">
     <input type="radio" id="@Id false" name="@Id" value="false" checked="@(!Value)" @onchange="UpdateValue" />
-    <label for="@Id false">Disabled</label>
+    <label for="@Id false" data-single-color="@IsSingleColor.ToString().ToLower()">@DisabledString</label>
 
     <input type="radio" id="@Id true" name="@Id" value="true" checked="@(Value)" @onchange="UpdateValue" />
-    <label for="@Id true">Enabled</label>
+    <label for="@Id true" data-single-color="@IsSingleColor.ToString().ToLower()">@EnabledString</label>
 </div>

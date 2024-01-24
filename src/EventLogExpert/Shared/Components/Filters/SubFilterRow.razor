@@ -2,7 +2,8 @@
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
-        <span>Join On: </span>
+        <BooleanSelect @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
+
         <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.Data.Type" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
