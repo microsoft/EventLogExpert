@@ -18,7 +18,7 @@
 
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
+    @if (EventTableState.Value.ActiveTable is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
     {
         var totalEvents = EventTableState.Value.ActiveTable.IsCombined ?
             EventLogState.Value.ActiveLogs.Sum(l => l.Value.Events.Count) :
