@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
-using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterColor;
@@ -36,19 +35,11 @@ public sealed partial class EventTable
 
     protected override void OnInitialized()
     {
-        EventTableState.StateChanged += async (state, args) =>
-        {
-            if (state is not IState<EventTableState> tableState) { return; }
-
-            foreach (var table in tableState.Value.EventTables)
-            {
-                if (table.ElementReference is null) { continue; }
-
-                await JSRuntime.InvokeVoidAsync("registerTableEvents", table.ElementReference);
-            }
-        };
-
         SelectedEventState.Select(s => s.SelectedEvent);
+
+        SubscribeToAction<EventTableAction.AddTable>(action => RegisterTableEvents().AndForget());
+        SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
+        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
 
         base.OnInitialized();
     }
@@ -96,6 +87,33 @@ public sealed partial class EventTable
         if (!SettingsState.Value.EventTableColumns.TryGetValue(columnName, out var enabled)) { return true; }
 
         return !enabled;
+    }
+
+    private async Task RegisterTableEvents()
+    {
+        foreach (var table in EventTableState.Value.EventTables)
+        {
+            await JSRuntime.InvokeVoidAsync("registerTableEvents", table.Id);
+        }
+    }
+
+    private async Task ScrollToSelectedEvent()
+    {
+        var table = EventTableState.Value.EventTables
+            .FirstOrDefault(table => table.Id == EventTableState.Value.ActiveTableId);
+
+        var entry = table?.DisplayedEvents.FirstOrDefault(x =>
+            string.Equals(x.LogName, SelectedEventState.Value?.LogName) &&
+            x.RecordId == SelectedEventState.Value?.RecordId);
+
+        if (table is null || entry is null) { return; }
+
+        var index = table.DisplayedEvents.IndexOf(entry);
+
+        if (index >= 0)
+        {
+            await JSRuntime.InvokeVoidAsync("scrollToRow", table.Id, index);
+        }
     }
 
     private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));

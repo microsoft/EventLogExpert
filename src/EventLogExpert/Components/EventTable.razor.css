@@ -41,6 +41,8 @@ th, td {
     &:last-child { border-right: none; }
 }
 
+tr { height: 22px; }
+
 .selected {
     background-color: var(--clr-lightblue) !important;
     color: var(--background-darkgray) !important;

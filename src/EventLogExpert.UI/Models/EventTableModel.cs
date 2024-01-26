@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using Microsoft.AspNetCore.Components;
 using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Models;
@@ -18,9 +17,6 @@ public sealed record EventTableModel
     public string LogName { get; init; } = string.Empty;
 
     public LogType LogType { get; init; }
-
-    // Yes this is mutable but HTML refs are only directly assigned to fields and properties
-    public ElementReference? ElementReference { get; set; }
 
     public ReadOnlyCollection<DisplayEventModel> DisplayedEvents { get; init; } =
         new List<DisplayEventModel>().AsReadOnly();

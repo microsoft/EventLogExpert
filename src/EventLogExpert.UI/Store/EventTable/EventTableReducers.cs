@@ -22,14 +22,14 @@ public sealed class EventTableReducers
 
         if (state.EventTables.IsEmpty)
         {
-            return state with { EventTables = state.EventTables.Add(newTable), ActiveTable = newTable };
+            return state with { EventTables = state.EventTables.Add(newTable), ActiveTableId = newTable.Id };
         }
 
         var combinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
 
         if (combinedTable is not null)
         {
-            return state with { EventTables = state.EventTables.Add(newTable), ActiveTable = combinedTable };
+            return state with { EventTables = state.EventTables.Add(newTable), ActiveTableId = combinedTable.Id };
         }
 
         combinedTable = new EventTableModel { IsCombined = true };
@@ -39,7 +39,7 @@ public sealed class EventTableReducers
             EventTables = state.EventTables
                 .Add(combinedTable)
                 .Add(newTable),
-            ActiveTable = combinedTable
+            ActiveTableId = combinedTable.Id
         };
     }
 
@@ -48,7 +48,7 @@ public sealed class EventTableReducers
 
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
-        state with { ActiveTable = state.EventTables.First(table => table.Id.Equals(action.TableId)) };
+        state with { ActiveTableId = state.EventTables.First(table => table.Id.Equals(action.TableId)).Id };
 
     //[ReducerMethod]
     //public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action) { }
@@ -82,48 +82,35 @@ public sealed class EventTableReducers
     public static EventTableState ReduceUpdateDisplayedEvents(EventTableState state,
         EventTableAction.UpdateDisplayedEvents action)
     {
-        var newState = state;
+        List<EventTableModel> updatedTables = [];
 
-        for (var i = 0; i < newState.EventTables.Count; i++)
+        foreach (var table in state.EventTables)
         {
-            if (newState.EventTables[i].IsCombined) { continue; }
+            if (table.IsCombined) { continue; }
 
-            var currentActiveLog = action.ActiveLogs.First(log => newState.EventTables[i].LogName.Equals(log.Key)).Value;
+            var currentActiveLog = action.ActiveLogs.First(log => table.LogName.Equals(log.Key)).Value;
 
-            if (newState.EventTables[i].DisplayedEvents.Count == currentActiveLog.Count()) { continue; }
-
-            newState = newState with
+            updatedTables.Add(table.DisplayedEvents.Count == currentActiveLog.Count() ? table : table with
             {
-                EventTables = newState.EventTables
-                    .Remove(newState.EventTables[i])
-                    .Add(newState.EventTables[i] with
-                    {
-                        DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
-                            .ToList()
-                            .AsReadOnly()
-                    })
-            };
+                DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
+                    .ToList()
+                    .AsReadOnly()
+            });
         }
 
-        if (newState.EventTables.Count <= 1)
+        if (updatedTables.Count > 1)
         {
-            return newState;
-        }
-
-        var table = newState.EventTables.First(table => table.IsCombined);
-
-        return newState with
-        {
-            EventTables = newState.EventTables
-                .Remove(table)
-                .Add(table with
+            updatedTables.Add(
+                state.EventTables.First(table => table.IsCombined) with
                 {
                     DisplayedEvents = GetCombinedEvents(action.ActiveLogs.Values.Select(log => log))
-                        .SortEvents((state.OrderBy ?? ColumnName.DateAndTime), state.IsDescending)
+                        .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
                         .ToList()
                         .AsReadOnly()
-                })
-        };
+                });
+        }
+
+        return state with { EventTables = [.. updatedTables] };
     }
 
     private static IEnumerable<DisplayEventModel> GetCombinedEvents(IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
@@ -140,24 +127,17 @@ public sealed class EventTableReducers
 
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)
     {
-        var newState = state;
+        List<EventTableModel> updatedTables = [];
 
-        foreach (var logData in newState.EventTables)
-        {
-            newState = newState with
-            {
-                EventTables = newState.EventTables
-                    .Remove(logData)
-                    .Add(logData with
-                    {
-                        DisplayedEvents = logData.DisplayedEvents
-                            .SortEvents(orderBy, isDescending)
-                            .ToList()
-                            .AsReadOnly()
-                    })
-            };
-        }
+        updatedTables.AddRange(
+            state.EventTables.Select(
+                logData => logData with
+                {
+                    DisplayedEvents = logData.DisplayedEvents.SortEvents(orderBy, isDescending)
+                        .ToList()
+                        .AsReadOnly()
+                }));
 
-        return newState with { OrderBy = orderBy, IsDescending = isDescending };
+        return state with { EventTables = [.. updatedTables], OrderBy = orderBy, IsDescending = isDescending };
     }
 }

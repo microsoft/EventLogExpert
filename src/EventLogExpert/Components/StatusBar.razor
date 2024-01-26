@@ -18,13 +18,17 @@
 
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (EventTableState.Value.ActiveTable is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
+    @if (EventTableState.Value.ActiveTableId is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
     {
-        var totalEvents = EventTableState.Value.ActiveTable.IsCombined ?
-            EventLogState.Value.ActiveLogs.Sum(l => l.Value.Events.Count) :
-            EventLogState.Value.ActiveLogs[EventTableState.Value.ActiveTable.LogName].Events.Count;
+        var activeTable = EventTableState.Value.EventTables.FirstOrDefault(table => table.Id == EventTableState.Value.ActiveTableId);
 
-        var filteredEvents = EventTableState.Value.ActiveTable.DisplayedEvents.Count;
+        if (activeTable is null) { return; }
+
+        var totalEvents = activeTable.IsCombined ?
+            EventLogState.Value.ActiveLogs.Sum(l => l.Value.Events.Count) :
+            EventLogState.Value.ActiveLogs[activeTable.LogName].Events.Count;
+
+        var filteredEvents = activeTable.DisplayedEvents.Count;
 
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }

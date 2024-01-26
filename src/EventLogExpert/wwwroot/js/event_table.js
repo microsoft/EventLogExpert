@@ -1,8 +1,10 @@
-window.registerTableEvents = (ref) => {
-    deleteColumnResize(ref);
-    enableColumnResize(ref);
+window.registerTableEvents = (id) => {
+    const table = document.getElementById(id);
 
-    registerKeyHandlers(ref);
+    deleteColumnResize(table);
+    enableColumnResize(table);
+
+    registerKeyHandlers(table);
 };
 
 window.deleteColumnResize = (table) => {
@@ -83,3 +85,10 @@ window.registerKeyHandlers = (table) => {
 
     table.addEventListener("keydown", keyDownHandler);
 };
+
+window.scrollToRow = (id, offset) => {
+    const table = document.getElementById(id);
+    const row = table.getElementsByTagName("tr")[0];
+
+    table.parentNode.scrollTo({top: row.offsetHeight * offset, behavior: "smooth"});
+}
