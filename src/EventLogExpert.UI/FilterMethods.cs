@@ -17,9 +17,9 @@ public static class FilterMethods
     {
         Dictionary<string, IEnumerable<DisplayEventModel>> activeLogsFiltered = [];
 
-        foreach (var activeLog in activeLogs)
+        foreach ((string logName, EventLogData data) in activeLogs)
         {
-            activeLogsFiltered.Add(activeLog.Key, GetFilteredEvents(activeLog.Value.Events, eventFilter));
+            activeLogsFiltered.Add(logName, GetFilteredEvents(data.Events, eventFilter));
         }
 
         return activeLogsFiltered;

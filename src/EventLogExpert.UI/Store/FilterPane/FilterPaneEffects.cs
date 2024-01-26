@@ -16,7 +16,10 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     [EffectMethod]
     public async Task HandleAddAdvancedFilter(FilterPaneAction.AddAdvancedFilter action, IDispatcher dispatcher)
     {
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        if (!string.IsNullOrEmpty(action.FilterModel?.Comparison.Value))
+        {
+            await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        }
 
         if (action.FilterModel?.Comparison.Value is not null)
         {
@@ -33,7 +36,10 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     [EffectMethod]
     public async Task HandleAddBasicFilter(FilterPaneAction.AddBasicFilter action, IDispatcher dispatcher)
     {
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        if (!string.IsNullOrEmpty(action.FilterModel?.Comparison.Value))
+        {
+            await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        }
 
         if (action.FilterModel?.Comparison.Value is not null)
         {
