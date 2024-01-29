@@ -9,7 +9,11 @@
     <ContentPage.MenuBarItems>
         <MenuBarItem Text="File">
             <MenuFlyoutSubItem Text="Open">
-                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" />
+                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked">
+                    <MenuFlyoutItem.KeyboardAccelerators>
+                        <KeyboardAccelerator Modifiers="Ctrl" Key="O" />
+                    </MenuFlyoutItem.KeyboardAccelerators>
+                </MenuFlyoutItem>
                 <MenuFlyoutSubItem Text="Live Event Log" >
                     <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
                     <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
@@ -26,18 +30,25 @@
                     <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" />
                 </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
-            <MenuFlyoutItem Text="Close All Open Logs" x:Name="CloseAllOpenLogs" Clicked="CloseAll_Clicked" />
+            <MenuFlyoutItem Text="Close All Open Logs" Clicked="CloseAll_Clicked" />
             <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="Edit">
-            <MenuFlyoutItem Text="Copy Selected" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
-            <MenuFlyoutItem Text="Copy Selected (Simple)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
-            <MenuFlyoutItem Text="Copy Selected (XML)" Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
+            <MenuFlyoutItem Text="Copy Selected" x:Name="CopySelected"
+                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
+            <MenuFlyoutItem Text="Copy Selected (Simple)" x:Name="CopySelectedSimple"
+                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
+            <MenuFlyoutItem Text="Copy Selected (XML)" x:Name="CopySelectedXml"
+                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
             <MenuFlyoutItem Text="Save All Filters" Clicked="SaveAllFilters_Clicked" />
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>
         <MenuBarItem Text="View">
-            <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem" />
+            <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem">
+                <MenuFlyoutItem.KeyboardAccelerators>
+                    <KeyboardAccelerator Modifiers="Ctrl" Key="H" />
+                </MenuFlyoutItem.KeyboardAccelerators>
+            </MenuFlyoutItem>
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
             <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />

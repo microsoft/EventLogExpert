@@ -6,7 +6,7 @@
 @foreach (var table in EventTableState.Value.EventTables)
 {
     <div class="table-container" hidden="@(!EventTableState.Value.ActiveTableId?.Equals(table.Id))">
-        <table id="@table.Id" @onkeyup="HandleKeyUp">
+        <table id="@table.Id">
             <thead @oncontextmenu="InvokeTableColumnMenu">
             <tr>
                 <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">
