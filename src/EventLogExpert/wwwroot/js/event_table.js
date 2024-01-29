@@ -90,5 +90,8 @@ window.scrollToRow = (id, offset) => {
     const table = document.getElementById(id);
     const row = table.getElementsByTagName("tr")[0];
 
-    table.parentNode.scrollTo({top: row.offsetHeight * offset, behavior: "smooth"});
-}
+    table.parentNode.scrollTo({
+        top: row.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
+        behavior: "smooth"
+    });
+};
