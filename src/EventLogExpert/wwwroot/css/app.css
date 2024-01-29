@@ -3,8 +3,9 @@
 
 :root {
     --clr-lightblue: #9CDCFE;
-    --clr-lightgray: rgb(164 185 192);
-    --clr-black: #111111;
+    --clr-lightgray: #A4B9C0;
+    --clr-white: #eee;
+    --clr-black: #111;
     --clr-red: #ee0d0d;
     --clr-green: #0dee0d;
     --clr-yellow: #eeff0d;
@@ -14,13 +15,13 @@
     --background-dark: #222222;
     --background-darkgray: #353535;
 
-    --highlight-blue: rgb(36 92 146);
-    --highlight-green: rgb(21 146 21);
-    --highlight-red: rgb(146 21 21);
-    --highlight-yellow: rgb(146 146 21);
-    --highlight-maroon: rgb(146 21 146);
-    --highlight-orange: rgb(146 102 21);
-    --highlight-pink: rgb(138 85 138);
+    --highlight-blue: #245C92;
+    --highlight-green: #159215;
+    --highlight-red: #921515;
+    --highlight-yellow: #929215;
+    --highlight-maroon: #921592;
+    --highlight-orange: #926615;
+    --highlight-pink: #8A558A;
 }
 
 ::-webkit-scrollbar {
