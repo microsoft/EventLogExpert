@@ -43,47 +43,48 @@ th, td {
 
 tr { height: 22px; }
 
+.error { color: var(--clr-red); }
+
+.warning { color: var(--clr-yellow); }
+
 .selected {
     background-color: var(--clr-lightblue) !important;
     color: var(--background-darkgray) !important;
+
+    & span.error { color: var(--background-darkgray) !important; }
+
+    & span.warning { color: var(--background-darkgray) !important; }
 }
 
 .table-row { cursor: pointer; }
 
-.table-row.blue {
-    background-color: var(--highlight-blue) !important;
-    color: var(--clr-lightgray) !important;
-}
-
-.table-row.green {
-    background-color: var(--highlight-green) !important;
-    color: var(--clr-lightgray) !important;
-}
-
-.table-row.red {
-    background-color: var(--highlight-red) !important;
-    color: var(--clr-lightgray) !important;
-}
-
-.table-row.yellow {
-    background-color: var(--highlight-yellow) !important;
-    color: var(--clr-lightgray) !important;
-}
-
-.table-row.maroon {
-    background-color: var(--highlight-maroon) !important;
-    color: var(--clr-lightgray) !important;
-}
-
-.table-row.orange {
-    background-color: var(--highlight-orange) !important;
-    color: var(--clr-lightgray) !important;
-}
-
+.table-row.blue,
+.table-row.green,
+.table-row.red,
+.table-row.yellow,
+.table-row.maroon,
+.table-row.orange,
 .table-row.pink {
-    background-color: var(--highlight-pink) !important;
-    color: var(--clr-lightgray) !important;
+    color: var(--clr-white) !important;
+
+    & span.error { color: var(--clr-white) !important; }
+
+    & span.warning { color: var(--clr-white) !important; }
 }
+
+.table-row.blue { background-color: var(--highlight-blue) !important; }
+
+.table-row.green { background-color: var(--highlight-green) !important; }
+
+.table-row.red { background-color: var(--highlight-red) !important; }
+
+.table-row.yellow { background-color: var(--highlight-yellow) !important; }
+
+.table-row.maroon { background-color: var(--highlight-maroon) !important; }
+
+.table-row.orange { background-color: var(--highlight-orange) !important; }
+
+.table-row.pink { background-color: var(--highlight-pink) !important; }
 
 .activity-id { width: 270px; }
 
@@ -102,7 +103,3 @@ tr { height: 22px; }
 .task { width: 200px; }
 
 .description { width: 100%; }
-
-.error { color: var(--clr-red); }
-
-.warning { color: var(--clr-yellow); }
