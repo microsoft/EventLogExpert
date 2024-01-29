@@ -19,7 +19,9 @@ namespace EventLogExpert;
 
 public sealed partial class App : Application
 {
-    public App(IDispatcher fluxorDispatcher,
+    public App(
+        IActionSubscriber actionSubscriber,
+        IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
@@ -38,7 +40,9 @@ public sealed partial class App : Application
         InitializeComponent();
 
         MainPage = new NavigationPage(
-            new MainPage(fluxorDispatcher,
+            new MainPage(
+                actionSubscriber,
+                fluxorDispatcher,
                 databaseCollectionProvider,
                 activeLogsState,
                 continuouslyUpdateState,

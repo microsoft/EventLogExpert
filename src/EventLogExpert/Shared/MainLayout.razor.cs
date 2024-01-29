@@ -1,10 +1,16 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
+using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared;
 
@@ -12,7 +18,13 @@ public sealed partial class MainLayout
 {
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
 
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
+
     [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
@@ -31,5 +43,27 @@ public sealed partial class MainLayout
         }
 
         await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override void OnInitialized()
+    {
+        SelectedEventState.Select(s => s.SelectedEvent);
+
+        base.OnInitialized();
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs args)
+    {
+        // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+        switch (args)
+        {
+            case { CtrlKey: true, Code: "KeyC" } :
+                ClipboardService.CopySelectedEvent(SelectedEventState.Value, SettingsState.Value.Config.CopyType);
+                break;
+
+            case { CtrlKey: true, Code: "KeyH" } :
+                Dispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
+                break;
+        }
     }
 }

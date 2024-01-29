@@ -3,14 +3,14 @@
 @using EventLogExpert.Components
 @inherits LayoutComponentBase
 
-<SettingsModal />
-<FilterCacheModal />
-<FilterGroupModal />
+<div class="page" tabindex="0" @onkeyup="HandleKeyUp">
+    <SettingsModal />
+    <FilterCacheModal />
+    <FilterGroupModal />
 
-<TableColumnMenu />
-<ContextMenu />
+    <TableColumnMenu />
+    <ContextMenu />
 
-<div class="page">
     <div class="display_layout">
         <FilterPane />
         <EventTable />

@@ -28,6 +28,8 @@ namespace EventLogExpert;
 
 public sealed partial class MainPage : ContentPage
 {
+    private static readonly KeyboardAccelerator CopyShortcut = new() { Modifiers = KeyboardAcceleratorModifiers.Ctrl, Key = "C" };
+
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IAppTitleService _appTitleService;
     private readonly IClipboardService _clipboardService;
@@ -40,7 +42,9 @@ public sealed partial class MainPage : ContentPage
 
     private DisplayEventModel? _selectedEvent;
 
-    public MainPage(IDispatcher fluxorDispatcher,
+    public MainPage(
+        IActionSubscriber actionSubscriber,
+        IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
@@ -100,6 +104,11 @@ public sealed partial class MainPage : ContentPage
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
                 Path.Join(fileLocationOptions.DatabasePath, path)));
+
+        actionSubscriber.SubscribeToAction<SettingsAction.LoadSettingsCompleted>(this,
+            action => { SetCopyKeyboardAccelerator(); });
+        actionSubscriber.SubscribeToAction<SettingsAction.SaveCompleted>(this,
+            action => { SetCopyKeyboardAccelerator(); });
 
         fluxorDispatcher.Dispatch(new SettingsAction.LoadColumns());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
@@ -304,6 +313,7 @@ public sealed partial class MainPage : ContentPage
     private void OpenEventLogFile(string fileName) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File));
 
+    // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)
     {
         var result = await GetFilePickerResult();
@@ -367,6 +377,30 @@ public sealed partial class MainPage : ContentPage
         if (string.IsNullOrEmpty(groupName)) { return; }
 
         _fluxorDispatcher.Dispatch(new FilterPaneAction.SaveFilterGroup(groupName));
+    }
+
+    private void SetCopyKeyboardAccelerator()
+    {
+        Application.Current!.Dispatcher.Dispatch(() =>
+        {
+            CopySelected.KeyboardAccelerators.Clear();
+            CopySelectedSimple.KeyboardAccelerators.Clear();
+            CopySelectedXml.KeyboardAccelerators.Clear();
+
+            switch (_settingsState.Value.Config.CopyType)
+            {
+                case CopyType.Full :
+                    CopySelected.KeyboardAccelerators.Add(CopyShortcut);
+                    break;
+                case CopyType.Simple :
+                    CopySelectedSimple.KeyboardAccelerators.Add(CopyShortcut);
+                    break;
+                case CopyType.Xml :
+                    CopySelectedXml.KeyboardAccelerators.Add(CopyShortcut);
+                    break;
+                default : throw new ArgumentOutOfRangeException();
+            }
+        });
     }
 
     private void ShowAllEvents_Clicked(object sender, EventArgs e) =>
