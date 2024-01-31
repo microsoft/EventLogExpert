@@ -34,6 +34,10 @@
                                     <i class="bi bi-plus-circle"></i> Apply Filters
                                 </button>
 
+                                <button class="button" type="button" @onclick="() => CopyGroup(group.Id)">
+                                    <i class="bi bi-clipboard2-plus"></i> Copy
+                                </button>
+
                                 <button class="button" type="button" @onclick="() => ToggleGroup(group.Id)">
                                     <i class="bi bi-funnel"></i> Edit
                                 </button>

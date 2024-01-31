@@ -29,8 +29,7 @@ public sealed partial class ContextMenu
         base.OnInitialized();
     }
 
-    private void CopySelected(CopyType? copyType) =>
-        ClipboardService.CopySelectedEvent(SelectedEventState.Value, copyType);
+    private void CopySelected(CopyType? copyType) => ClipboardService.CopySelectedEvent(copyType);
 
     private void FilterEvent(FilterType filterType, FilterEvaluator filterEvaluator)
     {
