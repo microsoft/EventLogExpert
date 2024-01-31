@@ -37,6 +37,17 @@ public sealed partial class FilterGroupModal
         Close().AndForget();
     }
 
+    private void CopyGroup(Guid id)
+    {
+        var group = FilterGroupState.Value.Groups.FirstOrDefault(g => g.Id == id);
+
+        if (group is null) { return; }
+
+        Clipboard.SetTextAsync(group.Filters.Count() > 1 ?
+            string.Join(" || ", group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
+            group.Filters.First().Comparison.Value);
+    }
+
     private void CreateGroup() =>
         Dispatcher.Dispatch(new FilterGroupAction.AddGroup(new FilterGroupModel { IsEditing = true }));
 

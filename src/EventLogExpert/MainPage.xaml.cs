@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
@@ -40,8 +39,6 @@ public sealed partial class MainPage : ContentPage
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
-    private DisplayEventModel? _selectedEvent;
-
     public MainPage(
         IActionSubscriber actionSubscriber,
         IDispatcher fluxorDispatcher,
@@ -49,7 +46,6 @@ public sealed partial class MainPage : ContentPage
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
-        IStateSelection<EventLogState, DisplayEventModel> selectedEventState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
         IAlertDialogService dialogService,
@@ -94,10 +90,6 @@ public sealed partial class MainPage : ContentPage
         filterPaneIsEnabledState.SelectedValueChanged += (sender, isEnabled) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
-
-        selectedEventState.Select(e => e.SelectedEvent!);
-
-        selectedEventState.SelectedValueChanged += (sender, selectedEvent) => { _selectedEvent = selectedEvent; };
 
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
@@ -228,7 +220,7 @@ public sealed partial class MainPage : ContentPage
         var item = sender as MenuFlyoutItem;
         var param = item?.CommandParameter as CopyType?;
 
-        _clipboardService.CopySelectedEvent(_selectedEvent, param);
+        _clipboardService.CopySelectedEvent(param);
     }
 
     private async void Docs_Clicked(object sender, EventArgs e)

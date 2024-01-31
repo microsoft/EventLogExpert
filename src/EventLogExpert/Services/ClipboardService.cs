@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Text;
@@ -11,50 +11,53 @@ namespace EventLogExpert.Services;
 
 public interface IClipboardService
 {
-    void CopySelectedEvent(DisplayEventModel? @event, CopyType? copyType);
+    void CopySelectedEvent(CopyType? copyType = null);
 }
 
-public class ClipboardService : IClipboardService
+public sealed class ClipboardService(IState<EventLogState> eventLogState, IState<SettingsState> settingsState)
+    : IClipboardService
 {
-    private readonly IState<SettingsState> _settingsState;
-
-    public ClipboardService(IState<SettingsState> settingsState) => _settingsState = settingsState;
-
-    public void CopySelectedEvent(DisplayEventModel? @event, CopyType? copyType)
+    public void CopySelectedEvent(CopyType? copyType = null)
     {
-        if (@event is null) { return; }
+        if (eventLogState.Value.SelectedEvent is null) { return; }
 
         StringBuilder stringToCopy = new();
 
-        switch (copyType)
+        switch (copyType ?? settingsState.Value.Config.CopyType)
         {
             case CopyType.Simple :
-                stringToCopy.Append($"\"{@event.Level}\" ");
-                stringToCopy.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
-                stringToCopy.Append($"\"{@event.Source}\" ");
-                stringToCopy.Append($"\"{@event.Id}\" ");
-                stringToCopy.Append($"\"{@event.Description}\"");
+                stringToCopy.Append($"\"{eventLogState.Value.SelectedEvent.Level}\" ");
+
+                stringToCopy.Append(
+                    $"\"{eventLogState.Value.SelectedEvent.TimeCreated.ConvertTimeZone(settingsState.Value.Config.TimeZoneInfo)}\" ");
+
+                stringToCopy.Append($"\"{eventLogState.Value.SelectedEvent.Source}\" ");
+                stringToCopy.Append($"\"{eventLogState.Value.SelectedEvent.Id}\" ");
+                stringToCopy.Append($"\"{eventLogState.Value.SelectedEvent.Description}\"");
 
                 Clipboard.SetTextAsync(stringToCopy.ToString());
                 break;
             case CopyType.Xml :
-                Clipboard.SetTextAsync(@event.Xml);
+                Clipboard.SetTextAsync(eventLogState.Value.SelectedEvent.Xml);
                 break;
             case CopyType.Full :
             default :
-                stringToCopy.AppendLine($"Log Name: {@event.LogName}");
-                stringToCopy.AppendLine($"Source: {@event.Source}");
-                stringToCopy.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
-                stringToCopy.AppendLine($"Event ID: {@event.Id}");
-                stringToCopy.AppendLine($"Task Category: {@event.TaskCategory}");
-                stringToCopy.AppendLine($"Level: {@event.Level}");
-                stringToCopy.AppendLine(@event.KeywordsDisplayNames.GetEventKeywords());
+                stringToCopy.AppendLine($"Log Name: {eventLogState.Value.SelectedEvent.LogName}");
+                stringToCopy.AppendLine($"Source: {eventLogState.Value.SelectedEvent.Source}");
+
+                stringToCopy.AppendLine(
+                    $"Date: {eventLogState.Value.SelectedEvent.TimeCreated.ConvertTimeZone(settingsState.Value.Config.TimeZoneInfo)}");
+
+                stringToCopy.AppendLine($"Event ID: {eventLogState.Value.SelectedEvent.Id}");
+                stringToCopy.AppendLine($"Task Category: {eventLogState.Value.SelectedEvent.TaskCategory}");
+                stringToCopy.AppendLine($"Level: {eventLogState.Value.SelectedEvent.Level}");
+                stringToCopy.AppendLine(eventLogState.Value.SelectedEvent.KeywordsDisplayNames.GetEventKeywords());
                 stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
-                stringToCopy.AppendLine($"Computer: {@event.ComputerName}");
+                stringToCopy.AppendLine($"Computer: {eventLogState.Value.SelectedEvent.ComputerName}");
                 stringToCopy.AppendLine("Description:");
-                stringToCopy.AppendLine(@event.Description);
+                stringToCopy.AppendLine(eventLogState.Value.SelectedEvent.Description);
                 stringToCopy.AppendLine("Event Xml:");
-                stringToCopy.AppendLine(@event.Xml);
+                stringToCopy.AppendLine(eventLogState.Value.SelectedEvent.Xml);
 
                 Clipboard.SetTextAsync(stringToCopy.ToString());
                 break;
