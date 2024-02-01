@@ -1,0 +1,25 @@
+@using EventLogExpert.UI.Models
+
+<div>
+    <div class="flex-space-between my-1">
+        <span>@Name</span>
+
+        <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu">
+            <i class="bi bi-caret-up"></i>
+        </span>
+    </div>
+
+    <div class="indent" hidden="@(!_menuState)">
+        @foreach ((string name, FilterGroupData data) in Data.ChildGroup)
+        {
+            <FilterGroupSection Parent="Parent" Name="@name" Data="data" />
+        }
+
+        <div class="flex-column-scroll">
+            @foreach (var group in Data.FilterGroups)
+            {
+                <FilterGroup Parent="Parent" Group="group" />
+            }
+        </div>
+    </div>
+</div>

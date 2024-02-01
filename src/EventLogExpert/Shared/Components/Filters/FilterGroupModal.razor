@@ -1,72 +1,23 @@
 @using EventLogExpert.Shared.Base
+@using EventLogExpert.UI.Models
 @inherits BaseModal
 
 <dialog id="filterGroupDialog" @ref="ElementReference">
     <div class="dialog-group">
         <div class="flex-column-scroll">
-            @foreach (var group in FilterGroupState.Value.Groups)
+            @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups)
             {
-                <div class="mb-1">
-                    <div class="flex-space-between">
-                        <div class="flex-space-between">
-                            <div>@group.Name</div>
-                            <button class="button" type="button" @onclick="() => RenameGroup(group)">
-                                <i class="bi bi-pencil-square"></i>
-                            </button>
-                        </div>
-
-                        @if (group.IsEditing)
-                        {
-                            <div>
-                                <button class="button button-green" type="button" @onclick="() => SaveGroup(group)">
-                                    <i class="bi bi-check-circle"></i> Save
-                                </button>
-
-                                <button class="button button-red" type="button" @onclick="() => RemoveGroup(group.Id)">
-                                    <i class="bi bi-dash-circle"></i> Remove
-                                </button>
-                            </div>
-                        }
-                        else
-                        {
-                            <div>
-                                <button class="button button-green" type="button" @onclick="() => ApplyFilters(group)">
-                                    <i class="bi bi-plus-circle"></i> Apply Filters
-                                </button>
-
-                                <button class="button" type="button" @onclick="() => CopyGroup(group.Id)">
-                                    <i class="bi bi-clipboard2-plus"></i> Copy
-                                </button>
-
-                                <button class="button" type="button" @onclick="() => ToggleGroup(group.Id)">
-                                    <i class="bi bi-funnel"></i> Edit
-                                </button>
-                            </div>
-                        }
-                    </div>
-
-                    @foreach (var filter in group.Filters)
+                if (data.ChildGroup.Count >= 1)
+                {
+                    <FilterGroupSection Parent="this" Name="@name" Data="data" />
+                }
+                else
+                {
+                    @foreach (var group in data.FilterGroups)
                     {
-                        @if (group.IsEditing)
-                        {
-                            <FilterGroupRow ParentId="group.Id" Value="filter" />
-                        }
-                        else
-                        {
-                            <div class="flex-align-center">
-                                <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
-                                <div>@filter.Comparison.Value</div>
-                            </div>
-                        }
+                        <FilterGroup Parent="this" Group="group" />
                     }
-
-                    @if (group.IsEditing)
-                    {
-                        <button class="button" type="button" @onclick="() => AddFilter(group)">
-                            <i class="bi bi-plus-circle"></i> Add Filter
-                        </button>
-                    }
-                </div>
+                }
             }
 
             <button class="button" @onclick="CreateGroup">

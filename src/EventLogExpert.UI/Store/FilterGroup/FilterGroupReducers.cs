@@ -156,4 +156,20 @@ public sealed class FilterGroupReducers
                 .Add(group with { IsEditing = !group.IsEditing })
         };
     }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerUpdateDisplayGroups(FilterGroupState state,
+        FilterGroupAction.UpdateDisplayGroups action)
+    {
+        Dictionary<string, FilterGroupData> displayGroups = [];
+
+        foreach (var group in action.Groups)
+        {
+            var folders = group.Name.Split('\\');
+
+            displayGroups.AddFilterGroup(folders, group);
+        }
+
+        return state with { DisplayGroups = displayGroups.AsReadOnly() };
+    }
 }

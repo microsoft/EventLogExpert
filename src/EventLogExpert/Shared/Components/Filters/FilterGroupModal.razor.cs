@@ -4,7 +4,6 @@
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
-using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
@@ -29,29 +28,11 @@ public sealed partial class FilterGroupModal
         base.OnInitialized();
     }
 
-    private void AddFilter(FilterGroupModel group) => Dispatcher.Dispatch(new FilterGroupAction.AddFilter(group.Id));
-
-    private void ApplyFilters(FilterGroupModel group)
-    {
-        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(group));
-        Close().AndForget();
-    }
-
-    private void CopyGroup(Guid id)
-    {
-        var group = FilterGroupState.Value.Groups.FirstOrDefault(g => g.Id == id);
-
-        if (group is null) { return; }
-
-        Clipboard.SetTextAsync(group.Filters.Count() > 1 ?
-            string.Join(" || ", group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
-            group.Filters.First().Comparison.Value);
-    }
-
     private void CreateGroup() =>
         Dispatcher.Dispatch(new FilterGroupAction.AddGroup(new FilterGroupModel { IsEditing = true }));
 
-    private async Task Export() {
+    private async Task Export()
+    {
         FileSavePicker picker = new()
         {
             SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
@@ -89,15 +70,13 @@ public sealed partial class FilterGroupModal
         }
     }
 
-    private async Task Import() {
+    private async Task Import()
+    {
         PickOptions options = new()
         {
             PickerTitle = "Please select a json file to import",
             FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.WinUI, [".json"] }
-                })
+                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, [".json"] } })
         };
 
         var result = await FilePicker.Default.PickAsync(options);
@@ -120,29 +99,4 @@ public sealed partial class FilterGroupModal
                 "OK");
         }
     }
-
-    private void RemoveGroup(Guid id) => Dispatcher.Dispatch(new FilterGroupAction.RemoveGroup(id));
-
-    private async void RenameGroup(FilterGroupModel model)
-    {
-        var groupName = await AlertDialogService.DisplayPrompt("Group Name", "What would you like to name this group?");
-
-        if (string.IsNullOrEmpty(groupName)) { return; }
-
-        model.Name = groupName;
-
-        Dispatcher.Dispatch(new FilterGroupAction.SetGroup(model));
-    }
-
-    private void SaveGroup(FilterGroupModel group)
-    {
-        foreach (var filter in group.Filters)
-        {
-            if (filter.IsEditing) { return; }
-        }
-
-        Dispatcher.Dispatch(new FilterGroupAction.SetGroup(group));
-    }
-
-    private void ToggleGroup(Guid id) => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(id));
 }

@@ -1,0 +1,62 @@
+<div class="mb-1">
+    <div class="flex-space-between">
+        <div class="flex-space-between">
+            <div>@Group.DisplayName</div>
+
+            <button class="button" type="button" @onclick="RenameGroup">
+                <i class="bi bi-pencil-square"></i>
+            </button>
+        </div>
+
+        @if (Group.IsEditing)
+        {
+            <div>
+                <button class="button button-green" type="button" @onclick="SaveGroup">
+                    <i class="bi bi-check-circle"></i> Save
+                </button>
+
+                <button class="button button-red" type="button" @onclick="RemoveGroup">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+            </div>
+        }
+        else
+        {
+            <div>
+                <button class="button button-green" type="button" @onclick="ApplyFilters">
+                    <i class="bi bi-plus-circle"></i> Apply Filters
+                </button>
+
+                <button class="button" type="button" @onclick="CopyGroup">
+                    <i class="bi bi-clipboard2-plus"></i> Copy
+                </button>
+
+                <button class="button" type="button" @onclick="ToggleGroup">
+                    <i class="bi bi-funnel"></i> Edit
+                </button>
+            </div>
+        }
+    </div>
+
+    @foreach (var filter in Group.Filters)
+    {
+        @if (Group.IsEditing)
+        {
+            <FilterGroupRow ParentId="Group.Id" Value="filter" />
+        }
+        else
+        {
+            <div class="flex-align-center">
+                <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
+                <div>@filter.Comparison.Value</div>
+            </div>
+        }
+    }
+
+    @if (Group.IsEditing)
+    {
+        <button class="button" type="button" @onclick="AddFilter">
+            <i class="bi bi-plus-circle"></i> Add Filter
+        </button>
+    }
+</div>

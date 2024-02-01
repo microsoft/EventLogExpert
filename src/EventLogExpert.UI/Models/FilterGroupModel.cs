@@ -12,6 +12,8 @@ public sealed record FilterGroupModel
 
     public string Name { get; set; } = "New Filter Group";
 
+    public string DisplayName => Name.Split('\\').Last();
+
     public IEnumerable<FilterModel> Filters { get; set; } = [];
 
     [JsonIgnore]

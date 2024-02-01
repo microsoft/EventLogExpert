@@ -11,6 +11,36 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
+    public static Dictionary<string, FilterGroupData> AddFilterGroup(
+        this Dictionary<string, FilterGroupData> group,
+        string[] folders,
+        FilterGroupModel data)
+    {
+        var name = folders.First();
+        folders = folders.Skip(1).ToArray();
+
+        if (group.TryGetValue(name, out var groupData))
+        {
+            if (folders.Length > 1)
+            {
+                groupData.ChildGroup.AddFilterGroup(folders, data);
+            }
+            else
+            {
+                groupData.FilterGroups.Add(data);
+            }
+        }
+        else
+        {
+            group.Add(name,
+                folders.Length > 1 ?
+                    new FilterGroupData { ChildGroup = new Dictionary<string, FilterGroupData>().AddFilterGroup(folders, data) } :
+                    new FilterGroupData { FilterGroups = [data] });
+        }
+
+        return group;
+    }
+
     public static IDictionary<string, IEnumerable<DisplayEventModel>> FilterActiveLogs(
         ImmutableDictionary<string, EventLogData> activeLogs,
         EventFilter eventFilter)
