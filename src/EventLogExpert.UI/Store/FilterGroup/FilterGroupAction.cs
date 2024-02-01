@@ -30,4 +30,6 @@ public sealed record FilterGroupAction
     public sealed record ToggleFilter(Guid ParentId, Guid Id);
 
     public sealed record ToggleGroup(Guid Id);
+
+    public sealed record UpdateDisplayGroups(IEnumerable<FilterGroupModel> Groups);
 }

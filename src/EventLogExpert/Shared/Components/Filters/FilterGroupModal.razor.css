@@ -1,6 +1,6 @@
 ﻿dialog {
     height: 60%;
-    min-width: 50rem;
+    min-width: 76rem;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);

@@ -152,6 +152,8 @@ a,
     overflow-x: hidden;
 }
 
+.indent { margin-left: 1rem; }
+
 .dialog-group {
     display: flex;
     flex-direction: column;
@@ -205,7 +207,7 @@ input[type="text"].input { padding: 0; }
 
 .menu-toggle { cursor: pointer; }
 
-    .menu-toggle[data-rotate="true"] { transform: translateY(-10%) rotate(-180deg); }
+    .menu-toggle[data-rotate="true"] { transform: rotate(-180deg); }
 
 .button {
     color: var(--clr-lightblue);
