@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
@@ -18,6 +19,8 @@ namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
+
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
@@ -60,6 +63,17 @@ public sealed partial class EventTable
         }
 
         return string.Empty;
+    }
+
+    private void HandleKeyUp(KeyboardEventArgs args)
+    {
+        // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
+        switch (args)
+        {
+            case { CtrlKey: true, Code: "KeyC" } :
+                ClipboardService.CopySelectedEvent();
+                break;
+        }
     }
 
     private async Task InvokeContextMenu(MouseEventArgs args) =>
