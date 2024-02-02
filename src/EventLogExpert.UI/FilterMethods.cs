@@ -13,17 +13,17 @@ public static class FilterMethods
 {
     public static Dictionary<string, FilterGroupData> AddFilterGroup(
         this Dictionary<string, FilterGroupData> group,
-        string[] folders,
+        string[] groupNames,
         FilterGroupModel data)
     {
-        var name = folders.First();
-        folders = folders.Skip(1).ToArray();
+        var root = groupNames.Length <= 1 ? string.Empty : groupNames.First();
+        groupNames = groupNames.Skip(1).ToArray();
 
-        if (group.TryGetValue(name, out var groupData))
+        if (group.TryGetValue(root, out var groupData))
         {
-            if (folders.Length > 1)
+            if (groupNames.Length > 1)
             {
-                groupData.ChildGroup.AddFilterGroup(folders, data);
+                groupData.ChildGroup.AddFilterGroup(groupNames, data);
             }
             else
             {
@@ -32,9 +32,9 @@ public static class FilterMethods
         }
         else
         {
-            group.Add(name,
-                folders.Length > 1 ?
-                    new FilterGroupData { ChildGroup = new Dictionary<string, FilterGroupData>().AddFilterGroup(folders, data) } :
+            group.Add(root,
+                groupNames.Length > 1 ?
+                    new FilterGroupData { ChildGroup = new Dictionary<string, FilterGroupData>().AddFilterGroup(groupNames, data) } :
                     new FilterGroupData { FilterGroups = [data] });
         }
 

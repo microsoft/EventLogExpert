@@ -11,36 +11,31 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class AdvancedFilterRow
 {
-    private Timer? _advancedFilterDebounceTimer = null;
-    private string _advancedFilterErrorMessage = string.Empty;
-    private bool _isAdvancedFilterValid;
+    private Timer? _debounceTimer = null;
+    private string _errorMessage = string.Empty;
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private void EditFilter()
-    {
-        // Check isn't necessary (should never return false)
-        // but we want save button to be visible when applied from filter group
-        _isAdvancedFilterValid = FilterMethods.TryParseExpression(Value.Comparison.Value, out var message);
-        _advancedFilterErrorMessage = message;
-
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEditing(Value.Id));
-    }
+    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEditing(Value.Id));
 
     private void OnInputChanged(ChangeEventArgs e)
     {
-        _advancedFilterDebounceTimer?.Dispose();
+        _debounceTimer?.Dispose();
 
-        _advancedFilterDebounceTimer = new Timer(s =>
+        _debounceTimer = new Timer(s =>
             {
-                _isAdvancedFilterValid = FilterMethods.TryParseExpression(s?.ToString(), out var message);
-                _advancedFilterErrorMessage = message;
+                if (s is not string value) { return; }
 
-                if (_isAdvancedFilterValid)
+                if (FilterMethods.TryParseExpression(value, out var message))
                 {
-                    Value.Comparison.Value = s?.ToString()!;
+                    Value.Comparison.Value = value;
+                    _errorMessage = string.Empty;
+                }
+                else
+                {
+                    _errorMessage = message;
                 }
 
                 InvokeAsync(StateHasChanged);
@@ -49,8 +44,12 @@ public sealed partial class AdvancedFilterRow
 
     private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveAdvancedFilter(Value.Id));
 
-    private void SaveFilter() =>
+    private void SaveFilter()
+    {
+        if (!string.IsNullOrEmpty(_errorMessage)) { return; }
+
         Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(Value with { IsEditing = false, IsEnabled = true }));
+    }
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEnabled(Value.Id));
 }
