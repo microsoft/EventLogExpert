@@ -5,9 +5,9 @@
 <dialog id="filterGroupDialog" @ref="ElementReference">
     <div class="dialog-group">
         <div class="flex-column-scroll">
-            @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups)
+            @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups.OrderBy(x => x.Key))
             {
-                if (data.ChildGroup.Count >= 1)
+                if (!string.IsNullOrEmpty(name))
                 {
                     <FilterGroupSection Parent="this" Name="@name" Data="data" />
                 }
@@ -19,11 +19,11 @@
                     }
                 }
             }
-
-            <button class="button" @onclick="CreateGroup">
-                <i class="bi bi-plus-circle"></i> Create Group
-            </button>
         </div>
+
+        <button class="button" @onclick="CreateGroup">
+            <i class="bi bi-plus-circle"></i> Create Group
+        </button>
 
         <div class="footer-group">
             <div>

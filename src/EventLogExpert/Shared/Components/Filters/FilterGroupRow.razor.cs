@@ -13,7 +13,6 @@ public sealed partial class FilterGroupRow
 {
     private Timer? _debounceTimer = null;
     private string _errorMessage = string.Empty;
-    private bool _isFilterValid;
 
     [Parameter] public Guid ParentId { get; set; }
 
@@ -21,15 +20,7 @@ public sealed partial class FilterGroupRow
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private void EditFilter()
-    {
-        // Check isn't necessary (should never return false)
-        // but we want save button to be visible when applied from filter group
-        _isFilterValid = FilterMethods.TryParseExpression(Value.Comparison.Value, out var message);
-        _errorMessage = message;
-
-        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilter(ParentId, Value.Id));
-    }
+    private void EditFilter() => Dispatcher.Dispatch(new FilterGroupAction.ToggleFilter(ParentId, Value.Id));
 
     private void OnInputChanged(ChangeEventArgs e)
     {
@@ -37,12 +28,16 @@ public sealed partial class FilterGroupRow
 
         _debounceTimer = new Timer(s =>
             {
-                _isFilterValid = FilterMethods.TryParseExpression(s?.ToString(), out var message);
-                _errorMessage = message;
+                if (s is not string value) { return; }
 
-                if (_isFilterValid)
+                if (FilterMethods.TryParseExpression(value, out var message))
                 {
-                    Value.Comparison.Value = s?.ToString()!;
+                    Value.Comparison.Value = value;
+                    _errorMessage = string.Empty;
+                }
+                else
+                {
+                    _errorMessage = message;
                 }
 
                 InvokeAsync(StateHasChanged);
@@ -51,5 +46,10 @@ public sealed partial class FilterGroupRow
 
     private void RemoveFilter() => Dispatcher.Dispatch(new FilterGroupAction.RemoveFilter(ParentId, Value.Id));
 
-    private void SaveFilter() => Dispatcher.Dispatch(new FilterGroupAction.SetFilter(ParentId, Value));
+    private void SaveFilter()
+    {
+        if (!string.IsNullOrEmpty(_errorMessage)) { return; }
+
+        Dispatcher.Dispatch(new FilterGroupAction.SetFilter(ParentId, Value));
+    }
 }

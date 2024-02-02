@@ -8,9 +8,10 @@
 <div id="details-pane" data-toggle="@IsVisible" hidden="@(EventLogState.Value.SelectedEvent is null)">
     <div id="details-resizer"></div>
 
-    <div id="details-header" class="flex-space-between">
+    <div id="details-header" class="flex-space-between" @onclick="ToggleMenu">
         <div>Details</div>
-        <span class="menu-toggle" data-rotate="@IsVisible" @onclick="ToggleMenu">
+
+        <span class="menu-toggle" data-rotate="@IsVisible">
             <i class="bi bi-caret-up"></i>
         </span>
     </div>

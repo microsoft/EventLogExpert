@@ -1,66 +1,72 @@
 @using EventLogExpert.UI
 @using EventLogExpert.UI.Store.FilterPane
 
-<div class="flex-align-center">
-    @if (Value.IsEditing)
-    {
-        <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
-            T="FilterColor" @bind-Value="Value.Color">
-            @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+<div class="flex-space-between">
+    <div class="flex-align-center">
+        @if (Value.IsEditing)
+        {
+            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
+                T="FilterColor" @bind-Value="Value.Color">
+                @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                {
+                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="FilterColor" Value="item" />
+                }
+            </ValueSelect>
+
+            <span>
+                Expression:
+                <input class="input advanced-filter" type="text"
+                    placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
+                    value="@Value.Comparison.Value" @oninput="OnInputChanged" />
+            </span>
+        }
+        else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
+        {
+            <span>No Filter Specified</span>
+        }
+        else
+        {
+            @if (Value.Color != FilterColor.None)
             {
-                <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="FilterColor" Value="item" />
+                <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
             }
-        </ValueSelect>
-    }
-    else if (Value.Color != FilterColor.None)
-    {
-        <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
-    }
+            <span>@Value.Comparison.Value</span>
+        }
+    </div>
 
-    <span>
-        Expression:
-        <input class="input advanced-filter" type="text"
-            placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-            value="@Value.Comparison.Value" @oninput="OnInputChanged" disabled="@(!Value.IsEditing)" />
-    </span>
-
-    @if (Value.IsEditing)
-    {
-        if (_isAdvancedFilterValid)
+    <div>
+        @if (Value.IsEditing)
         {
             <button class="button button-green" type="button" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Apply
             </button>
-        }
 
-        <button class="button button-red" type="button" @onclick="RemoveFilter">
-            <i class="bi bi-dash-circle"></i> Remove
-        </button>
-    }
-    else
-    {
-        <button class="button" type="button" @onclick="EditFilter">
-            <i class="bi bi-funnel"></i> Edit
-        </button>
-
-        @if (Value.IsEnabled)
-        {
-            <button class="button button-red" @onclick="ToggleFilter">
-                <i class="bi bi-dash-circle"></i> Disable
+            <button class="button button-red" type="button" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
             </button>
         }
         else
         {
-            <button class="button button-green" @onclick="ToggleFilter">
-                <i class="bi bi-plus-circle"></i> Enable
+            <button class="button" type="button" @onclick="EditFilter">
+                <i class="bi bi-funnel"></i> Edit
             </button>
+
+            @if (Value.IsEnabled)
+            {
+                <button class="button button-red" @onclick="ToggleFilter">
+                    <i class="bi bi-dash-circle"></i> Disable
+                </button>
+            }
+            else
+            {
+                <button class="button button-green" @onclick="ToggleFilter">
+                    <i class="bi bi-plus-circle"></i> Enable
+                </button>
+            }
         }
-    }
+    </div>
 </div>
 
-@if (!_isAdvancedFilterValid)
-{
-    <div hidden="@(string.IsNullOrWhiteSpace(_advancedFilterErrorMessage))">
-        <span class="advanced-filter-error">@_advancedFilterErrorMessage</span>
-    </div>
-}
+<div hidden="@(string.IsNullOrWhiteSpace(_errorMessage))">
+    <span class="advanced-filter-error">@_errorMessage</span>
+</div>
