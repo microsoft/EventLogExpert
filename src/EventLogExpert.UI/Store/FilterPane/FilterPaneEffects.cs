@@ -150,6 +150,19 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         UpdateFilterColors(action.FilterModel, dispatcher);
     }
 
+    [EffectMethod]
+    public async Task HandleSetCachedFilter(FilterPaneAction.SetCachedFilter action, IDispatcher dispatcher)
+    {
+        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+
+        if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
+        {
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
+        }
+
+        UpdateFilterColors(action.FilterModel, dispatcher);
+    }
+
     [EffectMethod(typeof(FilterPaneAction.SetFilterDateRange))]
     public async Task HandleSetFilterDateRange(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
@@ -190,8 +203,12 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         UpdateFilterColors(filter, dispatcher);
     }
 
+    [EffectMethod(typeof(FilterPaneAction.ToggleCachedFilterEditing))]
+    public async Task HandleToggleCachedFilterEditing(IDispatcher dispatcher) =>
+        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+
     [EffectMethod]
-    public async Task HandleToggleCachedFilter(FilterPaneAction.ToggleCachedFilter action, IDispatcher dispatcher)
+    public async Task HandleToggleCachedFilterEnabled(FilterPaneAction.ToggleCachedFilterEnabled action, IDispatcher dispatcher)
     {
         var filter = filterPaneState.Value.CachedFilters.FirstOrDefault(x => x.Id.Equals(action.Id));
 

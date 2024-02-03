@@ -3,7 +3,7 @@
 
 <div class="flex-space-between">
     <div class="flex-align-center">
-        @if (_isEditing)
+        @if (Value.IsEditing)
         {
             <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="FilterColor" @bind-Value="Value.Color">
                 @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
@@ -46,7 +46,7 @@
     </div>
 
     <div class="justify-self-right">
-        @if (_isEditing)
+        @if (Value.IsEditing)
         {
             <button class="button button-green" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
@@ -78,7 +78,6 @@
     </div>
 </div>
 
-@if (!string.IsNullOrEmpty(_errorMessage))
-{
+<div hidden="@(string.IsNullOrWhiteSpace(_errorMessage))">
     <span class="advanced-filter-error">@_errorMessage</span>
-}
+</div>

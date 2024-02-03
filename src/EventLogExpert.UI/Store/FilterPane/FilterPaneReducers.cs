@@ -164,6 +164,18 @@ public sealed class FilterPaneReducers
 
     [ReducerMethod]
     public static FilterPaneState
+        ReduceSetCachedFilter(FilterPaneState state, FilterPaneAction.SetCachedFilter action) => state with
+    {
+        CachedFilters =
+        [
+            .. state.CachedFilters
+                .Where(filter => filter.Id != action.FilterModel.Id)
+                .Concat([action.FilterModel])
+        ]
+    };
+
+    [ReducerMethod]
+    public static FilterPaneState
         ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
         state with { FilteredDateRange = action.FilterDateModel };
 
@@ -248,9 +260,29 @@ public sealed class FilterPaneReducers
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceToggleCachedFilter(
+    public static FilterPaneState ReduceToggleCachedFilterEditing(
         FilterPaneState state,
-        FilterPaneAction.ToggleCachedFilter action)
+        FilterPaneAction.ToggleCachedFilterEditing action)
+    {
+        List<FilterModel> filters = [];
+
+        foreach (var filterModel in state.CachedFilters)
+        {
+            if (filterModel.Id == action.Id)
+            {
+                filterModel.IsEditing = !filterModel.IsEditing;
+            }
+
+            filters.Add(filterModel);
+        }
+
+        return state with { CachedFilters = [.. filters] };
+    }
+
+    [ReducerMethod]
+    public static FilterPaneState ReduceToggleCachedFilterEnabled(
+        FilterPaneState state,
+        FilterPaneAction.ToggleCachedFilterEnabled action)
     {
         List<FilterModel> filters = [];
 

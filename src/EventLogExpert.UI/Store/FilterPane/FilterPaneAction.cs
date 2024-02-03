@@ -33,6 +33,8 @@ public sealed record FilterPaneAction
 
     public sealed record SetBasicFilter(FilterModel FilterModel);
 
+    public sealed record SetCachedFilter(FilterModel FilterModel);
+
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
     public sealed record ToggleAdvancedFilterEditing(Guid Id);
@@ -43,7 +45,9 @@ public sealed record FilterPaneAction
 
     public sealed record ToggleBasicFilterEnabled(Guid Id);
 
-    public sealed record ToggleCachedFilter(Guid Id);
+    public sealed record ToggleCachedFilterEditing(Guid Id);
+
+    public sealed record ToggleCachedFilterEnabled(Guid Id);
 
     public sealed record ToggleFilterDate;
 
