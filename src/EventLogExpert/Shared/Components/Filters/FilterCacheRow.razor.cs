@@ -14,10 +14,8 @@ namespace EventLogExpert.Shared.Components.Filters;
 public sealed partial class FilterCacheRow
 {
     private CacheType _cacheType = CacheType.Favorites;
-    private FilterModel _filter = null!;
-    private string _filterValue = null!;
-    private bool _isEditing;
     private string? _errorMessage;
+    private string _filterValue = string.Empty;
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
@@ -32,47 +30,34 @@ public sealed partial class FilterCacheRow
         _ => [],
     };
 
-    protected override void OnInitialized()
+    private void EditFilter()
     {
         _filterValue = Value.Comparison.Value;
 
-        base.OnInitialized();
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilterEditing(Value.Id));
     }
 
-    private void EditFilter()
-    {
-        _isEditing = true;
-        _filter = Value with { };
-    }
-
-    private void RemoveFilter()
-    {
-        _isEditing = false;
-
-        Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
-    }
+    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
 
     private void SaveFilter()
     {
-        if (!FilterMethods.TryParseExpression(_filterValue, out _errorMessage)) { return; }
-
-        _isEditing = false;
-
-        if (string.Equals(Value.Comparison.Value, _filterValue, StringComparison.OrdinalIgnoreCase)) { return; }
-
-        try
+        if (!FilterMethods.TryParseExpression(_filterValue, out var message))
         {
-            _filter.Comparison.Value = _filterValue;
+            _errorMessage = message;
+            return;
+        }
 
-            Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
-            Dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(_filterValue));
-            Dispatcher.Dispatch(new FilterPaneAction.AddCachedFilter(_filter));
-        }
-        catch (Exception ex)
+        _errorMessage = string.Empty;
+
+        FilterModel newModel = Value with
         {
-            _errorMessage = ex.Message;
-        }
+            Comparison = new FilterComparison { Value = _filterValue },
+            IsEditing = false,
+            IsEnabled = true
+        };
+
+        Dispatcher.Dispatch(new FilterPaneAction.SetCachedFilter(newModel));
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilter(Value.Id));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilterEnabled(Value.Id));
 }

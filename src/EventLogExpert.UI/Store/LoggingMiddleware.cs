@@ -70,12 +70,14 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterPaneAction.SaveFilterGroup :
             case FilterPaneAction.SetAdvancedFilter :
             case FilterPaneAction.SetBasicFilter :
+            case FilterPaneAction.SetCachedFilter :
             case FilterPaneAction.SetFilterDateRange :
             case FilterPaneAction.ToggleAdvancedFilterEditing :
             case FilterPaneAction.ToggleAdvancedFilterEnabled :
             case FilterPaneAction.ToggleBasicFilterEditing :
             case FilterPaneAction.ToggleBasicFilterEnabled :
-            case FilterPaneAction.ToggleCachedFilter :
+            case FilterPaneAction.ToggleCachedFilterEditing :
+            case FilterPaneAction.ToggleCachedFilterEnabled :
             case FilterPaneAction.ToggleFilterDate :
             case FilterPaneAction.ToggleIsEnabled :
             case FilterPaneAction.ToggleIsLoading :
