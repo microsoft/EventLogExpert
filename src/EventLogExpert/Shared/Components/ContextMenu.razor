@@ -12,6 +12,8 @@
         <ul>
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
+                @if (item is FilterType.Description or FilterType.Xml) { continue; }
+
                 <li @onclick="() => FilterEvent(item, FilterEvaluator.Equals)">@item.ToFullString()</li>
             }
         </ul>
@@ -22,6 +24,8 @@
         <ul>
             @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
             {
+                @if (item is FilterType.Description or FilterType.Xml) { continue; }
+
                 <li @onclick="() => FilterEvent(item, FilterEvaluator.NotEqual)">@item.ToFullString()</li>
             }
         </ul>
