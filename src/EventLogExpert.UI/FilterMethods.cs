@@ -191,7 +191,7 @@ public static class FilterMethods
             stringBuilder.Append(GetComparisonString(filterModel.Data.Type, filterModel.Data.Evaluator));
         }
 
-        if (filterModel.SubFilters?.Count > 0)
+        if (filterModel.SubFilters.Count > 0)
         {
             foreach (var subFilter in filterModel.SubFilters)
             {
