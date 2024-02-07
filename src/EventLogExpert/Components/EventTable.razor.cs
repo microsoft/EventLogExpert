@@ -55,6 +55,10 @@ public sealed partial class EventTable
     private string GetCss(DisplayEventModel @event) => SelectedEventState.Value?.RecordId == @event.RecordId ?
         "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
 
+    private string GetDateColumnHeader() => SettingsState.Value.Config.TimeZoneId == TimeZoneInfo.Local.Id ?
+        "Date and Time" :
+        $"Date and Time {SettingsState.Value.Config.TimeZoneInfo.DisplayName.Split(" ").First()}";
+
     private string GetHighlightedColor(DisplayEventModel @event)
     {
         foreach (var filter in FilterColorState.Value.Filters.Where(filter => filter.Comparison.Expression(@event)))
