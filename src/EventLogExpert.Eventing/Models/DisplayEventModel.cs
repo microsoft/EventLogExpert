@@ -42,15 +42,12 @@ public sealed record DisplayEventModel(
                     <Keywords>{(Keywords.HasValue ? "0x" + Keywords.Value.ToString("X") : "0x0")}</Keywords>
                     <TimeCreated SystemTime="{TimeCreated.ToUniversalTime():o}" />
                     <EventRecordID>{RecordId}</EventRecordID>
-            """);
-
-            if (ActivityId is not null) { sb.AppendLine($"        <ActivityID>{ActivityId}</ActivityID>"); }
-
-            sb.AppendLine($"""
+                    {(ActivityId is null ? "<Correlation />" : $"<Correlation ActivityID=\"{ActivityId}\" />")}
+                    {(ProcessId is null && ThreadId is null ?
+                        "<Execution />" :
+                        $"<Execution ProcessID=\"{ProcessId}\" ThreadID=\"{ThreadId}\" />")}
                     <Channel>{LogName}</Channel>
                     <Computer>{ComputerName}</Computer>
-                    <ProcessID>{ProcessId}</ProcessID>
-                    <ThreadID>{ThreadId}</ThreadID>
                 </System>
                 <EventData>
             """);
