@@ -19,7 +19,8 @@
                     }
                 </th>
                 <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                    Date and Time
+                    @GetDateColumnHeader()
+
                     @if (EventTableState.Value.OrderBy == ColumnName.DateAndTime)
                     {
                         <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">

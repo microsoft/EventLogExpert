@@ -94,12 +94,12 @@ tr { height: 22px; }
 
 .level { width: 100px; }
 
-.time { width: 165px; }
+.time { width: 150px; }
 
 .source { width: 250px; }
 
-.id { width: 100px; }
+.id { width: 80px; }
 
-.task { width: 200px; }
+.task { width: 180px; }
 
 .description { width: 100%; }
