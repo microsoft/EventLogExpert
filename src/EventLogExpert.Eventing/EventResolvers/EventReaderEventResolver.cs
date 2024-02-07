@@ -52,7 +52,8 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.ThreadId,
             eventRecord.LogName,
             null,
-            OwningLogName);
+            OwningLogName,
+            eventRecord);
     }
 
     private static T TryGetValue<T>(Func<T> func)

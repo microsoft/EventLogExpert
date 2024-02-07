@@ -303,7 +303,8 @@ public partial class EventResolverBase
             eventRecord.ThreadId,
             eventRecord.LogName!,
             template,
-            owningLogName);
+            owningLogName,
+            eventRecord);
     }
 
     [GeneratedRegex("%+[0-9]+")]

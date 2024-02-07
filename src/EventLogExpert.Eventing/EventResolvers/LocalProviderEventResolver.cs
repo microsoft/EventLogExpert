@@ -59,7 +59,8 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ThreadId,
                 eventRecord.LogName,
                 null,
-                OwningLogName);
+                OwningLogName,
+                eventRecord);
         }
 
         // The Properties getter is expensive, so we only call the getter once,

@@ -213,7 +213,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ThreadId,
                 eventRecord.LogName,
                 null,
-                OwningLogName);
+                OwningLogName,
+                eventRecord);
         }
 
         if (lastResult.Description == null)

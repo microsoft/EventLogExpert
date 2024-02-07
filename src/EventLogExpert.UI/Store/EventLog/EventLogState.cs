@@ -30,4 +30,6 @@ public sealed record EventLogState
     public bool NewEventBufferIsFull { get; init; }
 
     public DisplayEventModel? SelectedEvent { get; init; }
+
+    public ImmutableDictionary<Guid, int> XmlLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 }

@@ -16,6 +16,11 @@
         <span>Loading: @loadingProgress.Value</span>
     }
 
+    @foreach (var xmlProgress in EventLogState.Value.XmlLoading)
+    {
+        <span>Populating XML: @xmlProgress.Value</span>
+    }
+
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
     @if (EventTableState.Value.ActiveTableId is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))

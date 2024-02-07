@@ -46,5 +46,7 @@ public sealed record EventLogAction
     /// <param name="Count"></param>
     public sealed record SetEventsLoading(Guid ActivityId, int Count);
 
+    public sealed record SetXmlLoading(Guid ActivityId, int Count);
+
     public sealed record SetFilters(EventFilter EventFilter);
 }
