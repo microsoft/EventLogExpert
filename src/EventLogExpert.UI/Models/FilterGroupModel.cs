@@ -10,7 +10,7 @@ public sealed record FilterGroupModel
     [JsonIgnore]
     public Guid Id { get; } = Guid.NewGuid();
 
-    public string Name { get; set; } = "New Filter Group";
+    public string Name { get; set; } = "New Filter Section\\New Filter Group";
 
     public string DisplayName => Name.Split('\\').Last();
 
