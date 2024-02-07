@@ -364,7 +364,10 @@ public sealed partial class MainPage : ContentPage
 
     private async void SaveAllFilters_Clicked(object sender, EventArgs e)
     {
-        var groupName = await _dialogService.DisplayPrompt("Group Name", "What would you like to name this group?");
+        var groupName = await _dialogService.DisplayPrompt(
+            "Group Name",
+            "What would you like to name this group?",
+            "New Filter Section\\New Filter Group");
 
         if (string.IsNullOrEmpty(groupName)) { return; }
 
