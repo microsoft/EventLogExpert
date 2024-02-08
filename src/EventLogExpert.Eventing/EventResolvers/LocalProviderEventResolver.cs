@@ -51,14 +51,11 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                eventRecord.Properties,
                 eventRecord.Qualifiers,
-                eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.ProcessId,
                 eventRecord.ThreadId,
                 eventRecord.LogName,
-                null,
                 OwningLogName,
                 eventRecord);
         }
@@ -71,7 +68,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
         if (result.Description == null)
         {
-            result = result with { Description = "" };
+            result.Description = "";
         }
 
         return result;

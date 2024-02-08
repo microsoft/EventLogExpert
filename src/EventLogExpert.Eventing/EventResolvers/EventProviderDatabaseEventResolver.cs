@@ -205,21 +205,18 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                eventProperties,
                 eventRecord.Qualifiers,
-                eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.ProcessId,
                 eventRecord.ThreadId,
                 eventRecord.LogName,
-                null,
                 OwningLogName,
                 eventRecord);
         }
 
         if (lastResult.Description == null)
         {
-            lastResult = lastResult with { Description = "" };
+            lastResult.Description = "";
         }
 
         return lastResult;

@@ -9,20 +9,17 @@ public sealed class DisplayEventModel
 {
     public Guid? ActivityId { get; }
     public string ComputerName { get; }
-    public string Description { get; }
+    public string Description { get; set; }
     public int Id { get; }
-    public long? Keywords { get; }
     public IEnumerable<string> KeywordsDisplayNames { get; }
     public string Level { get; }
     public string LogName { get; }
     public string OwningLog { get; }
     public int? ProcessId { get; }
-    public IList<EventProperty> Properties { get; }
     public int? Qualifiers { get; }
     public long? RecordId { get; }
     public string Source { get; }
     public string TaskCategory { get; }
-    public string? Template { get; }
     public int? ThreadId { get; }
     public DateTime TimeCreated { get; }
 
@@ -36,36 +33,32 @@ public sealed class DisplayEventModel
     string source,
     string taskCategory,
     string description,
-    IList<EventProperty> properties,
     int? qualifiers,
-    long? keywords,
     IEnumerable<string> keywordsDisplayNames,
     int? processId,
     int? threadId,
     string logName, // This is the log name from the event reader
-    string? template,
     string owningLog, // This is the name of the log file or the live log, which we use internally
     EventRecord eventRecord)
     {
         // Public immutable properties
         ActivityId = activityId;
         ComputerName = computerName;
-        Description = description;
         Id = id;
-        Keywords = keywords;
         KeywordsDisplayNames = keywordsDisplayNames;
         Level = level;
         LogName = logName;
         OwningLog = owningLog;
         ProcessId = processId;
-        Properties = properties;
         Qualifiers = qualifiers;
         RecordId = recordId;
         Source = source;
         TaskCategory = taskCategory;
-        Template = template;
         ThreadId = threadId;
         TimeCreated = timeCreated;
+
+        // Public mutable properties
+        Description = description;
 
         // Private properties
         _eventRecord = eventRecord;
