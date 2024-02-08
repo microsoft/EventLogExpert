@@ -44,7 +44,8 @@ public sealed class EventTableReducers
     }
 
     [ReducerMethod(typeof(EventTableAction.CloseAll))]
-    public static EventTableState ReduceCloseAll(EventTableState state) => state with { EventTables = [] };
+    public static EventTableState ReduceCloseAll(EventTableState state) =>
+        state with { EventTables = [], ActiveTableId = null };
 
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
