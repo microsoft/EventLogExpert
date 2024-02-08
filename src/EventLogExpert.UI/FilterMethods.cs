@@ -61,13 +61,6 @@ public static class FilterMethods
 
         List<Func<DisplayEventModel, bool>> filters = [];
 
-        if (eventFilter.DateFilter?.IsEnabled is true)
-        {
-            filters.Add(e =>
-                e.TimeCreated >= eventFilter.DateFilter.After &&
-                e.TimeCreated <= eventFilter.DateFilter.Before);
-        }
-
         if (!eventFilter.AdvancedFilters.IsEmpty)
         {
             filters.Add(e => eventFilter.AdvancedFilters
@@ -84,6 +77,20 @@ public static class FilterMethods
         {
             filters.Add(e => eventFilter.CachedFilters
                 .Any(filter => filter.Comparison.Expression(e)));
+        }
+
+        if (eventFilter.DateFilter?.IsEnabled is true)
+        {
+            return filters.Count <= 0 ?
+                events.Where(e =>
+                    e.TimeCreated >= eventFilter.DateFilter.After &&
+                    e.TimeCreated <= eventFilter.DateFilter.Before) :
+                events.AsParallel()
+                    .Where(e =>
+                        e.TimeCreated >= eventFilter.DateFilter.After &&
+                        e.TimeCreated <= eventFilter.DateFilter.Before &&
+                        filters
+                            .Any(filter => filter(e)));
         }
 
         return events.AsParallel()
