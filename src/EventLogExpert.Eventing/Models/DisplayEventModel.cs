@@ -92,7 +92,6 @@ public sealed class DisplayEventModel
                         _cachedXml = unformattedXml;
                     }
 
-                    _eventRecord.Dispose();
                     _eventRecord = null;
                 }
 
