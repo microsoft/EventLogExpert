@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
+using System;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -95,19 +96,7 @@ public sealed class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSetEventsLoading(EventLogState state, EventLogAction.SetEventsLoading action)
     {
-        var newEventsLoading = state.EventsLoading;
-
-        if (newEventsLoading.ContainsKey(action.ActivityId))
-        {
-            newEventsLoading = newEventsLoading.Remove(action.ActivityId);
-        }
-
-        if (action.Count == 0)
-        {
-            return state with { EventsLoading = newEventsLoading };
-        }
-
-        return state with { EventsLoading = newEventsLoading.Add(action.ActivityId, action.Count) };
+        return state with { EventsLoading = CommonLoadingReducer(state.EventsLoading, action.ActivityId, action.Count) };
     }
 
     [ReducerMethod]
@@ -119,6 +108,27 @@ public sealed class EventLogReducers
         }
 
         return state with { AppliedFilter = action.EventFilter };
+    }
+
+    [ReducerMethod]
+    public static EventLogState ReduceSetXmlLoading(EventLogState state, EventLogAction.SetXmlLoading action)
+    {
+        return state with { XmlLoading = CommonLoadingReducer(state.XmlLoading, action.ActivityId, action.Count) };
+    }
+
+    private static ImmutableDictionary<Guid, int> CommonLoadingReducer(ImmutableDictionary<Guid, int> loadingEntries, Guid activityId, int count)
+    {
+        if (loadingEntries.ContainsKey(activityId))
+        {
+            loadingEntries = loadingEntries.Remove(activityId);
+        }
+
+        if (count == 0)
+        {
+            return loadingEntries;
+        }
+
+        return loadingEntries.Add(activityId, count);
     }
 
     private static EventLogData GetEmptyLogData(string logName, LogType logType) => new(

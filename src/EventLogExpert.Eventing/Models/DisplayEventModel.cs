@@ -2,120 +2,105 @@
 // // Licensed under the MIT License.
 
 using System.Diagnostics.Eventing.Reader;
-using System.Text;
 
 namespace EventLogExpert.Eventing.Models;
 
-public sealed record DisplayEventModel(
-    long? RecordId,
-    Guid? ActivityId,
-    DateTime TimeCreated,
-    int Id,
-    string ComputerName,
-    string Level,
-    string Source,
-    string TaskCategory,
-    string Description,
-    IList<EventProperty> Properties,
-    int? Qualifiers,
-    long? Keywords,
-    IEnumerable<string> KeywordsDisplayNames,
-    int? ProcessId,
-    int? ThreadId,
-    string LogName, // This is the log name from the event reader
-    string? Template,
-    string OwningLog) // This is the name of the log file or the live log, which we use internally
+public sealed class DisplayEventModel
 {
+    public Guid? ActivityId { get; }
+    public string ComputerName { get; }
+    public string Description { get; set; }
+    public int Id { get; }
+    public IEnumerable<string> KeywordsDisplayNames { get; }
+    public string Level { get; }
+    public string LogName { get; }
+    public string OwningLog { get; }
+    public int? ProcessId { get; }
+    public int? Qualifiers { get; }
+    public long? RecordId { get; }
+    public string Source { get; }
+    public string TaskCategory { get; }
+    public int? ThreadId { get; }
+    public DateTime TimeCreated { get; }
+
+    public DisplayEventModel(
+    long? recordId,
+    Guid? activityId,
+    DateTime timeCreated,
+    int id,
+    string computerName,
+    string level,
+    string source,
+    string taskCategory,
+    string description,
+    int? qualifiers,
+    IEnumerable<string> keywordsDisplayNames,
+    int? processId,
+    int? threadId,
+    string logName, // This is the log name from the event reader
+    string owningLog, // This is the name of the log file or the live log, which we use internally
+    EventRecord eventRecord)
+    {
+        // Public immutable properties
+        ActivityId = activityId;
+        ComputerName = computerName;
+        Id = id;
+        KeywordsDisplayNames = keywordsDisplayNames;
+        Level = level;
+        LogName = logName;
+        OwningLog = owningLog;
+        ProcessId = processId;
+        Qualifiers = qualifiers;
+        RecordId = recordId;
+        Source = source;
+        TaskCategory = taskCategory;
+        ThreadId = threadId;
+        TimeCreated = timeCreated;
+
+        // Public mutable properties
+        Description = description;
+
+        // Private properties
+        _eventRecord = eventRecord;
+    }
+
     public string Xml
     {
         get
         {
-            StringBuilder sb = new();
+            if (_cachedXml is not null)
+            {
+                return _cachedXml;
+            }
+            
+            lock (this)
+            {
+                if (_cachedXml is null)
+                {
+                    if (_eventRecord is null)
+                    {
+                        return "Unable to get XML. EventRecord is null.";
+                    }
 
-            sb.AppendLine($"""
-            <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
-                <System>
-                    <Provider Name="{Source}" />
-                    <EventID{(Qualifiers.HasValue ? $" Qualifiers=\"{Qualifiers.Value}\"" : "")}>{Id}</EventID>
-                    <Level>{Level}</Level>
-                    <Task>{TaskCategory}</Task>
-                    <Keywords>{(Keywords.HasValue ? "0x" + Keywords.Value.ToString("X") : "0x0")}</Keywords>
-                    <TimeCreated SystemTime="{TimeCreated.ToUniversalTime():o}" />
-                    <EventRecordID>{RecordId}</EventRecordID>
-                    {(ActivityId is null ? "<Correlation />" : $"<Correlation ActivityID=\"{ActivityId}\" />")}
-                    {(ProcessId is null && ThreadId is null ?
-                        "<Execution />" :
-                        $"<Execution ProcessID=\"{ProcessId}\" ThreadID=\"{ThreadId}\" />")}
-                    <Channel>{LogName}</Channel>
-                    <Computer>{ComputerName}</Computer>
-                </System>
-                <EventData>
-            """);
+                    var unformattedXml = _eventRecord.ToXml();
+                    try
+                    {
+                        _cachedXml = System.Xml.Linq.XElement.Parse(unformattedXml).ToString();
+                    }
+                    catch
+                    {
+                        _cachedXml = unformattedXml;
+                    }
 
-            sb.Append(GetEventData());
+                    _eventRecord = null;
+                }
 
-            sb.Append("""
-                </EventData>
-            </Event>
-            """);
-
-            return sb.ToString();
+                return _cachedXml;
+            }
         }
     }
 
-    private string GetEventData()
-    {
-        StringBuilder sb = new();
+    private string? _cachedXml = null;
 
-        if (!string.IsNullOrEmpty(Template))
-        {
-            try
-            {
-                List<string> propertyNames = [];
-                int index = -1;
-
-                while (-1 < (index = Template.IndexOf("name=", index + 1, StringComparison.Ordinal)))
-                {
-                    var nameStart = index + 6;
-                    var nameEnd = Template.IndexOf('"', nameStart);
-                    var name = Template[nameStart..nameEnd];
-                    propertyNames.Add(name);
-                }
-
-                for (var i = 0; i < Properties.Count; i++)
-                {
-                    if (i >= propertyNames.Count) { break; }
-
-                    if (Properties[i].Value is byte[] val)
-                    {
-                        sb.AppendLine($"           <Data Name=\"{propertyNames[i]}\">{Convert.ToHexString(val)}</Data>");
-                    }
-                    else
-                    {
-                        sb.AppendLine($"           <Data Name=\"{propertyNames[i]}\">{Properties[i].Value}</Data>");
-                    }
-                }
-
-                return sb.ToString();
-            }
-            catch
-            {
-                // No tracer available here
-            }
-        }
-
-        foreach (var p in Properties)
-        {
-            if (p.Value is byte[] bytes)
-            {
-                sb.AppendLine($"            <Data>{Convert.ToHexString(bytes)}</Data>");
-            }
-            else
-            {
-                sb.AppendLine($"            <Data>{p.Value}</Data>");
-            }
-        }
-
-        return sb.ToString();
-    }
+    private EventRecord? _eventRecord;
 }

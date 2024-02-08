@@ -188,6 +188,22 @@ public sealed class EventLogEffects(
                     {
                         logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
                     }
+
+                    sw.Restart();
+                    for (int i = 0; i < events.Count; i++)
+                    {
+                        if (sw.ElapsedMilliseconds > 1000)
+                        {
+                            sw.Restart();
+                            dispatcher.Dispatch(new EventLogAction.SetXmlLoading(activityId, i));
+                        }
+
+                        _ = events[i].Xml;
+                    }
+
+                    dispatcher.Dispatch(new EventLogAction.SetXmlLoading(activityId, 0));
+
+                    dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($""));
                 }
                 finally
                 {

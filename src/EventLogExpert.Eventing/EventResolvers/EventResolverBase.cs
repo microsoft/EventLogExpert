@@ -295,15 +295,13 @@ public partial class EventResolverBase
             eventRecord.ProviderName,
             taskName?.TrimEnd('\0') ?? string.Empty,
             description?.TrimEnd('\0') ?? "Unable to format description",
-            eventProperties,
             eventRecord.Qualifiers,
-            eventRecord.Keywords,
             GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
             eventRecord.ProcessId,
             eventRecord.ThreadId,
             eventRecord.LogName!,
-            template,
-            owningLogName);
+            owningLogName,
+            eventRecord);
     }
 
     [GeneratedRegex("%+[0-9]+")]

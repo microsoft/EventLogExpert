@@ -166,6 +166,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
                     }
 
                     var resolved = _resolver.Resolve(eventArgs.EventRecord, logName);
+                    _ = resolved.Xml; // Immediately cache the ToXml() result.
                     _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
                 }
             };

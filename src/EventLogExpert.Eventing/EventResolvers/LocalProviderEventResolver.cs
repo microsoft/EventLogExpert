@@ -51,15 +51,13 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ProviderName,
                 "",
                 "Description not found. No provider available.",
-                eventRecord.Properties,
                 eventRecord.Qualifiers,
-                eventRecord.Keywords,
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.ProcessId,
                 eventRecord.ThreadId,
                 eventRecord.LogName,
-                null,
-                OwningLogName);
+                OwningLogName,
+                eventRecord);
         }
 
         // The Properties getter is expensive, so we only call the getter once,
@@ -70,7 +68,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
         if (result.Description == null)
         {
-            result = result with { Description = "" };
+            result.Description = "";
         }
 
         return result;
