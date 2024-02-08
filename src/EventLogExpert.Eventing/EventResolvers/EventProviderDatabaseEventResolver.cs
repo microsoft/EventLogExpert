@@ -216,7 +216,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
         if (lastResult.Description == null)
         {
-            lastResult.Description = "";
+            lastResult = lastResult with { Description = ""};
         }
 
         return lastResult;

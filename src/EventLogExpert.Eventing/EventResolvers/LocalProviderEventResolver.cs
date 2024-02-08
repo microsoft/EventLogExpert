@@ -68,7 +68,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
         if (result.Description == null)
         {
-            result.Description = "";
+            result = result with { Description = "" };
         }
 
         return result;
