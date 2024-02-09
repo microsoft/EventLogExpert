@@ -73,6 +73,9 @@ public sealed class FilterPaneReducers
 
         foreach (var filter in action.FilterGroup.Filters)
         {
+            if (state.AdvancedFilters.FirstOrDefault(
+                f => string.Equals(f.Comparison.Value, filter.Comparison.Value)) is not null) { continue; }
+
             updatedList.Add(new FilterModel
             {
                 Color = filter.Color,

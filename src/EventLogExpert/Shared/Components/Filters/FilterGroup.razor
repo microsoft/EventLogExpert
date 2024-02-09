@@ -15,6 +15,10 @@
                     <i class="bi bi-check-circle"></i> Save
                 </button>
 
+                <button class="button" type="button" @onclick="ImportGroup">
+                    <i class="bi bi-download"></i> Import
+                </button>
+
                 <button class="button button-red" type="button" @onclick="RemoveGroup">
                     <i class="bi bi-dash-circle"></i> Remove
                 </button>
@@ -29,6 +33,10 @@
 
                 <button class="button" type="button" @onclick="CopyGroup">
                     <i class="bi bi-clipboard2-plus"></i> Copy
+                </button>
+
+                <button class="button" type="button" @onclick="ExportGroup">
+                    <i class="bi bi-upload"></i> Export
                 </button>
 
                 <button class="button" type="button" @onclick="ToggleGroup">
