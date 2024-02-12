@@ -16,26 +16,10 @@ using IDispatcher = Fluxor.IDispatcher;
 namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed class EventLogEffects(
+    IEventResolver eventResolver,
     IState<EventLogState> eventLogState,
-    ILogWatcherService logWatcherService,
-    IServiceProvider serviceProvider)
+    ILogWatcherService logWatcherService)
 {
-    [EffectMethod(typeof(EventLogAction.CloseAll))]
-    public static Task HandleCloseAll(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.CloseAll());
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod]
-    public static Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogName));
-
-        return Task.CompletedTask;
-    }
-
     [EffectMethod]
     public Task HandleAddEvent(EventLogAction.AddEvent action, IDispatcher dispatcher)
     {
@@ -69,17 +53,22 @@ public sealed class EventLogEffects(
     }
 
     [EffectMethod(typeof(EventLogAction.CloseAll))]
-    public Task HandleCloseAllAction(IDispatcher dispatcher)
+    public Task HandleCloseAll(IDispatcher dispatcher)
     {
         logWatcherService.RemoveAll();
+
+        dispatcher.Dispatch(new EventTableAction.CloseAll());
+        dispatcher.Dispatch(new StatusBarAction.CloseAll());
 
         return Task.CompletedTask;
     }
 
     [EffectMethod]
-    public Task HandleCloseLogAction(EventLogAction.CloseLog action, IDispatcher dispatcher)
+    public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
         logWatcherService.RemoveLog(action.LogName);
+
+        dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogName));
 
         return Task.CompletedTask;
     }
@@ -87,8 +76,7 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.LoadEvents))]
     public Task HandleLoadEvents(IDispatcher dispatcher)
     {
-        var activeLogs =
-            FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, eventLogState.Value.AppliedFilter);
+        var activeLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, eventLogState.Value.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
 
@@ -110,49 +98,32 @@ public sealed class EventLogEffects(
             new EventLogReader(action.LogName, PathType.LogName) :
             new EventLogReader(action.LogName, PathType.FilePath);
 
+        var activityId = Guid.NewGuid();
+
         dispatcher.Dispatch(new EventTableAction.AddTable(
             action.LogType == LogType.Live ? null : action.LogName,
             action.LogName,
             action.LogType));
 
-        // Do this on a background thread so we don't hang the UI
-        await Task.Run(() =>
-            {
-                IEventResolver? eventResolver;
+        try
+        {
+            var sw = new Stopwatch();
+            sw.Start();
 
-                try
+            List<DisplayEventModel> events = [];
+            HashSet<int> eventIdsAll = [];
+            HashSet<Guid?> eventActivityIdsAll = [];
+            HashSet<string> eventProviderNamesAll = [];
+            HashSet<string> eventTaskNamesAll = [];
+            HashSet<string> eventKeywordNamesAll = [];
+            EventRecord? lastEvent = null;
+
+            await Task.Run(() =>
                 {
-                    eventResolver = serviceProvider.GetService<IEventResolver>();
-                }
-                catch (Exception ex)
-                {
-                    dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"{ex.GetType}: {ex.Message}"));
-                    return;
-                }
-
-                if (eventResolver == null)
-                {
-                    dispatcher.Dispatch(new StatusBarAction.SetResolverStatus("Error: No event resolver available."));
-                    return;
-                }
-
-                try
-                {
-                    var activityId = Guid.NewGuid();
-
-                    var sw = new Stopwatch();
-                    sw.Start();
-
-                    List<DisplayEventModel> events = [];
-                    HashSet<int> eventIdsAll = [];
-                    HashSet<Guid?> eventActivityIdsAll = [];
-                    HashSet<string> eventProviderNamesAll = [];
-                    HashSet<string> eventTaskNamesAll = [];
-                    HashSet<string> eventKeywordNamesAll = [];
-                    EventRecord lastEvent = null!;
-
                     while (reader.ReadEvent() is { } e)
                     {
+                        action.Token.ThrowIfCancellationRequested();
+
                         lastEvent = e;
                         var resolved = eventResolver.Resolve(e, action.LogName);
                         eventIdsAll.Add(resolved.Id);
@@ -166,51 +137,61 @@ public sealed class EventLogEffects(
                         if (sw.ElapsedMilliseconds > 1000)
                         {
                             sw.Restart();
-                            dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, events.Count));
+                            dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count));
                         }
                     }
+                },
+                action.Token);
 
-                    dispatcher.Dispatch(new EventLogAction.LoadEvents(
-                        action.LogName,
-                        action.LogType,
-                        events,
-                        eventIdsAll.ToImmutableList(),
-                        eventActivityIdsAll.ToImmutableList(),
-                        eventProviderNamesAll.ToImmutableList(),
-                        eventTaskNamesAll.ToImmutableList(),
-                        eventKeywordNamesAll.ToImmutableList()));
+            dispatcher.Dispatch(new EventLogAction.LoadEvents(
+                action.LogName,
+                action.LogType,
+                events,
+                eventIdsAll.ToImmutableList(),
+                eventActivityIdsAll.ToImmutableList(),
+                eventProviderNamesAll.ToImmutableList(),
+                eventTaskNamesAll.ToImmutableList(),
+                eventKeywordNamesAll.ToImmutableList()));
 
-                    dispatcher.Dispatch(new EventTableAction.ToggleLoading(action.LogName));
+            dispatcher.Dispatch(new EventTableAction.ToggleLoading(action.LogName));
+            dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
-                    dispatcher.Dispatch(new EventLogAction.SetEventsLoading(activityId, 0));
+            if (action.LogType == LogType.Live)
+            {
+                logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
+            }
 
-                    if (action.LogType == LogType.Live)
-                    {
-                        logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
-                    }
+            sw.Restart();
 
-                    sw.Restart();
+            await Task.Run(() =>
+                {
                     for (int i = 0; i < events.Count; i++)
                     {
+                        action.Token.ThrowIfCancellationRequested();
+
                         if (sw.ElapsedMilliseconds > 1000)
                         {
                             sw.Restart();
-                            dispatcher.Dispatch(new EventLogAction.SetXmlLoading(activityId, i));
+                            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, i));
                         }
 
                         _ = events[i].Xml;
                     }
+                },
+                action.Token);
+        }
+        catch (TaskCanceledException)
+        {
+            dispatcher.Dispatch(new EventLogAction.CloseLog(action.LogName));
+        }
+        finally
+        {
+            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(""));
 
-                    dispatcher.Dispatch(new EventLogAction.SetXmlLoading(activityId, 0));
-
-                    dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($""));
-                }
-                finally
-                {
-                    eventResolver.Dispose();
-                }
-            },
-            new CancellationToken());
+            reader.Dispose();
+            eventResolver.Dispose();
+        }
     }
 
     [EffectMethod]

@@ -5,6 +5,7 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterColor;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
@@ -87,8 +88,9 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case EventLogAction.CloseLog :
             case EventLogAction.LoadNewEvents :
             case EventLogAction.SetContinouslyUpdate :
-            case EventLogAction.SetEventsLoading :
             case EventLogAction.SetFilters :
+            case StatusBarAction.SetEventsLoading :
+            case StatusBarAction.SetXmlLoading :
                 debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction :
