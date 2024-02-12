@@ -22,14 +22,10 @@ public sealed record EventLogState
 
     public bool ContinuouslyUpdate { get; init; } = false;
 
-    public ImmutableDictionary<Guid, int> EventsLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
-
     public ReadOnlyCollection<DisplayEventModel> NewEventBuffer { get; init; } =
         new List<DisplayEventModel>().AsReadOnly();
 
     public bool NewEventBufferIsFull { get; init; }
 
     public DisplayEventModel? SelectedEvent { get; init; }
-
-    public ImmutableDictionary<Guid, int> XmlLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 }

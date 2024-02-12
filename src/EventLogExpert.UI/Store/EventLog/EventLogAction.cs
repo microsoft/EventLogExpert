@@ -32,21 +32,11 @@ public sealed record EventLogAction
 
     public sealed record LoadNewEvents;
 
-    public sealed record OpenLog(string LogName, LogType LogType);
+    public sealed record OpenLog(string LogName, LogType LogType, CancellationToken Token = default);
 
     public sealed record SelectEvent(DisplayEventModel? SelectedEvent);
 
     public sealed record SetContinouslyUpdate(bool ContinuouslyUpdate);
-
-    /// <summary>Used to indicate the progress of event logs being loaded.</summary>
-    /// <param name="ActivityId">
-    ///     A unique id that distinguishes this loading activity from others, since log names such as
-    ///     Application will be common and many file names will be the same.
-    /// </param>
-    /// <param name="Count"></param>
-    public sealed record SetEventsLoading(Guid ActivityId, int Count);
-
-    public sealed record SetXmlLoading(Guid ActivityId, int Count);
 
     public sealed record SetFilters(EventFilter EventFilter);
 }

@@ -17,8 +17,10 @@ public sealed record FilterModel
     [JsonIgnore]
     public FilterData Data { get; set; } = new();
 
+    [JsonIgnore]
     public List<FilterModel> SubFilters { get; set; } = [];
 
+    [JsonIgnore]
     public bool ShouldCompareAny { get; set; }
 
     [JsonIgnore]

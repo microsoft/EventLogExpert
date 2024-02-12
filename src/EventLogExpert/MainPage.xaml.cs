@@ -25,7 +25,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
-public sealed partial class MainPage : ContentPage
+public sealed partial class MainPage : ContentPage, IDisposable
 {
     private static readonly KeyboardAccelerator CopyShortcut = new() { Modifiers = KeyboardAcceleratorModifiers.Ctrl, Key = "C" };
 
@@ -38,6 +38,8 @@ public sealed partial class MainPage : ContentPage
     private readonly IState<SettingsState> _settingsState;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
+
+    private CancellationTokenSource _cancellationTokenSource = new();
 
     public MainPage(
         IActionSubscriber actionSubscriber,
@@ -118,6 +120,12 @@ public sealed partial class MainPage : ContentPage
         EnableAddLogToViewViaDragAndDrop();
     }
 
+    public void Dispose()
+    {
+        _cancellationTokenSource.Cancel();
+        _cancellationTokenSource.Dispose();
+    }
+
     private static async Task<IEnumerable<FileResult?>> GetFilePickerResult()
     {
         var options = new PickOptions
@@ -186,7 +194,12 @@ public sealed partial class MainPage : ContentPage
             return;
         }
 
-        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logName, LogType.Live));
+        if (_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logName, LogType.Live, _cancellationTokenSource.Token));
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -206,6 +219,8 @@ public sealed partial class MainPage : ContentPage
     private void CloseAll_Clicked(object? sender, EventArgs e)
     {
         if (sender is null) { return; }
+
+        _cancellationTokenSource.Cancel();
 
         _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
     }
@@ -302,8 +317,15 @@ public sealed partial class MainPage : ContentPage
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
 
-    private void OpenEventLogFile(string fileName) =>
-        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File));
+    private void OpenEventLogFile(string fileName)
+    {
+        if (_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File, _cancellationTokenSource.Token));
+    }
 
     // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)
@@ -349,6 +371,8 @@ public sealed partial class MainPage : ContentPage
 
         foreach (var name in names)
         {
+            if (_cancellationTokenSource.IsCancellationRequested) { return; }
+
             var openItem = new MenuFlyoutItem { Text = name };
             openItem.Clicked += OpenLiveLog_Clicked;
 
