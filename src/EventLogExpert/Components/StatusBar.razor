@@ -11,12 +11,12 @@
 @inject IState<StatusBarState> StatusBarState
 
 <div class="status-bar">
-    @foreach (var loadingProgress in EventLogState.Value.EventsLoading)
+    @foreach (var loadingProgress in StatusBarState.Value.EventsLoading)
     {
         <span>Loading: @loadingProgress.Value</span>
     }
 
-    @foreach (var xmlProgress in EventLogState.Value.XmlLoading)
+    @foreach (var xmlProgress in StatusBarState.Value.XmlLoading)
     {
         <span>Populating XML: @xmlProgress.Value</span>
     }

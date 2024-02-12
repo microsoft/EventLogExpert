@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.EventTable;
 
@@ -22,14 +23,22 @@ public sealed class EventTableReducers
 
         if (state.EventTables.IsEmpty)
         {
-            return state with { EventTables = state.EventTables.Add(newTable), ActiveTableId = newTable.Id };
+            return state with
+            {
+                EventTables = state.EventTables.Add(newTable),
+                ActiveTableId = newTable.Id
+            };
         }
 
         var combinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
 
         if (combinedTable is not null)
         {
-            return state with { EventTables = state.EventTables.Add(newTable), ActiveTableId = combinedTable.Id };
+            return state with
+            {
+                EventTables = state.EventTables.Add(newTable),
+                ActiveTableId = combinedTable.Id
+            };
         }
 
         combinedTable = new EventTableModel { IsCombined = true };
@@ -48,11 +57,40 @@ public sealed class EventTableReducers
         state with { EventTables = [], ActiveTableId = null };
 
     [ReducerMethod]
+    public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action)
+    {
+        var updatedTables = state.EventTables
+            .Where(table => !string.Equals(table.LogName, action.LogName) && !table.IsCombined)
+            .ToImmutableList();
+
+        if (updatedTables.Count <= 0)
+        {
+            return state with { EventTables = [], ActiveTableId = null };
+        }
+
+        return updatedTables.Count > 1 ?
+            state with
+            {
+                EventTables = updatedTables.Add(
+                    new EventTableModel
+                    {
+                        IsCombined = true,
+                        DisplayedEvents = GetCombinedEvents(updatedTables.Select(log => log.DisplayedEvents))
+                            .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
+                            .ToList()
+                            .AsReadOnly()
+                    })
+            } :
+            state with
+            {
+                EventTables = updatedTables,
+                ActiveTableId = updatedTables.First().Id
+            };
+    }
+
+    [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
         state with { ActiveTableId = state.EventTables.First(table => table.Id.Equals(action.TableId)).Id };
-
-    //[ReducerMethod]
-    //public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action) { }
 
     [ReducerMethod]
     public static EventTableState ReduceSetOrderBy(EventTableState state, EventTableAction.SetOrderBy action) =>
@@ -89,7 +127,7 @@ public sealed class EventTableReducers
         {
             if (table.IsCombined) { continue; }
 
-            var currentActiveLog = action.ActiveLogs.First(log => table.LogName.Equals(log.Key)).Value;
+            var currentActiveLog = action.ActiveLogs.First(log => string.Equals(table.LogName, log.Key)).Value;
 
             updatedTables.Add(table.DisplayedEvents.Count == currentActiveLog.Count() ? table : table with
             {
@@ -139,6 +177,11 @@ public sealed class EventTableReducers
                         .AsReadOnly()
                 }));
 
-        return state with { EventTables = [.. updatedTables], OrderBy = orderBy, IsDescending = isDescending };
+        return state with
+        {
+            EventTables = [.. updatedTables],
+            OrderBy = orderBy,
+            IsDescending = isDescending
+        };
     }
 }
