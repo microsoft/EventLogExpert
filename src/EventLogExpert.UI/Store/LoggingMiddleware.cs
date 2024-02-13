@@ -5,7 +5,6 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterColor;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
@@ -29,68 +28,34 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                 debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
 
                 break;
-            case EventTableAction.AddTable :
-            case EventTableAction.CloseAll :
-            case EventTableAction.CloseLog :
-            case EventTableAction.SetActiveTable :
-            case EventTableAction.SetOrderBy :
-            case EventTableAction.ToggleLoading :
-            case EventTableAction.ToggleSorting :
+            case EventLogAction.OpenLog openLogAction :
+                debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogType}.");
+                break;
+            case EventLogAction.AddEventBuffered :
+            case EventLogAction.AddEventSuccess :
+            case EventLogAction.SetFilters :
             case EventTableAction.UpdateDisplayedEvents :
-            case FilterCacheAction.AddFavoriteFilter :
             case FilterCacheAction.AddFavoriteFilterCompleted :
-            case FilterCacheAction.AddRecentFilter :
             case FilterCacheAction.AddRecentFilterCompleted :
-            case FilterCacheAction.RemoveFavoriteFilter :
-            case FilterCacheAction.RemoveFavoriteFilterCompleted :
+            case FilterCacheAction.ImportFavorites :
             case FilterCacheAction.LoadFiltersCompleted :
-            case FilterColorAction.ClearAllFilters :
-            case FilterColorAction.RemoveFilter :
+            case FilterCacheAction.RemoveFavoriteFilterCompleted :
             case FilterColorAction.SetFilter :
-            case FilterGroupAction.AddFilter :
+            case FilterColorAction.SetFilters :
             case FilterGroupAction.AddGroup :
-            case FilterGroupAction.LoadGroups :
+            case FilterGroupAction.ImportGroups :
             case FilterGroupAction.LoadGroupsSuccess :
-            case FilterGroupAction.OpenMenu :
-            case FilterGroupAction.RemoveFilter :
-            case FilterGroupAction.RemoveGroup :
             case FilterGroupAction.SetFilter :
             case FilterGroupAction.SetGroup :
-            case FilterGroupAction.ToggleFilter :
-            case FilterGroupAction.ToggleGroup :
+            case FilterGroupAction.UpdateDisplayGroups :
             case FilterPaneAction.AddAdvancedFilter :
             case FilterPaneAction.AddBasicFilter :
             case FilterPaneAction.AddCachedFilter :
-            case FilterPaneAction.AddSubFilter :
             case FilterPaneAction.ApplyFilterGroup :
-            case FilterPaneAction.ClearAllFilters :
-            case FilterPaneAction.RemoveAdvancedFilter :
-            case FilterPaneAction.RemoveBasicFilter :
-            case FilterPaneAction.RemoveCachedFilter :
-            case FilterPaneAction.RemoveSubFilter :
-            case FilterPaneAction.SaveFilterGroup :
             case FilterPaneAction.SetAdvancedFilter :
             case FilterPaneAction.SetBasicFilter :
             case FilterPaneAction.SetCachedFilter :
             case FilterPaneAction.SetFilterDateRange :
-            case FilterPaneAction.ToggleAdvancedFilterEditing :
-            case FilterPaneAction.ToggleAdvancedFilterEnabled :
-            case FilterPaneAction.ToggleBasicFilterEditing :
-            case FilterPaneAction.ToggleBasicFilterEnabled :
-            case FilterPaneAction.ToggleCachedFilterEditing :
-            case FilterPaneAction.ToggleCachedFilterEnabled :
-            case FilterPaneAction.ToggleFilterDate :
-            case FilterPaneAction.ToggleIsEnabled :
-            case FilterPaneAction.ToggleIsLoading :
-            case EventLogAction.AddEventBuffered :
-            case EventLogAction.AddEventSuccess :
-            case EventLogAction.CloseAll :
-            case EventLogAction.CloseLog :
-            case EventLogAction.LoadNewEvents :
-            case EventLogAction.SetContinouslyUpdate :
-            case EventLogAction.SetFilters :
-            case StatusBarAction.SetEventsLoading :
-            case StatusBarAction.SetXmlLoading :
                 debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction :

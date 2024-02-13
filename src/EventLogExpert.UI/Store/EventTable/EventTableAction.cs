@@ -21,5 +21,7 @@ public sealed record EventTableAction
 
     public sealed record ToggleSorting;
 
+    public sealed record UpdateCombinedEvents;
+
     public sealed record UpdateDisplayedEvents(IDictionary<string, IEnumerable<DisplayEventModel>> ActiveLogs);
 }

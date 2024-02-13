@@ -16,9 +16,9 @@ using IDispatcher = Fluxor.IDispatcher;
 namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed class EventLogEffects(
-    IEventResolver eventResolver,
     IState<EventLogState> eventLogState,
-    ILogWatcherService logWatcherService)
+    ILogWatcherService logWatcherService,
+    IServiceProvider serviceProvider)
 {
     [EffectMethod]
     public Task HandleAddEvent(EventLogAction.AddEvent action, IDispatcher dispatcher)
@@ -94,6 +94,17 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
+        using var scopedProvider = serviceProvider.CreateScope();
+
+        var eventResolver = scopedProvider.ServiceProvider.GetService<IEventResolver>();
+
+        if (eventResolver is null)
+        {
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus("Error: No event resolver available"));
+
+            return;
+        }
+
         EventLogReader reader = action.LogType == LogType.Live ?
             new EventLogReader(action.LogName, PathType.LogName) :
             new EventLogReader(action.LogName, PathType.FilePath);
@@ -153,7 +164,6 @@ public sealed class EventLogEffects(
                 eventTaskNamesAll.ToImmutableList(),
                 eventKeywordNamesAll.ToImmutableList()));
 
-            dispatcher.Dispatch(new EventTableAction.ToggleLoading(action.LogName));
             dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
             if (action.LogType == LogType.Live)
@@ -179,18 +189,19 @@ public sealed class EventLogEffects(
                     }
                 },
                 action.Token);
+
+                dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
         }
         catch (TaskCanceledException)
         {
             dispatcher.Dispatch(new EventLogAction.CloseLog(action.LogName));
+            dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
         }
         finally
         {
-            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
-            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(""));
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
 
             reader.Dispose();
-            eventResolver.Dispose();
         }
     }
 

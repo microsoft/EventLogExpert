@@ -5,6 +5,8 @@ namespace EventLogExpert.UI.Store.StatusBar;
 
 public sealed record StatusBarAction
 {
+    public sealed record ClearStatus(Guid ActivityId);
+
     public sealed record CloseAll;
 
     /// <summary>Used to indicate the progress of event logs being loaded.</summary>
