@@ -19,6 +19,9 @@ namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
+    private EventTableState _eventTableState = null!;
+    private DisplayEventModel? _selectedEventState;
+
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
@@ -33,31 +36,55 @@ public sealed partial class EventTable
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
-    protected override void OnInitialized()
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("registerTableEvents");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvent);
 
-        SubscribeToAction<EventTableAction.AddTable>(action => RegisterTableEvents().AndForget());
         SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
+        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
 
-        base.OnInitialized();
+        await base.OnInitializedAsync();
     }
 
-    private static string GetLevelClass(string level) => level switch
+    protected override bool ShouldRender()
     {
-        nameof(SeverityLevel.Error) => "bi bi-exclamation-circle error",
-        nameof(SeverityLevel.Warning) => "bi bi-exclamation-triangle warning",
-        nameof(SeverityLevel.Information) => "bi bi-info-circle",
-        _ => string.Empty,
-    };
+        if (ReferenceEquals(EventTableState.Value, _eventTableState) &&
+            ReferenceEquals(SelectedEventState.Value, _selectedEventState)) { return false; }
 
-    private string GetCss(DisplayEventModel @event) => SelectedEventState.Value?.RecordId == @event.RecordId ?
-        "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
+        _eventTableState = EventTableState.Value;
+        _selectedEventState = SelectedEventState.Value;
 
-    private string GetDateColumnHeader() => SettingsState.Value.Config.TimeZoneId == TimeZoneInfo.Local.Id ?
-        "Date and Time" :
-        $"Date and Time {SettingsState.Value.Config.TimeZoneInfo.DisplayName.Split(" ").First()}";
+        return true;
+    }
+
+    private static string GetLevelClass(string level) =>
+        level switch
+        {
+            nameof(SeverityLevel.Error) => "bi bi-exclamation-circle error",
+            nameof(SeverityLevel.Warning) => "bi bi-exclamation-triangle warning",
+            nameof(SeverityLevel.Information) => "bi bi-info-circle",
+            _ => string.Empty,
+        };
+
+    private string GetCss(DisplayEventModel @event) =>
+        SelectedEventState.Value?.RecordId == @event.RecordId ?
+            "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
+
+    private string GetDateColumnHeader() =>
+        SettingsState.Value.Config.TimeZoneId == TimeZoneInfo.Local.Id ?
+            "Date and Time" :
+            $"Date and Time {SettingsState.Value.Config.TimeZoneInfo.DisplayName.Split(" ").First()}";
 
     private string GetHighlightedColor(DisplayEventModel @event)
     {
@@ -93,18 +120,9 @@ public sealed partial class EventTable
         return !enabled;
     }
 
-    private async Task RegisterTableEvents()
-    {
-        foreach (var table in EventTableState.Value.EventTables)
-        {
-            await JSRuntime.InvokeVoidAsync("registerTableEvents", table.Id);
-        }
-    }
-
     private async Task ScrollToSelectedEvent()
     {
-        var table = EventTableState.Value.EventTables
-            .FirstOrDefault(table => table.Id == EventTableState.Value.ActiveTableId);
+        var table = EventTableState.Value.EventTables.FirstOrDefault(x => x.Id == EventTableState.Value.ActiveTableId);
 
         var entry = table?.DisplayedEvents.FirstOrDefault(x =>
             string.Equals(x.LogName, SelectedEventState.Value?.LogName) &&
@@ -116,7 +134,7 @@ public sealed partial class EventTable
 
         if (index >= 0)
         {
-            await JSRuntime.InvokeVoidAsync("scrollToRow", table.Id, index);
+            await JSRuntime.InvokeVoidAsync("scrollToRow", index);
         }
     }
 

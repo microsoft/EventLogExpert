@@ -1,5 +1,7 @@
-window.registerTableEvents = (id) => {
-    const table = document.getElementById(id);
+window.registerTableEvents = () => {
+    const table = document.getElementById("eventTable");
+
+    if (!table) { return; }
 
     deleteColumnResize(table);
     enableColumnResize(table);
@@ -86,8 +88,8 @@ window.registerKeyHandlers = (table) => {
     table.addEventListener("keydown", keyDownHandler);
 };
 
-window.scrollToRow = (id, offset) => {
-    const table = document.getElementById(id);
+window.scrollToRow = (offset) => {
+    const table = document.getElementById("eventTable");
     const row = table.getElementsByTagName("tr")[0];
 
     table.parentNode.scrollTo({

@@ -8,6 +8,24 @@ namespace EventLogExpert.UI.Store.StatusBar;
 
 public sealed class StatusBarReducers
 {
+    [ReducerMethod]
+    public static StatusBarState ReduceCloseAll(StatusBarState state, StatusBarAction.ClearStatus action)
+    {
+        var updatedState = state with { };
+
+        if (state.EventsLoading.ContainsKey(action.ActivityId))
+        {
+            updatedState = updatedState with { EventsLoading = updatedState.EventsLoading.Remove(action.ActivityId) };
+        }
+
+        if (state.XmlLoading.ContainsKey(action.ActivityId))
+        {
+            updatedState = updatedState with { XmlLoading = updatedState.XmlLoading.Remove(action.ActivityId) };
+        }
+
+        return updatedState;
+    }
+
     [ReducerMethod(typeof(StatusBarAction.CloseAll))]
     public static StatusBarState ReduceCloseAll(StatusBarState state) => new();
 
