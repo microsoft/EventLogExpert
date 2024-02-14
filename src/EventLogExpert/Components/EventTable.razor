@@ -87,7 +87,7 @@
             </thead>
             <tbody @oncontextmenu="InvokeContextMenu">
             <Virtualize Items="table.DisplayedEvents" Context="evt">
-                <tr @key="@($"{table.Id}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
+                <tr @key="@($"{evt.OwningLog}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td hidden="@(IsColumnHidden(ColumnName.Level))">
                         <span class="@GetLevelClass(evt.Level)"></span>
                         @evt.Level
