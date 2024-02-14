@@ -9,6 +9,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
@@ -104,7 +105,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         actionSubscriber.SubscribeToAction<SettingsAction.SaveCompleted>(this,
             action => { SetCopyKeyboardAccelerator(); });
 
-        fluxorDispatcher.Dispatch(new SettingsAction.LoadColumns());
+        fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());

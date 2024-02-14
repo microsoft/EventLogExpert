@@ -115,7 +115,7 @@ public sealed partial class EventTable
 
     private bool IsColumnHidden(ColumnName columnName)
     {
-        if (!SettingsState.Value.EventTableColumns.TryGetValue(columnName, out var enabled)) { return true; }
+        if (!EventTableState.Value.Columns.TryGetValue(columnName, out var enabled)) { return true; }
 
         return !enabled;
     }

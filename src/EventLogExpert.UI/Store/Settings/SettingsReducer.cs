@@ -10,13 +10,6 @@ namespace EventLogExpert.UI.Store.Settings;
 public sealed partial class SettingsReducer
 {
     [ReducerMethod]
-    public static SettingsState ReduceLoadColumnsComleted(SettingsState state,
-        SettingsAction.LoadColumnsCompleted action) => state with
-    {
-        EventTableColumns = action.LoadedColumns.ToImmutableDictionary()
-    };
-
-    [ReducerMethod]
     public static SettingsState ReduceLoadDatabasesCompleted(SettingsState state,
         SettingsAction.LoadDatabasesCompleted action) => state with
     {

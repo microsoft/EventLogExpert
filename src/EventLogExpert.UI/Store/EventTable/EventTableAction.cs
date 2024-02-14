@@ -13,9 +13,15 @@ public sealed record EventTableAction
 
     public sealed record CloseLog(string LogName);
 
+    public sealed record LoadColumns;
+
+    public sealed record LoadColumnsCompleted(IDictionary<ColumnName, bool> LoadedColumns);
+
     public sealed record SetActiveTable(Guid TableId);
 
     public sealed record SetOrderBy(ColumnName? OrderBy);
+
+    public sealed record ToggleColumn(ColumnName ColumnName);
 
     public sealed record ToggleLoading(string LogName);
 
