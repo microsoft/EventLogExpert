@@ -14,6 +14,8 @@ public sealed record EventTableState
 
     public Guid? ActiveTableId { get; init; }
 
+    public IImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
+
     public ColumnName? OrderBy { get; init; }
 
     public bool IsDescending { get; init; } = true;

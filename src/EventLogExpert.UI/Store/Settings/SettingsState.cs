@@ -12,8 +12,5 @@ public record SettingsState
 {
     public SettingsModel Config { get; init; } = new();
 
-    public IImmutableDictionary<ColumnName, bool> EventTableColumns { get; init; } =
-        ImmutableDictionary<ColumnName, bool>.Empty;
-
     public IImmutableList<string> LoadedDatabases { get; init; } = ImmutableList<string>.Empty;
 }

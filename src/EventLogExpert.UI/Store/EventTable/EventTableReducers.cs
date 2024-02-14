@@ -85,6 +85,15 @@ public sealed class EventTableReducers
     }
 
     [ReducerMethod]
+    public static EventTableState ReduceLoadColumnsCompleted(
+        EventTableState state,
+        EventTableAction.LoadColumnsCompleted action) =>
+        state with
+        {
+            Columns = action.LoadedColumns.ToImmutableDictionary()
+        };
+
+    [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
         state with { ActiveTableId = state.EventTables.First(table => table.Id.Equals(action.TableId)).Id };
 
