@@ -6,37 +6,71 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
 public sealed partial class SplitLogTabPane
 {
-    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
+    private EventTableState _eventTableState = null!;
+
+    private List<EventTableModel> _sortedTabs = [];
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private static string GetTabName(EventTableModel table) =>
-        table.LogType is LogType.File ?
+    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
+
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("registerTabPaneEvents");
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override bool ShouldRender()
+    {
+        if (ReferenceEquals(EventTableState.Value, _eventTableState)) { return false; }
+
+        _eventTableState = EventTableState.Value;
+
+        _sortedTabs =
+        [
+            .. EventTableState.Value.EventTables
+                .OrderByDescending(table => table.IsCombined)
+                .ThenBy(table => table.ComputerName)
+                .ThenBy(table => table.LogName)
+        ];
+
+        return true;
+    }
+
+    private static string GetTabName(EventTableModel table)
+    {
+        if (table.IsCombined) { return "Combined"; }
+
+        return table.LogType is LogType.File ?
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
             $"{table.LogName} - {table.ComputerName}";
-
-    private static string GetTabTooltip(EventTableModel table) =>
-        $"{(table.LogType == LogType.File ? "Log File: " : "Live Log: ")} {table.FileName}\n" +
-        $"Log Name: {table.LogName}\n" +
-        $"Computer Name: {table.ComputerName}";
-
-    private string GetTabWidth()
-    {
-        var logCount = EventTableState.Value.EventTables.Count;
-
-        return logCount > 4 ? $"{100 / (logCount + 1)}vw" : "20vw";
     }
 
-    private void SetActiveLog(EventTableModel table)
+    private static string GetTabTooltip(EventTableModel table)
     {
-        if (table.IsLoading) { return; }
+        if (table.IsCombined) { return string.Empty; }
 
+        return $"{(table.LogType == LogType.File ? "Log File: " : "Live Log: ")} {table.FileName}\n" +
+            $"Log Name: {table.LogName}\n" +
+            $"Computer Name: {table.ComputerName}";
+    }
+
+    private string GetActiveTab(EventTableModel table) =>
+        EventTableState.Value.ActiveTableId == table.Id ? "tab active" : "tab";
+
+    private void SetActiveLog(EventTableModel table) =>
         Dispatcher.Dispatch(new EventTableAction.SetActiveTable(table.Id));
-    }
 }

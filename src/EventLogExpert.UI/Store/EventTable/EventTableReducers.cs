@@ -94,8 +94,14 @@ public sealed class EventTableReducers
         };
 
     [ReducerMethod]
-    public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action) =>
-        state with { ActiveTableId = state.EventTables.First(table => table.Id.Equals(action.TableId)).Id };
+    public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action)
+    {
+        var activeTable = state.EventTables.First(table => table.Id.Equals(action.TableId));
+
+        if (activeTable.IsLoading) { return state; }
+
+        return state with { ActiveTableId = activeTable.Id };
+    }
 
     [ReducerMethod]
     public static EventTableState ReduceSetOrderBy(EventTableState state, EventTableAction.SetOrderBy action) =>

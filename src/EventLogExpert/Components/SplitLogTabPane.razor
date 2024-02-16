@@ -1,38 +1,19 @@
 @inherits FluxorComponent
 
-@if (EventTableState.Value.EventTables.Count > 1)
-{
-    <div id="tab-pane">
-        <div class="tab-row">
-            <div style="max-width: @GetTabWidth()">
-                <input type="radio" name="tab" id="log" checked
-                    @onclick="() => SetActiveLog(EventTableState.Value.EventTables.First(table => table.IsCombined))" />
-                <label for="log" tabindex="0">Combined</label>
+<div id="tab-pane" hidden="@(EventTableState.Value.EventTables.Count <= 1)">
+    <div class="tab-row">
+        @foreach (var table in _sortedTabs)
+        {
+            <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)" @onclick="() => SetActiveLog(table)" disabled="@table.IsLoading">
+                <span>
+                    @if (table.IsLoading)
+                    {
+                        <i class="spinner-border" role="status"></i>
+                        @:&nbsp;
+                    }
+                    @GetTabName(table)
+                </span>
             </div>
-
-            @{
-                var logsTabSorted = EventTableState.Value.EventTables
-                    .Where(l => l.IsCombined is false)
-                    .OrderBy(l => l.ComputerName)
-                    .ThenBy(l => l.LogName)
-                    .ToList();
-
-                for (int i = 0; i < logsTabSorted.Count; i++)
-                {
-                    var log = logsTabSorted[i];
-                    <div style="max-width: @GetTabWidth()" title="@GetTabTooltip(log)">
-                        <input type="radio" name="tab" id="@($"log{i}")" @onclick="() => SetActiveLog(log)" disabled="@log.IsLoading" />
-                        <label for="@($"log{i}")" tabindex="0">
-                            @if (log.IsLoading)
-                            {
-                                <i class="spinner-border" role="status"></i>
-                                @:&nbsp;
-                            }
-                            @GetTabName(log)
-                        </label>
-                    </div>
-                }
-            }
-        </div>
+        }
     </div>
-}
+</div>
