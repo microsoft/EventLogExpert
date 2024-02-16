@@ -53,5 +53,11 @@ window.registerTabPaneScroller = (tabPane) => {
         tabPane.scrollLeft = currentPos - pos;
     });
 
+    tabPane.addEventListener("wheel", (e) => {
+        e.preventDefault();
+
+        tabPane.scrollLeft += e.deltaY;
+    });
+
     tabPane.addEventListener("mouseleave", () => { canDrag = false; });
 }
