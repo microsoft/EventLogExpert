@@ -10,7 +10,7 @@ namespace EventLogExpert.UI.Services;
 
 public interface IUpdateService
 {
-    Task CheckForUpdates(bool isPrereleaseEnabled, bool manualScan);
+    Task CheckForUpdates(bool isPreReleaseEnabled, bool manualScan);
 
     Task GetReleaseNotes();
 }
@@ -23,12 +23,12 @@ public sealed class UpdateService(
     ITraceLogger traceLogger,
     IAlertDialogService alertDialogService) : IUpdateService
 {
-    public async Task CheckForUpdates(bool prereleaseVersionsEnabled, bool manualScan)
-    {
-        traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(prereleaseVersionsEnabled)} is {prereleaseVersionsEnabled}. " +
-            $"{nameof(manualScan)} is {manualScan}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
+    private List<string>? _currentChanges;
 
-        GitReleaseModel? latest = null;
+    public async Task CheckForUpdates(bool usePreRelease, bool manualScan)
+    {
+        traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(usePreRelease)} is {usePreRelease}. " +
+            $"{nameof(manualScan)} is {manualScan}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
 
         if (versionProvider.IsDevBuild)
         {
@@ -37,55 +37,75 @@ public sealed class UpdateService(
             return;
         }
 
+        GitReleaseModel latest;
+
         try
         {
             // Versions are based on current DateTime so this is safer than dealing with
             // stripping the v off the Version for every release
-            var releases = await githubService.GetReleases();
-            releases = releases.OrderByDescending(x => x.ReleaseDate).ToArray();
+            GitReleaseModel[] releases = [.. (await githubService.GetReleases()).OrderByDescending(x => x.ReleaseDate)];
+
+            if (releases.Length <= 0)
+            {
+                throw new FileNotFoundException("No releases available");
+            }
 
             traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:");
 
             foreach (var release in releases)
             {
                 traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
-                    $"ReleaseDate: {release.ReleaseDate} IsPrerelease: {release.IsPrerelease}");
-            }
+                    $"ReleaseDate: {release.ReleaseDate} IsPreRelease: {release.IsPreRelease}");
 
-            latest = prereleaseVersionsEnabled ?
-                releases.FirstOrDefault() :
-                releases.FirstOrDefault(x => !x.IsPrerelease);
+                if (versionProvider.CurrentVersion.CompareTo(release) != 0) { continue; }
 
-            if (latest is null)
-            {
-                traceLogger.Trace($"{nameof(CheckForUpdates)} Could not find latest release.", LogLevel.Warning);
+                _currentChanges = release.Changes;
 
-                return;
-            }
-
-            traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPrerelease: {latest.IsPrerelease}");
-
-            // Need to drop the v off the version number provided by GitHub
-            var newVersion = new Version(latest.Version.TrimStart('v'));
-
-            traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
-
-            // Setting version to equal allows rollback if a version is pulled
-            if (newVersion.CompareTo(versionProvider.CurrentVersion) == 0)
-            {
-                if (manualScan)
+                if (release.IsPreRelease)
                 {
-                    await alertDialogService.ShowAlert("No Updates Available",
-                        "You are currently running the latest version.",
-                        "Ok");
+                    appTitleService.SetIsPrerelease(true);
                 }
-
-                return;
             }
 
-            string? downloadPath = latest.Assets.FirstOrDefault(x => x.Name.Contains(".msix"))?.Uri;
+            latest = releases.First(x => x.IsPreRelease == usePreRelease);
+            
+        }
+        catch (Exception ex)
+        {
+            traceLogger.Trace($"{nameof(CheckForUpdates)} failed while retrieving releases: {ex.Message}.", LogLevel.Warning);
+            
+            await alertDialogService.ShowAlert("Update Failure",
+                $"Failed to retrieve latest releases:\r\n{ex.Message}",
+                "Ok");
 
-            if (downloadPath is null)
+            return;
+        }
+
+        traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPreRelease: {latest.IsPreRelease}");
+
+        // Need to drop the v off the version number provided by GitHub
+        var newVersion = new Version(latest.Version.TrimStart('v'));
+
+        traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
+
+        // Setting version to equal allows rollback if a version is pulled
+        if (newVersion.CompareTo(versionProvider.CurrentVersion) == 0)
+        {
+            if (manualScan)
+            {
+                await alertDialogService.ShowAlert("No Updates Available",
+                    "You are currently running the latest version.",
+                    "Ok");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string downloadPath = latest.Assets.First(x => x.Name.Contains(".msix")).Uri;
+
+            if (string.IsNullOrEmpty(downloadPath))
             {
                 traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
 
@@ -116,20 +136,13 @@ public sealed class UpdateService(
         }
         finally
         {
-            appTitleService.SetIsPrerelease(latest?.IsPrerelease ?? false);
-
             appTitleService.SetProgressString(null);
         }
     }
 
     public async Task GetReleaseNotes()
     {
-        var releases = await githubService.GetReleases();
-
-        var currentRelease = releases.FirstOrDefault(
-            x => new Version(x.Version.TrimStart('v')).CompareTo(versionProvider.CurrentVersion) == 0);
-
-        if (currentRelease is null)
+        if (_currentChanges is null)
         {
             await alertDialogService.ShowAlert("Release Notes Failure",
                 "Failed to get release notes for the current version",
@@ -140,11 +153,11 @@ public sealed class UpdateService(
 
         StringBuilder formattedChanges = new();
 
-        foreach (var change in currentRelease.Changes)
+        foreach (var change in _currentChanges)
         {
             formattedChanges.AppendLine($"# {change}");
         }
 
-        await alertDialogService.ShowAlert($"Release notes for {currentRelease.Version}", formattedChanges.ToString(), "Ok");
+        await alertDialogService.ShowAlert($"Release notes for {versionProvider.CurrentVersion}", formattedChanges.ToString(), "Ok");
     }
 }

@@ -6,17 +6,17 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Models;
 
-public sealed partial record GitReleaseModel
+public readonly partial record struct GitReleaseModel
 {
-    [JsonPropertyName("name")] public string Version { get; set; } = null!;
+    [JsonPropertyName("name")] public string Version { get; init; }
 
-    [JsonPropertyName("prerelease")] public bool IsPrerelease { get; set; }
+    [JsonPropertyName("prerelease")] public bool IsPreRelease { get; init; }
 
-    [JsonPropertyName("published_at")] public DateTime ReleaseDate { get; set; }
+    [JsonPropertyName("published_at")] public DateTime ReleaseDate { get; init; }
 
-    [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; set; } = null!;
+    [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; init; }
 
-    [JsonPropertyName("body")] public string RawChanges { get; set; } = null!;
+    [JsonPropertyName("body")] public string RawChanges { get; init; }
 
     public List<string> Changes
     {
@@ -49,9 +49,9 @@ public sealed partial record GitReleaseModel
     private static partial Regex SplitChangeLog();
 }
 
-public sealed record GitReleaseAsset
+public readonly record struct GitReleaseAsset()
 {
-    [JsonPropertyName("name")] public string Name { get; set; } = null!;
+    [JsonPropertyName("name")] public string Name { get; init; } = null!;
 
-    [JsonPropertyName("browser_download_url")] public string Uri { get; set; } = null!;
+    [JsonPropertyName("browser_download_url")] public string Uri { get; init; }
 }

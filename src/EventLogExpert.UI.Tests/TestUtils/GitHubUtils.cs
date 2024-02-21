@@ -10,7 +10,7 @@ public static class GitHubUtils
         new GitReleaseModel
         {
             Version = GitHubPrereleaseVersion,
-            IsPrerelease = true,
+            IsPreRelease = true,
             ReleaseDate = DateTime.Now,
             Assets =
             [
@@ -25,7 +25,7 @@ public static class GitHubUtils
         new GitReleaseModel
         {
             Version = GitHubLatestVersion,
-            IsPrerelease = false,
+            IsPreRelease = false,
             ReleaseDate = DateTime.Now.AddDays(-1),
             Assets =
             [
