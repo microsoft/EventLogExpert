@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Models;
 
-public record FilterDateModel
+public sealed record FilterDateModel
 {
     public DateTime After { get; set; }
 

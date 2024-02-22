@@ -12,7 +12,7 @@ public sealed record EventTableState
 {
     public ImmutableList<EventTableModel> EventTables { get; init; } = [];
 
-    public Guid? ActiveTableId { get; init; }
+    public EventLogId? ActiveEventLogId { get; init; }
 
     public IImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
 

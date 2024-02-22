@@ -30,7 +30,7 @@ public enum CopyType
     Xml
 }
 
-public enum FilterColor {
+public enum HighlightColor {
     None,
     Blue,
     Green,

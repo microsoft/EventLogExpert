@@ -4,7 +4,6 @@
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
-using EventLogExpert.UI.Store.FilterColor;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using System.Collections.Immutable;
@@ -26,11 +25,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
             dispatcher.Dispatch(
                 new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
-
-        if (action.FilterModel?.IsEnabled is true)
-        {
-            dispatcher.Dispatch(new FilterColorAction.SetFilter(action.FilterModel));
-        }
     }
 
     [EffectMethod]
@@ -46,61 +40,31 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
             dispatcher.Dispatch(
                 new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
-
-        if (action.FilterModel?.IsEnabled is true)
-        {
-            dispatcher.Dispatch(new FilterColorAction.SetFilter(action.FilterModel));
-        }
     }
 
-    [EffectMethod]
-    public async Task HandleAddCachedFilter(FilterPaneAction.AddCachedFilter action, IDispatcher dispatcher)
-    {
+    [EffectMethod(typeof(FilterPaneAction.AddCachedFilter))]
+    public async Task HandleAddCachedFilter(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        dispatcher.Dispatch(new FilterColorAction.SetFilter(action.FilterModel));
-    }
 
     [EffectMethod(typeof(FilterPaneAction.ApplyFilterGroup))]
-    public async Task HandleApplyFilterGroup(IDispatcher dispatcher)
-    {
+    public async Task HandleApplyFilterGroup(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        dispatcher.Dispatch(new FilterColorAction.SetFilters(
-            filterPaneState.Value.AdvancedFilters.Where(filter => filter is { IsEditing: false, IsEnabled: true })));
-    }
 
     [EffectMethod(typeof(FilterPaneAction.ClearAllFilters))]
-    public async Task HandleClearAllFilters(IDispatcher dispatcher)
-    {
+    public async Task HandleClearAllFilters(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-        dispatcher.Dispatch(new FilterColorAction.ClearAllFilters());
-    }
-
-    [EffectMethod]
-    public async Task HandleRemoveAdvancedFilter(FilterPaneAction.RemoveAdvancedFilter action, IDispatcher dispatcher)
-    {
+    [EffectMethod(typeof(FilterPaneAction.RemoveAdvancedFilter))]
+    public async Task HandleRemoveAdvancedFilter(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-        dispatcher.Dispatch(new FilterColorAction.RemoveFilter(action.Id));
-    }
-
-    [EffectMethod]
-    public async Task HandleRemoveBasicFilter(FilterPaneAction.RemoveBasicFilter action, IDispatcher dispatcher)
-    {
+    [EffectMethod(typeof(FilterPaneAction.RemoveBasicFilter))]
+    public async Task HandleRemoveBasicFilter(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-        dispatcher.Dispatch(new FilterColorAction.RemoveFilter(action.Id));
-    }
-
-    [EffectMethod]
-    public async Task HandleRemoveCachedFilter(FilterPaneAction.RemoveCachedFilter action, IDispatcher dispatcher)
-    {
+    [EffectMethod(typeof(FilterPaneAction.RemoveCachedFilter))]
+    public async Task HandleRemoveCachedFilter(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        dispatcher.Dispatch(new FilterColorAction.RemoveFilter(action.Id));
-    }
 
     [EffectMethod]
     public Task HandleSaveFilterGroup(FilterPaneAction.SaveFilterGroup action, IDispatcher dispatcher)
@@ -114,11 +78,15 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
                 new FilterGroupModel
                 {
                     Name = action.Name,
-                    Filters = [.. filters.Select(filter =>
-                        new FilterModel {
-                            Color = filter.Color,
-                            Comparison = filter.Comparison with { }
-                        })]
+                    Filters =
+                    [
+                        .. filters.Select(filter =>
+                            new FilterModel
+                            {
+                                Color = filter.Color,
+                                Comparison = filter.Comparison with { }
+                            })
+                    ]
                 }));
 
         return Task.CompletedTask;
@@ -133,8 +101,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
-
-        UpdateFilterColors(action.FilterModel, dispatcher);
     }
 
     [EffectMethod]
@@ -146,8 +112,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
-
-        UpdateFilterColors(action.FilterModel, dispatcher);
     }
 
     [EffectMethod]
@@ -159,8 +123,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
-
-        UpdateFilterColors(action.FilterModel, dispatcher);
     }
 
     [EffectMethod(typeof(FilterPaneAction.SetFilterDateRange))]
@@ -181,8 +143,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         if (filter is null) { return; }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        UpdateFilterColors(filter, dispatcher);
     }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleBasicFilterEditing))]
@@ -199,8 +159,6 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         if (filter is null) { return; }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        UpdateFilterColors(filter, dispatcher);
     }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleCachedFilterEditing))]
@@ -208,15 +166,15 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
     [EffectMethod]
-    public async Task HandleToggleCachedFilterEnabled(FilterPaneAction.ToggleCachedFilterEnabled action, IDispatcher dispatcher)
+    public async Task HandleToggleCachedFilterEnabled(
+        FilterPaneAction.ToggleCachedFilterEnabled action,
+        IDispatcher dispatcher)
     {
-        var filter = filterPaneState.Value.CachedFilters.FirstOrDefault(x => x.Id.Equals(action.Id));
+        var filter = filterPaneState.Value.CachedFilters.FirstOrDefault(x => x.Id == action.Id);
 
         if (filter is null) { return; }
 
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
-        UpdateFilterColors(filter, dispatcher);
     }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterDate))]
@@ -227,12 +185,13 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     public async Task HandleToggleIsEnabled(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
-        filterPaneState.FilteredDateRange,
-        filterPaneState.AdvancedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-        filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-        filterPaneState.BasicFilters.Where(f => f.IsEnabled).ToImmutableList()
-    );
+    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
+        new(
+            filterPaneState.FilteredDateRange,
+            filterPaneState.AdvancedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+            filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+            filterPaneState.BasicFilters.Where(f => f.IsEnabled).ToImmutableList()
+        );
 
     private static async Task UpdateEventTableFiltersAsync(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
@@ -250,17 +209,5 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         }
 
         dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
-    }
-
-    private static void UpdateFilterColors(FilterModel model, IDispatcher dispatcher)
-    {
-        if (model.IsEnabled)
-        {
-            dispatcher.Dispatch(new FilterColorAction.SetFilter(model));
-        }
-        else
-        {
-            dispatcher.Dispatch(new FilterColorAction.RemoveFilter(model.Id));
-        }
     }
 }

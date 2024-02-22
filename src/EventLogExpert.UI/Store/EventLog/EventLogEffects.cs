@@ -36,7 +36,7 @@ public sealed class EventLogEffects(
         {
             var activeLogs = DistributeEventsToManyLogs(eventLogState.Value.ActiveLogs, newEvent);
 
-            var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs, eventLogState.Value.AppliedFilter);
+            var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, eventLogState.Value.AppliedFilter);
 
             dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
             dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
@@ -44,7 +44,7 @@ public sealed class EventLogEffects(
         else
         {
             var updatedBuffer = newEvent.Concat(eventLogState.Value.NewEventBuffer).ToList().AsReadOnly();
-            var full = updatedBuffer.Count >= eventLogState.Value.MaxNewEvents;
+            var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
             dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
         }
@@ -68,7 +68,7 @@ public sealed class EventLogEffects(
     {
         logWatcherService.RemoveLog(action.LogName);
 
-        dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogName));
+        dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
         return Task.CompletedTask;
     }
@@ -76,7 +76,7 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.LoadEvents))]
     public Task HandleLoadEvents(IDispatcher dispatcher)
     {
-        var activeLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, eventLogState.Value.AppliedFilter);
+        var activeLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs.Values, eventLogState.Value.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
 
@@ -105,16 +105,20 @@ public sealed class EventLogEffects(
             return;
         }
 
+        if (!eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
+        {
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to open {action.LogName}"));
+
+            return;
+        }
+
         EventLogReader reader = action.LogType == LogType.Live ?
             new EventLogReader(action.LogName, PathType.LogName) :
             new EventLogReader(action.LogName, PathType.FilePath);
 
         var activityId = Guid.NewGuid();
 
-        dispatcher.Dispatch(new EventTableAction.AddTable(
-            action.LogType == LogType.Live ? null : action.LogName,
-            action.LogName,
-            action.LogType));
+        dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
         try
         {
@@ -155,14 +159,13 @@ public sealed class EventLogEffects(
                 action.Token);
 
             dispatcher.Dispatch(new EventLogAction.LoadEvents(
-                action.LogName,
-                action.LogType,
-                events,
-                eventIdsAll.ToImmutableList(),
-                eventActivityIdsAll.ToImmutableList(),
-                eventProviderNamesAll.ToImmutableList(),
-                eventTaskNamesAll.ToImmutableList(),
-                eventKeywordNamesAll.ToImmutableList()));
+                logData,
+                events.AsReadOnly(),
+                [.. eventIdsAll],
+                [.. eventActivityIdsAll],
+                [.. eventProviderNamesAll],
+                [.. eventTaskNamesAll],
+                [.. eventKeywordNamesAll]));
 
             dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
@@ -190,11 +193,11 @@ public sealed class EventLogEffects(
                 },
                 action.Token);
 
-                dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
+            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
         }
         catch (TaskCanceledException)
         {
-            dispatcher.Dispatch(new EventLogAction.CloseLog(action.LogName));
+            dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
             dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
         }
         finally
@@ -219,7 +222,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs, action.EventFilter);
+        var filteredActiveLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs.Values, action.EventFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
 
@@ -273,7 +276,7 @@ public sealed class EventLogEffects(
     {
         var activeLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer);
 
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs, state.AppliedFilter);
+        var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, state.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));

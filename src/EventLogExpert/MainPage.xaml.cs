@@ -211,7 +211,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             return;
         }
 
-        await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPrereleaseEnabled, manualScan: true);
+        await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPreReleaseEnabled, manualScan: true);
     }
 
     private void ClearAllFilters_Clicked(object? sender, EventArgs e) =>

@@ -7,7 +7,7 @@ using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
-using EventLogExpert.UI.Store.FilterColor;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -28,7 +28,7 @@ public sealed partial class EventTable
 
     [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
-    [Inject] private IState<FilterColorState> FilterColorState { get; init; } = null!;
+    [Inject] private IState<FilterPaneState> FilterPaneState{ get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -88,9 +88,19 @@ public sealed partial class EventTable
 
     private string GetHighlightedColor(DisplayEventModel @event)
     {
-        foreach (var filter in FilterColorState.Value.Filters.Where(filter => filter.Comparison.Expression(@event)))
+        foreach (var filter in FilterPaneState.Value.AdvancedFilters.Where(filter => filter.Comparison.Expression(@event)))
         {
-            return filter.Color.Equals(FilterColor.None) ? string.Empty : filter.Color.ToString().ToLower();
+            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
+        }
+
+        foreach (var filter in FilterPaneState.Value.BasicFilters.Where(filter => filter.Comparison.Expression(@event)))
+        {
+            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
+        }
+
+        foreach (var filter in FilterPaneState.Value.CachedFilters.Where(filter => filter.Comparison.Expression(@event)))
+        {
+            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
         }
 
         return string.Empty;
@@ -122,7 +132,7 @@ public sealed partial class EventTable
 
     private async Task ScrollToSelectedEvent()
     {
-        var table = EventTableState.Value.EventTables.FirstOrDefault(x => x.Id == EventTableState.Value.ActiveTableId);
+        var table = EventTableState.Value.EventTables.FirstOrDefault(x => x.Id == EventTableState.Value.ActiveEventLogId);
 
         var entry = table?.DisplayedEvents.FirstOrDefault(x =>
             string.Equals(x.LogName, SelectedEventState.Value?.LogName) &&

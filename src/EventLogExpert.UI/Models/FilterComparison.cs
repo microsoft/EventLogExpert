@@ -16,11 +16,11 @@ public sealed record FilterComparison
         get => _value;
         set
         {
-            _value = value;
-
             Expression = DynamicExpressionParser
-                .ParseLambda<DisplayEventModel, bool>(EventLogExpertCustomTypeProvider.ParsingConfig, false, _value)
+                .ParseLambda<DisplayEventModel, bool>(EventLogExpertCustomTypeProvider.ParsingConfig, false, value)
                 .Compile();
+
+            _value = value;
         }
     }
 

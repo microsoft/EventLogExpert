@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Models;
 
-public sealed class FilterData
+public sealed record FilterData
 {
     private FilterType _type;
 

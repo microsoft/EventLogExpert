@@ -14,7 +14,7 @@ public sealed partial class FilterGroupRow
     private Timer? _debounceTimer = null;
     private string _errorMessage = string.Empty;
 
-    [Parameter] public Guid ParentId { get; set; }
+    [Parameter] public FilterGroupId ParentId { get; set; }
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 

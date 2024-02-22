@@ -13,11 +13,11 @@ public sealed class EventTableReducers
     [ReducerMethod]
     public static EventTableState ReduceAddTable(EventTableState state, EventTableAction.AddTable action)
     {
-        var newTable = new EventTableModel
+        var newTable = new EventTableModel(action.LogData.Id)
         {
-            FileName = action.FileName,
-            LogName = action.LogName,
-            LogType = action.LogType,
+            FileName = action.LogData.Type == LogType.Live ? null : action.LogData.Name,
+            LogName = action.LogData.Name,
+            LogType = action.LogData.Type,
             IsLoading = true
         };
 
@@ -26,7 +26,7 @@ public sealed class EventTableReducers
             return state with
             {
                 EventTables = state.EventTables.Add(newTable),
-                ActiveTableId = newTable.Id
+                ActiveEventLogId = newTable.Id
             };
         }
 
@@ -37,51 +37,55 @@ public sealed class EventTableReducers
             return state with { EventTables = state.EventTables.Add(newTable) };
         }
 
-        combinedTable = new EventTableModel { IsCombined = true };
+        combinedTable = new EventTableModel(EventLogId.Create()) { IsCombined = true };
 
         return state with
         {
             EventTables = state.EventTables
                 .Add(combinedTable)
                 .Add(newTable),
-            ActiveTableId = combinedTable.Id
+            ActiveEventLogId = combinedTable.Id
         };
     }
 
     [ReducerMethod(typeof(EventTableAction.CloseAll))]
     public static EventTableState ReduceCloseAll(EventTableState state) =>
-        state with { EventTables = [], ActiveTableId = null };
+        state with { EventTables = [], ActiveEventLogId = null };
 
     [ReducerMethod]
     public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action)
     {
         var updatedTables = state.EventTables
-            .Where(table => !string.Equals(table.LogName, action.LogName) && !table.IsCombined)
+            .Where(table => table.Id == action.LogId && !table.IsCombined)
             .ToImmutableList();
 
-        if (updatedTables.Count <= 0)
+        switch (updatedTables.Count)
         {
-            return state with { EventTables = [], ActiveTableId = null };
-        }
+            case <= 0 : return state with { EventTables = [], ActiveEventLogId = null };
+            case <= 1 :
+                return state with
+                {
+                    EventTables = updatedTables,
+                    ActiveEventLogId = updatedTables.First().Id
+                };
+            default :
+                var combinedTable = new EventTableModel(EventLogId.Create())
+                {
+                    IsCombined = true,
+                    DisplayedEvents = GetCombinedEvents(updatedTables.Select(log => log.DisplayedEvents))
+                        .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
+                        .ToList()
+                        .AsReadOnly()
+                };
 
-        return updatedTables.Count > 1 ?
-            state with
-            {
-                EventTables = updatedTables.Add(
-                    new EventTableModel
-                    {
-                        IsCombined = true,
-                        DisplayedEvents = GetCombinedEvents(updatedTables.Select(log => log.DisplayedEvents))
-                            .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
-                            .ToList()
-                            .AsReadOnly()
-                    })
-            } :
-            state with
-            {
-                EventTables = updatedTables,
-                ActiveTableId = updatedTables.First().Id
-            };
+                return state with
+                {
+                    EventTables = updatedTables.Add(combinedTable),
+                    ActiveEventLogId =
+                    updatedTables.FirstOrDefault(table => table.Id == state.ActiveEventLogId) is not null ?
+                        state.ActiveEventLogId : combinedTable.Id
+                };
+        }
     }
 
     [ReducerMethod]
@@ -96,11 +100,11 @@ public sealed class EventTableReducers
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action)
     {
-        var activeTable = state.EventTables.First(table => table.Id.Equals(action.TableId));
+        var activeTable = state.EventTables.First(table => table.Id == action.LogId);
 
         if (activeTable.IsLoading) { return state; }
 
-        return state with { ActiveTableId = activeTable.Id };
+        return state with { ActiveEventLogId = activeTable.Id };
     }
 
     [ReducerMethod]
@@ -112,7 +116,7 @@ public sealed class EventTableReducers
     [ReducerMethod]
     public static EventTableState ReduceToggleLoading(EventTableState state, EventTableAction.ToggleLoading action)
     {
-        var table = state.EventTables.FirstOrDefault(table => table.LogName.Equals(action.LogName));
+        var table = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
 
         if (table is null) { return state; }
 
@@ -168,7 +172,7 @@ public sealed class EventTableReducers
                 continue;
             }
 
-            var currentActiveLog = action.ActiveLogs.First(log => string.Equals(table.LogName, log.Key)).Value;
+            var currentActiveLog = action.ActiveLogs.First(log => log.Key == table.Id).Value;
 
             updatedTables.Add(table.DisplayedEvents.Count == currentActiveLog.Count() ? table : table with
             {

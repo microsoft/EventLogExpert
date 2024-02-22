@@ -84,9 +84,9 @@
         </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu">
-        @if (EventTableState.Value.ActiveTableId is not null)
+        @if (EventTableState.Value.ActiveEventLogId is not null)
         {
-            <Virtualize Items="EventTableState.Value.EventTables.First(x => x.Id == EventTableState.Value.ActiveTableId).DisplayedEvents" Context="evt">
+            <Virtualize Items="EventTableState.Value.EventTables.First(x => x.Id == EventTableState.Value.ActiveEventLogId).DisplayedEvents" Context="evt">
                 <tr @key="@($"{evt.OwningLog}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
                     <td hidden="@(IsColumnHidden(ColumnName.Level))">
                         <span class="@GetLevelClass(evt.Level)"></span>

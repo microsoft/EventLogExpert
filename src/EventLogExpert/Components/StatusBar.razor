@@ -23,9 +23,9 @@
 
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (EventTableState.Value.ActiveTableId is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
+    @if (EventTableState.Value.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
     {
-        var activeTable = EventTableState.Value.EventTables.FirstOrDefault(table => table.Id == EventTableState.Value.ActiveTableId);
+        var activeTable = EventTableState.Value.EventTables.FirstOrDefault(table => table.Id == EventTableState.Value.ActiveEventLogId);
 
         if (activeTable is null) { return; }
 

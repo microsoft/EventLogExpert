@@ -19,5 +19,5 @@ public sealed record SettingsModel
 
     public LogLevel LogLevel { get; set; } = LogLevel.Information;
 
-    public bool IsPrereleaseEnabled { get; set; }
+    public bool IsPreReleaseEnabled { get; set; }
 }

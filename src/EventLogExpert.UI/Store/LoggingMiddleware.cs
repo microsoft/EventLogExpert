@@ -2,11 +2,12 @@
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterCache;
-using EventLogExpert.UI.Store.FilterColor;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
+using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -27,7 +28,6 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                 break;
             case EventLogAction.AddEvent addEventsAction :
                 debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
-
                 break;
             case EventLogAction.OpenLog openLogAction :
                 debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogType}.");
@@ -35,6 +35,7 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case EventLogAction.AddEventBuffered :
             case EventLogAction.AddEventSuccess :
             case EventLogAction.SetFilters :
+            case EventTableAction.AddTable :
             case EventTableAction.LoadColumnsCompleted :
             case EventTableAction.UpdateDisplayedEvents :
             case FilterCacheAction.AddFavoriteFilterCompleted :
@@ -42,8 +43,6 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterCacheAction.ImportFavorites :
             case FilterCacheAction.LoadFiltersCompleted :
             case FilterCacheAction.RemoveFavoriteFilterCompleted :
-            case FilterColorAction.SetFilter :
-            case FilterColorAction.SetFilters :
             case FilterGroupAction.AddGroup :
             case FilterGroupAction.ImportGroups :
             case FilterGroupAction.LoadGroupsSuccess :
@@ -66,6 +65,10 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                 debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected " +
                     $"{selectEventAction.SelectedEvent?.Source} event ID {selectEventAction.SelectedEvent?.Id}.");
 
+                break;
+            case StatusBarAction.SetEventsLoading :
+            case StatusBarAction.SetXmlLoading :
+                debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}", LogLevel.Debug);
                 break;
             default :
                 try
