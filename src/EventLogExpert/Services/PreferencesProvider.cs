@@ -22,7 +22,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string LevelColumn = "level-column";
     private const string LoggingLevel = "logging-level";
     private const string LogNameColumn = "log-name-column";
-    private const string PrereleaseEnabled = "prerelease-enabled";
+    private const string PreReleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
     private const string SavedFilters = "saved-filters";
     private const string SourceColumn = "source-column";
@@ -98,10 +98,10 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(LogNameColumn, value);
     }
 
-    public bool PrereleasePreference
+    public bool PreReleasePreference
     {
-        get => Preferences.Default.Get(PrereleaseEnabled, false);
-        set => Preferences.Default.Set(PrereleaseEnabled, value);
+        get => Preferences.Default.Get(PreReleaseEnabled, false);
+        set => Preferences.Default.Set(PreReleaseEnabled, value);
     }
 
     public IList<string> RecentFiltersPreference
