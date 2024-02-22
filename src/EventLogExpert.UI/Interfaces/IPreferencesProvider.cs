@@ -30,7 +30,7 @@ public interface IPreferencesProvider
 
     bool LogNameColumnPreference { get; set; }
 
-    bool PrereleasePreference { get; set; }
+    bool PreReleasePreference { get; set; }
 
     IList<string> RecentFiltersPreference { get; set; }
 

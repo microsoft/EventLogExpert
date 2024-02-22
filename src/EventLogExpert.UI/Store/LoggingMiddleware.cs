@@ -59,6 +59,8 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterPaneAction.SetFilterDateRange :
             case SettingsAction.LoadDatabasesCompleted :
             case SettingsAction.LoadSettingsCompleted :
+            case SettingsAction.Save:
+            case SettingsAction.SaveCompleted :
                 debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction :

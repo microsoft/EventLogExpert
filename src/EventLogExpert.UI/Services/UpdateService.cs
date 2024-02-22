@@ -10,7 +10,7 @@ namespace EventLogExpert.UI.Services;
 
 public interface IUpdateService
 {
-    Task CheckForUpdates(bool isPreReleaseEnabled, bool manualScan);
+    Task CheckForUpdates(bool usePreRelease, bool manualScan);
 
     Task GetReleaseNotes();
 }
@@ -37,7 +37,7 @@ public sealed class UpdateService(
             return;
         }
 
-        GitReleaseModel latest;
+        GitReleaseModel? latest = null;
 
         try
         {
@@ -57,7 +57,14 @@ public sealed class UpdateService(
                 traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
                     $"ReleaseDate: {release.ReleaseDate} IsPreRelease: {release.IsPreRelease}");
 
-                if (versionProvider.CurrentVersion.CompareTo(release) != 0) { continue; }
+                if (!usePreRelease && release.IsPreRelease) { continue; }
+
+                // Need to drop the v off the version number provided by GitHub
+                if (versionProvider.CurrentVersion.CompareTo(new Version(release.Version.TrimStart('v'))) != 0) {
+                    latest = release;
+
+                    break;
+                }
 
                 _currentChanges = release.Changes;
 
@@ -65,10 +72,21 @@ public sealed class UpdateService(
                 {
                     appTitleService.SetIsPrerelease(true);
                 }
+
+                if (manualScan)
+                {
+                    await alertDialogService.ShowAlert("No Updates Available",
+                        "You are currently running the latest version.",
+                        "Ok");
+                }
+
+                return;
             }
 
-            latest = releases.First(x => x.IsPreRelease == usePreRelease);
-            
+            if (!latest.HasValue)
+            {
+                throw new FileNotFoundException("Unable to determine latest version");
+            }
         }
         catch (Exception ex)
         {
@@ -81,29 +99,11 @@ public sealed class UpdateService(
             return;
         }
 
-        traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Version}. IsPreRelease: {latest.IsPreRelease}");
-
-        // Need to drop the v off the version number provided by GitHub
-        var newVersion = new Version(latest.Version.TrimStart('v'));
-
-        traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(newVersion)} {newVersion}.");
-
-        // Setting version to equal allows rollback if a version is pulled
-        if (newVersion.CompareTo(versionProvider.CurrentVersion) == 0)
-        {
-            if (manualScan)
-            {
-                await alertDialogService.ShowAlert("No Updates Available",
-                    "You are currently running the latest version.",
-                    "Ok");
-            }
-
-            return;
-        }
+        traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Value.Version}. IsPreRelease: {latest.Value.IsPreRelease}");
 
         try
         {
-            string downloadPath = latest.Assets.First(x => x.Name.Contains(".msix")).Uri;
+            string downloadPath = latest.Value.Assets.First(x => x.Name.Contains(".msix")).Uri;
 
             if (string.IsNullOrEmpty(downloadPath))
             {

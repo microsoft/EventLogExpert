@@ -27,28 +27,28 @@ public sealed class EventTableEffects(
     {
         switch (action.ColumnName)
         {
-            case ColumnName.Level:
+            case ColumnName.Level :
                 preferencesProvider.LevelColumnPreference = !preferencesProvider.LevelColumnPreference;
                 break;
-            case ColumnName.DateAndTime:
+            case ColumnName.DateAndTime :
                 preferencesProvider.DateAndTimeColumnPreference = !preferencesProvider.DateAndTimeColumnPreference;
                 break;
-            case ColumnName.ActivityId:
+            case ColumnName.ActivityId :
                 preferencesProvider.ActivityIdColumnPreference = !preferencesProvider.ActivityIdColumnPreference;
                 break;
-            case ColumnName.LogName:
+            case ColumnName.LogName :
                 preferencesProvider.LogNameColumnPreference = !preferencesProvider.LogNameColumnPreference;
                 break;
-            case ColumnName.ComputerName:
+            case ColumnName.ComputerName :
                 preferencesProvider.ComputerNameColumnPreference = !preferencesProvider.ComputerNameColumnPreference;
                 break;
-            case ColumnName.Source:
+            case ColumnName.Source :
                 preferencesProvider.SourceColumnPreference = !preferencesProvider.SourceColumnPreference;
                 break;
-            case ColumnName.EventId:
+            case ColumnName.EventId :
                 preferencesProvider.EventIdColumnPreference = !preferencesProvider.EventIdColumnPreference;
                 break;
-            case ColumnName.TaskCategory:
+            case ColumnName.TaskCategory :
                 preferencesProvider.TaskCategoryColumnPreference = !preferencesProvider.TaskCategoryColumnPreference;
                 break;
         }

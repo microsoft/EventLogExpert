@@ -49,9 +49,6 @@ public sealed class EventLogReducers
     {
         var newLogsCollection = state.ActiveLogs.Remove(action.LogData.Name);
 
-        // Events collection is always ordered descending by record id
-        //var sortedEvents = action.Events.SortEvents(null, true).ToList();
-
         return state with
         {
             ActiveLogs = newLogsCollection.Add(

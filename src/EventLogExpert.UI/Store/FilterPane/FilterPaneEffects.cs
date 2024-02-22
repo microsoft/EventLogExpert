@@ -185,13 +185,11 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
     public async Task HandleToggleIsEnabled(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
-        new(
-            filterPaneState.FilteredDateRange,
-            filterPaneState.AdvancedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-            filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
-            filterPaneState.BasicFilters.Where(f => f.IsEnabled).ToImmutableList()
-        );
+    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) => new(
+        filterPaneState.FilteredDateRange,
+        filterPaneState.AdvancedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+        filterPaneState.CachedFilters.Where(f => f.IsEnabled).ToImmutableList(),
+        filterPaneState.BasicFilters.Where(f => f.IsEnabled).ToImmutableList());
 
     private static async Task UpdateEventTableFiltersAsync(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
