@@ -13,7 +13,7 @@ namespace EventLogExpert.UI.Store.EventLog;
 public sealed record EventLogState
 {
     /// <summary>The maximum number of new events we will hold in the state before we turn off the watcher.</summary>
-    public int MaxNewEvents { get; } = 1000;
+    public static int MaxNewEvents => 1000;
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
         ImmutableDictionary<string, EventLogData>.Empty;

@@ -18,17 +18,16 @@ public sealed record EventLogAction
 
     public sealed record CloseAll;
 
-    public sealed record CloseLog(string LogName);
+    public sealed record CloseLog(EventLogId LogId, string LogName);
 
     public sealed record LoadEvents(
-        string LogName,
-        LogType Type,
-        List<DisplayEventModel> Events,
-        IEnumerable<int> AllEventIds,
-        IEnumerable<Guid?> AllActivityIds,
-        IEnumerable<string> AllProviderNames,
-        IEnumerable<string> AllTaskNames,
-        IEnumerable<string> AllKeywords);
+        EventLogData LogData,
+        ReadOnlyCollection<DisplayEventModel> Events,
+        ImmutableHashSet<int> AllEventIds,
+        ImmutableHashSet<Guid?> AllActivityIds,
+        ImmutableHashSet<string> AllProviderNames,
+        ImmutableHashSet<string> AllTaskNames,
+        ImmutableHashSet<string> AllKeywords);
 
     public sealed record LoadNewEvents;
 

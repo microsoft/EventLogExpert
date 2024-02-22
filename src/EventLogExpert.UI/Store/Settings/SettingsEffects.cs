@@ -32,7 +32,7 @@ public sealed class SettingsEffects(
             ShowDisplayPaneOnSelectionChange = preferencesProvider.DisplayPaneSelectionPreference,
             CopyType = preferencesProvider.KeyboardCopyTypePreference,
             LogLevel = preferencesProvider.LogLevelPreference,
-            IsPrereleaseEnabled = preferencesProvider.PrereleasePreference
+            IsPreReleaseEnabled = preferencesProvider.PrereleasePreference
         };
 
         dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config));
@@ -48,7 +48,7 @@ public sealed class SettingsEffects(
         preferencesProvider.DisplayPaneSelectionPreference = action.Settings.ShowDisplayPaneOnSelectionChange;
         preferencesProvider.KeyboardCopyTypePreference = action.Settings.CopyType;
         preferencesProvider.LogLevelPreference = action.Settings.LogLevel;
-        preferencesProvider.PrereleasePreference = action.Settings.IsPrereleaseEnabled;
+        preferencesProvider.PrereleasePreference = action.Settings.IsPreReleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
 

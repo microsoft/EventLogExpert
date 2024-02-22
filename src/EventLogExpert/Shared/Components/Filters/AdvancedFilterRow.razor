@@ -6,10 +6,10 @@
         @if (Value.IsEditing)
         {
             <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
-                T="FilterColor" @bind-Value="Value.Color">
-                @foreach (FilterColor item in Enum.GetValues(typeof(FilterColor)))
+                T="HighlightColor" @bind-Value="Value.Color">
+                @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                 {
-                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="FilterColor" Value="item" />
+                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
                 }
             </ValueSelect>
 
@@ -26,7 +26,7 @@
         }
         else
         {
-            @if (Value.Color != FilterColor.None)
+            @if (Value.Color != HighlightColor.None)
             {
                 <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
             }

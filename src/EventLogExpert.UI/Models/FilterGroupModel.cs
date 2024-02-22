@@ -8,10 +8,11 @@ namespace EventLogExpert.UI.Models;
 public sealed record FilterGroupModel
 {
     [JsonIgnore]
-    public Guid Id { get; } = Guid.NewGuid();
+    public FilterGroupId Id { get; } = FilterGroupId.Create();
 
     public string Name { get; set; } = "New Filter Section\\New Filter Group";
 
+    [JsonIgnore]
     public string DisplayName => Name.Split('\\').Last();
 
     public IEnumerable<FilterModel> Filters { get; set; } = [];

@@ -29,7 +29,7 @@ public sealed partial class MainLayout
         {
             if (CurrentVersionProvider.IsSupportedOS(DeviceInfo.Version))
             {
-                await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPrereleaseEnabled, false);
+                await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPreReleaseEnabled, false);
             }
 
             AppTitleService.SetLogName(null);

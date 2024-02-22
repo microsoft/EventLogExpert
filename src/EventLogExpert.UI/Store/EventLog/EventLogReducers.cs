@@ -40,36 +40,31 @@ public sealed class EventLogReducers
         {
             ActiveLogs = state.ActiveLogs.Remove(action.LogName),
             NewEventBuffer = newEventBuffer,
-            NewEventBufferIsFull = newEventBuffer.Count >= state.MaxNewEvents
+            NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents
         };
     }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
     {
-        var newLogsCollection = state.ActiveLogs;
-
-        if (newLogsCollection.ContainsKey(action.LogName))
-        {
-            newLogsCollection = newLogsCollection.Remove(action.LogName);
-        }
+        var newLogsCollection = state.ActiveLogs.Remove(action.LogData.Name);
 
         // Events collection is always ordered descending by record id
-        var sortedEvents = action.Events.SortEvents(null, true).ToList();
+        //var sortedEvents = action.Events.SortEvents(null, true).ToList();
 
         return state with
         {
             ActiveLogs = newLogsCollection.Add(
-                action.LogName,
-                new EventLogData(
-                    action.LogName,
-                    action.Type,
-                    sortedEvents.AsReadOnly(),
-                    action.AllEventIds.ToImmutableHashSet(),
-                    action.AllActivityIds.ToImmutableHashSet(),
-                    action.AllProviderNames.ToImmutableHashSet(),
-                    action.AllTaskNames.ToImmutableHashSet(),
-                    action.AllKeywords.ToImmutableHashSet()))
+                action.LogData.Name,
+                action.LogData with
+                {
+                    Events = action.Events,
+                    EventIds = action.AllEventIds,
+                    EventActivityIds = action.AllActivityIds,
+                    EventProviderNames = action.AllProviderNames,
+                    TaskNames = action.AllTaskNames,
+                    KeywordNames = action.AllKeywords
+                })
         };
     }
 

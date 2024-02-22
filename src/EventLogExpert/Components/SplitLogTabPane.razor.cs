@@ -69,7 +69,7 @@ public sealed partial class SplitLogTabPane
     }
 
     private string GetActiveTab(EventTableModel table) =>
-        EventTableState.Value.ActiveTableId == table.Id ? "tab active" : "tab";
+        EventTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
 
     private void SetActiveLog(EventTableModel table) =>
         Dispatcher.Dispatch(new EventTableAction.SetActiveTable(table.Id));

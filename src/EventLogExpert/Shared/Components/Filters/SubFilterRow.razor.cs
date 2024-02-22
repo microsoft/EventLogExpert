@@ -14,7 +14,7 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class SubFilterRow
 {
-    [Parameter] public Guid ParentId { get; set; }
+    [Parameter] public FilterId ParentId { get; set; }
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 

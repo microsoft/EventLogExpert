@@ -13,19 +13,19 @@ public sealed record FilterPaneAction
 
     public sealed record AddCachedFilter(FilterModel FilterModel);
 
-    public sealed record AddSubFilter(Guid ParentId);
+    public sealed record AddSubFilter(FilterId ParentId);
 
     public sealed record ApplyFilterGroup(FilterGroupModel FilterGroup);
 
     public sealed record ClearAllFilters;
 
-    public sealed record RemoveAdvancedFilter(Guid Id);
+    public sealed record RemoveAdvancedFilter(FilterId Id);
 
-    public sealed record RemoveBasicFilter(Guid Id);
+    public sealed record RemoveBasicFilter(FilterId Id);
 
-    public sealed record RemoveCachedFilter(Guid Id);
+    public sealed record RemoveCachedFilter(FilterId Id);
 
-    public sealed record RemoveSubFilter(Guid ParentId, Guid SubFilterId);
+    public sealed record RemoveSubFilter(FilterId ParentId, FilterId SubFilterId);
 
     public sealed record SaveFilterGroup(string Name);
 
@@ -37,17 +37,17 @@ public sealed record FilterPaneAction
 
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
-    public sealed record ToggleAdvancedFilterEditing(Guid Id);
+    public sealed record ToggleAdvancedFilterEditing(FilterId Id);
 
-    public sealed record ToggleAdvancedFilterEnabled(Guid Id);
+    public sealed record ToggleAdvancedFilterEnabled(FilterId Id);
 
-    public sealed record ToggleBasicFilterEditing(Guid Id);
+    public sealed record ToggleBasicFilterEditing(FilterId Id);
 
-    public sealed record ToggleBasicFilterEnabled(Guid Id);
+    public sealed record ToggleBasicFilterEnabled(FilterId Id);
 
-    public sealed record ToggleCachedFilterEditing(Guid Id);
+    public sealed record ToggleCachedFilterEditing(FilterId Id);
 
-    public sealed record ToggleCachedFilterEnabled(Guid Id);
+    public sealed record ToggleCachedFilterEnabled(FilterId Id);
 
     public sealed record ToggleFilterDate;
 

@@ -6,10 +6,8 @@ using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Models;
 
-public sealed record EventTableModel
+public sealed record EventTableModel(EventLogId Id)
 {
-    public Guid Id { get; } = Guid.NewGuid();
-
     public string? FileName { get; init; }
 
     public string ComputerName => DisplayedEvents.FirstOrDefault()?.ComputerName ?? string.Empty;

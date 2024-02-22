@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Models;
 
-public sealed record FilterGroupData
+public readonly record struct FilterGroupData()
 {
     public Dictionary<string, FilterGroupData> ChildGroup { get; init; } = [];
 

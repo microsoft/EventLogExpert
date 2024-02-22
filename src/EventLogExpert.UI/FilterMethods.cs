@@ -41,15 +41,15 @@ public static class FilterMethods
         return group;
     }
 
-    public static IDictionary<string, IEnumerable<DisplayEventModel>> FilterActiveLogs(
-        ImmutableDictionary<string, EventLogData> activeLogs,
+    public static IDictionary<EventLogId, IEnumerable<DisplayEventModel>> FilterActiveLogs(
+        IEnumerable<EventLogData> logData,
         EventFilter eventFilter)
     {
-        Dictionary<string, IEnumerable<DisplayEventModel>> activeLogsFiltered = [];
+        Dictionary<EventLogId, IEnumerable<DisplayEventModel>> activeLogsFiltered = [];
 
-        foreach ((string logName, EventLogData data) in activeLogs)
+        foreach (var data in logData)
         {
-            activeLogsFiltered.Add(logName, GetFilteredEvents(data.Events, eventFilter));
+            activeLogsFiltered.Add(data.Id, GetFilteredEvents(data.Events, eventFilter));
         }
 
         return activeLogsFiltered;

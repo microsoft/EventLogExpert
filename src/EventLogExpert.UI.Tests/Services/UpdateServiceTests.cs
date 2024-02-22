@@ -42,7 +42,7 @@ public sealed class UpdateServiceTests
             _mockTraceLogger,
             _mockAlertDialogService);
 
-        await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
+        await updateService.CheckForUpdates(usePreRelease: false, manualScan: false);
 
         _mockDeploymentService.Received(1).RestartNowAndUpdate(Constants.GitHubLatestUri);
     }
@@ -61,7 +61,7 @@ public sealed class UpdateServiceTests
             _mockTraceLogger,
             _mockAlertDialogService);
 
-        await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: false);
+        await updateService.CheckForUpdates(usePreRelease: false, manualScan: false);
 
         _mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri);
     }
@@ -80,7 +80,7 @@ public sealed class UpdateServiceTests
             _mockTraceLogger,
             _mockAlertDialogService);
 
-        await updateService.CheckForUpdates(prereleaseVersionsEnabled: false, manualScan: true);
+        await updateService.CheckForUpdates(usePreRelease: false, manualScan: true);
 
         _mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>());
         _mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>());
@@ -105,7 +105,7 @@ public sealed class UpdateServiceTests
             _mockTraceLogger,
             _mockAlertDialogService);
 
-        await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
+        await updateService.CheckForUpdates(usePreRelease: true, manualScan: false);
 
         _mockDeploymentService.Received(1).RestartNowAndUpdate(Constants.GitHubPrereleaseUri);
     }
@@ -124,7 +124,7 @@ public sealed class UpdateServiceTests
             _mockTraceLogger,
             _mockAlertDialogService);
 
-        await updateService.CheckForUpdates(prereleaseVersionsEnabled: true, manualScan: false);
+        await updateService.CheckForUpdates(usePreRelease: true, manualScan: false);
 
         _mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubPrereleaseUri);
     }
