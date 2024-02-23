@@ -11,8 +11,6 @@ public sealed record SettingsModel
 
     public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId);
 
-    public IList<string> DisabledDatabases { get; set; } = [];
-
     public bool ShowDisplayPaneOnSelectionChange { get; set; }
 
     public CopyType CopyType { get; set; } = CopyType.Full;

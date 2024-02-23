@@ -27,11 +27,11 @@
             <div class="flex-column-scroll">
                 @if (_databases.Any())
                 {
-                    @foreach (var database in _databases.OrderBy(x => x.Key))
+                    @foreach (var database in _databases.OrderBy(x => x.name))
                     {
                         <div class="flex-space-between">
-                            <span>@database.Key</span>
-                            <BooleanSelect Value="database.Value" ValueChanged="() => ToggleDatabase(database.Key)" />
+                            <span>@database.name</span>
+                            <BooleanSelect Value="database.isEnabled" ValueChanged="() => ToggleDatabase(database.name)" />
                         </div>
                     }
                 }

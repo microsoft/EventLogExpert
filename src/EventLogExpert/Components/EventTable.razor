@@ -93,7 +93,7 @@
                         @evt.Level
                     </td>
                     <td hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                        @evt.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)
+                        @evt.TimeCreated.ConvertTimeZone(TimeZoneSettings.Value)
                     </td>
                     <td hidden="@(IsColumnHidden(ColumnName.ActivityId))">@evt.ActivityId</td>
                     <td hidden="@(IsColumnHidden(ColumnName.LogName))">@evt.OwningLog.Split("\\").Last()</td>
