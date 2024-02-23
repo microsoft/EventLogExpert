@@ -2,7 +2,7 @@
 @inherits Base.BaseComponent<T>
 
 <div class="dropdown-input" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)"
-    @onkeydown="HandleKeyDown" @onblur="CloseDropDown" @onfocusout="CloseDropDown">
+    @onkeydown="HandleKeyDown" @onblur="CloseDropDown">
     @if (IsInput && !IsMultiSelect)
     {
         <input type="text" class="@CssClass" value="@DisplayString" tabindex="0"
@@ -15,7 +15,7 @@
         </span>
     }
 
-    <div class="dropdown-list" data-toggle="@IsDropDownVisible">
+    <div class="dropdown-list" data-toggle="@IsDropDownVisible" @onfocusout="CloseDropDown">
         <CascadingValue Value="this">
             @ChildContent
         </CascadingValue>
