@@ -15,9 +15,8 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class SettingsModal
 {
-    private readonly Dictionary<string, bool> _databases = [];
+    private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
 
-    private bool _hasDatabasesChanged = false;
     private SettingsModel _request = new();
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
@@ -94,21 +93,27 @@ public sealed partial class SettingsModal
 
     private async Task Load()
     {
-        _request = SettingsState.Value.Config with
-        {
-            DisabledDatabases = SettingsState.Value.Config.DisabledDatabases.Select(x => x).ToList()
-        };
+        _request = SettingsState.Value.Config with { };
 
         _databases.Clear();
 
         foreach (var database in SettingsState.Value.LoadedDatabases)
         {
-            _databases.TryAdd(database, SettingsState.Value.Config.DisabledDatabases.Contains(database) is false);
+            _databases.Add((database, true, false));
         }
 
-        foreach (var database in SettingsState.Value.Config.DisabledDatabases)
+        foreach (var database in SettingsState.Value.DisabledDatabases)
         {
-            _databases.TryAdd(database, false);
+            var index = _databases.FindIndex(x => string.Equals(x.name, database));
+
+            if (index < 0)
+            {
+                _databases.Add((database, false, false));
+            }
+            else
+            {
+                _databases[index] = (database, false, false);
+            }
         }
 
         await InvokeAsync(StateHasChanged);
@@ -138,16 +143,23 @@ public sealed partial class SettingsModal
 
     private async Task Save()
     {
-        if (_hasDatabasesChanged)
+        if (!SettingsState.Value.Config.Equals(_request))
         {
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
+        }
+
+        if (_databases.Any(database => database.hasChanged))
+        {
+            Dispatcher.Dispatch(
+                new SettingsAction.SaveDisabledDatabases(
+                    _databases
+                        .Where(db => !db.isEnabled)
+                        .Select(db => db.name)
+                        .ToList()));
+
             Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
             await ReloadOpenLogs();
-        }
-        else
-        {
-            Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
         await Close();
@@ -155,20 +167,12 @@ public sealed partial class SettingsModal
 
     private void ToggleDatabase(string database)
     {
-        _databases[database] = !_databases[database];
+        var index = _databases.FindIndex(x => string.Equals(x.name, database));
 
-        bool isDisabled = _request.DisabledDatabases.Contains(database);
+        if (index < 0) { return; }
 
-        switch (_databases[database])
-        {
-            case true when isDisabled :
-                _request.DisabledDatabases.Remove(database);
-                _hasDatabasesChanged = true;
-                break;
-            case false when !isDisabled :
-                _request.DisabledDatabases.Add(database);
-                _hasDatabasesChanged = true;
-                break;
-        }
+        var db = _databases[index];
+
+        _databases[index] = (db.name, !db.isEnabled, !db.hasChanged);
     }
 }

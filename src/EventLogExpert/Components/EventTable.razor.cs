@@ -21,6 +21,7 @@ public sealed partial class EventTable
 {
     private EventTableState _eventTableState = null!;
     private DisplayEventModel? _selectedEventState;
+    private TimeZoneInfo _timeZoneSettings = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -34,7 +35,7 @@ public sealed partial class EventTable
 
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
 
-    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
+    [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneSettings { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -49,6 +50,7 @@ public sealed partial class EventTable
     protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvent);
+        TimeZoneSettings.Select(settings => settings.Config.TimeZoneInfo);
 
         SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => ScrollToSelectedEvent().AndForget());
@@ -60,10 +62,12 @@ public sealed partial class EventTable
     protected override bool ShouldRender()
     {
         if (ReferenceEquals(EventTableState.Value, _eventTableState) &&
-            ReferenceEquals(SelectedEventState.Value, _selectedEventState)) { return false; }
+            ReferenceEquals(SelectedEventState.Value, _selectedEventState) &&
+            TimeZoneSettings.Value.Equals(_timeZoneSettings)) { return false; }
 
         _eventTableState = EventTableState.Value;
         _selectedEventState = SelectedEventState.Value;
+        _timeZoneSettings = TimeZoneSettings.Value;
 
         return true;
     }
@@ -82,9 +86,9 @@ public sealed partial class EventTable
             "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
 
     private string GetDateColumnHeader() =>
-        SettingsState.Value.Config.TimeZoneId == TimeZoneInfo.Local.Id ?
+        TimeZoneSettings.Value.Equals(TimeZoneInfo.Local) ?
             "Date and Time" :
-            $"Date and Time {SettingsState.Value.Config.TimeZoneInfo.DisplayName.Split(" ").First()}";
+            $"Date and Time {TimeZoneSettings.Value.DisplayName.Split(" ").First()}";
 
     private string GetHighlightedColor(DisplayEventModel @event)
     {

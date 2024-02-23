@@ -18,11 +18,21 @@ public sealed partial class SettingsReducer
 
     [ReducerMethod]
     public static SettingsState ReduceLoadSettings(SettingsState state, SettingsAction.LoadSettingsCompleted action) =>
-        state with { Config = action.Config };
+        state with
+        {
+            Config = action.Config,
+            DisabledDatabases = action.DisabledDatabases.ToImmutableList()
+        };
 
     [ReducerMethod]
-    public static SettingsState ReduceSave(SettingsState state, SettingsAction.SaveCompleted action) =>
+    public static SettingsState ReduceSaveCompleted(SettingsState state, SettingsAction.SaveCompleted action) =>
         state with { Config = action.Settings };
+
+    [ReducerMethod]
+    public static SettingsState ReduceSaveDisabledDatabasesCompleted(
+        SettingsState state,
+        SettingsAction.SaveDisabledDatabasesCompleted action) =>
+        state with { DisabledDatabases = action.Databases.ToImmutableList() };
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {

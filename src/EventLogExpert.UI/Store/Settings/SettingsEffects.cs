@@ -28,14 +28,13 @@ public sealed class SettingsEffects(
         SettingsModel config = new()
         {
             TimeZoneId = preferencesProvider.TimeZonePreference,
-            DisabledDatabases = preferencesProvider.DisabledDatabasesPreference,
             ShowDisplayPaneOnSelectionChange = preferencesProvider.DisplayPaneSelectionPreference,
             CopyType = preferencesProvider.KeyboardCopyTypePreference,
             LogLevel = preferencesProvider.LogLevelPreference,
             IsPreReleaseEnabled = preferencesProvider.PreReleasePreference
         };
 
-        dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config));
+        dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config, preferencesProvider.DisabledDatabasesPreference));
 
         return Task.CompletedTask;
     }
@@ -44,13 +43,22 @@ public sealed class SettingsEffects(
     public Task HandleSave(SettingsAction.Save action, IDispatcher dispatcher)
     {
         preferencesProvider.TimeZonePreference = action.Settings.TimeZoneId;
-        preferencesProvider.DisabledDatabasesPreference = action.Settings.DisabledDatabases;
         preferencesProvider.DisplayPaneSelectionPreference = action.Settings.ShowDisplayPaneOnSelectionChange;
         preferencesProvider.KeyboardCopyTypePreference = action.Settings.CopyType;
         preferencesProvider.LogLevelPreference = action.Settings.LogLevel;
         preferencesProvider.PreReleasePreference = action.Settings.IsPreReleaseEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleSaveDisabledDatabases(SettingsAction.SaveDisabledDatabases action, IDispatcher dispatcher)
+    {
+        preferencesProvider.DisabledDatabasesPreference = action.Databases;
+        
+        dispatcher.Dispatch(new SettingsAction.SaveDisabledDatabasesCompleted(action.Databases));
 
         return Task.CompletedTask;
     }
