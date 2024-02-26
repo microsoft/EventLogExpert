@@ -10,7 +10,6 @@ using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -123,17 +122,14 @@ public sealed class EventLogEffects(
 
         try
         {
-            var sw = new Stopwatch();
-            sw.Start();
-
             EventRecord? lastEvent = null;
 
-            int batchSize = 200;
+            const int batchSize = 200;
             bool doneReading = false;
             ConcurrentQueue<EventRecord> records = new();
             ConcurrentQueue<DisplayEventModel> events = new();
 
-            using Timer timer = new(
+            await using Timer timer = new(
                 s => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count)); },
                 null,
                 TimeSpan.Zero,
@@ -141,29 +137,31 @@ public sealed class EventLogEffects(
 
             // Don't need to wait on this since we are waiting for doneReading in the resolver tasks
             _ = Task.Run(() =>
-            {
-                using var reader = new EventLogReader(eventLog);
-
-                int count = 0;
-                while (reader.ReadEvent() is { } e)
                 {
-                    action.Token.ThrowIfCancellationRequested();
+                    using var reader = new EventLogReader(eventLog);
 
-                    if (count % batchSize == 0)
+                    int count = 0;
+
+                    while (reader.ReadEvent() is { } e)
                     {
-                        records.Enqueue(e);
+                        action.Token.ThrowIfCancellationRequested();
+
+                        if (count % batchSize == 0)
+                        {
+                            records.Enqueue(e);
+                        }
+
+                        count++;
+
+                        lastEvent = e;
                     }
 
-                    count++;
-
-                    lastEvent = e;
-                }
-
-                doneReading = true;
-            }, action.Token);
+                    doneReading = true;
+                },
+                action.Token);
 
             await Parallel.ForEachAsync(
-                [0, 1],
+                Enumerable.Range(1, 8),
                 action.Token,
                 (_, token) =>
                 {

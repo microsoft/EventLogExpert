@@ -18,6 +18,7 @@ namespace EventLogExpert.UI.Store;
 
 public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
 {
+    private readonly ITraceLogger _debugLogger = debugLogger;
     private readonly JsonSerializerOptions _serializerOptions = new();
 
     private IStore? _store;
@@ -27,13 +28,13 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
         switch (action)
         {
             case EventLogAction.LoadEvents loadEventsAction:
-                debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
+                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
                 break;
             case EventLogAction.AddEvent addEventsAction:
-                debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
+                _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
                 break;
             case EventLogAction.OpenLog openLogAction:
-                debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogType}.");
+                _debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogType}.");
                 break;
             case EventLogAction.AddEventBuffered:
             case EventLogAction.AddEventSuccess:
@@ -64,24 +65,24 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case SettingsAction.LoadSettingsCompleted:
             case SettingsAction.Save:
             case SettingsAction.SaveCompleted:
-                debugLogger.Trace($"Action: {action.GetType()}.");
+                _debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:
-                debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected " +
+                _debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvent)} selected " +
                     $"{selectEventAction.SelectedEvent?.Source} event ID {selectEventAction.SelectedEvent?.Id}.");
 
                 break;
             case StatusBarAction.SetEventsLoading:
-                debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}", LogLevel.Debug);
+                _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}", LogLevel.Debug);
                 break;
             default:
                 try
                 {
-                    debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
+                    _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}");
                 }
                 catch
                 {
-                    debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
+                    _debugLogger.Trace($"Action: {action.GetType()}. Could not serialize payload.");
                 }
 
                 break;
