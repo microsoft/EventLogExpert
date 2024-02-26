@@ -173,27 +173,6 @@ public sealed class EventLogEffects(
             {
                 logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
             }
-
-            sw.Restart();
-
-            await Task.Run(() =>
-                {
-                    for (int i = 0; i < events.Count; i++)
-                    {
-                        action.Token.ThrowIfCancellationRequested();
-
-                        if (sw.ElapsedMilliseconds > 1000)
-                        {
-                            sw.Restart();
-                            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, i));
-                        }
-
-                        _ = events[i].Xml;
-                    }
-                },
-                action.Token);
-
-            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
         }
         catch (TaskCanceledException)
         {

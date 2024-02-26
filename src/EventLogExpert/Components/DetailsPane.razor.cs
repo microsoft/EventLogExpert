@@ -1,12 +1,13 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
-
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Services;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using System.Text;
 
 namespace EventLogExpert.Components;
 
@@ -16,13 +17,17 @@ public sealed partial class DetailsPane
     private bool _isVisible = false;
     private bool _isXmlVisible = false;
 
-    private DisplayEventModel? Event { get; set; }
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    private string IsVisible => (EventLogState.Value.SelectedEvent is not null && _isVisible).ToString().ToLower();
+    private string IsVisible => (SelectedEvent is not null && _isVisible).ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    private DisplayEventModel? SelectedEvent { get; set; }
+
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; init; } = null!;
+
+    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -36,44 +41,23 @@ public sealed partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        base.OnInitialized();
-
         SelectedEventSelection.Select(s => s.SelectedEvent);
 
-        SelectedEventSelection.SelectedValueChanged += (s, v) =>
+        SelectedEventSelection.SelectedValueChanged += (s, selectedEvent) =>
         {
-            if (v is not null)
-            {
-                Event = EventLogState.Value.SelectedEvent;
+            SelectedEvent = selectedEvent;
 
-                if (SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange || !_hasOpened)
-                {
-                    _isVisible = true;
-                }
+            if (SelectedEvent is not null &&
+                (!_hasOpened || SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange))
+            {
+                _isVisible = true;
             }
         };
+
+        base.OnInitialized();
     }
 
-    private void CopyEvent()
-    {
-        StringBuilder stringToCopy = new();
-
-        stringToCopy.AppendLine($"Log Name: {Event?.LogName}");
-        stringToCopy.AppendLine($"Source: {Event?.Source}");
-        stringToCopy.AppendLine($"Date: {Event?.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)}");
-        stringToCopy.AppendLine($"Event ID: {Event?.Id}");
-        stringToCopy.AppendLine($"Task Category: {Event?.TaskCategory}");
-        stringToCopy.AppendLine($"Level: {Event?.Level}");
-        stringToCopy.AppendLine(Event?.KeywordsDisplayNames.GetEventKeywords());
-        stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
-        stringToCopy.AppendLine($"Computer: {Event?.ComputerName}");
-        stringToCopy.AppendLine("Description:");
-        stringToCopy.AppendLine(Event?.Description);
-        stringToCopy.AppendLine("Event Xml:");
-        stringToCopy.AppendLine(Event?.Xml);
-
-        Clipboard.SetTextAsync(stringToCopy.ToString());
-    }
+    private void CopyEvent() => ClipboardService.CopySelectedEvent(CopyType.Full);
 
     private void ToggleMenu()
     {
