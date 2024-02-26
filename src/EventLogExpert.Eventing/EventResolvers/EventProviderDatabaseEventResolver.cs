@@ -27,7 +27,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     private bool disposedValue;
 
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s,log) => { }) { }
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s, log) => { }) { }
 
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string, LogLevel> tracer) : base(tracer)
     {
@@ -146,7 +146,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
     {
-        DisplayEventModel lastResult = null!;
+        DisplayEventModel? lastResult = null;
 
         // The Properties getter is expensive, so we only call the getter once,
         // and we pass this value separately from the eventRecord so it can be reused.
@@ -177,6 +177,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                         {
                             _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
                             _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
+
                             return lastResult;
                         }
                     }
@@ -211,12 +212,12 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ThreadId,
                 eventRecord.LogName,
                 OwningLogName,
-                eventRecord);
+                eventRecord.ToXml());
         }
 
         if (lastResult.Description == null)
         {
-            lastResult = lastResult with { Description = ""};
+            lastResult = lastResult with { Description = "" };
         }
 
         return lastResult;

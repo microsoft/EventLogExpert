@@ -18,11 +18,6 @@ public sealed class StatusBarReducers
             updatedState = updatedState with { EventsLoading = updatedState.EventsLoading.Remove(action.ActivityId) };
         }
 
-        if (state.XmlLoading.ContainsKey(action.ActivityId))
-        {
-            updatedState = updatedState with { XmlLoading = updatedState.XmlLoading.Remove(action.ActivityId) };
-        }
-
         return updatedState;
     }
 
@@ -42,12 +37,6 @@ public sealed class StatusBarReducers
     public static StatusBarState
         ReduceSetResolverStatus(StatusBarState state, StatusBarAction.SetResolverStatus action) =>
         new() { ResolverStatus = action.ResolverStatus };
-
-    [ReducerMethod]
-    public static StatusBarState ReduceSetXmlLoading(StatusBarState state, StatusBarAction.SetXmlLoading action)
-    {
-        return state with { XmlLoading = CommonLoadingReducer(state.XmlLoading, action.ActivityId, action.Count) };
-    }
 
     private static ImmutableDictionary<Guid, int> CommonLoadingReducer(
         ImmutableDictionary<Guid, int> loadingEntries,

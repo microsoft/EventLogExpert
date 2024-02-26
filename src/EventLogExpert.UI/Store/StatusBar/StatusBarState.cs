@@ -12,6 +12,4 @@ public sealed record StatusBarState
     public ImmutableDictionary<Guid, int> EventsLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 
     public string ResolverStatus { get; init; } = string.Empty;
-
-    public ImmutableDictionary<Guid, int> XmlLoading { get; init; } = ImmutableDictionary<Guid, int>.Empty;
 }
