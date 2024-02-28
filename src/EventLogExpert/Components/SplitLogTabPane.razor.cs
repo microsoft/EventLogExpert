@@ -54,9 +54,11 @@ public sealed partial class SplitLogTabPane
     {
         if (table.IsCombined) { return "Combined"; }
 
-        return table.LogType is LogType.File ?
+        string tabName = table.LogType is LogType.File ?
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
             $"{table.LogName} - {table.ComputerName}";
+
+        return table.DisplayedEvents.Count <= 0 && !table.IsLoading ? $"(Empty) {tabName}" : tabName;
     }
 
     private static string GetTabTooltip(EventTableModel table)
