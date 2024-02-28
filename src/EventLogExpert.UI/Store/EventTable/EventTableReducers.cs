@@ -61,14 +61,14 @@ public sealed class EventTableReducers
 
         switch (updatedTables.Count)
         {
-            case <= 0 : return state with { EventTables = [], ActiveEventLogId = null };
-            case <= 1 :
+            case <= 0: return state with { EventTables = [], ActiveEventLogId = null };
+            case <= 1:
                 return state with
                 {
                     EventTables = updatedTables,
                     ActiveEventLogId = updatedTables.First().Id
                 };
-            default :
+            default:
                 var combinedTable = new EventTableModel(EventLogId.Create())
                 {
                     IsCombined = true,
@@ -137,6 +137,8 @@ public sealed class EventTableReducers
     {
         if (state.EventTables.Count <= 1) { return state; }
 
+        if (state.EventTables.Any(table => table.IsLoading)) { return state; }
+
         var updatedTable = state.EventTables.First(table => table.IsCombined);
 
         return state with
@@ -174,16 +176,31 @@ public sealed class EventTableReducers
 
             var currentActiveLog = action.ActiveLogs.First(log => log.Key == table.Id).Value;
 
-            updatedTables.Add(table.DisplayedEvents.Count == currentActiveLog.Count() ? table : table with
+            updatedTables.Add(table with
             {
                 DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
                     .ToList()
-                    .AsReadOnly(),
-                IsLoading = false
+                    .AsReadOnly()
             });
         }
 
         return state with { EventTables = [.. updatedTables] };
+    }
+
+    [ReducerMethod]
+    public static EventTableState ReduceUpdateTable(EventTableState state, EventTableAction.UpdateTable action)
+    {
+        var table = state.EventTables.First(t => action.LogId == t.Id);
+
+        return state with
+        {
+            EventTables = state.EventTables.Remove(table).Add(table with
+            {
+                DisplayedEvents = action.Events.SortEvents(state.OrderBy, state.IsDescending).ToList()
+                    .AsReadOnly(),
+                IsLoading = false
+            })
+        };
     }
 
     private static IEnumerable<DisplayEventModel> GetCombinedEvents(

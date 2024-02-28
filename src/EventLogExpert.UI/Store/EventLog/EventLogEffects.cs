@@ -73,12 +73,12 @@ public sealed class EventLogEffects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod(typeof(EventLogAction.LoadEvents))]
-    public Task HandleLoadEvents(IDispatcher dispatcher)
+    [EffectMethod]
+    public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
     {
-        var activeLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs.Values, eventLogState.Value.AppliedFilter);
+        var filteredEvents = FilterMethods.GetFilteredEvents(action.Events, eventLogState.Value.AppliedFilter);
 
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
+        dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
 
         return Task.CompletedTask;
     }
