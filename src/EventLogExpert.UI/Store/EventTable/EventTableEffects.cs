@@ -9,13 +9,31 @@ namespace EventLogExpert.UI.Store.EventTable;
 
 public sealed class EventTableEffects(
     IEventTableColumnProvider columnProvider,
-    IState<EventTableState> eventTableState,
     IPreferencesProvider preferencesProvider)
 {
+    private readonly IEventTableColumnProvider _columnProvider = columnProvider;
+    private readonly IPreferencesProvider _preferencesProvider = preferencesProvider;
+
+    [EffectMethod(typeof(EventTableAction.UpdateDisplayedEvents))]
+    public static Task HandleUpdateDisplayedEvents(IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod(typeof(EventTableAction.UpdateTable))]
+    public static Task HandleUpdateTable(IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(EventTableAction.LoadColumns))]
     public Task HandleLoadColumns(IDispatcher dispatcher)
     {
-        var columns = columnProvider.GetColumns();
+        var columns = _columnProvider.GetColumns();
 
         dispatcher.Dispatch(new EventTableAction.LoadColumnsCompleted(columns));
 
@@ -27,44 +45,31 @@ public sealed class EventTableEffects(
     {
         switch (action.ColumnName)
         {
-            case ColumnName.Level :
-                preferencesProvider.LevelColumnPreference = !preferencesProvider.LevelColumnPreference;
+            case ColumnName.Level:
+                _preferencesProvider.LevelColumnPreference = !_preferencesProvider.LevelColumnPreference;
                 break;
-            case ColumnName.DateAndTime :
-                preferencesProvider.DateAndTimeColumnPreference = !preferencesProvider.DateAndTimeColumnPreference;
+            case ColumnName.DateAndTime:
+                _preferencesProvider.DateAndTimeColumnPreference = !_preferencesProvider.DateAndTimeColumnPreference;
                 break;
-            case ColumnName.ActivityId :
-                preferencesProvider.ActivityIdColumnPreference = !preferencesProvider.ActivityIdColumnPreference;
+            case ColumnName.ActivityId:
+                _preferencesProvider.ActivityIdColumnPreference = !_preferencesProvider.ActivityIdColumnPreference;
                 break;
-            case ColumnName.LogName :
-                preferencesProvider.LogNameColumnPreference = !preferencesProvider.LogNameColumnPreference;
+            case ColumnName.LogName:
+                _preferencesProvider.LogNameColumnPreference = !_preferencesProvider.LogNameColumnPreference;
                 break;
-            case ColumnName.ComputerName :
-                preferencesProvider.ComputerNameColumnPreference = !preferencesProvider.ComputerNameColumnPreference;
+            case ColumnName.ComputerName:
+                _preferencesProvider.ComputerNameColumnPreference = !_preferencesProvider.ComputerNameColumnPreference;
                 break;
-            case ColumnName.Source :
-                preferencesProvider.SourceColumnPreference = !preferencesProvider.SourceColumnPreference;
+            case ColumnName.Source:
+                _preferencesProvider.SourceColumnPreference = !_preferencesProvider.SourceColumnPreference;
                 break;
-            case ColumnName.EventId :
-                preferencesProvider.EventIdColumnPreference = !preferencesProvider.EventIdColumnPreference;
+            case ColumnName.EventId:
+                _preferencesProvider.EventIdColumnPreference = !_preferencesProvider.EventIdColumnPreference;
                 break;
-            case ColumnName.TaskCategory :
-                preferencesProvider.TaskCategoryColumnPreference = !preferencesProvider.TaskCategoryColumnPreference;
+            case ColumnName.TaskCategory:
+                _preferencesProvider.TaskCategoryColumnPreference = !_preferencesProvider.TaskCategoryColumnPreference;
                 break;
         }
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(EventTableAction.UpdateDisplayedEvents))]
-    public Task HandleUpdateDisplayedEvents(IDispatcher dispatcher)
-    {
-        if (eventTableState.Value.EventTables.Any(table => table.IsLoading))
-        {
-            return Task.CompletedTask;
-        }
-
-        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
 
         return Task.CompletedTask;
     }

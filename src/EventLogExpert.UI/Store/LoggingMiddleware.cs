@@ -42,6 +42,7 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case EventTableAction.AddTable:
             case EventTableAction.LoadColumnsCompleted:
             case EventTableAction.UpdateDisplayedEvents:
+            case EventTableAction.UpdateTable:
             case FilterCacheAction.AddFavoriteFilterCompleted:
             case FilterCacheAction.AddRecentFilterCompleted:
             case FilterCacheAction.ImportFavorites:
