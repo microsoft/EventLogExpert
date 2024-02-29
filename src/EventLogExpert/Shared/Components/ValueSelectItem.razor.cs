@@ -23,8 +23,6 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     [Parameter]
     public bool IsDisabled { get; set; }
 
-    public string ItemId { get; } = $"_{Guid.NewGuid().ToString()[..8]}";
-
     [Parameter]
     public T Value { get; set; } = default!;
 
@@ -56,7 +54,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
 
         if (ClearItem) { ValueSelect.ClearSelected(); }
 
-        if (!ValueSelect.IsMultiSelect) { ValueSelect.CloseDropDown(); }
+        if (!ValueSelect.IsMultiSelect) { await ValueSelect.CloseDropDown(); }
 
         await ValueSelect.UpdateValue(Value);
     }

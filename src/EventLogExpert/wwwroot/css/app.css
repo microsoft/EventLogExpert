@@ -282,14 +282,11 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     border: 1px solid var(--clr-lightblue);
     background-color: var(--background-dark);
     z-index: 10;
-    /* position: absolute; */
-    /* top: 2rem; */
-    /* width: 100%; */
     max-height: 240px;
     overflow-y: auto;
     overflow-x: hidden;
 
-    &[data-toggle="true"] { display: block; }
+    &[data-toggle] { display: block; }
 
     & > div {
         text-align: left;

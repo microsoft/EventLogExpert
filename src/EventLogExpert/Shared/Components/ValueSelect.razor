@@ -1,21 +1,19 @@
 @typeparam T
 @inherits Base.BaseComponent<T>
 
-<div class="dropdown-input" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)"
-    @onkeydown="HandleKeyDown" @onblur="CloseDropDown">
+<div class="dropdown-input" @onkeydown="HandleKeyDown" @ref="_selectComponent" tabindex="@(IsInput && !IsMultiSelect ? -1 : 0)">
     @if (IsInput && !IsMultiSelect)
     {
-        <input type="text" class="@CssClass" value="@DisplayString" tabindex="0"
-            @oninput="OnInputChange" @onclick="ToggleDropDownVisibility" />
+        <input class="@CssClass" @oninput="OnInputChange" type="text" value="@DisplayString" />
     }
     else
     {
-        <span class="@CssClass" @onclick="ToggleDropDownVisibility">
+        <span class="@CssClass">
             @DisplayString
         </span>
     }
 
-    <div class="dropdown-list" data-toggle="@IsDropDownVisible" @onfocusout="CloseDropDown">
+    <div class="dropdown-list">
         <CascadingValue Value="this">
             @ChildContent
         </CascadingValue>

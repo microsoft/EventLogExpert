@@ -13,7 +13,6 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
     private readonly List<ValueSelectItem<T>> _items = [];
     private readonly HashSet<T> _selectedValues = [];
 
-    private bool _isDropDownVisible;
     private ElementReference _selectComponent;
 
     [Parameter]
@@ -44,8 +43,6 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         }
     }
 
-    private string IsDropDownVisible => _isDropDownVisible.ToString().ToLower();
-
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     public bool AddItem(ValueSelectItem<T> item)
@@ -73,11 +70,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     public void ClearSelected() => _selectedValues.Clear();
 
-    public async void CloseDropDown()
-    {
-        _isDropDownVisible = false;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
-    }
+    public async Task CloseDropDown() => await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
 
     public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 
@@ -115,39 +108,36 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await JSRuntime.InvokeVoidAsync("registerDropdown", _selectComponent);
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
     private async void HandleKeyDown(KeyboardEventArgs args)
     {
         switch (args.Code)
         {
-            case "Space" :
+            case "Space":
                 if (!IsInput) { ToggleDropDownVisibility(); }
 
                 break;
-            case "ArrowUp" :
-                if (!_isDropDownVisible)
-                {
-                    ToggleDropDownVisibility();
-                }
-                else
-                {
-                    await SelectAdjacentItem(-1);
-                }
+            case "ArrowUp":
+                await SelectAdjacentItem(-1);
 
                 break;
-            case "ArrowDown" :
-                if (!_isDropDownVisible)
-                {
-                    ToggleDropDownVisibility();
-                }
-                else
-                {
-                    await SelectAdjacentItem(+1);
-                }
+            case "ArrowDown":
+                await SelectAdjacentItem(+1);
 
                 break;
-            case "Enter" :
-            case "Escape" :
-                CloseDropDown();
+            case "Enter":
+            case "Escape":
+                await CloseDropDown();
+
                 break;
         }
     }
@@ -158,22 +148,13 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         await ValueChanged.InvokeAsync(Value);
     }
 
-    private async Task ScrollToSelectedItem()
-    {
-        var item = _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true);
-
-        if (item is null) { return; }
-
-        await JSRuntime.InvokeVoidAsync("scrollToItem", item.ItemId);
-    }
-
     private async Task SelectAdjacentItem(int direction)
     {
         // TODO: Should highlight next line but not change selection
         if (IsMultiSelect || IsInput) { return; }
 
-        var index = _items.FindIndex(x => x.ItemId.Equals(
-            _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)?.ItemId));
+        var index = _items.FindIndex(x => x.Equals(
+            _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)));
 
         if (direction < 0 && index < 0) { index = 0; }
 
@@ -191,17 +172,12 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
             _selectedValues.Add(_items[index].Value);
             await UpdateValue(_items[index].Value);
 
+            await JSRuntime.InvokeVoidAsync("scrollToSelectedItem", _selectComponent);
+
             break;
         }
-
-        if (_isDropDownVisible) { await ScrollToSelectedItem(); }
     }
 
-    private async void ToggleDropDownVisibility()
-    {
-        _isDropDownVisible = !_isDropDownVisible;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent, _isDropDownVisible);
-
-        await ScrollToSelectedItem();
-    }
+    private async void ToggleDropDownVisibility() =>
+        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent);
 }
