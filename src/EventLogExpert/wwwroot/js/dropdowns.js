@@ -1,25 +1,62 @@
-window.toggleDropdown = (root, isVisible) => {
+window.registerDropdown = (root) => {
+    const input = root.getElementsByTagName("input")[0];
+
+    if (input) {
+        input.addEventListener("blur",
+            (e) => {
+                const target = e.currentTarget.parentNode;
+
+                requestAnimationFrame(() => {
+                    if (target.contains(document.activeElement)) { return; }
+
+                    closeDropdown(root);
+                });
+            });
+    }
+
+    root.addEventListener("blur",
+        (e) => {
+            const target = e.currentTarget;
+
+            requestAnimationFrame(() => {
+                if (target.contains(document.activeElement)) { return; }
+
+                closeDropdown(root);
+            });
+        });
+
+    root.addEventListener("click", (e) => toggleDropdown(root));
+};
+
+window.closeDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
-    if (isVisible) {
-        const bounds = root.getBoundingClientRect();
+    dropdown.removeAttribute("data-toggle");
+};
 
-        dropdown.style.position = "fixed";
-        dropdown.style.top = `${bounds.bottom + 4}px`;
-        dropdown.style.left = `${bounds.left}px`;
-        dropdown.style.width = `${bounds.width}px`;
-    } else {
-        dropdown.style.position = false;
-        dropdown.style.top = false;
-        dropdown.style.left = false;
-        dropdown.style.width = false;
+window.scrollToSelectedItem = (root) => {
+    const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const items = dropdown.getElementsByTagName("div");
+
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].getAttribute("selected") !== null) {
+            items[i].scrollIntoView({ block: "nearest" });
+
+            return;
+        }
     }
 };
 
-window.scrollToItem = (elementId) => {
-    const element = document.getElementById(elementId);
+window.toggleDropdown = (root) => {
+    const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const bounds = root.getBoundingClientRect();
 
-    if (element) {
-        element.scrollIntoView({ block: "nearest" });
+    dropdown.style.position = "fixed";
+    dropdown.style.top = `${bounds.bottom + 4}px`;
+    dropdown.style.left = `${bounds.left}px`;
+    dropdown.style.width = `${bounds.width}px`;
+
+    if (dropdown.toggleAttribute("data-toggle")) {
+        scrollToSelectedItem(root);
     }
 };
