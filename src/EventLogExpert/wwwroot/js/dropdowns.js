@@ -2,13 +2,18 @@ window.registerDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const input = root.getElementsByTagName("input")[0];
 
-    const closeDropdown = (e) => {
+    const closeDropdown = (e, force = false) => {
         const target = e.currentTarget.parentNode;
 
         requestAnimationFrame(() => {
-            if (target.contains(document.activeElement)) { return; }
+            if (force === false && target.contains(document.activeElement)) { return; }
 
             dropdown.removeAttribute("data-toggle");
+
+            dropdown.style.position = false;
+            dropdown.style.top = false;
+            dropdown.style.left = false;
+            dropdown.style.width = false;
         });
     };
 
@@ -16,7 +21,7 @@ window.registerDropdown = (root) => {
         const items = dropdown.getElementsByTagName("div");
 
         for (let i = 0; i < items.length; i++) {
-            if (items[i].getAttribute("selected") !== null) {
+            if (items[i].hasAttribute("selected")) {
                 items[i].scrollIntoView({ block: "nearest" });
 
                 return;
@@ -24,7 +29,7 @@ window.registerDropdown = (root) => {
         }
     };
 
-    const toggleDropdown = () => {
+    const openDropdown = () => {
         const bounds = root.getBoundingClientRect();
 
         dropdown.style.position = "fixed";
@@ -32,13 +37,26 @@ window.registerDropdown = (root) => {
         dropdown.style.left = `${bounds.left}px`;
         dropdown.style.width = `${bounds.width}px`;
 
-        if (dropdown.toggleAttribute("data-toggle")) {
-            scrollToSelectedItem();
+        dropdown.setAttribute("data-toggle", "");
+
+        scrollToSelectedItem();
+    }
+
+    const toggleDropdown = (e) => {
+        if (dropdown.hasAttribute("data-toggle")) {
+            closeDropdown(e, true);
+        } else {
+            openDropdown();
         }
     };
 
-    input.addEventListener("click", (e) => toggleDropdown(root));
+    input.addEventListener("mousedown", (e) => {
+        e.stopPropagation();
+
+        toggleDropdown(e);
+    });
     input.addEventListener("blur", (e) => closeDropdown(e));
+    input.addEventListener("focusin", (e) => openDropdown());
 
     dropdown.addEventListener("blur", (e) => closeDropdown(e));
 };
@@ -47,6 +65,40 @@ window.closeDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     dropdown.removeAttribute("data-toggle");
+
+    dropdown.style.position = false;
+    dropdown.style.top = false;
+    dropdown.style.left = false;
+    dropdown.style.width = false;
+};
+
+window.openDropdown = (root) => {
+    const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const bounds = root.getBoundingClientRect();
+
+    if (dropdown.hasAttribute("data-toggle")) { return; }
+
+    dropdown.style.position = "fixed";
+    dropdown.style.top = `${bounds.bottom + 4}px`;
+    dropdown.style.left = `${bounds.left}px`;
+    dropdown.style.width = `${bounds.width}px`;
+
+    dropdown.setAttribute("data-toggle", "");
+
+    scrollToSelectedItem(root);
+};
+
+window.scrollToHighlightedItem = (root) => {
+    const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const items = dropdown.getElementsByTagName("div");
+
+    for (let i = 0; i < items.length; i++) {
+        if (items[i].hasAttribute("highlighted")) {
+            items[i].scrollIntoView({ block: "nearest" });
+
+            return;
+        }
+    }
 };
 
 window.scrollToSelectedItem = (root) => {
@@ -54,7 +106,7 @@ window.scrollToSelectedItem = (root) => {
     const items = dropdown.getElementsByTagName("div");
 
     for (let i = 0; i < items.length; i++) {
-        if (items[i].getAttribute("selected") !== null) {
+        if (items[i].hasAttribute("selected")) {
             items[i].scrollIntoView({ block: "nearest" });
 
             return;
@@ -64,14 +116,10 @@ window.scrollToSelectedItem = (root) => {
 
 window.toggleDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
-    const bounds = root.getBoundingClientRect();
 
-    dropdown.style.position = "fixed";
-    dropdown.style.top = `${bounds.bottom + 4}px`;
-    dropdown.style.left = `${bounds.left}px`;
-    dropdown.style.width = `${bounds.width}px`;
-
-    if (dropdown.toggleAttribute("data-toggle")) {
-        scrollToSelectedItem(root);
+    if (dropdown.hasAttribute("data-toggle")) {
+        closeDropdown(root);
+    } else {
+        openDropdown(root);
     }
 };
