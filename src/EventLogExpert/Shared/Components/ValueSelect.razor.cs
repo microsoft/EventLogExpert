@@ -18,6 +18,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
+    public ValueSelectItem<T>? HighlightedItem { get; private set; } = null;
+
     [Parameter]
     public bool IsInput { get; set; }
 
@@ -72,6 +74,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     public async Task CloseDropDown() => await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
 
+    public async Task OpenDropDown() => await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
+
     public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 
     public async Task UpdateValue(T item)
@@ -125,20 +129,37 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
             case "Space":
                 if (!IsInput) { ToggleDropDownVisibility(); }
 
-                break;
+                return;
             case "ArrowUp":
+                await OpenDropDown();
                 await SelectAdjacentItem(-1);
 
-                break;
+                return;
             case "ArrowDown":
+                await OpenDropDown();
                 await SelectAdjacentItem(+1);
 
-                break;
+                return;
             case "Enter":
+                if ((IsInput || IsMultiSelect) && HighlightedItem is not null)
+                {
+                    if (HighlightedItem.ClearItem)
+                    {
+                        ClearSelected();
+                    }
+
+                    await UpdateValue(HighlightedItem.Value);
+                }
+                else
+                {
+                    await CloseDropDown();
+                }
+
+                return;
             case "Escape":
                 await CloseDropDown();
 
-                break;
+                return;
         }
     }
 
@@ -150,13 +171,20 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     private async Task SelectAdjacentItem(int direction)
     {
-        // TODO: Should highlight next line but not change selection
-        if (IsMultiSelect || IsInput) { return; }
+        int index;
 
-        var index = _items.FindIndex(x => x.Equals(
-            _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)));
+        if (IsMultiSelect || IsInput)
+        {
+            index = _items.FindIndex(x => x.Equals(_items.FirstOrDefault(item => item.Equals(HighlightedItem))));
+        }
+        else
+        {
+            index = _items.FindIndex(x => x.Equals(
+                _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)));
+        }
 
-        if (direction < 0 && index < 0) { index = 0; }
+        // Need to account for first item being an empty placeholder
+        if (index < 0) { index = 0; }
 
         for (int i = 0; i < _items.Count; i++)
         {
@@ -168,13 +196,25 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
             if (_items[index].IsDisabled) { continue; }
 
-            _selectedValues.Clear();
-            _selectedValues.Add(_items[index].Value);
-            await UpdateValue(_items[index].Value);
+            if (IsMultiSelect || IsInput)
+            {
+                HighlightedItem = _items[index];
 
-            await JSRuntime.InvokeVoidAsync("scrollToSelectedItem", _selectComponent);
+                StateHasChanged();
 
-            break;
+                await JSRuntime.InvokeVoidAsync("scrollToHighlightedItem", _selectComponent);
+            }
+            else
+            {
+                _selectedValues.Clear();
+                _selectedValues.Add(_items[index].Value);
+
+                await UpdateValue(_items[index].Value);
+
+                await JSRuntime.InvokeVoidAsync("scrollToSelectedItem", _selectComponent);
+            }
+
+            return;
         }
     }
 

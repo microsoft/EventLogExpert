@@ -300,7 +300,8 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
         &:hover { background-color: var(--background-darkgray); }
 
-        &[selected] {
+        &[selected],
+        &[highlighted] {
             color: var(--background-darkgray);
             background-color: var(--clr-lightblue);
         }

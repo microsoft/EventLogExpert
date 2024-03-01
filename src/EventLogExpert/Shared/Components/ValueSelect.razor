@@ -2,7 +2,7 @@
 @inherits Base.BaseComponent<T>
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @ref="_selectComponent">
-    <input class="@CssClass" @oninput="OnInputChange" type="text" value="@DisplayString" tabindex="0" readonly="@(!IsInput || IsMultiSelect)" />
+    <input class="@CssClass" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" tabindex="0" type="text" value="@DisplayString" />
 
     <div class="dropdown-list" tabindex="-1">
         <CascadingValue Value="this">
