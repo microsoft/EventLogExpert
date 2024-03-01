@@ -47,7 +47,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     public bool AddItem(ValueSelectItem<T> item)
     {
-        if (_items.Select(x => x.Value).Contains(item.Value))
+        if (_items.Contains(item))
         {
             return _selectedValues.Contains(item.Value);
         }
