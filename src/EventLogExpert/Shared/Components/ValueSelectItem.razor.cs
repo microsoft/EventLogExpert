@@ -48,6 +48,13 @@ public sealed partial class ValueSelectItem<T> : IDisposable
 
     public void Dispose() => ValueSelect.RemoveItem(this);
 
+    private void HighlightItem()
+    {
+        if (!_parent.IsMultiSelect) { return; }
+
+        _parent.HighlightedItem = this;
+    }
+
     private async void SelectItem()
     {
         if (IsDisabled) { return; }
