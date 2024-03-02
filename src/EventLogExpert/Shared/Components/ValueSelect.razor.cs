@@ -13,12 +13,22 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
     private readonly List<ValueSelectItem<T>> _items = [];
     private readonly HashSet<T> _selectedValues = [];
 
+    private ValueSelectItem<T>? _highlightedItem;
+    private bool _preventDefault;
     private ElementReference _selectComponent;
 
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
-    public ValueSelectItem<T>? HighlightedItem { get; private set; } = null;
+    public ValueSelectItem<T>? HighlightedItem
+    {
+        get => _highlightedItem;
+        set
+        {
+            _highlightedItem = value;
+            StateHasChanged();
+        }
+    }
 
     [Parameter]
     public bool IsInput { get; set; }
@@ -131,11 +141,15 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
                 return;
             case "ArrowUp":
+                _preventDefault = true;
+
                 await OpenDropDown();
                 await SelectAdjacentItem(-1);
 
                 return;
             case "ArrowDown":
+                _preventDefault = true;
+
                 await OpenDropDown();
                 await SelectAdjacentItem(+1);
 
@@ -161,6 +175,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
                 return;
         }
+
+        _preventDefault = false;
     }
 
     private async void OnInputChange(ChangeEventArgs args)

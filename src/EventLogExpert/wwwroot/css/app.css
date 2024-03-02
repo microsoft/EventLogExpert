@@ -298,10 +298,10 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
         color: #fff;
 
-        &:hover { background-color: var(--background-darkgray); }
+        &:hover,
+        &[highlighted] { background-color: var(--background-darkgray); }
 
-        &[selected],
-        &[highlighted] {
+        &[selected] {
             color: var(--background-darkgray);
             background-color: var(--clr-lightblue);
         }

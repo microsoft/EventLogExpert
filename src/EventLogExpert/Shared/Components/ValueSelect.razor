@@ -1,7 +1,7 @@
 @typeparam T
 @inherits Base.BaseComponent<T>
 
-<div class="dropdown-input" @onkeydown="HandleKeyDown" @ref="_selectComponent">
+<div class="dropdown-input" @onkeydown="HandleKeyDown" @onkeydown:preventDefault="_preventDefault" @ref="_selectComponent">
     <input class="@CssClass" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" tabindex="0" type="text" value="@DisplayString" />
 
     <div class="dropdown-list" tabindex="-1">
