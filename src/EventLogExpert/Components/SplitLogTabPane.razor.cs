@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -69,6 +70,9 @@ public sealed partial class SplitLogTabPane
             $"Log Name: {table.LogName}\n" +
             $"Computer Name: {table.ComputerName}";
     }
+
+    private void CloseLog(EventTableModel table) =>
+        Dispatcher.Dispatch(new EventLogAction.CloseLog(table.Id, table.LogName));
 
     private string GetActiveTab(EventTableModel table) =>
         EventTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
