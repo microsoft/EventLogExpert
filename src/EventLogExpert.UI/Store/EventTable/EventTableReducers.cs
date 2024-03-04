@@ -56,7 +56,7 @@ public sealed class EventTableReducers
     public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action)
     {
         var updatedTables = state.EventTables
-            .Where(table => table.Id == action.LogId && !table.IsCombined)
+            .Where(table => table.Id != action.LogId && !table.IsCombined)
             .ToImmutableList();
 
         switch (updatedTables.Count)
