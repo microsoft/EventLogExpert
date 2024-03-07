@@ -1,14 +1,10 @@
-﻿@using EventLogExpert.UI.Store.EventLog
-@using EventLogExpert.UI.Store.Settings
+﻿@using System.Xml.Linq
 @inherits FluxorComponent
 
-@inject IState<EventLogState> EventLogState
-@inject IState<SettingsState> SettingsState
-
-<div id="details-pane" data-toggle="@IsVisible" hidden="@(EventLogState.Value.SelectedEvent is null)">
+<div data-toggle="@IsVisible" hidden="@(SelectedEvent is null)" id="details-pane">
     <div id="details-resizer"></div>
 
-    <div id="details-header" class="flex-space-between" @onclick="ToggleMenu">
+    <div class="flex-space-between" id="details-header" @onclick="ToggleMenu">
         <div>Details</div>
 
         <span class="menu-toggle" data-rotate="@IsVisible">
@@ -16,28 +12,25 @@
         </span>
     </div>
 
-    @if (Event is not null)
+    @if (SelectedEvent is not null)
     {
         <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
             <div class="d-flex flex-row">
-                @if (EventLogState.Value.ActiveLogs.Count > 1)
-                {
-                    <div>Log Name: @Event.LogName</div>
-                }
-                <div>Source: @Event.Source</div>
-                <div>Event Id: @Event.Id</div>
-                <div>Level: @Event.Level</div>
-                @if (Event.KeywordsDisplayNames.Any())
+                <div>Log Name: @SelectedEvent.LogName</div>
+                <div>Source: @SelectedEvent.Source</div>
+                <div>Event Id: @SelectedEvent.Id</div>
+                <div>Level: @SelectedEvent.Level</div>
+                @if (SelectedEvent.KeywordsDisplayNames.Any())
                 {
                     <div>
-                        @Event.KeywordsDisplayNames.GetEventKeywords()
+                        @SelectedEvent.KeywordsDisplayNames.GetEventKeywords()
                     </div>
                 }
-                <div>Date and Time: @Event.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</div>
+                <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</div>
             </div>
 
             <div>Description:</div>
-            <p class="details-description">@Event.Description</p>
+            <p class="details-description">@SelectedEvent.Description</p>
         </div>
 
         <div class="details-row-xml" @onclick="ToggleXml">
@@ -50,6 +43,6 @@
             </span>
         </div>
 
-        <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@Event.Xml</p>
+        <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@XElement.Parse(SelectedEvent.Xml)</p>
     }
 </div>

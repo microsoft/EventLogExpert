@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -54,9 +55,11 @@ public sealed partial class SplitLogTabPane
     {
         if (table.IsCombined) { return "Combined"; }
 
-        return table.LogType is LogType.File ?
+        string tabName = table.LogType is LogType.File ?
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
             $"{table.LogName} - {table.ComputerName}";
+
+        return table.DisplayedEvents.Count <= 0 && !table.IsLoading ? $"(Empty) {tabName}" : tabName;
     }
 
     private static string GetTabTooltip(EventTableModel table)
@@ -67,6 +70,9 @@ public sealed partial class SplitLogTabPane
             $"Log Name: {table.LogName}\n" +
             $"Computer Name: {table.ComputerName}";
     }
+
+    private void CloseLog(EventTableModel table) =>
+        Dispatcher.Dispatch(new EventLogAction.CloseLog(table.Id, table.LogName));
 
     private string GetActiveTab(EventTableModel table) =>
         EventTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";

@@ -10,37 +10,54 @@
 }
 
 .tab {
-    width: 30ch;
-    text-align: center;
-
-    &:hover > span,
-    &.active > span {
-        padding-top: 6px;
-        border-top: 2px solid var(--clr-lightblue);
-    }
-}
-
-.tab-row > div {
-    float: left;
-    display: block;
-}
-
-span {
-    display: block;
     margin: 0 1px 0 0;
     padding: 4px 22px;
     border-radius: 3px 3px 0 0;
-
-    overflow: hidden;
-    user-select: none;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 
     background: var(--background-darkgray);
     cursor: pointer;
     position: relative;
     top: 2px;
     transition: all 0.1s ease-in-out;
+
+    width: 30ch;
+    text-align: center;
+
+    &:hover,
+    &.active {
+        padding-top: 6px;
+        border-top: 2px solid var(--clr-lightblue);
+    }
+
+    & > i {
+        visibility: hidden;
+
+        position: absolute;
+        right: 5px;
+        top: 4px;
+
+        width: 1.5em;
+    }
+
+    &:hover > i {
+        visibility: visible;
+
+        border-radius: 3px;
+        border: 1px solid transparent;
+
+        &:hover {
+            border-color: var(--clr-lightblue);
+        }
+    }
+}
+
+span {
+    display: block;
+
+    overflow: hidden;
+    user-select: none;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .spinner-border {

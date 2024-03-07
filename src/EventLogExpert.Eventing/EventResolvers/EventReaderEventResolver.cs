@@ -50,7 +50,7 @@ public class EventReaderEventResolver : IEventResolver
             eventRecord.ThreadId,
             eventRecord.LogName,
             OwningLogName,
-            eventRecord);
+            eventRecord.ToXml());
     }
 
     private static T TryGetValue<T>(Func<T> func)

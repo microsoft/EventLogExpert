@@ -10,7 +10,7 @@
 
     border-top: solid var(--background-darkgray);
 
-    &[data-toggle="false"] { 
+    &[data-toggle="false"] {
         height: auto !important;
         min-height: 0 !important;
 
@@ -55,6 +55,8 @@
     margin: 0;
     height: 100%;
     overflow-y: auto;
+    overflow-x: hidden;
+    text-wrap: pretty;
     white-space: pre-wrap;
 }
 

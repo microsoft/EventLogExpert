@@ -8,8 +8,8 @@ using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -73,12 +73,12 @@ public sealed class EventLogEffects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod(typeof(EventLogAction.LoadEvents))]
-    public Task HandleLoadEvents(IDispatcher dispatcher)
+    [EffectMethod]
+    public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
     {
-        var activeLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs.Values, eventLogState.Value.AppliedFilter);
+        var filteredEvents = FilterMethods.GetFilteredEvents(action.Events, eventLogState.Value.AppliedFilter);
 
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(activeLogs));
+        dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
 
         return Task.CompletedTask;
     }
@@ -112,9 +112,9 @@ public sealed class EventLogEffects(
             return;
         }
 
-        EventLogReader reader = action.LogType == LogType.Live ?
-            new EventLogReader(action.LogName, PathType.LogName) :
-            new EventLogReader(action.LogName, PathType.FilePath);
+        EventLogQuery eventLog = action.LogType == LogType.Live ?
+            new EventLogQuery(action.LogName, PathType.LogName) :
+            new EventLogQuery(action.LogName, PathType.FilePath);
 
         var activityId = Guid.NewGuid();
 
@@ -122,50 +122,80 @@ public sealed class EventLogEffects(
 
         try
         {
-            var sw = new Stopwatch();
-            sw.Start();
-
-            List<DisplayEventModel> events = [];
-            HashSet<int> eventIdsAll = [];
-            HashSet<Guid?> eventActivityIdsAll = [];
-            HashSet<string> eventProviderNamesAll = [];
-            HashSet<string> eventTaskNamesAll = [];
-            HashSet<string> eventKeywordNamesAll = [];
             EventRecord? lastEvent = null;
 
-            await Task.Run(() =>
+            const int batchSize = 200;
+            bool doneReading = false;
+            ConcurrentQueue<EventRecord> records = new();
+            ConcurrentQueue<DisplayEventModel> events = new();
+
+            await using Timer timer = new(
+                s => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count)); },
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(1));
+
+            // Don't need to wait on this since we are waiting for doneReading in the resolver tasks
+            _ = Task.Run(() =>
                 {
+                    using var reader = new EventLogReader(eventLog);
+
+                    int count = 0;
+
                     while (reader.ReadEvent() is { } e)
                     {
                         action.Token.ThrowIfCancellationRequested();
 
-                        lastEvent = e;
-                        var resolved = eventResolver.Resolve(e, action.LogName);
-                        eventIdsAll.Add(resolved.Id);
-                        eventActivityIdsAll.Add(resolved.ActivityId);
-                        eventProviderNamesAll.Add(resolved.Source);
-                        eventTaskNamesAll.Add(resolved.TaskCategory);
-                        eventKeywordNamesAll.UnionWith(resolved.KeywordsDisplayNames);
-
-                        events.Add(resolved);
-
-                        if (sw.ElapsedMilliseconds > 1000)
+                        if (count % batchSize == 0)
                         {
-                            sw.Restart();
-                            dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count));
+                            records.Enqueue(e);
                         }
+
+                        count++;
+
+                        lastEvent = e;
                     }
+
+                    doneReading = true;
                 },
                 action.Token);
 
+            await Parallel.ForEachAsync(
+                Enumerable.Range(1, 8),
+                action.Token,
+                (_, token) =>
+                {
+                    using var reader = new EventLogReader(eventLog);
+
+                    while (records.TryDequeue(out EventRecord? @event) || !doneReading)
+                    {
+                        token.ThrowIfCancellationRequested();
+
+                        if (@event is null) { continue; }
+
+                        reader.Seek(@event.Bookmark);
+
+                        for (int i = 0; i < batchSize; i++)
+                        {
+                            @event = reader.ReadEvent();
+
+                            if (@event is null) { break; }
+
+                            events.Enqueue(eventResolver.Resolve(@event, action.LogName));
+                        }
+                    }
+
+                    return ValueTask.CompletedTask;
+                });
+
             dispatcher.Dispatch(new EventLogAction.LoadEvents(
                 logData,
-                events.AsReadOnly(),
-                [.. eventIdsAll],
-                [.. eventActivityIdsAll],
-                [.. eventProviderNamesAll],
-                [.. eventTaskNamesAll],
-                [.. eventKeywordNamesAll]));
+                events.ToList().AsReadOnly(),
+                events.Select(e => e.Id).ToImmutableHashSet(),
+                events.Select(e => e.ActivityId).ToImmutableHashSet(),
+                events.Select(e => e.Source).ToImmutableHashSet(),
+                events.Select(e => e.TaskCategory).ToImmutableHashSet(),
+                events.SelectMany(e => e.KeywordsDisplayNames).ToImmutableHashSet()));
 
             dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
@@ -173,27 +203,6 @@ public sealed class EventLogEffects(
             {
                 logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
             }
-
-            sw.Restart();
-
-            await Task.Run(() =>
-                {
-                    for (int i = 0; i < events.Count; i++)
-                    {
-                        action.Token.ThrowIfCancellationRequested();
-
-                        if (sw.ElapsedMilliseconds > 1000)
-                        {
-                            sw.Restart();
-                            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, i));
-                        }
-
-                        _ = events[i].Xml;
-                    }
-                },
-                action.Token);
-
-            dispatcher.Dispatch(new StatusBarAction.SetXmlLoading(activityId, 0));
         }
         catch (TaskCanceledException)
         {
@@ -203,8 +212,6 @@ public sealed class EventLogEffects(
         finally
         {
             dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
-
-            reader.Dispose();
         }
     }
 

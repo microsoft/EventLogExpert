@@ -4,8 +4,8 @@
     <div class="tab-row">
         @foreach (var table in _sortedTabs)
         {
-            <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)" @onclick="() => SetActiveLog(table)" disabled="@table.IsLoading">
-                <span>
+            <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)">
+                <span @onmousedown="() => SetActiveLog(table)" disabled="@table.IsLoading">
                     @if (table.IsLoading)
                     {
                         <i class="spinner-border" role="status"></i>
@@ -13,6 +13,8 @@
                     }
                     @GetTabName(table)
                 </span>
+
+                <i class="bi bi-x" @onmousedown="() => CloseLog(table)"></i>
             </div>
         }
     </div>

@@ -301,7 +301,7 @@ public partial class EventResolverBase
             eventRecord.ThreadId,
             eventRecord.LogName!,
             owningLogName,
-            eventRecord);
+            eventRecord.ToXml());
     }
 
     [GeneratedRegex("%+[0-9]+")]

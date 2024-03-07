@@ -18,6 +18,4 @@ public sealed record StatusBarAction
     public sealed record SetEventsLoading(Guid ActivityId, int Count);
 
     public sealed record SetResolverStatus(string ResolverStatus);
-
-    public sealed record SetXmlLoading(Guid ActivityId, int Count);
 }
