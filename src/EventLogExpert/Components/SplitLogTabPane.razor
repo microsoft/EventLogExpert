@@ -14,7 +14,10 @@
                     @GetTabName(table)
                 </span>
 
-                <i class="bi bi-x" @onmousedown="() => CloseLog(table)"></i>
+                @if (!table.IsCombined)
+                {
+                    <i class="bi bi-x" @onmousedown="() => CloseLog(table)"></i>
+                }
             </div>
         }
     </div>
