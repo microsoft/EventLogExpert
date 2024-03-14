@@ -59,12 +59,12 @@ tr { height: 22px; }
 .table-row { cursor: pointer; }
 
 .table-row.blue,
+.table-row.dodgerblue,
+.table-row.firebrick,
 .table-row.green,
-.table-row.red,
-.table-row.yellow,
-.table-row.maroon,
-.table-row.orange,
-.table-row.pink {
+.table-row.lightcoral,
+.table-row.purple,
+.table-row.red {
     color: var(--clr-white) !important;
 
     & span.error { color: var(--clr-white) !important; }
@@ -72,19 +72,53 @@ tr { height: 22px; }
     & span.warning { color: var(--clr-white) !important; }
 }
 
+.table-row.aqua,
+.table-row.fuchsia,
+.table-row.lime,
+.table-row.lightgray,
+.table-row.orange,
+.table-row.tan,
+.table-row.violet,
+.table-row.yellow,
+.table-row.yellowgreen {
+    color: var(--background-darkgray) !important;
+
+    & span.error { color: var(--background-darkgray) !important; }
+
+    & span.warning { color: var(--background-darkgray) !important; }
+}
+
+.table-row.aqua { background-color: var(--highlight-aqua) !important; }
+
 .table-row.blue { background-color: var(--highlight-blue) !important; }
+
+.table-row.dodgerblue { background-color: var(--highlight-dodgerblue) !important; }
+
+.table-row.firebrick { background-color: var(--highlight-firebrick) !important; }
+
+.table-row.fuchsia { background-color: var(--highlight-fuchsia) !important; }
 
 .table-row.green { background-color: var(--highlight-green) !important; }
 
-.table-row.red { background-color: var(--highlight-red) !important; }
+.table-row.lightcoral { background-color: var(--highlight-lightcoral) !important; }
 
-.table-row.yellow { background-color: var(--highlight-yellow) !important; }
+.table-row.lightgray { background-color: var(--highlight-lightgray) !important; }
 
-.table-row.maroon { background-color: var(--highlight-maroon) !important; }
+.table-row.lime { background-color: var(--highlight-lime) !important; }
 
 .table-row.orange { background-color: var(--highlight-orange) !important; }
 
-.table-row.pink { background-color: var(--highlight-pink) !important; }
+.table-row.purple { background-color: var(--highlight-purple) !important; }
+
+.table-row.red { background-color: var(--highlight-red) !important; }
+
+.table-row.tan { background-color: var(--highlight-tan) !important; }
+
+.table-row.violet { background-color: var(--highlight-violet) !important; }
+
+.table-row.yellow { background-color: var(--highlight-yellow) !important; }
+
+.table-row.yellowgreen { background-color: var(--highlight-yellowgreen) !important; }
 
 .activity-id { width: 270px; }
 

@@ -29,7 +29,7 @@ public sealed partial class EventTable
 
     [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
-    [Inject] private IState<FilterPaneState> FilterPaneState{ get; init; } = null!;
+    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -118,7 +118,7 @@ public sealed partial class EventTable
         // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
         switch (args)
         {
-            case { CtrlKey: true, Code: "KeyC" } :
+            case { CtrlKey: true, Code: "KeyC" }:
                 ClipboardService.CopySelectedEvent();
                 break;
         }

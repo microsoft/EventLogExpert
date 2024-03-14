@@ -15,17 +15,26 @@
     --background-dark: #222222;
     --background-darkgray: #353535;
 
-    --highlight-blue: #245C92;
-    --highlight-green: #159215;
-    --highlight-red: #921515;
-    --highlight-yellow: #929215;
-    --highlight-maroon: #921592;
-    --highlight-orange: #926615;
-    --highlight-pink: #8A558A;
+    --highlight-aqua: rgb(0, 255, 255);
+    --highlight-blue: rgb(0, 0, 255);
+    --highlight-dodgerblue: rgb(30, 144, 255);
+    --highlight-firebrick: rgb(178, 34, 34);
+    --highlight-fuchsia: rgb(255, 0, 255);
+    --highlight-green: rgb(0, 128, 0);
+    --highlight-lightcoral: rgb(240, 128, 128);
+    --highlight-lightgray: rgb(211, 211, 211);
+    --highlight-lime: rgb(0, 255, 0);
+    --highlight-orange: rgb(255, 165, 0);
+    --highlight-purple: rgb(128, 0, 128);
+    --highlight-red: rgb(255, 0, 0);
+    --highlight-tan: rgb(210, 180, 140);
+    --highlight-violet: rgb(238, 130, 238);
+    --highlight-yellow: rgb(255, 255, 0);
+    --highlight-yellowgreen: rgb(154, 205, 50);
 }
 
 ::-webkit-scrollbar {
-    width: 7px;
+    width: 6px;
     background: var(--background-darkgray);
 }
 
@@ -321,19 +330,37 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
     &.none { background-color: var(--background-dark) !important; }
 
+    &.aqua { background-color: var(--highlight-aqua) !important; }
+
     &.blue { background-color: var(--highlight-blue) !important; }
+
+    &.dodgerblue { background-color: var(--highlight-dodgerblue) !important; }
+
+    &.firebrick { background-color: var(--highlight-firebrick) !important; }
+
+    &.fuchsia { background-color: var(--highlight-fuchsia) !important; }
 
     &.green { background-color: var(--highlight-green) !important; }
 
-    &.red { background-color: var(--highlight-red) !important; }
+    &.lightcoral { background-color: var(--highlight-lightcoral) !important; }
 
-    &.yellow { background-color: var(--highlight-yellow) !important; }
+    &.lightgray { background-color: var(--highlight-lightgray) !important; }
 
-    &.maroon { background-color: var(--highlight-maroon) !important; }
+    &.lime { background-color: var(--highlight-lime) !important; }
 
     &.orange { background-color: var(--highlight-orange) !important; }
 
-    &.pink { background-color: var(--highlight-pink) !important; }
+    &.purple { background-color: var(--highlight-purple) !important; }
+
+    &.red { background-color: var(--highlight-red) !important; }
+
+    &.tan { background-color: var(--highlight-tan) !important; }
+
+    &.violet { background-color: var(--highlight-violet) !important; }
+
+    &.yellow { background-color: var(--highlight-yellow) !important; }
+
+    &.yellowgreen { background-color: var(--highlight-yellowgreen) !important; }
 }
 
 .color-dropdown-item {
