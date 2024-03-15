@@ -9,7 +9,7 @@ namespace EventLogExpert.UI.Store.StatusBar;
 public sealed class StatusBarReducers
 {
     [ReducerMethod]
-    public static StatusBarState ReduceCloseAll(StatusBarState state, StatusBarAction.ClearStatus action)
+    public static StatusBarState ReduceClearStatus(StatusBarState state, StatusBarAction.ClearStatus action)
     {
         var updatedState = state with { };
 
