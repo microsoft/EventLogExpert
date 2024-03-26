@@ -61,3 +61,5 @@
 }
 
     .details-xml[data-toggle="false"] { display: none; }
+
+hr { margin: 1px 0; }
