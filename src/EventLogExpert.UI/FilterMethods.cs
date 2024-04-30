@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
-using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Text;
 
@@ -41,15 +40,23 @@ public static class FilterMethods
         return group;
     }
 
-    public static bool Filter(this DisplayEventModel? @event, ImmutableList<FilterModel> filters)
+    public static bool Filter(this DisplayEventModel? @event, IEnumerable<FilterModel> filters)
     {
         if (@event is null) { return false; }
 
-        if (filters.IsEmpty) { return true; }
+        bool isEmpty = true;
+        bool isFiltered = false;
 
-        if (filters.Any(filter => filter.IsExcluded && filter.Comparison.Expression(@event))) { return false; }
+        foreach (var filter in filters)
+        {
+            if (filter.IsExcluded && filter.Comparison.Expression(@event)) { return false; }
 
-        return filters.All(filter => filter.IsExcluded) || filters.Any(filter => !filter.IsExcluded && filter.Comparison.Expression(@event));
+            if (!filter.IsExcluded) { isEmpty = false; }
+
+            if (!filter.IsExcluded && filter.Comparison.Expression(@event)) { isFiltered = true; }
+        }
+
+        return isEmpty || isFiltered;
     }
 
     public static IDictionary<EventLogId, IEnumerable<DisplayEventModel>> FilterActiveLogs(
