@@ -1,16 +1,18 @@
 @using EventLogExpert.UI
-@using EventLogExpert.UI.Models
 
 <div class="flex-space-between">
     <div class="flex-align-center">
         @if (Value.IsEditing)
         {
-            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
-                @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
-                {
-                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
-                }
-            </ValueSelect>
+            if (!Value.IsExcluded)
+            {
+                <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
+                    @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
+                    {
+                        <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
+                    }
+                </ValueSelect>
+            }
 
             <span>Cache Type: </span>
             <ValueSelect CssClass="input filter-dropdown" T="CacheType" @bind-Value="_cacheType" ToStringFunc="x => x.ToFullString()">
@@ -20,7 +22,14 @@
                 }
             </ValueSelect>
 
-            <span>Value: </span>
+            if (Value.IsExcluded)
+            {
+                <span>Exclude Value: </span>
+            }
+            else
+            {
+                <span>Value: </span>
+            }
             <ValueSelect CssClass="input cache-dropdown" T="string" @bind-Value="_filterValue" IsInput>
                 @if (Items.Any())
                 {
