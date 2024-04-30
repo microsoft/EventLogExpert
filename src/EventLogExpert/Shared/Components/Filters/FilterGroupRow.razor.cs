@@ -52,4 +52,7 @@ public sealed partial class FilterGroupRow
 
         Dispatcher.Dispatch(new FilterGroupAction.SetFilter(ParentId, Value));
     }
+
+    private void ToggleFilterExclusion() =>
+        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilterExcluded(ParentId, Value.Id));
 }

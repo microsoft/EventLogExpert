@@ -42,6 +42,10 @@
                 <button class="button" type="button" @onclick="ToggleGroup">
                     <i class="bi bi-funnel"></i> Edit
                 </button>
+                
+                <button class="button button-red" type="button" @onclick="RemoveGroup">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
             </div>
         }
     </div>
@@ -56,7 +60,15 @@
         {
             <div class="flex-align-center">
                 <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
-                <div>@filter.Comparison.Value</div>
+
+                @if (filter.IsExcluded)
+                {
+                    <span>Exclude: @filter.Comparison.Value</span>
+                }
+                else
+                {
+                    <span>@filter.Comparison.Value</span>                
+                }
             </div>
         }
     }

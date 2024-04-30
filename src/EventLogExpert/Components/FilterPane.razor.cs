@@ -26,11 +26,7 @@ public sealed partial class FilterPane
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
-    private bool HasFilters =>
-        IsDateFilterVisible ||
-        FilterPaneState.Value.AdvancedFilters.IsEmpty is false ||
-        FilterPaneState.Value.BasicFilters.IsEmpty is false ||
-        FilterPaneState.Value.CachedFilters.IsEmpty is false;
+    private bool HasFilters => IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false;
 
     private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
 
@@ -52,13 +48,23 @@ public sealed partial class FilterPane
 
     private void AddAdvancedFilter()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddAdvancedFilter());
+        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
+        {
+            FilterType = FilterType.Advanced,
+            IsEditing = true
+        }));
+
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddBasicFilter());
+        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
+        {
+            FilterType = FilterType.Basic,
+            IsEditing = true
+        }));
+
         _isFilterListVisible = true;
     }
 
@@ -93,6 +99,18 @@ public sealed partial class FilterPane
         _canEditDate = true;
     }
 
+    private void AddExclusion()
+    {
+        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
+        {
+            FilterType = FilterType.Basic,
+            IsEditing = true,
+            IsExcluded = true
+        }));
+
+        _isFilterListVisible = true;
+    }
+
     private void ApplyDateFilter()
     {
         FilterDateModel model = new()
@@ -113,9 +131,7 @@ public sealed partial class FilterPane
         int count = 0;
 
         count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
-        count += FilterPaneState.Value.AdvancedFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false});
-        count += FilterPaneState.Value.BasicFilters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
-        count += FilterPaneState.Value.CachedFilters.Count(filter => filter is { IsEnabled: true });
+        count += FilterPaneState.Value.Filters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
 
         return count;
     }

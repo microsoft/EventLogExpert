@@ -7,9 +7,9 @@ public sealed class FilterDataTests
     [Fact]
     public void FilterValue_WhenFilterTypeChanged_IsNull()
     {
-        FilterData model = new() { Type = FilterType.Id, Value = "100" };
+        FilterData model = new() { Category = FilterCategory.Id, Value = "100" };
 
-        model.Type = FilterType.Level;
+        model.Category = FilterCategory.Level;
 
         Assert.Null(model.Value);
     }
@@ -17,9 +17,9 @@ public sealed class FilterDataTests
     [Fact]
     public void FilterValues_WhenFilterTypeChanged_IsEmpty()
     {
-        FilterData model = new() { Type = FilterType.Id, Values = ["100", "1000"] };
+        FilterData model = new() { Category = FilterCategory.Id, Values = ["100", "1000"] };
 
-        model.Type = FilterType.Level;
+        model.Category = FilterCategory.Level;
 
         Assert.Empty(model.Values);
     }

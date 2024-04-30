@@ -31,19 +31,19 @@ public sealed partial class ContextMenu
 
     private void CopySelected(CopyType? copyType) => ClipboardService.CopySelectedEvent(copyType);
 
-    private void FilterEvent(FilterType filterType, FilterEvaluator filterEvaluator)
+    private void FilterEvent(FilterCategory filterType, bool shouldExclude = false)
     {
         if (SelectedEventState.Value is null) { return; }
 
         string filterValue = filterType switch
         {
-            FilterType.Id => SelectedEventState.Value.Id.ToString(),
-            FilterType.ActivityId => SelectedEventState.Value.ActivityId.ToString()!,
-            FilterType.Level => SelectedEventState.Value.Level,
-            FilterType.KeywordsDisplayNames => SelectedEventState.Value.KeywordsDisplayNames.GetEventKeywords(),
-            FilterType.Source => SelectedEventState.Value.Source,
-            FilterType.TaskCategory => SelectedEventState.Value.TaskCategory,
-            FilterType.Description => SelectedEventState.Value.Description,
+            FilterCategory.Id => SelectedEventState.Value.Id.ToString(),
+            FilterCategory.ActivityId => SelectedEventState.Value.ActivityId.ToString()!,
+            FilterCategory.Level => SelectedEventState.Value.Level,
+            FilterCategory.KeywordsDisplayNames => SelectedEventState.Value.KeywordsDisplayNames.GetEventKeywords(),
+            FilterCategory.Source => SelectedEventState.Value.Source,
+            FilterCategory.TaskCategory => SelectedEventState.Value.TaskCategory,
+            FilterCategory.Description => SelectedEventState.Value.Description,
             _ => string.Empty,
         };
 
@@ -51,18 +51,19 @@ public sealed partial class ContextMenu
         {
             Data = new FilterData
             {
-                Type = filterType,
+                Category = filterType,
                 Value = filterValue,
-                Evaluator = filterEvaluator
+                Evaluator = FilterEvaluator.Equals
             },
             IsEditing = false,
-            IsEnabled = true
+            IsEnabled = true,
+            IsExcluded = shouldExclude
         };
 
         if (!FilterMethods.TryParse(filter, out var comparisonString)) { return; }
 
         filter.Comparison.Value = comparisonString;
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetBasicFilter(filter));
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }
 }

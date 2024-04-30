@@ -41,7 +41,15 @@
             {
                 <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
             }
-            <span>@Value.Comparison.Value</span>
+
+            @if (Value.IsExcluded)
+            {
+                <span>Exclude: @Value.Comparison.Value</span>
+            }
+            else
+            {
+                <span>@Value.Comparison.Value</span>
+            }
         }
     </div>
 
@@ -60,6 +68,23 @@
         {
             <button class="button" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
+            </button>
+
+            @if (Value.IsExcluded)
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-plus-circle"></i> Include
+                </button>
+            }
+            else
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-dash-circle"></i> Exclude
+                </button>
+            }
+
+            <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
             </button>
 
             @if (Value.IsEnabled)

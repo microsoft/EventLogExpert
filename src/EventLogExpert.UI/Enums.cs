@@ -52,6 +52,18 @@ public enum HighlightColor
     LightGray
 }
 
+public enum FilterCategory
+{
+    [EnumMember(Value = "Event ID")] Id,
+    [EnumMember(Value = "Activity ID")] ActivityId,
+    Level,
+    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
+    Source,
+    [EnumMember(Value = "Task Category")] TaskCategory,
+    Description,
+    Xml
+}
+
 public enum FilterEvaluator
 {
     Equals,
@@ -63,14 +75,9 @@ public enum FilterEvaluator
 
 public enum FilterType
 {
-    [EnumMember(Value = "Event ID")] Id,
-    [EnumMember(Value = "Activity ID")] ActivityId,
-    Level,
-    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
-    Source,
-    [EnumMember(Value = "Task Category")] TaskCategory,
-    Description,
-    Xml
+    Basic,
+    Advanced,
+    Cached
 }
 
 public enum LogType

@@ -28,8 +28,9 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
     [EffectMethod]
     public Task HandleAddRecentFilter(FilterCacheAction.AddRecentFilter action, IDispatcher dispatcher)
     {
-        if (state.Value.RecentFilters.Any(filter =>
-            string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)))
+        if (string.IsNullOrWhiteSpace(action.Filter) ||
+            state.Value.RecentFilters.Any(filter =>
+                string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)))
         {
             return Task.CompletedTask;
         }

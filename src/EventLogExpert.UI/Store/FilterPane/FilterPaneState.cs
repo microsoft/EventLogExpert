@@ -10,11 +10,7 @@ namespace EventLogExpert.UI.Store.FilterPane;
 [FeatureState]
 public sealed record FilterPaneState
 {
-    public ImmutableList<FilterModel> AdvancedFilters { get; init; } = [];
-
-    public ImmutableList<FilterModel> BasicFilters { get; init; } = [];
-
-    public ImmutableList<FilterModel> CachedFilters { get; init; } = [];
+    public ImmutableList<FilterModel> Filters { get; init; } = [];
 
     public FilterDateModel? FilteredDateRange { get; init; }
 

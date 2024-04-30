@@ -18,7 +18,7 @@ public sealed partial class AdvancedFilterRow
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEditing(Value.Id));
+    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
 
     private void OnInputChanged(ChangeEventArgs e)
     {
@@ -42,14 +42,17 @@ public sealed partial class AdvancedFilterRow
             }, e.Value, 250, 0);
     }
 
-    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveAdvancedFilter(Value.Id));
+    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
 
     private void SaveFilter()
     {
         if (!string.IsNullOrEmpty(_errorMessage)) { return; }
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetAdvancedFilter(Value with { IsEditing = false, IsEnabled = true }));
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(Value with { IsEditing = false, IsEnabled = true }));
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleAdvancedFilterEnabled(Value.Id));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
+
+    private void ToggleFilterExclusion() =>
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
 }

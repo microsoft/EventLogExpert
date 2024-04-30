@@ -54,13 +54,9 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterGroupAction.SetFilter:
             case FilterGroupAction.SetGroup:
             case FilterGroupAction.UpdateDisplayGroups:
-            case FilterPaneAction.AddAdvancedFilter:
-            case FilterPaneAction.AddBasicFilter:
-            case FilterPaneAction.AddCachedFilter:
+            case FilterPaneAction.AddFilter:
             case FilterPaneAction.ApplyFilterGroup:
-            case FilterPaneAction.SetAdvancedFilter:
-            case FilterPaneAction.SetBasicFilter:
-            case FilterPaneAction.SetCachedFilter:
+            case FilterPaneAction.SetFilter:
             case FilterPaneAction.SetFilterDateRange:
             case SettingsAction.LoadDatabasesCompleted:
             case SettingsAction.LoadSettingsCompleted:
