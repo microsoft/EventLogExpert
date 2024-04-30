@@ -41,6 +41,17 @@ public static class FilterMethods
         return group;
     }
 
+    public static bool Filter(this DisplayEventModel? @event, ImmutableList<FilterModel> filters)
+    {
+        if (@event is null) { return false; }
+
+        if (filters.IsEmpty) { return true; }
+
+        if (filters.Any(filter => filter.IsExcluded && filter.Comparison.Expression(@event))) { return false; }
+
+        return filters.All(filter => filter.IsExcluded) || filters.Any(filter => !filter.IsExcluded && filter.Comparison.Expression(@event));
+    }
+
     public static IDictionary<EventLogId, IEnumerable<DisplayEventModel>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter)
@@ -55,85 +66,58 @@ public static class FilterMethods
         return activeLogsFiltered;
     }
 
-    public static IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter)
+    public static DisplayEventModel? FilterByDate(this DisplayEventModel? @event, FilterDateModel? dateFilter)
+    {
+        if (@event is null) { return null; }
+
+        if (dateFilter is null) { return @event; }
+
+        return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before ? @event : null;
+    }
+
+    public static IEnumerable<DisplayEventModel> GetFilteredEvents(
+        IEnumerable<DisplayEventModel> events,
+        EventFilter eventFilter)
     {
         if (!IsFilteringEnabled(eventFilter)) { return events; }
 
-        List<Func<DisplayEventModel, bool>> filters = [];
-
-        if (!eventFilter.AdvancedFilters.IsEmpty)
-        {
-            filters.Add(e => eventFilter.AdvancedFilters
-                .Any(filter => filter.Comparison.Expression(e)));
-        }
-
-        if (!eventFilter.BasicFilters.IsEmpty)
-        {
-            filters.Add(e => eventFilter.BasicFilters
-                .Any(filter => filter.Comparison.Expression(e)));
-        }
-
-        if (!eventFilter.CachedFilters.IsEmpty)
-        {
-            filters.Add(e => eventFilter.CachedFilters
-                .Any(filter => filter.Comparison.Expression(e)));
-        }
-
-        if (eventFilter.DateFilter?.IsEnabled is true)
-        {
-            return filters.Count <= 0 ?
-                events.Where(e =>
-                    e.TimeCreated >= eventFilter.DateFilter.After &&
-                    e.TimeCreated <= eventFilter.DateFilter.Before) :
-                events.AsParallel()
-                    .Where(e =>
-                        e.TimeCreated >= eventFilter.DateFilter.After &&
-                        e.TimeCreated <= eventFilter.DateFilter.Before &&
-                        filters
-                            .Any(filter => filter(e)));
-        }
-
         return events.AsParallel()
-            .Where(e => filters
-                .Any(filter => filter(e)));
+            .Where(e => e.FilterByDate(eventFilter.DateFilter)
+                .Filter(eventFilter.Filters));
     }
 
     public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
         updated.DateFilter?.Equals(original.DateFilter) is false ||
-        updated.AdvancedFilters.Equals(original.AdvancedFilters) is false ||
-        updated.BasicFilters.Equals(original.BasicFilters) is false ||
-        updated.CachedFilters.Equals(original.CachedFilters) is false;
+        updated.Filters.Equals(original.Filters) is false;
 
     public static bool IsFilteringEnabled(EventFilter eventFilter) =>
         eventFilter.DateFilter?.IsEnabled is true ||
-        eventFilter.AdvancedFilters.IsEmpty is false ||
-        eventFilter.BasicFilters.IsEmpty is false ||
-        eventFilter.CachedFilters.IsEmpty is false;
+        eventFilter.Filters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified</summary>
     public static IEnumerable<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,
         ColumnName? orderBy = null,
         bool isDescending = false) => orderBy switch
-    {
-        ColumnName.Level => isDescending ? events.OrderByDescending(e => e.Level) : events.OrderBy(e => e.Level),
-        ColumnName.DateAndTime => isDescending ?
-            events.OrderByDescending(e => e.TimeCreated) :
-            events.OrderBy(e => e.TimeCreated),
-        ColumnName.ActivityId => isDescending ?
-            events.OrderByDescending(e => e.ActivityId) :
-            events.OrderBy(e => e.ActivityId),
-        ColumnName.LogName => isDescending ? events.OrderByDescending(e => e.LogName) : events.OrderBy(e => e.LogName),
-        ColumnName.ComputerName => isDescending ?
-            events.OrderByDescending(e => e.ComputerName) :
-            events.OrderBy(e => e.ComputerName),
-        ColumnName.Source => isDescending ? events.OrderByDescending(e => e.Source) : events.OrderBy(e => e.Source),
-        ColumnName.EventId => isDescending ? events.OrderByDescending(e => e.Id) : events.OrderBy(e => e.Id),
-        ColumnName.TaskCategory => isDescending ?
-            events.OrderByDescending(e => e.TaskCategory) :
-            events.OrderBy(e => e.TaskCategory),
-        _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
-    };
+        {
+            ColumnName.Level => isDescending ? events.OrderByDescending(e => e.Level) : events.OrderBy(e => e.Level),
+            ColumnName.DateAndTime => isDescending ?
+                events.OrderByDescending(e => e.TimeCreated) :
+                events.OrderBy(e => e.TimeCreated),
+            ColumnName.ActivityId => isDescending ?
+                events.OrderByDescending(e => e.ActivityId) :
+                events.OrderBy(e => e.ActivityId),
+            ColumnName.LogName => isDescending ? events.OrderByDescending(e => e.LogName) : events.OrderBy(e => e.LogName),
+            ColumnName.ComputerName => isDescending ?
+                events.OrderByDescending(e => e.ComputerName) :
+                events.OrderBy(e => e.ComputerName),
+            ColumnName.Source => isDescending ? events.OrderByDescending(e => e.Source) : events.OrderBy(e => e.Source),
+            ColumnName.EventId => isDescending ? events.OrderByDescending(e => e.Id) : events.OrderBy(e => e.Id),
+            ColumnName.TaskCategory => isDescending ?
+                events.OrderByDescending(e => e.TaskCategory) :
+                events.OrderBy(e => e.TaskCategory),
+            _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
+        };
 
     public static bool TryParse(FilterModel filterModel, out string comparison)
     {
@@ -148,16 +132,16 @@ public static class FilterMethods
         StringBuilder stringBuilder = new();
 
         if (filterModel.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            filterModel.Data.Type is FilterType.KeywordsDisplayNames)
+            filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
         {
-            stringBuilder.Append(GetComparisonString(filterModel.Data.Type, filterModel.Data.Evaluator));
+            stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
         }
 
         switch (filterModel.Data.Evaluator)
         {
-            case FilterEvaluator.Equals :
-            case FilterEvaluator.NotEqual :
-                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Equals:
+            case FilterEvaluator.NotEqual:
+                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -167,9 +151,9 @@ public static class FilterMethods
                 }
 
                 break;
-            case FilterEvaluator.Contains :
-            case FilterEvaluator.NotContains :
-                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Contains:
+            case FilterEvaluator.NotContains:
+                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"(\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -179,8 +163,8 @@ public static class FilterMethods
                 }
 
                 break;
-            case FilterEvaluator.MultiSelect :
-                if (filterModel.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.MultiSelect:
+                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.Data.Values)}\"}}).Contains(e))");
                 }
@@ -190,12 +174,12 @@ public static class FilterMethods
                 }
 
                 break;
-            default : return false;
+            default: return false;
         }
 
-        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Type: not FilterType.KeywordsDisplayNames })
+        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.KeywordsDisplayNames })
         {
-            stringBuilder.Append(GetComparisonString(filterModel.Data.Type, filterModel.Data.Evaluator));
+            stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
         }
 
         if (filterModel.SubFilters.Count > 0)
@@ -233,30 +217,30 @@ public static class FilterMethods
         }
     }
 
-    private static string GetComparisonString(FilterType type, FilterEvaluator evaluator) => evaluator switch
+    private static string GetComparisonString(FilterCategory type, FilterEvaluator evaluator) => evaluator switch
     {
-        FilterEvaluator.Equals => type is FilterType.KeywordsDisplayNames ?
+        FilterEvaluator.Equals => type is FilterCategory.KeywordsDisplayNames ?
             $"{type}.Any(e => string.Equals(e, " :
             $"{type} == ",
         FilterEvaluator.Contains => type switch
         {
-            FilterType.Id or FilterType.ActivityId => $"{type}.ToString().Contains",
-            FilterType.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
+            FilterCategory.Id or FilterCategory.ActivityId => $"{type}.ToString().Contains",
+            FilterCategory.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
             _ => $"{type}.Contains"
         },
-        FilterEvaluator.NotEqual => type is FilterType.KeywordsDisplayNames ?
+        FilterEvaluator.NotEqual => type is FilterCategory.KeywordsDisplayNames ?
             $"!{type}.Any(e => string.Equals(e, " :
             $"{type} != ",
         FilterEvaluator.NotContains => type switch
         {
-            FilterType.Id or FilterType.ActivityId => $"!{type}.ToString().Contains",
-            FilterType.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
+            FilterCategory.Id or FilterCategory.ActivityId => $"!{type}.ToString().Contains",
+            FilterCategory.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
             _ => $"!{type}.Contains"
         },
         FilterEvaluator.MultiSelect => type switch
         {
-            FilterType.Id or FilterType.Level => $"{type}.ToString())",
-            FilterType.KeywordsDisplayNames => $"{type}.Any",
+            FilterCategory.Id or FilterCategory.Level => $"{type}.ToString())",
+            FilterCategory.KeywordsDisplayNames => $"{type}.Any",
             _ => $"{type})"
         },
         _ => string.Empty
@@ -273,16 +257,16 @@ public static class FilterMethods
         StringBuilder stringBuilder = new(subFilter.ShouldCompareAny ? " || " : " && ");
 
         if (subFilter.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            subFilter.Data.Type is FilterType.KeywordsDisplayNames)
+            subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
         {
-            stringBuilder.Append(GetComparisonString(subFilter.Data.Type, subFilter.Data.Evaluator));
+            stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
         }
 
         switch (subFilter.Data.Evaluator)
         {
-            case FilterEvaluator.Equals :
-            case FilterEvaluator.NotEqual :
-                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Equals:
+            case FilterEvaluator.NotEqual:
+                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -292,9 +276,9 @@ public static class FilterMethods
                 }
 
                 break;
-            case FilterEvaluator.Contains :
-            case FilterEvaluator.NotContains :
-                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.Contains:
+            case FilterEvaluator.NotContains:
+                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"(\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -304,8 +288,8 @@ public static class FilterMethods
                 }
 
                 break;
-            case FilterEvaluator.MultiSelect :
-                if (subFilter.Data.Type is FilterType.KeywordsDisplayNames)
+            case FilterEvaluator.MultiSelect:
+                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
                     stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.Data.Values)}\"}}).Contains(e))");
                 }
@@ -315,12 +299,12 @@ public static class FilterMethods
                 }
 
                 break;
-            default : return null;
+            default: return null;
         }
 
-        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Type: not FilterType.KeywordsDisplayNames })
+        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.KeywordsDisplayNames })
         {
-            stringBuilder.Append(GetComparisonString(subFilter.Data.Type, subFilter.Data.Evaluator));
+            stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
         }
 
         return stringBuilder.ToString();

@@ -30,25 +30,50 @@
                 {
                     <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
                 }
-                <span>@Value.Comparison.Value</span>
+
+                @if (Value.IsExcluded)
+                {
+                    <span>Exclude: @Value.Comparison.Value</span>
+                }
+                else
+                {
+                    <span>@Value.Comparison.Value</span>                
+                }
             }
         </div>
 
         <div>
             @if (Value.IsEditing)
             {
-                <button class="button button-green" type="button" @onclick="SaveFilter">
+                <button class="button button-green" @onclick="SaveFilter">
                     <i class="bi bi-check-circle"></i> Save
                 </button>
 
-                <button class="button button-red" type="button" @onclick="RemoveFilter">
+                <button class="button button-red fixed-width" @onclick="RemoveFilter">
                     <i class="bi bi-dash-circle"></i> Remove
                 </button>
             }
             else
             {
-                <button class="button" type="button" @onclick="EditFilter">
+                <button class="button" @onclick="EditFilter">
                     <i class="bi bi-funnel"></i> Edit
+                </button>
+
+                @if (Value.IsExcluded)
+                {
+                    <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                        <i class="bi bi-plus-circle"></i> Include
+                    </button>
+                }
+                else
+                {
+                    <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                        <i class="bi bi-dash-circle"></i> Exclude
+                    </button>
+                }
+
+                <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                    <i class="bi bi-dash-circle"></i> Remove
                 </button>
             }
         </div>

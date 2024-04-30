@@ -94,6 +94,14 @@ public sealed class FilterGroupEffects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(FilterGroupAction.ToggleFilterExcluded))]
+    public Task HandleToggleFilterExcluded(IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(FilterGroupAction.ToggleGroup))]
     public Task HandleToggleGroup(IDispatcher dispatcher)
     {

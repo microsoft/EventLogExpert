@@ -243,6 +243,8 @@ input[type="text"].input { padding: 0; }
     border: var(--clr-yellow);
 }
 
+.button.fixed-width { width: 11ch; }
+
 div.table-divider {
     height: 22px;
     width: 8px;

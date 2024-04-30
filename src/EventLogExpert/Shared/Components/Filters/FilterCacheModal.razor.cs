@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterCache;
@@ -35,8 +36,13 @@ public sealed partial class FilterCacheModal
     private void AddFilter(string filter)
     {
         Dispatcher.Dispatch(
-            new FilterPaneAction.AddCachedFilter(
-                new FilterModel { Comparison = new FilterComparison { Value = filter } }));
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    Comparison = new FilterComparison { Value = filter },
+                    FilterType = FilterType.Cached,
+                    IsEnabled = true
+                }));
 
         Close().AndForget();
     }

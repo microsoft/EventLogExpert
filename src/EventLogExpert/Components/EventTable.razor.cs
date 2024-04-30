@@ -92,20 +92,8 @@ public sealed partial class EventTable
 
     private string GetHighlightedColor(DisplayEventModel @event)
     {
-        foreach (var filter in FilterPaneState.Value.AdvancedFilters.Where(filter =>
-            filter.IsEnabled && filter.Comparison.Expression(@event)))
-        {
-            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
-        }
-
-        foreach (var filter in FilterPaneState.Value.BasicFilters.Where(filter =>
-            filter.IsEnabled && filter.Comparison.Expression(@event)))
-        {
-            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
-        }
-
-        foreach (var filter in FilterPaneState.Value.CachedFilters.Where(filter =>
-            filter.IsEnabled && filter.Comparison.Expression(@event)))
+        foreach (var filter in FilterPaneState.Value.Filters.Where(filter =>
+            filter is { IsEnabled: true, IsExcluded: false } && filter.Comparison.Expression(@event)))
         {
             return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
         }

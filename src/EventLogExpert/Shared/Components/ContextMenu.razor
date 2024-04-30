@@ -10,11 +10,11 @@
     <div class="sub-menu">
         <div>Include <i class="bi bi-caret-right"></i></div>
         <ul>
-            @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+            @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                @if (item is FilterType.Description or FilterType.Xml) { continue; }
+                @if (item is FilterCategory.Description or FilterCategory.Xml) { continue; }
 
-                <li @onclick="() => FilterEvent(item, FilterEvaluator.Equals)">@item.ToFullString()</li>
+                <li @onclick="() => FilterEvent(item)">@item.ToFullString()</li>
             }
         </ul>
     </div>
@@ -22,11 +22,11 @@
     <div class="sub-menu">
         <div>Exclude <i class="bi bi-caret-right"></i></div>
         <ul>
-            @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+            @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                @if (item is FilterType.Description or FilterType.Xml) { continue; }
+                @if (item is FilterCategory.Description or FilterCategory.Xml) { continue; }
 
-                <li @onclick="() => FilterEvent(item, FilterEvaluator.NotEqual)">@item.ToFullString()</li>
+                <li @onclick="() => FilterEvent(item, true)">@item.ToFullString()</li>
             }
         </ul>
     </div>

@@ -15,6 +15,9 @@ public sealed record FilterModel
     public FilterComparison Comparison { get; set; } = new();
 
     [JsonIgnore]
+    public FilterType FilterType { get; set; } = FilterType.Advanced;
+
+    [JsonIgnore]
     public FilterData Data { get; set; } = new();
 
     [JsonIgnore]
@@ -28,4 +31,6 @@ public sealed record FilterModel
 
     [JsonIgnore]
     public bool IsEnabled { get; set; }
+
+    public bool IsExcluded { get; set; }
 }
