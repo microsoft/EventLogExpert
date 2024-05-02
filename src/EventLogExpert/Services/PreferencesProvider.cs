@@ -11,41 +11,16 @@ namespace EventLogExpert.Services;
 
 public sealed class PreferencesProvider : IPreferencesProvider
 {
-    private const string ActivityIdColumn = "activity-id-column";
-    private const string ComputerNameColumn = "computer-name-column";
-    private const string DateAndTimeColumn = "date-and-time-column";
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
-    private const string EventIdColumn = "event-id-column";
+    private const string EnabledEventTableColumns = "enabled-event-table-columns";
     private const string FavoriteFilters = "favorite-filters";
     private const string KeyboardCopyType = "keyboard-copy-type";
-    private const string LevelColumn = "level-column";
     private const string LoggingLevel = "logging-level";
-    private const string LogNameColumn = "log-name-column";
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
     private const string SavedFilters = "saved-filters";
-    private const string SourceColumn = "source-column";
-    private const string TaskCategoryColumn = "task-category-column";
     private const string TimeZone = "timezone";
-
-    public bool ActivityIdColumnPreference
-    {
-        get => Preferences.Default.Get(ActivityIdColumn, false);
-        set => Preferences.Default.Set(ActivityIdColumn, value);
-    }
-
-    public bool ComputerNameColumnPreference
-    {
-        get => Preferences.Default.Get(ComputerNameColumn, false);
-        set => Preferences.Default.Set(ComputerNameColumn, value);
-    }
-
-    public bool DateAndTimeColumnPreference
-    {
-        get => Preferences.Default.Get(DateAndTimeColumn, true);
-        set => Preferences.Default.Set(DateAndTimeColumn, value);
-    }
 
     public IList<string> DisabledDatabasesPreference
     {
@@ -59,10 +34,14 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(DisplaySelectionEnabled, value);
     }
 
-    public bool EventIdColumnPreference
+    public IList<ColumnName> EnabledEventTableColumnsPreference
     {
-        get => Preferences.Default.Get(EventIdColumn, true);
-        set => Preferences.Default.Set(EventIdColumn, value);
+        get =>
+            JsonSerializer.Deserialize<List<ColumnName>>(
+                Preferences.Default.Get(EnabledEventTableColumns,
+                    $"[{ColumnName.Level:D}, {ColumnName.DateAndTime:D}, {ColumnName.Source:D}, {ColumnName.EventId:D}, {ColumnName.TaskCategory:D}]")) ??
+            [];
+        set => Preferences.Default.Set(EnabledEventTableColumns, JsonSerializer.Serialize(value));
     }
 
     public IList<string> FavoriteFiltersPreference
@@ -71,17 +50,12 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
     }
 
-    public CopyType KeyboardCopyTypePreference {
+    public CopyType KeyboardCopyTypePreference
+    {
         get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyType, CopyType.Full.ToString()),
             out CopyType value) ?
             value : CopyType.Full;
         set => Preferences.Default.Set(KeyboardCopyType, value.ToString());
-    }
-
-    public bool LevelColumnPreference
-    {
-        get => Preferences.Default.Get(LevelColumn, true);
-        set => Preferences.Default.Set(LevelColumn, value);
     }
 
     public LogLevel LogLevelPreference
@@ -90,12 +64,6 @@ public sealed class PreferencesProvider : IPreferencesProvider
             out LogLevel value) ?
             value : LogLevel.Information;
         set => Preferences.Default.Set(LoggingLevel, value.ToString());
-    }
-
-    public bool LogNameColumnPreference
-    {
-        get => Preferences.Default.Get(LogNameColumn, false);
-        set => Preferences.Default.Set(LogNameColumn, value);
     }
 
     public bool PreReleasePreference
@@ -114,18 +82,6 @@ public sealed class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<List<FilterGroupModel>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
         set => Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value));
-    }
-
-    public bool SourceColumnPreference
-    {
-        get => Preferences.Default.Get(SourceColumn, true);
-        set => Preferences.Default.Set(SourceColumn, value);
-    }
-
-    public bool TaskCategoryColumnPreference
-    {
-        get => Preferences.Default.Get(TaskCategoryColumn, true);
-        set => Preferences.Default.Set(TaskCategoryColumn, value);
     }
 
     public string TimeZonePreference

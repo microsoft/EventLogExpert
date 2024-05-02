@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Security.Principal;
+
 namespace EventLogExpert.Eventing.Models;
 
 public sealed record DisplayEventModel(
@@ -17,6 +19,7 @@ public sealed record DisplayEventModel(
     IEnumerable<string> KeywordsDisplayNames,
     int? ProcessId,
     int? ThreadId,
+    SecurityIdentifier UserId,
     string LogName, // This is the log name from the event reader
     string OwningLog, // This is the name of the log file or the live log, which we use internally
     string Xml);

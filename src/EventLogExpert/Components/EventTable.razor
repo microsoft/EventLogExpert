@@ -7,79 +7,19 @@
     <table id="eventTable" @onkeyup="HandleKeyUp">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr>
-            <th class="level" hidden="@(IsColumnHidden(ColumnName.Level))">
-                Level
-                    @if (EventTableState.Value.OrderBy == ColumnName.Level)
-                {
+            @foreach ((ColumnName column, bool _) in EventTableState.Value.Columns.Where(column => column.Value))
+            {
+                <th class="@column.ToString().ToLower()">
+                    @column.ToFullString()
+                    @if (EventTableState.Value.OrderBy == column)
+                    {
                         <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="time" hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                @GetDateColumnHeader()
+                            <i class="bi bi-caret-up"></i>
+                        </span>
+                    }
+                </th>
+            }
 
-                    @if (EventTableState.Value.OrderBy == ColumnName.DateAndTime)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="activity-id" hidden="@(IsColumnHidden(ColumnName.ActivityId))">
-                Activity ID
-                    @if (EventTableState.Value.OrderBy == ColumnName.ActivityId)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="logname" hidden="@(IsColumnHidden(ColumnName.LogName))">
-                Log Name
-                    @if (EventTableState.Value.OrderBy == ColumnName.LogName)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="computername" hidden="@(IsColumnHidden(ColumnName.ComputerName))">
-                Computer
-                    @if (EventTableState.Value.OrderBy == ColumnName.ComputerName)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="source" hidden="@(IsColumnHidden(ColumnName.Source))">
-                Source
-                    @if (EventTableState.Value.OrderBy == ColumnName.Source)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="id" hidden="@(IsColumnHidden(ColumnName.EventId))">
-                Event ID
-                    @if (EventTableState.Value.OrderBy == ColumnName.EventId)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
-            <th class="task" hidden="@(IsColumnHidden(ColumnName.TaskCategory))">
-                Task Category
-                    @if (EventTableState.Value.OrderBy == ColumnName.TaskCategory)
-                {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
-                        <i class="bi bi-caret-up"></i>
-                    </span>
-                }
-            </th>
             <th class="description">Description</th>
         </tr>
         </thead>
@@ -88,19 +28,51 @@
         {
             <Virtualize Items="EventTableState.Value.EventTables.First(x => x.Id == EventTableState.Value.ActiveEventLogId).DisplayedEvents" Context="evt">
                 <tr @key="@($"{evt.OwningLog}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                    <td hidden="@(IsColumnHidden(ColumnName.Level))">
-                        <span class="@GetLevelClass(evt.Level)"></span>
-                        @evt.Level
-                    </td>
-                    <td hidden="@(IsColumnHidden(ColumnName.DateAndTime))">
-                        @evt.TimeCreated.ConvertTimeZone(TimeZoneSettings.Value)
-                    </td>
-                    <td hidden="@(IsColumnHidden(ColumnName.ActivityId))">@evt.ActivityId</td>
-                    <td hidden="@(IsColumnHidden(ColumnName.LogName))">@evt.OwningLog.Split("\\").Last()</td>
-                    <td hidden="@(IsColumnHidden(ColumnName.ComputerName))">@evt.ComputerName</td>
-                    <td hidden="@(IsColumnHidden(ColumnName.Source))">@evt.Source</td>
-                    <td hidden="@(IsColumnHidden(ColumnName.EventId))">@evt.Id</td>
-                    <td hidden="@(IsColumnHidden(ColumnName.TaskCategory))">@evt.TaskCategory</td>
+                    @foreach ((ColumnName column, bool _) in EventTableState.Value.Columns.Where(column => column.Value))
+                    {
+                        <td>
+                            @switch (column)
+                            {
+                                case ColumnName.Level:
+                                    <text><span class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
+                                    break;
+                                case ColumnName.DateAndTime:
+                                    @evt.TimeCreated.ConvertTimeZone(TimeZoneSettings.Value)
+                                    break;
+                                case ColumnName.ActivityId:
+                                    @evt.ActivityId
+                                    break;
+                                case ColumnName.Log:
+                                    @evt.OwningLog.Split("\\").Last()
+                                    break;
+                                case ColumnName.ComputerName:
+                                    @evt.ComputerName
+                                    break;
+                                case ColumnName.Source:
+                                    @evt.Source
+                                    break;
+                                case ColumnName.EventId:
+                                    @evt.Id
+                                    break;
+                                case ColumnName.TaskCategory:
+                                    @evt.TaskCategory
+                                    break;
+                                case ColumnName.Keywords:
+                                    <text>@string.Join(", ", evt.KeywordsDisplayNames)</text>
+                                    break;
+                                case ColumnName.ProcessId:
+                                    @evt.ProcessId
+                                    break;
+                                case ColumnName.ThreadId:
+                                    @evt.ThreadId
+                                    break;
+                                case ColumnName.User:
+                                    @evt.UserId
+                                    break;
+                            }
+                        </td>
+                    }
+
                     <td>@evt.Description</td>
                 </tr>
             </Virtualize>

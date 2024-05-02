@@ -210,6 +210,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.ProcessId,
                 eventRecord.ThreadId,
+                eventRecord.UserId,
                 eventRecord.LogName,
                 OwningLogName,
                 eventRecord.ToXml());

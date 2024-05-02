@@ -55,6 +55,7 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 GetKeywordsFromBitmask(eventRecord.Keywords, null),
                 eventRecord.ProcessId,
                 eventRecord.ThreadId,
+                eventRecord.UserId,
                 eventRecord.LogName,
                 OwningLogName,
                 eventRecord.ToXml());
