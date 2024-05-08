@@ -15,22 +15,33 @@
     --background-dark: #222222;
     --background-darkgray: #353535;
 
-    --highlight-aqua: rgb(0, 255, 255);
-    --highlight-blue: rgb(0, 0, 255);
-    --highlight-dodgerblue: rgb(30, 144, 255);
-    --highlight-firebrick: rgb(178, 34, 34);
-    --highlight-fuchsia: rgb(255, 0, 255);
-    --highlight-green: rgb(0, 128, 0);
-    --highlight-lightcoral: rgb(240, 128, 128);
-    --highlight-lightgray: rgb(211, 211, 211);
-    --highlight-lime: rgb(0, 255, 0);
-    --highlight-orange: rgb(255, 165, 0);
-    --highlight-purple: rgb(128, 0, 128);
-    --highlight-red: rgb(255, 0, 0);
-    --highlight-tan: rgb(210, 180, 140);
-    --highlight-violet: rgb(238, 130, 238);
-    --highlight-yellow: rgb(255, 255, 0);
-    --highlight-yellowgreen: rgb(154, 205, 50);
+    --highlight-lightred: #EE8F86;
+    --highlight-red: #D03B2D;
+    --highlight-darkred: #73190E;
+    --highlight-lightorange: #FEB95E;
+    --highlight-orange: #FE9100;
+    --highlight-darkorange: #BE660F;
+    --highlight-lightyellow: #FCE393;
+    --highlight-yellow: #F8C84B;
+    --highlight-darkyellow: #F29A3B;
+    --highlight-lightgreen: #A5E1AC;
+    --highlight-green: #5AC358;
+    --highlight-darkgreen: #3C8331;
+    --highlight-lightteal: #5DC2B4;
+    --highlight-teal: #018C76;
+    --highlight-darkteal: #01594C;
+    --highlight-lightblue: #73B8FD;
+    --highlight-blue: #066EE2;
+    --highlight-darkblue: #013B73;
+    --highlight-lightpurple: #B28BF5;
+    --highlight-purple: #7446F2;
+    --highlight-darkpurple: #271296;
+    --highlight-lightmagenta: #E495DD;
+    --highlight-magenta: #C330B9;
+    --highlight-darkmagenta: #9526AF;
+    --highlight-lightpink: #FF74A1;
+    --highlight-pink: #E2074C;
+    --highlight-darkpink: #960131;
 }
 
 ::-webkit-scrollbar {
@@ -322,47 +333,69 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 .input.color-dropdown,
 .color-dropdown-item,
 .color-box {
-    width: 25px;
+    width: 40px;
     height: 22px;
     display: inline-block;
     text-align: center;
     border-bottom: 0;
     border: 1px solid var(--clr-lightblue);
-    text-indent: -9999px;
+    text-indent: 100%;
 
     &.none { background-color: var(--background-dark) !important; }
 
-    &.aqua { background-color: var(--highlight-aqua) !important; }
-
-    &.blue { background-color: var(--highlight-blue) !important; }
-
-    &.dodgerblue { background-color: var(--highlight-dodgerblue) !important; }
-
-    &.firebrick { background-color: var(--highlight-firebrick) !important; }
-
-    &.fuchsia { background-color: var(--highlight-fuchsia) !important; }
-
-    &.green { background-color: var(--highlight-green) !important; }
-
-    &.lightcoral { background-color: var(--highlight-lightcoral) !important; }
-
-    &.lightgray { background-color: var(--highlight-lightgray) !important; }
-
-    &.lime { background-color: var(--highlight-lime) !important; }
-
-    &.orange { background-color: var(--highlight-orange) !important; }
-
-    &.purple { background-color: var(--highlight-purple) !important; }
+    &.lightred { background-color: var(--highlight-lightred) !important; }
 
     &.red { background-color: var(--highlight-red) !important; }
 
-    &.tan { background-color: var(--highlight-tan) !important; }
+    &.darkred { background-color: var(--highlight-darkred) !important; }
 
-    &.violet { background-color: var(--highlight-violet) !important; }
+    &.lightorange { background-color: var(--highlight-lightorange) !important; }
+
+    &.orange { background-color: var(--highlight-orange) !important; }
+
+    &.darkorange { background-color: var(--highlight-darkorange) !important; }
+
+    &.lightyellow { background-color: var(--highlight-lightyellow) !important; }
 
     &.yellow { background-color: var(--highlight-yellow) !important; }
 
-    &.yellowgreen { background-color: var(--highlight-yellowgreen) !important; }
+    &.darkyellow { background-color: var(--highlight-darkyellow) !important; }
+
+    &.lightgreen { background-color: var(--highlight-lightgreen) !important; }
+
+    &.green { background-color: var(--highlight-green) !important; }
+
+    &.darkgreen { background-color: var(--highlight-darkgreen) !important; }
+
+    &.lightteal { background-color: var(--highlight-lightteal) !important; }
+
+    &.teal { background-color: var(--highlight-teal) !important; }
+
+    &.darkteal { background-color: var(--highlight-darkteal) !important; }
+
+    &.lightblue { background-color: var(--highlight-lightblue) !important; }
+
+    &.blue { background-color: var(--highlight-blue) !important; }
+
+    &.darkblue { background-color: var(--highlight-darkblue) !important; }
+
+    &.lightpurple { background-color: var(--highlight-lightpurple) !important; }
+
+    &.purple { background-color: var(--highlight-purple) !important; }
+
+    &.darkpurple { background-color: var(--highlight-darkpurple) !important; }
+
+    &.lightmagenta { background-color: var(--highlight-lightmagenta) !important; }
+
+    &.magenta { background-color: var(--highlight-magenta) !important; }
+
+    &.darkmagenta { background-color: var(--highlight-darkmagenta) !important; }
+
+    &.lightpink { background-color: var(--highlight-lightpink) !important; }
+
+    &.pink { background-color: var(--highlight-pink) !important; }
+
+    &.darkpink { background-color: var(--highlight-darkpink) !important; }
 }
 
 .color-dropdown-item {

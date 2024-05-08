@@ -34,26 +34,36 @@ public enum CopyType
     Xml
 }
 
-// Color samples: http://flounder.com/csharp_color_table.htm
 public enum HighlightColor
 {
     None,
-    Blue,
-    Green,
+    LightRed,
     Red,
-    Yellow,
-    Purple,
+    DarkRed,
+    LightOrange,
     Orange,
-    Lime,
-    Fuchsia,
-    Aqua,
-    DodgerBlue,
-    YellowGreen,
-    Tan,
-    Firebrick,
-    Violet,
-    LightCoral,
-    LightGray
+    DarkOrange,
+    LightYellow,
+    Yellow,
+    DarkYellow,
+    LightGreen,
+    Green,
+    DarkGreen,
+    LightTeal,
+    Teal,
+    DarkTeal,
+    LightBlue,
+    Blue,
+    DarkBlue,
+    LightPurple,
+    Purple,
+    DarkPurple,
+    LightMagenta,
+    Magenta,
+    DarkMagenta,
+    LightPink,
+    Pink,
+    DarkPink
 }
 
 public enum FilterCategory
