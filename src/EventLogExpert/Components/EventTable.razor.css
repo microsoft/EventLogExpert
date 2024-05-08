@@ -58,13 +58,17 @@ tr { height: 22px; }
 
 .table-row { cursor: pointer; }
 
+.table-row.red,
+.table-row.darkred,
+.table-row.darkteal,
 .table-row.blue,
-.table-row.dodgerblue,
-.table-row.firebrick,
-.table-row.green,
-.table-row.lightcoral,
+.table-row.darkblue,
 .table-row.purple,
-.table-row.red {
+.table-row.darkpurple,
+.table-row.magenta,
+.table-row.darkmagenta,
+.table-row.pink,
+.table-row.darkpink {
     color: var(--clr-white) !important;
 
     & span.error { color: var(--clr-white) !important; }
@@ -72,15 +76,22 @@ tr { height: 22px; }
     & span.warning { color: var(--clr-white) !important; }
 }
 
-.table-row.aqua,
-.table-row.fuchsia,
-.table-row.lime,
-.table-row.lightgray,
+.table-row.lightred,
+.table-row.lightorange,
 .table-row.orange,
-.table-row.tan,
-.table-row.violet,
+.table-row.darkorange,
+.table-row.lightyellow,
 .table-row.yellow,
-.table-row.yellowgreen {
+.table-row.darkyellow,
+.table-row.lightgreen,
+.table-row.green,
+.table-row.darkgreen,
+.table-row.lightteal,
+.table-row.teal,
+.table-row.lightblue,
+.table-row.lightpurple,
+.table-row.lightmagenta,
+.table-row.lightpink {
     color: var(--background-darkgray) !important;
 
     & span.error { color: var(--background-darkgray) !important; }
@@ -88,37 +99,59 @@ tr { height: 22px; }
     & span.warning { color: var(--background-darkgray) !important; }
 }
 
-.table-row.aqua { background-color: var(--highlight-aqua) !important; }
-
-.table-row.blue { background-color: var(--highlight-blue) !important; }
-
-.table-row.dodgerblue { background-color: var(--highlight-dodgerblue) !important; }
-
-.table-row.firebrick { background-color: var(--highlight-firebrick) !important; }
-
-.table-row.fuchsia { background-color: var(--highlight-fuchsia) !important; }
-
-.table-row.green { background-color: var(--highlight-green) !important; }
-
-.table-row.lightcoral { background-color: var(--highlight-lightcoral) !important; }
-
-.table-row.lightgray { background-color: var(--highlight-lightgray) !important; }
-
-.table-row.lime { background-color: var(--highlight-lime) !important; }
-
-.table-row.orange { background-color: var(--highlight-orange) !important; }
-
-.table-row.purple { background-color: var(--highlight-purple) !important; }
+.table-row.lightred { background-color: var(--highlight-lightred) !important; }
 
 .table-row.red { background-color: var(--highlight-red) !important; }
 
-.table-row.tan { background-color: var(--highlight-tan) !important; }
+.table-row.darkred { background-color: var(--highlight-darkred) !important; }
 
-.table-row.violet { background-color: var(--highlight-violet) !important; }
+.table-row.lightorange { background-color: var(--highlight-lightorange) !important; }
+
+.table-row.orange { background-color: var(--highlight-orange) !important; }
+
+.table-row.darkorange { background-color: var(--highlight-darkorange) !important; }
+
+.table-row.lightyellow { background-color: var(--highlight-lightyellow) !important; }
 
 .table-row.yellow { background-color: var(--highlight-yellow) !important; }
 
-.table-row.yellowgreen { background-color: var(--highlight-yellowgreen) !important; }
+.table-row.darkyellow { background-color: var(--highlight-darkyellow) !important; }
+
+.table-row.lightgreen { background-color: var(--highlight-lightgreen) !important; }
+
+.table-row.green { background-color: var(--highlight-green) !important; }
+
+.table-row.darkgreen { background-color: var(--highlight-darkgreen) !important; }
+
+.table-row.lightteal { background-color: var(--highlight-lightteal) !important; }
+
+.table-row.teal { background-color: var(--highlight-teal) !important; }
+
+.table-row.darkteal { background-color: var(--highlight-darkteal) !important; }
+
+.table-row.lightblue { background-color: var(--highlight-lightblue) !important; }
+
+.table-row.blue { background-color: var(--highlight-blue) !important; }
+
+.table-row.darkblue { background-color: var(--highlight-darkblue) !important; }
+
+.table-row.lightpurple { background-color: var(--highlight-lightpurple) !important; }
+
+.table-row.purple { background-color: var(--highlight-purple) !important; }
+
+.table-row.darkpurple { background-color: var(--highlight-darkpurple) !important; }
+
+.table-row.lightmagenta { background-color: var(--highlight-lightmagenta) !important; }
+
+.table-row.magenta { background-color: var(--highlight-magenta) !important; }
+
+.table-row.darkmagenta { background-color: var(--highlight-darkmagenta) !important; }
+
+.table-row.lightpink { background-color: var(--highlight-lightpink) !important; }
+
+.table-row.pink { background-color: var(--highlight-pink) !important; }
+
+.table-row.darkpink { background-color: var(--highlight-darkpink) !important; }
 
 .level { width: 100px; }
 
