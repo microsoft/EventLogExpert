@@ -10,7 +10,14 @@
             @foreach ((ColumnName column, bool _) in EventTableState.Value.Columns.Where(column => column.Value))
             {
                 <th class="@column.ToString().ToLower()">
-                    @column.ToFullString()
+                    @if (column == ColumnName.DateAndTime)
+                    {
+                        <text>@GetDateColumnHeader()</text>
+                    }
+                    else
+                    {
+                        @column.ToFullString()
+                    }
                     @if (EventTableState.Value.OrderBy == column)
                     {
                         <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
