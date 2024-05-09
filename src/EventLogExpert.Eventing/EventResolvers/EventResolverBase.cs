@@ -6,8 +6,10 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
+using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Xml;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
@@ -29,9 +31,29 @@ public partial class EventResolverBase
         { 0x80000000000000, "Classic" }
     };
 
+    /// <summary>
+    ///     The mappings from the outType attribute in the EventModel XML template
+    ///     to determine if it should be displayed as Hex.
+    /// </summary>
+    private static readonly Dictionary<string, bool> XmlHexMappings = new()
+    {
+        { "win:HexInt32", true },
+        { "win:HexInt64", true },
+        { "win:Pointer", true },
+        { "win:SID", false },
+        { "win:UnicodeString", false },
+        { "win:Win32Error", true },
+        { "xs:dateTime", false },
+        { "xs:GUID", false },
+        { "xs:string", false },
+        { "xs:unsignedByte", true },
+        { "xs:unsignedInt", false },
+        { "xs:unsignedLong", false }
+    };
+
     protected readonly Action<string, LogLevel> _tracer;
 
-    private readonly Regex _formatRegex = RegexFormatter();
+    private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
     protected EventResolverBase(Action<string, LogLevel> tracer)
     {
@@ -68,7 +90,7 @@ public partial class EventResolverBase
     }
 
     protected string? FormatDescription(
-        IList<EventProperty> properties,
+        List<string> properties,
         string? descriptionTemplate,
         List<MessageModel> parameters)
     {
@@ -79,96 +101,71 @@ public partial class EventResolverBase
             .Replace("%n\r\n", "\r\n ")
             .Replace("%n", "\r\n");
 
-        var matches = _formatRegex.Matches(description);
+        var matches = _sectionsToReplace.Matches(description);
 
-        if (matches.Count > 0)
+        if (matches.Count <= 0)
         {
-            try
-            {
-                var sb = new StringBuilder();
-                var lastIndex = 0;
-                var anyParameterStrings = parameters.Count <= 0;
-
-                for (var i = 0; i < matches.Count; i++)
-                {
-                    if (matches[i].Value.StartsWith("%%"))
-                    {
-                        // The % is escaped, so skip it.
-                        continue;
-                    }
-
-                    sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
-                    var propIndex = int.Parse(matches[i].Value.Trim(['{', '}', '%']));
-
-                    if (propIndex - 1 >= properties.Count) { return null; }
-
-                    var valueFormatted = false;
-                    var propValue = properties[propIndex - 1].Value;
-
-                    if (propValue is DateTime eventTime)
-                    {
-                        // Exactly match the format produced by EventRecord.FormatMessage().
-                        // I have no idea why it includes Unicode LRM marks, but it does.
-                        sb.Append(eventTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
-                        valueFormatted = true;
-                    }
-                    else if (anyParameterStrings && propValue is string propString && propString.StartsWith("%%"))
-                    {
-                        var endParameterId = propString.IndexOf(' ');
-                        var parameterIdString = endParameterId > 2 ? propString[2..endParameterId] : propString[2..];
-
-                        if (int.TryParse(parameterIdString, out var parameterId))
-                        {
-                            var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
-
-                            if (parameterMessage != null)
-                            {
-                                propString = endParameterId > 2 ?
-                                    parameterMessage.Text + propString[++endParameterId..] :
-                                    parameterMessage.Text;
-
-                                sb.Append(propString);
-                                valueFormatted = true;
-                            }
-                        }
-                    }
-
-                    if (!valueFormatted)
-                    {
-                        if (propValue is byte[] bytes)
-                        {
-                            sb.Append(Convert.ToHexString(bytes));
-                        }
-                        else
-                        {
-                            sb.Append(propValue);
-                        }
-                    }
-
-                    lastIndex = matches[i].Index + matches[i].Length;
-                }
-
-                if (lastIndex < description.Length)
-                {
-                    sb.Append(description[lastIndex..]);
-                }
-
-                description = sb.ToString();
-            }
-            catch (Exception ex)
-            {
-                _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
-
-                return null;
-            }
+            return description.TrimEnd(['\r', '\n']);
         }
 
-        while (description.EndsWith("\r\n"))
+        try
         {
-            description = description.Remove(description.Length - "\r\n".Length);
+            var sb = new StringBuilder();
+            var lastIndex = 0;
+
+            for (var i = 0; i < matches.Count; i++)
+            {
+                if (matches[i].Value.StartsWith("%%"))
+                {
+                    // The % is escaped, so skip it.
+                    continue;
+                }
+
+                sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
+                var propIndex = int.Parse(matches[i].Value.Trim(['{', '}', '%']));
+
+                if (propIndex - 1 >= properties.Count) { return null; }
+
+                var propString = properties[propIndex - 1];
+
+                if (propString.StartsWith("%%") && parameters.Count > 0)
+                {
+                    var endParameterId = propString.IndexOf(' ');
+                    var parameterIdString = endParameterId > 2 ? propString[2..endParameterId] : propString[2..];
+
+                    if (int.TryParse(parameterIdString, out var parameterId))
+                    {
+                        var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
+
+                        if (parameterMessage != null)
+                        {
+                            propString = endParameterId > 2 ?
+                                parameterMessage.Text.TrimEnd(['\r', '\n']) + propString[++endParameterId..] :
+                                parameterMessage.Text.TrimEnd(['\r', '\n']);
+                        }
+                    }
+                }
+
+                sb.Append(propString);
+
+                lastIndex = matches[i].Index + matches[i].Length;
+            }
+
+            if (lastIndex < description.Length)
+            {
+                sb.Append(description[lastIndex..]);
+            }
+
+            description = sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
+
+            return null;
         }
 
-        return description;
+        return description.TrimEnd(['\r', '\n']);
     }
 
     /// <summary>Resolve event descriptions from a provider.</summary>
@@ -189,7 +186,6 @@ public partial class EventResolverBase
     {
         string? description = null;
         string? taskName = null;
-        string? template = null;
 
         if (eventRecord is { Version: not null, LogName: not null })
         {
@@ -224,6 +220,8 @@ public partial class EventResolverBase
 
                 providerDetails.Tasks.TryGetValue(e.Task, out taskName);
 
+                var properties = GetFormattedProperties(e.Template, eventProperties);
+
                 // If we don't have a description
                 if (string.IsNullOrEmpty(e.Description))
                 {
@@ -243,17 +241,15 @@ public partial class EventResolverBase
                 }
                 else
                 {
-                    description = FormatDescription(eventProperties, e.Description, providerDetails.Parameters);
+                    description = FormatDescription(properties, e.Description, providerDetails.Parameters);
                 }
-
-                template = e.Template;
             }
         }
 
         if (description == null)
         {
-            description = providerDetails.Messages?.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text;
-            description = FormatDescription(eventProperties, description, providerDetails.Parameters);
+            var properties = GetFormattedProperties(null, eventProperties);
+            description = FormatDescription(properties, providerDetails.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text, providerDetails.Parameters);
         }
 
         if (taskName == null && eventRecord.Task.HasValue)
@@ -262,7 +258,7 @@ public partial class EventResolverBase
 
             if (taskName == null)
             {
-                var potentialTaskNames = providerDetails.Messages?
+                var potentialTaskNames = providerDetails.Messages
                     .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
                     .ToList();
 
@@ -305,6 +301,54 @@ public partial class EventResolverBase
             eventRecord.ToXml());
     }
 
+    private static List<string> GetFormattedProperties(string? template, IList<EventProperty> properties)
+    {
+        List<string> providers = [];
+        XmlNodeList? dataNodes = null;
+
+        if (!string.IsNullOrWhiteSpace(template))
+        {
+            XmlDocument xml = new();
+            xml.LoadXml(template);
+
+            // Select all the 'data' nodes in the XML
+            dataNodes = xml.SelectNodes("/*/*");
+        }
+
+        for (int i = 0; i < properties.Count; i++)
+        {
+            string? outType = dataNodes?[i]?.Attributes?["outType"]?.Value;
+
+            switch (properties[i].Value)
+            {
+                case DateTime eventTime:
+                    // Exactly match the format produced by EventRecord.FormatMessage().
+                    // I have no idea why it includes Unicode LRM marks, but it does.
+                    providers.Add(eventTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                    continue;
+                case byte[] bytes:
+                    providers.Add(Convert.ToHexString(bytes));
+                    continue;
+                case SecurityIdentifier sid:
+                    providers.Add(sid.Value);
+                    continue;
+                default:
+                    if (!string.IsNullOrEmpty(outType) && XmlHexMappings.TryGetValue(outType, out bool isHex))
+                    {
+                        providers.Add(isHex ? $"0x{properties[i].Value:X}" : $"{properties[i].Value}");
+                    }
+                    else
+                    {
+                        providers.Add($"{properties[i].Value}");
+                    }
+
+                    continue;
+            }
+        }
+
+        return providers;
+    }
+
     [GeneratedRegex("%+[0-9]+")]
-    private static partial Regex RegexFormatter();
+    private static partial Regex WildcardWithNumberRegex();
 }

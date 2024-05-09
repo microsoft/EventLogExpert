@@ -141,7 +141,8 @@ public class EventMessageProvider
                  * issue.
                  */
 
-                hModule = NativeMethods.LoadLibraryEx(file, nint.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+                // Splitting file path because this will not resolve %systemroot% and will instead try to use drive:\windows\%systemroot%\system32\...
+                hModule = NativeMethods.LoadLibraryEx(file.Split("\\").Last(), nint.Zero, NativeMethods.LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
 
                 // TODO: Evaulate if there's any need to EnumResourceTypes.
                 // This is an alternative approach to FindResource. Leaving it here until we're sure FindResource is good enough.
