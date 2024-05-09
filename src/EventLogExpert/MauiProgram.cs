@@ -51,7 +51,6 @@ public static class MauiProgram
 
         // Provider Services
         builder.Services.AddSingleton<IEnabledDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
-        builder.Services.AddSingleton<IEventTableColumnProvider, EventTableColumnProvider>();
         builder.Services.AddSingleton<IDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
         builder.Services.AddTransient<IEventResolver, VersatileEventResolver>();
 

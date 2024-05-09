@@ -120,20 +120,28 @@ tr { height: 22px; }
 
 .table-row.yellowgreen { background-color: var(--highlight-yellowgreen) !important; }
 
-.activity-id { width: 270px; }
+.level { width: 100px; }
 
-.logname { width: 100px; }
+.dateandtime { width: 150px; }
+
+.activityid { width: 270px; }
+
+.log { width: 100px; }
 
 .computername { width: 100px; }
 
-.level { width: 100px; }
-
-.time { width: 150px; }
-
 .source { width: 250px; }
 
-.id { width: 80px; }
+.eventid { width: 80px; }
 
-.task { width: 180px; }
+.taskcategory { width: 180px; }
+
+.keywords { width: 100px; }
+
+.processid { width: 80px; }
+
+.threadid { width: 80px; }
+
+.user { width: 180px; }
 
 .description { width: 100%; }

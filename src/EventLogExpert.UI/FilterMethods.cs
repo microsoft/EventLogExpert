@@ -105,7 +105,8 @@ public static class FilterMethods
     public static IEnumerable<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,
         ColumnName? orderBy = null,
-        bool isDescending = false) => orderBy switch
+        bool isDescending = false) =>
+        orderBy switch
         {
             ColumnName.Level => isDescending ? events.OrderByDescending(e => e.Level) : events.OrderBy(e => e.Level),
             ColumnName.DateAndTime => isDescending ?
@@ -114,7 +115,7 @@ public static class FilterMethods
             ColumnName.ActivityId => isDescending ?
                 events.OrderByDescending(e => e.ActivityId) :
                 events.OrderBy(e => e.ActivityId),
-            ColumnName.LogName => isDescending ? events.OrderByDescending(e => e.LogName) : events.OrderBy(e => e.LogName),
+            ColumnName.Log => isDescending ? events.OrderByDescending(e => e.LogName) : events.OrderBy(e => e.LogName),
             ColumnName.ComputerName => isDescending ?
                 events.OrderByDescending(e => e.ComputerName) :
                 events.OrderBy(e => e.ComputerName),
@@ -123,6 +124,16 @@ public static class FilterMethods
             ColumnName.TaskCategory => isDescending ?
                 events.OrderByDescending(e => e.TaskCategory) :
                 events.OrderBy(e => e.TaskCategory),
+            ColumnName.Keywords => isDescending ?
+                events.OrderByDescending(e => e.KeywordsDisplayNames) :
+                events.OrderBy(e => e.KeywordsDisplayNames),
+            ColumnName.ProcessId => isDescending ?
+                events.OrderByDescending(e => e.ProcessId) :
+                events.OrderBy(e => e.ProcessId),
+            ColumnName.ThreadId => isDescending ?
+                events.OrderByDescending(e => e.ThreadId) :
+                events.OrderBy(e => e.ThreadId),
+            ColumnName.User => isDescending ? events.OrderByDescending(e => e.UserId) : events.OrderBy(e => e.UserId),
             _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
         };
 

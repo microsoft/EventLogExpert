@@ -14,7 +14,7 @@ public sealed record EventTableState
 
     public EventLogId? ActiveEventLogId { get; init; }
 
-    public IImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
+    public ImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
 
     public ColumnName? OrderBy { get; init; }
 

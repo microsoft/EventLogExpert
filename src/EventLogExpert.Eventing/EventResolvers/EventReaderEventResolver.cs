@@ -48,6 +48,7 @@ public class EventReaderEventResolver : IEventResolver
             keywordsDisplayNames,
             eventRecord.ProcessId,
             eventRecord.ThreadId,
+            eventRecord.UserId,
             eventRecord.LogName,
             OwningLogName,
             eventRecord.ToXml());

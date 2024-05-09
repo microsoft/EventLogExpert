@@ -37,21 +37,12 @@ public sealed partial class EventTable
 
     [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneSettings { get; init; } = null!;
 
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await JSRuntime.InvokeVoidAsync("registerTableEvents");
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
-    }
-
     protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvent);
         TimeZoneSettings.Select(settings => settings.Config.TimeZoneInfo);
 
+        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => RegisterTableEventHandlers().AndForget());
         SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
@@ -118,12 +109,7 @@ public sealed partial class EventTable
     private async Task InvokeTableColumnMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeTableColumnMenu", args.ClientX, args.ClientY);
 
-    private bool IsColumnHidden(ColumnName columnName)
-    {
-        if (!EventTableState.Value.Columns.TryGetValue(columnName, out var enabled)) { return true; }
-
-        return !enabled;
-    }
+    private async Task RegisterTableEventHandlers() => await JSRuntime.InvokeVoidAsync("registerTableEvents");
 
     private async Task ScrollToSelectedEvent()
     {
