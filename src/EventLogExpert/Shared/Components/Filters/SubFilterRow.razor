@@ -4,10 +4,10 @@
     <div class="flex-align-center">
         <BooleanSelect @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
 
-        <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.Data.Type" ToStringFunc="x => x.ToFullString()">
-            @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+        <ValueSelect CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
+            @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                <ValueSelectItem T="FilterType" Value="item" />
+                <ValueSelectItem T="FilterCategory" Value="item" />
             }
         </ValueSelect>
 
@@ -20,7 +20,7 @@
         </ValueSelect>
 
         <span>Value: </span>
-        @if (Value.Data.Type is FilterType.Description)
+        @if (Value.Data.Category is FilterCategory.Description)
         {
             <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
         }
@@ -48,7 +48,7 @@
 
     </div>
 
-    <button class="button button-red" @onclick="RemoveSubFilter">
+    <button class="button button-red fixed-width" @onclick="RemoveSubFilter">
         <i class="bi bi-dash-circle"></i> Remove
     </button>
 </div>

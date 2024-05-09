@@ -16,11 +16,15 @@ public enum ColumnName
     Level,
     [EnumMember(Value = "Date and Time")] DateAndTime,
     [EnumMember(Value = "Activity ID")] ActivityId,
-    [EnumMember(Value = "Log Name")] LogName,
+    Log,
     [EnumMember(Value = "Computer Name")] ComputerName,
     Source,
     [EnumMember(Value = "Event ID")] EventId,
-    [EnumMember(Value = "Task Category")] TaskCategory
+    [EnumMember(Value = "Task Category")] TaskCategory,
+    Keywords,
+    [EnumMember(Value = "Process ID")] ProcessId,
+    [EnumMember(Value = "Thread ID")] ThreadId,
+    User
 }
 
 public enum CopyType
@@ -52,6 +56,18 @@ public enum HighlightColor
     LightGray
 }
 
+public enum FilterCategory
+{
+    [EnumMember(Value = "Event ID")] Id,
+    [EnumMember(Value = "Activity ID")] ActivityId,
+    Level,
+    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
+    Source,
+    [EnumMember(Value = "Task Category")] TaskCategory,
+    Description,
+    Xml
+}
+
 public enum FilterEvaluator
 {
     Equals,
@@ -63,14 +79,9 @@ public enum FilterEvaluator
 
 public enum FilterType
 {
-    [EnumMember(Value = "Event ID")] Id,
-    [EnumMember(Value = "Activity ID")] ActivityId,
-    Level,
-    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
-    Source,
-    [EnumMember(Value = "Task Category")] TaskCategory,
-    Description,
-    Xml
+    Basic,
+    Advanced,
+    Cached
 }
 
 public enum LogType

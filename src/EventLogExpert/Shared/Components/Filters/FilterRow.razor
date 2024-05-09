@@ -4,18 +4,28 @@
     <div class="flex-align-center">
         @if (Value.IsEditing)
         {
-            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
-                @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
-                {
-                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
-                }
-            </ValueSelect>
+            if (!Value.IsExcluded)
+            {
+                <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
+                    @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
+                    {
+                        <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
+                    }
+                </ValueSelect>
+            }
 
-            <span>Filter On: </span>
-            <ValueSelect CssClass="input filter-dropdown" T="FilterType" @bind-Value="Value.Data.Type" ToStringFunc="x => x.ToFullString()">
-                @foreach (FilterType item in Enum.GetValues(typeof(FilterType)))
+            if (Value.IsExcluded)
+            {
+                <span>Exclude On: </span>
+            }
+            else
+            {
+                <span>Filter On: </span>
+            }
+            <ValueSelect CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
+                @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
                 {
-                    <ValueSelectItem T="FilterType" Value="item" />
+                    <ValueSelectItem T="FilterCategory" Value="item" />
                 }
             </ValueSelect>
 
@@ -29,7 +39,7 @@
 
             <span>Value: </span>
             <div>
-                @if (Value.Data.Type is FilterType.Description)
+                @if (Value.Data.Category is FilterCategory.Description)
                 {
                     <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
                 }
@@ -66,7 +76,15 @@
             {
                 <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
             }
-            <span>@Value.Comparison.Value</span>
+
+            @if (Value.IsExcluded)
+            {
+                <span>Exclude: @Value.Comparison.Value</span>
+            }
+            else
+            {
+                <span>@Value.Comparison.Value</span>                
+            }
         }
      </div>
 
@@ -89,6 +107,23 @@
         {
             <button class="button" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
+            </button>
+
+            @if (Value.IsExcluded)
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-plus-circle"></i> Include
+                </button>
+            }
+            else
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-dash-circle"></i> Exclude
+                </button>
+            }
+
+            <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
             </button>
 
             @if (Value.IsEnabled)

@@ -1,5 +1,4 @@
 ﻿@using EventLogExpert.Shared.Components.Filters
-@using EventLogExpert.Shared.Components
 @using EventLogExpert.UI
 @inherits FluxorComponent
 
@@ -23,6 +22,10 @@
 
             <button class="button" @onclick="AddCachedFilter">
                 <i class="bi bi-plus-circle"></i> Add Cached Filter
+            </button>
+
+            <button class="button" @onclick="AddExclusion">
+                <i class="bi bi-plus-circle"></i> Add Exclusion
             </button>
         </div>
 
@@ -79,6 +82,10 @@
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
+                    <button class="button button-red" type="button" @onclick="RemoveDateFilter">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+
                     @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
                     {
                         <button class="button button-red" @onclick="ToggleDateFilter">
@@ -95,19 +102,23 @@
             </EditForm>
         }
 
-        @foreach (var item in FilterPaneState.Value.BasicFilters)
+        @foreach (var item in FilterPaneState.Value.Filters)
         {
-            <FilterRow Value="item" />
-        }
+            switch (item.FilterType)
+            {
+                case FilterType.Basic:
+                    <FilterRow Value="item" />
 
-        @foreach (var item in FilterPaneState.Value.AdvancedFilters)
-        {
-            <AdvancedFilterRow Value="item" />
-        }
+                    break;
+                case FilterType.Advanced:
+                    <AdvancedFilterRow Value="item" />
 
-        @foreach (var item in FilterPaneState.Value.CachedFilters)
-        {
-            <FilterCacheRow Value="item" />
+                    break;
+                case FilterType.Cached:
+                    <FilterCacheRow Value="item" />
+
+                    break;
+            }
         }
     </div>
 </div>

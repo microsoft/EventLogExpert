@@ -5,14 +5,14 @@ namespace EventLogExpert.UI.Models;
 
 public sealed record FilterData
 {
-    private FilterType _type;
+    private FilterCategory _category;
 
-    public FilterType Type
+    public FilterCategory Category
     {
-        get => _type;
+        get => _category;
         set
         {
-            _type = value;
+            _category = value;
             Value = null;
             Values.Clear();
         }

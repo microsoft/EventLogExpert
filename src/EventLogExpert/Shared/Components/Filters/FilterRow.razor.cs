@@ -31,15 +31,16 @@ public sealed partial class FilterRow
     {
         get
         {
-            switch (Value.Data.Type)
+            switch (Value.Data.Category)
             {
-                case FilterType.Id :
+                case FilterCategory.Id:
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
                         .Distinct().OrderBy(id => id).Select(id => id.ToString()).ToList();
-                case FilterType.ActivityId:
+                case FilterCategory.ActivityId:
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
-                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList();
-                case FilterType.Level :
+                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty)
+                        .ToList();
+                case FilterCategory.Level:
                     List<string> items = [];
 
                     foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
@@ -48,17 +49,18 @@ public sealed partial class FilterRow
                     }
 
                     return items;
-                case FilterType.KeywordsDisplayNames :
+                case FilterCategory.KeywordsDisplayNames:
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterType.Source :
+                case FilterCategory.Source:
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames)
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterType.TaskCategory :
+                case FilterCategory.TaskCategory:
                     return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
                         .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterType.Description :
-                default :
+                case FilterCategory.Xml:
+                case FilterCategory.Description:
+                default:
                     return [];
             }
         }
@@ -66,9 +68,9 @@ public sealed partial class FilterRow
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleBasicFilterEditing(Value.Id));
+    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
 
-    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveBasicFilter(Value.Id));
+    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
 
     private async void SaveFilter()
     {
@@ -88,8 +90,11 @@ public sealed partial class FilterRow
             IsEnabled = true
         };
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetBasicFilter(newModel));
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleBasicFilterEnabled(Value.Id));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
+
+    private void ToggleFilterExclusion() =>
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
 }

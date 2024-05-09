@@ -29,6 +29,8 @@ public sealed record FilterGroupAction
 
     public sealed record ToggleFilter(FilterGroupId ParentId, FilterId Id);
 
+    public sealed record ToggleFilterExcluded(FilterGroupId ParentId, FilterId Id);
+
     public sealed record ToggleGroup(FilterGroupId Id);
 
     public sealed record UpdateDisplayGroups(IEnumerable<FilterGroupModel> Groups);

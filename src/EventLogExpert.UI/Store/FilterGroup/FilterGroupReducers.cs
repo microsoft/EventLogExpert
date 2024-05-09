@@ -143,6 +143,33 @@ public sealed class FilterGroupReducers
     }
 
     [ReducerMethod]
+    public static FilterGroupState ReducerToggleFilterExcluded(
+        FilterGroupState state,
+        FilterGroupAction.ToggleFilterExcluded action)
+    {
+        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
+
+        if (parent is null) { return state; }
+
+        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Id);
+
+        if (filter is null) { return state; }
+
+        return state with
+        {
+            Groups = state.Groups
+                .Remove(parent)
+                .Add(parent with
+                {
+                    Filters =
+                    [
+                        .. parent.Filters.Where(x => x.Id != action.Id), filter with { IsExcluded = !filter.IsExcluded }
+                    ]
+                })
+        };
+    }
+
+    [ReducerMethod]
     public static FilterGroupState ReducerToggleGroup(FilterGroupState state, FilterGroupAction.ToggleGroup action)
     {
         var group = state.Groups.FirstOrDefault(x => x.Id == action.Id);

@@ -68,7 +68,7 @@ public partial class EventResolverBase
 
         foreach (var k in StandardKeywords.Keys)
         {
-            if ((bitmask.Value & k) == k) { returnValue.Add(StandardKeywords[k]); }
+            if ((bitmask.Value & k) == k) { returnValue.Add(StandardKeywords[k].TrimEnd('\0')); }
         }
 
         if (providerDetails != null)
@@ -81,7 +81,7 @@ public partial class EventResolverBase
             {
                 foreach (var k in providerDetails.Keywords.Keys)
                 {
-                    if ((lower32 & k) == k) { returnValue.Add(providerDetails.Keywords[k]); }
+                    if ((lower32 & k) == k) { returnValue.Add(providerDetails.Keywords[k].TrimEnd('\0')); }
                 }
             }
         }
@@ -295,6 +295,7 @@ public partial class EventResolverBase
             GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
             eventRecord.ProcessId,
             eventRecord.ThreadId,
+            eventRecord.UserId,
             eventRecord.LogName!,
             owningLogName,
             eventRecord.ToXml());

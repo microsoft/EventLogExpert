@@ -5,19 +5,29 @@
     <div class="flex-align-center">
         @if (Value.IsEditing)
         {
-            <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
-                T="HighlightColor" @bind-Value="Value.Color">
-                @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
-                {
-                    <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
-                }
-            </ValueSelect>
+            @if (!Value.IsExcluded)
+            {
+                <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
+                    T="HighlightColor" @bind-Value="Value.Color">
+                    @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
+                    {
+                        <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
+                    }
+                </ValueSelect>
+            }
 
             <span>
-                Expression:
-                <input class="input advanced-filter" type="text"
+                @if (Value.IsExcluded)
+                {
+                    <text>Exclude Expression: </text>
+                }
+                else
+                {
+                    <text>Expression: </text>
+                }
+                <input class="input advanced-filter" @oninput="OnInputChanged"
                     placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-                    value="@Value.Comparison.Value" @oninput="OnInputChanged" />
+                    type="text" value="@Value.Comparison.Value" />
             </span>
         }
         else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
@@ -30,36 +40,61 @@
             {
                 <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
             }
-            <span>@Value.Comparison.Value</span>
+
+            @if (Value.IsExcluded)
+            {
+                <span>Exclude: @Value.Comparison.Value</span>
+            }
+            else
+            {
+                <span>@Value.Comparison.Value</span>
+            }
         }
     </div>
 
     <div>
         @if (Value.IsEditing)
         {
-            <button class="button button-green" type="button" @onclick="SaveFilter">
-                <i class="bi bi-check-circle"></i> Apply
+            <button class="button button-green" @onclick="SaveFilter">
+                <i class="bi bi-check-circle"></i> Save
             </button>
 
-            <button class="button button-red" type="button" @onclick="RemoveFilter">
+            <button class="button button-red fixed-width" @onclick="RemoveFilter">
                 <i class="bi bi-dash-circle"></i> Remove
             </button>
         }
         else
         {
-            <button class="button" type="button" @onclick="EditFilter">
+            <button class="button" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
+            </button>
+
+            @if (Value.IsExcluded)
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-plus-circle"></i> Include
+                </button>
+            }
+            else
+            {
+                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
+                    <i class="bi bi-dash-circle"></i> Exclude
+                </button>
+            }
+
+            <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                <i class="bi bi-dash-circle"></i> Remove
             </button>
 
             @if (Value.IsEnabled)
             {
-                <button class="button button-red" @onclick="ToggleFilter">
+                <button class="button button-red fixed-width" @onclick="ToggleFilter">
                     <i class="bi bi-dash-circle"></i> Disable
                 </button>
             }
             else
             {
-                <button class="button button-green" @onclick="ToggleFilter">
+                <button class="button button-green fixed-width" @onclick="ToggleFilter">
                     <i class="bi bi-plus-circle"></i> Enable
                 </button>
             }

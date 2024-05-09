@@ -34,10 +34,10 @@ public sealed partial class FilterCacheRow
     {
         _filterValue = Value.Comparison.Value;
 
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilterEditing(Value.Id));
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
     }
 
-    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveCachedFilter(Value.Id));
+    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
 
     private void SaveFilter()
     {
@@ -56,8 +56,11 @@ public sealed partial class FilterCacheRow
             IsEnabled = true
         };
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetCachedFilter(newModel));
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleCachedFilterEnabled(Value.Id));
+    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
+
+    private void ToggleFilterExclusion() =>
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
 }

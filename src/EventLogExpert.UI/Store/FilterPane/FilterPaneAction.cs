@@ -7,11 +7,7 @@ namespace EventLogExpert.UI.Store.FilterPane;
 
 public sealed record FilterPaneAction
 {
-    public sealed record AddAdvancedFilter(FilterModel? FilterModel = null);
-
-    public sealed record AddBasicFilter(FilterModel? FilterModel = null);
-
-    public sealed record AddCachedFilter(FilterModel FilterModel);
+    public sealed record AddFilter(FilterModel? FilterModel = null);
 
     public sealed record AddSubFilter(FilterId ParentId);
 
@@ -19,35 +15,21 @@ public sealed record FilterPaneAction
 
     public sealed record ClearAllFilters;
 
-    public sealed record RemoveAdvancedFilter(FilterId Id);
-
-    public sealed record RemoveBasicFilter(FilterId Id);
-
-    public sealed record RemoveCachedFilter(FilterId Id);
+    public sealed record RemoveFilter(FilterId Id);
 
     public sealed record RemoveSubFilter(FilterId ParentId, FilterId SubFilterId);
 
     public sealed record SaveFilterGroup(string Name);
 
-    public sealed record SetAdvancedFilter(FilterModel FilterModel);
-
-    public sealed record SetBasicFilter(FilterModel FilterModel);
-
-    public sealed record SetCachedFilter(FilterModel FilterModel);
+    public sealed record SetFilter(FilterModel FilterModel);
 
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
-    public sealed record ToggleAdvancedFilterEditing(FilterId Id);
+    public sealed record ToggleFilterEditing(FilterId Id);
 
-    public sealed record ToggleAdvancedFilterEnabled(FilterId Id);
+    public sealed record ToggleFilterEnabled(FilterId Id);
 
-    public sealed record ToggleBasicFilterEditing(FilterId Id);
-
-    public sealed record ToggleBasicFilterEnabled(FilterId Id);
-
-    public sealed record ToggleCachedFilterEditing(FilterId Id);
-
-    public sealed record ToggleCachedFilterEnabled(FilterId Id);
+    public sealed record ToggleFilterExcluded(FilterId Id);
 
     public sealed record ToggleFilterDate;
 
