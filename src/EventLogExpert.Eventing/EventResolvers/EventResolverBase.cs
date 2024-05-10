@@ -62,9 +62,9 @@ public partial class EventResolverBase
 
     protected static IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
     {
-        if (bitmask is null or 0) { return Enumerable.Empty<string>(); }
+        if (bitmask is null or 0) { return []; }
 
-        var returnValue = new List<string>();
+        List<string> returnValue = [];
 
         foreach (var k in StandardKeywords.Keys)
         {
@@ -94,7 +94,12 @@ public partial class EventResolverBase
         string? descriptionTemplate,
         List<MessageModel> parameters)
     {
-        if (descriptionTemplate == null) { return null; }
+        if (string.IsNullOrWhiteSpace(descriptionTemplate))
+        {
+            // Some events don't have a template but have event details in the properties
+            // Found a few providers that have their properties wrapped with \r\n for some reason
+            return properties.Count == 1 ? properties[0].Trim(['\r', '\n']) : null;
+        }
 
         string description = descriptionTemplate
             .Replace("\r\n%n", " \r\n")
@@ -250,6 +255,8 @@ public partial class EventResolverBase
         {
             var properties = GetFormattedProperties(null, eventProperties);
             description = FormatDescription(properties, providerDetails.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text, providerDetails.Parameters);
+
+            description ??= "Unable to resolve description, see XML for more details.";
         }
 
         if (taskName == null && eventRecord.Task.HasValue)
@@ -290,7 +297,7 @@ public partial class EventResolverBase
             Severity.GetString(eventRecord.Level),
             eventRecord.ProviderName,
             taskName?.TrimEnd('\0') ?? string.Empty,
-            description?.TrimEnd('\0') ?? "Unable to format description",
+            description.TrimEnd('\0'),
             eventRecord.Qualifiers,
             GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
             eventRecord.ProcessId,
