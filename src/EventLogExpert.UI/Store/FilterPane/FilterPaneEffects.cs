@@ -111,9 +111,11 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         }
         else
         {
-            // Keep date filtering but remove other filters
+            // Only keep date and excluded filters
             await Task.Run(() => dispatcher.Dispatch(
-                new EventLogAction.SetFilters(new EventFilter(filterPaneState.FilteredDateRange, []))));
+                new EventLogAction.SetFilters(
+                    new EventFilter(filterPaneState.FilteredDateRange,
+                        filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList()))));
         }
 
         dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
