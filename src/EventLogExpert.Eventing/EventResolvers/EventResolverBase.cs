@@ -9,7 +9,7 @@ using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Xml;
+using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
@@ -89,16 +89,19 @@ public partial class EventResolverBase
         return returnValue;
     }
 
-    protected string? FormatDescription(
+    protected string FormatDescription(
         List<string> properties,
         string? descriptionTemplate,
         List<MessageModel> parameters)
     {
         if (string.IsNullOrWhiteSpace(descriptionTemplate))
         {
-            // Some events don't have a template but have event details in the properties
+            // If there is only one property then this is what certain EventRecords look like
+            // when the entire description is a string literal, and there is no provider DLL needed.
             // Found a few providers that have their properties wrapped with \r\n for some reason
-            return properties.Count == 1 ? properties[0].Trim(['\r', '\n']) : null;
+            return properties.Count == 1 ?
+                properties[0].Trim(['\r', '\n']) :
+                "Unable to resolve description, see XML for more details.";
         }
 
         string description = descriptionTemplate
@@ -120,18 +123,21 @@ public partial class EventResolverBase
 
             for (var i = 0; i < matches.Count; i++)
             {
-                if (matches[i].Value.StartsWith("%%"))
-                {
-                    // The % is escaped, so skip it.
-                    continue;
-                }
-
                 sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
-                var propIndex = int.Parse(matches[i].Value.Trim(['{', '}', '%']));
 
-                if (propIndex - 1 >= properties.Count) { return null; }
+                string propString = matches[i].Value;
 
-                var propString = properties[propIndex - 1];
+                if (!propString.StartsWith("%%"))
+                {
+                    var propIndex = int.Parse(propString.Trim(['{', '}', '%']));
+
+                    if (propIndex - 1 >= properties.Count)
+                    {
+                        return "Unable to resolve description, see XML for more details.";
+                    }
+
+                    propString = properties[propIndex - 1];
+                }
 
                 if (propString.StartsWith("%%") && parameters.Count > 0)
                 {
@@ -142,11 +148,15 @@ public partial class EventResolverBase
                     {
                         var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
 
-                        if (parameterMessage != null)
+                        // Fallback to use RawId if ShortId is not found, GP is one provider that uses this to indicate additional information
+                        parameterMessage ??= parameters.FirstOrDefault(m => m.RawId == parameterId);
+
+                        if (parameterMessage is not null)
                         {
+                            // Some RawId parameters have a trailing '%0' that needs to be removed
                             propString = endParameterId > 2 ?
-                                parameterMessage.Text.TrimEnd(['\r', '\n']) + propString[++endParameterId..] :
-                                parameterMessage.Text.TrimEnd(['\r', '\n']);
+                                parameterMessage.Text.TrimEnd(['%', '0', '\r', '\n']) + propString[++endParameterId..] :
+                                parameterMessage.Text.TrimEnd(['%', '0', '\r', '\n']);
                         }
                     }
                 }
@@ -161,16 +171,14 @@ public partial class EventResolverBase
                 sb.Append(description[lastIndex..]);
             }
 
-            description = sb.ToString();
+            return sb.ToString().TrimEnd(['\r', '\n']);
         }
         catch (Exception ex)
         {
             _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
 
-            return null;
+            return "Unable to resolve description, see XML for more details.";
         }
-
-        return description.TrimEnd(['\r', '\n']);
     }
 
     /// <summary>Resolve event descriptions from a provider.</summary>
@@ -226,40 +234,17 @@ public partial class EventResolverBase
                 providerDetails.Tasks.TryGetValue(e.Task, out taskName);
 
                 var properties = GetFormattedProperties(e.Template, eventProperties);
-
-                // If we don't have a description
-                if (string.IsNullOrEmpty(e.Description))
-                {
-                    // And we have exactly one property
-                    if (eventRecord.Properties.Count == 1)
-                    {
-                        // Return that property as the description. This is what certain EventRecords look like
-                        // when the entire description is a string literal, and there is no provider DLL needed.
-                        description = eventRecord.Properties[0].ToString();
-                    }
-                    else
-                    {
-                        description = "This event record is missing a description. " +
-                            "The following information was included with the event:\n\n" +
-                            string.Join("\n", eventRecord.Properties);
-                    }
-                }
-                else
-                {
-                    description = FormatDescription(properties, e.Description, providerDetails.Parameters);
-                }
+                description = FormatDescription(properties, e.Description, providerDetails.Parameters);
             }
         }
 
-        if (description == null)
+        if (string.IsNullOrEmpty(description))
         {
             var properties = GetFormattedProperties(null, eventProperties);
             description = FormatDescription(properties, providerDetails.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text, providerDetails.Parameters);
-
-            description ??= "Unable to resolve description, see XML for more details.";
         }
 
-        if (taskName == null && eventRecord.Task.HasValue)
+        if (taskName is null && eventRecord.Task.HasValue)
         {
             providerDetails.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
 
@@ -311,20 +296,16 @@ public partial class EventResolverBase
     private static List<string> GetFormattedProperties(string? template, IList<EventProperty> properties)
     {
         List<string> providers = [];
-        XmlNodeList? dataNodes = null;
+        XElement[]? dataNodes = null;
 
         if (!string.IsNullOrWhiteSpace(template))
         {
-            XmlDocument xml = new();
-            xml.LoadXml(template);
-
-            // Select all the 'data' nodes in the XML
-            dataNodes = xml.SelectNodes("/*/*");
+            dataNodes = XElement.Parse(template).Descendants().ToArray();
         }
 
         for (int i = 0; i < properties.Count; i++)
         {
-            string? outType = dataNodes?[i]?.Attributes?["outType"]?.Value;
+            string? outType = dataNodes?[i].Attributes().FirstOrDefault(a => a.Name == "outType")?.Value;
 
             switch (properties[i].Value)
             {
