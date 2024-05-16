@@ -23,7 +23,7 @@ public sealed class EventLogReducers
         state with
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
-            SelectedEvent = null,
+            SelectedEvents = [],
             NewEventBuffer = new List<DisplayEventModel>().AsReadOnly(),
             NewEventBufferIsFull = false
         };
@@ -75,9 +75,37 @@ public sealed class EventLogReducers
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, EventLogAction.SelectEvent action)
     {
-        if (state.SelectedEvent == action.SelectedEvent) { return state; }
+        if (!state.SelectedEvents.Contains(action.SelectedEvent))
+        {
+            return state with
+            {
+                SelectedEvents = action.IsMultiSelect ?
+                    state.SelectedEvents.Add(action.SelectedEvent) : [action.SelectedEvent]
+            };
+        }
 
-        return state with { SelectedEvent = action.SelectedEvent };
+        if (action is { IsMultiSelect: true, ShouldStaySelected: false })
+        {
+            return state with { SelectedEvents = state.SelectedEvents.Remove(action.SelectedEvent) };
+        }
+
+        return action.ShouldStaySelected ? state : state with { SelectedEvents = [action.SelectedEvent] };
+    }
+
+    [ReducerMethod]
+    public static EventLogState ReduceSelectEvents(EventLogState state, EventLogAction.SelectEvents action)
+    {
+        List<DisplayEventModel> eventsToAdd = [];
+
+        foreach (var selectedEvent in action.SelectedEvents)
+        {
+            if (!state.SelectedEvents.Contains(selectedEvent))
+            {
+                eventsToAdd.Add(selectedEvent);
+            }
+        }
+
+        return state with { SelectedEvents = state.SelectedEvents.AddRange(eventsToAdd) };
     }
 
     [ReducerMethod]

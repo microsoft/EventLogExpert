@@ -9,6 +9,7 @@ using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
@@ -20,11 +21,11 @@ public sealed partial class ContextMenu
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject]
-    private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
+    private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
-        SelectedEventState.Select(s => s.SelectedEvent);
+        SelectedEventState.Select(s => s.SelectedEvents);
 
         base.OnInitialized();
     }
@@ -33,17 +34,19 @@ public sealed partial class ContextMenu
 
     private void FilterEvent(FilterCategory filterType, bool shouldExclude = false)
     {
-        if (SelectedEventState.Value is null) { return; }
+        if (SelectedEventState.Value.IsEmpty) { return; }
+
+        var selectedEvent = SelectedEventState.Value.Last();
 
         string filterValue = filterType switch
         {
-            FilterCategory.Id => SelectedEventState.Value.Id.ToString(),
-            FilterCategory.ActivityId => SelectedEventState.Value.ActivityId.ToString()!,
-            FilterCategory.Level => SelectedEventState.Value.Level,
-            FilterCategory.KeywordsDisplayNames => SelectedEventState.Value.KeywordsDisplayNames.GetEventKeywords(),
-            FilterCategory.Source => SelectedEventState.Value.Source,
-            FilterCategory.TaskCategory => SelectedEventState.Value.TaskCategory,
-            FilterCategory.Description => SelectedEventState.Value.Description,
+            FilterCategory.Id => selectedEvent.Id.ToString(),
+            FilterCategory.ActivityId => selectedEvent.ActivityId.ToString()!,
+            FilterCategory.Level => selectedEvent.Level,
+            FilterCategory.KeywordsDisplayNames => selectedEvent.KeywordsDisplayNames.GetEventKeywords(),
+            FilterCategory.Source => selectedEvent.Source,
+            FilterCategory.TaskCategory => selectedEvent.TaskCategory,
+            FilterCategory.Description => selectedEvent.Description,
             _ => string.Empty,
         };
 

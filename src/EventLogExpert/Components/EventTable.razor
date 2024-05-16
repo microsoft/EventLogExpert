@@ -4,10 +4,10 @@
 <SplitLogTabPane />
 
 <div class="table-container">
-    <table id="eventTable" @onkeyup="HandleKeyUp">
+    <table id="eventTable" @onkeydown="HandleKeyDown">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr>
-            @foreach ((ColumnName column, bool _) in EventTableState.Value.Columns.Where(column => column.Value))
+            @foreach ((ColumnName column, bool _) in _eventTableState.Columns.Where(column => column.Value))
             {
                 <th class="@column.ToString().ToLower()">
                     @if (column == ColumnName.DateAndTime)
@@ -18,9 +18,9 @@
                     {
                         @column.ToFullString()
                     }
-                    @if (EventTableState.Value.OrderBy == column)
+                    @if (_eventTableState.OrderBy == column)
                     {
-                        <span class="menu-toggle" data-rotate="@EventTableState.Value.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@_eventTableState.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }
@@ -31,11 +31,12 @@
         </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu">
-        @if (EventTableState.Value.ActiveEventLogId is not null)
+        @if (_currentTable is not null)
         {
-            <Virtualize Items="EventTableState.Value.EventTables.First(x => x.Id == EventTableState.Value.ActiveEventLogId).DisplayedEvents" Context="evt">
-                <tr @key="@($"{evt.OwningLog}_{evt.RecordId}")" class="@GetCss(evt)" @onfocus="() => SelectEvent(evt)" tabindex="0">
-                    @foreach ((ColumnName column, bool _) in EventTableState.Value.Columns.Where(column => column.Value))
+            <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
+                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")"
+                    @onmouseenter="args => DragSelectEvent(args, evt)" @onmousedown="args => SelectEvent(args, evt)" tabindex="0">
+                    @foreach ((ColumnName column, bool _) in _eventTableState.Columns.Where(column => column.Value))
                     {
                         <td>
                             @switch (column)
@@ -44,7 +45,7 @@
                                     <text><span class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
                                     break;
                                 case ColumnName.DateAndTime:
-                                    @evt.TimeCreated.ConvertTimeZone(TimeZoneSettings.Value)
+                                    @evt.TimeCreated.ConvertTimeZone(_timeZoneSettings)
                                     break;
                                 case ColumnName.ActivityId:
                                     @evt.ActivityId

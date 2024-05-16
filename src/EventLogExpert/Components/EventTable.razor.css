@@ -41,7 +41,10 @@ th, td {
     &:last-child { border-right: none; }
 }
 
-tr { height: 22px; }
+tr {
+    height: 22px;
+    user-select: none;
+}
 
 .error { color: var(--clr-red); }
 

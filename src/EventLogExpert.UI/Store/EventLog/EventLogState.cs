@@ -27,5 +27,5 @@ public sealed record EventLogState
 
     public bool NewEventBufferIsFull { get; init; }
 
-    public DisplayEventModel? SelectedEvent { get; init; }
+    public ImmutableList<DisplayEventModel> SelectedEvents { get; init; } = [];
 }
