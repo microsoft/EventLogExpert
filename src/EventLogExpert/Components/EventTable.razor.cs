@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
@@ -13,14 +14,16 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
+    private EventTableModel? _currentTable;
     private EventTableState _eventTableState = null!;
-    private DisplayEventModel? _selectedEventState;
+    private ImmutableList<DisplayEventModel> _selectedEventState = [];
     private TimeZoneInfo _timeZoneSettings = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
@@ -33,19 +36,24 @@ public sealed partial class EventTable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventState { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventState { get; init; } = null!;
 
     [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneSettings { get; init; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
-        SelectedEventState.Select(s => s.SelectedEvent);
+        SelectedEventState.Select(s => s.SelectedEvents);
         TimeZoneSettings.Select(settings => settings.Config.TimeZoneInfo);
 
-        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => RegisterTableEventHandlers().AndForget());
         SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
+        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => RegisterTableEventHandlers().AndForget());
         SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
+
+        _eventTableState = EventTableState.Value;
+        _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
+        _selectedEventState = SelectedEventState.Value;
+        _timeZoneSettings = TimeZoneSettings.Value;
 
         await base.OnInitializedAsync();
     }
@@ -57,6 +65,7 @@ public sealed partial class EventTable
             TimeZoneSettings.Value.Equals(_timeZoneSettings)) { return false; }
 
         _eventTableState = EventTableState.Value;
+        _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = TimeZoneSettings.Value;
 
@@ -72,9 +81,16 @@ public sealed partial class EventTable
             _ => string.Empty,
         };
 
+    private void DragSelectEvent(MouseEventArgs args, DisplayEventModel @event)
+    {
+        if (args.Buttons == 1)
+        {
+            Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event, IsMultiSelect: true, ShouldStaySelected: !args.CtrlKey));
+        }
+    }
+
     private string GetCss(DisplayEventModel @event) =>
-        SelectedEventState.Value?.RecordId == @event.RecordId ?
-            "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
+        _selectedEventState.Contains(@event) ? "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
 
     private string GetDateColumnHeader() =>
         TimeZoneSettings.Value.Equals(TimeZoneInfo.Local) ?
@@ -92,14 +108,14 @@ public sealed partial class EventTable
         return string.Empty;
     }
 
-    private void HandleKeyUp(KeyboardEventArgs args)
+    private void HandleKeyDown(KeyboardEventArgs args)
     {
         // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
         switch (args)
         {
             case { CtrlKey: true, Code: "KeyC" }:
                 ClipboardService.CopySelectedEvent();
-                break;
+                return;
         }
     }
 
@@ -113,15 +129,13 @@ public sealed partial class EventTable
 
     private async Task ScrollToSelectedEvent()
     {
-        var table = EventTableState.Value.EventTables.FirstOrDefault(x => x.Id == EventTableState.Value.ActiveEventLogId);
+        var entry = _currentTable?.DisplayedEvents.FirstOrDefault(x =>
+            string.Equals(x.LogName, _selectedEventState.LastOrDefault()?.LogName) &&
+            x.RecordId == _selectedEventState.LastOrDefault()?.RecordId);
 
-        var entry = table?.DisplayedEvents.FirstOrDefault(x =>
-            string.Equals(x.LogName, SelectedEventState.Value?.LogName) &&
-            x.RecordId == SelectedEventState.Value?.RecordId);
+        if (entry is null) { return; }
 
-        if (table is null || entry is null) { return; }
-
-        var index = table.DisplayedEvents.IndexOf(entry);
+        var index = _currentTable?.DisplayedEvents.IndexOf(entry);
 
         if (index >= 0)
         {
@@ -129,7 +143,42 @@ public sealed partial class EventTable
         }
     }
 
-    private void SelectEvent(DisplayEventModel @event) => Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
+    private void SelectEvent(MouseEventArgs args, DisplayEventModel @event)
+    {
+        switch (args)
+        {
+            case { CtrlKey: true }:
+                Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event, true));
+                return;
+            case { ShiftKey: true }:
+                var startEvent = _selectedEventState.LastOrDefault();
+
+                if (startEvent is null || _currentTable is null) { return; }
+
+                var startIndex = _currentTable.DisplayedEvents.IndexOf(startEvent);
+                var endIndex = _currentTable.DisplayedEvents.IndexOf(@event);
+
+                if (startIndex < endIndex)
+                {
+                    Dispatcher.Dispatch(new EventLogAction.SelectEvents(
+                        _currentTable.DisplayedEvents
+                            .Skip(startIndex)
+                            .Take(endIndex - startIndex + 1)));
+                }
+                else
+                {
+                    Dispatcher.Dispatch(new EventLogAction.SelectEvents(
+                        _currentTable.DisplayedEvents
+                            .Skip(endIndex)
+                            .Take(startIndex - endIndex + 1)));
+                }
+
+                return;
+            default:
+                Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event));
+                return;
+        }
+    }
 
     private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());
 }

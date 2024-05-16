@@ -6,6 +6,7 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
+using System.Collections.Immutable;
 using System.Text;
 using System.Xml.Linq;
 
@@ -18,60 +19,75 @@ public interface IClipboardService
 
 public sealed class ClipboardService : IClipboardService
 {
-    private readonly IStateSelection<EventLogState, DisplayEventModel?> _selectedEvent;
+    private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
     private readonly IState<SettingsState> _settingsState;
 
     public ClipboardService(
-        IStateSelection<EventLogState, DisplayEventModel?> selectedEvent,
+        IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
         IState<SettingsState> settingsState)
     {
-        _selectedEvent = selectedEvent;
+        _selectedEvents = selectedEvents;
         _settingsState = settingsState;
 
-        _selectedEvent.Select(s => s.SelectedEvent);
+        _selectedEvents.Select(s => s.SelectedEvents);
     }
 
     public void CopySelectedEvent(CopyType? copyType = null)
     {
-        if (_selectedEvent.Value is null) { return; }
+        if (_selectedEvents.Value.IsEmpty) { return; }
+
+        if (_selectedEvents.Value.Count == 1)
+        {
+            Clipboard.SetTextAsync(GetFormattedEvent(copyType, _selectedEvents.Value[0]));
+
+            return;
+        }
 
         StringBuilder stringToCopy = new();
 
+        foreach (var selectedEvent in _selectedEvents.Value)
+        {
+            stringToCopy.AppendLine(GetFormattedEvent(copyType, selectedEvent));
+        }
+
+        Clipboard.SetTextAsync(stringToCopy.ToString());
+    }
+
+    private string GetFormattedEvent(CopyType? copyType, DisplayEventModel @event)
+    {
         switch (copyType ?? _settingsState.Value.Config.CopyType)
         {
             case CopyType.Simple:
-                stringToCopy.Append($"\"{_selectedEvent.Value.Level}\" ");
-                stringToCopy.Append($"\"{_selectedEvent.Value.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
-                stringToCopy.Append($"\"{_selectedEvent.Value.Source}\" ");
-                stringToCopy.Append($"\"{_selectedEvent.Value.Id}\" ");
-                stringToCopy.Append($"\"{_selectedEvent.Value.Description}\"");
+                StringBuilder simpleEvent = new();
 
-                Clipboard.SetTextAsync(stringToCopy.ToString());
+                simpleEvent.Append($"\"{@event.Level}\" ");
+                simpleEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                simpleEvent.Append($"\"{@event.Source}\" ");
+                simpleEvent.Append($"\"{@event.Id}\" ");
+                simpleEvent.Append($"\"{@event.Description}\"");
 
-                break;
+                return simpleEvent.ToString();
             case CopyType.Xml:
-                Clipboard.SetTextAsync(XElement.Parse(_selectedEvent.Value.Xml).ToString());
-
-                break;
+                return XElement.Parse(@event.Xml).ToString();
             case CopyType.Full:
             default:
-                stringToCopy.AppendLine($"Log Name: {_selectedEvent.Value.LogName}");
-                stringToCopy.AppendLine($"Source: {_selectedEvent.Value.Source}");
-                stringToCopy.AppendLine($"Date: {_selectedEvent.Value.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
-                stringToCopy.AppendLine($"Event ID: {_selectedEvent.Value.Id}");
-                stringToCopy.AppendLine($"Task Category: {_selectedEvent.Value.TaskCategory}");
-                stringToCopy.AppendLine($"Level: {_selectedEvent.Value.Level}");
-                stringToCopy.AppendLine(_selectedEvent.Value.KeywordsDisplayNames.GetEventKeywords());
-                stringToCopy.AppendLine("User:"); // TODO: Update after DisplayEventModel is updated
-                stringToCopy.AppendLine($"Computer: {_selectedEvent.Value.ComputerName}");
-                stringToCopy.AppendLine("Description:");
-                stringToCopy.AppendLine(_selectedEvent.Value.Description);
-                stringToCopy.AppendLine("Event Xml:");
-                stringToCopy.AppendLine(XElement.Parse(_selectedEvent.Value.Xml).ToString());
+                StringBuilder fullEvent = new();
 
-                Clipboard.SetTextAsync(stringToCopy.ToString());
+                fullEvent.AppendLine($"Log Name: {@event.LogName}");
+                fullEvent.AppendLine($"Source: {@event.Source}");
+                fullEvent.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
+                fullEvent.AppendLine($"Event ID: {@event.Id}");
+                fullEvent.AppendLine($"Task Category: {@event.TaskCategory}");
+                fullEvent.AppendLine($"Level: {@event.Level}");
+                fullEvent.AppendLine(@event.KeywordsDisplayNames.GetEventKeywords());
+                fullEvent.AppendLine($"User: {@event.UserId}");
+                fullEvent.AppendLine($"Computer: {@event.ComputerName}");
+                fullEvent.AppendLine("Description:");
+                fullEvent.AppendLine(@event.Description);
+                fullEvent.AppendLine("Event Xml:");
+                fullEvent.AppendLine(XElement.Parse(@event.Xml).ToString());
 
-                break;
+                return fullEvent.ToString();
         }
     }
 }

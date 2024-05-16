@@ -62,10 +62,12 @@ window.enableColumnResize = (table) => {
 window.registerKeyHandlers = (table) => {
     const selectAdjacentRow = function(direction) {
         const tableRows = table.getElementsByTagName("tr");
-        const selectedRow = table.getElementsByClassName("selected")[0];
+        const focusedRow = document.activeElement;
+
+        if (focusedRow.tagName.toLowerCase() !== "tr") { return; }
 
         for (let i = 0; i < tableRows.length; i++) {
-            if (tableRows[i] === selectedRow) {
+            if (tableRows[i] === focusedRow) {
                 tableRows[i + direction].focus();
 
                 break;

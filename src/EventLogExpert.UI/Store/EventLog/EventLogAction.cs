@@ -33,7 +33,12 @@ public sealed record EventLogAction
 
     public sealed record OpenLog(string LogName, LogType LogType, CancellationToken Token = default);
 
-    public sealed record SelectEvent(DisplayEventModel? SelectedEvent);
+    public sealed record SelectEvent(
+        DisplayEventModel SelectedEvent,
+        bool IsMultiSelect = false,
+        bool ShouldStaySelected = false);
+
+    public sealed record SelectEvents(IEnumerable<DisplayEventModel> SelectedEvents);
 
     public sealed record SetContinouslyUpdate(bool ContinuouslyUpdate);
 

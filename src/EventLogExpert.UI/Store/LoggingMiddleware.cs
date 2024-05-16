@@ -69,6 +69,11 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                     $"{selectEventAction.SelectedEvent?.Source} event ID {selectEventAction.SelectedEvent?.Id}.");
 
                 break;
+            case EventLogAction.SelectEvents selectEventsAction:
+                _debugLogger.Trace($"Action: {nameof(EventLogAction.SelectEvents)} selected " +
+                    $"{selectEventsAction.SelectedEvents.Count()} events");
+
+                break;
             case StatusBarAction.SetEventsLoading:
                 _debugLogger.Trace($"Action: {action.GetType()} {JsonSerializer.Serialize(action, _serializerOptions)}", LogLevel.Debug);
                 break;

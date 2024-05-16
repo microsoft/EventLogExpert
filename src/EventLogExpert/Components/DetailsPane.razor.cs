@@ -9,6 +9,7 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.Components;
 
@@ -26,7 +27,7 @@ public sealed partial class DetailsPane
 
     private DisplayEventModel? SelectedEvent { get; set; }
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEventSelection { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventSelection { get; init; } = null!;
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
@@ -42,11 +43,11 @@ public sealed partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        SelectedEventSelection.Select(s => s.SelectedEvent);
+        SelectedEventSelection.Select(s => s.SelectedEvents);
 
-        SelectedEventSelection.SelectedValueChanged += (s, selectedEvent) =>
+        SelectedEventSelection.SelectedValueChanged += (s, selectedEvents) =>
         {
-            SelectedEvent = selectedEvent;
+            SelectedEvent = selectedEvents.LastOrDefault();
 
             if (SelectedEvent is not null &&
                 (!_hasOpened || SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange))
