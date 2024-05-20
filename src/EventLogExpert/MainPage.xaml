@@ -35,11 +35,13 @@
         </MenuBarItem>
         <MenuBarItem Text="Edit">
             <MenuFlyoutItem Text="Copy Selected" x:Name="CopySelected"
-                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
+                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Default}" />
             <MenuFlyoutItem Text="Copy Selected (Simple)" x:Name="CopySelectedSimple"
                             Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
             <MenuFlyoutItem Text="Copy Selected (XML)" x:Name="CopySelectedXml"
                             Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
+            <MenuFlyoutItem Text="Copy Selected (Full)" x:Name="CopySelectedFull"
+                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
             <MenuFlyoutItem Text="Save All Filters" Clicked="SaveAllFilters_Clicked" />
             <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
         </MenuBarItem>

@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
@@ -19,16 +20,20 @@ public interface IClipboardService
 
 public sealed class ClipboardService : IClipboardService
 {
+    private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
     private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
     private readonly IState<SettingsState> _settingsState;
 
     public ClipboardService(
+        IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
         IState<SettingsState> settingsState)
     {
+        _eventTableColumns = eventTableColumns;
         _selectedEvents = selectedEvents;
         _settingsState = settingsState;
 
+        _eventTableColumns.Select(s => s.Columns);
         _selectedEvents.Select(s => s.SelectedEvents);
     }
 
@@ -57,6 +62,53 @@ public sealed class ClipboardService : IClipboardService
     {
         switch (copyType ?? _settingsState.Value.Config.CopyType)
         {
+            case CopyType.Default:
+                StringBuilder defaultEvent = new();
+
+                foreach ((ColumnName column, _) in _eventTableColumns.Value.Where(x => x.Value))
+                {
+                    switch (column)
+                    {
+                        case ColumnName.Level:
+                            defaultEvent.Append($"\"{@event.Level}\" ");
+                            break;
+                        case ColumnName.DateAndTime:
+                            defaultEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                            break;
+                        case ColumnName.ActivityId:
+                            defaultEvent.Append($"\"{@event.ActivityId}\" ");
+                            break;
+                        case ColumnName.Log:
+                            defaultEvent.Append($"\"{@event.OwningLog.Split("\\").Last()}\" ");
+                            break;
+                        case ColumnName.ComputerName:
+                            defaultEvent.Append($"\"{@event.ComputerName}\" ");
+                            break;
+                        case ColumnName.Source:
+                            defaultEvent.Append($"\"{@event.Source}\" ");
+                            break;
+                        case ColumnName.EventId:
+                            defaultEvent.Append($"\"{@event.Id}\" ");
+                            break;
+                        case ColumnName.TaskCategory:
+                            defaultEvent.Append($"\"{@event.TaskCategory}\" ");
+                            break;
+                        case ColumnName.Keywords:
+                            defaultEvent.Append($"\"{string.Join(", ", @event.KeywordsDisplayNames)}\" ");
+                            break;
+                        case ColumnName.ProcessId:
+                            defaultEvent.Append($"\"{@event.ProcessId}\" ");
+                            break;
+                        case ColumnName.ThreadId:
+                            defaultEvent.Append($"\"{@event.ThreadId}\" ");
+                            break;
+                        case ColumnName.User:
+                            defaultEvent.Append($"\"{@event.UserId}\" ");
+                            break;
+                    }
+                }
+
+                return defaultEvent.Append($"\"{@event.Description}\"").ToString();
             case CopyType.Simple:
                 StringBuilder simpleEvent = new();
 
