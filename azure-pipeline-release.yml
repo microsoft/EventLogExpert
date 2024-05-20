@@ -9,7 +9,7 @@ steps:
 - task: UseDotNet@2
   displayName: 'Install .NET SDK'
   inputs:
-    version: '8.0.204'
+    version: '8.x'
     performMultiLevelLookup: true
 
 - script: dotnet workload restore src/EventLogExpert.sln
