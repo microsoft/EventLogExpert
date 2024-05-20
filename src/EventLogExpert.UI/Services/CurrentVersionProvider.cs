@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Security.Principal;
 using Windows.ApplicationModel;
 
 namespace EventLogExpert.UI.Services;
@@ -8,6 +9,8 @@ namespace EventLogExpert.UI.Services;
 public interface ICurrentVersionProvider
 {
     Version CurrentVersion { get; }
+
+    bool IsAdmin { get; }
 
     bool IsDevBuild { get; }
 
@@ -23,6 +26,17 @@ public class CurrentVersionProvider : ICurrentVersionProvider
     }
 
     public Version CurrentVersion { get; init; }
+
+    public bool IsAdmin
+    {
+        get
+        {
+            var identity = WindowsIdentity.GetCurrent();
+            WindowsPrincipal principal = new(identity);
+
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+    }
 
     public bool IsDevBuild => CurrentVersion.Major <= 1;
 

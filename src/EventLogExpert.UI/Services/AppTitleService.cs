@@ -66,6 +66,11 @@ public sealed class AppTitleService(
             title.Append($" {versionProvider.CurrentVersion}");
         }
 
+        if (versionProvider.IsAdmin)
+        {
+            title.Append(" (Admin)");
+        }
+
         titleProvider.SetTitle(title.ToString());
     }
 }
