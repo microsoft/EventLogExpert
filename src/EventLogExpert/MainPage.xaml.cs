@@ -406,19 +406,23 @@ public sealed partial class MainPage : ContentPage, IDisposable
             CopySelected.KeyboardAccelerators.Clear();
             CopySelectedSimple.KeyboardAccelerators.Clear();
             CopySelectedXml.KeyboardAccelerators.Clear();
+            CopySelectedFull.KeyboardAccelerators.Clear();
 
             switch (_settingsState.Value.Config.CopyType)
             {
-                case CopyType.Full :
+                case CopyType.Default:
                     CopySelected.KeyboardAccelerators.Add(CopyShortcut);
                     break;
-                case CopyType.Simple :
+                case CopyType.Simple:
                     CopySelectedSimple.KeyboardAccelerators.Add(CopyShortcut);
                     break;
-                case CopyType.Xml :
+                case CopyType.Xml:
                     CopySelectedXml.KeyboardAccelerators.Add(CopyShortcut);
                     break;
-                default : throw new ArgumentOutOfRangeException();
+                case CopyType.Full:
+                    CopySelectedFull.KeyboardAccelerators.Add(CopyShortcut);
+                    break;
+                default: throw new ArgumentOutOfRangeException();
             }
         });
     }

@@ -29,9 +29,10 @@ public enum ColumnName
 
 public enum CopyType
 {
-    Full,
+    Default,
     Simple,
-    Xml
+    Xml,
+    Full
 }
 
 public enum HighlightColor
