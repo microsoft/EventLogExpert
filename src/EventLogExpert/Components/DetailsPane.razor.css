@@ -32,6 +32,11 @@
     cursor: n-resize;
 }
 
+#details-header {
+    user-select: none;
+    cursor: pointer;
+}
+
 .details-group { display: contents; }
 
     .details-group[data-toggle="true"] { display: none; }
@@ -47,6 +52,8 @@
 .details-row-xml {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
+    user-select: none;
+    cursor: pointer;
 
     & .button-primary { width: 6rem; }
 }

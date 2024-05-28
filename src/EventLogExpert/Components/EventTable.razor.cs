@@ -81,14 +81,6 @@ public sealed partial class EventTable
             _ => string.Empty,
         };
 
-    private void DragSelectEvent(MouseEventArgs args, DisplayEventModel @event)
-    {
-        if (args.Buttons == 1)
-        {
-            Dispatcher.Dispatch(new EventLogAction.SelectEvent(@event, IsMultiSelect: true, ShouldStaySelected: !args.CtrlKey));
-        }
-    }
-
     private string GetCss(DisplayEventModel @event) =>
         _selectedEventState.Contains(@event) ? "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
 
