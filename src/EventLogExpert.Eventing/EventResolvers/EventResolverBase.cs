@@ -36,21 +36,13 @@ public partial class EventResolverBase
     ///     The mappings from the outType attribute in the EventModel XML template
     ///     to determine if it should be displayed as Hex.
     /// </summary>
-    private static readonly Dictionary<string, bool> XmlHexMappings = new()
-    {
-        { "win:HexInt32", true },
-        { "win:HexInt64", true },
-        { "win:Pointer", true },
-        { "win:SID", false },
-        { "win:UnicodeString", false },
-        { "win:Win32Error", true },
-        { "xs:dateTime", false },
-        { "xs:GUID", false },
-        { "xs:string", false },
-        { "xs:unsignedByte", true },
-        { "xs:unsignedInt", false },
-        { "xs:unsignedLong", false }
-    };
+    private static readonly List<string> DisplayAsHexTypes =
+    [
+        "win:HexInt32",
+        "win:HexInt64",
+        "win:Pointer",
+        "win:Win32Error",
+    ];
 
     protected readonly Action<string, LogLevel> _tracer;
 
@@ -328,9 +320,9 @@ public partial class EventResolverBase
                         continue;
                     }
 
-                    if (XmlHexMappings.TryGetValue(outType, out bool isHex))
+                    if (DisplayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
                     {
-                        providers.Add(isHex ? $"0x{properties[i].Value:X}" : $"{properties[i].Value}");
+                        providers.Add($"0x{properties[i].Value:X}");
                     }
                     else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) &&
                         properties[i].Value is int hResult)
