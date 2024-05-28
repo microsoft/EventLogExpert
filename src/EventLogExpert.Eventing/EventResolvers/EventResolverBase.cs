@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -144,12 +145,11 @@ public partial class EventResolverBase
                     var endParameterId = propString.IndexOf(' ');
                     var parameterIdString = endParameterId > 2 ? propString[2..endParameterId] : propString[2..];
 
-                    if (int.TryParse(parameterIdString, out var parameterId))
+                    if (long.TryParse(parameterIdString, out var parameterId))
                     {
-                        var parameterMessage = parameters.FirstOrDefault(m => m.ShortId == parameterId);
-
-                        // Fallback to use RawId if ShortId is not found, GP is one provider that uses this to indicate additional information
-                        parameterMessage ??= parameters.FirstOrDefault(m => m.RawId == parameterId);
+                        // Some parameters exceed int size and need to be cast from long to int
+                        // because they are actually negative numbers
+                        var parameterMessage = parameters.FirstOrDefault(m => m.RawId == (int)parameterId);
 
                         if (parameterMessage is not null)
                         {
@@ -177,7 +177,7 @@ public partial class EventResolverBase
         {
             _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
 
-            return "Unable to resolve description, see XML for more details.";
+            return "Failed to resolve description, see XML for more details.";
         }
     }
 
@@ -321,9 +321,23 @@ public partial class EventResolverBase
                     providers.Add(sid.Value);
                     continue;
                 default:
-                    if (!string.IsNullOrEmpty(outType) && XmlHexMappings.TryGetValue(outType, out bool isHex))
+                    if (string.IsNullOrEmpty(outType))
+                    {
+                        providers.Add($"{properties[i].Value}");
+
+                        continue;
+                    }
+
+                    if (XmlHexMappings.TryGetValue(outType, out bool isHex))
                     {
                         providers.Add(isHex ? $"0x{properties[i].Value:X}" : $"{properties[i].Value}");
+                    }
+                    else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) &&
+                        properties[i].Value is int hResult)
+                    {
+                        providers.Add(hResult == 0 ?
+                            "The operation completed successfully." :
+                            $"{Marshal.GetExceptionForHR(hResult)?.Message ?? properties[i].Value}");
                     }
                     else
                     {
