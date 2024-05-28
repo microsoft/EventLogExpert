@@ -161,11 +161,11 @@ public static class FilterMethods
             case FilterEvaluator.NotEqual:
                 if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{filterModel.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{filterModel.Data.Value}\"");
+                    stringBuilder.Append($"\"{filterModel.Data.Value?.Replace("\"", "\'")}\"");
                 }
 
                 break;
@@ -173,11 +173,11 @@ public static class FilterMethods
             case FilterEvaluator.NotContains:
                 if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{filterModel.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{filterModel.Data.Value}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{filterModel.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
@@ -286,11 +286,11 @@ public static class FilterMethods
             case FilterEvaluator.NotEqual:
                 if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{subFilter.Data.Value?.Replace("\"", "\\\"")}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{subFilter.Data.Value}\"");
+                    stringBuilder.Append($"\"{subFilter.Data.Value?.Replace("\"", "\\\"")}\"");
                 }
 
                 break;
@@ -298,11 +298,11 @@ public static class FilterMethods
             case FilterEvaluator.NotContains:
                 if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
                 {
-                    stringBuilder.Append($"(\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{subFilter.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{subFilter.Data.Value}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{subFilter.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
