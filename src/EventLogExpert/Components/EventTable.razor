@@ -34,8 +34,7 @@
         @if (_currentTable is not null)
         {
             <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
-                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")"
-                    @onmouseenter="args => DragSelectEvent(args, evt)" @onmousedown="args => SelectEvent(args, evt)" tabindex="0">
+                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" tabindex="0">
                     @foreach ((ColumnName column, bool _) in _eventTableState.Columns.Where(column => column.Value))
                     {
                         <td>
