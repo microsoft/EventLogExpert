@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
@@ -16,6 +17,20 @@ namespace EventLogExpert.Eventing.EventResolvers;
 
 public partial class EventResolverBase
 {
+    /// <summary>
+    ///     The mappings from the outType attribute in the EventModel XML template
+    ///     to determine if it should be displayed as Hex.
+    /// </summary>
+    private static readonly List<string> DisplayAsHexTypes =
+    [
+        "win:HexInt32",
+        "win:HexInt64",
+        "win:Pointer",
+        "win:Win32Error"
+    ];
+
+    private static readonly ConcurrentDictionary<string, string[]> FormattedPropertiesCache = [];
+
     /// <summary>
     ///     These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords. However, the names
     ///     there do not match what is normally displayed in Event Viewer. We redefine them here so we can use our own strings.
@@ -31,18 +46,6 @@ public partial class EventResolverBase
         { 0x40000000000000, "Correlation Hint" },
         { 0x80000000000000, "Classic" }
     };
-
-    /// <summary>
-    ///     The mappings from the outType attribute in the EventModel XML template
-    ///     to determine if it should be displayed as Hex.
-    /// </summary>
-    private static readonly List<string> DisplayAsHexTypes =
-    [
-        "win:HexInt32",
-        "win:HexInt64",
-        "win:Pointer",
-        "win:Win32Error",
-    ];
 
     protected readonly Action<string, LogLevel> _tracer;
 
@@ -287,17 +290,31 @@ public partial class EventResolverBase
 
     private static List<string> GetFormattedProperties(string? template, IList<EventProperty> properties)
     {
+        string[]? dataNodes = null;
         List<string> providers = [];
-        XElement[]? dataNodes = null;
 
         if (!string.IsNullOrWhiteSpace(template))
         {
-            dataNodes = XElement.Parse(template).Descendants().ToArray();
+            if (FormattedPropertiesCache.TryGetValue(template, out var values))
+            {
+                dataNodes = values;
+            }
+            else
+            {
+                dataNodes = XElement.Parse(template)
+                    .Descendants()
+                    .Attributes()
+                    .Where(a => a.Name == "outType")
+                    .Select(a => a.Value)
+                    .ToArray();
+
+                FormattedPropertiesCache.TryAdd(template, dataNodes);
+            }
         }
 
         for (int i = 0; i < properties.Count; i++)
         {
-            string? outType = dataNodes?[i].Attributes().FirstOrDefault(a => a.Name == "outType")?.Value;
+            string? outType = dataNodes?[i];
 
             switch (properties[i].Value)
             {
