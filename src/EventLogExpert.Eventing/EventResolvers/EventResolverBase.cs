@@ -7,7 +7,6 @@ using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Diagnostics.Eventing.Reader;
-using System.Runtime.InteropServices;
 using System.Security.Principal;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -344,9 +343,7 @@ public partial class EventResolverBase
                     else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) &&
                         properties[i].Value is int hResult)
                     {
-                        providers.Add(hResult == 0 ?
-                            "The operation completed successfully." :
-                            $"{Marshal.GetExceptionForHR(hResult)?.Message ?? properties[i].Value}");
+                        providers.Add(ResolverMethods.GetErrorMessage((uint)hResult));
                     }
                     else
                     {
