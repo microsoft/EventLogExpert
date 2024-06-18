@@ -13,19 +13,19 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
+public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
     public string Status { get; private set; } = string.Empty;
 
     public event EventHandler<string>? StatusChanged;
 
-    private ImmutableArray<EventProviderDbContext> dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
+    private ImmutableArray<EventProviderDbContext> _dbContexts = [];
 
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
-    private readonly SemaphoreSlim _databaseAccessSemaphore = new SemaphoreSlim(1);
+    private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
 
-    private bool disposedValue;
+    private bool _disposedValue;
 
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s, log) => { }) { }
 
@@ -49,12 +49,12 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
         _providerDetails.Clear();
 
-        foreach (var context in dbContexts)
+        foreach (var context in _dbContexts)
         {
             context.Dispose();
         }
 
-        dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
+        _dbContexts = [];
 
         var databasesToLoad = SortDatabases(databasePaths);
 
@@ -80,18 +80,18 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             newContexts.Add(c);
         }
 
-        dbContexts = newContexts.ToImmutableArray();
+        _dbContexts = [.. newContexts];
 
-        if (obsoleteDbs.Any())
+        if (obsoleteDbs.Count > 0)
         {
-            foreach (var db in dbContexts)
+            foreach (var db in _dbContexts)
             {
                 db.Dispose();
             }
 
-            dbContexts = ImmutableArray<EventProviderDbContext>.Empty;
+            _dbContexts = [];
 
-            throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(db => Path.GetFileName(db))));
+            throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(Path.GetFileName)));
         }
     }
 
@@ -108,10 +108,10 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
     {
         if (!databasePaths.Any())
         {
-            return Array.Empty<string>();
+            return [];
         }
 
-        var r = new Regex("^(.+) (\\S+)$");
+        var r = SplitProductAndVersionRegex();
 
         return databasePaths
             .Select(path =>
@@ -140,11 +140,10 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             })
             .OrderBy(n => n.FirstPart)
             .ThenByDescending(n => n.SecondPart)
-            .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart))
-            .ToList();
+            .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart));
     }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
     {
         DisplayEventModel? lastResult = null;
 
@@ -152,12 +151,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         // and we pass this value separately from the eventRecord so it can be reused.
         var eventProperties = eventRecord.Properties;
 
-        if (_providerDetails.ContainsKey(eventRecord.ProviderName))
+        if (_providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails))
         {
-            _providerDetails.TryGetValue(eventRecord.ProviderName, out ProviderDetails? providerDetails);
-            if (providerDetails != null)
+            if (providerDetails is not null)
             {
-                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
+                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, owningLogName);
             }
         }
         else
@@ -166,20 +164,20 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
             try
             {
-                foreach (var dbContext in dbContexts)
+                foreach (var dbContext in _dbContexts)
                 {
-                    var providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
-                    if (providerDetails != null)
+                    providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
+
+                    if (providerDetails is null) { continue; }
+
+                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, owningLogName);
+
+                    if (!string.IsNullOrEmpty(lastResult.Description))
                     {
-                        lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
+                        _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
+                        _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
 
-                        if (lastResult?.Description != null)
-                        {
-                            _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
-                            _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
-
-                            return lastResult;
-                        }
+                        return lastResult;
                     }
                 }
             }
@@ -194,7 +192,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
             }
         }
 
-        if (lastResult == null)
+        if (lastResult is null)
         {
             return new DisplayEventModel(
                 eventRecord.RecordId,
@@ -212,13 +210,8 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
                 eventRecord.ThreadId,
                 eventRecord.UserId,
                 eventRecord.LogName,
-                OwningLogName,
+                owningLogName,
                 eventRecord.ToXml());
-        }
-
-        if (lastResult.Description == null)
-        {
-            lastResult = lastResult with { Description = "" };
         }
 
         return lastResult;
@@ -226,11 +219,11 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
             if (disposing)
             {
-                foreach (var context in dbContexts)
+                foreach (var context in _dbContexts)
                 {
                     context.Dispose();
                 }
@@ -238,7 +231,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
 
             _providerDetails.Clear();
 
-            disposedValue = true;
+            _disposedValue = true;
 
             _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Information);
         }
@@ -249,4 +242,7 @@ public class EventProviderDatabaseEventResolver : EventResolverBase, IEventResol
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
+
+    [GeneratedRegex("^(.+) (\\S+)$")]
+    private static partial Regex SplitProductAndVersionRegex();
 }

@@ -15,7 +15,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Resolves event descriptions by using our own logic to look up
 ///     message strings in the providers available on the local machine.
 /// </summary>
-public class LocalProviderEventResolver : EventResolverBase, IEventResolver
+public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
 {
     public string Status { get; private set; } = string.Empty;
 
@@ -23,23 +23,19 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
 
     private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
-    private bool disposedValue;
+    private bool _disposedValue;
 
-    public LocalProviderEventResolver() : base((s, log) => Debug.WriteLine(s)) { }
+    public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
-    public LocalProviderEventResolver(Action<string, LogLevel> tracer) : base(tracer) { }
-
-    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
+    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
     {
-        if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
+        if (!_providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails))
         {
-            var provider = new EventMessageProvider(eventRecord.ProviderName, _tracer);
-            _providerDetails.TryAdd(eventRecord.ProviderName, provider.LoadProviderDetails());
+            providerDetails = new EventMessageProvider(eventRecord.ProviderName, _tracer).LoadProviderDetails();
+            _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
         }
 
-        _providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails);
-
-        if (providerDetails == null)
+        if (providerDetails is null)
         {
             return new DisplayEventModel(
                 eventRecord.RecordId,
@@ -57,31 +53,20 @@ public class LocalProviderEventResolver : EventResolverBase, IEventResolver
                 eventRecord.ThreadId,
                 eventRecord.UserId,
                 eventRecord.LogName,
-                OwningLogName,
+                owningLogName,
                 eventRecord.ToXml());
         }
 
-        // The Properties getter is expensive, so we only call the getter once,
-        // and we pass this value separately from the eventRecord so it can be reused.
-        var eventProperties = eventRecord.Properties;
-
-        var result = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, OwningLogName);
-
-        if (result.Description == null)
-        {
-            result = result with { Description = "" };
-        }
-
-        return result;
+        return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, providerDetails, owningLogName);
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
             _providerDetails.Clear();
 
-            disposedValue = true;
+            _disposedValue = true;
         }
     }
 
