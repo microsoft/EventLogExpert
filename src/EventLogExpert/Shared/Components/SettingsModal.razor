@@ -30,7 +30,16 @@
                     @foreach (var database in _databases.OrderBy(x => x.name))
                     {
                         <div class="flex-space-between">
-                            <span>@database.name</span>
+                            <div>
+                                <span>@database.name</span>
+
+                                @if (!SettingsState.Value.LoadedDatabases.Contains(database.name))
+                                {
+                                    <button class="button button-red" type="button" @onclick="() => RemoveDatabase(database.name)">
+                                        <i class="bi bi-dash-circle"></i>
+                                    </button>
+                                }
+                            </div>
                             <BooleanSelect Value="database.isEnabled" ValueChanged="() => ToggleDatabase(database.name)" />
                         </div>
                     }

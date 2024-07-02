@@ -17,6 +17,7 @@ public sealed partial class SettingsModal
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
 
+    private bool _databaseRemoved = false;
     private SettingsModel _request = new();
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
@@ -28,6 +29,21 @@ public sealed partial class SettingsModal
     [Inject] private FileLocationOptions FileLocationOptions { get; init; } = null!;
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
+
+    protected internal override Task Close()
+    {
+        if (_databaseRemoved)
+        {
+            Dispatcher.Dispatch(
+                new SettingsAction.SaveDisabledDatabases(
+                    _databases
+                        .Where(db => !db.isEnabled)
+                        .Select(db => db.name)
+                        .ToList()));
+        }
+
+        return base.Close();
+    }
 
     protected override void OnInitialized()
     {
@@ -141,6 +157,30 @@ public sealed partial class SettingsModal
         }
     }
 
+    private async Task RemoveDatabase(string name)
+    {
+        try
+        {
+            var databaseDirectory = new DirectoryInfo(FileLocationOptions.DatabasePath);
+
+            // Using wildcard to also remove the db-shm and db-wal files
+            foreach (var file in databaseDirectory.GetFiles($"{name}*"))
+            {
+                file.Delete();
+            }
+
+            _databases.RemoveAll(db => string.Equals(db.name, name));
+
+            _databaseRemoved = true;
+        }
+        catch (Exception ex)
+        {
+            await AlertDialogService.ShowAlert("Failed to Remove Database",
+                $"An exception occurred while removing provider databases: {ex.Message}",
+                "OK");
+        }
+    }
+
     private async Task Save()
     {
         if (!SettingsState.Value.Config.Equals(_request))
@@ -156,8 +196,6 @@ public sealed partial class SettingsModal
                         .Where(db => !db.isEnabled)
                         .Select(db => db.name)
                         .ToList()));
-
-            Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
             await ReloadOpenLogs();
         }

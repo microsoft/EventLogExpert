@@ -57,8 +57,9 @@ public sealed class SettingsEffects(
     public Task HandleSaveDisabledDatabases(SettingsAction.SaveDisabledDatabases action, IDispatcher dispatcher)
     {
         preferencesProvider.DisabledDatabasesPreference = action.Databases;
-        
+
         dispatcher.Dispatch(new SettingsAction.SaveDisabledDatabasesCompleted(action.Databases));
+        dispatcher.Dispatch(new SettingsAction.LoadDatabases());
 
         return Task.CompletedTask;
     }

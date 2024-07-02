@@ -13,7 +13,7 @@ public abstract class BaseModal : FluxorComponent
 
     [Inject] protected IJSRuntime JSRuntime { get; init; } = null!;
 
-    protected internal async Task Close() => await JSRuntime.InvokeVoidAsync("closeModal", ElementReference);
+    protected internal virtual async Task Close() => await JSRuntime.InvokeVoidAsync("closeModal", ElementReference);
 
-    protected internal async Task Open() => await JSRuntime.InvokeVoidAsync("openModal", ElementReference);
+    protected internal virtual async Task Open() => await JSRuntime.InvokeVoidAsync("openModal", ElementReference);
 }
