@@ -3,8 +3,8 @@
 
 <div aria-label="@AriaLabel" class="toggle" role="radiogroup">
     <input aria-label="@DisabledString" checked="@(!Value)" id="@Id false" name="@Id" @onchange="UpdateValue" type="radio" value="false" />
-    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id false">@DisabledString</label>
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id false" @onkeydown="ToggleValue" tabindex="0">@DisabledString</label>
 
     <input aria-label="@EnabledString" checked="@(Value)" id="@Id true" name="@Id" @onchange="UpdateValue" type="radio" value="true" />
-    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id true">@EnabledString</label>
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id true" @onkeydown="ToggleValue" tabindex="0">@EnabledString</label>
 </div>
