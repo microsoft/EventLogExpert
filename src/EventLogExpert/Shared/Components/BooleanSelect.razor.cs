@@ -8,6 +8,8 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class BooleanSelect : BaseComponent<bool>
 {
+    [Parameter] public string AriaLabel { get; set; } = string.Empty;
+
     [Parameter] public string DisabledString { get; set; } = "Disabled";
 
     [Parameter] public string EnabledString { get; set; } = "Enabled";

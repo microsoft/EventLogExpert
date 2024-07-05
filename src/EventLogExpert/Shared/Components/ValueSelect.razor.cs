@@ -17,6 +17,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
     private bool _preventDefault;
     private ElementReference _selectComponent;
 
+    [Parameter] public string AriaLabel { get; set; } = string.Empty;
+
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 

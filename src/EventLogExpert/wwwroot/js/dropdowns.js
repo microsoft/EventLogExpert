@@ -9,6 +9,7 @@ window.registerDropdown = (root) => {
             if (force === false && target.contains(document.activeElement)) { return; }
 
             dropdown.removeAttribute("data-toggle");
+            dropdown.setAttribute("aria-expanded", "false");
 
             dropdown.style.position = false;
             dropdown.style.top = false;
@@ -38,6 +39,7 @@ window.registerDropdown = (root) => {
         dropdown.style.width = `${bounds.width}px`;
 
         dropdown.setAttribute("data-toggle", "");
+        dropdown.setAttribute("aria-expanded", "true");
 
         scrollToSelectedItem();
     }
@@ -56,7 +58,6 @@ window.registerDropdown = (root) => {
         toggleDropdown(e);
     });
     input.addEventListener("blur", (e) => closeDropdown(e));
-    input.addEventListener("focusin", (e) => openDropdown());
 
     dropdown.addEventListener("blur", (e) => closeDropdown(e));
 };
@@ -65,6 +66,7 @@ window.closeDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     dropdown.removeAttribute("data-toggle");
+    dropdown.setAttribute("aria-expanded", "false");
 
     dropdown.style.position = false;
     dropdown.style.top = false;
@@ -84,6 +86,7 @@ window.openDropdown = (root) => {
     dropdown.style.width = `${bounds.width}px`;
 
     dropdown.setAttribute("data-toggle", "");
+    dropdown.setAttribute("aria-expanded", "true");
 
     scrollToSelectedItem(root);
 };
