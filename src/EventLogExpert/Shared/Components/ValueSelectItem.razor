@@ -1,7 +1,7 @@
 @typeparam T
 
 <div class="@CssClass" highlighted="@(_parent.HighlightedItem?.Equals(this) ?? false)" @onmousedown="SelectItem"
-    @onmouseenter="HighlightItem" selected="@_isSelected">
+    @onmouseenter="HighlightItem" role="menuitem" selected="@_isSelected">
     @if (ChildContent is not null)
     {
         @ChildContent

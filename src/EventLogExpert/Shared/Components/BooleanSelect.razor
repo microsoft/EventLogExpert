@@ -1,9 +1,10 @@
-@inherits Base.BaseComponent<bool>
+@using EventLogExpert.Shared.Base
+@inherits BaseComponent<bool>
 
-<div class="toggle">
-    <input type="radio" id="@Id false" name="@Id" value="false" checked="@(!Value)" @onchange="UpdateValue" />
-    <label for="@Id false" data-single-color="@IsSingleColor.ToString().ToLower()">@DisabledString</label>
+<div aria-label="@AriaLabel" class="toggle" role="radiogroup">
+    <input aria-label="@DisabledString" checked="@(!Value)" id="@Id false" name="@Id" @onchange="UpdateValue" type="radio" value="false" />
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id false">@DisabledString</label>
 
-    <input type="radio" id="@Id true" name="@Id" value="true" checked="@(Value)" @onchange="UpdateValue" />
-    <label for="@Id true" data-single-color="@IsSingleColor.ToString().ToLower()">@EnabledString</label>
+    <input aria-label="@EnabledString" checked="@(Value)" id="@Id true" name="@Id" @onchange="UpdateValue" type="radio" value="true" />
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id true">@EnabledString</label>
 </div>
