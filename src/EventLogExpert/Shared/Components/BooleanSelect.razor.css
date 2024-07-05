@@ -32,8 +32,7 @@
 .toggle input:checked + label:first-of-type {
     background-color: var(--clr-red);
     box-shadow: none;
-    color: #fff;
-    opacity: 0.75;
+    color: var(--clr-white);
 
     &[data-single-color="true"] {
         background-color: var(--clr-lightblue);
@@ -45,7 +44,6 @@
     background-color: var(--clr-green);
     box-shadow: none;
     color: var(--clr-black);
-    opacity: 0.75;
 
     &[data-single-color="true"] { background-color: var(--clr-lightblue); }
 }

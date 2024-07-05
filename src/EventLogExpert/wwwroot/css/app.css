@@ -4,11 +4,11 @@
 :root {
     --clr-lightblue: #9CDCFE;
     --clr-lightgray: #A4B9C0;
-    --clr-white: #eee;
-    --clr-black: #111;
-    --clr-red: #ee0d0d;
-    --clr-green: #0dee0d;
-    --clr-yellow: #eeff0d;
+    --clr-white: #FFF;
+    --clr-black: #000;
+    --clr-red: #D03B2D;
+    --clr-green: #5AC358;
+    --clr-yellow: #F8C84B;
 
     --clr-statusbar: #3C64E7;
 

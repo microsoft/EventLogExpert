@@ -7,7 +7,7 @@
         <ResourceDictionary>
 
             <Color x:Key="PageBackgroundColor">#3C64E7</Color>
-            <Color x:Key="PrimaryTextColor">#eee</Color>
+            <Color x:Key="PrimaryTextColor">#000</Color>
 
             <Style TargetType="Label">
                 <Setter Property="TextColor" Value="{DynamicResource PrimaryTextColor}" />
