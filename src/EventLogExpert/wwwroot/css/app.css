@@ -10,7 +10,7 @@
     --clr-green: #5AC358;
     --clr-yellow: #F8C84B;
 
-    --clr-statusbar: #3C64E7;
+    --clr-statusbar: #426EE2;
 
     --background-dark: #222222;
     --background-darkgray: #353535;
@@ -281,21 +281,6 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     margin: 0 0.5rem;
 
     & > .input { margin: 0; }
-
-    & span {
-        display: inherit;
-        user-select: none;
-    }
-
-    & label > i {
-        position: absolute;
-        right: 2px;
-        cursor: pointer;
-
-        color: #fff;
-
-        &[data-toggle="true"] { transform: translateY(10%) rotate(-180deg); }
-    }
 }
 
 .dropdown-list {
