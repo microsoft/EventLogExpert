@@ -95,32 +95,32 @@ public partial class EventResolverBase
             // when the entire description is a string literal, and there is no provider DLL needed.
             // Found a few providers that have their properties wrapped with \r\n for some reason
             return properties.Count == 1 ?
-                properties[0].Trim(['\r', '\n']) :
+                properties[0].Trim(['\0', '\r', '\n']) :
                 "Unable to resolve description, see XML for more details.";
         }
 
-        string description = descriptionTemplate
+        var matches = _sectionsToReplace.Matches(descriptionTemplate);
+
+        ReadOnlySpan<char> description = descriptionTemplate
             .Replace("\r\n%n", " \r\n")
             .Replace("%n\r\n", "\r\n ")
             .Replace("%n", "\r\n");
 
-        var matches = _sectionsToReplace.Matches(description);
-
         if (matches.Count <= 0)
         {
-            return description.TrimEnd(['\r', '\n']);
+            return description.TrimEnd(['\0', '\r', '\n']).ToString();
         }
 
         try
         {
-            var sb = new StringBuilder();
-            var lastIndex = 0;
+            StringBuilder updatedDescription = new();
+            int lastIndex = 0;
 
-            for (var i = 0; i < matches.Count; i++)
+            for (int i = 0; i < matches.Count; i++)
             {
-                sb.Append(description.AsSpan(lastIndex, matches[i].Index - lastIndex));
+                updatedDescription.Append(description[lastIndex..matches[i].Index]);
 
-                string propString = matches[i].Value;
+                ReadOnlySpan<char> propString = matches[i].Value;
 
                 if (!propString.StartsWith("%%"))
                 {
@@ -136,36 +136,37 @@ public partial class EventResolverBase
 
                 if (propString.StartsWith("%%") && parameters.Count > 0)
                 {
-                    var endParameterId = propString.IndexOf(' ');
-                    var parameterIdString = endParameterId > 2 ? propString[2..endParameterId] : propString[2..];
+                    int endParameterId = propString.IndexOf(' ');
+                    var parameterIdString = endParameterId > 2 ? propString.Slice(2, endParameterId) : propString[2..];
 
-                    if (long.TryParse(parameterIdString, out var parameterId))
+                    if (long.TryParse(parameterIdString, out long parameterId))
                     {
                         // Some parameters exceed int size and need to be cast from long to int
                         // because they are actually negative numbers
-                        var parameterMessage = parameters.FirstOrDefault(m => m.RawId == (int)parameterId);
+                        ReadOnlySpan<char> parameterMessage =
+                            parameters.FirstOrDefault(m => m.RawId == (int)parameterId)?.Text ?? string.Empty;
 
-                        if (parameterMessage is not null)
+                        if (!parameterMessage.IsEmpty)
                         {
                             // Some RawId parameters have a trailing '%0' that needs to be removed
                             propString = endParameterId > 2 ?
-                                parameterMessage.Text.TrimEnd(['%', '0', '\r', '\n']) + propString[++endParameterId..] :
-                                parameterMessage.Text.TrimEnd(['%', '0', '\r', '\n']);
+                                string.Concat(parameterMessage.TrimEnd(['%', '0']), propString[++endParameterId..]) :
+                                parameterMessage.TrimEnd(['%', '0']);
                         }
                     }
                 }
 
-                sb.Append(propString);
+                updatedDescription.Append(propString);
 
                 lastIndex = matches[i].Index + matches[i].Length;
             }
 
             if (lastIndex < description.Length)
             {
-                sb.Append(description[lastIndex..]);
+                updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
             }
 
-            return sb.ToString().TrimEnd(['\r', '\n']);
+            return updatedDescription.ToString();
         }
         catch (Exception ex)
         {
@@ -250,7 +251,7 @@ public partial class EventResolverBase
 
                 if (potentialTaskNames is { Count: > 0 })
                 {
-                    taskName = potentialTaskNames[0].Text;
+                    taskName = potentialTaskNames[0].Text.TrimEnd('\0');
 
                     if (potentialTaskNames.Count > 1)
                     {
@@ -275,8 +276,8 @@ public partial class EventResolverBase
             eventRecord.MachineName,
             Severity.GetString(eventRecord.Level),
             eventRecord.ProviderName,
-            taskName?.TrimEnd('\0') ?? string.Empty,
-            description.TrimEnd('\0'),
+            taskName ?? string.Empty,
+            description,
             eventRecord.Qualifiers,
             GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
             eventRecord.ProcessId,
