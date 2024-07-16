@@ -14,7 +14,7 @@ extends:
   template: v1/1ES.Unofficial.PipelineTemplate.yml@1ESPipelineTemplates
   parameters:
     pool:
-      name: MSSecurity-1ES-Build-Agents-Pool
+      name: Azure-Pipelines-CI-Test-EO
       image: MSSecurity-1ES-Windows-2022
       os: windows
     customBuildTags:
