@@ -157,11 +157,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private async void AddLiveLog_Clicked(object? sender, EventArgs e)
+    private async Task AddLiveLog(string logName)
     {
-        if (sender is null) { return; }
-
-        var logName = ((MenuFlyoutItem)sender).Text;
+        if (string.IsNullOrWhiteSpace(logName)) { return; }
 
         if (_activeLogsState.Value.Any(l => l.Key == logName)) { return; }
 
@@ -203,6 +201,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logName, LogType.Live, _cancellationTokenSource.Token));
     }
 
+    private async void AddLiveLog_Clicked(object? sender, EventArgs e)
+    {
+        if (sender is null) { return; }
+
+        await AddLiveLog(((MenuFlyoutItem)sender).Text);
+    }
+
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
     {
         if (!_currentVersionProvider.IsSupportedOS(DeviceInfo.Version))
@@ -237,6 +242,47 @@ public sealed partial class MainPage : ContentPage, IDisposable
         var param = item?.CommandParameter as CopyType?;
 
         _clipboardService.CopySelectedEvent(param);
+    }
+
+    private void CreateFlyoutMenu(MenuFlyoutSubItem rootMenu, IEnumerable<string> logNames, bool shouldAddLog = false)
+    {
+        foreach (var logName in logNames)
+        {
+            if (_cancellationTokenSource.IsCancellationRequested) { return; }
+
+            var folders = logName.Split(['-', '/']);
+            MenuFlyoutSubItem menu = rootMenu;
+
+            if (folders.Length > 1)
+            {
+                for (int i = 0; i < folders.Length - 1; i++)
+                {
+                    if (menu.FirstOrDefault(x => x.Text.Equals(folders[i])) is MenuFlyoutSubItem newMenu)
+                    {
+                        menu = newMenu;
+
+                        continue;
+                    }
+
+                    newMenu = new MenuFlyoutSubItem { Text = folders[i] };
+                    menu.Add(newMenu);
+                    menu = newMenu;
+                }
+            }
+
+            var log = new MenuFlyoutItem { Text = folders[^1] };
+
+            if (shouldAddLog)
+            {
+                log.Clicked += async (s, e) => { await AddLiveLog(logName); };
+            }
+            else
+            {
+                log.Clicked += async (s, e) => { await OpenLiveLog(logName); };
+            }
+
+            menu.Add(log);
+        }
     }
 
     private async void Docs_Clicked(object sender, EventArgs e)
@@ -345,6 +391,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
+    private async Task OpenLiveLog(string logName)
+    {
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+
+        await AddLiveLog(logName);
+    }
+
     private void OpenLiveLog_Clicked(object? sender, EventArgs e)
     {
         _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
@@ -359,30 +412,10 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         using EventLogSession session = new();
 
-        var logsThatAlreadyHaveMenuItems = new[]
-        {
-            "Application",
-            "System",
-            "Security"
-        };
+        var names = session.GetLogNames().Order();
 
-        var names = session.GetLogNames()
-            .Where(n => !logsThatAlreadyHaveMenuItems.Contains(n))
-            .Order();
-
-        foreach (var name in names)
-        {
-            if (_cancellationTokenSource.IsCancellationRequested) { return; }
-
-            var openItem = new MenuFlyoutItem { Text = name };
-            openItem.Clicked += OpenLiveLog_Clicked;
-
-            var addItem = new MenuFlyoutItem { Text = name };
-            addItem.Clicked += AddLiveLog_Clicked;
-
-            OpenOtherLogsFlyoutSubitem.Add(openItem);
-            AddOtherLogsFlyoutSubitem.Add(addItem);
-        }
+        CreateFlyoutMenu(AddOtherLogsFlyoutSubitem, names, true);
+        CreateFlyoutMenu(OpenOtherLogsFlyoutSubitem, names);
     }
 
     private async void ReleaseNotes_Clicked(object sender, EventArgs e) => await _updateService.GetReleaseNotes();
