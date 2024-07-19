@@ -251,7 +251,7 @@ public partial class EventResolverBase
 
                 if (potentialTaskNames is { Count: > 0 })
                 {
-                    taskName = potentialTaskNames[0].Text.TrimEnd('\0');
+                    taskName = potentialTaskNames[0].Text;
 
                     if (potentialTaskNames.Count > 1)
                     {
@@ -276,7 +276,7 @@ public partial class EventResolverBase
             eventRecord.MachineName,
             Severity.GetString(eventRecord.Level),
             eventRecord.ProviderName,
-            taskName ?? string.Empty,
+            taskName?.TrimEnd('\0') ?? string.Empty,
             description,
             eventRecord.Qualifiers,
             GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
