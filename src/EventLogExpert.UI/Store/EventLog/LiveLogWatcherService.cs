@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.Eventing.Reader;
@@ -165,9 +166,11 @@ public sealed class LiveLogWatcherService : ILogWatcherService
                         return;
                     }
 
-                    var resolved = _resolver.Resolve(eventArgs.EventRecord, logName);
-                    _ = resolved.Xml; // Immediately cache the ToXml() result.
-                    _dispatcher.Dispatch(new EventLogAction.AddEvent(resolved));
+                    _resolver.ResolveProviderDetails(eventArgs.EventRecord, logName);
+
+                    _dispatcher.Dispatch(
+                        new EventLogAction.AddEvent(
+                            new DisplayEventModel(eventArgs.EventRecord, logName)));
                 }
             };
 

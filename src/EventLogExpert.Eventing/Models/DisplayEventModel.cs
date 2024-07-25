@@ -1,25 +1,46 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
+using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Models;
 
 public sealed record DisplayEventModel(
-    long? RecordId,
-    Guid? ActivityId,
-    DateTime TimeCreated,
-    int Id,
-    string ComputerName,
-    string Level,
-    string Source,
-    string TaskCategory,
-    string Description,
-    int? Qualifiers,
-    IEnumerable<string> KeywordsDisplayNames,
-    int? ProcessId,
-    int? ThreadId,
-    SecurityIdentifier UserId,
-    string LogName, // This is the log name from the event reader
-    string OwningLog, // This is the name of the log file or the live log, which we use internally
-    string Xml);
+    EventRecord EventRecord,
+    string OwningLog /*This is the name of the log file or the live log, which we use internally*/)
+{
+    private EventRecord EventRecord { get; } = EventRecord;
+
+    public Guid? ActivityId => EventRecord.ActivityId;
+
+    public string ComputerName => EventRecord.MachineName;
+
+    public string Description => "";
+
+    public int Id => EventRecord.Id;
+
+    public IEnumerable<string> KeywordsDisplayNames => [];
+
+    // This is the log name from the event reader
+    public string Level => Severity.GetString(EventRecord.Level);
+
+    public string LogName => EventRecord.LogName;
+
+    public int? ProcessId => EventRecord.ProcessId;
+
+    public long? RecordId => EventRecord.RecordId;
+
+    public string Source => EventRecord.ProviderName;
+
+    public string TaskCategory => "";
+
+    public int? ThreadId => EventRecord.ThreadId;
+
+    public DateTime TimeCreated => EventRecord.TimeCreated!.Value.ToUniversalTime();
+
+    public SecurityIdentifier UserId => EventRecord.UserId;
+
+    public string Xml => EventRecord.ToXml();
+}
