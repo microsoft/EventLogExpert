@@ -1,11 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Eventing.Reader;
 
@@ -17,62 +14,34 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
 {
-    public string Status { get; private set; } = string.Empty;
-
-    public event EventHandler<string>? StatusChanged;
-
-    private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
-
     private bool _disposedValue;
 
     public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
+    public void Dispose()
     {
-        if (!_providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails))
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    {
+        if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
         {
-            providerDetails = new EventMessageProvider(eventRecord.ProviderName, _tracer).LoadProviderDetails();
-            _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
+            return;
         }
 
-        if (providerDetails is null)
-        {
-            return new DisplayEventModel(
-                eventRecord.RecordId,
-                eventRecord.ActivityId,
-                eventRecord.TimeCreated!.Value.ToUniversalTime(),
-                eventRecord.Id,
-                eventRecord.MachineName,
-                Severity.GetString(eventRecord.Level),
-                eventRecord.ProviderName,
-                "",
-                "Description not found. No provider available.",
-                eventRecord.Qualifiers,
-                GetKeywordsFromBitmask(eventRecord.Keywords, null),
-                eventRecord.ProcessId,
-                eventRecord.ThreadId,
-                eventRecord.UserId,
-                eventRecord.LogName,
-                owningLogName,
-                eventRecord.ToXml());
-        }
-
-        return ResolveFromProviderDetails(eventRecord, eventRecord.Properties, providerDetails, owningLogName);
+        details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+        providerDetails.TryAdd(eventRecord.ProviderName, details);
     }
 
     protected virtual void Dispose(bool disposing)
     {
         if (!_disposedValue)
         {
-            _providerDetails.Clear();
+            providerDetails.Clear();
 
             _disposedValue = true;
         }
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
     }
 }

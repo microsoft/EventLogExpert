@@ -1,13 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using System.Diagnostics;
-using System.Diagnostics.Eventing.Reader;
-using System.Reflection;
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using NSubstitute;
+using System.Diagnostics;
+using System.Diagnostics.Eventing.Reader;
+using System.Reflection;
 using Xunit.Abstractions;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
@@ -16,15 +16,20 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
-        public string Status { get; private set; } = string.Empty;
-
-        public event EventHandler<string>? StatusChanged;
-
         private readonly List<ProviderDetails> _providerDetailsList;
 
         internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base((s, log) => Debug.WriteLine(s)) => _providerDetailsList = providerDetailsList;
 
-        public DisplayEventModel Resolve(EventRecord eventRecord, string owningLog) => ResolveFromProviderDetails(eventRecord, eventRecord.Properties, _providerDetailsList[0], owningLog);
+        public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+        {
+            if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
+            {
+                return;
+            }
+
+            details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+            providerDetails.TryAdd(eventRecord.ProviderName, details);
+        }
 
         public void Dispose() { }
     }
@@ -94,12 +99,13 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         };
 
         var resolver = new UnitTestEventResolver([providerDetails]);
-        var result = resolver.Resolve(eventRecord, "Test");
+        var description = resolver.ResolveDescription(eventRecord);
+        var taskName = resolver.ResolveTaskName(eventRecord);
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 
-        Assert.Equal(expectedDescription, result.Description);
-        Assert.Equal("Service", result.TaskCategory);
+        Assert.Equal(expectedDescription, description);
+        Assert.Equal("Service", taskName);
     }
 
     [Fact]
@@ -113,7 +119,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
         while (null != (er = eventLogReader.ReadEvent()))
         {
-            resolver.Resolve(er, "Test");
+            resolver.ResolveProviderDetails(er, "Test");
         }
 
         sw.Stop();
@@ -143,100 +149,97 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
         foreach (var record in eventRecords)
         {
-            resolver.Resolve(record, "Test");
+            resolver.ResolveProviderDetails(record, "Test");
         }
 
         sw.Stop();
         Debug.WriteLine("Resolving events took " + sw.ElapsedMilliseconds);
     }
 
-    [Fact]
-    public void Test1()
-    {
-        var eventLogReader = new EventLogReader("Application", PathType.LogName);
+    //[Fact]
+    //public void Test1()
+    //{
+    //    var eventLogReader = new EventLogReader("Application", PathType.LogName);
 
-        var resolvers = new List<IEventResolver>
-        {
-            new EventReaderEventResolver(),
-            new LocalProviderEventResolver(),
-            /* new EventProviderDatabaseEventResolver(
-                s => {
-                    _outputHelper.WriteLine(s);
-                    Debug.WriteLine(s);
-                    Debug.Flush();
-                }) */
-        };
+    //    var resolvers = new List<IEventResolver>
+    //    {
+    //        new LocalProviderEventResolver(),
+    //        /* new EventProviderDatabaseEventResolver(
+    //            s => {
+    //                _outputHelper.WriteLine(s);
+    //                Debug.WriteLine(s);
+    //                Debug.Flush();
+    //            }) */
+    //    };
 
-        EventRecord er;
-        HashSet<string> uniqueDescriptions = [];
-        HashSet<string> uniqueXml = [];
-        HashSet<string> uniqueKeywords = [];
+    //    EventRecord er;
+    //    HashSet<string> uniqueDescriptions = [];
+    //    HashSet<string> uniqueXml = [];
+    //    HashSet<string> uniqueKeywords = [];
 
-        var totalCount = 0;
-        var mismatchCount = 0;
-        var xmlMismatchCount = 0;
-        var keywordsMismatchCount = 0;
-        var mismatches = new List<List<string>>();
-        var xmlMismatches = new List<List<string>>();
-        var keywordMismatches = new List<List<string>>();
+    //    var totalCount = 0;
+    //    var mismatchCount = 0;
+    //    var xmlMismatchCount = 0;
+    //    var keywordsMismatchCount = 0;
+    //    var mismatches = new List<List<string>>();
+    //    var xmlMismatches = new List<List<string>>();
+    //    var keywordMismatches = new List<List<string>>();
 
-        while (null != (er = eventLogReader.ReadEvent()))
-        {
-            uniqueDescriptions.Clear();
-            uniqueXml.Clear();
-            uniqueKeywords.Clear();
+    //    while (null != (er = eventLogReader.ReadEvent()))
+    //    {
+    //        uniqueDescriptions.Clear();
+    //        uniqueXml.Clear();
+    //        uniqueKeywords.Clear();
 
-            foreach (var r in resolvers)
-            {
-                var resolved = r.Resolve(er, "Test");
+    //        foreach (var r in resolvers)
+    //        {
+    //            var resolved = r.ResolveProviderDetails(er, "Test");
 
-                uniqueDescriptions.Add(resolved.Description
-                    .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
-                    .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
-                    .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
-                    .Replace("\u200E", "")  // Remove LRM marks from dates.
-                    .Trim());
+    //            uniqueDescriptions.Add(resolved.Description
+    //                .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
+    //                .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
+    //                .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
+    //                .Replace("\u200E", "")  // Remove LRM marks from dates.
+    //                .Trim());
 
-                uniqueXml.Add(resolved.Xml);
+    //            if (r is EventReaderEventResolver && resolved.KeywordsDisplayNames.Count() < 1)
+    //            {
+    //                // Don't bother adding it. EventReader fails to resolve a lot of keywords for some reason.
+    //            }
+    //            else
+    //            {
+    //                uniqueKeywords.Add(string.Join(" ", resolved.KeywordsDisplayNames.OrderBy(n => n)));
+    //            }
+    //        }
 
-                if (r is EventReaderEventResolver && resolved.KeywordsDisplayNames.Count() < 1)
-                {
-                    // Don't bother adding it. EventReader fails to resolve a lot of keywords for some reason.
-                }
-                else
-                {
-                    uniqueKeywords.Add(string.Join(" ", resolved.KeywordsDisplayNames.OrderBy(n => n)));
-                }
-            }
+    //        if (uniqueDescriptions.Count > 1)
+    //        {
+    //            mismatchCount++;
+    //            mismatches.Add(uniqueDescriptions.ToList());
+    //        }
 
-            if (uniqueDescriptions.Count > 1)
-            {
-                mismatchCount++;
-                mismatches.Add(uniqueDescriptions.ToList());
-            }
+    //        if (uniqueXml.Count > 1)
+    //        {
+    //            xmlMismatchCount++;
+    //            xmlMismatches.Add(uniqueXml.ToList());
+    //        }
 
-            if (uniqueXml.Count > 1)
-            {
-                xmlMismatchCount++;
-                xmlMismatches.Add(uniqueXml.ToList());
-            }
+    //        if (uniqueKeywords.Count > 1)
+    //        {
+    //            keywordsMismatchCount++;
+    //            keywordMismatches.Add(uniqueKeywords.ToList());
+    //        }
 
-            if (uniqueKeywords.Count > 1)
-            {
-                keywordsMismatchCount++;
-                keywordMismatches.Add(uniqueKeywords.ToList());
-            }
+    //        totalCount++;
+    //    }
 
-            totalCount++;
-        }
+    //    foreach (var resolver in resolvers)
+    //    {
+    //        resolver?.Dispose();
+    //    }
 
-        foreach (var resolver in resolvers)
-        {
-            resolver?.Dispose();
-        }
+    //    var mismatchPercent = mismatchCount / totalCount * 100;
 
-        var mismatchPercent = mismatchCount / totalCount * 100;
-
-        Assert.True(mismatchPercent < 1);
-    }
+    //    Assert.True(mismatchPercent < 1);
+    //}
 }

@@ -17,15 +17,12 @@ namespace EventLogExpert.Eventing.EventResolvers;
 public partial class EventResolverBase
 {
     /// <summary>
-    ///     The mappings from the outType attribute in the EventModel XML template
-    ///     to determine if it should be displayed as Hex.
+    ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
+    ///     as Hex.
     /// </summary>
     private static readonly List<string> DisplayAsHexTypes =
     [
-        "win:HexInt32",
-        "win:HexInt64",
-        "win:Pointer",
-        "win:Win32Error"
+        "win:HexInt32", "win:HexInt64", "win:Pointer", "win:Win32Error"
     ];
 
     private static readonly ConcurrentDictionary<string, string[]> FormattedPropertiesCache = [];
@@ -46,42 +43,116 @@ public partial class EventResolverBase
         { 0x80000000000000, "Classic" }
     };
 
-    protected readonly Action<string, LogLevel> _tracer;
+    protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
+    protected readonly Action<string, LogLevel> tracer;
 
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
     protected EventResolverBase(Action<string, LogLevel> tracer)
     {
-        _tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
+        this.tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
     }
 
-    protected static IEnumerable<string> GetKeywordsFromBitmask(long? bitmask, ProviderDetails? providerDetails)
+    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
     {
-        if (bitmask is null or 0) { return []; }
+        if (eventRecord.Keywords is null or 0) { return []; }
 
         List<string> returnValue = [];
 
         foreach (var k in StandardKeywords.Keys)
         {
-            if ((bitmask.Value & k) == k) { returnValue.Add(StandardKeywords[k].TrimEnd('\0')); }
+            if ((eventRecord.Keywords.Value & k) == k) { returnValue.Add(StandardKeywords[k].TrimEnd('\0')); }
         }
 
-        if (providerDetails != null)
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
         {
-            // Some providers re-define the standard keywords in their own metadata,
-            // so let's skip those.
-            var lower32 = bitmask.Value & 0xFFFFFFFF;
+            return returnValue;
+        }
 
-            if (lower32 != 0)
+        // Some providers re-define the standard keywords in their own metadata,
+        // so let's skip those.
+        var lower32 = eventRecord.Keywords.Value & 0xFFFFFFFF;
+
+        if (lower32 != 0)
+        {
+            foreach (var k in details.Keywords.Keys)
             {
-                foreach (var k in providerDetails.Keywords.Keys)
-                {
-                    if ((lower32 & k) == k) { returnValue.Add(providerDetails.Keywords[k].TrimEnd('\0')); }
-                }
+                if ((lower32 & k) == k) { returnValue.Add(details.Keywords[k].TrimEnd('\0')); }
             }
         }
 
         return returnValue;
+    }
+
+    /// <summary>Resolve event descriptions from an event record.</summary>
+    public string ResolveDescription(EventRecord eventRecord)
+    {
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        {
+            return "Description not found. No provider available.";
+        }
+
+        var @event = GetModernEvent(eventRecord, details);
+        var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
+
+        return string.IsNullOrEmpty(@event?.Description)
+            ? FormatDescription(
+                properties,
+                details.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text,
+                details.Parameters)
+            : FormatDescription(properties, @event.Description, details.Parameters);
+    }
+
+    /// <summary>Resolve event task names from an event record.</summary>
+    public string ResolveTaskName(EventRecord eventRecord)
+    {
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        {
+            return string.Empty;
+        }
+
+        var @event = GetModernEvent(eventRecord, details);
+
+        if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
+        {
+            return taskName.TrimEnd('\0');
+        }
+
+        if (!eventRecord.Task.HasValue)
+        {
+            return string.Empty;
+        }
+
+        details.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
+
+        if (taskName is not null)
+        {
+            return taskName.TrimEnd('\0');
+        }
+
+        var potentialTaskNames = details.Messages
+            .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
+            .ToList();
+
+        if (potentialTaskNames is { Count: > 0 })
+        {
+            taskName = potentialTaskNames[0].Text;
+
+            if (potentialTaskNames.Count > 1)
+            {
+                tracer("More than one matching task ID was found.", LogLevel.Information);
+                tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
+                tracer("   Potential matches:", LogLevel.Information);
+
+                potentialTaskNames.ForEach(t => tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
+            }
+        }
+        else
+        {
+            taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
+        }
+
+        return taskName.TrimEnd('\0');
     }
 
     protected string FormatDescription(
@@ -168,122 +239,10 @@ public partial class EventResolverBase
         }
         catch (Exception ex)
         {
-            _tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
+            tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
 
             return "Failed to resolve description, see XML for more details.";
         }
-    }
-
-    /// <summary>Resolve event descriptions from a provider.</summary>
-    /// <param name="eventRecord"></param>
-    /// <param name="eventProperties">
-    ///     The getter for EventRecord.Properties is expensive, so we require the caller to call it
-    ///     and then pass this value separately. This ensures the value can be reused by both the caller and the resolver,
-    ///     optimizing performance in this critical path.
-    /// </param>
-    /// <param name="providerDetails"></param>
-    /// <param name="owningLogName"></param>
-    /// <returns></returns>
-    protected DisplayEventModel ResolveFromProviderDetails(
-        EventRecord eventRecord,
-        IList<EventProperty> eventProperties,
-        ProviderDetails providerDetails,
-        string owningLogName)
-    {
-        string? description = null;
-        string? taskName = null;
-
-        if (eventRecord is { Version: not null, LogName: not null })
-        {
-            var modernEvents = providerDetails.Events
-                .Where(e => e.Id == eventRecord.Id &&
-                    e.Version == eventRecord.Version &&
-                    e.LogName == eventRecord.LogName).ToList();
-
-            if (modernEvents is { Count: 0 })
-            {
-                // Try again forcing the long to a short and with no log name.
-                // This is needed for providers such as Microsoft-Windows-Complus
-                modernEvents = providerDetails.Events?
-                    .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version).ToList();
-            }
-
-            if (modernEvents is { Count: > 0 })
-            {
-                if (modernEvents.Count > 1)
-                {
-                    _tracer("Ambiguous modern event found:", LogLevel.Information);
-
-                    foreach (var modernEvent in modernEvents)
-                    {
-                        _tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} " +
-                            $"LogName: {modernEvent.LogName} Description: {modernEvent.Description}",
-                            LogLevel.Information);
-                    }
-                }
-
-                var e = modernEvents[0];
-
-                providerDetails.Tasks.TryGetValue(e.Task, out taskName);
-
-                var properties = GetFormattedProperties(e.Template, eventProperties);
-                description = FormatDescription(properties, e.Description, providerDetails.Parameters);
-            }
-        }
-
-        if (string.IsNullOrEmpty(description))
-        {
-            var properties = GetFormattedProperties(null, eventProperties);
-            description = FormatDescription(properties, providerDetails.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text, providerDetails.Parameters);
-        }
-
-        if (taskName is null && eventRecord.Task.HasValue)
-        {
-            providerDetails.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
-
-            if (taskName == null)
-            {
-                var potentialTaskNames = providerDetails.Messages
-                    .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
-                    .ToList();
-
-                if (potentialTaskNames is { Count: > 0 })
-                {
-                    taskName = potentialTaskNames[0].Text;
-
-                    if (potentialTaskNames.Count > 1)
-                    {
-                        _tracer("More than one matching task ID was found.", LogLevel.Information);
-                        _tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
-                        _tracer("   Potential matches:", LogLevel.Information);
-                        potentialTaskNames.ForEach(t => _tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
-                    }
-                }
-                else
-                {
-                    taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
-                }
-            }
-        }
-
-        return new DisplayEventModel(
-            eventRecord.RecordId,
-            eventRecord.ActivityId,
-            eventRecord.TimeCreated!.Value.ToUniversalTime(),
-            eventRecord.Id,
-            eventRecord.MachineName,
-            Severity.GetString(eventRecord.Level),
-            eventRecord.ProviderName,
-            taskName?.TrimEnd('\0') ?? string.Empty,
-            description,
-            eventRecord.Qualifiers,
-            GetKeywordsFromBitmask(eventRecord.Keywords, providerDetails),
-            eventRecord.ProcessId,
-            eventRecord.ThreadId,
-            eventRecord.UserId,
-            eventRecord.LogName!,
-            owningLogName,
-            eventRecord.ToXml());
     }
 
     private static List<string> GetFormattedProperties(string? template, IList<EventProperty> properties)
@@ -358,4 +317,46 @@ public partial class EventResolverBase
 
     [GeneratedRegex("%+[0-9]+")]
     private static partial Regex WildcardWithNumberRegex();
+
+    private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
+    {
+        if (eventRecord is { Version: null, LogName: null })
+        {
+            return null;
+        }
+
+        var modernEvents = details.Events
+            .Where(e => e.Id == eventRecord.Id &&
+                e.Version == eventRecord.Version &&
+                e.LogName == eventRecord.LogName).ToList();
+
+        if (modernEvents is { Count: 0 })
+        {
+            // Try again forcing the long to a short and with no log name.
+            // This is needed for providers such as Microsoft-Windows-Complus
+            modernEvents = details.Events?
+                .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version).ToList();
+        }
+
+        if (modernEvents is not { Count: > 0 })
+        {
+            return null;
+        }
+
+        if (modernEvents.Count <= 1)
+        {
+            return modernEvents[0];
+        }
+
+        tracer("Ambiguous modern event found:", LogLevel.Information);
+
+        foreach (var modernEvent in modernEvents)
+        {
+            tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} " +
+                $"LogName: {modernEvent.LogName} Description: {modernEvent.Description}",
+                LogLevel.Information);
+        }
+
+        return modernEvents[0];
+    }
 }

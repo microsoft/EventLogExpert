@@ -2,8 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Eventing.EventResolvers;
@@ -16,23 +14,16 @@ public class VersatileEventResolver : IEventResolver, IDisposable
 {
     private readonly LocalProviderEventResolver _localResolver;
     private readonly EventProviderDatabaseEventResolver _databaseResolver;
-    private readonly ITraceLogger _tracer;
+    private readonly bool _useDatabaseResolver;
 
-    private volatile bool _useDatabaseResolver = false;
-    private bool disposedValue = false;
-
-    public string Status => _useDatabaseResolver ? _databaseResolver.Status : _localResolver.Status;
-
-    public event EventHandler<string>? StatusChanged;
+    private bool _disposedValue;
 
     public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger tracer)
     {
         _localResolver = new LocalProviderEventResolver(tracer.Trace);
         _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
-        _useDatabaseResolver = dbCollection.ActiveDatabases.Any();
-        _tracer = tracer;
-        _tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
-        _databaseResolver.StatusChanged += (sender, args) => StatusChanged?.Invoke(sender, args);
+        _useDatabaseResolver = !dbCollection.ActiveDatabases.IsEmpty;
+        tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
     }
 
     public void Dispose()
@@ -41,21 +32,28 @@ public class VersatileEventResolver : IEventResolver, IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord, string OwningLogName)
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
-        return _useDatabaseResolver ? _databaseResolver.Resolve(eventRecord, OwningLogName) : _localResolver.Resolve(eventRecord, OwningLogName);
+        if (_useDatabaseResolver)
+        {
+            _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
+        }
+        else
+        {
+            _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
+        }
     }
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposedValue)
+        if (!_disposedValue)
         {
             if (disposing)
             {
                 _databaseResolver.Dispose();
             }
 
-            disposedValue = true;
+            _disposedValue = true;
         }
     }
 }

@@ -2,11 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
@@ -15,13 +12,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 
 public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
-    public string Status { get; private set; } = string.Empty;
-
-    public event EventHandler<string>? StatusChanged;
-
     private ImmutableArray<EventProviderDbContext> _dbContexts = [];
-
-    private readonly ConcurrentDictionary<string, ProviderDetails?> _providerDetails = new();
 
     private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
 
@@ -41,13 +32,14 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        _tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
+        tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
+
         foreach (var databasePath in databasePaths)
         {
-            _tracer($"  {databasePath}", LogLevel.Information);
+            tracer($"  {databasePath}", LogLevel.Information);
         }
 
-        _providerDetails.Clear();
+        providerDetails.Clear();
 
         foreach (var context in _dbContexts)
         {
@@ -57,9 +49,9 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
         _dbContexts = [];
 
         var databasesToLoad = SortDatabases(databasePaths);
-
         var obsoleteDbs = new List<string>();
         var newContexts = new List<EventProviderDbContext>();
+
         foreach (var file in databasesToLoad)
         {
             if (!File.Exists(file))
@@ -67,7 +59,7 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
                 throw new FileNotFoundException(file);
             }
 
-            var c = new EventProviderDbContext(file, readOnly: true, _tracer);
+            var c = new EventProviderDbContext(file, readOnly: true, tracer);
             var (needsv2, needsv3) = c.IsUpgradeNeeded();
             if (needsv2 || needsv3)
             {
@@ -119,6 +111,7 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
                 var name = Path.GetFileName(path);
                 var directory = Path.GetDirectoryName(path);
                 var m = r.Match(name);
+
                 if (m.Success)
                 {
                     return new
@@ -128,93 +121,49 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
                         SecondPart = m.Groups[2].Value
                     };
                 }
-                else
+
+                return new
                 {
-                    return new
-                    {
-                        Directory = directory,
-                        FirstPart = name,
-                        SecondPart = ""
-                    };
-                }
+                    Directory = directory,
+                    FirstPart = name,
+                    SecondPart = ""
+                };
             })
             .OrderBy(n => n.FirstPart)
             .ThenByDescending(n => n.SecondPart)
             .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart));
     }
 
-    public DisplayEventModel Resolve(EventRecord eventRecord, string owningLogName)
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
-        DisplayEventModel? lastResult = null;
-
-        // The Properties getter is expensive, so we only call the getter once,
-        // and we pass this value separately from the eventRecord so it can be reused.
-        var eventProperties = eventRecord.Properties;
-
-        if (_providerDetails.TryGetValue(eventRecord.ProviderName, out var providerDetails))
+        if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
         {
-            if (providerDetails is not null)
-            {
-                lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, owningLogName);
-            }
-        }
-        else
-        {
-            _databaseAccessSemaphore.Wait();
-
-            try
-            {
-                foreach (var dbContext in _dbContexts)
-                {
-                    providerDetails = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
-
-                    if (providerDetails is null) { continue; }
-
-                    lastResult = ResolveFromProviderDetails(eventRecord, eventProperties, providerDetails, owningLogName);
-
-                    if (!string.IsNullOrEmpty(lastResult.Description))
-                    {
-                        _tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
-                        _providerDetails.TryAdd(eventRecord.ProviderName, providerDetails);
-
-                        return lastResult;
-                    }
-                }
-            }
-            finally
-            {
-                _databaseAccessSemaphore.Release();
-            }
-
-            if (!_providerDetails.ContainsKey(eventRecord.ProviderName))
-            {
-                _providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
-            }
+            return;
         }
 
-        if (lastResult is null)
+        _databaseAccessSemaphore.Wait();
+
+        try
         {
-            return new DisplayEventModel(
-                eventRecord.RecordId,
-                eventRecord.ActivityId,
-                eventRecord.TimeCreated!.Value.ToUniversalTime(),
-                eventRecord.Id,
-                eventRecord.MachineName,
-                Severity.GetString(eventRecord.Level),
-                eventRecord.ProviderName,
-                "",
-                "Description not found. No provider available.",
-                eventRecord.Qualifiers,
-                GetKeywordsFromBitmask(eventRecord.Keywords, null),
-                eventRecord.ProcessId,
-                eventRecord.ThreadId,
-                eventRecord.UserId,
-                eventRecord.LogName,
-                owningLogName,
-                eventRecord.ToXml());
+            foreach (var dbContext in _dbContexts)
+            {
+                details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
+
+                if (details is null) { continue; }
+
+                tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
+                providerDetails.TryAdd(eventRecord.ProviderName, details);
+            }
+        }
+        finally
+        {
+            _databaseAccessSemaphore.Release();
         }
 
-        return lastResult;
+        if (!providerDetails.ContainsKey(eventRecord.ProviderName))
+        {
+            providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
+        }
     }
 
     protected virtual void Dispose(bool disposing)
@@ -229,11 +178,11 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
                 }
             }
 
-            _providerDetails.Clear();
+            providerDetails.Clear();
 
             _disposedValue = true;
 
-            _tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Information);
+            tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Information);
         }
     }
 

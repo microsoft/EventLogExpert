@@ -187,7 +187,8 @@ public sealed class EventLogEffects(
 
                             try
                             {
-                                events.Enqueue(eventResolver.Resolve(@event, action.LogName));
+                                eventResolver.ResolveProviderDetails(@event, action.LogName);
+                                events.Enqueue(new DisplayEventModel(@event, action.LogName));
                             }
                             catch (Exception ex) when (ex is EventLogInvalidDataException)
                             {
