@@ -1,6 +1,6 @@
 ﻿.status-bar {
     background-color: var(--clr-statusbar);
-    color: var(--clr-black);
+    color: var(--clr-white);
     padding-left: 5px;
 }
 
