@@ -6,8 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
 
-            <Color x:Key="PageBackgroundColor">#426EE2</Color>
-            <Color x:Key="PrimaryTextColor">#000</Color>
+            <Color x:Key="PageBackgroundColor">#3C64E7</Color>
+            <Color x:Key="PrimaryTextColor">#FFF</Color>
 
             <Style TargetType="NavigationPage">
                 <Setter Property="BarBackgroundColor" Value="{DynamicResource PageBackgroundColor}" />
