@@ -99,28 +99,21 @@ public partial class EventResolverBase
                 "Unable to resolve description, see XML for more details.";
         }
 
-        var matches = _sectionsToReplace.Matches(descriptionTemplate);
-
         ReadOnlySpan<char> description = descriptionTemplate
             .Replace("\r\n%n", " \r\n")
             .Replace("%n\r\n", "\r\n ")
             .Replace("%n", "\r\n");
-
-        if (matches.Count <= 0)
-        {
-            return description.TrimEnd(['\0', '\r', '\n']).ToString();
-        }
 
         try
         {
             StringBuilder updatedDescription = new();
             int lastIndex = 0;
 
-            for (int i = 0; i < matches.Count; i++)
+            foreach (var match in _sectionsToReplace.EnumerateMatches(description))
             {
-                updatedDescription.Append(description[lastIndex..matches[i].Index]);
+                updatedDescription.Append(description[lastIndex..match.Index]);
 
-                ReadOnlySpan<char> propString = matches[i].Value;
+                ReadOnlySpan<char> propString = description[match.Index..(match.Index + match.Length)];
 
                 if (!propString.StartsWith("%%"))
                 {
@@ -158,7 +151,7 @@ public partial class EventResolverBase
 
                 updatedDescription.Append(propString);
 
-                lastIndex = matches[i].Index + matches[i].Length;
+                lastIndex = match.Index + match.Length;
             }
 
             if (lastIndex < description.Length)
@@ -167,6 +160,11 @@ public partial class EventResolverBase
             }
 
             return updatedDescription.ToString();
+        }
+        catch (InvalidOperationException)
+        {
+            // If the regex fails to match, then we just return the original description.
+            return description.TrimEnd(['\0', '\r', '\n']).ToString();
         }
         catch (Exception ex)
         {
