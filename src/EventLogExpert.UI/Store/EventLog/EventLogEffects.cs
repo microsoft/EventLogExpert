@@ -188,7 +188,26 @@ public sealed class EventLogEffects(
                             try
                             {
                                 eventResolver.ResolveProviderDetails(@event, action.LogName);
-                                events.Enqueue(new DisplayEventModel(@event, action.LogName));
+
+                                var displayEvent = new DisplayEventModel(action.LogName) {
+                                    ActivityId = @event.ActivityId,
+                                    ComputerName = @event.MachineName,
+                                    Description = eventResolver.ResolveDescription(@event),
+                                    Id = @event.Id,
+                                    KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event),
+                                    Level = Severity.GetString(@event.Level),
+                                    LogName = @event.LogName,
+                                    ProcessId = @event.ProcessId,
+                                    RecordId = @event.RecordId,
+                                    Source = @event.ProviderName,
+                                    TaskCategory = eventResolver.ResolveTaskName(@event),
+                                    ThreadId = @event.ThreadId,
+                                    TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
+                                    UserId = @event.UserId,
+                                    Xml = @event.ToXml()
+                                };
+
+                                events.Enqueue(displayEvent);
                             }
                             catch (Exception ex) when (ex is EventLogInvalidDataException)
                             {

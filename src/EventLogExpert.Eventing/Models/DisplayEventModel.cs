@@ -1,46 +1,41 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
-using System.Diagnostics.Eventing.Reader;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Models;
 
 public sealed record DisplayEventModel(
-    EventRecord EventRecord,
     string OwningLog /*This is the name of the log file or the live log, which we use internally*/)
 {
-    private EventRecord EventRecord { get; } = EventRecord;
+    public Guid? ActivityId { get; init; }
 
-    public Guid? ActivityId => EventRecord.ActivityId;
+    public string ComputerName { get; init; } = string.Empty;
 
-    public string ComputerName => EventRecord.MachineName;
+    public string Description { get; init; } = string.Empty;
 
-    public string Description => "";
+    public int Id { get; init; }
 
-    public int Id => EventRecord.Id;
-
-    public IEnumerable<string> KeywordsDisplayNames => [];
+    public IEnumerable<string> KeywordsDisplayNames { get; init; } = [];
 
     // This is the log name from the event reader
-    public string Level => Severity.GetString(EventRecord.Level);
+    public string Level { get; init; } = string.Empty;
 
-    public string LogName => EventRecord.LogName;
+    public string LogName { get; init; } = string.Empty;
 
-    public int? ProcessId => EventRecord.ProcessId;
+    public int? ProcessId { get; init; }
 
-    public long? RecordId => EventRecord.RecordId;
+    public long? RecordId { get; init; }
 
-    public string Source => EventRecord.ProviderName;
+    public string Source { get; init; } = string.Empty;
 
-    public string TaskCategory => "";
+    public string TaskCategory { get; init; } = string.Empty;
 
-    public int? ThreadId => EventRecord.ThreadId;
+    public int? ThreadId { get; init; }
 
-    public DateTime TimeCreated => EventRecord.TimeCreated!.Value.ToUniversalTime();
+    public DateTime TimeCreated { get; init; }
 
-    public SecurityIdentifier UserId => EventRecord.UserId;
+    public SecurityIdentifier UserId { get; init; } = new(WellKnownSidType.NullSid, null);
 
-    public string Xml => EventRecord.ToXml();
+    public string Xml { get; init; } = "Unable to load XML, ensure that loading XML data is enabled in the settings.";
 }
