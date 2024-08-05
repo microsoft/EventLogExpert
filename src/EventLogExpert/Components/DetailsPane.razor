@@ -33,18 +33,21 @@
             <p class="details-description">@SelectedEvent.Description</p>
         </div>
 
-        <hr />
+        @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
+        {
+            <hr />
 
-        <div class="details-row-xml" @onclick="ToggleXml">
-            <div>XML</div>
-            <div class="justify-self-center">
-                <button class="button" @onclick="CopyEvent">Copy Event</button>
+            <div class="details-row-xml" @onclick="ToggleXml">
+                <div>XML</div>
+                <div class="justify-self-center">
+                    <button class="button" @onclick="CopyEvent">Copy Event</button>
+                </div>
+                <span class="menu-toggle justify-self-right" data-rotate="@_isXmlVisible.ToString().ToLower()">
+                    <i class="bi bi-caret-up"></i>
+                </span>
             </div>
-            <span class="menu-toggle justify-self-right" data-rotate="@_isXmlVisible.ToString().ToLower()">
-                <i class="bi bi-caret-up"></i>
-            </span>
-        </div>
 
-        <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@XElement.Parse(SelectedEvent.Xml)</p>
+            <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@XElement.Parse(SelectedEvent.Xml)</p>
+        }
     }
 </div>

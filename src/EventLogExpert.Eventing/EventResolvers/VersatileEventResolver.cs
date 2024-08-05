@@ -6,14 +6,11 @@ using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-/// <summary>
-/// This IEventResolver uses event databases if any are
-/// available, and falls back to local providers if not.
-/// </summary>
+/// <summary>This IEventResolver uses event databases if any are available, and falls back to local providers if not.</summary>
 public class VersatileEventResolver : IEventResolver, IDisposable
 {
-    private readonly LocalProviderEventResolver _localResolver;
     private readonly EventProviderDatabaseEventResolver _databaseResolver;
+    private readonly LocalProviderEventResolver _localResolver;
     private readonly bool _useDatabaseResolver;
 
     private bool _disposedValue;
@@ -23,6 +20,7 @@ public class VersatileEventResolver : IEventResolver, IDisposable
         _localResolver = new LocalProviderEventResolver(tracer.Trace);
         _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
         _useDatabaseResolver = !dbCollection.ActiveDatabases.IsEmpty;
+
         tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
     }
 
@@ -31,6 +29,16 @@ public class VersatileEventResolver : IEventResolver, IDisposable
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
+
+    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord) =>
+        _useDatabaseResolver
+            ? _databaseResolver.GetKeywordsFromBitmask(eventRecord)
+            : _localResolver.GetKeywordsFromBitmask(eventRecord);
+
+    public string ResolveDescription(EventRecord eventRecord) =>
+        _useDatabaseResolver ?
+            _databaseResolver.ResolveDescription(eventRecord) :
+            _localResolver.ResolveDescription(eventRecord);
 
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
@@ -43,6 +51,11 @@ public class VersatileEventResolver : IEventResolver, IDisposable
             _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
         }
     }
+
+    public string ResolveTaskName(EventRecord eventRecord) =>
+        _useDatabaseResolver ?
+            _databaseResolver.ResolveTaskName(eventRecord) :
+            _localResolver.ResolveTaskName(eventRecord);
 
     protected virtual void Dispose(bool disposing)
     {

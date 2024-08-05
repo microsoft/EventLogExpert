@@ -11,5 +11,11 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public interface IEventResolver : IDisposable
 {
+    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
+
+    public string ResolveDescription(EventRecord eventRecord);
+
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
+
+    public string ResolveTaskName(EventRecord eventRecord);
 }

@@ -30,7 +30,8 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
     private IEventResolver? _resolver;
 
-    public LiveLogWatcherService(ITraceLogger debugLogger,
+    public LiveLogWatcherService(
+        ITraceLogger debugLogger,
         IServiceProvider serviceProvider,
         IDispatcher dispatcher,
         IStateSelection<EventLogState, bool> bufferFullStateSelection)
@@ -168,9 +169,25 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
                     _resolver.ResolveProviderDetails(eventArgs.EventRecord, logName);
 
-                    _dispatcher.Dispatch(
-                        new EventLogAction.AddEvent(
-                            new DisplayEventModel(eventArgs.EventRecord, logName)));
+                    var displayEvent = new DisplayEventModel(logName)
+                    {
+                        ActivityId = eventArgs.EventRecord.ActivityId,
+                        ComputerName = eventArgs.EventRecord.MachineName,
+                        Description = _resolver.ResolveDescription(eventArgs.EventRecord),
+                        Id = eventArgs.EventRecord.Id,
+                        KeywordsDisplayNames = _resolver.GetKeywordsFromBitmask(eventArgs.EventRecord),
+                        Level = Severity.GetString(eventArgs.EventRecord.Level),
+                        LogName = eventArgs.EventRecord.LogName,
+                        ProcessId = eventArgs.EventRecord.ProcessId,
+                        RecordId = eventArgs.EventRecord.RecordId,
+                        Source = eventArgs.EventRecord.ProviderName,
+                        TaskCategory = _resolver.ResolveTaskName(eventArgs.EventRecord),
+                        ThreadId = eventArgs.EventRecord.ThreadId,
+                        TimeCreated = eventArgs.EventRecord.TimeCreated!.Value.ToUniversalTime(),
+                        UserId = eventArgs.EventRecord.UserId
+                    };
+
+                    _dispatcher.Dispatch(new EventLogAction.AddEvent(displayEvent));
                 }
             };
 
