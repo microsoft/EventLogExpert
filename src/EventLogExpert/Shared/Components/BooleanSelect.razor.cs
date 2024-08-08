@@ -3,7 +3,6 @@
 
 using EventLogExpert.Shared.Base;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.Shared.Components;
 
@@ -18,18 +17,6 @@ public sealed partial class BooleanSelect : BaseComponent<bool>
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [Parameter] public bool IsSingleColor { get; set; }
-
-    private async Task ToggleValue(KeyboardEventArgs args)
-    {
-        switch (args)
-        {
-            case { Code: "Space" or "Enter" }:
-                Value = !Value;
-                await ValueChanged.InvokeAsync(Value);
-
-                break;
-        }
-    }
 
     private async Task UpdateValue(ChangeEventArgs args)
     {
