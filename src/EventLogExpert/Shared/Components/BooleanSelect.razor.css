@@ -32,7 +32,7 @@
 .toggle input:checked + label:first-of-type {
     background-color: var(--clr-red);
     box-shadow: none;
-    color: var(--clr-white);
+    color: var(--clr-black);
 
     &[data-single-color="true"] {
         background-color: var(--clr-lightblue);
