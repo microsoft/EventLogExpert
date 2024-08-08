@@ -1,15 +1,15 @@
 ﻿.toggle {
     display: flex;
-    overflow: hidden;
     margin-left: 5px;
 }
 
 .toggle input {
     position: absolute !important;
-    clip: rect(0, 0, 0, 0);
-    height: 1px;
-    width: 1px;
-    border: 0;
+    clip: rect(1px, 1px, 1px, 1px);
+    height: 1px !important;
+    width: 1px !important;
+    border: 0 !important;
+    padding: 0 !important;
     overflow: hidden;
 }
 
@@ -27,27 +27,19 @@
     min-width: 4rem;
 }
 
-.toggle label:hover { cursor: pointer; }
+.toggle label:first-of-type { border-radius: 4px 0 0 4px; }
 
-.toggle input:checked + label:first-of-type {
-    background-color: var(--clr-red);
-    box-shadow: none;
-    color: var(--clr-black);
+.toggle label:last-of-type { border-radius: 0 4px 4px 0; }
 
-    &[data-single-color="true"] {
-        background-color: var(--clr-lightblue);
-        color: var(--clr-black);
-    }
-}
-
-.toggle input:checked + label:last-of-type {
-    background-color: var(--clr-green);
+.toggle input:checked + label {
     box-shadow: none;
     color: var(--clr-black);
 
     &[data-single-color="true"] { background-color: var(--clr-lightblue); }
 }
 
-.toggle label:first-of-type { border-radius: 4px 0 0 4px; }
+.toggle input:checked + label:first-of-type { background-color: var(--clr-red); }
 
-.toggle label:last-of-type { border-radius: 0 4px 4px 0; }
+.toggle input:checked + label:last-of-type { background-color: var(--clr-green); }
+
+.toggle input:focus + label { border: 1px solid var(--clr-white); }
