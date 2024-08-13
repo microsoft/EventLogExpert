@@ -25,6 +25,7 @@ window.enableColumnResize = (table) => {
             divider.classList.add("table-divider");
 
             column.appendChild(divider);
+            divider.tabIndex = 0;
 
             const mouseMoveHandler = function(e) {
                 const distance = e.clientX - x;
@@ -50,7 +51,19 @@ window.enableColumnResize = (table) => {
                 document.addEventListener("mouseup", mouseUpHandler);
             };
 
+            const keyboardResizeHandler = function (e) {
+                const styles = window.getComputedStyle(column);
+                w = parseInt(styles.width, 10);
+
+                if (e.key === "ArrowRight") {
+                    column.style.width = `${w + 10}px`;
+                } else if (e.key === "ArrowLeft") {
+                    column.style.width = `${w - 10}px`;
+                }
+            };
+
             divider.addEventListener("mousedown", mouseDownHandler);
+            divider.addEventListener("keydown", keyboardResizeHandler);
         };
 
         for (let i = 0; i < columns.length - 1; i++) {
