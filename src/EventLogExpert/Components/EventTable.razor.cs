@@ -22,7 +22,9 @@ namespace EventLogExpert.Components;
 public sealed partial class EventTable
 {
     private EventTableModel? _currentTable;
+    private ColumnName[] _enabledColumns = null!;
     private EventTableState _eventTableState = null!;
+    private int _rowIndex = 0;
     private ImmutableList<DisplayEventModel> _selectedEventState = [];
     private TimeZoneInfo _timeZoneSettings = null!;
 
@@ -51,7 +53,9 @@ public sealed partial class EventTable
         SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
 
         _eventTableState = EventTableState.Value;
+
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
+        _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = TimeZoneSettings.Value;
 
@@ -65,7 +69,9 @@ public sealed partial class EventTable
             TimeZoneSettings.Value.Equals(_timeZoneSettings)) { return false; }
 
         _eventTableState = EventTableState.Value;
+
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
+        _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = TimeZoneSettings.Value;
 

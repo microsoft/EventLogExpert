@@ -4,12 +4,12 @@
 <SplitLogTabPane />
 
 <div class="table-container">
-    <table id="eventTable" @onkeydown="HandleKeyDown">
+    <table id="eventTable" @onkeydown="HandleKeyDown" role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu">
-        <tr>
-            @foreach ((ColumnName column, bool _) in _eventTableState.Columns.Where(column => column.Value))
+        <tr role="row">
+            @foreach (ColumnName column in _enabledColumns)
             {
-                <th class="@column.ToString().ToLower()">
+                <th class="@column.ToString().ToLower()" role="columnheader">
                     @if (column == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>
@@ -34,11 +34,12 @@
         @if (_currentTable is not null)
         {
             <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
-                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" tabindex="0">
-                    @foreach ((ColumnName column, bool _) in _eventTableState.Columns.Where(column => column.Value))
+                @{ _rowIndex = _currentTable.DisplayedEvents.IndexOf(evt); }
+                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+                    @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
-                        <td>
-                            @switch (column)
+                        <td aria-label="Row @(_rowIndex), Column @(i + 1)" role="gridcell">
+                            @switch (_enabledColumns[i])
                             {
                                 case ColumnName.Level:
                                     <text><span class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
@@ -80,7 +81,7 @@
                         </td>
                     }
 
-                    <td>@evt.Description</td>
+                    <td aria-label="Row @(_rowIndex), Column @(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
                 </tr>
             </Virtualize>
         }
