@@ -2,15 +2,18 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Diagnostics.Eventing.Reader;
+using System.Xml.Linq;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -18,7 +21,7 @@ namespace EventLogExpert.UI.Store.EventLog;
 public sealed class EventLogEffects(
     IState<EventLogState> eventLogState,
     ILogWatcherService logWatcherService,
-    IServiceProvider serviceProvider)
+    IServiceScopeFactory serviceScopeFactory)
 {
     [EffectMethod]
     public Task HandleAddEvent(EventLogAction.AddEvent action, IDispatcher dispatcher)
@@ -94,9 +97,10 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        using var scopedProvider = serviceProvider.CreateScope();
+        using var serviceScope = serviceScopeFactory.CreateScope();
 
-        var eventResolver = scopedProvider.ServiceProvider.GetService<IEventResolver>();
+        var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
+        ITraceLogger? logger = null;
 
         if (eventResolver is null)
         {
@@ -185,10 +189,26 @@ public sealed class EventLogEffects(
                             {
                                 events.Enqueue(eventResolver.Resolve(@event, action.LogName));
                             }
+                            catch (Exception ex) when (ex is EventLogInvalidDataException)
+                            {
+                                logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
+
+                                logger?.Trace(
+                                    $"Invalid data in RecordId: {
+                                        XElement.Parse(@event.Bookmark.BookmarkXml)
+                                            .Descendants()
+                                            .Attributes()
+                                            .Where(a => a.Name == "RecordId")
+                                            .Select(a => a.Value)
+                                            .FirstOrDefault()}",
+                                    LogLevel.Error);
+                            }
                             catch (Exception ex)
                             {
-                                dispatcher.Dispatch(
-                                    new StatusBarAction.SetResolverStatus($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}"));
+                                logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
+
+                                logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
+                                    LogLevel.Error);
                             }
                         }
                     }
