@@ -32,11 +32,16 @@ public sealed partial class SubFilterRow
         {
             switch (Value.Data.Category)
             {
-                case FilterCategory.Id :
-                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventIds)
-                        .Distinct().OrderBy(id => id).Select(id => id.ToString()).ToList();
-                case FilterCategory.Level :
-                    var items = new List<string>();
+                case FilterCategory.Id:
+                    return EventLogState.Value.ActiveLogs.Values
+                        .SelectMany(log => log.GetCategoryValues(FilterCategory.Id))
+                        .Distinct().Order().ToList();
+                case FilterCategory.ActivityId:
+                    return EventLogState.Value.ActiveLogs.Values
+                        .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
+                        .Distinct().Order().ToList();
+                case FilterCategory.Level:
+                    List<string> items = [];
 
                     foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
                     {
@@ -44,20 +49,21 @@ public sealed partial class SubFilterRow
                     }
 
                     return items;
-                case FilterCategory.KeywordsDisplayNames :
-                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.KeywordNames)
-                        .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterCategory.Source :
-                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventProviderNames)
-                        .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterCategory.TaskCategory :
-                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.TaskNames)
-                        .Distinct().OrderBy(name => name).Select(name => name.ToString()).ToList();
-                case FilterCategory.ActivityId :
-                    return EventLogState.Value.ActiveLogs.Values.SelectMany(log => log.EventActivityIds)
-                        .Distinct().OrderBy(id => id).Select(activityId => activityId.ToString() ?? string.Empty).ToList();
-                case FilterCategory.Description :
-                default :
+                case FilterCategory.KeywordsDisplayNames:
+                    return EventLogState.Value.ActiveLogs.Values
+                        .SelectMany(log => log.GetCategoryValues(FilterCategory.KeywordsDisplayNames))
+                        .Distinct().Order().ToList();
+                case FilterCategory.Source:
+                    return EventLogState.Value.ActiveLogs.Values
+                        .SelectMany(log => log.GetCategoryValues(FilterCategory.Source))
+                        .Distinct().Order().ToList();
+                case FilterCategory.TaskCategory:
+                    return EventLogState.Value.ActiveLogs.Values
+                        .SelectMany(log => log.GetCategoryValues(FilterCategory.TaskCategory))
+                        .Distinct().Order().ToList();
+                case FilterCategory.Xml:
+                case FilterCategory.Description:
+                default:
                     return [];
             }
         }
