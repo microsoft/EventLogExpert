@@ -33,7 +33,7 @@
             <p class="details-description">@SelectedEvent.Description</p>
         </div>
 
-        @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
+        @if (SettingsState.Value.Config.IsXmlEnabled)
         {
             <hr />
 
@@ -48,13 +48,13 @@
             </div>
 
             <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
-                @if (SettingsState.Value.Config.IsXmlEnabled)
+                @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
                 {
                     @XElement.Parse(SelectedEvent.Xml)
                 }
                 else
                 {
-                    <text>@SelectedEvent.Xml</text>
+                    <text>Xml data is unavailable</text>
                 }
             </p>
         }

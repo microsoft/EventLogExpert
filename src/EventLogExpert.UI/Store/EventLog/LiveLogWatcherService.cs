@@ -192,9 +192,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
                                 ThreadId = eventArgs.EventRecord.ThreadId,
                                 TimeCreated = eventArgs.EventRecord.TimeCreated!.Value.ToUniversalTime(),
                                 UserId = eventArgs.EventRecord.UserId,
-                                Xml = _settingsState.Value.Config.IsXmlEnabled ?
-                                    eventArgs.EventRecord.ToXml() :
-                                    "XML loading is disabled in settings"
+                                Xml = _settingsState.Value.Config.IsXmlEnabled ? eventArgs.EventRecord.ToXml() : null
                             }));
                 }
             };
