@@ -120,7 +120,9 @@ public sealed class ClipboardService : IClipboardService
 
                 return simpleEvent.ToString();
             case CopyType.Xml:
-                return XElement.Parse(@event.Xml).ToString();
+                return string.IsNullOrEmpty(@event.Xml) ?
+                    string.Empty :
+                    XElement.Parse(@event.Xml).ToString();
             case CopyType.Full:
             default:
                 StringBuilder fullEvent = new();
@@ -137,7 +139,11 @@ public sealed class ClipboardService : IClipboardService
                 fullEvent.AppendLine("Description:");
                 fullEvent.AppendLine(@event.Description);
                 fullEvent.AppendLine("Event Xml:");
-                fullEvent.AppendLine(XElement.Parse(@event.Xml).ToString());
+
+                if (!string.IsNullOrEmpty(@event.Xml))
+                {
+                    fullEvent.AppendLine(XElement.Parse(@event.Xml).ToString());
+                }
 
                 return fullEvent.ToString();
         }

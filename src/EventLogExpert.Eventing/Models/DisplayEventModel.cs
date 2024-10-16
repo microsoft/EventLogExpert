@@ -18,9 +18,9 @@ public sealed record DisplayEventModel(
 
     public List<string> KeywordsDisplayNames { get; init; } = [];
 
-    // This is the log name from the event reader
     public string Level { get; init; } = string.Empty;
 
+    // This is the log name from the event reader
     public string LogName { get; init; } = string.Empty;
 
     public int? ProcessId { get; init; }
@@ -37,5 +37,5 @@ public sealed record DisplayEventModel(
 
     public SecurityIdentifier UserId { get; init; } = new(WellKnownSidType.NullSid, null);
 
-    public string Xml { get; init; } = string.Empty;
+    public string? Xml { get; init; }
 }

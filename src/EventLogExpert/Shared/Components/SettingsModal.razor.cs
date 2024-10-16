@@ -19,6 +19,7 @@ public sealed partial class SettingsModal
 
     private bool _databaseRemoved = false;
     private SettingsModel _request = new();
+    private bool _shouldReload = false;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -30,7 +31,7 @@ public sealed partial class SettingsModal
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
-    protected internal override Task Close()
+    protected internal override async Task Close()
     {
         if (_databaseRemoved)
         {
@@ -42,7 +43,13 @@ public sealed partial class SettingsModal
                         .ToList()));
         }
 
-        return base.Close();
+        if (_shouldReload)
+        {
+            await ReloadOpenLogs();
+            _shouldReload = false;
+        }
+
+        await base.Close();
     }
 
     protected override void OnInitialized()
@@ -142,7 +149,7 @@ public sealed partial class SettingsModal
         if (EventLogState.Value.ActiveLogs.IsEmpty) { return; }
 
         bool answer = await AlertDialogService.ShowAlert("Reload Open Logs Now?",
-            "In order to use these databases, all currently open logs must be reopened. Would you like to reopen all open logs now?",
+            "In order for these changes to take effect, all currently open logs must be reloaded. Would you like to reload all open logs now?",
             "Yes", "No");
 
         if (!answer) { return; }
@@ -185,6 +192,12 @@ public sealed partial class SettingsModal
     {
         if (!SettingsState.Value.Config.Equals(_request))
         {
+            if (_request.IsXmlEnabled != SettingsState.Value.Config.IsXmlEnabled && _request.IsXmlEnabled)
+            {
+                // Really only need to reload logs if the user is enabling XML
+                _shouldReload = true;
+            }
+
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 
@@ -197,7 +210,7 @@ public sealed partial class SettingsModal
                         .Select(db => db.name)
                         .ToList()));
 
-            await ReloadOpenLogs();
+            _shouldReload = true;
         }
 
         await Close();
