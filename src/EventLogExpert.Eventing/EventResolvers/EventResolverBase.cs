@@ -22,10 +22,14 @@ public partial class EventResolverBase
     /// </summary>
     private static readonly List<string> DisplayAsHexTypes =
     [
-        "win:HexInt32", "win:HexInt64", "win:Pointer", "win:Win32Error"
+        "win:HexInt32",
+        "win:HexInt64",
+        "win:Pointer",
+        "win:Win32Error"
     ];
 
     private static readonly ConcurrentDictionary<string, string[]> FormattedPropertiesCache = [];
+    private static readonly StringCache XmlCache = new();
 
     /// <summary>
     ///     These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords. However, the names
@@ -252,6 +256,8 @@ public partial class EventResolverBase
 
         if (!string.IsNullOrWhiteSpace(template))
         {
+            template = XmlCache.Get(template);
+
             if (FormattedPropertiesCache.TryGetValue(template, out var values))
             {
                 dataNodes = values;
@@ -262,7 +268,7 @@ public partial class EventResolverBase
                     .Descendants()
                     .Attributes()
                     .Where(a => a.Name == "outType")
-                    .Select(a => a.Value)
+                    .Select(a => XmlCache.Get(a.Value))
                     .ToArray();
 
                 FormattedPropertiesCache.TryAdd(template, dataNodes);

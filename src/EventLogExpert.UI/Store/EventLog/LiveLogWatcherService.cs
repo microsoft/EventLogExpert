@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Diagnostics.Eventing.Reader;
@@ -27,6 +28,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly List<string> _logsToWatch = [];
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
+    private readonly IState<SettingsState> _settingsState;
 
     private IEventResolver? _resolver;
 
@@ -34,11 +36,13 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         ITraceLogger debugLogger,
         IServiceProvider serviceProvider,
         IDispatcher dispatcher,
-        IStateSelection<EventLogState, bool> bufferFullStateSelection)
+        IStateSelection<EventLogState, bool> bufferFullStateSelection,
+        IState<SettingsState> settingsState)
     {
         _debugLogger = debugLogger;
         _dispatcher = dispatcher;
         _serviceProvider = serviceProvider;
+        _settingsState = settingsState;
         bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
 
         bufferFullStateSelection.SelectedValueChanged += (sender, isFull) =>
@@ -169,25 +173,29 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
                     _resolver.ResolveProviderDetails(eventArgs.EventRecord, logName);
 
-                    var displayEvent = new DisplayEventModel(logName)
-                    {
-                        ActivityId = eventArgs.EventRecord.ActivityId,
-                        ComputerName = eventArgs.EventRecord.MachineName,
-                        Description = _resolver.ResolveDescription(eventArgs.EventRecord),
-                        Id = eventArgs.EventRecord.Id,
-                        KeywordsDisplayNames = _resolver.GetKeywordsFromBitmask(eventArgs.EventRecord),
-                        Level = Severity.GetString(eventArgs.EventRecord.Level),
-                        LogName = eventArgs.EventRecord.LogName,
-                        ProcessId = eventArgs.EventRecord.ProcessId,
-                        RecordId = eventArgs.EventRecord.RecordId,
-                        Source = eventArgs.EventRecord.ProviderName,
-                        TaskCategory = _resolver.ResolveTaskName(eventArgs.EventRecord),
-                        ThreadId = eventArgs.EventRecord.ThreadId,
-                        TimeCreated = eventArgs.EventRecord.TimeCreated!.Value.ToUniversalTime(),
-                        UserId = eventArgs.EventRecord.UserId
-                    };
-
-                    _dispatcher.Dispatch(new EventLogAction.AddEvent(displayEvent));
+                    // Ideally this should be cached, but we don't have access to EventLogData
+                    _dispatcher.Dispatch(
+                        new EventLogAction.AddEvent(
+                            new DisplayEventModel(logName)
+                            {
+                                ActivityId = eventArgs.EventRecord.ActivityId,
+                                ComputerName = eventArgs.EventRecord.MachineName,
+                                Description = _resolver.ResolveDescription(eventArgs.EventRecord),
+                                Id = eventArgs.EventRecord.Id,
+                                KeywordsDisplayNames = _resolver.GetKeywordsFromBitmask(eventArgs.EventRecord).ToList(),
+                                Level = Severity.GetString(eventArgs.EventRecord.Level),
+                                LogName = eventArgs.EventRecord.LogName,
+                                ProcessId = eventArgs.EventRecord.ProcessId,
+                                RecordId = eventArgs.EventRecord.RecordId,
+                                Source = eventArgs.EventRecord.ProviderName,
+                                TaskCategory = _resolver.ResolveTaskName(eventArgs.EventRecord),
+                                ThreadId = eventArgs.EventRecord.ThreadId,
+                                TimeCreated = eventArgs.EventRecord.TimeCreated!.Value.ToUniversalTime(),
+                                UserId = eventArgs.EventRecord.UserId,
+                                Xml = _settingsState.Value.Config.IsXmlEnabled ?
+                                    eventArgs.EventRecord.ToXml() :
+                                    "XML loading is disabled in settings"
+                            }));
                 }
             };
 

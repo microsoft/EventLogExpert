@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,7 @@ namespace EventLogExpert.UI.Store.EventLog;
 public sealed class EventLogEffects(
     IState<EventLogState> eventLogState,
     ILogWatcherService logWatcherService,
+    IState<SettingsState> settingsState,
     IServiceScopeFactory serviceScopeFactory)
 {
     [EffectMethod]
@@ -189,25 +191,26 @@ public sealed class EventLogEffects(
                             {
                                 eventResolver.ResolveProviderDetails(@event, action.LogName);
 
-                                var displayEvent = new DisplayEventModel(action.LogName) {
-                                    ActivityId = @event.ActivityId,
-                                    ComputerName = @event.MachineName,
-                                    Description = eventResolver.ResolveDescription(@event),
-                                    Id = @event.Id,
-                                    KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event),
-                                    Level = Severity.GetString(@event.Level),
-                                    LogName = @event.LogName,
-                                    ProcessId = @event.ProcessId,
-                                    RecordId = @event.RecordId,
-                                    Source = @event.ProviderName,
-                                    TaskCategory = eventResolver.ResolveTaskName(@event),
-                                    ThreadId = @event.ThreadId,
-                                    TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
-                                    UserId = @event.UserId,
-                                    Xml = @event.ToXml()
-                                };
-
-                                events.Enqueue(displayEvent);
+                                events.Enqueue(
+                                    new DisplayEventModel(action.LogName)
+                                    {
+                                        ActivityId = @event.ActivityId,
+                                        ComputerName = logData.ValueCache.Get(@event.MachineName),
+                                        Description = logData.ValueCache.Get(eventResolver.ResolveDescription(@event)),
+                                        Id = @event.Id,
+                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
+                                            .Select(keyword => logData.ValueCache.Get(keyword)).ToList(),
+                                        Level = Severity.GetString(@event.Level),
+                                        LogName = logData.ValueCache.Get(@event.LogName),
+                                        ProcessId = @event.ProcessId,
+                                        RecordId = @event.RecordId,
+                                        Source = logData.ValueCache.Get(@event.ProviderName),
+                                        TaskCategory = logData.ValueCache.Get(eventResolver.ResolveTaskName(@event)),
+                                        ThreadId = @event.ThreadId,
+                                        TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
+                                        UserId = @event.UserId,
+                                        Xml = settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : null
+                                    });
                             }
                             catch (Exception ex) when (ex is EventLogInvalidDataException)
                             {
@@ -244,14 +247,7 @@ public sealed class EventLogEffects(
             return;
         }
 
-        dispatcher.Dispatch(new EventLogAction.LoadEvents(
-            logData,
-            events.ToList().AsReadOnly(),
-            events.Select(e => e.Id).ToImmutableHashSet(),
-            events.Select(e => e.ActivityId).ToImmutableHashSet(),
-            events.Select(e => e.Source).ToImmutableHashSet(),
-            events.Select(e => e.TaskCategory).ToImmutableHashSet(),
-            events.SelectMany(e => e.KeywordsDisplayNames).ToImmutableHashSet()));
+        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.ToList().AsReadOnly()));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
@@ -292,17 +288,7 @@ public sealed class EventLogEffects(
             .ToList()
             .AsReadOnly();
 
-        var updatedEventIds = logData.EventIds.Union(newEvents.Select(e => e.Id));
-        var updatedProviderNames = logData.EventProviderNames.Union(newEvents.Select(e => e.Source));
-        var updatedTaskNames = logData.TaskNames.Union(newEvents.Select(e => e.TaskCategory));
-
-        var updatedLogData = logData with
-        {
-            Events = newEvents,
-            EventIds = updatedEventIds,
-            EventProviderNames = updatedProviderNames,
-            TaskNames = updatedTaskNames
-        };
+        var updatedLogData = logData with { Events = newEvents };
 
         return updatedLogData;
     }

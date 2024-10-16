@@ -16,7 +16,7 @@ public sealed record DisplayEventModel(
 
     public int Id { get; init; }
 
-    public IEnumerable<string> KeywordsDisplayNames { get; init; } = [];
+    public List<string> KeywordsDisplayNames { get; init; } = [];
 
     // This is the log name from the event reader
     public string Level { get; init; } = string.Empty;
@@ -37,5 +37,5 @@ public sealed record DisplayEventModel(
 
     public SecurityIdentifier UserId { get; init; } = new(WellKnownSidType.NullSid, null);
 
-    public string Xml { get; init; } = "Unable to load XML, ensure that loading XML data is enabled in the settings.";
+    public string Xml { get; init; } = string.Empty;
 }

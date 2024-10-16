@@ -264,13 +264,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
                         continue;
                     }
 
-                    newMenu = new MenuFlyoutSubItem { Text = folders[i] };
+                    newMenu = new MenuFlyoutSubItem { Text = string.Intern(folders[i]) };
                     menu.Add(newMenu);
                     menu = newMenu;
                 }
             }
 
-            var log = new MenuFlyoutItem { Text = folders[^1] };
+            var log = new MenuFlyoutItem { Text = string.Intern(folders[^1]) };
 
             if (shouldAddLog)
             {

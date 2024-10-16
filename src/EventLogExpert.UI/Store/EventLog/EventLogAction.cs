@@ -20,14 +20,7 @@ public sealed record EventLogAction
 
     public sealed record CloseLog(EventLogId LogId, string LogName);
 
-    public sealed record LoadEvents(
-        EventLogData LogData,
-        ReadOnlyCollection<DisplayEventModel> Events,
-        ImmutableHashSet<int> AllEventIds,
-        ImmutableHashSet<Guid?> AllActivityIds,
-        ImmutableHashSet<string> AllProviderNames,
-        ImmutableHashSet<string> AllTaskNames,
-        ImmutableHashSet<string> AllKeywords);
+    public sealed record LoadEvents(EventLogData LogData, ReadOnlyCollection<DisplayEventModel> Events);
 
     public sealed record LoadNewEvents;
 

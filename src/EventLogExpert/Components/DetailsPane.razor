@@ -47,7 +47,16 @@
                 </span>
             </div>
 
-            <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">@XElement.Parse(SelectedEvent.Xml)</p>
+            <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
+                @if (SettingsState.Value.Config.IsXmlEnabled)
+                {
+                    @XElement.Parse(SelectedEvent.Xml)
+                }
+                else
+                {
+                    <text>@SelectedEvent.Xml</text>
+                }
+            </p>
         }
     }
 </div>

@@ -53,15 +53,7 @@ public sealed class EventLogReducers
         {
             ActiveLogs = newLogsCollection.Add(
                 action.LogData.Name,
-                action.LogData with
-                {
-                    Events = action.Events,
-                    EventIds = action.AllEventIds,
-                    EventActivityIds = action.AllActivityIds,
-                    EventProviderNames = action.AllProviderNames,
-                    TaskNames = action.AllTaskNames,
-                    KeywordNames = action.AllKeywords
-                })
+                action.LogData with { Events = action.Events })
         };
     }
 
@@ -126,5 +118,5 @@ public sealed class EventLogReducers
     }
 
     private static EventLogData GetEmptyLogData(string logName, LogType logType) =>
-        new(logName, logType, new List<DisplayEventModel>().AsReadOnly(), [], [], [], [], []);
+        new(logName, logType, new List<DisplayEventModel>().AsReadOnly());
 }
