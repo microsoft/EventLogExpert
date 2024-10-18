@@ -16,7 +16,7 @@ public sealed record DisplayEventModel(
 
     public int Id { get; init; }
 
-    public List<string> KeywordsDisplayNames { get; init; } = [];
+    public IEnumerable<string> KeywordsDisplayNames { get; init; } = [];
 
     public string Level { get; init; } = string.Empty;
 
