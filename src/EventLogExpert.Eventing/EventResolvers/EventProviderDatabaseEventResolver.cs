@@ -16,8 +16,6 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
 
     private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
 
-    private bool _disposedValue;
-
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s, log) => { }) { }
 
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string, LogLevel> tracer) : base(tracer)
@@ -164,32 +162,6 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
         {
             providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
         }
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposedValue)
-        {
-            if (disposing)
-            {
-                foreach (var context in _dbContexts)
-                {
-                    context.Dispose();
-                }
-            }
-
-            providerDetails.Clear();
-
-            _disposedValue = true;
-
-            tracer($"{nameof(EventProviderDatabaseEventResolver)} Disposed at:\n{Environment.StackTrace}", LogLevel.Information);
-        }
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
     }
 
     [GeneratedRegex("^(.+) (\\S+)$")]
