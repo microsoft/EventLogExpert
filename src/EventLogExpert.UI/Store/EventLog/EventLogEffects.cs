@@ -212,7 +212,7 @@ public sealed class EventLogEffects(
                                         ThreadId = @event.ThreadId,
                                         TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
                                         UserId = @event.UserId,
-                                        Xml = settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : null
+                                        Xml = settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : string.Empty
                                     });
                             }
                             catch (Exception ex) when (ex is EventLogInvalidDataException)

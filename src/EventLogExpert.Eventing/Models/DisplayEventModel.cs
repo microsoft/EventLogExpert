@@ -37,5 +37,5 @@ public sealed record DisplayEventModel(
 
     public SecurityIdentifier UserId { get; init; } = new(WellKnownSidType.NullSid, null);
 
-    public string? Xml { get; init; }
+    public string Xml { get; init; } = string.Empty;
 }
