@@ -20,7 +20,7 @@ public partial class EventResolverBase : IDisposable
     ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
     ///     as Hex.
     /// </summary>
-    private static readonly List<string> DisplayAsHexTypes =
+    private static readonly List<string> s_displayAsHexTypes =
     [
         "win:HexInt32",
         "win:HexInt64",
@@ -28,13 +28,13 @@ public partial class EventResolverBase : IDisposable
         "win:Win32Error"
     ];
 
-    private static readonly ConcurrentDictionary<string, string[]> FormattedPropertiesCache = [];
+    private static readonly ConcurrentDictionary<string, string[]> s_formattedPropertiesCache = [];
 
     /// <summary>
     ///     These are already defined in System.Diagnostics.Eventing.Reader.StandardEventKeywords. However, the names
     ///     there do not match what is normally displayed in Event Viewer. We redefine them here so we can use our own strings.
     /// </summary>
-    private static readonly Dictionary<long, string> StandardKeywords = new()
+    private static readonly Dictionary<long, string> s_standardKeywords = new()
     {
         { 0x1000000000000, "Response Time" },
         { 0x2000000000000, "Wdi Context" },
@@ -46,7 +46,8 @@ public partial class EventResolverBase : IDisposable
         { 0x80000000000000, "Classic" }
     };
 
-    private static readonly StringCache XmlCache = new();
+    private static readonly StringCache s_descriptionCache = new();
+    private static readonly StringCache s_xmlCache = new();
 
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly Action<string, LogLevel> tracer;
@@ -72,9 +73,14 @@ public partial class EventResolverBase : IDisposable
 
         List<string> returnValue = [];
 
-        foreach (var k in StandardKeywords.Keys)
+        foreach (var k in s_standardKeywords.Keys)
         {
-            if ((eventRecord.Keywords.Value & k) == k) { returnValue.Add(StandardKeywords[k].TrimEnd('\0')); }
+            if ((eventRecord.Keywords.Value & k) == k)
+            {
+                returnValue.Add(
+                    IEventResolver.ValueCache.Get(
+                        s_standardKeywords[k].TrimEnd('\0')));
+            }
         }
 
         if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
@@ -90,7 +96,12 @@ public partial class EventResolverBase : IDisposable
         {
             foreach (var k in details.Keywords.Keys)
             {
-                if ((lower32 & k) == k) { returnValue.Add(details.Keywords[k].TrimEnd('\0')); }
+                if ((lower32 & k) == k)
+                {
+                    returnValue.Add(
+                        IEventResolver.ValueCache.Get(
+                            details.Keywords[k].TrimEnd('\0')));
+                }
             }
         }
 
@@ -128,7 +139,7 @@ public partial class EventResolverBase : IDisposable
 
         if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
         {
-            return taskName.TrimEnd('\0');
+            return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
         }
 
         if (!eventRecord.Task.HasValue)
@@ -140,7 +151,7 @@ public partial class EventResolverBase : IDisposable
 
         if (taskName is not null)
         {
-            return taskName.TrimEnd('\0');
+            return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
         }
 
         var potentialTaskNames = details.Messages
@@ -165,7 +176,7 @@ public partial class EventResolverBase : IDisposable
             taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
         }
 
-        return taskName.TrimEnd('\0');
+        return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
     }
 
     protected virtual void Dispose(bool disposing)
@@ -174,7 +185,7 @@ public partial class EventResolverBase : IDisposable
 
         if (disposing)
         {
-            FormattedPropertiesCache.Clear();
+            s_formattedPropertiesCache.Clear();
             providerDetails.Clear();
         }
 
@@ -192,7 +203,7 @@ public partial class EventResolverBase : IDisposable
             // when the entire description is a string literal, and there is no provider DLL needed.
             // Found a few providers that have their properties wrapped with \r\n for some reason
             return properties.Count == 1 ?
-                properties[0].Trim(['\0', '\r', '\n']) :
+                s_descriptionCache.Get(properties[0].Trim(['\0', '\r', '\n'])) :
                 "Unable to resolve description, see XML for more details.";
         }
 
@@ -256,7 +267,7 @@ public partial class EventResolverBase : IDisposable
                 updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
             }
 
-            return updatedDescription.ToString();
+            return s_descriptionCache.Get(updatedDescription.ToString());
         }
         catch (InvalidOperationException)
         {
@@ -278,9 +289,9 @@ public partial class EventResolverBase : IDisposable
 
         if (!string.IsNullOrWhiteSpace(template))
         {
-            template = XmlCache.Get(template);
+            template = s_xmlCache.Get(template);
 
-            if (FormattedPropertiesCache.TryGetValue(template, out var values))
+            if (s_formattedPropertiesCache.TryGetValue(template, out var values))
             {
                 dataNodes = values;
             }
@@ -290,10 +301,10 @@ public partial class EventResolverBase : IDisposable
                     .Descendants()
                     .Attributes()
                     .Where(a => a.Name == "outType")
-                    .Select(a => XmlCache.Get(a.Value))
+                    .Select(a => s_xmlCache.Get(a.Value))
                     .ToArray();
 
-                FormattedPropertiesCache.TryAdd(template, dataNodes);
+                s_formattedPropertiesCache.TryAdd(template, dataNodes);
             }
         }
 
@@ -322,7 +333,7 @@ public partial class EventResolverBase : IDisposable
                         continue;
                     }
 
-                    if (DisplayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
+                    if (s_displayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
                     {
                         providers.Add($"0x{properties[i].Value:X}");
                     }

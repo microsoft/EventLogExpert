@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Models;
 using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Eventing.EventResolvers;
@@ -11,6 +12,8 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public interface IEventResolver : IDisposable
 {
+    public static readonly StringCache ValueCache = new();
+
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
 
     public string ResolveDescription(EventRecord eventRecord);

@@ -195,17 +195,16 @@ public sealed class EventLogEffects(
                                     new DisplayEventModel(action.LogName)
                                     {
                                         ActivityId = @event.ActivityId,
-                                        ComputerName = logData.ValueCache.Get(@event.MachineName),
-                                        Description = logData.ValueCache.Get(eventResolver.ResolveDescription(@event)),
+                                        ComputerName = IEventResolver.ValueCache.Get(@event.MachineName),
+                                        Description = eventResolver.ResolveDescription(@event),
                                         Id = @event.Id,
-                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
-                                            .Select(keyword => logData.ValueCache.Get(keyword)).ToList(),
+                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event),
                                         Level = Severity.GetString(@event.Level),
-                                        LogName = logData.ValueCache.Get(@event.LogName),
+                                        LogName = IEventResolver.ValueCache.Get(@event.LogName),
                                         ProcessId = @event.ProcessId,
                                         RecordId = @event.RecordId,
-                                        Source = logData.ValueCache.Get(@event.ProviderName),
-                                        TaskCategory = logData.ValueCache.Get(eventResolver.ResolveTaskName(@event)),
+                                        Source = IEventResolver.ValueCache.Get(@event.ProviderName),
+                                        TaskCategory = eventResolver.ResolveTaskName(@event),
                                         ThreadId = @event.ThreadId,
                                         TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
                                         UserId = @event.UserId,

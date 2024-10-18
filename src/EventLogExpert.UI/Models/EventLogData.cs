@@ -14,36 +14,27 @@ public readonly record struct EventLogData(
 {
     public EventLogId Id { get; } = EventLogId.Create();
 
-    public StringCache ValueCache { get; } = new();
-
-    public List<string> GetCategoryValues(FilterCategory category)
+    public IEnumerable<string> GetCategoryValues(FilterCategory category)
     {
         switch (category)
         {
             case FilterCategory.Id:
                 return Events.Select(e => e.Id.ToString())
-                    .Distinct().Order().ToList();
+                    .Distinct().Order();
             case FilterCategory.ActivityId:
                 return Events.Select(e => e.ActivityId?.ToString() ?? string.Empty)
-                    .Distinct().Order().ToList();
+                    .Distinct().Order();
             case FilterCategory.Level:
-                List<string> items = [];
-
-                foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
-                {
-                    items.Add(item.ToString());
-                }
-
-                return items;
+                return Enum.GetNames<SeverityLevel>();
             case FilterCategory.KeywordsDisplayNames:
                 return Events.SelectMany(e => e.KeywordsDisplayNames)
-                    .Distinct().Order().ToList();
+                    .Distinct().Order();
             case FilterCategory.Source:
                 return Events.Select(e => e.Source)
-                    .Distinct().Order().ToList();
+                    .Distinct().Order();
             case FilterCategory.TaskCategory:
                 return Events.Select(e => e.TaskCategory)
-                    .Distinct().Order().ToList();
+                    .Distinct().Order();
             case FilterCategory.Xml:
             case FilterCategory.Description:
             default:
