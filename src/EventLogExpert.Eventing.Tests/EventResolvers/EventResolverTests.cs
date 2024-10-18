@@ -16,22 +16,20 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
-        private readonly List<ProviderDetails> _providerDetailsList;
-
-        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) : base((s, log) => Debug.WriteLine(s)) => _providerDetailsList = providerDetailsList;
+        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) :
+            base((s, log) => Debug.WriteLine(s)) =>
+            providerDetailsList.ForEach(p => providerDetails.TryAdd(p.ProviderName, p));
 
         public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
         {
-            if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
+            if (providerDetails.ContainsKey(eventRecord.ProviderName))
             {
                 return;
             }
 
-            details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+            var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
             providerDetails.TryAdd(eventRecord.ProviderName, details);
         }
-
-        public void Dispose() { }
     }
 
     private readonly ITestOutputHelper _outputHelper = outputHelper;
