@@ -64,6 +64,7 @@ public class VersatileEventResolver : IEventResolver
         if (disposing)
         {
             _databaseResolver.Dispose();
+            _localResolver.Dispose();
         }
 
         _disposedValue = true;

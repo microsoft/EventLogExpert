@@ -26,23 +26,25 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly ITraceLogger _debugLogger;
     private readonly IDispatcher _dispatcher;
     private readonly List<string> _logsToWatch = [];
-    private readonly IServiceProvider _serviceProvider;
-    private readonly Dictionary<string, EventLogWatcher> _watchers = [];
+    private readonly IEventResolverCache _resolverCache;
+    private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IState<SettingsState> _settingsState;
-
-    private IEventResolver? _resolver;
+    private readonly Dictionary<string, EventLogWatcher> _watchers = [];
 
     public LiveLogWatcherService(
-        ITraceLogger debugLogger,
-        IServiceProvider serviceProvider,
-        IDispatcher dispatcher,
         IStateSelection<EventLogState, bool> bufferFullStateSelection,
+        ITraceLogger debugLogger,
+        IDispatcher dispatcher,
+        IEventResolverCache resolverCache,
+        IServiceScopeFactory serviceScopeFactory,
         IState<SettingsState> settingsState)
     {
         _debugLogger = debugLogger;
         _dispatcher = dispatcher;
-        _serviceProvider = serviceProvider;
+        _resolverCache = resolverCache;
+        _serviceScopeFactory = serviceScopeFactory;
         _settingsState = settingsState;
+
         bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
 
         bufferFullStateSelection.SelectedValueChanged += (sender, isFull) =>
@@ -139,13 +141,6 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     {
         lock (this)
         {
-            if (_resolver == null)
-            {
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Getting a new IEventResolver so we can start watching.");
-
-                _resolver = _serviceProvider.GetService<IEventResolver>();
-            }
-
             if (_watchers.ContainsKey(logName)) { return; }
 
             var query = new EventLogQuery(logName, PathType.LogName);
@@ -160,10 +155,13 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             {
                 lock (this)
                 {
+                    using var serviceScope = _serviceScopeFactory.CreateScope();
+                    var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
+
                     _debugLogger.Trace("EventRecordWritten callback was called.");
                     _bookmarks[logName] = eventArgs.EventRecord.Bookmark;
 
-                    if (_resolver == null)
+                    if (eventResolver is null)
                     {
                         _debugLogger.Trace(
                             $"{nameof(LiveLogWatcherService)} _resolver is null in EventRecordWritten callback.");
@@ -171,24 +169,26 @@ public sealed class LiveLogWatcherService : ILogWatcherService
                         return;
                     }
 
-                    _resolver.ResolveProviderDetails(eventArgs.EventRecord, logName);
+                    eventResolver.ResolveProviderDetails(eventArgs.EventRecord, logName);
 
-                    // Ideally this should be cached, but we don't have access to EventLogData
                     _dispatcher.Dispatch(
                         new EventLogAction.AddEvent(
                             new DisplayEventModel(logName)
                             {
                                 ActivityId = eventArgs.EventRecord.ActivityId,
-                                ComputerName = eventArgs.EventRecord.MachineName,
-                                Description = _resolver.ResolveDescription(eventArgs.EventRecord),
+                                ComputerName = _resolverCache.GetValue(eventArgs.EventRecord.MachineName),
+                                Description = _resolverCache.GetDescription(
+                                    eventResolver.ResolveDescription(eventArgs.EventRecord)),
                                 Id = eventArgs.EventRecord.Id,
-                                KeywordsDisplayNames = _resolver.GetKeywordsFromBitmask(eventArgs.EventRecord).ToList(),
+                                KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(eventArgs.EventRecord)
+                                    .Select(_resolverCache.GetValue).ToList(),
                                 Level = Severity.GetString(eventArgs.EventRecord.Level),
-                                LogName = eventArgs.EventRecord.LogName,
+                                LogName = _resolverCache.GetValue(eventArgs.EventRecord.LogName),
                                 ProcessId = eventArgs.EventRecord.ProcessId,
                                 RecordId = eventArgs.EventRecord.RecordId,
-                                Source = eventArgs.EventRecord.ProviderName,
-                                TaskCategory = _resolver.ResolveTaskName(eventArgs.EventRecord),
+                                Source = _resolverCache.GetValue(eventArgs.EventRecord.ProviderName),
+                                TaskCategory = _resolverCache.GetValue(
+                                    eventResolver.ResolveTaskName(eventArgs.EventRecord)),
                                 ThreadId = eventArgs.EventRecord.ThreadId,
                                 TimeCreated = eventArgs.EventRecord.TimeCreated!.Value.ToUniversalTime(),
                                 UserId = eventArgs.EventRecord.UserId,
@@ -229,17 +229,6 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             });
 
             _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
-
-            if (_watchers.Count < 1)
-            {
-                if (_resolver is IDisposable disposableResolver)
-                {
-                    disposableResolver.Dispose();
-                    _debugLogger.Trace($"{nameof(LiveLogWatcherService)} Disposed the IEventResolver.");
-                }
-
-                _resolver = null;
-            }
         }
     }
 }

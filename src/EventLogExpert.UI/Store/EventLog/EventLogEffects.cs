@@ -20,6 +20,7 @@ using IDispatcher = Fluxor.IDispatcher;
 namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed class EventLogEffects(
+    IEventResolverCache resolverCache,
     IState<EventLogState> eventLogState,
     ILogWatcherService logWatcherService,
     IState<SettingsState> settingsState,
@@ -64,6 +65,8 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
+
+        resolverCache.ClearAll();
 
         return Task.CompletedTask;
     }
@@ -195,16 +198,17 @@ public sealed class EventLogEffects(
                                     new DisplayEventModel(action.LogName)
                                     {
                                         ActivityId = @event.ActivityId,
-                                        ComputerName = IEventResolver.ValueCache.Get(@event.MachineName),
-                                        Description = eventResolver.ResolveDescription(@event),
+                                        ComputerName = resolverCache.GetValue(@event.MachineName),
+                                        Description = resolverCache.GetDescription(eventResolver.ResolveDescription(@event)),
                                         Id = @event.Id,
-                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event),
+                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
+                                            .Select(resolverCache.GetValue).ToList(),
                                         Level = Severity.GetString(@event.Level),
-                                        LogName = IEventResolver.ValueCache.Get(@event.LogName),
+                                        LogName = resolverCache.GetValue(@event.LogName),
                                         ProcessId = @event.ProcessId,
                                         RecordId = @event.RecordId,
-                                        Source = IEventResolver.ValueCache.Get(@event.ProviderName),
-                                        TaskCategory = eventResolver.ResolveTaskName(@event),
+                                        Source = resolverCache.GetValue(@event.ProviderName),
+                                        TaskCategory = resolverCache.GetValue(eventResolver.ResolveTaskName(@event)),
                                         ThreadId = @event.ThreadId,
                                         TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
                                         UserId = @event.UserId,
