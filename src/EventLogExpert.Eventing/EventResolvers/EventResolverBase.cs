@@ -46,10 +46,8 @@ public partial class EventResolverBase : IDisposable
         { 0x80000000000000, "Classic" }
     };
 
-    private static readonly StringCache s_descriptionCache = new();
-    private static readonly StringCache s_xmlCache = new();
-
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
+    protected readonly ReaderWriterLockSlim providerDetailsLock = new();
     protected readonly Action<string, LogLevel> tracer;
 
     protected bool disposed;
@@ -77,9 +75,7 @@ public partial class EventResolverBase : IDisposable
         {
             if ((eventRecord.Keywords.Value & k) == k)
             {
-                returnValue.Add(
-                    IEventResolver.ValueCache.Get(
-                        s_standardKeywords[k].TrimEnd('\0')));
+                returnValue.Add(s_standardKeywords[k].TrimEnd('\0'));
             }
         }
 
@@ -98,9 +94,7 @@ public partial class EventResolverBase : IDisposable
             {
                 if ((lower32 & k) == k)
                 {
-                    returnValue.Add(
-                        IEventResolver.ValueCache.Get(
-                            details.Keywords[k].TrimEnd('\0')));
+                    returnValue.Add(details.Keywords[k].TrimEnd('\0'));
                 }
             }
         }
@@ -139,7 +133,7 @@ public partial class EventResolverBase : IDisposable
 
         if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
         {
-            return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
+            return taskName.TrimEnd('\0');
         }
 
         if (!eventRecord.Task.HasValue)
@@ -151,7 +145,7 @@ public partial class EventResolverBase : IDisposable
 
         if (taskName is not null)
         {
-            return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
+            return taskName.TrimEnd('\0');
         }
 
         var potentialTaskNames = details.Messages
@@ -176,7 +170,7 @@ public partial class EventResolverBase : IDisposable
             taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
         }
 
-        return IEventResolver.ValueCache.Get(taskName.TrimEnd('\0'));
+        return taskName.TrimEnd('\0');
     }
 
     protected virtual void Dispose(bool disposing)
@@ -203,7 +197,7 @@ public partial class EventResolverBase : IDisposable
             // when the entire description is a string literal, and there is no provider DLL needed.
             // Found a few providers that have their properties wrapped with \r\n for some reason
             return properties.Count == 1 ?
-                s_descriptionCache.Get(properties[0].Trim(['\0', '\r', '\n'])) :
+                properties[0].Trim(['\0', '\r', '\n']) :
                 "Unable to resolve description, see XML for more details.";
         }
 
@@ -267,7 +261,7 @@ public partial class EventResolverBase : IDisposable
                 updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
             }
 
-            return s_descriptionCache.Get(updatedDescription.ToString());
+            return updatedDescription.ToString();
         }
         catch (InvalidOperationException)
         {
@@ -289,8 +283,6 @@ public partial class EventResolverBase : IDisposable
 
         if (!string.IsNullOrWhiteSpace(template))
         {
-            template = s_xmlCache.Get(template);
-
             if (s_formattedPropertiesCache.TryGetValue(template, out var values))
             {
                 dataNodes = values;
@@ -301,7 +293,7 @@ public partial class EventResolverBase : IDisposable
                     .Descendants()
                     .Attributes()
                     .Where(a => a.Name == "outType")
-                    .Select(a => s_xmlCache.Get(a.Value))
+                    .Select(a =>a.Value)
                     .ToArray();
 
                 s_formattedPropertiesCache.TryAdd(template, dataNodes);

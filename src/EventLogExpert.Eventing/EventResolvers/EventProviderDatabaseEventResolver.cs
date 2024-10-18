@@ -12,9 +12,9 @@ namespace EventLogExpert.Eventing.EventResolvers;
 
 public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
-    private ImmutableArray<EventProviderDbContext> _dbContexts = [];
-
     private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
+
+    private ImmutableArray<EventProviderDbContext> _dbContexts = [];
 
     public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s, log) => { }) { }
 
@@ -24,64 +24,47 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
-    /// <summary>
-    /// Loads the databases. If ActiveDatabases is populated, any databases
-    /// not named therein are skipped.
-    /// </summary>
-    private void LoadDatabases(IEnumerable<string> databasePaths)
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
-        tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
+        providerDetailsLock.EnterUpgradeableReadLock();
 
-        foreach (var databasePath in databasePaths)
+        try
         {
-            tracer($"  {databasePath}", LogLevel.Information);
-        }
-
-        providerDetails.Clear();
-
-        foreach (var context in _dbContexts)
-        {
-            context.Dispose();
-        }
-
-        _dbContexts = [];
-
-        var databasesToLoad = SortDatabases(databasePaths);
-        var obsoleteDbs = new List<string>();
-        var newContexts = new List<EventProviderDbContext>();
-
-        foreach (var file in databasesToLoad)
-        {
-            if (!File.Exists(file))
+            if (providerDetails.ContainsKey(eventRecord.ProviderName))
             {
-                throw new FileNotFoundException(file);
+                return;
             }
 
-            var c = new EventProviderDbContext(file, readOnly: true, tracer);
-            var (needsv2, needsv3) = c.IsUpgradeNeeded();
-            if (needsv2 || needsv3)
+            providerDetailsLock.EnterWriteLock();
+
+            try
             {
-                obsoleteDbs.Add(file);
-                c.Dispose();
-                continue;
+                _databaseAccessSemaphore.Wait();
+
+                foreach (var dbContext in _dbContexts)
+                {
+                    var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
+
+                    if (details is null) { continue; }
+
+                    tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
+                    providerDetails.TryAdd(eventRecord.ProviderName, details);
+                }
+            }
+            finally
+            {
+                _databaseAccessSemaphore.Release();
+                providerDetailsLock.ExitWriteLock();
             }
 
-            c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
-            newContexts.Add(c);
+            if (!providerDetails.ContainsKey(eventRecord.ProviderName))
+            {
+                providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
+            }
         }
-
-        _dbContexts = [.. newContexts];
-
-        if (obsoleteDbs.Count > 0)
+        finally
         {
-            foreach (var db in _dbContexts)
-            {
-                db.Dispose();
-            }
-
-            _dbContexts = [];
-
-            throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(Path.GetFileName)));
+            providerDetailsLock.ExitUpgradeableReadLock();
         }
     }
 
@@ -132,38 +115,65 @@ public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEv
             .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart));
     }
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
-    {
-        if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
-        {
-            return;
-        }
-
-        _databaseAccessSemaphore.Wait();
-
-        try
-        {
-            foreach (var dbContext in _dbContexts)
-            {
-                details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
-
-                if (details is null) { continue; }
-
-                tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
-                providerDetails.TryAdd(eventRecord.ProviderName, details);
-            }
-        }
-        finally
-        {
-            _databaseAccessSemaphore.Release();
-        }
-
-        if (!providerDetails.ContainsKey(eventRecord.ProviderName))
-        {
-            providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
-        }
-    }
-
     [GeneratedRegex("^(.+) (\\S+)$")]
     private static partial Regex SplitProductAndVersionRegex();
+
+    /// <summary>
+    /// Loads the databases. If ActiveDatabases is populated, any databases
+    /// not named therein are skipped.
+    /// </summary>
+    private void LoadDatabases(IEnumerable<string> databasePaths)
+    {
+        tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
+
+        foreach (var databasePath in databasePaths)
+        {
+            tracer($"  {databasePath}", LogLevel.Information);
+        }
+
+        foreach (var context in _dbContexts)
+        {
+            context.Dispose();
+        }
+
+        _dbContexts = [];
+
+        var databasesToLoad = SortDatabases(databasePaths);
+        var obsoleteDbs = new List<string>();
+        var newContexts = new List<EventProviderDbContext>();
+
+        foreach (var file in databasesToLoad)
+        {
+            if (!File.Exists(file))
+            {
+                throw new FileNotFoundException(file);
+            }
+
+            var c = new EventProviderDbContext(file, readOnly: true, tracer);
+            var (needsv2, needsv3) = c.IsUpgradeNeeded();
+            if (needsv2 || needsv3)
+            {
+                obsoleteDbs.Add(file);
+                c.Dispose();
+                continue;
+            }
+
+            c.ChangeTracker.QueryTrackingBehavior = Microsoft.EntityFrameworkCore.QueryTrackingBehavior.NoTracking;
+            newContexts.Add(c);
+        }
+
+        _dbContexts = [.. newContexts];
+
+        if (obsoleteDbs.Count > 0)
+        {
+            foreach (var db in _dbContexts)
+            {
+                db.Dispose();
+            }
+
+            _dbContexts = [];
+
+            throw new InvalidOperationException("Obsolete DB format: " + string.Join(' ', obsoleteDbs.Select(Path.GetFileName)));
+        }
+    }
 }

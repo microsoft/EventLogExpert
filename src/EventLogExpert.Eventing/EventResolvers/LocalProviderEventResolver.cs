@@ -18,12 +18,31 @@ public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : Event
 
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
-        if (providerDetails.TryGetValue(eventRecord.ProviderName, out var details))
-        {
-            return;
-        }
+        providerDetailsLock.EnterUpgradeableReadLock();
 
-        details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
-        providerDetails.TryAdd(eventRecord.ProviderName, details);
+        try
+        {
+            if (providerDetails.ContainsKey(eventRecord.ProviderName))
+            {
+                return;
+            }
+
+            providerDetailsLock.EnterWriteLock();
+
+            try
+            {
+                var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+                providerDetails.TryAdd(eventRecord.ProviderName, details);
+            }
+            finally
+            {
+                providerDetailsLock.ExitWriteLock();
+            }
+
+        }
+        finally
+        {
+            providerDetailsLock.ExitUpgradeableReadLock();
+        }
     }
 }
