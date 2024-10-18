@@ -7,7 +7,7 @@ using System.Diagnostics.Eventing.Reader;
 namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>This IEventResolver uses event databases if any are available, and falls back to local providers if not.</summary>
-public class VersatileEventResolver : IEventResolver, IDisposable
+public class VersatileEventResolver : IEventResolver
 {
     private readonly EventProviderDatabaseEventResolver _databaseResolver;
     private readonly LocalProviderEventResolver _localResolver;
@@ -59,14 +59,13 @@ public class VersatileEventResolver : IEventResolver, IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!_disposedValue)
-        {
-            if (disposing)
-            {
-                _databaseResolver.Dispose();
-            }
+        if (_disposedValue) { return; }
 
-            _disposedValue = true;
+        if (disposing)
+        {
+            _databaseResolver.Dispose();
         }
+
+        _disposedValue = true;
     }
 }

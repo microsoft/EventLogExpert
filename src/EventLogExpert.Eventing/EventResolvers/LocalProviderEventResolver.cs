@@ -14,15 +14,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
 {
-    private bool _disposedValue;
-
     public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
 
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
@@ -33,15 +25,5 @@ public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : Event
 
         details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
         providerDetails.TryAdd(eventRecord.ProviderName, details);
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!_disposedValue)
-        {
-            providerDetails.Clear();
-
-            _disposedValue = true;
-        }
     }
 }
