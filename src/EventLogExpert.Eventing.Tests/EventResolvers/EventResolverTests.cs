@@ -154,90 +154,75 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         Debug.WriteLine("Resolving events took " + sw.ElapsedMilliseconds);
     }
 
-    //[Fact]
-    //public void Test1()
-    //{
-    //    var eventLogReader = new EventLogReader("Application", PathType.LogName);
+    [Fact]
+    public void Test1()
+    {
+        var eventLogReader = new EventLogReader("Application", PathType.LogName);
 
-    //    var resolvers = new List<IEventResolver>
-    //    {
-    //        new LocalProviderEventResolver(),
-    //        /* new EventProviderDatabaseEventResolver(
-    //            s => {
-    //                _outputHelper.WriteLine(s);
-    //                Debug.WriteLine(s);
-    //                Debug.Flush();
-    //            }) */
-    //    };
+        var resolvers = new List<IEventResolver>
+        {
+            new LocalProviderEventResolver(),
+            /* new EventProviderDatabaseEventResolver(
+                s => {
+                    _outputHelper.WriteLine(s);
+                    Debug.WriteLine(s);
+                    Debug.Flush();
+                }) */
+        };
 
-    //    EventRecord er;
-    //    HashSet<string> uniqueDescriptions = [];
-    //    HashSet<string> uniqueXml = [];
-    //    HashSet<string> uniqueKeywords = [];
+        HashSet<string> uniqueDescriptions = [];
+        HashSet<string> uniqueKeywords = [];
 
-    //    var totalCount = 0;
-    //    var mismatchCount = 0;
-    //    var xmlMismatchCount = 0;
-    //    var keywordsMismatchCount = 0;
-    //    var mismatches = new List<List<string>>();
-    //    var xmlMismatches = new List<List<string>>();
-    //    var keywordMismatches = new List<List<string>>();
+        var totalCount = 0;
+        var mismatchCount = 0;
+        var keywordsMismatchCount = 0;
 
-    //    while (null != (er = eventLogReader.ReadEvent()))
-    //    {
-    //        uniqueDescriptions.Clear();
-    //        uniqueXml.Clear();
-    //        uniqueKeywords.Clear();
+        while (eventLogReader.ReadEvent() is { } er)
+        {
+            uniqueDescriptions.Clear();
+            uniqueKeywords.Clear();
 
-    //        foreach (var r in resolvers)
-    //        {
-    //            var resolved = r.ResolveProviderDetails(er, "Test");
+            foreach (var r in resolvers)
+            {
+                r.ResolveProviderDetails(er, "Test");
 
-    //            uniqueDescriptions.Add(resolved.Description
-    //                .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
-    //                .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
-    //                .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
-    //                .Replace("\u200E", "")  // Remove LRM marks from dates.
-    //                .Trim());
+                var description = r.ResolveDescription(er);
+                var keywords = r.GetKeywordsFromBitmask(er);
 
-    //            if (r is EventReaderEventResolver && resolved.KeywordsDisplayNames.Count() < 1)
-    //            {
-    //                // Don't bother adding it. EventReader fails to resolve a lot of keywords for some reason.
-    //            }
-    //            else
-    //            {
-    //                uniqueKeywords.Add(string.Join(" ", resolved.KeywordsDisplayNames.OrderBy(n => n)));
-    //            }
-    //        }
+                uniqueDescriptions.Add(description
+                    .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
+                    .Replace("\n", "")      // CRLFs and spaces in or takes them out, so I'm just giving up for now.
+                    .Replace(" ", "")       // If we're this close to matching FormatMessage() then we're close enough.
+                    .Replace("\u200E", "")  // Remove LRM marks from dates.
+                    .Trim());
 
-    //        if (uniqueDescriptions.Count > 1)
-    //        {
-    //            mismatchCount++;
-    //            mismatches.Add(uniqueDescriptions.ToList());
-    //        }
+                if (!keywords.Any())
+                {
+                    // Don't bother adding it. EventReader fails to resolve a lot of keywords for some reason.
+                }
+                else
+                {
+                    uniqueKeywords.Add(string.Join(" ", keywords.OrderBy(n => n)));
+                }
+            }
 
-    //        if (uniqueXml.Count > 1)
-    //        {
-    //            xmlMismatchCount++;
-    //            xmlMismatches.Add(uniqueXml.ToList());
-    //        }
+            if (uniqueDescriptions.Count > 1)
+            {
+                mismatchCount++;
+            }
 
-    //        if (uniqueKeywords.Count > 1)
-    //        {
-    //            keywordsMismatchCount++;
-    //            keywordMismatches.Add(uniqueKeywords.ToList());
-    //        }
+            if (uniqueKeywords.Count > 1)
+            {
+                keywordsMismatchCount++;
+            }
 
-    //        totalCount++;
-    //    }
+            totalCount++;
+        }
 
-    //    foreach (var resolver in resolvers)
-    //    {
-    //        resolver?.Dispose();
-    //    }
+        var totalMismatchCount = mismatchCount + keywordsMismatchCount;
 
-    //    var mismatchPercent = mismatchCount / totalCount * 100;
+        var mismatchPercent = totalMismatchCount > 0 && totalCount > 0 ? totalMismatchCount / totalCount * 100 : 0;
 
-    //    Assert.True(mismatchPercent < 1);
-    //}
+        Assert.True(mismatchPercent < 1);
+    }
 }
