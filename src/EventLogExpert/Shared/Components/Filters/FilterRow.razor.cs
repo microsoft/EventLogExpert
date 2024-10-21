@@ -42,14 +42,7 @@ public sealed partial class FilterRow
                         .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
                         .Distinct().Order().ToList();
                 case FilterCategory.Level:
-                    List<string> items = [];
-
-                    foreach (SeverityLevel item in Enum.GetValues(typeof(SeverityLevel)))
-                    {
-                        items.Add(item.ToString());
-                    }
-
-                    return items;
+                    return Enum.GetNames<SeverityLevel>().ToList();
                 case FilterCategory.KeywordsDisplayNames:
                     return EventLogState.Value.ActiveLogs.Values
                         .SelectMany(log => log.GetCategoryValues(FilterCategory.KeywordsDisplayNames))
