@@ -14,7 +14,7 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public partial class EventResolverBase : IDisposable
+public partial class EventResolverBase
 {
     /// <summary>
     ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
@@ -50,19 +50,11 @@ public partial class EventResolverBase : IDisposable
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
     protected readonly Action<string, LogLevel> tracer;
 
-    protected bool disposed;
-
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
     protected EventResolverBase(Action<string, LogLevel> tracer)
     {
         this.tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
     }
 
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
@@ -171,19 +163,6 @@ public partial class EventResolverBase : IDisposable
         }
 
         return taskName.TrimEnd('\0');
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposed) { return; }
-
-        if (disposing)
-        {
-            s_formattedPropertiesCache.Clear();
-            providerDetails.Clear();
-        }
-
-        disposed = true;
     }
 
     protected string FormatDescription(

@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
+public sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
     private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
 

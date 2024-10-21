@@ -9,7 +9,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Turns a System.Diagnostics.Eventing.Reader.EventRecord into an
 ///     EventLogExpert.Eventing.Models.DisplayEventModel.
 /// </summary>
-public interface IEventResolver : IDisposable
+public interface IEventResolver
 {
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
 

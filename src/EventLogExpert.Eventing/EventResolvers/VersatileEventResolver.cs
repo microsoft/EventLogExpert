@@ -7,66 +7,86 @@ using System.Diagnostics.Eventing.Reader;
 namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>This IEventResolver uses event databases if any are available, and falls back to local providers if not.</summary>
-public class VersatileEventResolver : IEventResolver
+public sealed class VersatileEventResolver : IEventResolver
 {
-    private readonly EventProviderDatabaseEventResolver _databaseResolver;
-    private readonly LocalProviderEventResolver _localResolver;
-    private readonly bool _useDatabaseResolver;
-
-    private bool _disposedValue;
+    private readonly EventProviderDatabaseEventResolver? _databaseResolver;
+    private readonly LocalProviderEventResolver? _localResolver;
 
     public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger tracer)
     {
-        _localResolver = new LocalProviderEventResolver(tracer.Trace);
-        _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
-        _useDatabaseResolver = !dbCollection.ActiveDatabases.IsEmpty;
-
-        tracer.Trace($"{nameof(_useDatabaseResolver)} is {_useDatabaseResolver} in {nameof(VersatileEventResolver)} constructor.");
-    }
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord) =>
-        _useDatabaseResolver
-            ? _databaseResolver.GetKeywordsFromBitmask(eventRecord)
-            : _localResolver.GetKeywordsFromBitmask(eventRecord);
-
-    public string ResolveDescription(EventRecord eventRecord) =>
-        _useDatabaseResolver ?
-            _databaseResolver.ResolveDescription(eventRecord) :
-            _localResolver.ResolveDescription(eventRecord);
-
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
-    {
-        if (_useDatabaseResolver)
+        if (dbCollection.ActiveDatabases.IsEmpty)
         {
-            _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
+            _localResolver = new LocalProviderEventResolver(tracer.Trace);
         }
         else
         {
-            _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
+            _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
         }
+
+        tracer.Trace($"Database Resolver is {dbCollection.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
-    public string ResolveTaskName(EventRecord eventRecord) =>
-        _useDatabaseResolver ?
-            _databaseResolver.ResolveTaskName(eventRecord) :
-            _localResolver.ResolveTaskName(eventRecord);
-
-    protected virtual void Dispose(bool disposing)
+    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
     {
-        if (_disposedValue) { return; }
-
-        if (disposing)
+        if (_databaseResolver is not null)
         {
-            _databaseResolver.Dispose();
-            _localResolver.Dispose();
+            return _databaseResolver.GetKeywordsFromBitmask(eventRecord);
         }
 
-        _disposedValue = true;
+        if (_localResolver is not null)
+        {
+            return _localResolver.GetKeywordsFromBitmask(eventRecord);
+        }
+
+        throw new InvalidOperationException("No database or local resolver available.");
+    }
+
+    public string ResolveDescription(EventRecord eventRecord)
+    {
+        if (_databaseResolver is not null)
+        {
+            return _databaseResolver.ResolveDescription(eventRecord);
+        }
+
+        if (_localResolver is not null)
+        {
+            return _localResolver.ResolveDescription(eventRecord);
+        }
+
+        throw new InvalidOperationException("No database or local resolver available.");
+    }
+
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    {
+        if (_databaseResolver is not null)
+        {
+            _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
+
+            return;
+        }
+
+        if (_localResolver is not null)
+        {
+            _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
+
+            return;
+        }
+
+        throw new InvalidOperationException("No database or local resolver available.");
+    }
+
+    public string ResolveTaskName(EventRecord eventRecord)
+    {
+        if (_databaseResolver is not null)
+        {
+            return _databaseResolver.ResolveTaskName(eventRecord);
+        }
+
+        if (_localResolver is not null)
+        {
+            return _localResolver.ResolveTaskName(eventRecord);
+        }
+
+        throw new InvalidOperationException("No database or local resolver available.");
     }
 }

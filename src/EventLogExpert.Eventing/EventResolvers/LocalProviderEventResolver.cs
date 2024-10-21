@@ -12,7 +12,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Resolves event descriptions by using our own logic to look up
 ///     message strings in the providers available on the local machine.
 /// </summary>
-public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
+public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
 {
     public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
@@ -38,7 +38,6 @@ public class LocalProviderEventResolver(Action<string, LogLevel> tracer) : Event
             {
                 providerDetailsLock.ExitWriteLock();
             }
-
         }
         finally
         {
