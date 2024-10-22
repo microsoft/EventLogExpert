@@ -23,13 +23,25 @@ internal static class ResolverMethods
             0x8000FFFF => "Catastrophic failure",
 
             0x80070002 => "The system cannot find the file specified",
+            0x80070003 => "The system cannot find the path specified",
             0x80070005 => "General access denied error",
             0x80070006 => "Invalid handle",
+            0x8007000D => "The data is invalid",
             0x8007000E => "Ran out of memory",
             0x80070032 => "The request is not supported",
             0x80070057 => "One or more arguments are invalid",
+            0x800704C7 => "The operation was canceled by the user",
             0x80070520 => "A specific logon session does not exist. It may already have been terminated",
             0x80070718 => "Not enough quota is available to process this command",
+            0x8007071A => "The remote procedure call was cancelled",
+
+            // WinEvt
+
+            0x80073AB3 => "The message resource is present but the message was not found in the message table",
+            0x80073AB4 => "The message ID for the desired message could not be found",
+            0x80073A9A => "The publisher metadata cannot be found in the resource",
+            0x80073A9D => "The event data raised by the publisher is not compatible with the event template definition in the publisher's manifest",
+            0x80073A9F => "The specified channel could not be found",
 
             // AppX
             0x80073CF0 => "Package could not be opened",

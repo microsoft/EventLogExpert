@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using System.Diagnostics.Eventing.Reader;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
@@ -26,67 +25,67 @@ public sealed class VersatileEventResolver : IEventResolver
         tracer.Trace($"Database Resolver is {dbCollection.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
-    {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.GetKeywordsFromBitmask(eventRecord);
-        }
+    //public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
+    //{
+    //    if (_databaseResolver is not null)
+    //    {
+    //        return _databaseResolver.GetKeywordsFromBitmask(eventRecord);
+    //    }
 
-        if (_localResolver is not null)
-        {
-            return _localResolver.GetKeywordsFromBitmask(eventRecord);
-        }
+    //    if (_localResolver is not null)
+    //    {
+    //        return _localResolver.GetKeywordsFromBitmask(eventRecord);
+    //    }
 
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
+    //    throw new InvalidOperationException("No database or local resolver available.");
+    //}
 
-    public string ResolveDescription(EventRecord eventRecord)
-    {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.ResolveDescription(eventRecord);
-        }
+    //public string ResolveDescription(EventRecord eventRecord)
+    //{
+    //    if (_databaseResolver is not null)
+    //    {
+    //        return _databaseResolver.ResolveDescription(eventRecord);
+    //    }
 
-        if (_localResolver is not null)
-        {
-            return _localResolver.ResolveDescription(eventRecord);
-        }
+    //    if (_localResolver is not null)
+    //    {
+    //        return _localResolver.ResolveDescription(eventRecord);
+    //    }
 
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
+    //    throw new InvalidOperationException("No database or local resolver available.");
+    //}
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
-    {
-        if (_databaseResolver is not null)
-        {
-            _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
+    //public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    //{
+    //    if (_databaseResolver is not null)
+    //    {
+    //        _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
 
-            return;
-        }
+    //        return;
+    //    }
 
-        if (_localResolver is not null)
-        {
-            _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
+    //    if (_localResolver is not null)
+    //    {
+    //        _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
 
-            return;
-        }
+    //        return;
+    //    }
 
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
+    //    throw new InvalidOperationException("No database or local resolver available.");
+    //}
 
-    public string ResolveTaskName(EventRecord eventRecord)
-    {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.ResolveTaskName(eventRecord);
-        }
+    //public string ResolveTaskName(EventRecord eventRecord)
+    //{
+    //    if (_databaseResolver is not null)
+    //    {
+    //        return _databaseResolver.ResolveTaskName(eventRecord);
+    //    }
 
-        if (_localResolver is not null)
-        {
-            return _localResolver.ResolveTaskName(eventRecord);
-        }
+    //    if (_localResolver is not null)
+    //    {
+    //        return _localResolver.ResolveTaskName(eventRecord);
+    //    }
 
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
+    //    throw new InvalidOperationException("No database or local resolver available.");
+    //}
 }

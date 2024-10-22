@@ -9,7 +9,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Helpers;
 
-public class NativeMethods
+public sealed class NativeMethods
 {
     public const int RT_MESSAGETABLE = 11;
 

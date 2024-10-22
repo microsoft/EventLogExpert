@@ -1,8 +1,6 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using System.Diagnostics.Eventing.Reader;
-
 namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>
@@ -11,11 +9,11 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// </summary>
 public interface IEventResolver
 {
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
+    //public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
 
-    public string ResolveDescription(EventRecord eventRecord);
+    //public string ResolveDescription(EventRecord eventRecord);
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
+    //public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
 
-    public string ResolveTaskName(EventRecord eventRecord);
+    //public string ResolveTaskName(EventRecord eventRecord);
 }

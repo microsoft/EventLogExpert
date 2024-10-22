@@ -1,4 +1,7 @@
-﻿using System.CommandLine;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -8,11 +11,11 @@ class Program
     {
         var rootCommand = new RootCommand("Tool used to create and modify databases for use with EventLogExpert");
 
-        rootCommand.AddCommand(ShowLocalCommand.GetCommand());
+        //rootCommand.AddCommand(ShowLocalCommand.GetCommand());
 
         rootCommand.AddCommand(ShowDatabaseCommand.GetCommand());
 
-        rootCommand.AddCommand(CreateDatabaseCommand.GetCommand());
+        //rootCommand.AddCommand(CreateDatabaseCommand.GetCommand());
 
         rootCommand.AddCommand(MergeDatabaseCommand.GetCommand());
 
