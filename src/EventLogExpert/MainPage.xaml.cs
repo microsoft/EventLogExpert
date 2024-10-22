@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Reader;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
@@ -18,7 +19,6 @@ using Fluxor;
 using Microsoft.Extensions.Logging;
 using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
-using System.Diagnostics.Eventing.Reader;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
@@ -186,7 +186,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             return;
         }
 
-        if (eventLogInformation?.RecordCount is null or <= 0)
+        if (eventLogInformation.RecordCount is null or <= 0)
         {
             await _dialogService.ShowAlert("Empty log", "Log contains no events", "Ok");
 
@@ -412,7 +412,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         using EventLogSession session = new();
 
-        var names = session.GetLogNames().Order();
+        var names = session.GetLogNames();
 
         CreateFlyoutMenu(AddOtherLogsFlyoutSubitem, names, true);
         CreateFlyoutMenu(OpenOtherLogsFlyoutSubitem, names);

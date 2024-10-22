@@ -2,10 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
-using System.Diagnostics.Eventing.Reader;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
@@ -24,49 +22,49 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
-    {
-        providerDetailsLock.EnterUpgradeableReadLock();
+    //public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    //{
+    //    providerDetailsLock.EnterUpgradeableReadLock();
 
-        try
-        {
-            if (providerDetails.ContainsKey(eventRecord.ProviderName))
-            {
-                return;
-            }
+    //    try
+    //    {
+    //        if (providerDetails.ContainsKey(eventRecord.ProviderName))
+    //        {
+    //            return;
+    //        }
 
-            providerDetailsLock.EnterWriteLock();
+    //        providerDetailsLock.EnterWriteLock();
 
-            try
-            {
-                _databaseAccessSemaphore.Wait();
+    //        try
+    //        {
+    //            _databaseAccessSemaphore.Wait();
 
-                foreach (var dbContext in _dbContexts)
-                {
-                    var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
+    //            foreach (var dbContext in _dbContexts)
+    //            {
+    //                var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
 
-                    if (details is null) { continue; }
+    //                if (details is null) { continue; }
 
-                    tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
-                    providerDetails.TryAdd(eventRecord.ProviderName, details);
-                }
-            }
-            finally
-            {
-                _databaseAccessSemaphore.Release();
-                providerDetailsLock.ExitWriteLock();
-            }
+    //                tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
+    //                providerDetails.TryAdd(eventRecord.ProviderName, details);
+    //            }
+    //        }
+    //        finally
+    //        {
+    //            _databaseAccessSemaphore.Release();
+    //            providerDetailsLock.ExitWriteLock();
+    //        }
 
-            if (!providerDetails.ContainsKey(eventRecord.ProviderName))
-            {
-                providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
-            }
-        }
-        finally
-        {
-            providerDetailsLock.ExitUpgradeableReadLock();
-        }
-    }
+    //        if (!providerDetails.ContainsKey(eventRecord.ProviderName))
+    //        {
+    //            providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
+    //        }
+    //    }
+    //    finally
+    //    {
+    //        providerDetailsLock.ExitUpgradeableReadLock();
+    //    }
+    //}
 
     /// <summary>
     /// If the database file name ends in a year or a number, such as Exchange 2019 or

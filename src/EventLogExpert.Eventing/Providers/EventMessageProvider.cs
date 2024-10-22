@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics.Eventing.Reader;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Providers;
@@ -14,7 +13,7 @@ namespace EventLogExpert.Eventing.Providers;
 /// </summary>
 public class EventMessageProvider
 {
-    private static HashSet<string> _allProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
+    //private static HashSet<string> _allProviderNames = new EventLogSession().GetProviderNames().ToHashSet();
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;
     private readonly Action<string, LogLevel> _traceAction;
@@ -31,69 +30,69 @@ public class EventMessageProvider
         _registryProvider = new RegistryProvider(computerName, _traceAction);
     }
 
-    public ProviderDetails? LoadProviderDetails()
-    {
-        ProviderMetadata providerMetadata = null;
-        try
-        {
-            providerMetadata = new ProviderMetadata(_providerName);
-        }
-        catch (Exception ex)
-        {
-            _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.", LogLevel.Information);
-        }
+    //public ProviderDetails? LoadProviderDetails()
+    //{
+    //    ProviderMetadata providerMetadata = null;
+    //    try
+    //    {
+    //        providerMetadata = new ProviderMetadata(_providerName);
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        _traceAction($"Couldn't get metadata for provider {_providerName}. Exception: {ex}.", LogLevel.Information);
+    //    }
 
-        ProviderDetails provider;
-        if (providerMetadata != null)
-        {
-            provider = LoadMessagesFromModernProvider(providerMetadata);
-        }
-        else
-        {
-            provider = new ProviderDetails { ProviderName = _providerName };
-        }
+    //    ProviderDetails provider;
+    //    if (providerMetadata != null)
+    //    {
+    //        provider = LoadMessagesFromModernProvider(providerMetadata);
+    //    }
+    //    else
+    //    {
+    //        provider = new ProviderDetails { ProviderName = _providerName };
+    //    }
 
-        var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
+    //    var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
-        if (legacyProviderFiles.Any())
-        {
-            provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
-        }
-        else
-        {
-            if (providerMetadata?.MessageFilePath == null)
-            {
-                _traceAction($"No message files found for provider {_providerName}. Returning null.", LogLevel.Information);
-                provider.Messages = new List<MessageModel>();
-            }
-            else
-            {
-                _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.", LogLevel.Information);
-                provider.Messages = LoadMessagesFromDlls(new[] { providerMetadata.MessageFilePath });
-            }
-        }
+    //    if (legacyProviderFiles.Any())
+    //    {
+    //        provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
+    //    }
+    //    else
+    //    {
+    //        if (providerMetadata?.MessageFilePath == null)
+    //        {
+    //            _traceAction($"No message files found for provider {_providerName}. Returning null.", LogLevel.Information);
+    //            provider.Messages = new List<MessageModel>();
+    //        }
+    //        else
+    //        {
+    //            _traceAction($"No message files found for provider {_providerName}. Using message file from modern provider.", LogLevel.Information);
+    //            provider.Messages = LoadMessagesFromDlls(new[] { providerMetadata.MessageFilePath });
+    //        }
+    //    }
 
-        if (providerMetadata?.ParameterFilePath != null)
-        {
-            provider.Parameters = LoadMessagesFromDlls(new[] { providerMetadata.ParameterFilePath });
-        }
+    //    if (providerMetadata?.ParameterFilePath != null)
+    //    {
+    //        provider.Parameters = LoadMessagesFromDlls(new[] { providerMetadata.ParameterFilePath });
+    //    }
 
-        if (provider.Events == null && provider.Messages == null)
-        {
-            return null;
-        }
-        else
-        {
-            // We got some sort of data back, so make sure all the collections are there
-            provider.Messages ??= new List<MessageModel>();
-            provider.Events ??= new List<EventModel>();
-            provider.Keywords ??= new Dictionary<long, string>();
-            provider.Opcodes ??= new Dictionary<int, string>();
-            provider.Tasks ??= new Dictionary<int, string>();
+    //    if (provider.Events == null && provider.Messages == null)
+    //    {
+    //        return null;
+    //    }
+    //    else
+    //    {
+    //        // We got some sort of data back, so make sure all the collections are there
+    //        provider.Messages ??= new List<MessageModel>();
+    //        provider.Events ??= new List<EventModel>();
+    //        provider.Keywords ??= new Dictionary<long, string>();
+    //        provider.Opcodes ??= new Dictionary<int, string>();
+    //        provider.Tasks ??= new Dictionary<int, string>();
 
-            return provider;
-        }
-    }
+    //        return provider;
+    //    }
+    //}
 
     /// <summary>
     ///     Loads the messages for a legacy provider from the files specified in
@@ -231,86 +230,86 @@ public class EventMessageProvider
         return true;
     }
 
-    /// <summary>
-    ///     Loads the messages for a modern provider. This info is stored at
-    ///     Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT
-    /// </summary>
-    /// <returns></returns>
-    private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
-    {
-        _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}", LogLevel.Information);
+    ///// <summary>
+    /////     Loads the messages for a modern provider. This info is stored at
+    /////     Computer\HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\WINEVT
+    ///// </summary>
+    ///// <returns></returns>
+    //private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
+    //{
+    //    _traceAction($"LoadMessagesFromModernProvider called for provider {_providerName}", LogLevel.Information);
 
-        var provider = new ProviderDetails { ProviderName = _providerName };
+    //    var provider = new ProviderDetails { ProviderName = _providerName };
 
-        if (!_allProviderNames.Contains(_providerName))
-        {
-            _traceAction($"{_providerName} modern provider is not present. Returning empty provider.", LogLevel.Information);
-            return provider;
-        }
+    //    if (!_allProviderNames.Contains(_providerName))
+    //    {
+    //        _traceAction($"{_providerName} modern provider is not present. Returning empty provider.", LogLevel.Information);
+    //        return provider;
+    //    }
 
-        try
-        {
-            provider.Events = providerMetadata.Events.Select(e => new EventModel
-            {
-                Description = e.Description,
-                Id = e.Id,
-                Keywords = e.Keywords.Select(k => k.Value).ToArray(),
-                Level = e.Level.Value,
-                LogName = e.LogLink.LogName,
-                Opcode = e.Opcode.Value,
-                Task = e.Task.Value,
-                Version = e.Version,
-                Template = e.Template
-            }).ToList();
-        }
-        catch (Exception ex)
-        {
-            provider.Events = new List<EventModel>();
-            _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:", LogLevel.Information);
-            _traceAction(ex.ToString(), LogLevel.Information);
-        }
+    //    try
+    //    {
+    //        provider.Events = providerMetadata.Events.Select(e => new EventModel
+    //        {
+    //            Description = e.Description,
+    //            Id = e.Id,
+    //            Keywords = e.Keywords.Select(k => k.Value).ToArray(),
+    //            Level = e.Level.Value,
+    //            LogName = e.LogLink.LogName,
+    //            Opcode = e.Opcode.Value,
+    //            Task = e.Task.Value,
+    //            Version = e.Version,
+    //            Template = e.Template
+    //        }).ToList();
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        provider.Events = new List<EventModel>();
+    //        _traceAction($"Failed to load Events for modern provider: {_providerName}. Exception:", LogLevel.Information);
+    //        _traceAction(ex.ToString(), LogLevel.Information);
+    //    }
 
-        try
-        {
-            provider.Keywords = providerMetadata.Keywords
-                .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
-                .ToDictionary(p => p.Key, p => p.Value);
+    //    try
+    //    {
+    //        provider.Keywords = providerMetadata.Keywords
+    //            .Select(i => new KeyValuePair<long, string>(i.Value, i.DisplayName ?? i.Name))
+    //            .ToDictionary(p => p.Key, p => p.Value);
 
-        }
-        catch (Exception ex)
-        {
-            provider.Keywords = new Dictionary<long, string>();
-            _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:", LogLevel.Information);
-            _traceAction(ex.ToString(), LogLevel.Information);
-        }
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        provider.Keywords = new Dictionary<long, string>();
+    //        _traceAction($"Failed to load Keywords for modern provider: {_providerName}. Exception:", LogLevel.Information);
+    //        _traceAction(ex.ToString(), LogLevel.Information);
+    //    }
 
-        try
-        {
-            provider.Opcodes = providerMetadata.Opcodes
-                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
-                .ToDictionary(p => p.Key, p => p.Value);
-        }
-        catch (Exception ex)
-        {
-            provider.Opcodes = new Dictionary<int, string>();
-            _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:", LogLevel.Information);
-            _traceAction(ex.ToString(), LogLevel.Information);
-        }
+    //    try
+    //    {
+    //        provider.Opcodes = providerMetadata.Opcodes
+    //            .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
+    //            .ToDictionary(p => p.Key, p => p.Value);
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        provider.Opcodes = new Dictionary<int, string>();
+    //        _traceAction($"Failed to load Opcodes for modern provider: {_providerName}. Exception:", LogLevel.Information);
+    //        _traceAction(ex.ToString(), LogLevel.Information);
+    //    }
 
-        try
-        {
-            provider.Tasks = providerMetadata.Tasks
-                .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
-                .ToDictionary(p => p.Key, p => p.Value);
-        }
-        catch (Exception ex)
-        {
-            provider.Tasks = new Dictionary<int, string>();
-            _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:", LogLevel.Information);
-            _traceAction(ex.ToString(), LogLevel.Information);
-        }
+    //    try
+    //    {
+    //        provider.Tasks = providerMetadata.Tasks
+    //            .Select(i => new KeyValuePair<int, string>(i.Value, i.DisplayName ?? i.Name))
+    //            .ToDictionary(p => p.Key, p => p.Value);
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        provider.Tasks = new Dictionary<int, string>();
+    //        _traceAction($"Failed to load Tasks for modern provider: {_providerName}. Exception:", LogLevel.Information);
+    //        _traceAction(ex.ToString(), LogLevel.Information);
+    //    }
 
-        _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}", LogLevel.Information);
-        return provider;
-    }
+    //    _traceAction($"Returning {provider.Events?.Count} events for provider {_providerName}", LogLevel.Information);
+    //    return provider;
+    //}
 }

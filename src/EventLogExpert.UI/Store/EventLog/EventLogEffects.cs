@@ -4,17 +4,15 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Reader;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Diagnostics.Eventing.Reader;
-using System.Xml.Linq;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -61,7 +59,7 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.CloseAll))]
     public Task HandleCloseAll(IDispatcher dispatcher)
     {
-        logWatcherService.RemoveAll();
+        //logWatcherService.RemoveAll();
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
@@ -74,7 +72,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        logWatcherService.RemoveLog(action.LogName);
+        //logWatcherService.RemoveLog(action.LogName);
 
         dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
@@ -121,19 +119,14 @@ public sealed class EventLogEffects(
             return;
         }
 
-        EventLogQuery eventLog = action.LogType == LogType.Live ?
-            new EventLogQuery(action.LogName, PathType.LogName) :
-            new EventLogQuery(action.LogName, PathType.FilePath);
-
         var activityId = Guid.NewGuid();
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
-        EventRecord? lastEvent = null;
+        //EventRecord? lastEvent = null;
 
         const int batchSize = 200;
         bool doneReading = false;
-        ConcurrentQueue<EventRecord> records = new();
         ConcurrentQueue<DisplayEventModel> events = new();
 
         await using Timer timer = new(
@@ -147,100 +140,100 @@ public sealed class EventLogEffects(
             // Don't need to wait on this since we are waiting for doneReading in the resolver tasks
             _ = Task.Run(() =>
             {
-                using var reader = new EventLogReader(eventLog);
+                using var reader = new EventLogReader(action.LogName, action.LogType == LogType.Live ? PathType.LogName : PathType.FilePath);
 
                 int count = 0;
 
-                while (reader.ReadEvent() is { } e)
-                {
-                    action.Token.ThrowIfCancellationRequested();
+                //while (reader.ReadEvent() is { } e)
+                //{
+                //    action.Token.ThrowIfCancellationRequested();
 
-                    if (count % batchSize == 0)
-                    {
-                        records.Enqueue(e);
-                    }
+                //    if (count % batchSize == 0)
+                //    {
+                //        records.Enqueue(e);
+                //    }
 
-                    count++;
+                //    count++;
 
-                    lastEvent = e;
-                }
+                //    lastEvent = e;
+                //}
 
                 doneReading = true;
             },
             action.Token);
 
-            await Parallel.ForEachAsync(
-                Enumerable.Range(1, 8),
-                action.Token,
-                (_, token) =>
-                {
-                    using var reader = new EventLogReader(eventLog);
+            //await Parallel.ForEachAsync(
+            //    Enumerable.Range(1, 8),
+            //    action.Token,
+            //    (_, token) =>
+            //    {
+            //        using var reader = new EventLogReader(eventLog);
 
-                    while (records.TryDequeue(out EventRecord? @event) || !doneReading)
-                    {
-                        token.ThrowIfCancellationRequested();
+            //        while (records.TryDequeue(out EventRecord? @event) || !doneReading)
+            //        {
+            //            token.ThrowIfCancellationRequested();
 
-                        if (@event is null) { continue; }
+            //            if (@event is null) { continue; }
 
-                        reader.Seek(@event.Bookmark);
+            //            reader.Seek(@event.Bookmark);
 
-                        for (int i = 0; i < batchSize; i++)
-                        {
-                            @event = reader.ReadEvent();
+            //            for (int i = 0; i < batchSize; i++)
+            //            {
+            //                @event = reader.ReadEvent();
 
-                            if (@event is null) { break; }
+            //                if (@event is null) { break; }
 
-                            try
-                            {
-                                eventResolver.ResolveProviderDetails(@event, action.LogName);
+            //                try
+            //                {
+            //                    eventResolver.ResolveProviderDetails(@event, action.LogName);
 
-                                events.Enqueue(
-                                    new DisplayEventModel(action.LogName)
-                                    {
-                                        ActivityId = @event.ActivityId,
-                                        ComputerName = resolverCache.GetValue(@event.MachineName),
-                                        Description = resolverCache.GetDescription(eventResolver.ResolveDescription(@event)),
-                                        Id = @event.Id,
-                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
-                                            .Select(resolverCache.GetValue).ToList(),
-                                        Level = Severity.GetString(@event.Level),
-                                        LogName = resolverCache.GetValue(@event.LogName),
-                                        ProcessId = @event.ProcessId,
-                                        RecordId = @event.RecordId,
-                                        Source = resolverCache.GetValue(@event.ProviderName),
-                                        TaskCategory = resolverCache.GetValue(eventResolver.ResolveTaskName(@event)),
-                                        ThreadId = @event.ThreadId,
-                                        TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
-                                        UserId = @event.UserId,
-                                        Xml = settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : string.Empty
-                                    });
-                            }
-                            catch (Exception ex) when (ex is EventLogInvalidDataException)
-                            {
-                                logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
+            //                    events.Enqueue(
+            //                        new DisplayEventModel(action.LogName)
+            //                        {
+            //                            ActivityId = @event.ActivityId,
+            //                            ComputerName = resolverCache.GetValue(@event.MachineName),
+            //                            Description = resolverCache.GetDescription(eventResolver.ResolveDescription(@event)),
+            //                            Id = @event.Id,
+            //                            KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
+            //                                .Select(resolverCache.GetValue).ToList(),
+            //                            Level = Severity.GetString(@event.Level),
+            //                            LogName = resolverCache.GetValue(@event.LogName),
+            //                            ProcessId = @event.ProcessId,
+            //                            RecordId = @event.RecordId,
+            //                            Source = resolverCache.GetValue(@event.ProviderName),
+            //                            TaskCategory = resolverCache.GetValue(eventResolver.ResolveTaskName(@event)),
+            //                            ThreadId = @event.ThreadId,
+            //                            TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
+            //                            UserId = @event.UserId,
+            //                            Xml = settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : string.Empty
+            //                        });
+            //                }
+            //                catch (Exception ex) when (ex is EventLogInvalidDataException)
+            //                {
+            //                    logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
 
-                                logger?.Trace(
-                                    $"Invalid data in RecordId: {
-                                        XElement.Parse(@event.Bookmark.BookmarkXml)
-                                            .Descendants()
-                                            .Attributes()
-                                            .Where(a => a.Name == "RecordId")
-                                            .Select(a => a.Value)
-                                            .FirstOrDefault()}",
-                                    LogLevel.Error);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
+            //                    logger?.Trace(
+            //                        $"Invalid data in RecordId: {
+            //                            XElement.Parse(@event.Bookmark.BookmarkXml)
+            //                                .Descendants()
+            //                                .Attributes()
+            //                                .Where(a => a.Name == "RecordId")
+            //                                .Select(a => a.Value)
+            //                                .FirstOrDefault()}",
+            //                        LogLevel.Error);
+            //                }
+            //                catch (Exception ex)
+            //                {
+            //                    logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
 
-                                logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
-                                    LogLevel.Error);
-                            }
-                        }
-                    }
+            //                    logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
+            //                        LogLevel.Error);
+            //                }
+            //            }
+            //        }
 
-                    return ValueTask.CompletedTask;
-                });
+            //        return ValueTask.CompletedTask;
+            //    });
         }
         catch (TaskCanceledException)
         {
@@ -254,10 +247,10 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
-        if (action.LogType == LogType.Live)
-        {
-            logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
-        }
+        //if (action.LogType == LogType.Live)
+        //{
+        //    logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
+        //}
 
         dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
     }
