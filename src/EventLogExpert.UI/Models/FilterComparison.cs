@@ -17,7 +17,7 @@ public sealed record FilterComparison
         set
         {
             Expression = DynamicExpressionParser
-                .ParseLambda<DisplayEventModel, bool>(EventLogExpertCustomTypeProvider.ParsingConfig, false, value)
+                .ParseLambda<DisplayEventModel, bool>(ParsingConfig.Default, false, value)
                 .Compile();
 
             _value = value;

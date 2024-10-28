@@ -33,7 +33,7 @@ public sealed record EventLogAction
 
     public sealed record SelectEvents(IEnumerable<DisplayEventModel> SelectedEvents);
 
-    public sealed record SetContinouslyUpdate(bool ContinuouslyUpdate);
+    public sealed record SetContinuouslyUpdate(bool ContinuouslyUpdate);
 
     public sealed record SetFilters(EventFilter EventFilter);
 }

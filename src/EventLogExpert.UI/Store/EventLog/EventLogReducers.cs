@@ -101,9 +101,9 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceSetContinouslyUpdate(
+    public static EventLogState ReduceSetContinuouslyUpdate(
         EventLogState state,
-        EventLogAction.SetContinouslyUpdate action) =>
+        EventLogAction.SetContinuouslyUpdate action) =>
         state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
 
     [ReducerMethod]

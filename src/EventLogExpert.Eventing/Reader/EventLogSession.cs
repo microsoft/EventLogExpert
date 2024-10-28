@@ -13,6 +13,8 @@ public sealed partial class EventLogSession : IDisposable
 
     internal EventLogHandle Handle { get; } = EventLogHandle.Zero;
 
+    internal EventLogHandle RenderContext { get; } = CreateRenderContext();
+
     public void Dispose()
     {
         Dispose(disposing: true);
@@ -21,6 +23,7 @@ public sealed partial class EventLogSession : IDisposable
 
     public EventLogInformation GetLogInformation(string logName, PathType pathType) => new(this, logName, pathType);
 
+    /// <summary>Gets an ordered list of all the log names on the system.</summary>
     public IEnumerable<string> GetLogNames()
     {
         List<string> paths = [];
@@ -57,6 +60,21 @@ public sealed partial class EventLogSession : IDisposable
         return paths.Order();
     }
 
+    private static EventLogHandle CreateRenderContext()
+    {
+        EventLogHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, EvtRenderContextFlags.System);
+        int error = Marshal.GetLastWin32Error();
+
+        if (renderContextHandle.IsInvalid)
+        {
+            renderContextHandle.Dispose();
+
+            EventMethods.ThrowEventLogException(error);
+        }
+
+        return renderContextHandle;
+    }
+
     private static string NextChannelPath(EventLogHandle handle, ref bool doneReading)
     {
         bool success = EventMethods.EvtNextChannelPath(handle, 0, null, out int bufferSize);
@@ -77,7 +95,7 @@ public sealed partial class EventLogSession : IDisposable
             }
         }
 
-        char[] buffer = new char[bufferSize];
+        var buffer = new char[bufferSize];
 
         success = EventMethods.EvtNextChannelPath(handle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
@@ -92,6 +110,11 @@ public sealed partial class EventLogSession : IDisposable
 
     private void Dispose(bool disposing)
     {
+        if (RenderContext is { IsInvalid: false })
+        {
+            RenderContext.Dispose();
+        }
+
         if (Handle is { IsInvalid: false })
         {
             Handle.Dispose();

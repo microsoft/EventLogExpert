@@ -27,6 +27,43 @@ internal enum EvtLogPropertyId
     Full,
 }
 
+internal enum EvtRenderContextFlags
+{
+    Values = 0,
+    System = 1,
+    User = 2
+}
+
+internal enum EvtRenderFlags
+{
+    EventValues = 0,
+    EventXml = 1,
+    Bookmark = 2
+}
+
+internal enum EvtSystemPropertyId
+{
+    ProviderName = 0,
+    ProviderGuid = 1,
+    EventId = 2,
+    Qualifiers = 3,
+    Level = 4,
+    Task = 5,
+    Opcode = 6,
+    Keywords = 7,
+    TimeCreated = 8,
+    EventRecordId = 9,
+    ActivityId = 10,
+    RelatedActivityId = 11,
+    ProcessID = 12,
+    ThreadID = 13,
+    Channel = 14,
+    Computer = 15,
+    UserID = 16,
+    Version = 17,
+    PropertyIdEND = 18,
+}
+
 internal enum EvtVariantType
 {
     Null = 0,
@@ -143,6 +180,12 @@ internal static partial class EventMethods
     internal static partial bool EvtClose(IntPtr handle);
 
     [LibraryImport(EventLogApi, SetLastError = true)]
+    internal static partial EventLogHandle EvtCreateRenderContext(
+        int valuePathsCount,
+        [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr)][Out] string[]? valuePaths,
+        EvtRenderContextFlags flags);
+
+    [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetLogInfo(
         EventLogHandle log,
@@ -150,6 +193,16 @@ internal static partial class EventMethods
         int propertyValueBufferSize,
         IntPtr propertyValueBuffer,
         out int propertyValueBufferUsed);
+
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtNext(
+        EventLogHandle resultSet,
+        int eventsSize,
+        [MarshalAs(UnmanagedType.LPArray)][Out] IntPtr[] events,
+        int timeout,
+        int flags,
+        ref int returned);
 
     [LibraryImport(EventLogApi, SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -185,12 +238,82 @@ internal static partial class EventMethods
         int flags);
 
     [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtRender(
+        EventLogHandle context,
+        EventLogHandle fragment,
+        EvtRenderFlags flags,
+        int bufferSize,
+        IntPtr buffer,
+        out int bufferUsed,
+        out int propertyCount);
+
+    [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtSeek(
         EventLogHandle resultSet,
         long position,
         EventLogHandle bookmark,
         int timeout,
         SeekFlags flags);
+
+    /// <summary>Converts an event buffer that was returned from EvtRender to an <see cref="EventProperties"/></summary>
+    /// <param name="eventBuffer">Pointer to a buffer returned from EvtRender</param>
+    /// <param name="propertyCount">Property count returned from EvtRender</param>
+    /// <returns></returns>
+    internal static EventProperties GetEventProperties(IntPtr eventBuffer, int propertyCount)
+    {
+        EventProperties properties = new();
+
+        for (int i = 0; i < propertyCount; i++)
+        {
+            var property = Marshal.PtrToStructure<EvtVariant>(eventBuffer + (i * Marshal.SizeOf<EvtVariant>()));
+
+            switch (i)
+            {
+                case (int)EvtSystemPropertyId.ActivityId:
+                    properties.ActivityId = (Guid?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.Computer:
+                    properties.ComputerName = (string?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.EventId:
+                    properties.Id = (ushort?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.Keywords:
+                    properties.Keywords = (ulong?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.Level:
+                    properties.Level = (byte?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.Channel:
+                    properties.LogName = (string?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.ProcessID:
+                    properties.ProcessId = (uint?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.EventRecordId:
+                    properties.RecordId = (ulong?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.ProviderName:
+                    properties.Source = (string?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.Task:
+                    properties.Task = (ushort?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.ThreadID:
+                    properties.ThreadId = (uint?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.TimeCreated:
+                    properties.TimeCreated = (DateTime?)ConvertVariant(property);
+                    break;
+                case (int)EvtSystemPropertyId.UserID:
+                    properties.UserId = (SecurityIdentifier?)ConvertVariant(property);
+                    break;
+            }
+        }
+
+        return properties;
+    }
 
     internal static void ThrowEventLogException(int error)
     {

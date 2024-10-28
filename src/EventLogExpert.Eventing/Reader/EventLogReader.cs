@@ -3,56 +3,106 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Reader;
 
-public sealed class EventLogReader : IDisposable
+public sealed partial class EventLogReader(string path, PathType pathType) : IDisposable
 {
-    private readonly EventLogHandle _handle;
-
-    private IntPtr[] _buffer;
-    private int _currentIndex;
-    private bool _disposed;
-    private int _total;
-
-    public EventLogReader(string path, PathType pathType)
-    {
-        //_handle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType == PathType.LogName ? 1 : 2);
-    }
-
-    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    // ~EventLogReader()
-    // {
-    //     // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-    //     Dispose(disposing: false);
-    // }
+    private readonly EventLogHandle _handle =
+        EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, (int)pathType);
+    private readonly SemaphoreSlim _semaphore = new(1);
 
     public void Dispose()
     {
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
     }
 
+    public bool TryGetEvents(out EventProperties[] events, int batchSize = 100)
+    {
+        var buffer = new IntPtr[batchSize];
+        int count = 0;
+
+        _semaphore.Wait();
+
+        try
+        {
+            bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
+
+            if (!success)
+            {
+                events = [];
+                return false;
+            }
+        }
+        finally
+        {
+            _semaphore.Release();
+        }
+
+        events = new EventProperties[count];
+
+        for (int i = 0; i < count; i++)
+        {
+            using var eventHandle = new EventLogHandle(buffer[i]);
+
+            events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+        }
+
+        return true;
+    }
+
+    private static EventProperties RenderEvent(EventLogHandle eventHandle, EvtRenderFlags flag)
+    {
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = EventMethods.EvtRender(
+                EventLogSession.GlobalSession.RenderContext,
+                eventHandle,
+                flag,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed,
+                out int propertyCount);
+
+            int error = Marshal.GetLastWin32Error();
+
+            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            {
+                EventMethods.ThrowEventLogException(error);
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferUsed);
+
+            success = EventMethods.EvtRender(
+                EventLogSession.GlobalSession.RenderContext,
+                eventHandle,
+                flag,
+                bufferUsed,
+                buffer,
+                out bufferUsed,
+                out propertyCount);
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                EventMethods.ThrowEventLogException(error);
+            }
+
+            return EventMethods.GetEventProperties(buffer, propertyCount);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
     private void Dispose(bool disposing)
     {
-        if (_disposed) { return; }
-
-        if (disposing)
-        {
-            // TODO: dispose managed state (managed objects)
-        }
-
-        while (_currentIndex < _total)
-        {
-            EventMethods.EvtClose(_buffer[_currentIndex]);
-            _currentIndex++;
-        }
-
         _handle.Dispose();
-
-        // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-        // TODO: set large fields to null
-        _disposed = true;
     }
 }

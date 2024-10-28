@@ -28,10 +28,9 @@ namespace EventLogExpert;
 
 public sealed partial class MainPage : ContentPage, IDisposable
 {
-    private static readonly KeyboardAccelerator CopyShortcut = new() { Modifiers = KeyboardAcceleratorModifiers.Ctrl, Key = "C" };
+    private static readonly KeyboardAccelerator s_copyShortcut = new() { Modifiers = KeyboardAcceleratorModifiers.Ctrl, Key = "C" };
 
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
-    private readonly IAppTitleService _appTitleService;
     private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IAlertDialogService _dialogService;
@@ -63,7 +62,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         PopulateOtherLogsMenu();
 
         _activeLogsState = activeLogsState;
-        _appTitleService = appTitleService;
         _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
         _fluxorDispatcher = fluxorDispatcher;
@@ -77,7 +75,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
             {
-                _appTitleService.SetLogName(
+                appTitleService.SetLogName(
                     activeLogs == ImmutableDictionary<string, EventLogData>.Empty ?
                         null : string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
             });
@@ -134,7 +132,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             FileTypes = new FilePickerFileType(
                 new Dictionary<DevicePlatform, IEnumerable<string>>
                 {
-                    { DevicePlatform.WinUI, new[] { ".evtx" } }
+                    { DevicePlatform.WinUI, [".evtx"] }
                 }
             )
         };
@@ -233,8 +231,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private void ContinuouslyUpdate_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(((MenuFlyoutItem)sender).Text == "Continuously Update" ?
-            new EventLogAction.SetContinouslyUpdate(true) :
-            new EventLogAction.SetContinouslyUpdate(false));
+            new EventLogAction.SetContinuouslyUpdate(true) :
+            new EventLogAction.SetContinuouslyUpdate(false));
 
     private void CopySelected_Clicked(object sender, EventArgs e)
     {
@@ -444,16 +442,16 @@ public sealed partial class MainPage : ContentPage, IDisposable
             switch (_settingsState.Value.Config.CopyType)
             {
                 case CopyType.Default:
-                    CopySelected.KeyboardAccelerators.Add(CopyShortcut);
+                    CopySelected.KeyboardAccelerators.Add(s_copyShortcut);
                     break;
                 case CopyType.Simple:
-                    CopySelectedSimple.KeyboardAccelerators.Add(CopyShortcut);
+                    CopySelectedSimple.KeyboardAccelerators.Add(s_copyShortcut);
                     break;
                 case CopyType.Xml:
-                    CopySelectedXml.KeyboardAccelerators.Add(CopyShortcut);
+                    CopySelectedXml.KeyboardAccelerators.Add(s_copyShortcut);
                     break;
                 case CopyType.Full:
-                    CopySelectedFull.KeyboardAccelerators.Add(CopyShortcut);
+                    CopySelectedFull.KeyboardAccelerators.Add(s_copyShortcut);
                     break;
                 default: throw new ArgumentOutOfRangeException();
             }

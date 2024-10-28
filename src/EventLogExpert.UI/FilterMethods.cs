@@ -223,8 +223,8 @@ public static class FilterMethods
 
         try
         {
-            _ = Enumerable.Empty<DisplayEventModel>().AsQueryable()
-                .Where(EventLogExpertCustomTypeProvider.ParsingConfig, expression);
+            _ = Enumerable.Empty<EventProperties>().AsQueryable()
+                .Where(ParsingConfig.Default, expression);
 
             return true;
         }
