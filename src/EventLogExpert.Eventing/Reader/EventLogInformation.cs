@@ -39,7 +39,7 @@ public sealed class EventLogInformation
 
     public long? RecordCount { get; }
 
-    private static object GetLogInfo(EventLogHandle handle, EvtLogPropertyId property)
+    private static object? GetLogInfo(EventLogHandle handle, EvtLogPropertyId property)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -48,7 +48,7 @@ public sealed class EventLogInformation
             bool success = EventMethods.EvtGetLogInfo(handle, property, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }

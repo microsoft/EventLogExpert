@@ -19,7 +19,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
         GC.SuppressFinalize(this);
     }
 
-    public bool TryGetEvents(out EventRecord[] events, int batchSize = 100)
+    public bool TryGetEvents(out EventRecord[] events, int batchSize = 200)
     {
         var buffer = new IntPtr[batchSize];
         int count = 0;
@@ -47,6 +47,8 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
         {
             using var eventHandle = new EventLogHandle(buffer[i]);
 
+            // Todo: We should handle exceptions here and skip the event if we can't render it.
+            // Maybe instead of skipping the event we put the failure reason in the description
             events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
             events[i].Properties = RenderEventProperties(eventHandle);
         }
@@ -71,7 +73,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -119,7 +121,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -149,7 +151,8 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
             for (int i = 0; i < propertyCount; i++)
             {
                 var property = Marshal.PtrToStructure<EvtVariant>(buffer + (i * Marshal.SizeOf<EvtVariant>()));
-                properties.Add(EventMethods.ConvertVariant(property));
+
+                properties.Add(EventMethods.ConvertVariant(property) ?? throw new InvalidDataException());
             }
 
             return properties;

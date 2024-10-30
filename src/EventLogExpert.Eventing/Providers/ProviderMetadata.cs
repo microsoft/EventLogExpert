@@ -2,13 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Reader;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Models;
+namespace EventLogExpert.Eventing.Providers;
 
-internal partial class ProviderMetadata : IDisposable
+internal sealed partial class ProviderMetadata : IDisposable
 {
     private readonly SemaphoreSlim _providerLock = new(1);
     private readonly EventLogHandle _publisherMetadataHandle;
@@ -58,7 +59,7 @@ internal partial class ProviderMetadata : IDisposable
                         i,
                         EvtPublisherMetadataPropertyId.ChannelReferencePath);
 
-                    channels.Add(channelId, channelName);
+                    channels.TryAdd(channelId, channelName);
                 }
 
                 _channels = channels.AsReadOnly();
@@ -102,7 +103,9 @@ internal partial class ProviderMetadata : IDisposable
                 string template = (string)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.Template);
                 int messageId = (int)(uint)GetEventMetadataProperty(metadataHandle, EvtEventMetadataPropertyId.MessageID);
 
-                string message = (messageId == -1) ? string.Empty : EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
+                string message = messageId == -1 ?
+                    string.Empty :
+                    EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
                 events.Add(new EventMetadata(id, version, channelId, level, opcode, task, keywords, template, message, this));
             }
@@ -149,7 +152,7 @@ internal partial class ProviderMetadata : IDisposable
                         name :
                         EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
-                    keywords.Add(value, displayName);
+                    keywords.TryAdd(value, displayName);
                 }
 
                 _keywords = keywords.AsReadOnly();
@@ -163,7 +166,7 @@ internal partial class ProviderMetadata : IDisposable
         }
     }
 
-    public string MessageFilePath => (string)GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.MessageFilePath);
+    public string MessageFilePath => GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.MessageFilePath);
 
     public IDictionary<int, string> Opcodes
     {
@@ -203,7 +206,7 @@ internal partial class ProviderMetadata : IDisposable
                         name :
                         EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
-                    opcodes.Add((int)(value >> 16), displayName);
+                    opcodes.TryAdd((int)(value >> 16), displayName);
                 }
 
                 _opcodes = opcodes.AsReadOnly();
@@ -217,7 +220,7 @@ internal partial class ProviderMetadata : IDisposable
         }
     }
 
-    public string ParameterFilePath => (string)GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.ParameterFilePath);
+    public string ParameterFilePath => GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.ParameterFilePath);
 
     public IDictionary<int, string> Tasks
     {
@@ -230,7 +233,7 @@ internal partial class ProviderMetadata : IDisposable
             try
             {
                 using EventLogHandle channelRefHandle =
-                    GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Opcodes);
+                    GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Tasks);
 
                 int size = EventMethods.GetObjectArraySize(channelRefHandle);
 
@@ -241,23 +244,23 @@ internal partial class ProviderMetadata : IDisposable
                     string name = (string)EventMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
-                        EvtPublisherMetadataPropertyId.OpcodeName);
+                        EvtPublisherMetadataPropertyId.TaskName);
 
-                    uint value = (uint)EventMethods.GetObjectArrayProperty(
+                    int value = (int)(uint)EventMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
-                        EvtPublisherMetadataPropertyId.OpcodeValue);
+                        EvtPublisherMetadataPropertyId.TaskValue);
 
                     int messageId = (int)(uint)EventMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
-                        EvtPublisherMetadataPropertyId.OpcodeMessageID);
+                        EvtPublisherMetadataPropertyId.TaskMessageID);
 
                     string displayName = messageId == -1 ?
                         name :
                         EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
-                    tasks.Add((int)(value >> 16), displayName);
+                    tasks.TryAdd(value, displayName);
                 }
 
                 _tasks = tasks.AsReadOnly();
@@ -277,33 +280,7 @@ internal partial class ProviderMetadata : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (_publisherMetadataHandle is { IsInvalid: false })
-        {
-            _publisherMetadataHandle.Dispose();
-        }
-    }
-
-    private static EventLogHandle? NextEventMetadata(EventLogHandle metadataHandle, int flags)
-    {
-        EventLogHandle handle = EventMethods.EvtNextEventMetadata(metadataHandle, flags);
-        int error = Marshal.GetLastWin32Error();
-
-        if (handle.IsInvalid)
-        {
-            if (error == 259 /* ERROR_NO_MORE_ITEMS */)
-            {
-                return null;
-            }
-
-            EventMethods.ThrowEventLogException(error);
-        }
-
-        return handle;
-    }
-
-    private object GetEventMetadataProperty(EventLogHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
+    private static object GetEventMetadataProperty(EventLogHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -312,7 +289,7 @@ internal partial class ProviderMetadata : IDisposable
             bool success = EventMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -329,7 +306,8 @@ internal partial class ProviderMetadata : IDisposable
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return EventMethods.ConvertVariant(variant);
+            return EventMethods.ConvertVariant(variant) ??
+                throw new InvalidDataException($"Invalid Metadata for PropertyId: {propertyId}");
         }
         finally
         {
@@ -337,23 +315,60 @@ internal partial class ProviderMetadata : IDisposable
         }
     }
 
-    private object GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
+    private static EventLogHandle? NextEventMetadata(EventLogHandle metadataHandle, int flags)
+    {
+        EventLogHandle handle = EventMethods.EvtNextEventMetadata(metadataHandle, flags);
+        int error = Marshal.GetLastWin32Error();
+
+        if (!handle.IsInvalid) { return handle; }
+
+        if (error != Interop.ERROR_NO_MORE_ITEMS)
+        {
+            EventMethods.ThrowEventLogException(error);
+        }
+        
+        return null;
+    }
+
+    private void Dispose(bool disposing)
+    {
+        if (_publisherMetadataHandle is { IsInvalid: false })
+        {
+            _publisherMetadataHandle.Dispose();
+        }
+    }
+
+    private string GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
         try
         {
-            bool success = EventMethods.EvtGetPublisherMetadataProperty(_publisherMetadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferUsed);
+            bool success = EventMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed);
+
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
-            success = EventMethods.EvtGetPublisherMetadataProperty(_publisherMetadataHandle, propertyId, 0, bufferUsed, buffer, out bufferUsed);
+            success = EventMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                bufferUsed,
+                buffer,
+                out bufferUsed);
+
             error = Marshal.GetLastWin32Error();
 
             if (!success)
@@ -363,7 +378,7 @@ internal partial class ProviderMetadata : IDisposable
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return EventMethods.ConvertVariant(variant);
+            return (string?)EventMethods.ConvertVariant(variant) ?? string.Empty;
         }
         finally
         {
@@ -377,17 +392,31 @@ internal partial class ProviderMetadata : IDisposable
 
         try
         {
-            bool success = EventMethods.EvtGetPublisherMetadataProperty(_publisherMetadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferUsed);
+            bool success = EventMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed);
+
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
-            success = EventMethods.EvtGetPublisherMetadataProperty(_publisherMetadataHandle, propertyId, 0, bufferUsed, buffer, out bufferUsed);
+            success = EventMethods.EvtGetPublisherMetadataProperty(
+                _publisherMetadataHandle,
+                propertyId,
+                0,
+                bufferUsed,
+                buffer,
+                out bufferUsed);
+
             error = Marshal.GetLastWin32Error();
 
             if (!success)

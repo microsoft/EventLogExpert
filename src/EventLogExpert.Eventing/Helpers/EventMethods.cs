@@ -10,7 +10,7 @@ namespace EventLogExpert.Eventing.Helpers;
 public enum PathType
 {
     LogName = 1,
-    FilePath = 2
+    FilePath
 }
 
 internal enum EvtEventMetadataPropertyId
@@ -148,8 +148,9 @@ internal enum EvtVariantType
     HexInt64,
     Handle,
     Xml,
-    StringArray = 129,
-    UInt32Array = 136
+
+    // Custom types
+    StringArray = 129 // String masked with EVT_VARIANT_TYPE_ARRAY
 }
 
 [Flags]
@@ -204,9 +205,7 @@ internal static partial class EventMethods
                 Marshal.Copy(variant.Binary, bytes, 0, bytes.Length);
                 return bytes;
             case (int)EvtVariantType.Guid:
-                return variant.GuidReference == IntPtr.Zero ?
-                    Guid.Empty :
-                    Marshal.PtrToStructure<Guid>(variant.GuidReference);
+                return Marshal.PtrToStructure<Guid>(variant.GuidReference);
             case (int)EvtVariantType.SizeT:
                 return variant.SizeT;
             case (int)EvtVariantType.FileTime:
@@ -240,7 +239,9 @@ internal static partial class EventMethods
 
                 for (int i = 0; i < variant.Count; i++)
                 {
-                    stringArray[i] = Marshal.PtrToStringAuto(Marshal.ReadIntPtr(variant.Reference, i * IntPtr.Size));
+                    IntPtr stringRef = Marshal.ReadIntPtr(variant.Reference, i * IntPtr.Size);
+
+                    stringArray[i] = Marshal.PtrToStringAuto(stringRef) ?? string.Empty;
                 }
 
                 return stringArray;
@@ -249,16 +250,19 @@ internal static partial class EventMethods
         }
     }
 
+    /// <summary>Closes an open handle</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtClose(IntPtr handle);
 
+    /// <summary>Creates a context that specifies the information in the event that you want to render</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtCreateRenderContext(
         int valuePathsCount,
         [MarshalAs(UnmanagedType.LPArray, ArraySubType = UnmanagedType.LPWStr)][Out] string[]? valuePaths,
         EvtRenderContextFlags flags);
 
+    /// <summary>Formats a message string</summary>
     [LibraryImport(EventLogApi, SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtFormatMessage(
@@ -272,6 +276,7 @@ internal static partial class EventMethods
         Span<char> buffer,
         out int bufferUsed);
 
+    /// <summary>Gets the specified event metadata property</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetEventMetadataProperty(
@@ -282,6 +287,7 @@ internal static partial class EventMethods
         IntPtr eventMetadataPropertyBuffer,
         out int eventMetadataPropertyBufferUsed);
 
+    /// <summary>Gets information about a channel or log file</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetLogInfo(
@@ -291,6 +297,7 @@ internal static partial class EventMethods
         IntPtr propertyValueBuffer,
         out int propertyValueBufferUsed);
 
+    /// <summary>Gets a provider metadata property from the specified object in the array</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetObjectArrayProperty(
@@ -302,10 +309,12 @@ internal static partial class EventMethods
         IntPtr propertyValueBuffer,
         out int propertyValueBufferUsed);
 
+    /// <summary>Gets the number of elements in the array of objects</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetObjectArraySize(EventLogHandle objectArray, out int objectArraySize);
 
+    /// <summary>Gets the specified provider metadata property</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetPublisherMetadataProperty(
@@ -316,6 +325,7 @@ internal static partial class EventMethods
         IntPtr publisherMetadataPropertyBuffer,
         out int publisherMetadataPropertyBufferUsed);
 
+    /// <summary>Gets the next event from the query or subscription results</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtNext(
@@ -326,6 +336,7 @@ internal static partial class EventMethods
         int flags,
         ref int returned);
 
+    /// <summary>Gets the channel name from the enumerator</summary>
     [LibraryImport(EventLogApi, SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtNextChannelPath(
@@ -334,9 +345,11 @@ internal static partial class EventMethods
         Span<char> channelPathBuffer,
         out int channelPathBufferUsed);
 
+    /// <summary>Gets an event definition from the enumerator</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtNextEventMetadata(EventLogHandle eventMetadataEnum, int flags);
 
+    /// <summary>Gets the identifier of a provider from the enumerator</summary>
     [LibraryImport(EventLogApi, SetLastError = true, StringMarshalling = StringMarshalling.Utf16)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtNextPublisherId(
@@ -345,21 +358,26 @@ internal static partial class EventMethods
         Span<char> publisherIdBuffer,
         out int publisherIdBufferUsed);
 
+    /// <summary>Gets a handle that you use to enumerate the list of channels that are registered on the computer</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtOpenChannelEnum(EventLogHandle session, int flags);
 
+    /// <summary>Gets a handle that you use to enumerate the list of events that the provider defines</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtOpenEventMetadataEnum(EventLogHandle publisherMetadata, int flags);
 
+    /// <summary>Gets a handle to a channel or log file that you can then use to get information about the channel or log file</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtOpenLog(
         EventLogHandle session,
         [MarshalAs(UnmanagedType.LPWStr)] string path,
         PathType flags);
 
+    /// <summary>Gets a handle that you can use to enumerate the list of registered providers on the computer</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtOpenPublisherEnum(EventLogHandle session, int flags);
 
+    /// <summary>Gets a handle that you use to read the specified provider's metadata</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtOpenPublisherMetadata(
         EventLogHandle session,
@@ -368,13 +386,7 @@ internal static partial class EventMethods
         int locale,
         int flags);
 
-    [LibraryImport(EventLogApi, SetLastError = true)]
-    internal static partial EventLogHandle EvtOpenSession(
-        EvtLoginClass loginClass,
-        IntPtr login,
-        int timeout,
-        int flags);
-
+    /// <summary>Runs a query to retrieve events from a channel or log file that match the specified query criteria</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtQuery(
         EventLogHandle session,
@@ -382,6 +394,7 @@ internal static partial class EventMethods
         [MarshalAs(UnmanagedType.LPWStr)] string? query,
         int flags);
 
+    /// <summary>Renders an XML fragment base on the render context that you specify</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtRender(
@@ -393,20 +406,16 @@ internal static partial class EventMethods
         out int bufferUsed,
         out int propertyCount);
 
-    [LibraryImport(EventLogApi, SetLastError = true)]
-    internal static partial EventLogHandle EvtSeek(
-        EventLogHandle resultSet,
-        long position,
-        EventLogHandle bookmark,
-        int timeout,
-        SeekFlags flags);
-
-    internal static string FormatMessage(EventLogHandle handle, uint messageId)
+    /// <summary>Formats a message string</summary>
+    /// <param name="publisherMetadataHandle">Handle returned from <see cref="EvtOpenPublisherMetadata" /></param>
+    /// <param name="messageId">The resource identifier of the message string that you want formated</param>
+    /// <returns></returns>
+    internal static string FormatMessage(EventLogHandle publisherMetadataHandle, uint messageId)
     {
         Span<char> emptyBuffer = ['\0'];
 
         bool success = EvtFormatMessage(
-            handle,
+            publisherMetadataHandle,
             EventLogHandle.Zero,
             messageId,
             0,
@@ -419,20 +428,20 @@ internal static partial class EventMethods
         int error = Marshal.GetLastWin32Error();
 
         if (!success &&
-            error != 15029 /* ERROR_EVT_UNRESOLVED_VALUE_INSERT */ &&
-            error != 15030 /* ERROR_EVT_UNRESOLVED_PARAMETER_INSERT */ &&
-            error != 15031 /* ERROR_EVT_MAX_INSERTS_REACHED */)
+            error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
+            error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
+            error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
         {
-            if (error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 ThrowEventLogException(error);
             }
         }
 
-        var buffer = new char[bufferUsed];
+        Span<char> buffer = stackalloc char[bufferUsed];
 
         success = EvtFormatMessage(
-            handle,
+            publisherMetadataHandle,
             EventLogHandle.Zero,
             messageId,
             0,
@@ -445,19 +454,19 @@ internal static partial class EventMethods
         error = Marshal.GetLastWin32Error();
 
         if (!success &&
-            error != 15029 /* ERROR_EVT_UNRESOLVED_VALUE_INSERT */ &&
-            error != 15030 /* ERROR_EVT_UNRESOLVED_PARAMETER_INSERT */ &&
-            error != 15031 /* ERROR_EVT_MAX_INSERTS_REACHED */)
+            error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
+            error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
+            error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
         {
             ThrowEventLogException(error);
         }
 
-        return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer, 0, bufferUsed - 1);
+        return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer[..(bufferUsed - 1)]);
     }
 
-    /// <summary>Converts an event buffer that was returned from EvtRender to an <see cref="EventRecord"/></summary>
-    /// <param name="eventBuffer">Pointer to a buffer returned from EvtRender</param>
-    /// <param name="propertyCount">Property count returned from EvtRender</param>
+    /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
+    /// <param name="eventBuffer">Pointer to a buffer returned from <see cref="EvtRender" /></param>
+    /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
     /// <returns></returns>
     internal static EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
     {
@@ -531,7 +540,7 @@ internal static partial class EventMethods
             bool success = EvtGetObjectArrayProperty(array, (int)propertyId, index, 0, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 ThrowEventLogException(error);
             }
@@ -548,7 +557,8 @@ internal static partial class EventMethods
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return ConvertVariant(variant);
+            return ConvertVariant(variant) ??
+                throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
         }
         finally
         {
@@ -575,21 +585,21 @@ internal static partial class EventMethods
 
         switch (error)
         {
-            case 2 /*ERROR_FILE_NOT_FOUND*/:
-            case 3 /*ERROR_PATH_NOT_FOUND*/:
-            case 0x3A9f /*ERROR_EVT_CHANNEL_NOT_FOUND*/:
-            case 0x3AB3 /*ERROR_EVT_MESSAGE_NOT_FOUND*/:
-            case 0x3AB4 /*ERROR_EVT_MESSAGE_ID_NOT_FOUND*/:
-            case 0x3A9A /*ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND*/:
+            case Interop.ERROR_FILE_NOT_FOUND:
+            case Interop.ERROR_PATH_NOT_FOUND:
+            case Interop.ERROR_EVT_CHANNEL_NOT_FOUND:
+            case Interop.ERROR_EVT_MESSAGE_NOT_FOUND:
+            case Interop.ERROR_EVT_MESSAGE_ID_NOT_FOUND:
+            case Interop.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND:
                 throw new FileNotFoundException(message);
-            case 0xD /*ERROR_INVALID_DATA*/:
-            case 0x3A9D /*ERROR_EVT_INVALID_EVENT_DATA*/:
+            case Interop.ERROR_INVALID_DATA:
+            case Interop.ERROR_EVT_INVALID_EVENT_DATA:
                 throw new InvalidDataException(message);
-            case 0x71A /*RPC_S_CALL_CANCELED*/:
-            case 0x4C7 /*ERROR_CANCELLED*/:
+            case Interop.RPC_S_CALL_CANCELED:
+            case Interop.ERROR_CANCELLED:
                 throw new OperationCanceledException(message);
-            case 5 /*ERROR_ACCESS_DENIED*/:
-            case 6 /*ERROR_INVALID_HANDLE*/:
+            case Interop.ERROR_ACCESS_DENIED:
+            case Interop.ERROR_INVALID_HANDLE:
                 throw new UnauthorizedAccessException();
             default:
                 throw new Exception(message);

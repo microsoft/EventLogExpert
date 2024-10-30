@@ -33,6 +33,12 @@ public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) 
 
             try
             {
+                // Double-check in case another thread added the provider details while we were waiting.
+                if (providerDetails.ContainsKey(eventRecord.ProviderName))
+                {
+                    return;
+                }
+
                 var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
                 providerDetails.TryAdd(eventRecord.ProviderName, details);
             }
