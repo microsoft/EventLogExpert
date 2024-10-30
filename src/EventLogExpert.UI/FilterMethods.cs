@@ -223,7 +223,7 @@ public static class FilterMethods
 
         try
         {
-            _ = Enumerable.Empty<EventProperties>().AsQueryable()
+            _ = Enumerable.Empty<DisplayEventModel>().AsQueryable()
                 .Where(ParsingConfig.Default, expression);
 
             return true;

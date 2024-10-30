@@ -1,19 +1,20 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Models;
+
 namespace EventLogExpert.Eventing.EventResolvers;
 
-/// <summary>
-///     Turns a System.Diagnostics.Eventing.Reader.EventRecord into an
-///     EventLogExpert.Eventing.Models.DisplayEventModel.
-/// </summary>
+/// <summary>Resolves event details from an <see cref="EventRecord" />.</summary>
 public interface IEventResolver
 {
-    //public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
+    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
 
-    //public string ResolveDescription(EventRecord eventRecord);
+    public string GetXml(EventRecord eventRecord);
 
-    //public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
+    public string ResolveDescription(EventRecord eventRecord);
 
-    //public string ResolveTaskName(EventRecord eventRecord);
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
+
+    public string ResolveTaskName(EventRecord eventRecord);
 }
