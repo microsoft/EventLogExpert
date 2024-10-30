@@ -1,9 +1,11 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Providers;
+
 namespace EventLogExpert.Eventing.Models;
 
-internal readonly record struct EventMetadata
+internal sealed record EventMetadata
 {
     private readonly byte _channelId;
     private readonly long _keywords;
@@ -33,11 +35,11 @@ internal readonly record struct EventMetadata
         _provider = provider;
     }
 
-    public string Description { get; }
+    internal string Description { get; }
 
-    public long Id { get; }
+    internal long Id { get; }
 
-    public IEnumerable<long> Keywords
+    internal IEnumerable<long> Keywords
     {
         get
         {
@@ -59,15 +61,23 @@ internal readonly record struct EventMetadata
         }
     }
 
-    public byte Level { get; }
+    internal byte Level { get; }
 
-    public string LogName => _provider.Channels[_channelId];
+    internal string? LogName
+    {
+        get
+        {
+            _provider.Channels.TryGetValue(_channelId, out string? logName);
 
-    public int Opcode { get; }
+            return logName;
+        }
+    }
 
-    public int Task { get; }
+    internal int Opcode { get; }
 
-    public string Template { get; }
+    internal int Task { get; }
 
-    public byte Version { get; }
+    internal string Template { get; }
+
+    internal byte Version { get; }
 }

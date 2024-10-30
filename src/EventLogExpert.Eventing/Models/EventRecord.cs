@@ -5,11 +5,11 @@ using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Models;
 
-public record struct EventRecord
+public sealed record EventRecord
 {
     public Guid? ActivityId { get; set; }
 
-    public string ComputerName { get; set; }
+    public string ComputerName { get; set; } = string.Empty;
 
     public ushort Id { get; set; }
 
@@ -17,15 +17,15 @@ public record struct EventRecord
 
     public byte? Level { get; set; }
 
-    public string LogName { get; set; }
+    public string LogName { get; set; } = string.Empty;
 
     public int? ProcessId { get; set; }
 
     public long? RecordId { get; set; }
 
-    public IList<object> Properties { get; set; }
+    public IList<object> Properties { get; set; } = [];
 
-    public string ProviderName { get; set; }
+    public string ProviderName { get; set; } = string.Empty;
 
     public ushort? Task { get; set; }
 

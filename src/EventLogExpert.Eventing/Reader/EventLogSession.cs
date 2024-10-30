@@ -104,20 +104,20 @@ public sealed partial class EventLogSession : IDisposable
 
         if (!success)
         {
-            if (error == 259 /* ERROR_NO_MORE_ITEMS */)
+            if (error == Interop.ERROR_NO_MORE_ITEMS)
             {
                 doneReading = true;
 
                 return string.Empty;
             }
 
-            if (error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
         }
 
-        var buffer = new char[bufferSize];
+        Span<char> buffer = stackalloc char[bufferSize];
 
         success = EventMethods.EvtNextChannelPath(channelHandle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
@@ -127,7 +127,7 @@ public sealed partial class EventLogSession : IDisposable
             EventMethods.ThrowEventLogException(error);
         }
 
-        return bufferSize - 1 <= 0 ? string.Empty : new string(buffer, 0, bufferSize - 1);
+        return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);
     }
 
     private static string NextPublisherId(EventLogHandle publisherHandle, ref bool doneReading)
@@ -137,20 +137,20 @@ public sealed partial class EventLogSession : IDisposable
 
         if (!success)
         {
-            if (error == 259 /* ERROR_NO_MORE_ITEMS */)
+            if (error == Interop.ERROR_NO_MORE_ITEMS)
             {
                 doneReading = true;
 
                 return string.Empty;
             }
 
-            if (error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
         }
 
-        var buffer = new char[bufferSize];
+        Span<char> buffer = stackalloc char[bufferSize];
 
         success = EventMethods.EvtNextPublisherId(publisherHandle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
@@ -160,7 +160,7 @@ public sealed partial class EventLogSession : IDisposable
             EventMethods.ThrowEventLogException(error);
         }
 
-        return bufferSize - 1 <= 0 ? string.Empty : new string(buffer, 0, bufferSize - 1);
+        return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);
     }
 
     private void Dispose(bool disposing)

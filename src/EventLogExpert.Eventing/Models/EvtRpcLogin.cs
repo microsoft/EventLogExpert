@@ -6,19 +6,11 @@ using System.Runtime.InteropServices;
 namespace EventLogExpert.Eventing.Models;
 
 [StructLayout(LayoutKind.Sequential)]
-public struct EvtRpcLogin
+internal record struct EvtRpcLogin
 {
-    [MarshalAs(UnmanagedType.LPWStr)]
-    public string Server;
-
-    [MarshalAs(UnmanagedType.LPWStr)]
-    public string User;
-
-    [MarshalAs(UnmanagedType.LPWStr)]
-    public string Domain;
-
-    [MarshalAs(UnmanagedType.LPWStr)]
-    public string Password;
-
+    [MarshalAs(UnmanagedType.LPWStr)] public string Server;
+    [MarshalAs(UnmanagedType.LPWStr)] public string User;
+    [MarshalAs(UnmanagedType.LPWStr)] public string Domain;
+    [MarshalAs(UnmanagedType.LPWStr)] public string Password;
     public int Flags;
 }
