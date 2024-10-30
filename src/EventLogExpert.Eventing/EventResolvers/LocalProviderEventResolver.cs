@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -14,32 +16,34 @@ public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) 
 {
     public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
-    //public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
-    //{
-    //    providerDetailsLock.EnterUpgradeableReadLock();
+    public string GetXml(EventRecord eventRecord) { return string.Empty; }
 
-    //    try
-    //    {
-    //        if (providerDetails.ContainsKey(eventRecord.ProviderName))
-    //        {
-    //            return;
-    //        }
+    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    {
+        providerDetailsLock.EnterUpgradeableReadLock();
 
-    //        providerDetailsLock.EnterWriteLock();
+        try
+        {
+            if (providerDetails.ContainsKey(eventRecord.ProviderName))
+            {
+                return;
+            }
 
-    //        try
-    //        {
-    //            var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
-    //            providerDetails.TryAdd(eventRecord.ProviderName, details);
-    //        }
-    //        finally
-    //        {
-    //            providerDetailsLock.ExitWriteLock();
-    //        }
-    //    }
-    //    finally
-    //    {
-    //        providerDetailsLock.ExitUpgradeableReadLock();
-    //    }
-    //}
+            providerDetailsLock.EnterWriteLock();
+
+            try
+            {
+                var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+                providerDetails.TryAdd(eventRecord.ProviderName, details);
+            }
+            finally
+            {
+                providerDetailsLock.ExitWriteLock();
+            }
+        }
+        finally
+        {
+            providerDetailsLock.ExitUpgradeableReadLock();
+        }
+    }
 }

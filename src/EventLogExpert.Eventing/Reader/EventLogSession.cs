@@ -13,7 +13,9 @@ public sealed partial class EventLogSession : IDisposable
 
     internal EventLogHandle Handle { get; } = EventLogHandle.Zero;
 
-    internal EventLogHandle RenderContext { get; } = CreateRenderContext();
+    internal EventLogHandle SystemRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.System);
+
+    internal EventLogHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
 
     public void Dispose()
     {
@@ -28,41 +30,61 @@ public sealed partial class EventLogSession : IDisposable
     {
         List<string> paths = [];
 
-        EventLogHandle channelHandle = EventMethods.EvtOpenChannelEnum(Handle, 0);
+        using EventLogHandle channelHandle = EventMethods.EvtOpenChannelEnum(Handle, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (channelHandle.IsInvalid)
         {
-            channelHandle.Dispose();
             EventMethods.ThrowEventLogException(error);
         }
 
         bool doneReading = false;
 
-        try
+        do
         {
-            do
-            {
-                string path = NextChannelPath(channelHandle, ref doneReading);
+            string path = NextChannelPath(channelHandle, ref doneReading);
 
-                if (!doneReading)
-                {
-                    paths.Add(path);
-                }
+            if (!doneReading)
+            {
+                paths.Add(path);
             }
-            while (!doneReading);
         }
-        finally
-        {
-            channelHandle.Dispose();
-        }
+        while (!doneReading);
 
         return paths.Order();
     }
 
-    private static EventLogHandle CreateRenderContext()
+    public HashSet<string> GetProviderNames()
     {
-        EventLogHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, EvtRenderContextFlags.System);
+        HashSet<string> providers = [];
+
+        using EventLogHandle providerHandle = EventMethods.EvtOpenPublisherEnum(Handle, 0);
+        int error = Marshal.GetLastWin32Error();
+
+        if (providerHandle.IsInvalid)
+        {
+            EventMethods.ThrowEventLogException(error);
+        }
+
+        bool doneReading = false;
+
+        do
+        {
+            string path = NextPublisherId(providerHandle, ref doneReading);
+
+            if (!doneReading)
+            {
+                providers.Add(path);
+            }
+        }
+        while (!doneReading);
+
+        return providers;
+    }
+
+    private static EventLogHandle CreateRenderContext(EvtRenderContextFlags renderContextFlags)
+    {
+        EventLogHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, renderContextFlags);
         int error = Marshal.GetLastWin32Error();
 
         if (renderContextHandle.IsInvalid)
@@ -75,9 +97,9 @@ public sealed partial class EventLogSession : IDisposable
         return renderContextHandle;
     }
 
-    private static string NextChannelPath(EventLogHandle handle, ref bool doneReading)
+    private static string NextChannelPath(EventLogHandle channelHandle, ref bool doneReading)
     {
-        bool success = EventMethods.EvtNextChannelPath(handle, 0, null, out int bufferSize);
+        bool success = EventMethods.EvtNextChannelPath(channelHandle, 0, null, out int bufferSize);
         int error = Marshal.GetLastWin32Error();
 
         if (!success)
@@ -97,7 +119,40 @@ public sealed partial class EventLogSession : IDisposable
 
         var buffer = new char[bufferSize];
 
-        success = EventMethods.EvtNextChannelPath(handle, bufferSize, buffer, out bufferSize);
+        success = EventMethods.EvtNextChannelPath(channelHandle, bufferSize, buffer, out bufferSize);
+        error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            EventMethods.ThrowEventLogException(error);
+        }
+
+        return bufferSize - 1 <= 0 ? string.Empty : new string(buffer, 0, bufferSize - 1);
+    }
+
+    private static string NextPublisherId(EventLogHandle publisherHandle, ref bool doneReading)
+    {
+        bool success = EventMethods.EvtNextPublisherId(publisherHandle, 0, null, out int bufferSize);
+        int error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            if (error == 259 /* ERROR_NO_MORE_ITEMS */)
+            {
+                doneReading = true;
+
+                return string.Empty;
+            }
+
+            if (error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            {
+                EventMethods.ThrowEventLogException(error);
+            }
+        }
+
+        var buffer = new char[bufferSize];
+
+        success = EventMethods.EvtNextPublisherId(publisherHandle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
 
         if (!success)
@@ -110,14 +165,19 @@ public sealed partial class EventLogSession : IDisposable
 
     private void Dispose(bool disposing)
     {
-        if (RenderContext is { IsInvalid: false })
-        {
-            RenderContext.Dispose();
-        }
-
         if (Handle is { IsInvalid: false })
         {
             Handle.Dispose();
+        }
+
+        if (SystemRenderContext is { IsInvalid: false })
+        {
+            SystemRenderContext.Dispose();
+        }
+
+        if (UserRenderContext is { IsInvalid: false })
+        {
+            UserRenderContext.Dispose();
         }
     }
 }

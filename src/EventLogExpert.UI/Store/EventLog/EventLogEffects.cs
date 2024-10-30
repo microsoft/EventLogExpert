@@ -126,8 +126,6 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
         DisplayEventModel? lastEvent = null;
-
-        bool doneReading = false;
         ConcurrentQueue<DisplayEventModel> events = new();
 
         await using Timer timer = new(
@@ -146,7 +144,7 @@ public sealed class EventLogEffects(
                 action.Token,
                 (_, token) =>
                 {
-                    while (reader.TryGetEvents(out EventProperties[]? properties))
+                    while (reader.TryGetEvents(out EventRecord[]? properties))
                     {
                         token.ThrowIfCancellationRequested();
 
@@ -156,30 +154,27 @@ public sealed class EventLogEffects(
                         {
                             try
                             {
-                                //eventResolver.ResolveProviderDetails(@event, action.LogName);
+                                eventResolver.ResolveProviderDetails(@event, action.LogName);
 
                                 events.Enqueue(
                                     new DisplayEventModel(action.LogName)
                                     {
                                         ActivityId = @event.ActivityId,
-                                        ComputerName = resolverCache.GetValue(@event.ComputerName ?? string.Empty),
-                                        Description =
-                                            "resolverCache.GetDescription(eventResolver.ResolveDescription(@event))",
-                                        Id = @event.Id ?? 0,
-                                        KeywordsDisplayNames = [],
-                                        //KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
-                                        //    .Select(resolverCache.GetValue).ToList(),
+                                        ComputerName = resolverCache.GetValue(@event.ComputerName),
+                                        Description = resolverCache.GetDescription(eventResolver.ResolveDescription(@event)),
+                                        Id = @event.Id,
+                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
+                                            .Select(resolverCache.GetValue).ToList(),
                                         Level = Severity.GetString(@event.Level),
-                                        LogName = resolverCache.GetValue(@event.LogName ?? string.Empty),
-                                        ProcessId = (int?)@event.ProcessId,
-                                        RecordId = (long?)@event.RecordId,
-                                        Source = resolverCache.GetValue(@event.Source ?? string.Empty),
-                                        TaskCategory = "resolverCache.GetValue(eventResolver.ResolveTaskName(@event))",
-                                        ThreadId = (int?)@event.ThreadId,
-                                        TimeCreated = @event.TimeCreated!.Value.ToUniversalTime(),
-                                        UserId =
-                                            @event.UserId ?? new SecurityIdentifier(WellKnownSidType.NullSid, null),
-                                        Xml = "settingsState.Value.Config.IsXmlEnabled ? @event.ToXml() : string.Empty"
+                                        LogName = resolverCache.GetValue(@event.LogName),
+                                        ProcessId = @event.ProcessId,
+                                        RecordId = @event.RecordId,
+                                        Source = resolverCache.GetValue(@event.ProviderName),
+                                        TaskCategory = resolverCache.GetValue(eventResolver.ResolveTaskName(@event)),
+                                        ThreadId = @event.ThreadId,
+                                        TimeCreated = @event.TimeCreated.ToUniversalTime(),
+                                        UserId = @event.UserId ?? new SecurityIdentifier(WellKnownSidType.NullSid, null),
+                                        Xml = settingsState.Value.Config.IsXmlEnabled ? eventResolver.GetXml(@event) : string.Empty
                                     });
                             }
                             //catch (Exception ex) when (ex is EventLogInvalidDataException)

@@ -39,7 +39,7 @@ public sealed class EventLogInformation
 
     public long? RecordCount { get; }
 
-    private static object? GetLogInfo(EventLogHandle handle, EvtLogPropertyId property)
+    private static object GetLogInfo(EventLogHandle handle, EvtLogPropertyId property)
     {
         IntPtr buffer = IntPtr.Zero;
 

@@ -19,7 +19,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
         GC.SuppressFinalize(this);
     }
 
-    public bool TryGetEvents(out EventProperties[] events, int batchSize = 100)
+    public bool TryGetEvents(out EventRecord[] events, int batchSize = 100)
     {
         var buffer = new IntPtr[batchSize];
         int count = 0;
@@ -41,26 +41,27 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
             _semaphore.Release();
         }
 
-        events = new EventProperties[count];
+        events = new EventRecord[count];
 
         for (int i = 0; i < count; i++)
         {
             using var eventHandle = new EventLogHandle(buffer[i]);
 
             events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+            events[i].Properties = RenderEventProperties(eventHandle);
         }
 
         return true;
     }
 
-    private static EventProperties RenderEvent(EventLogHandle eventHandle, EvtRenderFlags flag)
+    private static EventRecord RenderEvent(EventLogHandle eventHandle, EvtRenderFlags flag)
     {
         IntPtr buffer = IntPtr.Zero;
 
         try
         {
             bool success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.RenderContext,
+                EventLogSession.GlobalSession.SystemRenderContext,
                 eventHandle,
                 flag,
                 0,
@@ -78,7 +79,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
             success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.RenderContext,
+                EventLogSession.GlobalSession.SystemRenderContext,
                 eventHandle,
                 flag,
                 bufferUsed,
@@ -93,7 +94,65 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
                 EventMethods.ThrowEventLogException(error);
             }
 
-            return EventMethods.GetEventProperties(buffer, propertyCount);
+            return EventMethods.GetEventRecord(buffer, propertyCount);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    private static IList<object> RenderEventProperties(EventLogHandle eventHandle)
+    {
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = EventMethods.EvtRender(
+                EventLogSession.GlobalSession.UserRenderContext,
+                eventHandle,
+                EvtRenderFlags.EventValues,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed,
+                out int propertyCount);
+
+            int error = Marshal.GetLastWin32Error();
+
+            if (!success && error != 122 /* ERROR_INSUFFICIENT_BUFFER */)
+            {
+                EventMethods.ThrowEventLogException(error);
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferUsed);
+
+            success = EventMethods.EvtRender(
+                EventLogSession.GlobalSession.UserRenderContext,
+                eventHandle,
+                EvtRenderFlags.EventValues,
+                bufferUsed,
+                buffer,
+                out bufferUsed,
+                out propertyCount);
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                EventMethods.ThrowEventLogException(error);
+            }
+
+            List<object> properties = [];
+
+            if (propertyCount <= 0) { return properties; }
+
+            for (int i = 0; i < propertyCount; i++)
+            {
+                var property = Marshal.PtrToStructure<EvtVariant>(buffer + (i * Marshal.SizeOf<EvtVariant>()));
+                properties.Add(EventMethods.ConvertVariant(property));
+            }
+
+            return properties;
         }
         finally
         {
@@ -103,6 +162,9 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
     private void Dispose(bool disposing)
     {
-        _handle.Dispose();
+        if (_handle is { IsInvalid: false })
+        {
+            _handle.Dispose();
+        }
     }
 }
