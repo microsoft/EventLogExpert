@@ -47,10 +47,15 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
         {
             using var eventHandle = new EventLogHandle(buffer[i]);
 
-            // Todo: We should handle exceptions here and skip the event if we can't render it.
-            // Maybe instead of skipping the event we put the failure reason in the description
-            events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
-            events[i].Properties = RenderEventProperties(eventHandle);
+            try
+            {
+                events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+                events[i].Properties = RenderEventProperties(eventHandle);
+            }
+            catch
+            {
+                events[i] = new EventRecord { RecordId = null };
+            }
         }
 
         return true;

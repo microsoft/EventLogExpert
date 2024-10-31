@@ -144,16 +144,18 @@ public sealed class EventLogEffects(
                 action.Token,
                 (_, token) =>
                 {
-                    while (reader.TryGetEvents(out EventRecord[]? properties))
+                    while (reader.TryGetEvents(out EventRecord[]? eventRecords))
                     {
                         token.ThrowIfCancellationRequested();
 
-                        if (properties.Length == 0) { continue; }
+                        if (eventRecords.Length == 0) { continue; }
 
-                        foreach (var @event in properties)
+                        foreach (var @event in eventRecords)
                         {
                             try
                             {
+                                if (@event.RecordId is null) { continue; }
+
                                 eventResolver.ResolveProviderDetails(@event, action.LogName);
 
                                 events.Enqueue(
@@ -177,19 +179,6 @@ public sealed class EventLogEffects(
                                         Xml = settingsState.Value.Config.IsXmlEnabled ? eventResolver.GetXml(@event) : string.Empty
                                     });
                             }
-                            //catch (Exception ex) when (ex is EventLogInvalidDataException)
-                            //{
-                            //    logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
-
-                            //    logger?.Trace(
-                            //        $"Invalid data in RecordId: {XElement.Parse(@event.Bookmark.BookmarkXml)
-                            //                .Descendants()
-                            //                .Attributes()
-                            //                .Where(a => a.Name == "RecordId")
-                            //                .Select(a => a.Value)
-                            //                .FirstOrDefault()}",
-                            //        LogLevel.Error);
-                            //}
                             catch (Exception ex)
                             {
                                 logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
