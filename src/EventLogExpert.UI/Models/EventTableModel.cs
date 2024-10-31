@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using System.Collections.ObjectModel;
 
@@ -14,7 +15,7 @@ public sealed record EventTableModel(EventLogId Id)
 
     public string LogName { get; init; } = string.Empty;
 
-    public LogType LogType { get; init; }
+    public PathType PathType { get; init; }
 
     public ReadOnlyCollection<DisplayEventModel> DisplayedEvents { get; init; } =
         new List<DisplayEventModel>().AsReadOnly();

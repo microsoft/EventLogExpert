@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
@@ -61,7 +62,7 @@ public sealed class EventLogReducers
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
         state with
         {
-            ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.LogType))
+            ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.PathType))
         };
 
     [ReducerMethod]
@@ -117,6 +118,6 @@ public sealed class EventLogReducers
         return state with { AppliedFilter = action.EventFilter };
     }
 
-    private static EventLogData GetEmptyLogData(string logName, LogType logType) =>
-        new(logName, logType, new List<DisplayEventModel>().AsReadOnly());
+    private static EventLogData GetEmptyLogData(string logName, PathType pathType) =>
+        new(logName, pathType, new List<DisplayEventModel>().AsReadOnly());
 }

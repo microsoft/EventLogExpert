@@ -33,7 +33,7 @@
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
-    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == LogType.Live))
+    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == PathType.LogName))
     {
         @if (EventLogState.Value.ContinuouslyUpdate)
         {

@@ -14,7 +14,7 @@ namespace EventLogExpert.Eventing.Providers;
 /// </summary>
 public class EventMessageProvider
 {
-    private static readonly HashSet<string> s_allProviderNames = new EventLogSession().GetProviderNames();
+    private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
 
     private readonly string _providerName;
     private readonly RegistryProvider _registryProvider;

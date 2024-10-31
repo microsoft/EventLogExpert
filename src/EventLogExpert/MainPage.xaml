@@ -22,12 +22,12 @@
                 </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
             <MenuFlyoutSubItem Text="Add Another Log To This View">
-                <MenuFlyoutItem Text="File" Clicked="AddFile_Clicked" />
+                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" CommandParameter="{StaticResource True}" />
                 <MenuFlyoutSubItem Text="Live Event Log" >
-                    <MenuFlyoutItem Text="Application" Clicked="AddLiveLog_Clicked" />
-                    <MenuFlyoutItem Text="System" Clicked="AddLiveLog_Clicked" />
-                    <MenuFlyoutItem Text="Security" Clicked="AddLiveLog_Clicked" />
-                    <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" />
+                    <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
+                    <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
+                    <MenuFlyoutItem Text="Security" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
+                    <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" CommandParameter="{StaticResource True}" />
                 </MenuFlyoutSubItem>
             </MenuFlyoutSubItem>
             <MenuFlyoutItem Text="Close All Open Logs" Clicked="CloseAll_Clicked" />

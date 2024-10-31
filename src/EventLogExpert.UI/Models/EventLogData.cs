@@ -9,7 +9,7 @@ namespace EventLogExpert.UI.Models;
 
 public readonly record struct EventLogData(
     string Name,
-    LogType Type,
+    PathType Type,
     ReadOnlyCollection<DisplayEventModel> Events)
 {
     public EventLogId Id { get; } = EventLogId.Create();

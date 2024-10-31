@@ -134,8 +134,7 @@ public sealed class EventLogEffects(
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1));
 
-        using var reader = new EventLogReader(action.LogName,
-            action.LogType == LogType.Live ? PathType.LogName : PathType.FilePath);
+        using var reader = new EventLogReader(action.LogName, action.PathType);
 
         try
         {

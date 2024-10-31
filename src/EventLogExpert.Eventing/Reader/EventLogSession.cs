@@ -9,6 +9,8 @@ namespace EventLogExpert.Eventing.Reader;
 
 public sealed partial class EventLogSession : IDisposable
 {
+    private EventLogSession() { }
+
     public static EventLogSession GlobalSession { get; } = new();
 
     internal EventLogHandle Handle { get; } = EventLogHandle.Zero;
