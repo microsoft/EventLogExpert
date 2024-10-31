@@ -21,11 +21,7 @@ public class ShowLocalCommand : DbToolCommand
             description: "Verbose logging. May be useful for troubleshooting.");
         showProvidersCommand.AddOption(filterOption);
         showProvidersCommand.AddOption(verboseOption);
-        showProvidersCommand.SetHandler((filterOptionValue, verboseOptionValue) =>
-        {
-            ShowProviderInfo(filterOptionValue, verboseOptionValue);
-        },
-        filterOption, verboseOption);
+        showProvidersCommand.SetHandler(ShowProviderInfo, filterOption, verboseOption);
 
         return showProvidersCommand;
     }

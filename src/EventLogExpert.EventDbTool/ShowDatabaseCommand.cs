@@ -2,14 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Providers;
-using System;
-using System.Collections.Generic;
 using System.CommandLine;
-using System.Linq;
-using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -32,11 +26,7 @@ public class ShowDatabaseCommand : DbToolCommand
         showDatabaseCommand.AddArgument(fileArgument);
         showDatabaseCommand.AddOption(filterOption);
         showDatabaseCommand.AddOption(verboseOption);
-        showDatabaseCommand.SetHandler((fileArgumentValue, filterOptionValue, verboseOptionValue) =>
-        {
-            ShowProviderInfo(fileArgumentValue, filterOptionValue, verboseOptionValue);
-        },
-        fileArgument, filterOption, verboseOption);
+        showDatabaseCommand.SetHandler(ShowProviderInfo, fileArgument, filterOption, verboseOption);
 
         return showDatabaseCommand;
     }

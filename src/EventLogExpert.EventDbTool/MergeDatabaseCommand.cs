@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Providers;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
@@ -31,11 +31,7 @@ public class MergeDatabaseCommand : DbToolCommand
         mergeDatabaseCommand.AddArgument(targetDatabaseArgument);
         mergeDatabaseCommand.AddOption(overwriteOption);
         mergeDatabaseCommand.AddOption(verboseOption);
-        mergeDatabaseCommand.SetHandler((sourceArgumentValue, targetArgumentValue, overwriteOptionValue, verboseOptionValue) =>
-        {
-            MergeDatabase(sourceArgumentValue, targetArgumentValue, overwriteOptionValue, verboseOptionValue);
-        },
-        sourceDatabaseArgument, targetDatabaseArgument, overwriteOption, verboseOption);
+        mergeDatabaseCommand.SetHandler(MergeDatabase, sourceDatabaseArgument, targetDatabaseArgument, overwriteOption, verboseOption);
 
         return mergeDatabaseCommand;
     }
