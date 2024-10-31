@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Reader;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -9,19 +11,18 @@ public class DbToolCommand
 {
     private static string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
 
-    //public static List<string> GetLocalProviderNames(string filter)
-    //{
-    //    var session = new EventLogSession();
-    //    var providers = new List<string>(session.GetProviderNames().Distinct().OrderBy(name => name));
+    public static List<string> GetLocalProviderNames(string filter)
+    {
+        var providers = new List<string>(EventLogSession.GlobalSession.GetProviderNames().Distinct().OrderBy(name => name));
 
-    //    if (!string.IsNullOrEmpty(filter))
-    //    {
-    //        var regex = new Regex(filter, RegexOptions.IgnoreCase);
-    //        providers = providers.Where(p => regex.IsMatch(p)).ToList();
-    //    }
+        if (!string.IsNullOrEmpty(filter))
+        {
+            var regex = new Regex(filter, RegexOptions.IgnoreCase);
+            providers = providers.Where(p => regex.IsMatch(p)).ToList();
+        }
 
-    //    return providers;
-    //}
+        return providers;
+    }
 
     public static void LogProviderDetailHeader(IEnumerable<string> providerNames)
     {
