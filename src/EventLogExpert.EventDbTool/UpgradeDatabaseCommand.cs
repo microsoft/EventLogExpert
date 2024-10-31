@@ -21,11 +21,7 @@ public class UpgradeDatabaseCommand : DbToolCommand
             description: "Verbose logging. May be useful for troubleshooting.");
         upgradeDatabaseCommand.AddArgument(fileArgument);
         upgradeDatabaseCommand.AddOption(verboseOption);
-        upgradeDatabaseCommand.SetHandler((fileArgumentValue, verboseOptionValue) =>
-        {
-            UpgradeDatabase(fileArgumentValue, verboseOptionValue);
-        },
-        fileArgument, verboseOption);
+        upgradeDatabaseCommand.SetHandler(UpgradeDatabase, fileArgument, verboseOption);
 
         return upgradeDatabaseCommand;
     }

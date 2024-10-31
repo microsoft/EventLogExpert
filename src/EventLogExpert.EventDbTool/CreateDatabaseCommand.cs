@@ -35,11 +35,7 @@ public class CreateDatabaseCommand : DbToolCommand
         createDatabaseCommand.AddOption(filterOption);
         createDatabaseCommand.AddOption(skipProvidersInFileOption);
         createDatabaseCommand.AddOption(verboseOption);
-        createDatabaseCommand.SetHandler((fileOptionValue, filterOptionValue, verboseOptionValue, skipProvidersInFileOption) =>
-        {
-            CreateDatabase(fileOptionValue, filterOptionValue, verboseOptionValue, skipProvidersInFileOption);
-        },
-        fileArgument, filterOption, verboseOption, skipProvidersInFileOption);
+        createDatabaseCommand.SetHandler(CreateDatabase, fileArgument, filterOption, verboseOption, skipProvidersInFileOption);
 
         return createDatabaseCommand;
     }

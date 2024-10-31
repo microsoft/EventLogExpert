@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Providers;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
@@ -11,7 +11,7 @@ public class DiffDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
-        var diffDatababaseCommand = new Command(
+        var diffDatabaseCommand = new Command(
             name: "diff",
             description: "Given two databases, produces a third database containing all providers " +
                 "from the second database which are not in the first database.");
@@ -27,17 +27,13 @@ public class DiffDatabaseCommand : DbToolCommand
         var verboseOption = new Option<bool>(
             name: "--verbose",
             description: "Verbose logging. May be useful for troubleshooting.");
-        diffDatababaseCommand.AddArgument(dbOneArgument);
-        diffDatababaseCommand.AddArgument(dbTwoArgument);
-        diffDatababaseCommand.AddArgument(newDbArgument);
-        diffDatababaseCommand.AddOption(verboseOption);
-        diffDatababaseCommand.SetHandler((dbOneArgValue, dbTwoArgValue, newDbArgValue, verboseOptionValue) =>
-        {
-            DiffDatabase(dbOneArgValue, dbTwoArgValue, newDbArgValue, verboseOptionValue);
-        },
-        dbOneArgument, dbTwoArgument, newDbArgument, verboseOption);
+        diffDatabaseCommand.AddArgument(dbOneArgument);
+        diffDatabaseCommand.AddArgument(dbTwoArgument);
+        diffDatabaseCommand.AddArgument(newDbArgument);
+        diffDatabaseCommand.AddOption(verboseOption);
+        diffDatabaseCommand.SetHandler(DiffDatabase, dbOneArgument, dbTwoArgument, newDbArgument, verboseOption);
 
-        return diffDatababaseCommand;
+        return diffDatabaseCommand;
     }
 
     public static void DiffDatabase(string dbOne, string dbTwo, string newDb, bool verbose)

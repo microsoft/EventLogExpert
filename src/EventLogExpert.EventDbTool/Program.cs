@@ -5,9 +5,9 @@ using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-class Program
+internal class Program
 {
-    static async Task<int> Main(string[] args)
+    private static async Task<int> Main(string[] args)
     {
         var rootCommand = new RootCommand("Tool used to create and modify databases for use with EventLogExpert");
 
