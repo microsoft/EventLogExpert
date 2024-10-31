@@ -94,9 +94,3 @@ public enum FilterType
     Advanced,
     Cached
 }
-
-public enum LogType
-{
-    Live,
-    File
-}

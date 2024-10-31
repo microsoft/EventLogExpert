@@ -113,7 +113,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         if (args.Length > 1)
         {
-            OpenEventLogFile(args[1]);
+            OpenLog(args[1], PathType.FilePath).AndForget();
         }
 
         EnableAddLogToViewViaDragAndDrop();
@@ -138,72 +138,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         };
 
         return await FilePicker.Default.PickMultipleAsync(options);
-    }
-
-    private async void AddFile_Clicked(object sender, EventArgs e)
-    {
-        var result = await GetFilePickerResult();
-
-        foreach (var file in result.Where(f => f is not null))
-        {
-            if (_activeLogsState.Value.Any(l => l.Key == file?.FullPath))
-            {
-                return;
-            }
-
-            OpenEventLogFile(file!.FullPath);
-        }
-    }
-
-    private async Task AddLiveLog(string logName)
-    {
-        if (string.IsNullOrWhiteSpace(logName)) { return; }
-
-        if (_activeLogsState.Value.Any(l => l.Key == logName)) { return; }
-
-        using EventLogSession session = new();
-
-        EventLogInformation? eventLogInformation;
-
-        try
-        {
-            eventLogInformation = session.GetLogInformation(logName, PathType.LogName);
-        }
-        catch (UnauthorizedAccessException)
-        {
-            await _dialogService.ShowAlert("Log requires elevation",
-                "Please relaunch with \"Run as Administrator\" to open this log",
-                "Ok");
-
-            return;
-        }
-        catch (Exception ex)
-        {
-            await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
-
-            return;
-        }
-
-        if (eventLogInformation.RecordCount is null or <= 0)
-        {
-            await _dialogService.ShowAlert("Empty log", "Log contains no events", "Ok");
-
-            return;
-        }
-
-        if (_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-        }
-
-        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logName, LogType.Live, _cancellationTokenSource.Token));
-    }
-
-    private async void AddLiveLog_Clicked(object? sender, EventArgs e)
-    {
-        if (sender is null) { return; }
-
-        await AddLiveLog(((MenuFlyoutItem)sender).Text);
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -270,14 +204,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
             var log = new MenuFlyoutItem { Text = string.Intern(folders[^1]) };
 
-            if (shouldAddLog)
-            {
-                log.Clicked += async (s, e) => { await AddLiveLog(logName); };
-            }
-            else
-            {
-                log.Clicked += async (s, e) => { await OpenLiveLog(logName); };
-            }
+            log.Clicked += async (s, e) => { await OpenLog(logName, PathType.LogName, shouldAddLog); };
 
             menu.Add(log);
         }
@@ -320,7 +247,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
                                 return;
                             }
 
-                            OpenEventLogFile($"{file.Path}");
+                            await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
                         }
                     }
                 }
@@ -362,45 +289,86 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
 
-    private void OpenEventLogFile(string fileName)
-    {
-        if (_cancellationTokenSource.IsCancellationRequested)
-        {
-            _cancellationTokenSource = new CancellationTokenSource();
-        }
-
-        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(fileName, LogType.File, _cancellationTokenSource.Token));
-    }
-
     // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)
     {
+        if (sender is not MenuFlyoutItem item) { return; }
+
+        bool shouldAddLog = item.CommandParameter is true;
+
         var result = await GetFilePickerResult();
 
         var logs = result.Where(f => f is not null).ToList();
 
         if (logs.Count <= 0) { return; }
 
-        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        if (!shouldAddLog)
+        {
+            await _cancellationTokenSource.CancelAsync();
+            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        }
 
         foreach (var file in logs)
         {
-            OpenEventLogFile(file!.FullPath);
+            await OpenLog(file!.FullPath, PathType.FilePath, shouldAddLog:true);
         }
     }
 
-    private async Task OpenLiveLog(string logName)
+    private async void OpenLiveLog_Clicked(object? sender, EventArgs e)
     {
-        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        if (sender is not MenuFlyoutItem item) { return; }
 
-        await AddLiveLog(logName);
+        bool shouldAddLog = item.CommandParameter is true;
+
+        await OpenLog(item.Text, PathType.LogName, shouldAddLog);
     }
 
-    private void OpenLiveLog_Clicked(object? sender, EventArgs e)
+    private async Task OpenLog(string logPath, PathType pathType, bool shouldAddLog = false)
     {
-        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        if (string.IsNullOrWhiteSpace(logPath)) { return; }
 
-        AddLiveLog_Clicked(sender, e);
+        if (_activeLogsState.Value.Any(l => l.Key == logPath)) { return; }
+
+        EventLogInformation? eventLogInformation;
+
+        try
+        {
+            eventLogInformation = EventLogSession.GlobalSession.GetLogInformation(logPath, pathType);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            await _dialogService.ShowAlert("Log requires elevation",
+                "Please relaunch with \"Run as Administrator\" to open this log",
+                "Ok");
+
+            return;
+        }
+        catch (Exception ex)
+        {
+            await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
+
+            return;
+        }
+
+        if (eventLogInformation.RecordCount is null or <= 0)
+        {
+            await _dialogService.ShowAlert("Empty log", "Log contains no events", "Ok");
+
+            return;
+        }
+
+        if (!shouldAddLog)
+        {
+            await _cancellationTokenSource.CancelAsync();
+            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        }
+
+        if (_cancellationTokenSource.IsCancellationRequested)
+        {
+            _cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
     }
 
     private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
@@ -408,9 +376,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private void PopulateOtherLogsMenu()
     {
-        using EventLogSession session = new();
-
-        var names = session.GetLogNames();
+        var names = EventLogSession.GlobalSession.GetLogNames();
 
         CreateFlyoutMenu(AddOtherLogsFlyoutSubitem, names, true);
         CreateFlyoutMenu(OpenOtherLogsFlyoutSubitem, names);

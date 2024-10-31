@@ -34,7 +34,7 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                 _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");
                 break;
             case EventLogAction.OpenLog openLogAction:
-                _debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogType}.");
+                _debugLogger.Trace($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.PathType}.");
                 break;
             case EventLogAction.AddEventBuffered:
             case EventLogAction.AddEventSuccess:

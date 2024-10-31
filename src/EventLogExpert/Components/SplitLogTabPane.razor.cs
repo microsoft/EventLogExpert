@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
@@ -55,7 +55,7 @@ public sealed partial class SplitLogTabPane
     {
         if (table.IsCombined) { return "Combined"; }
 
-        string tabName = table.LogType is LogType.File ?
+        string tabName = table.PathType is PathType.FilePath ?
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
             $"{table.LogName} - {table.ComputerName}";
 
@@ -66,7 +66,7 @@ public sealed partial class SplitLogTabPane
     {
         if (table.IsCombined) { return string.Empty; }
 
-        return $"{(table.LogType == LogType.File ? "Log File: " : "Live Log: ")} {table.FileName}\n" +
+        return $"{(table.PathType == PathType.FilePath ? "Log File: " : "Live Log: ")} {table.FileName}\n" +
             $"Log Name: {table.LogName}\n" +
             $"Computer Name: {table.ComputerName}";
     }

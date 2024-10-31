@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using System.Collections.Immutable;
@@ -24,7 +25,7 @@ public sealed record EventLogAction
 
     public sealed record LoadNewEvents;
 
-    public sealed record OpenLog(string LogName, LogType LogType, CancellationToken Token = default);
+    public sealed record OpenLog(string LogName, PathType PathType, CancellationToken Token = default);
 
     public sealed record SelectEvent(
         DisplayEventModel SelectedEvent,
