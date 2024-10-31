@@ -2,12 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Providers;
-using Microsoft.Data.Sqlite;
-using Microsoft.EntityFrameworkCore;
 using System.CommandLine;
-using System.Text.Json;
 
 namespace EventLogExpert.EventDbTool;
 
