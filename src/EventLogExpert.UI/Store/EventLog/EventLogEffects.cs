@@ -61,7 +61,7 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.CloseAll))]
     public Task HandleCloseAll(IDispatcher dispatcher)
     {
-        //logWatcherService.RemoveAll();
+        logWatcherService.RemoveAll();
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
@@ -74,7 +74,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        //logWatcherService.RemoveLog(action.LogName);
+        logWatcherService.RemoveLog(action.LogName);
 
         dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
@@ -122,10 +122,10 @@ public sealed class EventLogEffects(
         }
 
         var activityId = Guid.NewGuid();
+        string? lastEvent;
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
-        DisplayEventModel? lastEvent = null;
         ConcurrentQueue<DisplayEventModel> events = new();
 
         await using Timer timer = new(
@@ -153,7 +153,7 @@ public sealed class EventLogEffects(
                         {
                             try
                             {
-                                if (@event.RecordId is null) { continue; }
+                                if (!@event.IsSuccess) { continue; }
 
                                 eventResolver.ResolveProviderDetails(@event, action.LogName);
 
@@ -190,6 +190,8 @@ public sealed class EventLogEffects(
 
                     return ValueTask.CompletedTask;
                 });
+
+            lastEvent = reader.LastBookmark;
         }
         catch (TaskCanceledException)
         {
@@ -203,10 +205,10 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
 
-        //if (action.LogType == LogType.Live)
-        //{
-        //    logWatcherService.AddLog(action.LogName, lastEvent?.Bookmark);
-        //}
+        if (action.PathType == PathType.LogName)
+        {
+            logWatcherService.AddLog(action.LogName, lastEvent);
+        }
 
         dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
     }

@@ -11,6 +11,7 @@ internal static class Interop
     internal const int ERROR_ACCESS_DENIED = 5;
     internal const int ERROR_INVALID_HANDLE = 6;
     internal const int ERROR_INVALID_DATA = 13;
+    internal const int ERROR_INVALID_PARAMETER = 87;
     
     internal const int ERROR_INSUFFICIENT_BUFFER = 122;
     internal const int ERROR_NO_MORE_ITEMS = 259;

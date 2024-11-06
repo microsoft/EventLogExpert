@@ -8,13 +8,18 @@ namespace EventLogExpert.Eventing.Models;
 
 internal sealed partial class EventLogHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
+    // Must be public for P/Invoke to work
+    public EventLogHandle() : base(true) { }
+
     internal EventLogHandle(IntPtr handle) : base(true)
     {
         SetHandle(handle);
     }
 
-    // Must be public for P/Invoke to work
-    public EventLogHandle() : base(true) { }
+    internal EventLogHandle(IntPtr handle, bool ownsHandle) : base(ownsHandle)
+    {
+        SetHandle(handle);
+    }
 
     internal static EventLogHandle Zero => new();
 

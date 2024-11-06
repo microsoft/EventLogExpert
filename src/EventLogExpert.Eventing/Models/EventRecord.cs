@@ -38,4 +38,8 @@ public sealed record EventRecord
     public byte? Version { get; set; }
 
     public string? Xml { get; set; }
+
+    public string? Error { get; set; }
+
+    public bool IsSuccess => string.IsNullOrEmpty(Error);
 }
