@@ -11,6 +11,11 @@ public sealed partial class EventLogSession : IDisposable
 {
     private EventLogSession() { }
 
+    ~EventLogSession()
+    {
+        Dispose(disposing: false);
+    }
+
     public static EventLogSession GlobalSession { get; } = new();
 
     internal EventLogHandle Handle { get; } = EventLogHandle.Zero;

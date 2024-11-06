@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Reader;
+using Microsoft.Win32.SafeHandles;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -98,6 +100,17 @@ internal enum EvtRenderFlags
     EventValues,
     EventXml,
     Bookmark
+}
+
+[Flags]
+internal enum EvtSubscribeFlags
+{
+    ToFutureEvents = 1,
+    StartAtOldestRecord = 2,
+    StartAfterBookmark = 3,
+    OriginMask = 3,
+    TolerateQueryErrors = 0x1000,
+    Strict = 0x10000
 }
 
 internal enum EvtSystemPropertyId
@@ -255,6 +268,10 @@ internal static partial class EventMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtClose(IntPtr handle);
 
+    /// <summary>Creates a bookmark that identifies an event in a channel</summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    internal static partial EventLogHandle EvtCreateBookmark([MarshalAs(UnmanagedType.LPWStr)] string? bookmarkXml);
+
     /// <summary>Creates a context that specifies the information in the event that you want to render</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     internal static partial EventLogHandle EvtCreateRenderContext(
@@ -392,7 +409,7 @@ internal static partial class EventMethods
         EventLogHandle session,
         [MarshalAs(UnmanagedType.LPWStr)] string path,
         [MarshalAs(UnmanagedType.LPWStr)] string? query,
-        int flags);
+        PathType flags);
 
     /// <summary>Renders an XML fragment base on the render context that you specify</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
@@ -405,6 +422,25 @@ internal static partial class EventMethods
         IntPtr buffer,
         out int bufferUsed,
         out int propertyCount);
+
+    /// <summary>
+    ///     Creates a subscription that will receive current and future events from a channel or log file that match the
+    ///     specified query criteria
+    /// </summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    internal static partial EventLogHandle EvtSubscribe(
+        EventLogHandle session,
+        SafeWaitHandle signalEvent,
+        [MarshalAs(UnmanagedType.LPWStr)] string channelPath,
+        [MarshalAs(UnmanagedType.LPWStr)] string? query,
+        EventLogHandle bookmark,
+        IntPtr context,
+        IntPtr callback,
+        EvtSubscribeFlags flags);
+
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtUpdateBookmark(EventLogHandle bookmark, EventLogHandle @event);
 
     /// <summary>Formats a message string</summary>
     /// <param name="publisherMetadataHandle">Handle returned from <see cref="EvtOpenPublisherMetadata" /></param>
@@ -577,6 +613,113 @@ internal static partial class EventMethods
         }
 
         return size;
+    }
+
+    internal static EventRecord RenderEvent(EventLogHandle eventHandle, EvtRenderFlags flag)
+    {
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = EvtRender(
+                EventLogSession.GlobalSession.SystemRenderContext,
+                eventHandle,
+                flag,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed,
+                out int propertyCount);
+
+            int error = Marshal.GetLastWin32Error();
+
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            {
+                ThrowEventLogException(error);
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferUsed);
+
+            success = EvtRender(
+                EventLogSession.GlobalSession.SystemRenderContext,
+                eventHandle,
+                flag,
+                bufferUsed,
+                buffer,
+                out bufferUsed,
+                out propertyCount);
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            return GetEventRecord(buffer, propertyCount);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
+    }
+
+    internal static IList<object> RenderEventProperties(EventLogHandle eventHandle)
+    {
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = EvtRender(
+                EventLogSession.GlobalSession.UserRenderContext,
+                eventHandle,
+                EvtRenderFlags.EventValues,
+                0,
+                IntPtr.Zero,
+                out int bufferUsed,
+                out int propertyCount);
+
+            int error = Marshal.GetLastWin32Error();
+
+            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            {
+                ThrowEventLogException(error);
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferUsed);
+
+            success = EvtRender(
+                EventLogSession.GlobalSession.UserRenderContext,
+                eventHandle,
+                EvtRenderFlags.EventValues,
+                bufferUsed,
+                buffer,
+                out bufferUsed,
+                out propertyCount);
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            List<object> properties = [];
+
+            if (propertyCount <= 0) { return properties; }
+
+            for (int i = 0; i < propertyCount; i++)
+            {
+                var property = Marshal.PtrToStructure<EvtVariant>(buffer + (i * Marshal.SizeOf<EvtVariant>()));
+
+                properties.Add(ConvertVariant(property) ?? throw new InvalidDataException());
+            }
+
+            return properties;
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 
     internal static void ThrowEventLogException(int error)

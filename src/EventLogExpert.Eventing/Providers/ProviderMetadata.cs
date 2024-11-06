@@ -30,6 +30,11 @@ internal sealed partial class ProviderMetadata : IDisposable
         }
     }
 
+    ~ProviderMetadata()
+    {
+        Dispose(disposing: false);
+    }
+
     public IDictionary<uint, string> Channels
     {
         get

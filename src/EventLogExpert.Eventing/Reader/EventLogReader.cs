@@ -9,9 +9,16 @@ namespace EventLogExpert.Eventing.Reader;
 
 public sealed partial class EventLogReader(string path, PathType pathType) : IDisposable
 {
+    private readonly object _eventLock = new();
     private readonly EventLogHandle _handle =
-        EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, (int)pathType);
-    private readonly SemaphoreSlim _semaphore = new(1);
+        EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
+
+    ~EventLogReader()
+    {
+        Dispose(disposing: false);
+    }
+
+    public string? LastBookmark { get; private set; }
 
     public void Dispose()
     {
@@ -19,14 +26,12 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
         GC.SuppressFinalize(this);
     }
 
-    public bool TryGetEvents(out EventRecord[] events, int batchSize = 200)
+    public bool TryGetEvents(out EventRecord[] events, int batchSize = 64)
     {
         var buffer = new IntPtr[batchSize];
         int count = 0;
 
-        _semaphore.Wait();
-
-        try
+        lock (_eventLock)
         {
             bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
 
@@ -35,10 +40,8 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
                 events = [];
                 return false;
             }
-        }
-        finally
-        {
-            _semaphore.Release();
+
+            LastBookmark = CreateBookmark(new EventLogHandle(buffer[count - 1], false));
         }
 
         events = new EventRecord[count];
@@ -49,34 +52,50 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
             try
             {
-                events[i] = RenderEvent(eventHandle, EvtRenderFlags.EventValues);
-                events[i].Properties = RenderEventProperties(eventHandle);
+                events[i] = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+                events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
             }
-            catch
+            catch (Exception ex)
             {
-                events[i] = new EventRecord { RecordId = null };
+                events[i] = new EventRecord { RecordId = null, Error = ex.Message };
             }
         }
 
         return true;
     }
 
-    private static EventRecord RenderEvent(EventLogHandle eventHandle, EvtRenderFlags flag)
+    private static string? CreateBookmark(EventLogHandle eventHandle)
     {
+        using EventLogHandle handle = EventMethods.EvtCreateBookmark(null);
+        int error = Marshal.GetLastWin32Error();
+
+        if (handle.IsInvalid)
+        {
+            EventMethods.ThrowEventLogException(error);
+        }
+
+        bool success = EventMethods.EvtUpdateBookmark(handle, eventHandle);
+        error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            EventMethods.ThrowEventLogException(error);
+        }
+
         IntPtr buffer = IntPtr.Zero;
 
         try
         {
-            bool success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.SystemRenderContext,
-                eventHandle,
-                flag,
+            success = EventMethods.EvtRender(
+                EventLogHandle.Zero,
+                handle,
+                EvtRenderFlags.Bookmark,
                 0,
                 IntPtr.Zero,
                 out int bufferUsed,
-                out int propertyCount);
+                out int _);
 
-            int error = Marshal.GetLastWin32Error();
+            error = Marshal.GetLastWin32Error();
 
             if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
             {
@@ -86,13 +105,13 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
             success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.SystemRenderContext,
-                eventHandle,
-                flag,
+                EventLogHandle.Zero,
+                handle,
+                EvtRenderFlags.Bookmark,
                 bufferUsed,
                 buffer,
                 out bufferUsed,
-                out propertyCount);
+                out int _);
 
             error = Marshal.GetLastWin32Error();
 
@@ -101,66 +120,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
                 EventMethods.ThrowEventLogException(error);
             }
 
-            return EventMethods.GetEventRecord(buffer, propertyCount);
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(buffer);
-        }
-    }
-
-    private static IList<object> RenderEventProperties(EventLogHandle eventHandle)
-    {
-        IntPtr buffer = IntPtr.Zero;
-
-        try
-        {
-            bool success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.UserRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                0,
-                IntPtr.Zero,
-                out int bufferUsed,
-                out int propertyCount);
-
-            int error = Marshal.GetLastWin32Error();
-
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
-            {
-                EventMethods.ThrowEventLogException(error);
-            }
-
-            buffer = Marshal.AllocHGlobal(bufferUsed);
-
-            success = EventMethods.EvtRender(
-                EventLogSession.GlobalSession.UserRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                bufferUsed,
-                buffer,
-                out bufferUsed,
-                out propertyCount);
-
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                EventMethods.ThrowEventLogException(error);
-            }
-
-            List<object> properties = [];
-
-            if (propertyCount <= 0) { return properties; }
-
-            for (int i = 0; i < propertyCount; i++)
-            {
-                var property = Marshal.PtrToStructure<EvtVariant>(buffer + (i * Marshal.SizeOf<EvtVariant>()));
-
-                properties.Add(EventMethods.ConvertVariant(property) ?? throw new InvalidDataException());
-            }
-
-            return properties;
+            return Marshal.PtrToStringAuto(buffer);
         }
         finally
         {
