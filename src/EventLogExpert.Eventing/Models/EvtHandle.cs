@@ -6,22 +6,22 @@ using Microsoft.Win32.SafeHandles;
 
 namespace EventLogExpert.Eventing.Models;
 
-internal sealed partial class EventLogHandle : SafeHandleZeroOrMinusOneIsInvalid
+internal sealed partial class EvtHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
     // Must be public for P/Invoke to work
-    public EventLogHandle() : base(true) { }
+    public EvtHandle() : base(true) { }
 
-    internal EventLogHandle(IntPtr handle) : base(true)
+    internal EvtHandle(IntPtr handle) : base(true)
     {
         SetHandle(handle);
     }
 
-    internal EventLogHandle(IntPtr handle, bool ownsHandle) : base(ownsHandle)
+    internal EvtHandle(IntPtr handle, bool ownsHandle) : base(ownsHandle)
     {
         SetHandle(handle);
     }
 
-    internal static EventLogHandle Zero => new();
+    internal static EvtHandle Zero => new();
 
     protected override bool ReleaseHandle()
     {

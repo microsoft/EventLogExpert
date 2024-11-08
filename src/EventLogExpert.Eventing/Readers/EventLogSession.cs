@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Reader;
+namespace EventLogExpert.Eventing.Readers;
 
 public sealed partial class EventLogSession : IDisposable
 {
@@ -18,11 +18,11 @@ public sealed partial class EventLogSession : IDisposable
 
     public static EventLogSession GlobalSession { get; } = new();
 
-    internal EventLogHandle Handle { get; } = EventLogHandle.Zero;
+    internal EvtHandle Handle { get; } = EvtHandle.Zero;
 
-    internal EventLogHandle SystemRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.System);
+    internal EvtHandle SystemRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.System);
 
-    internal EventLogHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
+    internal EvtHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
 
     public void Dispose()
     {
@@ -37,7 +37,7 @@ public sealed partial class EventLogSession : IDisposable
     {
         List<string> paths = [];
 
-        using EventLogHandle channelHandle = EventMethods.EvtOpenChannelEnum(Handle, 0);
+        using EvtHandle channelHandle = EventMethods.EvtOpenChannelEnum(Handle, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (channelHandle.IsInvalid)
@@ -65,7 +65,7 @@ public sealed partial class EventLogSession : IDisposable
     {
         HashSet<string> providers = [];
 
-        using EventLogHandle providerHandle = EventMethods.EvtOpenPublisherEnum(Handle, 0);
+        using EvtHandle providerHandle = EventMethods.EvtOpenPublisherEnum(Handle, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (providerHandle.IsInvalid)
@@ -89,9 +89,9 @@ public sealed partial class EventLogSession : IDisposable
         return providers;
     }
 
-    private static EventLogHandle CreateRenderContext(EvtRenderContextFlags renderContextFlags)
+    private static EvtHandle CreateRenderContext(EvtRenderContextFlags renderContextFlags)
     {
-        EventLogHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, renderContextFlags);
+        EvtHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, renderContextFlags);
         int error = Marshal.GetLastWin32Error();
 
         if (renderContextHandle.IsInvalid)
@@ -104,7 +104,7 @@ public sealed partial class EventLogSession : IDisposable
         return renderContextHandle;
     }
 
-    private static string NextChannelPath(EventLogHandle channelHandle, ref bool doneReading)
+    private static string NextChannelPath(EvtHandle channelHandle, ref bool doneReading)
     {
         bool success = EventMethods.EvtNextChannelPath(channelHandle, 0, null, out int bufferSize);
         int error = Marshal.GetLastWin32Error();
@@ -137,7 +137,7 @@ public sealed partial class EventLogSession : IDisposable
         return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);
     }
 
-    private static string NextPublisherId(EventLogHandle publisherHandle, ref bool doneReading)
+    private static string NextPublisherId(EvtHandle publisherHandle, ref bool doneReading)
     {
         bool success = EventMethods.EvtNextPublisherId(publisherHandle, 0, null, out int bufferSize);
         int error = Marshal.GetLastWin32Error();
@@ -172,6 +172,8 @@ public sealed partial class EventLogSession : IDisposable
 
     private void Dispose(bool disposing)
     {
+        if (disposing) { return; }
+
         if (Handle is { IsInvalid: false })
         {
             Handle.Dispose();

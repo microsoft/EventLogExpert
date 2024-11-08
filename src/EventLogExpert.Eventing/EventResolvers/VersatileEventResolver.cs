@@ -41,20 +41,6 @@ public sealed class VersatileEventResolver : IEventResolver
         throw new InvalidOperationException("No database or local resolver available.");
     }
 
-    public string GetXml(EventRecord eventRecord) {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.GetXml(eventRecord);
-        }
-
-        if (_localResolver is not null)
-        {
-            return _localResolver.GetXml(eventRecord);
-        }
-
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
-
     public string ResolveDescription(EventRecord eventRecord)
     {
         if (_databaseResolver is not null)

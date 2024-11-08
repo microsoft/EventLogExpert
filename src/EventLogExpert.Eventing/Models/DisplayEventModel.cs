@@ -35,7 +35,7 @@ public sealed record DisplayEventModel(
 
     public DateTime TimeCreated { get; init; }
 
-    public SecurityIdentifier UserId { get; init; } = new(WellKnownSidType.NullSid, null);
+    public SecurityIdentifier? UserId { get; init; }
 
     public string Xml { get; init; } = string.Empty;
 }

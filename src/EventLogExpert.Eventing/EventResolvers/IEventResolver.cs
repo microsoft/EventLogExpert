@@ -10,8 +10,6 @@ public interface IEventResolver
 {
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
 
-    public string GetXml(EventRecord eventRecord);
-
     public string ResolveDescription(EventRecord eventRecord);
 
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);

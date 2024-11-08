@@ -24,11 +24,6 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
-    public string GetXml(EventRecord eventRecord)
-    {
-        return string.Empty;
-    }
-
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
         providerDetailsLock.EnterUpgradeableReadLock();

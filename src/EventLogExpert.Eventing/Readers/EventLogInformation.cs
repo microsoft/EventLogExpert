@@ -5,13 +5,13 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Reader;
+namespace EventLogExpert.Eventing.Readers;
 
 public sealed class EventLogInformation
 {
     internal EventLogInformation(EventLogSession session, string logName, PathType pathType)
     {
-        using EventLogHandle handle = EventMethods.EvtOpenLog(session.Handle, logName, pathType);
+        using EvtHandle handle = EventMethods.EvtOpenLog(session.Handle, logName, pathType);
 
         Attributes = (int?)(uint?)GetLogInfo(handle, EvtLogPropertyId.Attributes);
         CreationTime = (DateTime?)GetLogInfo(handle, EvtLogPropertyId.CreationTime);
@@ -39,7 +39,7 @@ public sealed class EventLogInformation
 
     public long? RecordCount { get; }
 
-    private static object? GetLogInfo(EventLogHandle handle, EvtLogPropertyId property)
+    private static object? GetLogInfo(EvtHandle handle, EvtLogPropertyId property)
     {
         IntPtr buffer = IntPtr.Zero;
 
