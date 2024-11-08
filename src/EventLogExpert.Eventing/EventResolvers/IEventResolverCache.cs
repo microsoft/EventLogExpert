@@ -7,7 +7,7 @@ public interface IEventResolverCache
 {
     void ClearAll();
 
-    string GetDescription(string description);
+    string GetOrAddDescription(string description);
 
-    string GetValue(string value);
+    string GetOrAddValue(string value);
 }

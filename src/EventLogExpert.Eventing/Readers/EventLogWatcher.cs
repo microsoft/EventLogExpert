@@ -5,19 +5,19 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Reader;
+namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogWatcher(string path, string? bookmark) : IDisposable
+public sealed partial class EventLogWatcher(string path, string? bookmark, bool renderXml = true) : IDisposable
 {
     private readonly string? _bookmark = bookmark;
     private readonly AutoResetEvent _newEvents = new(false);
-    private readonly EventLogHandle _queryHandle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
+    private readonly EvtHandle _queryHandle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
 
     private bool _isSubscribed;
-    private EventLogHandle _subscriptionHandle = EventLogHandle.Zero;
+    private EvtHandle _subscriptionHandle = EvtHandle.Zero;
     private RegisteredWaitHandle? _waitHandle;
 
-    public EventLogWatcher(string path) : this(path, null) { }
+    public EventLogWatcher(string path, bool renderXml = true) : this(path, null, renderXml) { }
 
     ~EventLogWatcher()
     {
@@ -82,13 +82,18 @@ public sealed partial class EventLogWatcher(string path, string? bookmark) : IDi
 
             for (int i = 0; i < count; i++)
             {
-                using var eventHandle = new EventLogHandle(buffer[i]);
+                using var eventHandle = new EvtHandle(buffer[i]);
                 EventRecord @event;
 
                 try
                 {
                     @event = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
                     @event.Properties = EventMethods.RenderEventProperties(eventHandle);
+
+                    if (renderXml)
+                    {
+                        @event.Xml = EventMethods.RenderEventXml(eventHandle);
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -108,7 +113,7 @@ public sealed partial class EventLogWatcher(string path, string? bookmark) : IDi
             EvtSubscribeFlags.ToFutureEvents :
             EvtSubscribeFlags.StartAfterBookmark;
 
-        using EventLogHandle bookmarkHandle = EventMethods.EvtCreateBookmark(_bookmark);
+        using EvtHandle bookmarkHandle = EventMethods.EvtCreateBookmark(_bookmark);
         int error = Marshal.GetLastWin32Error();
 
         if (bookmarkHandle.IsInvalid)

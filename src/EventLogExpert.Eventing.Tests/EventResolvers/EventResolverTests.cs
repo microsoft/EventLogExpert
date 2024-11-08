@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Reader;
+using EventLogExpert.Eventing.Readers;
 using System.Diagnostics;
 using Xunit.Abstractions;
 
@@ -29,8 +29,6 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
             var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
             providerDetails.TryAdd(eventRecord.ProviderName, details);
         }
-
-        public string GetXml(EventRecord eventRecord) { throw new NotImplementedException(); }
     }
 
     private readonly ITestOutputHelper _outputHelper = outputHelper;

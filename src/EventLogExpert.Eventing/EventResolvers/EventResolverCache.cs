@@ -28,7 +28,7 @@ public sealed class EventResolverCache : IEventResolverCache
     }
 
     /// <summary>Returns the description if it exists in the cache, otherwise adds it to the cache and returns it.</summary>
-    public string GetDescription(string description)
+    public string GetOrAddDescription(string description)
     {
         _descriptionCacheLock.EnterUpgradeableReadLock();
 
@@ -43,6 +43,11 @@ public sealed class EventResolverCache : IEventResolverCache
 
             try
             {
+                if (_descriptionCache.TryGetValue(description, out result))
+                {
+                    return result;
+                }
+
                 _descriptionCache.Add(description);
 
                 return description;
@@ -59,7 +64,7 @@ public sealed class EventResolverCache : IEventResolverCache
     }
 
     /// <summary>Returns the value if it exists in the cache, otherwise adds it to the cache and returns it.</summary>
-    public string GetValue(string value)
+    public string GetOrAddValue(string value)
     {
         _valueCacheLock.EnterUpgradeableReadLock();
 
@@ -74,6 +79,12 @@ public sealed class EventResolverCache : IEventResolverCache
 
             try
             {
+                // Double-check if the value was added by another thread
+                if (_valueCache.TryGetValue(value, out result))
+                {
+                    return result;
+                }
+
                 _valueCache.Add(value);
 
                 return value;

@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Reader;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.Settings;
@@ -14,7 +14,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using System.Security.Principal;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -134,7 +133,7 @@ public sealed class EventLogEffects(
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1));
 
-        using var reader = new EventLogReader(action.LogName, action.PathType);
+        using var reader = new EventLogReader(action.LogName, action.PathType, settingsState.Value.Config.IsXmlEnabled);
 
         try
         {
@@ -161,21 +160,21 @@ public sealed class EventLogEffects(
                                     new DisplayEventModel(action.LogName)
                                     {
                                         ActivityId = @event.ActivityId,
-                                        ComputerName = resolverCache.GetValue(@event.ComputerName),
-                                        Description = resolverCache.GetDescription(eventResolver.ResolveDescription(@event)),
+                                        ComputerName = resolverCache.GetOrAddValue(@event.ComputerName),
+                                        Description = resolverCache.GetOrAddDescription(eventResolver.ResolveDescription(@event)),
                                         Id = @event.Id,
                                         KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
-                                            .Select(resolverCache.GetValue).ToList(),
+                                            .Select(resolverCache.GetOrAddValue).ToList(),
                                         Level = Severity.GetString(@event.Level),
-                                        LogName = resolverCache.GetValue(@event.LogName),
+                                        LogName = resolverCache.GetOrAddValue(@event.LogName),
                                         ProcessId = @event.ProcessId,
                                         RecordId = @event.RecordId,
-                                        Source = resolverCache.GetValue(@event.ProviderName),
-                                        TaskCategory = resolverCache.GetValue(eventResolver.ResolveTaskName(@event)),
+                                        Source = resolverCache.GetOrAddValue(@event.ProviderName),
+                                        TaskCategory = resolverCache.GetOrAddValue(eventResolver.ResolveTaskName(@event)),
                                         ThreadId = @event.ThreadId,
                                         TimeCreated = @event.TimeCreated.ToUniversalTime(),
-                                        UserId = @event.UserId ?? new SecurityIdentifier(WellKnownSidType.NullSid, null),
-                                        Xml = settingsState.Value.Config.IsXmlEnabled ? eventResolver.GetXml(@event) : string.Empty
+                                        UserId = @event.UserId,
+                                        Xml = @event.Xml ?? string.Empty
                                     });
                             }
                             catch (Exception ex)

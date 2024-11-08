@@ -4,11 +4,10 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Reader;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using System.Security.Principal;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -146,8 +145,8 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             if (_watchers.ContainsKey(logName)) { return; }
 
             EventLogWatcher watcher = _bookmarks[logName] != null ?
-                new EventLogWatcher(logName, _bookmarks[logName]) :
-                new EventLogWatcher(logName);
+                new EventLogWatcher(logName, _bookmarks[logName], _settingsState.Value.Config.IsXmlEnabled) :
+                new EventLogWatcher(logName, _settingsState.Value.Config.IsXmlEnabled);
 
             _watchers.Add(logName, watcher);
 
@@ -179,25 +178,23 @@ public sealed class LiveLogWatcherService : ILogWatcherService
                             new DisplayEventModel(logName)
                             {
                                 ActivityId = eventArgs.ActivityId,
-                                ComputerName = _resolverCache.GetValue(eventArgs.ComputerName),
-                                Description = _resolverCache.GetDescription(
+                                ComputerName = _resolverCache.GetOrAddValue(eventArgs.ComputerName),
+                                Description = _resolverCache.GetOrAddDescription(
                                     eventResolver.ResolveDescription(eventArgs)),
                                 Id = eventArgs.Id,
                                 KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(eventArgs)
-                                    .Select(_resolverCache.GetValue).ToList(),
+                                    .Select(_resolverCache.GetOrAddValue).ToList(),
                                 Level = Severity.GetString(eventArgs.Level),
-                                LogName = _resolverCache.GetValue(eventArgs.LogName),
+                                LogName = _resolverCache.GetOrAddValue(eventArgs.LogName),
                                 ProcessId = eventArgs.ProcessId,
                                 RecordId = eventArgs.RecordId,
-                                Source = _resolverCache.GetValue(eventArgs.ProviderName),
-                                TaskCategory = _resolverCache.GetValue(
+                                Source = _resolverCache.GetOrAddValue(eventArgs.ProviderName),
+                                TaskCategory = _resolverCache.GetOrAddValue(
                                     eventResolver.ResolveTaskName(eventArgs)),
                                 ThreadId = eventArgs.ThreadId,
                                 TimeCreated = eventArgs.TimeCreated.ToUniversalTime(),
-                                UserId = eventArgs.UserId ?? new SecurityIdentifier(WellKnownSidType.NullSid, null),
-                                Xml = _settingsState.Value.Config.IsXmlEnabled ?
-                                    eventResolver.GetXml(eventArgs) :
-                                    string.Empty
+                                UserId = eventArgs.UserId,
+                                Xml = eventArgs.Xml ?? string.Empty
                             }));
                 }
             };

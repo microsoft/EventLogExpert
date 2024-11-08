@@ -16,8 +16,6 @@ public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) 
 {
     public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
 
-    public string GetXml(EventRecord eventRecord) { return string.Empty; }
-
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
         providerDetailsLock.EnterUpgradeableReadLock();

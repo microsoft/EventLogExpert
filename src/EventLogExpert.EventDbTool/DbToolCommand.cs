@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Reader;
+using EventLogExpert.Eventing.Readers;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;

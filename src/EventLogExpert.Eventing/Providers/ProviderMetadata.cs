@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Reader;
+using EventLogExpert.Eventing.Readers;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;
 
@@ -12,7 +12,7 @@ namespace EventLogExpert.Eventing.Providers;
 internal sealed partial class ProviderMetadata : IDisposable
 {
     private readonly SemaphoreSlim _providerLock = new(1);
-    private readonly EventLogHandle _publisherMetadataHandle;
+    private readonly EvtHandle _publisherMetadataHandle;
 
     private ReadOnlyDictionary<uint, string>? _channels;
     private ReadOnlyDictionary<long, string>? _keywords;
@@ -45,7 +45,7 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             try
             {
-                using EventLogHandle channelRefHandle =
+                using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.ChannelReferences);
 
                 int size = EventMethods.GetObjectArraySize(channelRefHandle);
@@ -84,7 +84,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             List<EventMetadata> events = [];
 
-            using EventLogHandle handle = EventMethods.EvtOpenEventMetadataEnum(_publisherMetadataHandle, 0);
+            using EvtHandle handle = EventMethods.EvtOpenEventMetadataEnum(_publisherMetadataHandle, 0);
             int error = Marshal.GetLastWin32Error();
 
             if (handle.IsInvalid)
@@ -94,7 +94,7 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             while (true)
             {
-                using EventLogHandle? metadataHandle = NextEventMetadata(handle, 0);
+                using EvtHandle? metadataHandle = NextEventMetadata(handle, 0);
 
                 if (metadataHandle is null) { break; }
 
@@ -129,7 +129,7 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             try
             {
-                using EventLogHandle channelRefHandle =
+                using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Keywords);
 
                 int size = EventMethods.GetObjectArraySize(channelRefHandle);
@@ -183,7 +183,7 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             try
             {
-                using EventLogHandle channelRefHandle =
+                using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Opcodes);
 
                 int size = EventMethods.GetObjectArraySize(channelRefHandle);
@@ -237,7 +237,7 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             try
             {
-                using EventLogHandle channelRefHandle =
+                using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Tasks);
 
                 int size = EventMethods.GetObjectArraySize(channelRefHandle);
@@ -285,7 +285,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private static object GetEventMetadataProperty(EventLogHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
+    private static object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -320,9 +320,9 @@ internal sealed partial class ProviderMetadata : IDisposable
         }
     }
 
-    private static EventLogHandle? NextEventMetadata(EventLogHandle metadataHandle, int flags)
+    private static EvtHandle? NextEventMetadata(EvtHandle metadataHandle, int flags)
     {
-        EventLogHandle handle = EventMethods.EvtNextEventMetadata(metadataHandle, flags);
+        EvtHandle handle = EventMethods.EvtNextEventMetadata(metadataHandle, flags);
         int error = Marshal.GetLastWin32Error();
 
         if (!handle.IsInvalid) { return handle; }
@@ -337,6 +337,8 @@ internal sealed partial class ProviderMetadata : IDisposable
 
     private void Dispose(bool disposing)
     {
+        if (disposing) { return; }
+
         if (_publisherMetadataHandle is { IsInvalid: false })
         {
             _publisherMetadataHandle.Dispose();
@@ -391,7 +393,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         }
     }
 
-    private EventLogHandle GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId propertyId)
+    private EvtHandle GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId propertyId)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -432,8 +434,8 @@ internal sealed partial class ProviderMetadata : IDisposable
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
             return variant.Handle == IntPtr.Zero ?
-                EventLogHandle.Zero :
-                new EventLogHandle(variant.Handle);
+                EvtHandle.Zero :
+                new EvtHandle(variant.Handle);
         }
         finally
         {
