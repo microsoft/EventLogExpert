@@ -18,6 +18,8 @@ namespace EventLogExpert;
 
 public sealed partial class App : Application
 {
+    private readonly MainPage _mainPage;
+
     public App(
         IActionSubscriber actionSubscriber,
         IDispatcher fluxorDispatcher,
@@ -37,30 +39,31 @@ public sealed partial class App : Application
     {
         InitializeComponent();
 
-        MainPage = new NavigationPage(
-            new MainPage(
-                actionSubscriber,
-                fluxorDispatcher,
-                databaseCollectionProvider,
-                activeLogsState,
-                continuouslyUpdateState,
-                filterPaneIsEnabledState,
-                loadedDatabasesState,
-                settingsState,
-                dialogService,
-                clipboardService,
-                updateService,
-                currentVersionProvider,
-                appTitleService,
-                fileLocationOptions,
-                traceLogger));
+        _mainPage = new MainPage(
+            actionSubscriber,
+            fluxorDispatcher,
+            databaseCollectionProvider,
+            activeLogsState,
+            continuouslyUpdateState,
+            filterPaneIsEnabledState,
+            loadedDatabasesState,
+            settingsState,
+            dialogService,
+            clipboardService,
+            updateService,
+            currentVersionProvider,
+            appTitleService,
+            fileLocationOptions,
+            traceLogger);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
-        var window = base.CreateWindow(activationState);
-
-        window.Title = "EventLogExpert";
+        var window = new Window
+        {
+            Title = "EventLogExpert",
+            Page = new NavigationPage(_mainPage)
+        };
 
         // Ultrawide monitors create a window that is way too wide
         if (DeviceDisplay.Current.MainDisplayInfo.Width >= 2048)

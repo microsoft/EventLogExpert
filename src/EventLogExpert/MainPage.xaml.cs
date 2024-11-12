@@ -284,7 +284,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     }
 
     private void Exit_Clicked(object sender, EventArgs e) =>
-        Application.Current?.CloseWindow(Application.Current.MainPage!.Window!);
+        Application.Current?.CloseWindow(Application.Current.Windows[0].Page!.Window!);
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
@@ -310,7 +310,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         foreach (var file in logs)
         {
-            await OpenLog(file!.FullPath, PathType.FilePath, shouldAddLog:true);
+            await OpenLog(file!.FullPath, PathType.FilePath, shouldAddLog: true);
         }
     }
 

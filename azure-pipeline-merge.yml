@@ -27,7 +27,7 @@ extends:
         - task: UseDotNet@2
           displayName: 'Install .NET SDK'
           inputs:
-            version: '8.x'
+            version: '9.x'
             performMultiLevelLookup: true
         - script: dotnet workload restore src/EventLogExpert.sln
           displayName: 'dotnet workload restore'
@@ -50,7 +50,7 @@ extends:
             dotnet publish src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj ` --self-contained ` -c Release ` -o "$(build.artifactStagingDirectory)" ` -p:IncludeNativeLibrariesForSelfExtract=true ` -p:PublishSingleFile=true ` -p:Version=$(ReleaseVersion)
           displayName: 'dotnet publish EventDbTool'
         - pwsh: >
-            dotnet publish src/EventLogExpert/EventLogExpert.csproj ` -c Release ` -f net8.0-windows10.0.19041.0 ` -p:AppxBundle=Never ` -p:AppInstallerCheckForUpdateFrequency=OnApplicationRun ` -p:AppInstallerUpdateFrequency=1 ` -p:AppInstallerUri="https://github.com/microsoft/EventLogExpert/releases/latest/download/" ` -p:GenerateAppInstallerFile=true ` -p:OutputPath="$(build.artifactStagingDirectory)\AppInstaller\" ` -p:RuntimeIdentifierOverride=win10-x64 ` -p:UapAppxPackageBuildMode=SideLoadOnly ` -p:Version=$(ReleaseVersion)
+            dotnet publish src/EventLogExpert/EventLogExpert.csproj ` -c Release ` -f net9.0-windows10.0.19041.0 ` -p:AppxBundle=Never ` -p:AppInstallerCheckForUpdateFrequency=OnApplicationRun ` -p:AppInstallerUpdateFrequency=1 ` -p:AppInstallerUri="https://github.com/microsoft/EventLogExpert/releases/latest/download/" ` -p:GenerateAppInstallerFile=true ` -p:OutputPath="$(build.artifactStagingDirectory)\AppInstaller\" ` -p:RuntimeIdentifierOverride=win10-x64 ` -p:UapAppxPackageBuildMode=SideLoadOnly ` -p:Version=$(ReleaseVersion)
           displayName: 'dotnet publish EventLogExpert'
         - pwsh: |
             Get-ChildItem -Recurse "$(build.artifactStagingDirectory)"
