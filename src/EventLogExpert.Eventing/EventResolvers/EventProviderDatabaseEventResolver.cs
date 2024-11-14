@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
@@ -16,11 +16,10 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
 
     private ImmutableArray<EventProviderDbContext> _dbContexts = [];
 
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection) : this(dbCollection, (s, log) => { }) { }
-
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, Action<string, LogLevel> tracer) : base(tracer)
+    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger? logger = null) : base(logger)
     {
-        tracer($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}", LogLevel.Information);
+        logger?.Trace($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
+
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
@@ -47,7 +46,7 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
 
                     if (details is null) { continue; }
 
-                    tracer($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.", LogLevel.Information);
+                    logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
                     providerDetails.TryAdd(eventRecord.ProviderName, details);
                 }
             }
@@ -124,11 +123,11 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        tracer($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.", LogLevel.Information);
+        logger?.Trace($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
 
         foreach (var databasePath in databasePaths)
         {
-            tracer($"  {databasePath}", LogLevel.Information);
+            logger?.Trace($"  {databasePath}");
         }
 
         foreach (var context in _dbContexts)
@@ -149,7 +148,7 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
                 throw new FileNotFoundException(file);
             }
 
-            var c = new EventProviderDbContext(file, readOnly: true, tracer);
+            var c = new EventProviderDbContext(file, readOnly: true, logger);
             var (needsv2, needsv3) = c.IsUpgradeNeeded();
             if (needsv2 || needsv3)
             {

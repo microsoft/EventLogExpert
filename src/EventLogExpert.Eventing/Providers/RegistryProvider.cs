@@ -2,24 +2,21 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using Microsoft.Extensions.Logging;
 using Microsoft.Win32;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Providers;
 
-public partial class RegistryProvider(string? computerName, Action<string, LogLevel> tracer)
+public partial class RegistryProvider(string? computerName, ITraceLogger? logger = null)
 {
-    private readonly Action<string, LogLevel> _tracer = tracer;
+    private readonly ITraceLogger? _logger = logger;
 
     public string? ComputerName { get; } = computerName;
 
     /// <summary>sounds Returns the file paths for the message files for this provider.</summary>
-    /// <param name="providerName"></param>
-    /// <returns></returns>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _tracer($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}", LogLevel.Information);
+        _logger?.Trace($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}");
 
         var hklm = string.IsNullOrEmpty(ComputerName)
             ? Registry.LocalMachine
@@ -48,7 +45,7 @@ public partial class RegistryProvider(string? computerName, Action<string, LogLe
                 continue;
             }
 
-            _tracer($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}", LogLevel.Information);
+            _logger?.Trace($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
 
             var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
 

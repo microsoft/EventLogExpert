@@ -1,10 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
@@ -12,10 +11,8 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Resolves event descriptions by using our own logic to look up
 ///     message strings in the providers available on the local machine.
 /// </summary>
-public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) : EventResolverBase(tracer), IEventResolver
+public sealed class LocalProviderEventResolver(ITraceLogger? logger = null) : EventResolverBase(logger), IEventResolver
 {
-    public LocalProviderEventResolver() : this((s, log) => Debug.WriteLine(s)) { }
-
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {
         providerDetailsLock.EnterUpgradeableReadLock();
@@ -37,7 +34,8 @@ public sealed class LocalProviderEventResolver(Action<string, LogLevel> tracer) 
                     return;
                 }
 
-                var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+                var details = new EventMessageProvider(eventRecord.ProviderName, logger).LoadProviderDetails();
+
                 providerDetails.TryAdd(eventRecord.ProviderName, details);
             }
             finally
