@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Security.Principal;
 using System.Text;
@@ -47,13 +46,13 @@ public partial class EventResolverBase
 
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
-    protected readonly Action<string, LogLevel> tracer;
+    protected readonly ITraceLogger? logger;
 
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
-    protected EventResolverBase(Action<string, LogLevel> tracer)
+    protected EventResolverBase(ITraceLogger? logger = null)
     {
-        this.tracer = tracer ?? throw new ArgumentNullException(nameof(tracer));
+        this.logger = logger;
     }
 
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
@@ -149,11 +148,11 @@ public partial class EventResolverBase
 
             if (potentialTaskNames.Count > 1)
             {
-                tracer("More than one matching task ID was found.", LogLevel.Information);
-                tracer($"  eventRecord.Task: {eventRecord.Task}", LogLevel.Information);
-                tracer("   Potential matches:", LogLevel.Information);
+                logger?.Trace("More than one matching task ID was found.");
+                logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
+                logger?.Trace("   Potential matches:");
 
-                potentialTaskNames.ForEach(t => tracer($"    {t.LogLink} {t.Text}", LogLevel.Information));
+                potentialTaskNames.ForEach(t => logger?.Trace($"    {t.LogLink} {t.Text}"));
             }
         }
         else
@@ -248,77 +247,71 @@ public partial class EventResolverBase
         }
         catch (Exception ex)
         {
-            tracer($"FormatDescription exception was caught: {ex}", LogLevel.Information);
+            logger?.Trace($"FormatDescription exception was caught: {ex}");
 
             return "Failed to resolve description, see XML for more details.";
         }
     }
 
-    private static List<string> GetFormattedProperties(string? template, IList<object> properties)
+    private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)
     {
         string[]? dataNodes = null;
         List<string> providers = [];
 
-        if (!string.IsNullOrWhiteSpace(template))
+        if (!string.IsNullOrWhiteSpace(template) && !s_formattedPropertiesCache.TryGetValue(template, out dataNodes))
         {
-            if (s_formattedPropertiesCache.TryGetValue(template, out var values))
-            {
-                dataNodes = values;
-            }
-            else
-            {
-                dataNodes = XElement.Parse(template)
-                    .Descendants()
-                    .Attributes()
-                    .Where(a => a.Name == "outType")
-                    .Select(a => a.Value)
-                    .ToArray();
+            dataNodes = XElement.Parse(template)
+                .Descendants()
+                .Attributes()
+                .Where(a => a.Name == "outType")
+                .Select(a => a.Value)
+                .ToArray();
 
-                s_formattedPropertiesCache.TryAdd(template, dataNodes);
-            }
+            s_formattedPropertiesCache.TryAdd(template, dataNodes);
         }
 
-        for (int i = 0; i < properties.Count; i++)
-        {
-            string? outType = dataNodes?[i];
+        int index = 0;
 
-            switch (properties[i])
+        foreach (object property in properties)
+        {
+            string? outType = dataNodes?[index];
+
+            switch (property)
             {
                 case DateTime eventTime:
-                    // Exactly match the format produced by EventRecord.FormatMessage().
-                    // I have no idea why it includes Unicode LRM marks, but it does.
                     providers.Add(eventTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
-                    continue;
+
+                    break;
                 case byte[] bytes:
                     providers.Add(Convert.ToHexString(bytes));
-                    continue;
+
+                    break;
                 case SecurityIdentifier sid:
                     providers.Add(sid.Value);
-                    continue;
+
+                    break;
                 default:
                     if (string.IsNullOrEmpty(outType))
                     {
-                        providers.Add($"{properties[i]}");
-
-                        continue;
+                        providers.Add($"{property}");
                     }
-
-                    if (s_displayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
+                    else if (s_displayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
                     {
-                        providers.Add($"0x{properties[i]:X}");
+                        providers.Add($"0x{property:X}");
                     }
-                    else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) &&
-                        properties[i] is int hResult)
+                    else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) && property is int hResult)
                     {
                         providers.Add(ResolverMethods.GetErrorMessage((uint)hResult));
                     }
                     else
                     {
-                        providers.Add($"{properties[i]}");
+                        providers.Add($"{property}");
                     }
 
-                    continue;
+                    break;
             }
+
+            index++;
         }
 
         return providers;
@@ -343,7 +336,7 @@ public partial class EventResolverBase
         {
             // Try again forcing the long to a short and with no log name.
             // This is needed for providers such as Microsoft-Windows-Complus
-            modernEvents = details.Events?
+            modernEvents = details.Events
                 .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version).ToList();
         }
 
@@ -357,13 +350,12 @@ public partial class EventResolverBase
             return modernEvents[0];
         }
 
-        tracer("Ambiguous modern event found:", LogLevel.Information);
+        logger?.Trace("Ambiguous modern event found:");
 
         foreach (var modernEvent in modernEvents)
         {
-            tracer($"  Version: {modernEvent.Version} Id: {modernEvent.Id} " +
-                $"LogName: {modernEvent.LogName} Description: {modernEvent.Description}",
-                LogLevel.Information);
+            logger?.Trace($"  Version: {modernEvent.Version} Id: {modernEvent.Id} " +
+                $"LogName: {modernEvent.LogName} Description: {modernEvent.Description}");
         }
 
         return modernEvents[0];

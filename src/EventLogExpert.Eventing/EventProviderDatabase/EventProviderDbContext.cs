@@ -1,10 +1,10 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
@@ -13,20 +13,13 @@ public class EventProviderDbContext : DbContext
 {
     private readonly bool _readOnly;
 
-    private readonly Action<string, LogLevel> _tracer;
+    private readonly ITraceLogger? _logger;
 
-    public EventProviderDbContext(string path, bool readOnly, Action<string, LogLevel>? tracer = null)
+    public EventProviderDbContext(string path, bool readOnly, ITraceLogger? logger = null)
     {
-        if (tracer != null)
-        {
-            _tracer = tracer;
-        }
-        else
-        {
-            _tracer = (s,log) => { };
-        }
+        _logger = logger;
 
-        _tracer($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}", LogLevel.Information);
+        _logger?.Trace($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}");
 
         Name = System.IO.Path.GetFileNameWithoutExtension(path);
         Path = path;
@@ -101,7 +94,7 @@ public class EventProviderDbContext : DbContext
 
         var needsUpgrade = needsV2Upgrade || needsV3Upgrade;
 
-        _tracer($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}", LogLevel.Information);
+        _logger?.Trace($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}");
 
         return (needsV2Upgrade, needsV3Upgrade);
     }
@@ -117,7 +110,7 @@ public class EventProviderDbContext : DbContext
 
         var size = new FileInfo(Path).Length;
 
-        _tracer($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}", LogLevel.Information);
+        _logger?.Trace($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}");
 
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
@@ -183,6 +176,6 @@ public class EventProviderDbContext : DbContext
 
         size = new FileInfo(Path).Length;
 
-        _tracer($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}", LogLevel.Information);
+        _logger?.Trace($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}");
     }
 }

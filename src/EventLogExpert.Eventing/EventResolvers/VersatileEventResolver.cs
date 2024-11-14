@@ -12,18 +12,18 @@ public sealed class VersatileEventResolver : IEventResolver
     private readonly EventProviderDatabaseEventResolver? _databaseResolver;
     private readonly LocalProviderEventResolver? _localResolver;
 
-    public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger tracer)
+    public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger? tracer = null)
     {
         if (dbCollection.ActiveDatabases.IsEmpty)
         {
-            _localResolver = new LocalProviderEventResolver(tracer.Trace);
+            _localResolver = new LocalProviderEventResolver(tracer);
         }
         else
         {
-            _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer.Trace);
+            _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer);
         }
 
-        tracer.Trace($"Database Resolver is {dbCollection.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
+        tracer?.Trace($"Database Resolver is {dbCollection.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
     public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)

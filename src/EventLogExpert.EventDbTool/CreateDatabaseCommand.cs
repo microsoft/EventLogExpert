@@ -2,13 +2,17 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public class CreateDatabaseCommand : DbToolCommand
+public sealed class CreateDatabaseCommand : DbToolCommand
 {
+    private static readonly ITraceLogger s_logger = new TraceLogger(LogLevel.Information);
+
     public static Command GetCommand()
     {
         var createDatabaseCommand = new Command(
@@ -54,26 +58,24 @@ public class CreateDatabaseCommand : DbToolCommand
             return;
         }
 
-        var skipProviderNames = new HashSet<string>();
+        HashSet<string> skipProviderNames = [];
 
-        if (skipProvidersInFile != null)
+        if (!File.Exists(skipProvidersInFile))
         {
-            if (!File.Exists(skipProvidersInFile))
-            {
-                Console.WriteLine($"File not found: {skipProvidersInFile}");
-            }
-
-            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
-            foreach (var provider in skipDbContext.ProviderDetails)
-            {
-                skipProviderNames.Add(provider.ProviderName);
-            }
-
-            Console.WriteLine($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. " +
-                "These will not be included in the new database.");
+            Console.WriteLine($"File not found: {skipProvidersInFile}");
         }
 
+        using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
+        foreach (var provider in skipDbContext.ProviderDetails)
+        {
+            skipProviderNames.Add(provider.ProviderName);
+        }
+
+        Console.WriteLine($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. " +
+            "These will not be included in the new database.");
+
         var providerNames = GetLocalProviderNames(filter);
+
         if (!providerNames.Any())
         {
             Console.WriteLine($"No providers found matching filter {filter}.");
@@ -94,16 +96,13 @@ public class CreateDatabaseCommand : DbToolCommand
 
         foreach (var providerName in providerNamesNotSkipped)
         {
-            var provider = new EventMessageProvider(providerName, verboseLogging ? (s, log) => Console.WriteLine(s) : (s, log) => { });
+            var provider = new EventMessageProvider(providerName, verboseLogging ? s_logger : null);
+
             var details = provider.LoadProviderDetails();
-            if (details != null)
-            {
-                dbContext.ProviderDetails.Add(details);
 
-                LogProviderDetails(details);
+            dbContext.ProviderDetails.Add(details);
 
-                details = null;
-            }
+            LogProviderDetails(details);
         }
 
         Console.WriteLine();
