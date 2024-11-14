@@ -9,25 +9,25 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.UI;
 
-public class NativeMethods
+/// <summary>Flags for the RegisterApplicationRestart function</summary>
+[Flags]
+internal enum RestartFlags
 {
-    /// <summary>Flags for the RegisterApplicationRestart function</summary>
-    [Flags]
-    public enum RestartFlags
-    {
-        /// <summary>None of the options below.</summary>
-        NONE = 0,
+    /// <summary>None of the options below.</summary>
+    NONE = 0,
 
-        /// <summary>Do not restart the process if it terminates due to an unhandled exception.</summary>
-        RESTART_NO_CRASH = 1,
-        /// <summary>Do not restart the process if it terminates due to the application not responding.</summary>
-        RESTART_NO_HANG = 2,
-        /// <summary>Do not restart the process if it terminates due to the installation of an update.</summary>
-        RESTART_NO_PATCH = 4,
-        /// <summary>Do not restart the process if the computer is restarted as the result of an update.</summary>
-        RESTART_NO_REBOOT = 8
-    }
+    /// <summary>Do not restart the process if it terminates due to an unhandled exception.</summary>
+    RESTART_NO_CRASH = 1,
+    /// <summary>Do not restart the process if it terminates due to the application not responding.</summary>
+    RESTART_NO_HANG = 2,
+    /// <summary>Do not restart the process if it terminates due to the installation of an update.</summary>
+    RESTART_NO_PATCH = 4,
+    /// <summary>Do not restart the process if the computer is restarted as the result of an update.</summary>
+    RESTART_NO_REBOOT = 8
+}
 
+internal sealed partial class NativeMethods
+{
     // https://learn.microsoft.com/en-us/windows/msix/non-store-developer-updates
     /// <summary>Registers the active instance of an application for restart.</summary>
     /// <param name="pwzCommandLine">
@@ -42,6 +42,8 @@ public class NativeMethods
     ///     This function returns S_OK on success or one of the following error codes: E_FAIL for internal error.
     ///     E_INVALIDARG if rhe specified command line is too long.
     /// </returns>
-    [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
-    public static extern uint RegisterApplicationRestart(string? pwzCommandLine, RestartFlags dwFlags);
+    [LibraryImport("kernel32.dll")]
+    internal static partial uint RegisterApplicationRestart(
+        [MarshalAs(UnmanagedType.LPWStr)] string? pwzCommandLine,
+        RestartFlags dwFlags);
 }

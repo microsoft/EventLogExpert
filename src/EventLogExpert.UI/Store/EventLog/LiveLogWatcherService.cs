@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -30,7 +31,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly IState<SettingsState> _settingsState;
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
-    private readonly object _watchersLock = new();
+    private readonly Lock _watchersLock = new();
 
     public LiveLogWatcherService(
         IStateSelection<EventLogState, bool> bufferFullStateSelection,
@@ -63,174 +64,167 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
     public void AddLog(string logName, string? bookmark)
     {
-        lock (_watchersLock)
+        using var scope = _watchersLock.EnterScope();
+
+        if (_logsToWatch.Contains(logName))
         {
-            if (_logsToWatch.Contains(logName))
-            {
-                throw new InvalidOperationException(
-                    $"Attempted to add log {logName} which is already present in LiveLogWatcher.");
-            }
+            throw new InvalidOperationException(
+                $"Attempted to add log {logName} which is already present in LiveLogWatcher.");
+        }
 
-            _logsToWatch.Add(logName);
-            _bookmarks.Add(logName, bookmark);
+        _logsToWatch.Add(logName);
+        _bookmarks.Add(logName, bookmark);
 
-            // If this is the first log added, or if we're already watching
-            // other logs, then we need to start watching this one.
-            //
-            // If we have _logsToWatch but no watchers, that means StopWatching()
-            // was called due to a full buffer. In that case we do not want to
-            // start watching the new log.
-            if (_logsToWatch.Count == 1 || IsWatching())
-            {
-                StartWatching(logName);
-            }
+        // If this is the first log added, or if we're already watching
+        // other logs, then we need to start watching this one.
+        //
+        // If we have _logsToWatch but no watchers, that means StopWatching()
+        // was called due to a full buffer. In that case we do not want to
+        // start watching the new log.
+        if (_logsToWatch.Count == 1 || IsWatching())
+        {
+            StartWatching(logName);
         }
     }
 
     public bool IsWatching()
     {
-        lock (_watchersLock)
-        {
-            return _watchers.Keys.Count > 0;
-        }
+        using var scope = _watchersLock.EnterScope();
+
+        return _watchers.Keys.Count > 0;
     }
 
     public void RemoveAll()
     {
-        lock (_watchersLock)
+        using var scope = _watchersLock.EnterScope();
+
+        while (_logsToWatch.Count > 0)
         {
-            while (_logsToWatch.Count > 0)
-            {
-                RemoveLog(_logsToWatch[0]);
-            }
+            RemoveLog(_logsToWatch[0]);
         }
     }
 
     public void RemoveLog(string logName)
     {
-        lock (_watchersLock)
-        {
-            _logsToWatch.Remove(logName);
-            _bookmarks.Remove(logName);
-            StopWatching(logName);
-        }
+        using var scope = _watchersLock.EnterScope();
+
+        _logsToWatch.Remove(logName);
+        _bookmarks.Remove(logName);
+        StopWatching(logName);
     }
 
     public void StartWatching()
     {
-        lock (_watchersLock)
+        using var scope = _watchersLock.EnterScope();
+
+        foreach (var logName in _logsToWatch)
         {
-            foreach (var logName in _logsToWatch)
-            {
-                StartWatching(logName);
-            }
+            StartWatching(logName);
         }
     }
 
     public void StopWatching()
     {
-        lock (_watchersLock)
+        using var scope = _watchersLock.EnterScope();
+
+        foreach (var logName in _watchers.Keys)
         {
-            foreach (var logName in _watchers.Keys)
-            {
-                StopWatching(logName);
-            }
+            StopWatching(logName);
         }
     }
 
     private void StartWatching(string logName)
     {
-        lock (_watchersLock)
+        using var scope = _watchersLock.EnterScope();
+
+        if (_watchers.ContainsKey(logName)) { return; }
+
+        EventLogWatcher watcher = _bookmarks[logName] != null ?
+            new EventLogWatcher(logName, _bookmarks[logName], _settingsState.Value.Config.IsXmlEnabled) :
+            new EventLogWatcher(logName, _settingsState.Value.Config.IsXmlEnabled);
+
+        _watchers.Add(logName, watcher);
+
+        watcher.EventRecordWritten += (sender, eventArgs) =>
         {
-            if (_watchers.ContainsKey(logName)) { return; }
+            if (!eventArgs.IsSuccess) { return; }
 
-            EventLogWatcher watcher = _bookmarks[logName] != null ?
-                new EventLogWatcher(logName, _bookmarks[logName], _settingsState.Value.Config.IsXmlEnabled) :
-                new EventLogWatcher(logName, _settingsState.Value.Config.IsXmlEnabled);
+            using var serviceScope = _serviceScopeFactory.CreateScope();
+            var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
 
-            _watchers.Add(logName, watcher);
+            _debugLogger.Trace("EventRecordWritten callback was called.");
+            // TODO: Not sure if we need to save current bookmark unless we plan on stopping and starting the watcher
+            //_bookmarks[logName] = eventArgs.Bookmark;
 
-            watcher.EventRecordWritten += (sender, eventArgs) =>
+            if (eventResolver is null)
             {
-                if (!eventArgs.IsSuccess) { return; }
+                _debugLogger.Trace(
+                    $"{nameof(LiveLogWatcherService)} event resolver is null in EventRecordWritten callback.", LogLevel.Error);
 
-                lock (this)
-                {
-                    using var serviceScope = _serviceScopeFactory.CreateScope();
-                    var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
+                return;
+            }
 
-                    _debugLogger.Trace("EventRecordWritten callback was called.");
-                    // TODO: Not sure if we need to save current bookmark unless we plan on stopping and starting the watcher
-                    //_bookmarks[logName] = eventArgs.Bookmark;
+            using var scope = _watchersLock.EnterScope();
 
-                    if (eventResolver is null)
+            eventResolver.ResolveProviderDetails(eventArgs, logName);
+
+            _dispatcher.Dispatch(
+                new EventLogAction.AddEvent(
+                    new DisplayEventModel(logName)
                     {
-                        _debugLogger.Trace(
-                            $"{nameof(LiveLogWatcherService)} event resolver is null in EventRecordWritten callback.");
+                        ActivityId = eventArgs.ActivityId,
+                        ComputerName = _resolverCache.GetOrAddValue(eventArgs.ComputerName),
+                        Description = _resolverCache.GetOrAddDescription(
+                            eventResolver.ResolveDescription(eventArgs)),
+                        Id = eventArgs.Id,
+                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(eventArgs)
+                            .Select(_resolverCache.GetOrAddValue).ToList(),
+                        Level = Severity.GetString(eventArgs.Level),
+                        LogName = _resolverCache.GetOrAddValue(eventArgs.LogName),
+                        ProcessId = eventArgs.ProcessId,
+                        RecordId = eventArgs.RecordId,
+                        Source = _resolverCache.GetOrAddValue(eventArgs.ProviderName),
+                        TaskCategory = _resolverCache.GetOrAddValue(
+                            eventResolver.ResolveTaskName(eventArgs)),
+                        ThreadId = eventArgs.ThreadId,
+                        TimeCreated = eventArgs.TimeCreated.ToUniversalTime(),
+                        UserId = eventArgs.UserId,
+                        Xml = eventArgs.Xml ?? string.Empty
+                    }));
+        };
 
-                        return;
-                    }
+        // When the watcher is enabled, it reads all the events since the
+        // last bookmark. Do this on a background thread so we don't tie
+        // up the UI.
+        Task.Run(() =>
+        {
+            watcher.Enabled = true;
 
-                    eventResolver.ResolveProviderDetails(eventArgs, logName);
-
-                    _dispatcher.Dispatch(
-                        new EventLogAction.AddEvent(
-                            new DisplayEventModel(logName)
-                            {
-                                ActivityId = eventArgs.ActivityId,
-                                ComputerName = _resolverCache.GetOrAddValue(eventArgs.ComputerName),
-                                Description = _resolverCache.GetOrAddDescription(
-                                    eventResolver.ResolveDescription(eventArgs)),
-                                Id = eventArgs.Id,
-                                KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(eventArgs)
-                                    .Select(_resolverCache.GetOrAddValue).ToList(),
-                                Level = Severity.GetString(eventArgs.Level),
-                                LogName = _resolverCache.GetOrAddValue(eventArgs.LogName),
-                                ProcessId = eventArgs.ProcessId,
-                                RecordId = eventArgs.RecordId,
-                                Source = _resolverCache.GetOrAddValue(eventArgs.ProviderName),
-                                TaskCategory = _resolverCache.GetOrAddValue(
-                                    eventResolver.ResolveTaskName(eventArgs)),
-                                ThreadId = eventArgs.ThreadId,
-                                TimeCreated = eventArgs.TimeCreated.ToUniversalTime(),
-                                UserId = eventArgs.UserId,
-                                Xml = eventArgs.Xml ?? string.Empty
-                            }));
-                }
-            };
-
-            // When the watcher is enabled, it reads all the events since the
-            // last bookmark. Do this on a background thread so we don't tie
-            // up the UI.
-            Task.Run(() =>
-            {
-                watcher.Enabled = true;
-
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {logName}.");
-            });
-        }
+            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {logName}.");
+        });
     }
 
     private void StopWatching(string logName)
     {
-        lock (this)
+        using var scope = _watchersLock.EnterScope();
+
+        if (!_watchers.Remove(logName, out var watcher))
         {
-            if (!_watchers.Remove(logName, out var watcher))
-            {
-                return;
-            }
-
-            // Always do this on a background thread to avoid a deadlock
-            // if this is called on the UI thread. EventLogWatcher.Enabled = false
-            // will cause the thread to block until all outstanding callbacks
-            // have completed.
-            Task.Run(() =>
-            {
-                watcher.Dispose();
-                _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
-            });
-
-            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
+            return;
         }
+
+        // Always do this on a background thread to avoid a deadlock
+        // if this is called on the UI thread. EventLogWatcher.Enabled = false
+        // will cause the thread to block until all outstanding callbacks
+        // have completed.
+        Task.Run(() =>
+        {
+            watcher.Dispose();
+
+            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
+        });
+
+        _debugLogger.Trace(
+            $"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
     }
 }

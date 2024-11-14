@@ -44,9 +44,9 @@ public partial class EventResolverBase
         { 0x80000000000000, "Classic" }
     };
 
+    protected readonly ITraceLogger? logger;
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
-    protected readonly ITraceLogger? logger;
 
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
@@ -174,8 +174,13 @@ public partial class EventResolverBase
             // when the entire description is a string literal, and there is no provider DLL needed.
             // Found a few providers that have their properties wrapped with \r\n for some reason
             return properties.Count == 1 ?
-                properties[0].Trim(['\0', '\r', '\n']) :
+                properties[0].TrimEnd('\0', '\r', '\n') :
                 "Unable to resolve description, see XML for more details.";
+        }
+
+        if (properties.Count <= 0)
+        {
+            return descriptionTemplate.TrimEnd('\0', '\r', '\n');
         }
 
         ReadOnlySpan<char> description = descriptionTemplate
@@ -194,10 +199,8 @@ public partial class EventResolverBase
 
                 ReadOnlySpan<char> propString = description[match.Index..(match.Index + match.Length)];
 
-                if (!propString.StartsWith("%%"))
+                if (!propString.StartsWith("%%") && int.TryParse(propString.Trim(['{', '}', '%']), out var propIndex))
                 {
-                    var propIndex = int.Parse(propString.Trim(['{', '}', '%']));
-
                     if (propIndex - 1 >= properties.Count)
                     {
                         return "Unable to resolve description, see XML for more details.";
@@ -243,7 +246,7 @@ public partial class EventResolverBase
         catch (InvalidOperationException)
         {
             // If the regex fails to match, then we just return the original description.
-            return description.TrimEnd(['\0', '\r', '\n']).ToString();
+            return descriptionTemplate.TrimEnd('\0', '\r', '\n');
         }
         catch (Exception ex)
         {
@@ -317,47 +320,29 @@ public partial class EventResolverBase
         return providers;
     }
 
-    [GeneratedRegex("%+[0-9]+")]
-    private static partial Regex WildcardWithNumberRegex();
-
-    private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
+    private static EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
     {
         if (eventRecord is { Version: null, LogName: null })
         {
             return null;
         }
 
-        var modernEvents = details.Events
-            .Where(e => e.Id == eventRecord.Id &&
+        EventModel? modernEvent = details.Events
+            .FirstOrDefault(e => e.Id == eventRecord.Id &&
                 e.Version == eventRecord.Version &&
-                e.LogName == eventRecord.LogName).ToList();
+                e.LogName == eventRecord.LogName);
 
-        if (modernEvents is { Count: 0 })
+        if (modernEvent is not null)
         {
-            // Try again forcing the long to a short and with no log name.
-            // This is needed for providers such as Microsoft-Windows-Complus
-            modernEvents = details.Events
-                .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version).ToList();
+            return modernEvent;
         }
 
-        if (modernEvents is not { Count: > 0 })
-        {
-            return null;
-        }
-
-        if (modernEvents.Count <= 1)
-        {
-            return modernEvents[0];
-        }
-
-        logger?.Trace("Ambiguous modern event found:");
-
-        foreach (var modernEvent in modernEvents)
-        {
-            logger?.Trace($"  Version: {modernEvent.Version} Id: {modernEvent.Id} " +
-                $"LogName: {modernEvent.LogName} Description: {modernEvent.Description}");
-        }
-
-        return modernEvents[0];
+        // Try again forcing the long to a short and with no log name.
+        // This is needed for providers such as Microsoft-Windows-Complus
+        return details.Events
+            .FirstOrDefault(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version);
     }
+
+    [GeneratedRegex("%+[0-9]+")]
+    private static partial Regex WildcardWithNumberRegex();
 }
