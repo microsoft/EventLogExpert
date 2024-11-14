@@ -1,4 +1,7 @@
-﻿using EventLogExpert.Eventing.Helpers;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -25,7 +28,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async void CheckForUpdates_Latest_ShouldUpdateImmediately()
+    public async Task CheckForUpdates_Latest_ShouldUpdateImmediately()
     {
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
@@ -48,7 +51,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async void CheckForUpdates_Latest_ShouldUpdateOnNextRestart()
+    public async Task CheckForUpdates_Latest_ShouldUpdateOnNextRestart()
     {
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
@@ -67,7 +70,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async void CheckForUpdates_NoUpdatesAvailable_ShouldAlert()
+    public async Task CheckForUpdates_NoUpdatesAvailable_ShouldAlert()
     {
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubLatestVersion[1..]));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
@@ -88,7 +91,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async void CheckForUpdates_Prerelease_ShouldUpdateImmediately()
+    public async Task CheckForUpdates_Prerelease_ShouldUpdateImmediately()
     {
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);
@@ -111,7 +114,7 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async void CheckForUpdates_Prerelease_ShouldUpdateOnNextRestart()
+    public async Task CheckForUpdates_PreRelease_ShouldUpdateOnNextRestart()
     {
         _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
         _mockCurrentVersionProvider.IsDevBuild.Returns(false);

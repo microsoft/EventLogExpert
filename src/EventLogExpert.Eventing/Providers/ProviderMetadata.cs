@@ -11,7 +11,7 @@ namespace EventLogExpert.Eventing.Providers;
 
 internal sealed partial class ProviderMetadata : IDisposable
 {
-    private readonly SemaphoreSlim _providerLock = new(1);
+    private readonly Lock _providerLock = new();
     private readonly EvtHandle _publisherMetadataHandle;
 
     private ReadOnlyDictionary<uint, string>? _channels;
@@ -19,14 +19,14 @@ internal sealed partial class ProviderMetadata : IDisposable
     private ReadOnlyDictionary<int, string>? _opcodes;
     private ReadOnlyDictionary<int, string>? _tasks;
 
-    internal ProviderMetadata(string providerName)
+    private ProviderMetadata(string providerName)
     {
         _publisherMetadataHandle = EventMethods.EvtOpenPublisherMetadata(EventLogSession.GlobalSession.Handle, providerName, null, 0, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (_publisherMetadataHandle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(error);
+            Error = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
         }
     }
 
@@ -41,7 +41,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             if (_channels is not null) { return _channels; }
 
-            _providerLock.Wait();
+            _providerLock.Enter();
 
             try
             {
@@ -73,7 +73,7 @@ internal sealed partial class ProviderMetadata : IDisposable
             }
             finally
             {
-                _providerLock.Release();
+                _providerLock.Exit();
             }
         }
     }
@@ -89,7 +89,9 @@ internal sealed partial class ProviderMetadata : IDisposable
 
             if (handle.IsInvalid)
             {
-                EventMethods.ThrowEventLogException(error);
+                Error = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
+
+                return events.AsReadOnly();
             }
 
             while (true)
@@ -115,7 +117,7 @@ internal sealed partial class ProviderMetadata : IDisposable
                 events.Add(new EventMetadata(id, version, channelId, level, opcode, task, keywords, template, message, this));
             }
 
-            return events;
+            return events.AsReadOnly();
         }
     }
 
@@ -125,7 +127,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             if (_keywords is not null) { return _keywords; }
 
-            _providerLock.Wait();
+            _providerLock.Enter();
 
             try
             {
@@ -166,7 +168,7 @@ internal sealed partial class ProviderMetadata : IDisposable
             }
             finally
             {
-                _providerLock.Release();
+                _providerLock.Exit();
             }
         }
     }
@@ -179,7 +181,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             if (_opcodes is not null) { return _opcodes; }
 
-            _providerLock.Wait();
+            _providerLock.Enter();
 
             try
             {
@@ -220,7 +222,7 @@ internal sealed partial class ProviderMetadata : IDisposable
             }
             finally
             {
-                _providerLock.Release();
+                _providerLock.Exit();
             }
         }
     }
@@ -233,7 +235,7 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             if (_tasks is not null) { return _tasks; }
 
-            _providerLock.Wait();
+            _providerLock.Enter();
 
             try
             {
@@ -274,15 +276,31 @@ internal sealed partial class ProviderMetadata : IDisposable
             }
             finally
             {
-                _providerLock.Release();
+                _providerLock.Exit();
             }
         }
     }
+
+    internal string? Error { get; private set; }
 
     public void Dispose()
     {
         Dispose(disposing: true);
         GC.SuppressFinalize(this);
+    }
+
+    internal static ProviderMetadata? Create(string providerName, ITraceLogger? logger = null)
+    {
+        ProviderMetadata metadata = new(providerName);
+
+        if (metadata.Error is null)
+        {
+            return metadata;
+        }
+
+        logger?.Trace($"Failed to create metadata for {providerName} provider: {metadata.Error}");
+
+        return null;
     }
 
     private static object GetEventMetadataProperty(EvtHandle metadataHandle, EvtEventMetadataPropertyId propertyId)

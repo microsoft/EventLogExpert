@@ -1,13 +1,17 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
 public class ShowLocalCommand : DbToolCommand
 {
+    private static readonly ITraceLogger s_logger = new TraceLogger(LogLevel.Information);
+
     public static Command GetCommand()
     {
         var showProvidersCommand = new Command(
@@ -33,7 +37,7 @@ public class ShowLocalCommand : DbToolCommand
         LogProviderDetailHeader(providerNames);
         foreach (var providerName in providerNames)
         {
-            var provider = new EventMessageProvider(providerName, verbose ? (s, log) => Console.WriteLine(s) : (s, log) => { });
+            var provider = new EventMessageProvider(providerName, verbose ? s_logger : null);
             var details = provider.LoadProviderDetails();
             if (details != null)
             {

@@ -9,7 +9,7 @@ namespace EventLogExpert.Eventing.Readers;
 
 public sealed partial class EventLogReader(string path, PathType pathType, bool renderXml = true) : IDisposable
 {
-    private readonly object _eventLock = new();
+    private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =
         EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
 
@@ -26,12 +26,15 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
         GC.SuppressFinalize(this);
     }
 
+    // BatchSize can cause some weird behavior if it's too large
+    // Tested 1024 which returned failure way too early, 512 caused weird memory bloat
+    // and there was barely a noticeable speed difference between 64 and 512
     public bool TryGetEvents(out EventRecord[] events, int batchSize = 64)
     {
         var buffer = new IntPtr[batchSize];
         int count = 0;
 
-        lock (_eventLock)
+        using (_eventLock.EnterScope())
         {
             bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
 
@@ -134,12 +137,9 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
     {
         if (disposing) { return; }
 
-        lock (_eventLock)
+        if (_handle is { IsInvalid: false })
         {
-            if (_handle is { IsInvalid: false })
-            {
-                _handle.Dispose();
-            }
+            _handle.Dispose();
         }
     }
 }

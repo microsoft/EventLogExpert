@@ -720,7 +720,7 @@ internal static partial class EventMethods
                 properties.Add(ConvertVariant(property) ?? throw new InvalidDataException());
             }
 
-            return properties;
+            return properties.AsReadOnly();
         }
         finally
         {

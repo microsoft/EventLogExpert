@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using Microsoft.Extensions.Logging;
 using System.Reflection;
 using Windows.Foundation;
 using Windows.Management.Deployment;
@@ -16,30 +15,22 @@ public interface IDeploymentService
     void UpdateOnNextRestart(string downloadPath);
 }
 
-public class DeploymentService : IDeploymentService
+public class DeploymentService(
+    ITraceLogger traceLogger,
+    IAppTitleService appTitleService,
+    IMainThreadService mainThreadService,
+    IAlertDialogService alertDialogService) : IDeploymentService
 {
-    private readonly ITraceLogger _traceLogger;
-    private readonly IAppTitleService _appTitleService;
-    private readonly IMainThreadService _mainThreadService;
-    private readonly IAlertDialogService _alertDialogService;
-
-    public DeploymentService(
-        ITraceLogger traceLogger,
-        IAppTitleService appTitleService,
-        IMainThreadService mainThreadService,
-        IAlertDialogService alertDialogService)
-    {
-        _traceLogger = traceLogger;
-        _appTitleService = appTitleService;
-        _mainThreadService = mainThreadService;
-        _alertDialogService = alertDialogService;
-    }
+    private readonly ITraceLogger _traceLogger = traceLogger;
+    private readonly IAppTitleService _appTitleService = appTitleService;
+    private readonly IMainThreadService _mainThreadService = mainThreadService;
+    private readonly IAlertDialogService _alertDialogService = alertDialogService;
 
     public void RestartNowAndUpdate(string downloadPath)
     {
         _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
 
-        uint res = NativeMethods.RegisterApplicationRestart(null, NativeMethods.RestartFlags.NONE);
+        uint res = NativeMethods.RegisterApplicationRestart(null, RestartFlags.NONE);
 
         if (res != 0) { return; }
 

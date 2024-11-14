@@ -15,8 +15,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
     internal class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
-        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) :
-            base((s, log) => Debug.WriteLine(s)) =>
+        internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) =>
             providerDetailsList.ForEach(p => providerDetails.TryAdd(p.ProviderName, p));
 
         public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
@@ -26,7 +25,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
                 return;
             }
 
-            var details = new EventMessageProvider(eventRecord.ProviderName, tracer).LoadProviderDetails();
+            var details = new EventMessageProvider(eventRecord.ProviderName).LoadProviderDetails();
             providerDetails.TryAdd(eventRecord.ProviderName, details);
         }
     }
@@ -34,7 +33,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
     private readonly ITestOutputHelper _outputHelper = outputHelper;
 
     [Fact]
-    public void CanResolveMSExchangeRepl4114()
+    public void EventResolver_MSExchangeReplId4114_ShouldResolve()
     {
         // This event has a message in the legacy provider, but a task in the modern provider.
         EventRecord eventRecord = new()
