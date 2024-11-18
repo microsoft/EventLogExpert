@@ -44,217 +44,38 @@ public partial class EventResolverBase
         { 0x80000000000000, "Classic" }
     };
 
+    protected readonly IEventResolverCache? cache;
     protected readonly ITraceLogger? logger;
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
 
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
-    protected EventResolverBase(ITraceLogger? logger = null)
+    protected EventResolverBase(IEventResolverCache? cache = null, ITraceLogger? logger = null)
     {
+        this.cache = cache;
         this.logger = logger;
     }
 
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
-    {
-        if (eventRecord.Keywords is null or 0) { return []; }
-
-        List<string> returnValue = [];
-
-        foreach (var k in s_standardKeywords.Keys)
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName) =>
+        new(owningLogName)
         {
-            if ((eventRecord.Keywords.Value & k) == k)
-            {
-                returnValue.Add(s_standardKeywords[k].TrimEnd('\0'));
-            }
-        }
-
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
-        {
-            return returnValue;
-        }
-
-        // Some providers re-define the standard keywords in their own metadata,
-        // so let's skip those.
-        var lower32 = eventRecord.Keywords.Value & 0xFFFFFFFF;
-
-        if (lower32 != 0)
-        {
-            foreach (var k in details.Keywords.Keys)
-            {
-                if ((lower32 & k) == k)
-                {
-                    returnValue.Add(details.Keywords[k].TrimEnd('\0'));
-                }
-            }
-        }
-
-        return returnValue;
-    }
-
-    /// <summary>Resolve event descriptions from an event record.</summary>
-    public string ResolveDescription(EventRecord eventRecord)
-    {
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
-        {
-            return "Description not found. No provider available.";
-        }
-
-        var @event = GetModernEvent(eventRecord, details);
-        var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
-
-        return string.IsNullOrEmpty(@event?.Description)
-            ? FormatDescription(
-                properties,
-                details.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text,
-                details.Parameters)
-            : FormatDescription(properties, @event.Description, details.Parameters);
-    }
-
-    /// <summary>Resolve event task names from an event record.</summary>
-    public string ResolveTaskName(EventRecord eventRecord)
-    {
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
-        {
-            return string.Empty;
-        }
-
-        var @event = GetModernEvent(eventRecord, details);
-
-        if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
-        {
-            return taskName.TrimEnd('\0');
-        }
-
-        if (!eventRecord.Task.HasValue)
-        {
-            return string.Empty;
-        }
-
-        details.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
-
-        if (taskName is not null)
-        {
-            return taskName.TrimEnd('\0');
-        }
-
-        var potentialTaskNames = details.Messages
-            .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
-            .ToList();
-
-        if (potentialTaskNames is { Count: > 0 })
-        {
-            taskName = potentialTaskNames[0].Text;
-
-            if (potentialTaskNames.Count > 1)
-            {
-                logger?.Trace("More than one matching task ID was found.");
-                logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
-                logger?.Trace("   Potential matches:");
-
-                potentialTaskNames.ForEach(t => logger?.Trace($"    {t.LogLink} {t.Text}"));
-            }
-        }
-        else
-        {
-            taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
-        }
-
-        return taskName.TrimEnd('\0');
-    }
-
-    protected string FormatDescription(
-        List<string> properties,
-        string? descriptionTemplate,
-        List<MessageModel> parameters)
-    {
-        if (string.IsNullOrWhiteSpace(descriptionTemplate))
-        {
-            // If there is only one property then this is what certain EventRecords look like
-            // when the entire description is a string literal, and there is no provider DLL needed.
-            // Found a few providers that have their properties wrapped with \r\n for some reason
-            return properties.Count == 1 ?
-                properties[0].TrimEnd('\0', '\r', '\n') :
-                "Unable to resolve description, see XML for more details.";
-        }
-
-        if (properties.Count <= 0)
-        {
-            return descriptionTemplate.TrimEnd('\0', '\r', '\n');
-        }
-
-        ReadOnlySpan<char> description = descriptionTemplate
-            .Replace("\r\n%n", " \r\n")
-            .Replace("%n\r\n", "\r\n ")
-            .Replace("%n", "\r\n");
-
-        try
-        {
-            StringBuilder updatedDescription = new();
-            int lastIndex = 0;
-
-            foreach (var match in _sectionsToReplace.EnumerateMatches(description))
-            {
-                updatedDescription.Append(description[lastIndex..match.Index]);
-
-                ReadOnlySpan<char> propString = description[match.Index..(match.Index + match.Length)];
-
-                if (!propString.StartsWith("%%") && int.TryParse(propString.Trim(['{', '}', '%']), out var propIndex))
-                {
-                    if (propIndex - 1 >= properties.Count)
-                    {
-                        return "Unable to resolve description, see XML for more details.";
-                    }
-
-                    propString = properties[propIndex - 1];
-                }
-
-                if (propString.StartsWith("%%") && parameters.Count > 0)
-                {
-                    int endParameterId = propString.IndexOf(' ');
-                    var parameterIdString = endParameterId > 2 ? propString.Slice(2, endParameterId) : propString[2..];
-
-                    if (long.TryParse(parameterIdString, out long parameterId))
-                    {
-                        // Some parameters exceed int size and need to be cast from long to int
-                        // because they are actually negative numbers
-                        ReadOnlySpan<char> parameterMessage =
-                            parameters.FirstOrDefault(m => m.RawId == (int)parameterId)?.Text ?? string.Empty;
-
-                        if (!parameterMessage.IsEmpty)
-                        {
-                            // Some RawId parameters have a trailing '%0' that needs to be removed
-                            propString = endParameterId > 2 ?
-                                string.Concat(parameterMessage.TrimEnd(['%', '0']), propString[++endParameterId..]) :
-                                parameterMessage.TrimEnd(['%', '0']);
-                        }
-                    }
-                }
-
-                updatedDescription.Append(propString);
-
-                lastIndex = match.Index + match.Length;
-            }
-
-            if (lastIndex < description.Length)
-            {
-                updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
-            }
-
-            return updatedDescription.ToString();
-        }
-        catch (InvalidOperationException)
-        {
-            // If the regex fails to match, then we just return the original description.
-            return descriptionTemplate.TrimEnd('\0', '\r', '\n');
-        }
-        catch (Exception ex)
-        {
-            logger?.Trace($"FormatDescription exception was caught: {ex}");
-
-            return "Failed to resolve description, see XML for more details.";
-        }
-    }
+            ActivityId = eventRecord.ActivityId,
+            ComputerName = cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
+            Description = ResolveDescription(eventRecord),
+            Id = eventRecord.Id,
+            KeywordsDisplayNames = GetKeywordsFromBitmask(eventRecord),
+            Level = Severity.GetString(eventRecord.Level),
+            LogName = cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
+            ProcessId = eventRecord.ProcessId,
+            RecordId = eventRecord.RecordId,
+            Source = cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
+            TaskCategory = ResolveTaskName(eventRecord),
+            ThreadId = eventRecord.ThreadId,
+            TimeCreated = eventRecord.TimeCreated,
+            UserId = eventRecord.UserId,
+            Xml = eventRecord.Xml ?? string.Empty
+        };
 
     private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)
     {
@@ -282,7 +103,7 @@ public partial class EventResolverBase
             switch (property)
             {
                 case DateTime eventTime:
-                    providers.Add(eventTime.ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                    providers.Add(eventTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
 
                     break;
                 case byte[] bytes:
@@ -345,4 +166,220 @@ public partial class EventResolverBase
 
     [GeneratedRegex("%+[0-9]+")]
     private static partial Regex WildcardWithNumberRegex();
+
+    private string FormatDescription(
+        List<string> properties,
+        string? descriptionTemplate,
+        List<MessageModel> parameters)
+    {
+        string returnDescription;
+
+        if (string.IsNullOrWhiteSpace(descriptionTemplate))
+        {
+            // If there is only one property then this is what certain EventRecords look like
+            // when the entire description is a string literal, and there is no provider DLL needed.
+            // Found a few providers that have their properties wrapped with \r\n for some reason
+            returnDescription = properties.Count == 1 ?
+                properties[0].TrimEnd('\0', '\r', '\n') :
+                "Unable to resolve description, see XML for more details.";
+
+            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+        }
+
+        if (properties.Count <= 0)
+        {
+            returnDescription = descriptionTemplate.TrimEnd('\0', '\r', '\n');
+
+            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+        }
+
+        ReadOnlySpan<char> description = descriptionTemplate
+            .Replace("\r\n%n", " \r\n")
+            .Replace("%n\r\n", "\r\n ")
+            .Replace("%n", "\r\n");
+
+        try
+        {
+            StringBuilder updatedDescription = new();
+            int lastIndex = 0;
+
+            foreach (var match in _sectionsToReplace.EnumerateMatches(description))
+            {
+                updatedDescription.Append(description[lastIndex..match.Index]);
+
+                ReadOnlySpan<char> propString = description[match.Index..(match.Index + match.Length)];
+
+                if (!propString.StartsWith("%%") && int.TryParse(propString.Trim(['{', '}', '%']), out var propIndex))
+                {
+                    if (propIndex - 1 >= properties.Count)
+                    {
+                        return "Unable to resolve description, see XML for more details.";
+                    }
+
+                    propString = properties[propIndex - 1];
+                }
+
+                if (propString.StartsWith("%%") && parameters.Count > 0)
+                {
+                    int endParameterId = propString.IndexOf(' ');
+                    var parameterIdString = endParameterId > 2 ? propString.Slice(2, endParameterId) : propString[2..];
+
+                    if (long.TryParse(parameterIdString, out long parameterId))
+                    {
+                        // Some parameters exceed int size and need to be cast from long to int
+                        // because they are actually negative numbers
+                        ReadOnlySpan<char> parameterMessage =
+                            parameters.FirstOrDefault(m => m.RawId == (int)parameterId)?.Text ?? string.Empty;
+
+                        if (!parameterMessage.IsEmpty)
+                        {
+                            // Some RawId parameters have a trailing '%0' that needs to be removed
+                            propString = endParameterId > 2 ?
+                                string.Concat(parameterMessage.TrimEnd(['%', '0']), propString[++endParameterId..]) :
+                                parameterMessage.TrimEnd(['%', '0']);
+                        }
+                    }
+                }
+
+                updatedDescription.Append(propString);
+
+                lastIndex = match.Index + match.Length;
+            }
+
+            if (lastIndex < description.Length)
+            {
+                updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
+            }
+
+            returnDescription = updatedDescription.ToString();
+
+            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+        }
+        catch (InvalidOperationException)
+        {
+            // If the regex fails to match, then we just return the original description.
+            returnDescription = descriptionTemplate.TrimEnd('\0', '\r', '\n');
+
+            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+        }
+        catch (Exception ex)
+        {
+            logger?.Trace($"FormatDescription exception was caught: {ex}");
+
+            return "Failed to resolve description, see XML for more details.";
+        }
+    }
+
+    private List<string> GetKeywordsFromBitmask(EventRecord eventRecord)
+    {
+        if (eventRecord.Keywords is null or 0) { return []; }
+
+        List<string> returnValue = [];
+
+        foreach (var k in s_standardKeywords.Keys)
+        {
+            if ((eventRecord.Keywords.Value & k) == k)
+            {
+                var keyword = s_standardKeywords[k].TrimEnd('\0');
+                returnValue.Add(cache?.GetOrAddValue(keyword) ?? keyword);
+            }
+        }
+
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        {
+            return returnValue;
+        }
+
+        // Some providers re-define the standard keywords in their own metadata,
+        // so let's skip those.
+        var lower32 = eventRecord.Keywords.Value & 0xFFFFFFFF;
+
+        if (lower32 != 0)
+        {
+            foreach (var k in details.Keywords.Keys)
+            {
+                if ((lower32 & k) == k)
+                {
+                    var keyword = details.Keywords[k].TrimEnd('\0');
+                    returnValue.Add(cache?.GetOrAddValue(keyword) ?? keyword);
+                }
+            }
+        }
+
+        return returnValue;
+    }
+
+    /// <summary>Resolve event descriptions from an event record.</summary>
+    private string ResolveDescription(EventRecord eventRecord)
+    {
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        {
+            return "Description not found. No provider available.";
+        }
+
+        var @event = GetModernEvent(eventRecord, details);
+        var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
+
+        return string.IsNullOrEmpty(@event?.Description)
+            ? FormatDescription(
+                properties,
+                details.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text,
+                details.Parameters)
+            : FormatDescription(properties, @event.Description, details.Parameters);
+    }
+
+    /// <summary>Resolve event task names from an event record.</summary>
+    private string ResolveTaskName(EventRecord eventRecord)
+    {
+        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        {
+            return string.Empty;
+        }
+
+        var @event = GetModernEvent(eventRecord, details);
+
+        if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
+        {
+            taskName = taskName.TrimEnd('\0');
+            return cache?.GetOrAddValue(taskName) ?? taskName;
+        }
+
+        if (!eventRecord.Task.HasValue)
+        {
+            return string.Empty;
+        }
+
+        details.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
+
+        if (taskName is not null)
+        {
+            taskName = taskName.TrimEnd('\0');
+            return cache?.GetOrAddValue(taskName) ?? taskName;
+        }
+
+        var potentialTaskNames = details.Messages
+            .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
+            .ToList();
+
+        if (potentialTaskNames is { Count: > 0 })
+        {
+            taskName = potentialTaskNames[0].Text;
+
+            if (potentialTaskNames.Count > 1)
+            {
+                logger?.Trace("More than one matching task ID was found.");
+                logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
+                logger?.Trace("   Potential matches:");
+
+                potentialTaskNames.ForEach(t => logger?.Trace($"    {t.LogLink} {t.Text}"));
+            }
+        }
+        else
+        {
+            taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
+        }
+
+        taskName = taskName.TrimEnd('\0');
+        return cache?.GetOrAddValue(taskName) ?? taskName;
+    }
 }

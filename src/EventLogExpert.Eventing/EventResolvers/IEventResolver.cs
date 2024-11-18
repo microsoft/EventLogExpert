@@ -8,11 +8,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// <summary>Resolves event details from an <see cref="EventRecord" />.</summary>
 public interface IEventResolver
 {
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord);
-
-    public string ResolveDescription(EventRecord eventRecord);
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName);
 
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
-
-    public string ResolveTaskName(EventRecord eventRecord);
 }

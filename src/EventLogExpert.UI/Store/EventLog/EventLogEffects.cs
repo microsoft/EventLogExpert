@@ -7,7 +7,6 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,36 +18,42 @@ using IDispatcher = Fluxor.IDispatcher;
 namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed class EventLogEffects(
-    IEventResolverCache resolverCache,
     IState<EventLogState> eventLogState,
+    ITraceLogger logger,
     ILogWatcherService logWatcherService,
-    IState<SettingsState> settingsState,
+    IEventResolverCache resolverCache,
     IServiceScopeFactory serviceScopeFactory)
 {
+    private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly ITraceLogger _logger = logger;
+    private readonly ILogWatcherService _logWatcherService = logWatcherService;
+    private readonly IEventResolverCache _resolverCache = resolverCache;
+    private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+
     [EffectMethod]
     public Task HandleAddEvent(EventLogAction.AddEvent action, IDispatcher dispatcher)
     {
         // Sometimes the watcher doesn't stop firing events immediately. Let's
         // make sure the events being added are for a log that is still "open".
-        if (!eventLogState.Value.ActiveLogs.ContainsKey(action.NewEvent.OwningLog)) { return Task.CompletedTask; }
+        if (!_eventLogState.Value.ActiveLogs.ContainsKey(action.NewEvent.OwningLog)) { return Task.CompletedTask; }
 
         var newEvent = new[]
         {
             action.NewEvent
         };
 
-        if (eventLogState.Value.ContinuouslyUpdate)
+        if (_eventLogState.Value.ContinuouslyUpdate)
         {
-            var activeLogs = DistributeEventsToManyLogs(eventLogState.Value.ActiveLogs, newEvent);
+            var activeLogs = DistributeEventsToManyLogs(_eventLogState.Value.ActiveLogs, newEvent);
 
-            var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, eventLogState.Value.AppliedFilter);
+            var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, _eventLogState.Value.AppliedFilter);
 
             dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
             dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
         }
         else
         {
-            var updatedBuffer = newEvent.Concat(eventLogState.Value.NewEventBuffer).ToList().AsReadOnly();
+            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer).ToList().AsReadOnly();
             var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
             dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
@@ -60,12 +65,12 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.CloseAll))]
     public Task HandleCloseAll(IDispatcher dispatcher)
     {
-        logWatcherService.RemoveAll();
+        _logWatcherService.RemoveAll();
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
 
-        resolverCache.ClearAll();
+        _resolverCache.ClearAll();
 
         return Task.CompletedTask;
     }
@@ -73,7 +78,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        logWatcherService.RemoveLog(action.LogName);
+        _logWatcherService.RemoveLog(action.LogName);
 
         dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
@@ -83,7 +88,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
     {
-        var filteredEvents = FilterMethods.GetFilteredEvents(action.Events, eventLogState.Value.AppliedFilter);
+        var filteredEvents = FilterMethods.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
 
@@ -93,7 +98,7 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.LoadNewEvents))]
     public Task HandleLoadNewEvents(IDispatcher dispatcher)
     {
-        ProcessNewEventBuffer(eventLogState.Value, dispatcher);
+        ProcessNewEventBuffer(_eventLogState.Value, dispatcher);
 
         return Task.CompletedTask;
     }
@@ -101,10 +106,9 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        using var serviceScope = serviceScopeFactory.CreateScope();
+        using var serviceScope = _serviceScopeFactory.CreateScope();
 
         var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
-        ITraceLogger? logger = null;
 
         if (eventResolver is null)
         {
@@ -113,7 +117,7 @@ public sealed class EventLogEffects(
             return;
         }
 
-        if (!eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
+        if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
         {
             dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to open {action.LogName}"));
 
@@ -133,7 +137,7 @@ public sealed class EventLogEffects(
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1));
 
-        using var reader = new EventLogReader(action.LogName, action.PathType, settingsState.Value.Config.IsXmlEnabled);
+        using var reader = new EventLogReader(action.LogName, action.PathType);
 
         try
         {
@@ -154,34 +158,11 @@ public sealed class EventLogEffects(
                             {
                                 if (!@event.IsSuccess) { continue; }
 
-                                eventResolver.ResolveProviderDetails(@event, action.LogName);
-
-                                events.Enqueue(
-                                    new DisplayEventModel(action.LogName)
-                                    {
-                                        ActivityId = @event.ActivityId,
-                                        ComputerName = resolverCache.GetOrAddValue(@event.ComputerName),
-                                        Description = resolverCache.GetOrAddDescription(eventResolver.ResolveDescription(@event)),
-                                        Id = @event.Id,
-                                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(@event)
-                                            .Select(resolverCache.GetOrAddValue).ToList(),
-                                        Level = Severity.GetString(@event.Level),
-                                        LogName = resolverCache.GetOrAddValue(@event.LogName),
-                                        ProcessId = @event.ProcessId,
-                                        RecordId = @event.RecordId,
-                                        Source = resolverCache.GetOrAddValue(@event.ProviderName),
-                                        TaskCategory = resolverCache.GetOrAddValue(eventResolver.ResolveTaskName(@event)),
-                                        ThreadId = @event.ThreadId,
-                                        TimeCreated = @event.TimeCreated.ToUniversalTime(),
-                                        UserId = @event.UserId,
-                                        Xml = @event.Xml ?? string.Empty
-                                    });
+                                events.Enqueue(eventResolver.ResolveEvent(@event, action.LogName));
                             }
                             catch (Exception ex)
                             {
-                                logger ??= serviceScope.ServiceProvider.GetService<ITraceLogger>();
-
-                                logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
+                                _logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
                                     LogLevel.Error);
                             }
                         }
@@ -206,7 +187,7 @@ public sealed class EventLogEffects(
 
         if (action.PathType == PathType.LogName)
         {
-            logWatcherService.AddLog(action.LogName, lastEvent);
+            _logWatcherService.AddLog(action.LogName, lastEvent);
         }
 
         dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
@@ -217,7 +198,7 @@ public sealed class EventLogEffects(
     {
         if (action.ContinuouslyUpdate)
         {
-            ProcessNewEventBuffer(eventLogState.Value, dispatcher);
+            ProcessNewEventBuffer(_eventLogState.Value, dispatcher);
         }
 
         return Task.CompletedTask;
@@ -226,7 +207,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(eventLogState.Value.ActiveLogs.Values, action.EventFilter);
+        var filteredActiveLogs = FilterMethods.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
 

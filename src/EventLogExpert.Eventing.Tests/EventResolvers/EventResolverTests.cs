@@ -13,7 +13,7 @@ namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
 public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 {
-    internal class UnitTestEventResolver : EventResolverBase, IEventResolver
+    private class UnitTestEventResolver : EventResolverBase, IEventResolver
     {
         internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) =>
             providerDetailsList.ForEach(p => providerDetails.TryAdd(p.ProviderName, p));
@@ -80,20 +80,19 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         };
 
         var resolver = new UnitTestEventResolver([providerDetails]);
-        var description = resolver.ResolveDescription(eventRecord);
-        var taskName = resolver.ResolveTaskName(eventRecord);
+        var @event = resolver.ResolveEvent(eventRecord, eventRecord.LogName);
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 
-        Assert.Equal(expectedDescription, description);
-        Assert.Equal("Service", taskName);
+        Assert.Equal(expectedDescription, @event.Description);
+        Assert.Equal("Service", @event.TaskCategory);
     }
 
     [Fact]
     public void PerfTest()
     {
         using var eventLogReader = new EventLogReader("Application", PathType.LogName);
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new VersatileEventResolver();
 
         var sw = Stopwatch.GetTimestamp();
 
@@ -112,7 +111,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
     public void PerfTest2()
     {
         using EventLogReader eventLogReader = new("Application", PathType.LogName);
-        LocalProviderEventResolver resolver = new();
+        VersatileEventResolver resolver = new();
         List<EventRecord> eventRecords = [];
 
         var sw = Stopwatch.GetTimestamp();
@@ -144,7 +143,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
         var resolvers = new List<IEventResolver>
         {
-            new LocalProviderEventResolver(),
+            new VersatileEventResolver(),
             /* new EventProviderDatabaseEventResolver(
                 s => {
                     _outputHelper.WriteLine(s);
@@ -169,10 +168,10 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
                 foreach (var r in resolvers)
                 {
-                    r.ResolveProviderDetails(record, "Test");
+                    var @event = r.ResolveEvent(record, "Test");
 
-                    var description = r.ResolveDescription(record);
-                    var keywords = r.GetKeywordsFromBitmask(record);
+                    var description = @event.Description;
+                    var keywords = @event.KeywordsDisplayNames;
 
                     uniqueDescriptions.Add(description
                         .Replace("\r", "")      // I can't figure out the logic of FormatMessage() for when it leaves
