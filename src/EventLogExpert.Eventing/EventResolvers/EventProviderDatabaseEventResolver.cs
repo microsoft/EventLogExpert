@@ -10,13 +10,16 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
+internal sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
-    private readonly SemaphoreSlim _databaseAccessSemaphore = new(1);
+    private readonly Lock _databaseAccessLock = new();
 
     private ImmutableArray<EventProviderDbContext> _dbContexts = [];
 
-    public EventProviderDatabaseEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger? logger = null) : base(logger)
+    internal EventProviderDatabaseEventResolver(
+        IDatabaseCollectionProvider dbCollection,
+        IEventResolverCache? cache = null,
+        ITraceLogger? logger = null) : base(cache, logger)
     {
         logger?.Trace($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
 
@@ -38,7 +41,7 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
 
             try
             {
-                _databaseAccessSemaphore.Wait();
+                _databaseAccessLock.Enter();
 
                 foreach (var dbContext in _dbContexts)
                 {
@@ -52,7 +55,7 @@ public sealed partial class EventProviderDatabaseEventResolver : EventResolverBa
             }
             finally
             {
-                _databaseAccessSemaphore.Release();
+                _databaseAccessLock.Exit();
                 providerDetailsLock.ExitWriteLock();
             }
 

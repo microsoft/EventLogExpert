@@ -12,45 +12,36 @@ public sealed class VersatileEventResolver : IEventResolver
     private readonly EventProviderDatabaseEventResolver? _databaseResolver;
     private readonly LocalProviderEventResolver? _localResolver;
 
-    public VersatileEventResolver(IDatabaseCollectionProvider dbCollection, ITraceLogger? tracer = null)
+    public VersatileEventResolver(
+        IDatabaseCollectionProvider? dbCollection = null,
+        IEventResolverCache? cache = null,
+        ITraceLogger? tracer = null)
     {
-        if (dbCollection.ActiveDatabases.IsEmpty)
+        if (dbCollection is null || dbCollection.ActiveDatabases.IsEmpty)
         {
-            _localResolver = new LocalProviderEventResolver(tracer);
+            _localResolver = new LocalProviderEventResolver(cache, tracer);
         }
         else
         {
-            _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, tracer);
+            _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, cache, tracer);
         }
 
-        tracer?.Trace($"Database Resolver is {dbCollection.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
+        tracer?.Trace(
+            $"Database Resolver is {dbCollection?.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
-    public IEnumerable<string> GetKeywordsFromBitmask(EventRecord eventRecord)
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName)
     {
+        ResolveProviderDetails(eventRecord, owningLogName);
+
         if (_databaseResolver is not null)
         {
-            return _databaseResolver.GetKeywordsFromBitmask(eventRecord);
+            return _databaseResolver.ResolveEvent(eventRecord, owningLogName);
         }
 
         if (_localResolver is not null)
         {
-            return _localResolver.GetKeywordsFromBitmask(eventRecord);
-        }
-
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
-
-    public string ResolveDescription(EventRecord eventRecord)
-    {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.ResolveDescription(eventRecord);
-        }
-
-        if (_localResolver is not null)
-        {
-            return _localResolver.ResolveDescription(eventRecord);
+            return _localResolver.ResolveEvent(eventRecord, owningLogName);
         }
 
         throw new InvalidOperationException("No database or local resolver available.");
@@ -70,21 +61,6 @@ public sealed class VersatileEventResolver : IEventResolver
             _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
 
             return;
-        }
-
-        throw new InvalidOperationException("No database or local resolver available.");
-    }
-
-    public string ResolveTaskName(EventRecord eventRecord)
-    {
-        if (_databaseResolver is not null)
-        {
-            return _databaseResolver.ResolveTaskName(eventRecord);
-        }
-
-        if (_localResolver is not null)
-        {
-            return _localResolver.ResolveTaskName(eventRecord);
         }
 
         throw new InvalidOperationException("No database or local resolver available.");

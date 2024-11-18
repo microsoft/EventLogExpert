@@ -11,7 +11,8 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     Resolves event descriptions by using our own logic to look up
 ///     message strings in the providers available on the local machine.
 /// </summary>
-public sealed class LocalProviderEventResolver(ITraceLogger? logger = null) : EventResolverBase(logger), IEventResolver
+internal sealed class LocalProviderEventResolver(IEventResolverCache? cache = null, ITraceLogger? logger = null)
+    : EventResolverBase(cache, logger), IEventResolver
 {
     public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
     {

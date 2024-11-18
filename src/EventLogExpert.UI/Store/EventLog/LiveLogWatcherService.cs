@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
@@ -140,8 +139,8 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         if (_watchers.ContainsKey(logName)) { return; }
 
         EventLogWatcher watcher = _bookmarks[logName] != null ?
-            new EventLogWatcher(logName, _bookmarks[logName], _settingsState.Value.Config.IsXmlEnabled) :
-            new EventLogWatcher(logName, _settingsState.Value.Config.IsXmlEnabled);
+            new EventLogWatcher(logName, _bookmarks[logName]) :
+            new EventLogWatcher(logName);
 
         _watchers.Add(logName, watcher);
 
@@ -166,31 +165,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
             using var scope = _watchersLock.EnterScope();
 
-            eventResolver.ResolveProviderDetails(eventArgs, logName);
-
-            _dispatcher.Dispatch(
-                new EventLogAction.AddEvent(
-                    new DisplayEventModel(logName)
-                    {
-                        ActivityId = eventArgs.ActivityId,
-                        ComputerName = _resolverCache.GetOrAddValue(eventArgs.ComputerName),
-                        Description = _resolverCache.GetOrAddDescription(
-                            eventResolver.ResolveDescription(eventArgs)),
-                        Id = eventArgs.Id,
-                        KeywordsDisplayNames = eventResolver.GetKeywordsFromBitmask(eventArgs)
-                            .Select(_resolverCache.GetOrAddValue).ToList(),
-                        Level = Severity.GetString(eventArgs.Level),
-                        LogName = _resolverCache.GetOrAddValue(eventArgs.LogName),
-                        ProcessId = eventArgs.ProcessId,
-                        RecordId = eventArgs.RecordId,
-                        Source = _resolverCache.GetOrAddValue(eventArgs.ProviderName),
-                        TaskCategory = _resolverCache.GetOrAddValue(
-                            eventResolver.ResolveTaskName(eventArgs)),
-                        ThreadId = eventArgs.ThreadId,
-                        TimeCreated = eventArgs.TimeCreated.ToUniversalTime(),
-                        UserId = eventArgs.UserId,
-                        Xml = eventArgs.Xml ?? string.Empty
-                    }));
+            _dispatcher.Dispatch(new EventLogAction.AddEvent(eventResolver.ResolveEvent(eventArgs, logName)));
         };
 
         // When the watcher is enabled, it reads all the events since the
