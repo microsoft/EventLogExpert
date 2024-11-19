@@ -20,6 +20,30 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
     public string? LastBookmark { get; private set; }
 
+    public static string GetXml(DisplayEventModel record)
+    {
+        using EvtHandle handle = EventMethods.EvtQuery(
+            EventLogSession.GlobalSession.Handle,
+            record.OwningLog,
+            $"*[System[EventRecordID='{record.RecordId}']]",
+            record.PathType);
+
+        if (handle.IsInvalid) { return string.Empty; }
+
+        var buffer = new IntPtr[1];
+        int count = 0;
+
+        bool success = EventMethods.EvtNext(handle, buffer.Length, buffer, 0, 0, ref count);
+
+        if (!success) { return string.Empty; }
+
+        using EvtHandle eventHandle = new(buffer[0]);
+
+        if (eventHandle.IsInvalid) { return string.Empty; }
+
+        return EventMethods.RenderEventXml(eventHandle) ?? string.Empty;
+    }
+
     public void Dispose()
     {
         Dispose(disposing: true);
@@ -55,7 +79,7 @@ public sealed partial class EventLogReader(string path, PathType pathType) : IDi
 
             try
             {
-                events[i] = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+                events[i] = EventMethods.RenderEvent(eventHandle);
                 events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
             }
             catch (Exception ex)

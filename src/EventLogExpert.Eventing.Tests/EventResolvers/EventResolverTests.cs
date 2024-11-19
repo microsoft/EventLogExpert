@@ -18,7 +18,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         internal UnitTestEventResolver(List<ProviderDetails> providerDetailsList) =>
             providerDetailsList.ForEach(p => providerDetails.TryAdd(p.ProviderName, p));
 
-        public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+        public void ResolveProviderDetails(EventRecord eventRecord)
         {
             if (providerDetails.ContainsKey(eventRecord.ProviderName))
             {
@@ -80,7 +80,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         };
 
         var resolver = new UnitTestEventResolver([providerDetails]);
-        var @event = resolver.ResolveEvent(eventRecord, eventRecord.LogName);
+        var @event = resolver.ResolveEvent(eventRecord);
 
         var expectedDescription = "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 
@@ -100,7 +100,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         {
             foreach (var record in er)
             {
-                resolver.ResolveProviderDetails(record, "Test");
+                resolver.ResolveProviderDetails(record);
             }
         }
 
@@ -130,7 +130,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
         foreach (var record in eventRecords)
         {
-            resolver.ResolveProviderDetails(record, "Test");
+            resolver.ResolveProviderDetails(record);
         }
 
         Debug.WriteLine("Resolving events took " + Stopwatch.GetElapsedTime(sw));
@@ -168,7 +168,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
                 foreach (var r in resolvers)
                 {
-                    var @event = r.ResolveEvent(record, "Test");
+                    var @event = r.ResolveEvent(record);
 
                     var description = @event.Description;
                     var keywords = @event.KeywordsDisplayNames;

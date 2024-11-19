@@ -622,7 +622,7 @@ internal static partial class EventMethods
         return size;
     }
 
-    internal static EventRecord RenderEvent(EvtHandle eventHandle, EvtRenderFlags flag)
+    internal static EventRecord RenderEvent(EvtHandle eventHandle)
     {
         IntPtr buffer = IntPtr.Zero;
 
@@ -631,7 +631,7 @@ internal static partial class EventMethods
             bool success = EvtRender(
                 EventLogSession.GlobalSession.SystemRenderContext,
                 eventHandle,
-                flag,
+                EvtRenderFlags.EventValues,
                 0,
                 buffer,
                 out int bufferUsed,
@@ -649,7 +649,7 @@ internal static partial class EventMethods
             success = EvtRender(
                 EventLogSession.GlobalSession.SystemRenderContext,
                 eventHandle,
-                flag,
+                EvtRenderFlags.EventValues,
                 bufferUsed,
                 buffer,
                 out bufferUsed,
