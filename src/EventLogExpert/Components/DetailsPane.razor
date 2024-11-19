@@ -1,4 +1,5 @@
 ﻿@using System.Xml.Linq
+@using EventLogExpert.Eventing.Readers
 @inherits FluxorComponent
 
 <div data-toggle="@IsVisible" hidden="@(SelectedEvent is null)" id="details-pane">
@@ -46,9 +47,9 @@
         </div>
 
         <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
-            @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
+            @if (!string.IsNullOrEmpty(_selectedXml))
             {
-                @XElement.Parse(SelectedEvent.Xml)
+                @XElement.Parse(_selectedXml)
             }
             else
             {

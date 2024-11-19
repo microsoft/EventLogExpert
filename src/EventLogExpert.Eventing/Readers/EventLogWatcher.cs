@@ -87,7 +87,7 @@ public sealed partial class EventLogWatcher(string path, string? bookmark) : IDi
 
                 try
                 {
-                    @event = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
+                    @event = EventMethods.RenderEvent(eventHandle);
                     @event.Properties = EventMethods.RenderEventProperties(eventHandle);
                 }
                 catch (Exception ex)

@@ -55,7 +55,6 @@ public sealed partial class FilterRow
                     return EventLogState.Value.ActiveLogs.Values
                         .SelectMany(log => log.GetCategoryValues(FilterCategory.TaskCategory))
                         .Distinct().Order().ToList();
-                case FilterCategory.Xml:
                 case FilterCategory.Description:
                 default:
                     return [];
