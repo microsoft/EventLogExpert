@@ -165,7 +165,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
             using var scope = _watchersLock.EnterScope();
 
-            _dispatcher.Dispatch(new EventLogAction.AddEvent(eventResolver.ResolveEvent(eventArgs, logName)));
+            _dispatcher.Dispatch(new EventLogAction.AddEvent(eventResolver.ResolveEvent(eventArgs)));
         };
 
         // When the watcher is enabled, it reads all the events since the

@@ -8,7 +8,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// <summary>Resolves event details from an <see cref="EventRecord" />.</summary>
 public interface IEventResolver
 {
-    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName);
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord);
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName);
+    public void ResolveProviderDetails(EventRecord eventRecord);
 }

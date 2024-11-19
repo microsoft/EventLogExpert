@@ -1,12 +1,17 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Models;
 
 public sealed record EventRecord
 {
+    public string PathName { get; set; } = string.Empty;
+
+    public PathType PathType { get; set; }
+
     public Guid? ActivityId { get; set; }
 
     public string ComputerName { get; set; } = string.Empty;
@@ -36,8 +41,6 @@ public sealed record EventRecord
     public SecurityIdentifier? UserId { get; set; }
 
     public byte? Version { get; set; }
-
-    public string? Xml { get; set; }
 
     public string? Error { get; set; }
 

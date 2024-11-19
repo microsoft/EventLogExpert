@@ -228,7 +228,7 @@ internal static partial class EventMethods
             case (int)EvtVariantType.SizeT:
                 return variant.SizeT;
             case (int)EvtVariantType.FileTime:
-                return DateTime.FromFileTime((long)variant.FileTime);
+                return DateTime.FromFileTimeUtc((long)variant.FileTime);
             case (int)EvtVariantType.SysTime:
                 var sysTime = Marshal.PtrToStructure<SystemTime>(variant.SystemTime);
 
@@ -239,7 +239,8 @@ internal static partial class EventMethods
                     sysTime.Hour,
                     sysTime.Minute,
                     sysTime.Second,
-                    sysTime.Milliseconds);
+                    sysTime.Milliseconds,
+                    DateTimeKind.Utc);
             case (int)EvtVariantType.Sid:
                 return variant.SidVal == IntPtr.Zero ? null : new SecurityIdentifier(variant.SidVal);
             case (int)EvtVariantType.HexInt32:

@@ -26,7 +26,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    public void ResolveProviderDetails(EventRecord eventRecord)
     {
         providerDetailsLock.EnterUpgradeableReadLock();
 

@@ -30,35 +30,35 @@ public sealed class VersatileEventResolver : IEventResolver
             $"Database Resolver is {dbCollection?.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
-    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName)
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord)
     {
-        ResolveProviderDetails(eventRecord, owningLogName);
+        ResolveProviderDetails(eventRecord);
 
         if (_databaseResolver is not null)
         {
-            return _databaseResolver.ResolveEvent(eventRecord, owningLogName);
+            return _databaseResolver.ResolveEvent(eventRecord);
         }
 
         if (_localResolver is not null)
         {
-            return _localResolver.ResolveEvent(eventRecord, owningLogName);
+            return _localResolver.ResolveEvent(eventRecord);
         }
 
         throw new InvalidOperationException("No database or local resolver available.");
     }
 
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    public void ResolveProviderDetails(EventRecord eventRecord)
     {
         if (_databaseResolver is not null)
         {
-            _databaseResolver.ResolveProviderDetails(eventRecord, owningLogName);
+            _databaseResolver.ResolveProviderDetails(eventRecord);
 
             return;
         }
 
         if (_localResolver is not null)
         {
-            _localResolver.ResolveProviderDetails(eventRecord, owningLogName);
+            _localResolver.ResolveProviderDetails(eventRecord);
 
             return;
         }

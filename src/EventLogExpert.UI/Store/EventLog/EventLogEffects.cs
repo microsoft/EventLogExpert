@@ -158,7 +158,7 @@ public sealed class EventLogEffects(
                             {
                                 if (!@event.IsSuccess) { continue; }
 
-                                events.Enqueue(eventResolver.ResolveEvent(@event, action.LogName));
+                                events.Enqueue(eventResolver.ResolveEvent(@event));
                             }
                             catch (Exception ex)
                             {
