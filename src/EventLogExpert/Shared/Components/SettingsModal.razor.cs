@@ -59,7 +59,7 @@ public sealed partial class SettingsModal
         base.OnInitialized();
     }
 
-    private async void ImportDatabase()
+    private async Task ImportDatabase()
     {
         PickOptions options = new()
         {
@@ -192,12 +192,6 @@ public sealed partial class SettingsModal
     {
         if (!SettingsState.Value.Config.Equals(_request))
         {
-            if (_request.IsXmlEnabled != SettingsState.Value.Config.IsXmlEnabled && _request.IsXmlEnabled)
-            {
-                // Really only need to reload logs if the user is enabling XML
-                _shouldReload = true;
-            }
-
             Dispatcher.Dispatch(new SettingsAction.Save(_request));
         }
 

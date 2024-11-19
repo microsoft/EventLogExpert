@@ -31,8 +31,7 @@ public sealed class SettingsEffects(
             ShowDisplayPaneOnSelectionChange = preferencesProvider.DisplayPaneSelectionPreference,
             CopyType = preferencesProvider.KeyboardCopyTypePreference,
             LogLevel = preferencesProvider.LogLevelPreference,
-            IsPreReleaseEnabled = preferencesProvider.PreReleasePreference,
-            IsXmlEnabled = preferencesProvider.LoadXmlPreference
+            IsPreReleaseEnabled = preferencesProvider.PreReleasePreference
         };
 
         dispatcher.Dispatch(new SettingsAction.LoadSettingsCompleted(config, preferencesProvider.DisabledDatabasesPreference));
@@ -48,7 +47,6 @@ public sealed class SettingsEffects(
         preferencesProvider.KeyboardCopyTypePreference = action.Settings.CopyType;
         preferencesProvider.LogLevelPreference = action.Settings.LogLevel;
         preferencesProvider.PreReleasePreference = action.Settings.IsPreReleaseEnabled;
-        preferencesProvider.LoadXmlPreference = action.Settings.IsXmlEnabled;
 
         dispatcher.Dispatch(new SettingsAction.SaveCompleted(action.Settings));
 

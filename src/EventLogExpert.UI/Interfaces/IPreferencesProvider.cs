@@ -18,8 +18,6 @@ public interface IPreferencesProvider
 
     CopyType KeyboardCopyTypePreference { get; set; }
 
-    bool LoadXmlPreference { get; set; }
-
     LogLevel LogLevelPreference { get; set; }
 
     bool PreReleasePreference { get; set; }

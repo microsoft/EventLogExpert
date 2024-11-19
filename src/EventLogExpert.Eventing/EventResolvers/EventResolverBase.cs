@@ -57,8 +57,8 @@ public partial class EventResolverBase
         this.logger = logger;
     }
 
-    public DisplayEventModel ResolveEvent(EventRecord eventRecord, string owningLogName) =>
-        new(owningLogName)
+    public DisplayEventModel ResolveEvent(EventRecord eventRecord) =>
+        new(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
@@ -73,8 +73,7 @@ public partial class EventResolverBase
             TaskCategory = ResolveTaskName(eventRecord),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
-            UserId = eventRecord.UserId,
-            Xml = eventRecord.Xml ?? string.Empty
+            UserId = eventRecord.UserId
         };
 
     private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)

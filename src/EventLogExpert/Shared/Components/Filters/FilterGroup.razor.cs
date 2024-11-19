@@ -35,7 +35,7 @@ public sealed partial class FilterGroup
         string.Join(" || ", Group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
         Group.Filters.First().Comparison.Value);
 
-    private async void ExportGroup()
+    private async Task ExportGroup()
     {
         FileSavePicker picker = new()
         {
@@ -72,7 +72,7 @@ public sealed partial class FilterGroup
         }
     }
 
-    private async void ImportGroup()
+    private async Task ImportGroup()
     {
         PickOptions options = new()
         {
@@ -110,7 +110,7 @@ public sealed partial class FilterGroup
 
     private void RemoveGroup() => Dispatcher.Dispatch(new FilterGroupAction.RemoveGroup(Group.Id));
 
-    private async void RenameGroup()
+    private async Task RenameGroup()
     {
         var newName = await AlertDialogService.DisplayPrompt("Group Name", "What would you like to name this group?", Group.Name);
 

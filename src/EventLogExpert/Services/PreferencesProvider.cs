@@ -16,7 +16,6 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string EnabledEventTableColumns = "enabled-event-table-columns";
     private const string FavoriteFilters = "favorite-filters";
     private const string KeyboardCopyType = "keyboard-copy-type";
-    private const string LoadXmlEnabled = "load-xml-enabled";
     private const string LoggingLevel = "logging-level";
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
@@ -57,12 +56,6 @@ public sealed class PreferencesProvider : IPreferencesProvider
             out CopyType value) ?
             value : CopyType.Full;
         set => Preferences.Default.Set(KeyboardCopyType, value.ToString());
-    }
-
-    public bool LoadXmlPreference
-    {
-        get => Preferences.Default.Get(LoadXmlEnabled, true);
-        set => Preferences.Default.Set(LoadXmlEnabled, value);
     }
 
     public LogLevel LogLevelPreference

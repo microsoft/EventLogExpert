@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogWatcher(string path, string? bookmark, bool renderXml = true) : IDisposable
+public sealed partial class EventLogWatcher(string path, string? bookmark) : IDisposable
 {
     private readonly string? _bookmark = bookmark;
     private readonly AutoResetEvent _newEvents = new(false);
@@ -17,7 +17,7 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
     private EvtHandle _subscriptionHandle = EvtHandle.Zero;
     private RegisteredWaitHandle? _waitHandle;
 
-    public EventLogWatcher(string path, bool renderXml = true) : this(path, null, renderXml) { }
+    public EventLogWatcher(string path, bool renderXml = true) : this(path, null) { }
 
     ~EventLogWatcher()
     {
@@ -89,11 +89,6 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
                 {
                     @event = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
                     @event.Properties = EventMethods.RenderEventProperties(eventHandle);
-
-                    if (renderXml)
-                    {
-                        @event.Xml = EventMethods.RenderEventXml(eventHandle);
-                    }
                 }
                 catch (Exception ex)
                 {

@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogReader(string path, PathType pathType, bool renderXml = true) : IDisposable
+public sealed partial class EventLogReader(string path, PathType pathType) : IDisposable
 {
     private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =
@@ -57,15 +57,15 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
             {
                 events[i] = EventMethods.RenderEvent(eventHandle, EvtRenderFlags.EventValues);
                 events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
-
-                if (renderXml)
-                {
-                    events[i].Xml = EventMethods.RenderEventXml(eventHandle);
-                }
             }
             catch (Exception ex)
             {
                 events[i] = new EventRecord { RecordId = null, Error = ex.Message };
+            }
+            finally
+            {
+                events[i].PathName = path;
+                events[i].PathType = pathType;
             }
         }
 

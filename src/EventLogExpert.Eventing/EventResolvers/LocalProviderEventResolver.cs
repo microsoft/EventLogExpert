@@ -14,7 +14,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 internal sealed class LocalProviderEventResolver(IEventResolverCache? cache = null, ITraceLogger? logger = null)
     : EventResolverBase(cache, logger), IEventResolver
 {
-    public void ResolveProviderDetails(EventRecord eventRecord, string owningLogName)
+    public void ResolveProviderDetails(EventRecord eventRecord)
     {
         providerDetailsLock.EnterUpgradeableReadLock();
 
