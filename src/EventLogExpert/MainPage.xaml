@@ -68,10 +68,16 @@
         </MenuBarItem>
     </ContentPage.MenuBarItems>
 
-    <BlazorWebView HostPage="wwwroot/index.html" x:Name="WebView">
-        <BlazorWebView.RootComponents>
-            <RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />
-        </BlazorWebView.RootComponents>
-    </BlazorWebView>
+    <Grid>
+        <Grid.GestureRecognizers>
+            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" DragOver="OnDrag" />
+        </Grid.GestureRecognizers>
+        
+        <BlazorWebView HostPage="wwwroot/index.html">
+            <BlazorWebView.RootComponents>
+                <RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />
+            </BlazorWebView.RootComponents>
+        </BlazorWebView>
+    </Grid>
 
 </ContentPage>
