@@ -17,7 +17,6 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.Logging;
-using Microsoft.Maui.Platform;
 using System.Collections.Immutable;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -115,8 +114,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         {
             OpenLog(args[1], PathType.FilePath).AndForget();
         }
-
-        EnableAddLogToViewViaDragAndDrop();
     }
 
     public void Dispose()
@@ -223,71 +220,64 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private void EnableAddLogToViewViaDragAndDrop()
-    {
-        Loaded += (s, e) =>
-        {
-            if (Handler?.MauiContext == null) { return; }
-
-            var platformElement = WebView.ToPlatform(Handler.MauiContext);
-            platformElement.AllowDrop = true;
-
-            platformElement.Drop += async (sender, eventArgs) =>
-            {
-                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
-                {
-                    var items = await eventArgs.DataView.GetStorageItemsAsync();
-
-                    foreach (var item in items)
-                    {
-                        if (item is StorageFile file)
-                        {
-                            if (_activeLogsState.Value.Any(l => l.Key == file.Path))
-                            {
-                                return;
-                            }
-
-                            await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
-                        }
-                    }
-                }
-            };
-
-            platformElement.DragOver += async (sender, eventArgs) =>
-            {
-                if (eventArgs.DataView.Contains(StandardDataFormats.StorageItems))
-                {
-                    var deferral = eventArgs.GetDeferral();
-                    var extensions = new List<string> { ".evtx" };
-                    var isAllowed = false;
-                    var items = await eventArgs.DataView.GetStorageItemsAsync();
-
-                    foreach (var item in items)
-                    {
-                        if (item is StorageFile file && extensions.Contains(file.FileType))
-                        {
-                            isAllowed = true;
-                            break;
-                        }
-                    }
-
-                    eventArgs.AcceptedOperation = isAllowed ?
-                        DataPackageOperation.Copy :
-                        DataPackageOperation.None;
-
-                    deferral.Complete();
-                }
-
-                eventArgs.AcceptedOperation = DataPackageOperation.None;
-            };
-        };
-    }
-
     private void Exit_Clicked(object sender, EventArgs e) =>
         Application.Current?.CloseWindow(Application.Current.Windows[0].Page!.Window!);
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+
+    private async void OnDrag(object sender, DragEventArgs e)
+    {
+        if (e.PlatformArgs is null) { return; }
+
+        if (e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            var deferral = e.PlatformArgs.DragEventArgs.GetDeferral();
+            var extensions = new List<string> { ".evtx" };
+            var isAllowed = false;
+            var items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
+
+            foreach (var item in items)
+            {
+                if (item is not StorageFile file || !extensions.Contains(file.FileType))
+                {
+                    continue;
+                }
+
+                isAllowed = true;
+
+                break;
+            }
+
+            e.PlatformArgs.DragEventArgs.AcceptedOperation = isAllowed ?
+                DataPackageOperation.Copy :
+                DataPackageOperation.None;
+
+            deferral.Complete();
+        }
+
+        e.PlatformArgs.DragEventArgs.AcceptedOperation = DataPackageOperation.None;
+    }
+
+    private async void OnDrop(object sender, DropEventArgs e)
+    {
+        if (e.PlatformArgs is null || !e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+        {
+            return;
+        }
+
+        var items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
+
+        foreach (var item in items)
+        {
+            if (item is not StorageFile file || _activeLogsState.Value.Any(l => l.Key == file.Path))
+            {
+                return;
+            }
+
+            await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
+        }
+    }
 
     // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)
