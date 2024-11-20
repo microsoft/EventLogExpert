@@ -97,7 +97,12 @@ public partial class EventResolverBase
 
         foreach (object property in properties)
         {
-            string? outType = dataNodes?[index];
+            if (dataNodes is null || index >= dataNodes.Length)
+            {
+                break;
+            }
+
+            string outType = dataNodes[index];
 
             switch (property)
             {
