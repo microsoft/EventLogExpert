@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
@@ -23,6 +24,8 @@ public sealed partial class FilterCacheRow
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
+    [Inject] private IFilterService FilterService { get; init; } = null!;
+
     private List<string> Items => _cacheType switch
     {
         CacheType.Favorites => [.. FilterCacheState.Value.FavoriteFilters],
@@ -41,7 +44,7 @@ public sealed partial class FilterCacheRow
 
     private void SaveFilter()
     {
-        if (!FilterMethods.TryParseExpression(_filterValue, out var message))
+        if (!FilterService.TryParseExpression(_filterValue, out var message))
         {
             _errorMessage = message;
             return;

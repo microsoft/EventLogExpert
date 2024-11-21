@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
@@ -18,6 +18,8 @@ public sealed partial class AdvancedFilterRow
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IFilterService FilterService { get; init; } = null!;
+
     private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
 
     private void OnInputChanged(ChangeEventArgs e)
@@ -28,7 +30,7 @@ public sealed partial class AdvancedFilterRow
             {
                 if (s is not string value) { return; }
 
-                if (FilterMethods.TryParseExpression(value, out var message))
+                if (FilterService.TryParseExpression(value, out var message))
                 {
                     Value.Comparison.Value = value;
                     _errorMessage = string.Empty;

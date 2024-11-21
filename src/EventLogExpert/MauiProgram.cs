@@ -61,6 +61,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
+        builder.Services.AddSingleton<IFilterService, FilterService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
             async (title, message, cancel) => await Application.Current!.Windows[0].Page!.DisplayAlert(title, message, cancel),

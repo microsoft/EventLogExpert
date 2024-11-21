@@ -75,7 +75,8 @@ public enum FilterCategory
     [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
     Source,
     [EnumMember(Value = "Task Category")] TaskCategory,
-    Description
+    Description,
+    Xml
 }
 
 public enum FilterEvaluator

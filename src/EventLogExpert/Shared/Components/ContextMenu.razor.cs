@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
@@ -19,6 +20,8 @@ public sealed partial class ContextMenu
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IFilterService FilterService { get; init; } = null!;
 
     [Inject]
     private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventState { get; init; } = null!;
@@ -46,7 +49,6 @@ public sealed partial class ContextMenu
             FilterCategory.KeywordsDisplayNames => selectedEvent.KeywordsDisplayNames.GetEventKeywords(),
             FilterCategory.Source => selectedEvent.Source,
             FilterCategory.TaskCategory => selectedEvent.TaskCategory,
-            FilterCategory.Description => selectedEvent.Description,
             _ => string.Empty,
         };
 
@@ -63,7 +65,7 @@ public sealed partial class ContextMenu
             IsExcluded = shouldExclude
         };
 
-        if (!FilterMethods.TryParse(filter, out var comparisonString)) { return; }
+        if (!FilterService.TryParse(filter, out var comparisonString)) { return; }
 
         filter.Comparison.Value = comparisonString;
 

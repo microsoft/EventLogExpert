@@ -53,6 +53,7 @@
             </MenuFlyoutItem>
             <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
             <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
+            <MenuFlyoutItem Text="Enable XML Filtering" Clicked="EnableXmlFiltering_Clicked" x:Name="EnableXmlFilteringMenuItem" />
             <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />
             <MenuFlyoutItem Text="Show Filter Groups" Clicked="ViewFilterGroups_Clicked" />
         </MenuBarItem>
@@ -70,7 +71,7 @@
 
     <Grid>
         <Grid.GestureRecognizers>
-            <DropGestureRecognizer AllowDrop="True" Drop="OnDrop" DragOver="OnDrag" />
+            <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_OnDrop" DragOver="DropGestureRecognizer_OnDragOver" />
         </Grid.GestureRecognizers>
         
         <BlazorWebView HostPage="wwwroot/index.html">

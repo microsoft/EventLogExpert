@@ -6,9 +6,9 @@ using System.Runtime.InteropServices;
 namespace EventLogExpert.Eventing.Models;
 
 [StructLayout(LayoutKind.Sequential)]
-internal struct MessageResourceBlock
+internal readonly record struct MessageResourceBlock
 {
-    internal int LowId;
-    internal int HighId;
-    internal int OffsetToEntries;
+    internal readonly int LowId;
+    internal readonly int HighId;
+    internal readonly int OffsetToEntries;
 }

@@ -47,13 +47,13 @@
         </div>
 
         <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
-            @if (!string.IsNullOrEmpty(_selectedXml))
+            @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
             {
-                @XElement.Parse(_selectedXml)
+                @XElement.Parse(SelectedEvent.Xml)
             }
             else
             {
-                <text>Unable to resolve XML</text>
+                <text>Resolving XML...</text>
             }
         </p>
     }
