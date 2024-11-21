@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 
@@ -73,7 +73,8 @@ public partial class EventResolverBase
             TaskCategory = ResolveTaskName(eventRecord),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
-            UserId = eventRecord.UserId
+            UserId = eventRecord.UserId,
+            Xml = eventRecord.Xml ?? string.Empty
         };
 
     private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)
@@ -81,7 +82,7 @@ public partial class EventResolverBase
         string[]? dataNodes = null;
         List<string> providers = [];
 
-        if (!string.IsNullOrWhiteSpace(template) && !s_formattedPropertiesCache.TryGetValue(template, out dataNodes))
+        if (!string.IsNullOrEmpty(template) && !s_formattedPropertiesCache.TryGetValue(template, out dataNodes))
         {
             dataNodes = XElement.Parse(template)
                 .Descendants()
@@ -97,12 +98,7 @@ public partial class EventResolverBase
 
         foreach (object property in properties)
         {
-            if (dataNodes is null || index >= dataNodes.Length)
-            {
-                break;
-            }
-
-            string outType = dataNodes[index];
+            string? outType = index < dataNodes?.Length ? dataNodes[index] : null;
 
             switch (property)
             {
@@ -202,14 +198,28 @@ public partial class EventResolverBase
             .Replace("%n\r\n", "\r\n ")
             .Replace("%n", "\r\n");
 
+        char[] buffer = ArrayPool<char>.Shared.Rent(description.Length * 2);
+
         try
         {
-            StringBuilder updatedDescription = new();
+            int currentLength = 0;
             int lastIndex = 0;
+            Span<char> updatedDescription = buffer;
 
             foreach (var match in _sectionsToReplace.EnumerateMatches(description))
             {
-                updatedDescription.Append(description[lastIndex..match.Index]);
+                ReadOnlySpan<char> sectionToAdd = description[lastIndex..match.Index];
+
+                if (currentLength + sectionToAdd.Length > updatedDescription.Length)
+                {
+                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + sectionToAdd.Length);
+                    updatedDescription.CopyTo(newBuffer);
+                    ArrayPool<char>.Shared.Return(buffer);
+                    updatedDescription = buffer = newBuffer;
+                }
+
+                sectionToAdd.CopyTo(updatedDescription[currentLength..]);
+                currentLength += sectionToAdd.Length;
 
                 ReadOnlySpan<char> propString = description[match.Index..(match.Index + match.Length)];
 
@@ -245,17 +255,36 @@ public partial class EventResolverBase
                     }
                 }
 
-                updatedDescription.Append(propString);
+                if (currentLength + propString.Length > updatedDescription.Length)
+                {
+                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + propString.Length);
+                    updatedDescription.CopyTo(newBuffer);
+                    ArrayPool<char>.Shared.Return(buffer);
+                    updatedDescription = buffer = newBuffer;
+                }
 
+                propString.CopyTo(updatedDescription[currentLength..]);
+                currentLength += propString.Length;
                 lastIndex = match.Index + match.Length;
             }
 
             if (lastIndex < description.Length)
             {
-                updatedDescription.Append(description[lastIndex..].TrimEnd(['\0', '\r', '\n']));
+                ReadOnlySpan<char> sectionToAdd = description[lastIndex..].TrimEnd(['\0', '\r', '\n']);
+
+                if (currentLength + sectionToAdd.Length > updatedDescription.Length)
+                {
+                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + sectionToAdd.Length);
+                    updatedDescription.CopyTo(newBuffer);
+                    ArrayPool<char>.Shared.Return(buffer);
+                    updatedDescription = buffer = newBuffer;
+                }
+
+                sectionToAdd.CopyTo(updatedDescription[currentLength..]);
+                currentLength += sectionToAdd.Length;
             }
 
-            returnDescription = updatedDescription.ToString();
+            returnDescription = new string(updatedDescription[.. currentLength]);
 
             return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
@@ -271,6 +300,10 @@ public partial class EventResolverBase
             logger?.Trace($"FormatDescription exception was caught: {ex}");
 
             return "Failed to resolve description, see XML for more details.";
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
         }
     }
 
@@ -324,12 +357,12 @@ public partial class EventResolverBase
         var @event = GetModernEvent(eventRecord, details);
         var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
 
-        return string.IsNullOrEmpty(@event?.Description)
-            ? FormatDescription(
+        return string.IsNullOrEmpty(@event?.Description) ?
+            FormatDescription(
                 properties,
                 details.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text,
-                details.Parameters)
-            : FormatDescription(properties, @event.Description, details.Parameters);
+                details.Parameters) :
+            FormatDescription(properties, @event.Description, details.Parameters);
     }
 
     /// <summary>Resolve event task names from an event record.</summary>

@@ -32,6 +32,10 @@ public sealed class FilterPaneReducers
         return state with { Filters = [.. updatedList] };
     }
 
+    [ReducerMethod(typeof(FilterPaneAction.ToggleIsXmlEnabled))]
+    public static FilterPaneState ReduceToggleIsXmlEnabled(FilterPaneState state) =>
+        state with { IsXmlEnabled = !state.IsXmlEnabled };
+
     [ReducerMethod]
     public static FilterPaneState ReduceApplyFilterGroup(
         FilterPaneState state,

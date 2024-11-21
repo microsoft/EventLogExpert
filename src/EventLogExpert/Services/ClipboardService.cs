@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
@@ -61,8 +60,6 @@ public sealed class ClipboardService : IClipboardService
 
     private string GetFormattedEvent(CopyType? copyType, DisplayEventModel @event)
     {
-        string xml;
-
         switch (copyType ?? _settingsState.Value.Config.CopyType)
         {
             case CopyType.Default:
@@ -123,11 +120,9 @@ public sealed class ClipboardService : IClipboardService
 
                 return simpleEvent.ToString();
             case CopyType.Xml:
-                xml = EventLogReader.GetXml(@event);
-
-                return string.IsNullOrEmpty(xml) ?
+                return string.IsNullOrEmpty(@event.Xml) ?
                     string.Empty :
-                    XElement.Parse(xml).ToString();
+                    XElement.Parse(@event.Xml).ToString();
             case CopyType.Full:
             default:
                 StringBuilder fullEvent = new();
@@ -145,11 +140,9 @@ public sealed class ClipboardService : IClipboardService
                 fullEvent.AppendLine(@event.Description);
                 fullEvent.AppendLine("Event Xml:");
 
-                xml = EventLogReader.GetXml(@event);
-
-                if (!string.IsNullOrEmpty(xml))
+                if (!string.IsNullOrEmpty(@event.Xml))
                 {
-                    fullEvent.AppendLine(XElement.Parse(xml).ToString());
+                    fullEvent.AppendLine(XElement.Parse(@event.Xml).ToString());
                 }
 
                 return fullEvent.ToString();

@@ -12,9 +12,9 @@ public sealed partial class FilterGroupSection
 
     [Parameter] public FilterGroupData Data { get; set; }
 
-    [Parameter] public string Name { get; set; } = null!;
+    [Parameter] public required string Name { get; set; }
 
-    [Parameter] public FilterGroupModal Parent { get; set; } = null!;
+    [Parameter] public required FilterGroupModal Parent { get; set; }
 
     private string MenuState => _menuState.ToString().ToLower();
 

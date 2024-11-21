@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventLog;
@@ -19,7 +18,6 @@ public sealed partial class DetailsPane
     private bool _hasOpened = false;
     private bool _isVisible = false;
     private bool _isXmlVisible = false;
-    private string _selectedXml = string.Empty;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
@@ -47,7 +45,7 @@ public sealed partial class DetailsPane
     {
         SelectedEventSelection.Select(s => s.SelectedEvents);
 
-        SelectedEventSelection.SelectedValueChanged += (s, selectedEvents) =>
+        SelectedEventSelection.SelectedValueChanged += async (s, selectedEvents) =>
         {
             SelectedEvent = selectedEvents.LastOrDefault();
 
@@ -57,8 +55,11 @@ public sealed partial class DetailsPane
                 return;
             }
 
-            _selectedXml = EventLogReader.GetXml(SelectedEvent);
+            await SelectedEvent.ResolveXml();
+
             _isVisible = true;
+
+            StateHasChanged();
         };
 
         base.OnInitialized();

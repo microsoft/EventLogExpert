@@ -16,5 +16,7 @@ public sealed record FilterPaneState
 
     public bool IsEnabled { get; init; } = true;
 
+    public bool IsXmlEnabled { get; init; }
+
     public bool IsLoading { get; init; }
 }

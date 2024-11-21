@@ -17,10 +17,13 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.Logging;
+using Microsoft.UI.Xaml;
 using System.Collections.Immutable;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
+using Application = Microsoft.Maui.Controls.Application;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
+using DragEventArgs = Microsoft.Maui.Controls.DragEventArgs;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
@@ -33,6 +36,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IAlertDialogService _dialogService;
+    private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsXmlEnabledState;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly IState<SettingsState> _settingsState;
     private readonly ITraceLogger _traceLogger;
@@ -47,6 +51,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
+        IStateSelection<FilterPaneState, bool> filterPaneIsXmlEnabledState,
         IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
         IState<SettingsState> settingsState,
         IAlertDialogService dialogService,
@@ -63,6 +68,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _activeLogsState = activeLogsState;
         _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
+        _filterPaneIsXmlEnabledState = filterPaneIsXmlEnabledState;
         _fluxorDispatcher = fluxorDispatcher;
         _settingsState = settingsState;
         _dialogService = dialogService;
@@ -91,16 +97,20 @@ public sealed partial class MainPage : ContentPage, IDisposable
             MainThread.InvokeOnMainThreadAsync(() =>
                 ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
 
+        filterPaneIsXmlEnabledState.Select(e => e.IsXmlEnabled);
+
+        filterPaneIsXmlEnabledState.SelectedValueChanged += async (sender, isEnabled) =>
+            await MainThread.InvokeOnMainThreadAsync(() =>
+                EnableXmlFilteringMenuItem.Text = $"Enable Xml Filtering{(isEnabled ? " ✓" : "")}");
+
         loadedProvidersState.Select(s => s.LoadedDatabases);
 
         loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
                 Path.Join(fileLocationOptions.DatabasePath, path)));
 
-        actionSubscriber.SubscribeToAction<SettingsAction.LoadSettingsCompleted>(this,
-            action => { SetCopyKeyboardAccelerator(); });
-        actionSubscriber.SubscribeToAction<SettingsAction.SaveCompleted>(this,
-            action => { SetCopyKeyboardAccelerator(); });
+        actionSubscriber.SubscribeToAction<SettingsAction.LoadSettingsCompleted>(this, _ => { SetCopyKeyboardAccelerator(); });
+        actionSubscriber.SubscribeToAction<SettingsAction.SaveCompleted>(this, _ => { SetCopyKeyboardAccelerator(); });
 
         fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
         fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
@@ -220,53 +230,47 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private void Exit_Clicked(object sender, EventArgs e) =>
-        Application.Current?.CloseWindow(Application.Current.Windows[0].Page!.Window!);
-
-    private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
-
-    private async void OnDrag(object sender, DragEventArgs e)
+    private async void DropGestureRecognizer_OnDragOver(object sender, DragEventArgs e)
     {
         if (e.PlatformArgs is null) { return; }
 
-        if (e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
+        if (!e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
         {
-            var deferral = e.PlatformArgs.DragEventArgs.GetDeferral();
-            var extensions = new List<string> { ".evtx" };
-            var isAllowed = false;
-            var items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
-
-            foreach (var item in items)
-            {
-                if (item is not StorageFile file || !extensions.Contains(file.FileType))
-                {
-                    continue;
-                }
-
-                isAllowed = true;
-
-                break;
-            }
-
-            e.PlatformArgs.DragEventArgs.AcceptedOperation = isAllowed ?
-                DataPackageOperation.Copy :
-                DataPackageOperation.None;
-
-            deferral.Complete();
+            e.PlatformArgs.DragEventArgs.AcceptedOperation = DataPackageOperation.None;
         }
 
-        e.PlatformArgs.DragEventArgs.AcceptedOperation = DataPackageOperation.None;
+        DragOperationDeferral deferral = e.PlatformArgs.DragEventArgs.GetDeferral();
+        List<string> extensions = [".evtx"];
+        bool isAllowed = false;
+        IReadOnlyList<IStorageItem> items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
+
+        foreach (var item in items)
+        {
+            if (item is not StorageFile file || !extensions.Contains(file.FileType))
+            {
+                continue;
+            }
+
+            isAllowed = true;
+
+            break;
+        }
+
+        e.PlatformArgs.DragEventArgs.AcceptedOperation = isAllowed ?
+            DataPackageOperation.Copy :
+            DataPackageOperation.None;
+
+        deferral.Complete();
     }
 
-    private async void OnDrop(object sender, DropEventArgs e)
+    private async void DropGestureRecognizer_OnDrop(object sender, DropEventArgs e)
     {
         if (e.PlatformArgs is null || !e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
         {
             return;
         }
 
-        var items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
+        IReadOnlyList<IStorageItem> items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
 
         foreach (var item in items)
         {
@@ -278,6 +282,38 @@ public sealed partial class MainPage : ContentPage, IDisposable
             await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
         }
     }
+
+    private async void EnableXmlFiltering_Clicked(object? sender, EventArgs e)
+    {
+        if (_filterPaneIsXmlEnabledState.Value || _activeLogsState.Value.IsEmpty)
+        {
+            _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsXmlEnabled());
+
+            return;
+        }
+
+        var shouldReload = await _dialogService.ShowAlert("Reload Open Logs Now?",
+            "In order for these changes to take effect, all currently open logs must be reloaded. Would you like to reload all open logs now?",
+            "Yes", "No");
+
+        if (shouldReload is false) { return; }
+
+        var logsToReopen = _activeLogsState.Value;
+
+        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsXmlEnabled());
+
+        foreach ((_, EventLogData data) in logsToReopen)
+        {
+            _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(data.Name, data.Type));
+        }
+    }
+
+    private void Exit_Clicked(object sender, EventArgs e) =>
+        Application.Current?.CloseWindow(Application.Current.Windows[0].Page!.Window!);
+
+    private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
 
     // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)

@@ -7,7 +7,7 @@ using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Models;
 
-public readonly record struct EventLogData(
+public sealed record EventLogData(
     string Name,
     PathType Type,
     ReadOnlyCollection<DisplayEventModel> Events)

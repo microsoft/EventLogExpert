@@ -36,13 +36,12 @@ public sealed partial class FilterCacheModal
     private void AddFilter(string filter)
     {
         Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    Comparison = new FilterComparison { Value = filter },
-                    FilterType = FilterType.Cached,
-                    IsEnabled = true
-                }));
+            new FilterPaneAction.AddFilter(new FilterModel
+            {
+                Comparison = new FilterComparison { Value = filter },
+                FilterType = FilterType.Cached,
+                IsEnabled = true
+            }));
 
         Close().AndForget();
     }

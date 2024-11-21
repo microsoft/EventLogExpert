@@ -5,8 +5,10 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -19,12 +21,14 @@ namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed class EventLogEffects(
     IState<EventLogState> eventLogState,
+    IFilterService filterService,
     ITraceLogger logger,
     ILogWatcherService logWatcherService,
     IEventResolverCache resolverCache,
     IServiceScopeFactory serviceScopeFactory)
 {
     private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
     private readonly IEventResolverCache _resolverCache = resolverCache;
@@ -46,7 +50,7 @@ public sealed class EventLogEffects(
         {
             var activeLogs = DistributeEventsToManyLogs(_eventLogState.Value.ActiveLogs, newEvent);
 
-            var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, _eventLogState.Value.AppliedFilter);
+            var filteredActiveLogs = _filterService.FilterActiveLogs(activeLogs.Values, _eventLogState.Value.AppliedFilter);
 
             dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
             dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
@@ -88,7 +92,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleLoadEvents(EventLogAction.LoadEvents action, IDispatcher dispatcher)
     {
-        var filteredEvents = FilterMethods.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
+        var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
 
@@ -124,6 +128,8 @@ public sealed class EventLogEffects(
             return;
         }
 
+        var filterState = serviceScope.ServiceProvider.GetService<IState<FilterPaneState>>();
+
         var activityId = Guid.NewGuid();
         string? lastEvent;
 
@@ -137,7 +143,7 @@ public sealed class EventLogEffects(
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1));
 
-        using var reader = new EventLogReader(action.LogName, action.PathType);
+        using var reader = new EventLogReader(action.LogName, action.PathType, filterState?.Value.IsXmlEnabled ?? false);
 
         try
         {
@@ -207,7 +213,7 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
+        var filteredActiveLogs = _filterService.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
 
@@ -247,11 +253,11 @@ public sealed class EventLogEffects(
         return newLogs;
     }
 
-    private static void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)
+    private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)
     {
         var activeLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer);
 
-        var filteredActiveLogs = FilterMethods.FilterActiveLogs(activeLogs.Values, state.AppliedFilter);
+        var filteredActiveLogs = _filterService.FilterActiveLogs(activeLogs.Values, state.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));

@@ -22,12 +22,8 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
             ? Registry.LocalMachine
             : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, ComputerName);
 
-        var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog");
-
-        if (eventLogKey == null)
-        {
+        var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
             throw new OpenEventLogRegistryKeyFailedException(ComputerName ?? string.Empty);
-        }
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
@@ -47,8 +43,6 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
             _logger?.Trace($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
 
-            var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
-
             // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
             // and trying to load that causes an access violation.
             var supportedExtensions = new[] { ".dll", ".exe" };
@@ -60,7 +54,7 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
             IEnumerable<string> files;
 
-            if (categoryMessageFilePath != null)
+            if (providerSubKey.GetValue("CategoryMessageFile") is string categoryMessageFilePath)
             {
                 var fileList = new List<string> { categoryMessageFilePath };
                 fileList.AddRange(messageFiles.Where(f => f != categoryMessageFilePath));
@@ -79,7 +73,8 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
         }
 
         hklm.Close();
-        return new List<string>();
+
+        return [];
     }
 
     public string? GetSystemRoot()
@@ -107,13 +102,9 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
         // For remote computer, get SystemRoot from the registry
         // TODO: Support variables other than SystemRoot?
-        var systemRoot = GetSystemRoot();
-
-        if (systemRoot == null)
-        {
+        var systemRoot = GetSystemRoot() ??
             throw new ExpandFilePathsFailedException(
                 $"Could not get SystemRoot from remote registry: {ComputerName}");
-        }
 
         paths = paths.Select(p =>
         {
