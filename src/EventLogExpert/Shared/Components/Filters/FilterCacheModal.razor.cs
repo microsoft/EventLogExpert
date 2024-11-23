@@ -36,12 +36,13 @@ public sealed partial class FilterCacheModal
     private void AddFilter(string filter)
     {
         Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(new FilterModel
-            {
-                Comparison = new FilterComparison { Value = filter },
-                FilterType = FilterType.Cached,
-                IsEnabled = true
-            }));
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    Comparison = new FilterComparison { Value = filter },
+                    FilterType = FilterType.Cached,
+                    IsEnabled = true
+                }));
 
         Close().AndForget();
     }
@@ -50,10 +51,11 @@ public sealed partial class FilterCacheModal
     {
         FileSavePicker picker = new()
         {
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "Saved Filters"
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = "Saved Filters"
         };
 
-        picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
+        picker.FileTypeChoices.Add("JSON", [".json"]);
 
         if (Application.Current?.Windows[0].Handler?.PlatformView is not MauiWinUIWindow window)
         {

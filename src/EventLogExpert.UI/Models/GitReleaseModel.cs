@@ -49,9 +49,9 @@ public readonly partial record struct GitReleaseModel
     private static partial Regex SplitChangeLog();
 }
 
-public readonly record struct GitReleaseAsset()
+public readonly record struct GitReleaseAsset
 {
-    [JsonPropertyName("name")] public string Name { get; init; } = null!;
+    [JsonPropertyName("name")] public required string Name { get; init; }
 
-    [JsonPropertyName("browser_download_url")] public string Uri { get; init; }
+    [JsonPropertyName("browser_download_url")] public required string Uri { get; init; }
 }

@@ -132,13 +132,14 @@ public sealed class EventLogEffects(
 
         var activityId = Guid.NewGuid();
         string? lastEvent;
+        int failed = 0;
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
         ConcurrentQueue<DisplayEventModel> events = new();
 
         await using Timer timer = new(
-            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count)); },
+            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count, failed)); },
             null,
             TimeSpan.Zero,
             TimeSpan.FromSeconds(1));
@@ -162,13 +163,19 @@ public sealed class EventLogEffects(
                         {
                             try
                             {
-                                if (!@event.IsSuccess) { continue; }
+                                if (!@event.IsSuccess) {
+                                    Interlocked.Increment(ref failed);
+
+                                    _logger.Trace($"{@event.PathName}: Bad Event: {@event.Error}", LogLevel.Error);
+
+                                    continue;
+                                }
 
                                 events.Enqueue(eventResolver.ResolveEvent(@event));
                             }
                             catch (Exception ex)
                             {
-                                _logger?.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
+                                _logger.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
                                     LogLevel.Error);
                             }
                         }
@@ -189,7 +196,7 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.ToList().AsReadOnly()));
 
-        dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0));
+        dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
         if (action.PathType == PathType.LogName)
         {

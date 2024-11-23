@@ -15,7 +15,7 @@ public sealed record StatusBarAction
     ///     Application will be common and many file names will be the same.
     /// </param>
     /// <param name="Count"></param>
-    public sealed record SetEventsLoading(Guid ActivityId, int Count);
+    public sealed record SetEventsLoading(Guid ActivityId, int Count, int FailedCount);
 
     public sealed record SetResolverStatus(string ResolverStatus);
 }

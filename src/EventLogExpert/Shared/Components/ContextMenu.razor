@@ -13,7 +13,7 @@
         <ul>
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                @if (item is FilterCategory.Description) { continue; }
+                @if (item is FilterCategory.Description or FilterCategory.Xml) { continue; }
 
                 <li @onclick="() => FilterEvent(item)">@item.ToFullString()</li>
             }
@@ -25,7 +25,7 @@
         <ul>
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                @if (item is FilterCategory.Description) { continue; }
+                @if (item is FilterCategory.Description or FilterCategory.Xml) { continue; }
 
                 <li @onclick="() => FilterEvent(item, true)">@item.ToFullString()</li>
             }

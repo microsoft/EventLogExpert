@@ -7,6 +7,8 @@
         <ValueSelect CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
+                if (item == FilterCategory.Xml && !FilterService.IsXmlEnabled) { continue; }
+
                 <ValueSelectItem T="FilterCategory" Value="item" />
             }
         </ValueSelect>
