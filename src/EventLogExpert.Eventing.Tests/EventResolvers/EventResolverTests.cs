@@ -143,13 +143,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
 
         var resolvers = new List<IEventResolver>
         {
-            new VersatileEventResolver(),
-            /* new EventProviderDatabaseEventResolver(
-                s => {
-                    _outputHelper.WriteLine(s);
-                    Debug.WriteLine(s);
-                    Debug.Flush();
-                }) */
+            new VersatileEventResolver()
         };
 
         HashSet<string> uniqueDescriptions = [];

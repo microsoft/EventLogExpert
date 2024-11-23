@@ -29,7 +29,7 @@ public sealed class StatusBarReducers
     {
         return state with
         {
-            EventsLoading = CommonLoadingReducer(state.EventsLoading, action.ActivityId, action.Count)
+            EventsLoading = CommonLoadingReducer(state.EventsLoading, action.ActivityId, action.Count, action.FailedCount)
         };
     }
 
@@ -38,16 +38,17 @@ public sealed class StatusBarReducers
         ReduceSetResolverStatus(StatusBarState state, StatusBarAction.SetResolverStatus action) =>
         new() { ResolverStatus = action.ResolverStatus };
 
-    private static ImmutableDictionary<Guid, int> CommonLoadingReducer(
-        ImmutableDictionary<Guid, int> loadingEntries,
+    private static ImmutableDictionary<Guid, (int, int)> CommonLoadingReducer(
+        ImmutableDictionary<Guid, (int, int)> loadingEntries,
         Guid activityId,
-        int count)
+        int count,
+        int failedCount)
     {
         if (loadingEntries.ContainsKey(activityId))
         {
             loadingEntries = loadingEntries.Remove(activityId);
         }
 
-        return count == 0 ? loadingEntries : loadingEntries.Add(activityId, count);
+        return count == 0 ? loadingEntries : loadingEntries.Add(activityId, (count, failedCount));
     }
 }

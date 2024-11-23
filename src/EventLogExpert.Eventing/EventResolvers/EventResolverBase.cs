@@ -77,6 +77,68 @@ public partial class EventResolverBase
             Xml = eventRecord.Xml ?? string.Empty
         };
 
+    private static ReadOnlySpan<char> CleanupFormatting(string unformattedString)
+    {
+        Span<char> buffer = stackalloc char[unformattedString.Length * 2];
+        int bufferIndex = 0;
+
+        for (int i = 0; i < unformattedString.Length; i++)
+        {
+            switch (unformattedString[i])
+            {
+                case '%' when i + 1 < unformattedString.Length:
+                    switch (unformattedString[i + 1])
+                    {
+                        case 'n':
+                            if (unformattedString[i + 2] != '\r')
+                            {
+                                buffer[bufferIndex++] = '\r';
+                                buffer[bufferIndex++] = '\n';
+                            }
+
+                            i++;
+
+                            break;
+                        case 't':
+                            buffer[bufferIndex++] = '\t';
+                            i++;
+
+                            break;
+                        default:
+                            buffer[bufferIndex++] = unformattedString[i];
+
+                            break;
+                    }
+
+                    break;
+                case '\r' when i + 1 < unformattedString.Length && unformattedString[i + 1] != '\n':
+                    buffer[bufferIndex++] = '\r';
+                    buffer[bufferIndex++] = '\n';
+
+                    break;
+                case '\0':
+                case '\r' when i + 1 >= unformattedString.Length:
+                case '\r' when i + 3 >= unformattedString.Length && unformattedString[i + 1] == '\n':
+                case '\r' when i + 5 >= unformattedString.Length && unformattedString[i + 2] == '\r':
+                    i++;
+
+                    break;
+                case '\r' when i + 3 < unformattedString.Length && unformattedString[i + 2] == '%' && unformattedString[i + 3] == 'n':
+                    buffer[bufferIndex++] = '\r';
+                    buffer[bufferIndex++] = '\n';
+                    i += 3;
+
+                    break;
+                default:
+                    buffer[bufferIndex++] = unformattedString[i];
+
+                    break;
+            }
+        }
+
+        return new ReadOnlySpan<char>(buffer[..bufferIndex].ToArray());
+    }
+
     private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)
     {
         string[]? dataNodes = null;
@@ -164,6 +226,14 @@ public partial class EventResolverBase
             .FirstOrDefault(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version);
     }
 
+    private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
+    {
+        char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
+        source.CopyTo(newBuffer);
+        ArrayPool<char>.Shared.Return(buffer);
+        source = buffer = newBuffer;
+    }
+
     [GeneratedRegex("%+[0-9]+")]
     private static partial Regex WildcardWithNumberRegex();
 
@@ -186,17 +256,14 @@ public partial class EventResolverBase
             return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
 
+        ReadOnlySpan<char> description = CleanupFormatting(descriptionTemplate);
+
         if (properties.Count <= 0)
         {
-            returnDescription = descriptionTemplate.TrimEnd('\0', '\r', '\n');
+            returnDescription = description.ToString();
 
             return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
-
-        ReadOnlySpan<char> description = descriptionTemplate
-            .Replace("\r\n%n", " \r\n")
-            .Replace("%n\r\n", "\r\n ")
-            .Replace("%n", "\r\n");
 
         char[] buffer = ArrayPool<char>.Shared.Rent(description.Length * 2);
 
@@ -212,10 +279,7 @@ public partial class EventResolverBase
 
                 if (currentLength + sectionToAdd.Length > updatedDescription.Length)
                 {
-                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + sectionToAdd.Length);
-                    updatedDescription.CopyTo(newBuffer);
-                    ArrayPool<char>.Shared.Return(buffer);
-                    updatedDescription = buffer = newBuffer;
+                    ResizeBuffer(ref buffer, ref updatedDescription, sectionToAdd.Length);
                 }
 
                 sectionToAdd.CopyTo(updatedDescription[currentLength..]);
@@ -257,10 +321,7 @@ public partial class EventResolverBase
 
                 if (currentLength + propString.Length > updatedDescription.Length)
                 {
-                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + propString.Length);
-                    updatedDescription.CopyTo(newBuffer);
-                    ArrayPool<char>.Shared.Return(buffer);
-                    updatedDescription = buffer = newBuffer;
+                    ResizeBuffer(ref buffer, ref updatedDescription, propString.Length);
                 }
 
                 propString.CopyTo(updatedDescription[currentLength..]);
@@ -270,28 +331,25 @@ public partial class EventResolverBase
 
             if (lastIndex < description.Length)
             {
-                ReadOnlySpan<char> sectionToAdd = description[lastIndex..].TrimEnd(['\0', '\r', '\n']);
+                ReadOnlySpan<char> sectionToAdd = description[lastIndex..];
 
                 if (currentLength + sectionToAdd.Length > updatedDescription.Length)
                 {
-                    char[] newBuffer = ArrayPool<char>.Shared.Rent(updatedDescription.Length + sectionToAdd.Length);
-                    updatedDescription.CopyTo(newBuffer);
-                    ArrayPool<char>.Shared.Return(buffer);
-                    updatedDescription = buffer = newBuffer;
+                    ResizeBuffer(ref buffer, ref updatedDescription, sectionToAdd.Length);
                 }
 
                 sectionToAdd.CopyTo(updatedDescription[currentLength..]);
                 currentLength += sectionToAdd.Length;
             }
 
-            returnDescription = new string(updatedDescription[.. currentLength]);
+            returnDescription = new string(updatedDescription[..currentLength]);
 
             return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
         catch (InvalidOperationException)
         {
             // If the regex fails to match, then we just return the original description.
-            returnDescription = descriptionTemplate.TrimEnd('\0', '\r', '\n');
+            returnDescription = description.ToString();
 
             return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }

@@ -13,7 +13,12 @@
 <div class="status-bar">
     @foreach (var loadingProgress in StatusBarState.Value.EventsLoading)
     {
-        <span>Loading: @loadingProgress.Value</span>
+        <span>Loading: @loadingProgress.Value.Item1</span>
+
+        @if (loadingProgress.Value.Item2 > 0)
+        {
+            <span>Failed: @loadingProgress.Value.Item2</span>
+        }
     }
 
     <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>

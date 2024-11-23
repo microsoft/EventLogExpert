@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
@@ -22,44 +23,33 @@ public sealed partial class SubFilterRow
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
+    [Inject] private IFilterService FilterService { get; init; } = null!;
+
     private List<string> FilteredItems => Items
         .Where(x => x.Contains(Value.Data.Value?.ToLower() ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
 
-    private List<string> Items
-    {
-        get
+    private List<string> Items =>
+        Value.Data.Category switch
         {
-            switch (Value.Data.Category)
-            {
-                case FilterCategory.Id:
-                    return EventLogState.Value.ActiveLogs.Values
-                        .SelectMany(log => log.GetCategoryValues(FilterCategory.Id))
-                        .Distinct().Order().ToList();
-                case FilterCategory.ActivityId:
-                    return EventLogState.Value.ActiveLogs.Values
-                        .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
-                        .Distinct().Order().ToList();
-                case FilterCategory.Level:
-                    return Enum.GetNames<SeverityLevel>().ToList();
-                case FilterCategory.KeywordsDisplayNames:
-                    return EventLogState.Value.ActiveLogs.Values
-                        .SelectMany(log => log.GetCategoryValues(FilterCategory.KeywordsDisplayNames))
-                        .Distinct().Order().ToList();
-                case FilterCategory.Source:
-                    return EventLogState.Value.ActiveLogs.Values
-                        .SelectMany(log => log.GetCategoryValues(FilterCategory.Source))
-                        .Distinct().Order().ToList();
-                case FilterCategory.TaskCategory:
-                    return EventLogState.Value.ActiveLogs.Values
-                        .SelectMany(log => log.GetCategoryValues(FilterCategory.TaskCategory))
-                        .Distinct().Order().ToList();
-                case FilterCategory.Description:
-                default:
-                    return [];
-            }
-        }
-    }
+            FilterCategory.Id => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.Id))
+                .Distinct().Order()],
+            FilterCategory.ActivityId => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
+                .Distinct().Order()],
+            FilterCategory.Level => [.. Enum.GetNames<SeverityLevel>()],
+            FilterCategory.KeywordsDisplayNames => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.KeywordsDisplayNames))
+                .Distinct().Order()],
+            FilterCategory.Source => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.Source))
+                .Distinct().Order()],
+            FilterCategory.TaskCategory => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.TaskCategory))
+                .Distinct().Order()],
+            _ => []
+        };
 
     private void RemoveSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveSubFilter(ParentId, Value.Id));
 }

@@ -326,7 +326,7 @@ internal static partial class EventMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static partial bool EvtGetObjectArrayProperty(
         EvtHandle objectArray,
-        int propertyId,
+        EvtPublisherMetadataPropertyId propertyId,
         int arrayIndex,
         int flags,
         int propertyValueBufferSize,
@@ -576,36 +576,46 @@ internal static partial class EventMethods
         int index,
         EvtPublisherMetadataPropertyId propertyId)
     {
-        IntPtr buffer = IntPtr.Zero;
+        bool success = EvtGetObjectArrayProperty(array, propertyId, index, 0, 0, IntPtr.Zero, out int bufferUsed);
+        int error = Marshal.GetLastWin32Error();
 
-        try
+        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
         {
-            bool success = EvtGetObjectArrayProperty(array, (int)propertyId, index, 0, 0, IntPtr.Zero, out int bufferSize);
-            int error = Marshal.GetLastWin32Error();
-
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
-            {
-                ThrowEventLogException(error);
-            }
-
-            buffer = Marshal.AllocHGlobal(bufferSize);
-
-            success = EvtGetObjectArrayProperty(array, (int)propertyId, index, 0, bufferSize, buffer, out bufferSize);
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                ThrowEventLogException(error);
-            }
-
-            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
-
-            return ConvertVariant(variant) ??
-                throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
+            ThrowEventLogException(error);
         }
-        finally
+
+        Span<char> buffer = stackalloc char[bufferUsed];
+
+        unsafe
         {
-            Marshal.FreeHGlobal(buffer);
+            fixed (char* bufferPtr = buffer)
+            {
+                success = EvtGetObjectArrayProperty(array,
+                    propertyId,
+                    index,
+                    0,
+                    bufferUsed,
+                    (IntPtr)bufferPtr,
+                    out bufferUsed);
+            }
+        }
+
+        error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            ThrowEventLogException(error);
+        }
+
+        unsafe
+        {
+            fixed (char* bufferPtr = buffer)
+            {
+                var variant = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr);
+
+                return ConvertVariant(variant) ??
+                    throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
+            }
         }
     }
 
@@ -624,109 +634,115 @@ internal static partial class EventMethods
 
     internal static EventRecord RenderEvent(EvtHandle eventHandle)
     {
-        IntPtr buffer = IntPtr.Zero;
+        bool success = EvtRender(
+            EventLogSession.GlobalSession.SystemRenderContext,
+            eventHandle,
+            EvtRenderFlags.EventValues,
+            0,
+            IntPtr.Zero,
+            out int bufferUsed,
+            out int propertyCount);
 
-        try
+        int error = Marshal.GetLastWin32Error();
+
+        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
         {
-            bool success = EvtRender(
-                EventLogSession.GlobalSession.SystemRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                0,
-                buffer,
-                out int bufferUsed,
-                out int propertyCount);
-
-            int error = Marshal.GetLastWin32Error();
-
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
-            {
-                ThrowEventLogException(error);
-            }
-
-            buffer = Marshal.AllocHGlobal(bufferUsed);
-
-            success = EvtRender(
-                EventLogSession.GlobalSession.SystemRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                bufferUsed,
-                buffer,
-                out bufferUsed,
-                out propertyCount);
-
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                ThrowEventLogException(error);
-            }
-
-            return GetEventRecord(buffer, propertyCount);
+            ThrowEventLogException(error);
         }
-        finally
+
+        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
+
+        unsafe
         {
-            Marshal.FreeHGlobal(buffer);
+            fixed (char* bufferPtr = buffer)
+            {
+                success = EvtRender(
+                    EventLogSession.GlobalSession.SystemRenderContext,
+                    eventHandle,
+                    EvtRenderFlags.EventValues,
+                    bufferUsed,
+                    (IntPtr)bufferPtr,
+                    out bufferUsed,
+                    out propertyCount);
+            }
+        }
+
+        error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            ThrowEventLogException(error);
+        }
+
+        unsafe
+        {
+            fixed (char* bufferPtr = buffer)
+            {
+                return GetEventRecord((IntPtr)bufferPtr, propertyCount);
+            }
         }
     }
 
     internal static IList<object> RenderEventProperties(EvtHandle eventHandle)
     {
-        IntPtr buffer = IntPtr.Zero;
+        bool success = EvtRender(
+            EventLogSession.GlobalSession.UserRenderContext,
+            eventHandle,
+            EvtRenderFlags.EventValues,
+            0,
+            IntPtr.Zero,
+            out int bufferUsed,
+            out int propertyCount);
 
-        try
+        int error = Marshal.GetLastWin32Error();
+
+        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
         {
-            bool success = EvtRender(
-                EventLogSession.GlobalSession.UserRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                0,
-                buffer,
-                out int bufferUsed,
-                out int propertyCount);
-
-            int error = Marshal.GetLastWin32Error();
-
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
-            {
-                ThrowEventLogException(error);
-            }
-
-            buffer = Marshal.AllocHGlobal(bufferUsed);
-
-            success = EvtRender(
-                EventLogSession.GlobalSession.UserRenderContext,
-                eventHandle,
-                EvtRenderFlags.EventValues,
-                bufferUsed,
-                buffer,
-                out bufferUsed,
-                out propertyCount);
-
-            error = Marshal.GetLastWin32Error();
-
-            if (!success)
-            {
-                ThrowEventLogException(error);
-            }
-
-            List<object> properties = [];
-
-            if (propertyCount <= 0) { return properties; }
-
-            for (int i = 0; i < propertyCount; i++)
-            {
-                var property = Marshal.PtrToStructure<EvtVariant>(buffer + (i * Marshal.SizeOf<EvtVariant>()));
-
-                properties.Add(ConvertVariant(property) ?? throw new InvalidDataException());
-            }
-
-            return properties.AsReadOnly();
+            ThrowEventLogException(error);
         }
-        finally
+
+        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
+
+        unsafe
         {
-            Marshal.FreeHGlobal(buffer);   
+            fixed (char* bufferPtr = buffer)
+            {
+                success = EvtRender(
+                    EventLogSession.GlobalSession.UserRenderContext,
+                    eventHandle,
+                    EvtRenderFlags.EventValues,
+                    bufferUsed,
+                    (IntPtr)bufferPtr,
+                    out bufferUsed,
+                    out propertyCount);
+            }
         }
+
+        error = Marshal.GetLastWin32Error();
+
+        if (!success)
+        {
+            ThrowEventLogException(error);
+        }
+
+        List<object> properties = [];
+
+        if (propertyCount <= 0) { return properties; }
+
+        for (int i = 0; i < propertyCount; i++)
+        {
+            unsafe
+            {
+                fixed (char* bufferPtr = buffer)
+                {
+                    var property = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr + (i * Marshal.SizeOf<EvtVariant>()));
+
+                    properties.Add(ConvertVariant(property) ?? throw new InvalidDataException());
+                }
+            }
+        }
+
+        return properties.AsReadOnly();
     }
 
     internal static string? RenderEventXml(EvtHandle eventHandle)

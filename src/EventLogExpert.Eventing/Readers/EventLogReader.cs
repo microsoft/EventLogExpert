@@ -7,7 +7,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogReader(string path, PathType pathType, bool isXmlEnabled = false) : IDisposable
+public sealed partial class EventLogReader(string path, PathType pathType, bool renderXml = false) : IDisposable
 {
     private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =
@@ -34,16 +34,16 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
         var buffer = new IntPtr[batchSize];
         int count = 0;
 
+        bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
+
+        if (!success)
+        {
+            events = [];
+            return false;
+        }
+
         using (_eventLock.EnterScope())
         {
-            bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
-
-            if (!success)
-            {
-                events = [];
-                return false;
-            }
-
             LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
         }
 
@@ -58,7 +58,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
                 events[i] = EventMethods.RenderEvent(eventHandle);
                 events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
 
-                if (isXmlEnabled)
+                if (renderXml)
                 {
                     events[i].Xml = EventMethods.RenderEventXml(eventHandle);
                 }
@@ -111,7 +111,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
             EventMethods.ThrowEventLogException(error);
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed];
+        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
 
         unsafe
         {
@@ -135,7 +135,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
             EventMethods.ThrowEventLogException(error);
         }
 
-        return bufferUsed - 1 <= 0 ? null : new string(buffer[..((bufferUsed - 1) / sizeof(char))]);
+        return bufferUsed - 1 <= 0 ? null : new string(buffer[..^1]);
     }
 
     private void Dispose(bool disposing)
