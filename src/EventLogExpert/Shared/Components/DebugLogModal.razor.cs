@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.Settings;
 using Microsoft.AspNetCore.Components;
 
@@ -11,7 +11,7 @@ public partial class DebugLogModal
 {
     private readonly List<string> _data = [];
 
-    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
+    [Inject] private IFileLogger TraceLogger { get; set; } = null!;
 
     protected internal override async Task Open()
     {
