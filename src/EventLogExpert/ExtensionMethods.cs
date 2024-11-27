@@ -30,6 +30,9 @@ internal static class ExtensionMethods
     internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
         destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
 
+    internal static DateTime ConvertTimeZoneToUtc(this DateTime time, TimeZoneInfo? destinationTime) =>
+        destinationTime is null ? time : TimeZoneInfo.ConvertTimeToUtc(time, destinationTime);
+
     internal static string GetEventKeywords(this IEnumerable<string> keywords)
     {
         StringBuilder sb = new("Keywords:");
