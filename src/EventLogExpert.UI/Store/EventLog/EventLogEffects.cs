@@ -194,7 +194,10 @@ public sealed class EventLogEffects(
             return;
         }
 
-        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.ToList().AsReadOnly()));
+        dispatcher.Dispatch(
+            new EventLogAction.LoadEvents(
+                logData,
+                events.OrderByDescending(e => e.RecordId).ToList().AsReadOnly()));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
