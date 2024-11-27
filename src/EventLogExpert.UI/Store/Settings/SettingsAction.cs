@@ -15,6 +15,8 @@ public sealed record SettingsAction
 
     public sealed record LoadSettingsCompleted(SettingsModel Config, IList<string> DisabledDatabases);
 
+    public sealed record OpenDebugLog;
+
     public sealed record OpenMenu;
 
     public sealed record Save(SettingsModel Settings);

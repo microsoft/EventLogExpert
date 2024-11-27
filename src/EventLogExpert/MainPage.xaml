@@ -66,6 +66,7 @@
             <MenuFlyoutItem Text="Submit an Issue" Clicked="SubmitAnIssue_Clicked" />
             <MenuFlyoutItem Text="Check for Updates" Clicked="CheckForUpdates_Clicked" />
             <MenuFlyoutItem Text="Release Notes" Clicked="ReleaseNotes_Clicked" />
+            <MenuFlyoutItem Text="View Logs" Clicked="ViewLogs_Clicked" />
         </MenuBarItem>
     </ContentPage.MenuBarItems>
 
