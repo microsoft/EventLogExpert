@@ -1,0 +1,28 @@
+@inherits Base.BaseModal
+
+<dialog id="debugLogDialog" @ref="ElementReference">
+    <div class="dialog-group">
+        <div class="flex-column-scroll">
+            @if (_data.Any())
+            {
+                @foreach(var line in _data)
+                {
+                    <text>@line</text><br />
+                }
+            }
+            else
+            {
+                <text>Log is Empty...</text>
+            }
+        </div>
+
+        <div class="footer-group">
+            <div>
+                <button class="button" @onclick="Refresh">Refresh</button>
+                <button class="button" @onclick="Clear">Clear</button>
+            </div>
+
+            <button class="button" @onclick="Close">Exit</button>
+        </div>
+    </div>
+</dialog>

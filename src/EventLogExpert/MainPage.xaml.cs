@@ -469,6 +469,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private void ViewFilterGroups_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterGroupAction.OpenMenu());
 
+    private void ViewLogs_Clicked(object? sender, EventArgs e) =>
+        _fluxorDispatcher.Dispatch(new SettingsAction.OpenDebugLog());
+
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
 }
