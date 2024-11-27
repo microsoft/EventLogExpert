@@ -7,9 +7,5 @@ namespace EventLogExpert.Eventing.Helpers;
 
 public interface ITraceLogger
 {
-    Task ClearAsync();
-
-    IAsyncEnumerable<string> LoadAsync();
-
     void Trace(string message, LogLevel level = LogLevel.Information);
 }

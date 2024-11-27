@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Store.Settings;
 using Fluxor;
@@ -10,7 +11,7 @@ using System.Diagnostics;
 
 namespace EventLogExpert.UI.Services;
 
-public sealed class DebugLogService : ITraceLogger
+public sealed class DebugLogService : ITraceLogger, IFileLogger
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
     private static readonly ReaderWriterLockSlim s_loggingFileLock = new();
