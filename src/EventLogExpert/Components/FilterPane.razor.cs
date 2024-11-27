@@ -74,26 +74,29 @@ public sealed partial class FilterPane
     {
         _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
 
-        // Round up/down to the nearest hour
-        var hourTicks = TimeSpan.FromHours(1).Ticks;
+        long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
-        _model.Before = new DateTime(hourTicks * ((EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Count > 0)
-            .Select(log => log.Events.First().TimeCreated)
-            .OrderBy(t => t)
-            .DefaultIfEmpty(DateTime.UtcNow)
-            .Last()
-            .Ticks + hourTicks) / hourTicks))
-            .ConvertTimeZone(_model.TimeZoneInfo);
+        long oldestEventTicks =
+            (EventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
+                    .Order()
+                    .LastOrDefault() ??
+                DateTime.UtcNow)
+            .Ticks;
 
-        _model.After = new DateTime(hourTicks * (EventLogState.Value.ActiveLogs.Values
-            .Where(log => log.Events.Count > 0)
-            .Select(log => log.Events.Last().TimeCreated)
-            .OrderBy(t => t)
-            .DefaultIfEmpty(DateTime.UtcNow)
-            .First()
-            .Ticks / hourTicks))
-            .ConvertTimeZone(_model.TimeZoneInfo);
+        long mostRecentEventTicks =
+            (EventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
+                    .Order()
+                    .FirstOrDefault() ??
+                DateTime.UtcNow)
+            .Ticks;
+
+        // Round down to the nearest hour for the earliest event
+        _model.After = new DateTime(oldestEventTicks / ticksPerHour * ticksPerHour, DateTimeKind.Utc)
+            .ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo);
+
+        // Round up to the nearest hour for the latest event
+        _model.Before = new DateTime(((mostRecentEventTicks + ticksPerHour - 1) / ticksPerHour) * ticksPerHour, DateTimeKind.Utc)
+            .ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo);
 
         _isFilterListVisible = true;
         _canEditDate = true;
@@ -115,8 +118,8 @@ public sealed partial class FilterPane
     {
         FilterDateModel model = new()
         {
-            After = _model.After.ToUniversalTime(),
-            Before = _model.Before.ToUniversalTime()
+            After = _model.After.ConvertTimeZoneToUtc(SettingsState.Value.Config.TimeZoneInfo),
+            Before = _model.Before.ConvertTimeZoneToUtc(SettingsState.Value.Config.TimeZoneInfo)
         };
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(model));
