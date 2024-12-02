@@ -37,11 +37,11 @@ public class DbToolCommand
         Console.WriteLine(
             s_providerDetailFormat,
             details.ProviderName,
-            details.Events.Count,
-            details.Parameters.Count,
+            details.Events.Count(),
+            details.Parameters.Count(),
             details.Keywords.Count,
             details.Opcodes.Count,
             details.Tasks.Count,
-            details.Messages.Count);
+            details.Messages.Count());
     }
 }

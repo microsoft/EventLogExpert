@@ -13,7 +13,7 @@ public sealed class EventLogReducers
 {
     [ReducerMethod]
     public static EventLogState ReduceAddEventBuffered(EventLogState state, EventLogAction.AddEventBuffered action) =>
-        state with { NewEventBuffer = action.UpdatedBuffer, NewEventBufferIsFull = action.IsFull };
+        state with { NewEventBuffer = action.UpdatedBuffer.ToList().AsReadOnly(), NewEventBufferIsFull = action.IsFull };
 
     [ReducerMethod]
     public static EventLogState ReduceAddEventSuccess(EventLogState state, EventLogAction.AddEventSuccess action) =>
@@ -54,7 +54,7 @@ public sealed class EventLogReducers
         {
             ActiveLogs = newLogsCollection.Add(
                 action.LogData.Name,
-                action.LogData with { Events = action.Events })
+                action.LogData with { Events = action.Events.ToList().AsReadOnly() })
         };
     }
 
