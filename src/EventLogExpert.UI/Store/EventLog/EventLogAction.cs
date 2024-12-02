@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -13,7 +12,7 @@ public sealed record EventLogAction
 {
     public sealed record AddEvent(DisplayEventModel NewEvent);
 
-    public sealed record AddEventBuffered(ReadOnlyCollection<DisplayEventModel> UpdatedBuffer, bool IsFull);
+    public sealed record AddEventBuffered(IEnumerable<DisplayEventModel> UpdatedBuffer, bool IsFull);
 
     public sealed record AddEventSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
 
@@ -21,7 +20,7 @@ public sealed record EventLogAction
 
     public sealed record CloseLog(EventLogId LogId, string LogName);
 
-    public sealed record LoadEvents(EventLogData LogData, ReadOnlyCollection<DisplayEventModel> Events);
+    public sealed record LoadEvents(EventLogData LogData, IEnumerable<DisplayEventModel> Events);
 
     public sealed record LoadNewEvents;
 

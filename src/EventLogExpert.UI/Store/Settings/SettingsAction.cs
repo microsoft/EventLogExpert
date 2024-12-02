@@ -13,7 +13,7 @@ public sealed record SettingsAction
 
     public sealed record LoadSettings;
 
-    public sealed record LoadSettingsCompleted(SettingsModel Config, IList<string> DisabledDatabases);
+    public sealed record LoadSettingsCompleted(SettingsModel Config, IEnumerable<string> DisabledDatabases);
 
     public sealed record OpenDebugLog;
 
@@ -23,7 +23,7 @@ public sealed record SettingsAction
 
     public sealed record SaveCompleted(SettingsModel Settings);
 
-    public sealed record SaveDisabledDatabases(IList<string> Databases);
+    public sealed record SaveDisabledDatabases(IEnumerable<string> Databases);
 
-    public sealed record SaveDisabledDatabasesCompleted(IList<string> Databases);
+    public sealed record SaveDisabledDatabasesCompleted(IEnumerable<string> Databases);
 }

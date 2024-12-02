@@ -57,8 +57,8 @@ public sealed class EventLogEffects(
         }
         else
         {
-            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer).ToList().AsReadOnly();
-            var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
+            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer);
+            var full = updatedBuffer.Count() >= EventLogState.MaxNewEvents;
 
             dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
         }
@@ -197,7 +197,7 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(
             new EventLogAction.LoadEvents(
                 logData,
-                events.OrderByDescending(e => e.RecordId).ToList().AsReadOnly()));
+                events.OrderByDescending(e => e.RecordId)));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
@@ -233,12 +233,9 @@ public sealed class EventLogEffects(
     /// <summary>Adds new events to the currently opened log</summary>
     private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
     {
-        var newEvents = eventsToAdd
-            .Concat(logData.Events)
-            .ToList()
-            .AsReadOnly();
+        var newEvents = eventsToAdd.Concat(logData.Events);
 
-        var updatedLogData = logData with { Events = newEvents };
+        var updatedLogData = logData with { Events = newEvents.ToList().AsReadOnly() };
 
         return updatedLogData;
     }
@@ -248,13 +245,13 @@ public sealed class EventLogEffects(
         IEnumerable<DisplayEventModel> eventsToDistribute)
     {
         var newLogs = logsToUpdate;
-        var events = eventsToDistribute.ToList();
+        var events = eventsToDistribute;
 
         foreach (var log in logsToUpdate.Values)
         {
-            var newEventsForThisLog = events.Where(e => e.OwningLog == log.Name).ToList();
+            var newEventsForThisLog = events.Where(e => e.OwningLog == log.Name);
 
-            if (newEventsForThisLog.Count <= 0) { continue; }
+            if (newEventsForThisLog.Any()) { continue; }
 
             var newLogData = AddEventsToOneLog(log, newEventsForThisLog);
             newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);

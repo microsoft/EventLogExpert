@@ -52,7 +52,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
         var providerDetails = new ProviderDetails
         {
             Events = [],
-            Keywords = [],
+            Keywords = new Dictionary<long, string>(),
             Messages =
             [
                 new MessageModel
@@ -66,7 +66,7 @@ public sealed class EventResolverTests(ITestOutputHelper outputHelper)
                     Text = "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
                 }
             ],
-            Opcodes = [],
+            Opcodes = new Dictionary<int, string>(),
             ProviderName = "MSExchangeRepl",
             Tasks = new Dictionary<int, string>
             {

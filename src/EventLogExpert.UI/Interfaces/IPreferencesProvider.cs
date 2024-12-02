@@ -8,13 +8,13 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IPreferencesProvider
 {
-    IList<string> DisabledDatabasesPreference { get; set; }
+    IEnumerable<string> DisabledDatabasesPreference { get; set; }
 
     bool DisplayPaneSelectionPreference { get; set; }
 
-    IList<ColumnName> EnabledEventTableColumnsPreference { get; set; }
+    IEnumerable<ColumnName> EnabledEventTableColumnsPreference { get; set; }
 
-    IList<string> FavoriteFiltersPreference { get; set; }
+    IEnumerable<string> FavoriteFiltersPreference { get; set; }
 
     CopyType KeyboardCopyTypePreference { get; set; }
 
@@ -22,9 +22,9 @@ public interface IPreferencesProvider
 
     bool PreReleasePreference { get; set; }
 
-    IList<string> RecentFiltersPreference { get; set; }
+    IEnumerable<string> RecentFiltersPreference { get; set; }
 
-    IList<FilterGroupModel> SavedFiltersPreference { get; set; }
+    IEnumerable<FilterGroupModel> SavedFiltersPreference { get; set; }
 
     string TimeZonePreference { get; set; }
 }

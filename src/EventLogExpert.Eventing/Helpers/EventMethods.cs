@@ -194,7 +194,7 @@ internal static partial class EventMethods
             case (int)EvtVariantType.Null:
                 return null;
             case (int)EvtVariantType.String:
-                return Marshal.PtrToStringAuto(variant.StringVal);
+                return Marshal.PtrToStringUni(variant.StringVal);
             case (int)EvtVariantType.AnsiString:
                 return Marshal.PtrToStringAnsi(variant.AnsiString);
             case (int)EvtVariantType.SByte:

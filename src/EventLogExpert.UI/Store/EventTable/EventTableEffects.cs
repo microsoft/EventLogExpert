@@ -32,7 +32,7 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider)
         var columns = new Dictionary<ColumnName, bool>();
         var enabledColumns = _preferencesProvider.EnabledEventTableColumnsPreference;
 
-        foreach (ColumnName column in Enum.GetValues(typeof(ColumnName)))
+        foreach (ColumnName column in Enum.GetValues<ColumnName>())
         {
             columns.Add(column, enabledColumns.Contains(column));
         }
@@ -48,7 +48,7 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider)
         var columns = new Dictionary<ColumnName, bool>();
         var enabledColumns = _preferencesProvider.EnabledEventTableColumnsPreference;
 
-        foreach (ColumnName column in Enum.GetValues(typeof(ColumnName)))
+        foreach (ColumnName column in Enum.GetValues<ColumnName>())
         {
             columns.Add(column,
                 column.Equals(action.ColumnName) ?
@@ -56,7 +56,7 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider)
                     enabledColumns.Contains(column));
         }
 
-        _preferencesProvider.EnabledEventTableColumnsPreference = columns.Keys.Where(column => columns[column]).ToList();
+        _preferencesProvider.EnabledEventTableColumnsPreference = columns.Keys.Where(column => columns[column]);
 
         dispatcher.Dispatch(new EventTableAction.LoadColumnsCompleted(columns));
 
