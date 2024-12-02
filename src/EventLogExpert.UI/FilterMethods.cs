@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
+using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI;
 
@@ -81,11 +82,12 @@ public static class FilterMethods
         eventFilter.Filters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified</summary>
-    public static IEnumerable<DisplayEventModel> SortEvents(
+    public static ReadOnlyCollection<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,
         ColumnName? orderBy = null,
-        bool isDescending = false) =>
-        orderBy switch
+        bool isDescending = false)
+    {
+        var sortedEvents = orderBy switch
         {
             ColumnName.Level => isDescending ? events.OrderByDescending(e => e.Level) : events.OrderBy(e => e.Level),
             ColumnName.DateAndTime => isDescending ?
@@ -115,4 +117,7 @@ public static class FilterMethods
             ColumnName.User => isDescending ? events.OrderByDescending(e => e.UserId) : events.OrderBy(e => e.UserId),
             _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
         };
+
+        return sortedEvents.ToList().AsReadOnly();
+    }
 }

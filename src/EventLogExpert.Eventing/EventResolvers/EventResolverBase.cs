@@ -8,7 +8,6 @@ using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
@@ -77,7 +76,7 @@ public partial class EventResolverBase
             Xml = eventRecord.Xml ?? string.Empty
         };
 
-    private static ReadOnlySpan<char> CleanupFormatting(string unformattedString)
+    private static string CleanupFormatting(ReadOnlySpan<char> unformattedString)
     {
         Span<char> buffer = stackalloc char[unformattedString.Length * 2];
         int bufferIndex = 0;
@@ -136,24 +135,38 @@ public partial class EventResolverBase
             }
         }
 
-        return new ReadOnlySpan<char>(buffer[..bufferIndex].ToArray());
+        return new string(buffer[..bufferIndex]);
     }
 
-    private static List<string> GetFormattedProperties(string? template, IEnumerable<object> properties)
+    private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
     {
         string[]? dataNodes = null;
         List<string> providers = [];
 
-        if (!string.IsNullOrEmpty(template) && !s_formattedPropertiesCache.TryGetValue(template, out dataNodes))
-        {
-            dataNodes = XElement.Parse(template)
-                .Descendants()
-                .Attributes()
-                .Where(a => a.Name == "outType")
-                .Select(a => a.Value)
-                .ToArray();
+        var cache = s_formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
 
-            s_formattedPropertiesCache.TryAdd(template, dataNodes);
+        if (!template.IsEmpty && !cache.TryGetValue(template, out dataNodes))
+        {
+            List<string> temp = [];
+            ReadOnlySpan<char> outTypeAttribute = "outType=\"";
+
+            foreach (var line in template.EnumerateLines())
+            {
+                int templateIndex = line.IndexOf(outTypeAttribute, StringComparison.Ordinal);
+
+                if (templateIndex == -1) { continue; }
+
+                templateIndex += outTypeAttribute.Length;
+                int endIndex = line[templateIndex..].IndexOf('"');
+
+                if (endIndex != -1)
+                {
+                    temp.Add(new string(line.Slice(templateIndex, endIndex)));
+                }
+            }
+
+            dataNodes = [.. temp];
+            cache.TryAdd(template, dataNodes);
         }
 
         int index = 0;
@@ -240,10 +253,9 @@ public partial class EventResolverBase
     private string FormatDescription(
         List<string> properties,
         string? descriptionTemplate,
-        List<MessageModel> parameters)
+        IEnumerable<MessageModel> parameters)
     {
         string returnDescription;
-
         if (string.IsNullOrWhiteSpace(descriptionTemplate))
         {
             // If there is only one property then this is what certain EventRecords look like
@@ -297,7 +309,7 @@ public partial class EventResolverBase
                     propString = properties[propIndex - 1];
                 }
 
-                if (propString.StartsWith("%%") && parameters.Count > 0)
+                if (propString.StartsWith("%%") && parameters.Any())
                 {
                     int endParameterId = propString.IndexOf(' ');
                     var parameterIdString = endParameterId > 2 ? propString.Slice(2, endParameterId) : propString[2..];
