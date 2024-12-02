@@ -28,7 +28,7 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
         switch (action)
         {
             case EventLogAction.LoadEvents loadEventsAction:
-                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
+                _debugLogger.Trace($"Action: {action.GetType()} with {loadEventsAction.Events.Count()} events.");
                 break;
             case EventLogAction.AddEvent addEventsAction:
                 _debugLogger.Trace($"Action: {action.GetType()} with {addEventsAction.NewEvent.Source} event ID {addEventsAction.NewEvent.Id}.");

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
+using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.EventTable;
 
@@ -75,8 +76,6 @@ public sealed class EventTableReducers
                     IsCombined = true,
                     DisplayedEvents = GetCombinedEvents(updatedTables.Select(log => log.DisplayedEvents))
                         .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
-                        .ToList()
-                        .AsReadOnly()
                 };
 
                 return state with
@@ -153,8 +152,6 @@ public sealed class EventTableReducers
                                 .Where(table => !table.IsCombined)
                                 .Select(table => table.DisplayedEvents))
                         .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
-                        .ToList()
-                        .AsReadOnly()
                 })
         };
     }
@@ -180,8 +177,6 @@ public sealed class EventTableReducers
             updatedTables.Add(table with
             {
                 DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
-                    .ToList()
-                    .AsReadOnly()
             });
         }
 
@@ -197,14 +192,13 @@ public sealed class EventTableReducers
         {
             EventTables = state.EventTables.Remove(table).Add(table with
             {
-                DisplayedEvents = action.Events.SortEvents(state.OrderBy, state.IsDescending).ToList()
-                    .AsReadOnly(),
+                DisplayedEvents = action.Events.SortEvents(state.OrderBy, state.IsDescending),
                 IsLoading = false
             })
         };
     }
 
-    private static IEnumerable<DisplayEventModel> GetCombinedEvents(
+    private static ReadOnlyCollection<DisplayEventModel> GetCombinedEvents(
         IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
     {
         List<DisplayEventModel> combinedEvents = [];
@@ -214,7 +208,7 @@ public sealed class EventTableReducers
             combinedEvents.AddRange(eventList);
         }
 
-        return combinedEvents;
+        return combinedEvents.AsReadOnly();
     }
 
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)
@@ -226,8 +220,6 @@ public sealed class EventTableReducers
                 logData => logData with
                 {
                     DisplayedEvents = logData.DisplayedEvents.SortEvents(orderBy, isDescending)
-                        .ToList()
-                        .AsReadOnly()
                 }));
 
         return state with

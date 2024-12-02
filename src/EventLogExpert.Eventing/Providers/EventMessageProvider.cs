@@ -209,7 +209,7 @@ public sealed class EventMessageProvider
                     Task = e.Task,
                     Template = e.Template,
                     Version = e.Version
-                }).ToList();
+                }).ToArray();
         }
         catch (Exception ex)
         {
@@ -218,7 +218,7 @@ public sealed class EventMessageProvider
 
         try
         {
-            provider.Keywords = new Dictionary<long, string>(providerMetadata.Keywords);
+            provider.Keywords = providerMetadata.Keywords;
 
         }
         catch (Exception ex)
@@ -228,7 +228,7 @@ public sealed class EventMessageProvider
 
         try
         {
-            provider.Opcodes = new Dictionary<int, string>(providerMetadata.Opcodes);
+            provider.Opcodes = providerMetadata.Opcodes;
         }
         catch (Exception ex)
         {
@@ -237,14 +237,14 @@ public sealed class EventMessageProvider
 
         try
         {
-            provider.Tasks = new Dictionary<int, string>(providerMetadata.Tasks);
+            provider.Tasks = providerMetadata.Tasks;
         }
         catch (Exception ex)
         {
             _logger?.Trace($"Failed to load Tasks for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
-        _logger?.Trace($"Returning {provider.Events.Count} events for provider {_providerName}");
+        _logger?.Trace($"Returning {provider.Events.Count()} events for provider {_providerName}");
 
         return provider;
     }
