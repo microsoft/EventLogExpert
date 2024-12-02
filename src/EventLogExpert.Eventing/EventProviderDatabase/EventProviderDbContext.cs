@@ -44,27 +44,27 @@ public class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Messages)
-            .HasConversion<CompressedJsonValueConverter<List<MessageModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IEnumerable<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Parameters)
-            .HasConversion<CompressedJsonValueConverter<List<MessageModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IEnumerable<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Events)
-            .HasConversion<CompressedJsonValueConverter<List<EventModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IEnumerable<EventModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Keywords)
-            .HasConversion<CompressedJsonValueConverter<Dictionary<long, string>>>();
+            .HasConversion<CompressedJsonValueConverter<IDictionary<long, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Opcodes)
-            .HasConversion<CompressedJsonValueConverter<Dictionary<int, string>>>();
+            .HasConversion<CompressedJsonValueConverter<IDictionary<int, string>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Tasks)
-            .HasConversion<CompressedJsonValueConverter<Dictionary<int, string>>>();
+            .HasConversion<CompressedJsonValueConverter<IDictionary<int, string>>>();
     }
 
     public (bool needsV2Upgrade, bool needsV3Upgrade) IsUpgradeNeeded()
