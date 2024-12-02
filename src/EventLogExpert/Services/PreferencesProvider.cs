@@ -22,7 +22,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string SavedFilters = "saved-filters";
     private const string TimeZone = "timezone";
 
-    public IList<string> DisabledDatabasesPreference
+    public IEnumerable<string> DisabledDatabasesPreference
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(DisabledDatabases, "[]")) ?? [];
         set => Preferences.Default.Set(DisabledDatabases, JsonSerializer.Serialize(value));
@@ -34,17 +34,18 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(DisplaySelectionEnabled, value);
     }
 
-    public IList<ColumnName> EnabledEventTableColumnsPreference
+    public IEnumerable<ColumnName> EnabledEventTableColumnsPreference
     {
         get =>
             JsonSerializer.Deserialize<List<ColumnName>>(
-                Preferences.Default.Get(EnabledEventTableColumns,
+                Preferences.Default.Get(
+                    EnabledEventTableColumns,
                     $"[{ColumnName.Level:D}, {ColumnName.DateAndTime:D}, {ColumnName.Source:D}, {ColumnName.EventId:D}, {ColumnName.TaskCategory:D}]")) ??
             [];
         set => Preferences.Default.Set(EnabledEventTableColumns, JsonSerializer.Serialize(value));
     }
 
-    public IList<string> FavoriteFiltersPreference
+    public IEnumerable<string> FavoriteFiltersPreference
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(FavoriteFilters, "[]")) ?? [];
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
@@ -72,13 +73,13 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(PreReleaseEnabled, value);
     }
 
-    public IList<string> RecentFiltersPreference
+    public IEnumerable<string> RecentFiltersPreference
     {
         get => JsonSerializer.Deserialize<List<string>>(Preferences.Default.Get(RecentFilters, "[]")) ?? [];
         set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
     }
 
-    public IList<FilterGroupModel> SavedFiltersPreference
+    public IEnumerable<FilterGroupModel> SavedFiltersPreference
     {
         get => JsonSerializer.Deserialize<List<FilterGroupModel>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
         set => Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value));
