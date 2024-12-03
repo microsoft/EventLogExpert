@@ -28,8 +28,9 @@ public static class MauiProgram
 
         builder.Services.AddMauiBlazorWebView();
 
-        if (Environment.GetCommandLineArgs().Contains("/EnableConsole", StringComparer.OrdinalIgnoreCase) ||
-            Environment.Version.CompareTo(new Version("9.0.0")) == 0)
+#if RELEASE
+        if (Environment.GetCommandLineArgs().Contains("/EnableConsole", StringComparer.OrdinalIgnoreCase))
+#endif
         {
             builder.Services.AddBlazorWebViewDeveloperTools();
         }
