@@ -8,23 +8,47 @@ using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Services;
 
-public sealed class DebugLogService : ITraceLogger, IFileLogger
+public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
+
     private static readonly ReaderWriterLockSlim s_loggingFileLock = new();
 
     private readonly FileLocationOptions _fileLocationOptions;
-    private readonly IState<SettingsState> _settingsState;
+    private readonly Lock _firstChanceLock = new();
+    private readonly IStateSelection<SettingsState, LogLevel> _logLevelState;
 
-    public DebugLogService(FileLocationOptions fileLocationOptions, IState<SettingsState> settingsState)
+    private bool _firstChanceLoggingEnabled;
+
+    public DebugLogService(
+        FileLocationOptions fileLocationOptions,
+        IStateSelection<SettingsState, LogLevel> logLevelState)
     {
         _fileLocationOptions = fileLocationOptions;
-        _settingsState = settingsState;
+        _logLevelState = logLevelState;
+
+        _logLevelState.Select(state => state.Config.LogLevel);
+
+        // HACK: Constructor is called before SettingsState gets LogLevel from preferences
+        // Injecting preferences means we check the saved preferences every time Trace is called, or
+        // we save the preference on init and an app restart is required to update the logging level
+        _logLevelState.StateChanged += (_, _) =>
+        {
+            if (_firstChanceLoggingEnabled)
+            {
+                AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
+            }
+
+            InitTracing();
+        };
 
         InitTracing();
+
+        AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
     public async Task ClearAsync()
@@ -38,6 +62,16 @@ public sealed class DebugLogService : ITraceLogger, IFileLogger
         finally
         {
             s_loggingFileLock.ExitWriteLock();
+        }
+    }
+
+    public void Dispose()
+    {
+        AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
+
+        if (_firstChanceLoggingEnabled)
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
         }
     }
 
@@ -60,7 +94,7 @@ public sealed class DebugLogService : ITraceLogger, IFileLogger
 
     public void Trace(string message, LogLevel level = LogLevel.Information)
     {
-        if (level < _settingsState.Value.Config.LogLevel) { return; }
+        if (level < _logLevelState.Value) { return; }
 
         string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
@@ -84,6 +118,8 @@ public sealed class DebugLogService : ITraceLogger, IFileLogger
 
     private void InitTracing()
     {
+        _firstChanceLoggingEnabled = false;
+
         // Set up tracing to a file
         var fileInfo = new FileInfo(_fileLocationOptions.LoggingPath);
 
@@ -95,24 +131,37 @@ public sealed class DebugLogService : ITraceLogger, IFileLogger
         // Disabling first chance exception logging unless LogLevel is at Trace level
         // since it is noisy and is logging double information for exceptions that are being handled.
         // This also saves any potential performance hit for when we aren't worried about tracking first chance exceptions.
-        if (_settingsState.Value.Config.LogLevel > LogLevel.Trace) { return; }
+        if (_logLevelState.Value > LogLevel.Trace) { return; }
 
-        var firstChanceSemaphore = new SemaphoreSlim(1);
+        _firstChanceLoggingEnabled = true;
 
         // Trace all exceptions
-        AppDomain.CurrentDomain.FirstChanceException += (o, args) =>
+        AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
+    }
+
+    private void OnFirstChanceException(object? sender, FirstChanceExceptionEventArgs e)
+    {
+        // Unless we're already tracing one.
+        //
+        // When an instance of EventLogExpert is launched by double-clicking an evtx file
+        // and no databases are present, we get into a condition where we're trying to trace
+        // a first-chance exception, and the act of tracing causes another first-chance
+        // exception, which we then try to trace, until we hit a stack overflow.
+
+        if (!_firstChanceLock.TryEnter(100)) { return; }
+
+        try
         {
-            // Unless we're already tracing one.
-            //
-            // When an instance of EventLogExpert is launched by double-clicking an evtx file
-            // and no databases are present, we get into a condition where we're trying to trace
-            // a first-chance exception, and the act of tracing causes another first-chance
-            // exception, which we then try to trace, until we hit a stack overflow.
-            if (firstChanceSemaphore.Wait(100))
-            {
-                Trace($"{args.Exception}", LogLevel.Trace);
-                firstChanceSemaphore.Release();
-            }
-        };
+            Trace($"{e.Exception}", LogLevel.Trace);
+        }
+        finally
+        {
+            _firstChanceLock.Exit();
+        }
+    }
+
+    private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
+    {
+        Trace($"Unhandled Exception: {e.ExceptionObject}", LogLevel.Critical);
     }
 }
