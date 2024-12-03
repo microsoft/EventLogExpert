@@ -1,9 +1,9 @@
-﻿@using EventLogExpert.Shared.Components
+﻿@using EventLogExpert.Components
+@using EventLogExpert.Shared.Components
 @using EventLogExpert.Shared.Components.Filters
-@using EventLogExpert.Components
 @inherits LayoutComponentBase
 
-<div class="page" tabindex="0" @onkeyup="HandleKeyUp">
+<div class="page" @onkeyup="HandleKeyUp" tabindex="0">
     <SettingsModal />
     <FilterCacheModal />
     <FilterGroupModal />
@@ -12,10 +12,10 @@
     <TableColumnMenu />
     <ContextMenu />
 
-    <div class="display_layout">
+    <div class="page">
         <FilterPane />
         <EventTable />
         <DetailsPane />
+        <StatusBar />
     </div>
-    <StatusBar />
 </div>
