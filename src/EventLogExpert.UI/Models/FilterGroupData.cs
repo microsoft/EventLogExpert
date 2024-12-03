@@ -3,9 +3,9 @@
 
 namespace EventLogExpert.UI.Models;
 
-public readonly record struct FilterGroupData
+public sealed record FilterGroupData
 {
-    public Dictionary<string, FilterGroupData> ChildGroup { get; init; }
+    public Dictionary<string, FilterGroupData> ChildGroup { get; init; } = [];
 
-    public List<FilterGroupModel> FilterGroups { get; init; }
+    public List<FilterGroupModel> FilterGroups { get; init; } = [];
 }
