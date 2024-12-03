@@ -120,9 +120,12 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         var args = Environment.GetCommandLineArgs();
 
-        if (args.Length > 1)
+        foreach (var arg in args)
         {
-            OpenLog(args[1], PathType.FilePath).AndForget();
+            if (arg.EndsWith(".evtx"))
+            {
+                OpenLog(arg, PathType.FilePath).AndForget();
+            }
         }
     }
 

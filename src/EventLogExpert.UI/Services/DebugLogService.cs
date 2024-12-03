@@ -20,28 +20,31 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly Lock _firstChanceLock = new();
-    private readonly IStateSelection<SettingsState, LogLevel> _logLevelState;
 
     private bool _firstChanceLoggingEnabled;
+    private LogLevel _logLevel;
 
     public DebugLogService(
         FileLocationOptions fileLocationOptions,
+        IPreferencesProvider preferencesProvider,
         IStateSelection<SettingsState, LogLevel> logLevelState)
     {
         _fileLocationOptions = fileLocationOptions;
-        _logLevelState = logLevelState;
+        // Pulling from preferences to make sure Informational isn't overriding desired logging until SettingsState is populated
+        _logLevel = preferencesProvider.LogLevelPreference;
 
-        _logLevelState.Select(state => state.Config.LogLevel);
+        logLevelState.Select(state => state.Config.LogLevel);
 
-        // HACK: Constructor is called before SettingsState gets LogLevel from preferences
-        // Injecting preferences means we check the saved preferences every time Trace is called, or
-        // we save the preference on init and an app restart is required to update the logging level
-        _logLevelState.StateChanged += (_, _) =>
+        logLevelState.SelectedValueChanged += (_, logLevel) =>
         {
+            if (_logLevel == logLevel) { return; }
+
             if (_firstChanceLoggingEnabled)
             {
                 AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
             }
+
+            _logLevel = logLevel;
 
             InitTracing();
         };
@@ -94,7 +97,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public void Trace(string message, LogLevel level = LogLevel.Information)
     {
-        if (level < _logLevelState.Value) { return; }
+        if (level < _logLevel) { return; }
 
         string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
@@ -131,7 +134,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         // Disabling first chance exception logging unless LogLevel is at Trace level
         // since it is noisy and is logging double information for exceptions that are being handled.
         // This also saves any potential performance hit for when we aren't worried about tracking first chance exceptions.
-        if (_logLevelState.Value > LogLevel.Trace) { return; }
+        if (_logLevel > LogLevel.Trace) { return; }
 
         _firstChanceLoggingEnabled = true;
 
