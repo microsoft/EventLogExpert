@@ -10,7 +10,9 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterPane;
 
-public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
+public sealed class FilterPaneEffects(
+    IState<EventLogState> eventLogState,
+    IState<FilterPaneState> filterPaneState)
 {
     [EffectMethod]
     public async Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
@@ -74,8 +76,58 @@ public sealed class FilterPaneEffects(IState<FilterPaneState> filterPaneState)
         }
     }
 
-    [EffectMethod(typeof(FilterPaneAction.SetFilterDateRange))]
-    public async Task HandleSetFilterDateRange(IDispatcher dispatcher) =>
+    [EffectMethod]
+    public Task HandleSetFilterDateRange(FilterPaneAction.SetFilterDateRange action, IDispatcher dispatcher)
+    {
+        if (action.FilterDateModel is null)
+        {
+            dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRangeSuccess(action.FilterDateModel));
+
+            return Task.CompletedTask;
+        }
+
+        DateTime? updatedAfter = action.FilterDateModel?.After ?? filterPaneState.Value.FilteredDateRange?.After;
+        DateTime? updatedBefore = action.FilterDateModel?.Before ?? filterPaneState.Value.FilteredDateRange?.Before;
+
+        long ticksPerHour = TimeSpan.FromHours(1).Ticks;
+
+        if (updatedAfter is null)
+        {
+            long ticks =
+                (eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
+                        .Order()
+                        .LastOrDefault() ??
+                    DateTime.UtcNow)
+                .Ticks;
+
+            updatedAfter = new DateTime(ticks / ticksPerHour * ticksPerHour, DateTimeKind.Utc);
+        }
+
+        if (updatedBefore is null)
+        {
+            long ticks =
+                (eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
+                        .Order()
+                        .FirstOrDefault() ??
+                    DateTime.UtcNow)
+                .Ticks;
+
+            updatedBefore = new DateTime((ticks + ticksPerHour - 1) / ticksPerHour * ticksPerHour, DateTimeKind.Utc);
+        }
+
+        dispatcher.Dispatch(
+            new FilterPaneAction.SetFilterDateRangeSuccess(
+                new FilterDateModel
+                {
+                    After = updatedAfter,
+                    Before = updatedBefore
+                }));
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod(typeof(FilterPaneAction.SetFilterDateRangeSuccess))]
+    public async Task HandleSetFilterDateRangeSuccess(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterDate))]

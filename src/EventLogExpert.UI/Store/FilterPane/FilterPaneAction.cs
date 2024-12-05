@@ -25,6 +25,8 @@ public sealed record FilterPaneAction
 
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
+    public sealed record SetFilterDateRangeSuccess(FilterDateModel? FilterDateModel);
+
     public sealed record ToggleFilterEditing(FilterId Id);
 
     public sealed record ToggleFilterEnabled(FilterId Id);

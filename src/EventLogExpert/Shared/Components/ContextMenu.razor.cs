@@ -35,6 +35,16 @@ public sealed partial class ContextMenu
 
     private void CopySelected(CopyType? copyType) => ClipboardService.CopySelectedEvent(copyType);
 
+    private void ExcludeAfter() =>
+        Dispatcher.Dispatch(
+            new FilterPaneAction.SetFilterDateRange(
+                new FilterDateModel { After = SelectedEventState.Value.FirstOrDefault()?.TimeCreated }));
+
+    private void ExcludeBefore() =>
+        Dispatcher.Dispatch(
+            new FilterPaneAction.SetFilterDateRange(
+                new FilterDateModel { Before = SelectedEventState.Value.FirstOrDefault()?.TimeCreated }));
+
     private void FilterEvent(FilterCategory filterType, bool shouldExclude = false)
     {
         if (SelectedEventState.Value.IsEmpty) { return; }

@@ -5,11 +5,9 @@ namespace EventLogExpert.UI.Models;
 
 public sealed record FilterDateModel
 {
-    public DateTime After { get; set; }
+    public DateTime? After { get; set; }
 
-    public DateTime Before { get; set; }
-
-    public TimeZoneInfo TimeZoneInfo { get; set; } = null!;
+    public DateTime? Before { get; set; }
 
     public bool IsEnabled { get; set; } = true;
 }

@@ -10,7 +10,7 @@ public sealed partial class FilterGroupSection
 {
     private bool _menuState = true;
 
-    [Parameter] public FilterGroupData Data { get; set; }
+    [Parameter] public required FilterGroupData Data { get; set; }
 
     [Parameter] public required string Name { get; set; }
 
