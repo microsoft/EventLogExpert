@@ -15,9 +15,10 @@ namespace EventLogExpert.Components;
 
 public sealed partial class FilterPane
 {
-    private readonly FilterDateModel _model = new() { TimeZoneInfo = TimeZoneInfo.Utc };
+    private readonly FilterDateModel _model = new();
 
     private bool _canEditDate;
+    private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
     private bool _isFilterListVisible;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
@@ -34,36 +35,40 @@ public sealed partial class FilterPane
 
     [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
 
-    [Inject] private IStateSelection<SettingsState, string> TimeZoneState { get; init; } = null!;
+    [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
         SubscribeToAction<FilterPaneAction.ClearAllFilters>(action => { _canEditDate = false; });
+        SubscribeToAction<FilterPaneAction.SetFilterDateRangeSuccess>(action => { UpdateFilterDate(action.FilterDateModel); });
 
-        TimeZoneState.Select(x => x.Config.TimeZoneId);
-        TimeZoneState.SelectedValueChanged += (sender, args) => { UpdateFilterDateModel(); };
+        TimeZoneState.Select(x => x.Config.TimeZoneInfo, selectedValueChanged: UpdateFilterDateTimeZone);
 
         base.OnInitialized();
     }
 
     private void AddAdvancedFilter()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
-        {
-            FilterType = FilterType.Advanced,
-            IsEditing = true
-        }));
+        Dispatcher.Dispatch(
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    FilterType = FilterType.Advanced,
+                    IsEditing = true
+                }));
 
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
-        {
-            FilterType = FilterType.Basic,
-            IsEditing = true
-        }));
+        Dispatcher.Dispatch(
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    FilterType = FilterType.Basic,
+                    IsEditing = true
+                }));
 
         _isFilterListVisible = true;
     }
@@ -72,7 +77,7 @@ public sealed partial class FilterPane
 
     private void AddDateFilter()
     {
-        _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
+        _currentTimeZone = SettingsState.Value.Config.TimeZoneInfo;
 
         long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
@@ -92,11 +97,11 @@ public sealed partial class FilterPane
 
         // Round down to the nearest hour for the earliest event
         _model.After = new DateTime(oldestEventTicks / ticksPerHour * ticksPerHour, DateTimeKind.Utc)
-            .ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo);
+            .ConvertTimeZone(_currentTimeZone);
 
         // Round up to the nearest hour for the latest event
         _model.Before = new DateTime(((mostRecentEventTicks + ticksPerHour - 1) / ticksPerHour) * ticksPerHour, DateTimeKind.Utc)
-            .ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo);
+            .ConvertTimeZone(_currentTimeZone);
 
         _isFilterListVisible = true;
         _canEditDate = true;
@@ -104,25 +109,27 @@ public sealed partial class FilterPane
 
     private void AddExclusion()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(new FilterModel
-        {
-            FilterType = FilterType.Basic,
-            IsEditing = true,
-            IsExcluded = true
-        }));
+        Dispatcher.Dispatch(
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    FilterType = FilterType.Basic,
+                    IsEditing = true,
+                    IsExcluded = true
+                }));
 
         _isFilterListVisible = true;
     }
 
     private void ApplyDateFilter()
     {
-        FilterDateModel model = new()
-        {
-            After = _model.After.ConvertTimeZoneToUtc(SettingsState.Value.Config.TimeZoneInfo),
-            Before = _model.Before.ConvertTimeZoneToUtc(SettingsState.Value.Config.TimeZoneInfo)
-        };
-
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(model));
+        Dispatcher.Dispatch(
+            new FilterPaneAction.SetFilterDateRange(
+                new FilterDateModel
+                {
+                    After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
+                    Before = _model.Before?.ConvertTimeZoneToUtc(_currentTimeZone)
+                }));
 
         _canEditDate = false;
     }
@@ -149,12 +156,20 @@ public sealed partial class FilterPane
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 
-    private void UpdateFilterDateModel()
+    private void UpdateFilterDate(FilterDateModel? updatedDate)
     {
-        var temp = _model.TimeZoneInfo;
-        _model.TimeZoneInfo = SettingsState.Value.Config.TimeZoneInfo;
+        _model.Before = updatedDate?.Before?.ConvertTimeZone(_currentTimeZone);
+        _model.After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone);
+    }
 
-        _model.Before = TimeZoneInfo.ConvertTime(_model.Before, temp, _model.TimeZoneInfo);
-        _model.After = TimeZoneInfo.ConvertTime(_model.After, temp, _model.TimeZoneInfo);
+    private void UpdateFilterDateTimeZone(TimeZoneInfo timeZoneInfo)
+    {
+        _model.Before = _model.Before is not null ?
+            TimeZoneInfo.ConvertTime(_model.Before.Value, _currentTimeZone, timeZoneInfo) : null;
+
+        _model.After = _model.After is not null ?
+            TimeZoneInfo.ConvertTime(_model.After.Value, _currentTimeZone, timeZoneInfo) : null;
+
+        _currentTimeZone = timeZoneInfo;
     }
 }

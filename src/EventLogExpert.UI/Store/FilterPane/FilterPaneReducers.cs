@@ -99,8 +99,9 @@ public sealed class FilterPaneReducers
         };
 
     [ReducerMethod]
-    public static FilterPaneState
-        ReduceSetFilterDateRange(FilterPaneState state, FilterPaneAction.SetFilterDateRange action) =>
+    public static FilterPaneState ReduceSetFilterDateRangeSuccess(
+        FilterPaneState state,
+        FilterPaneAction.SetFilterDateRangeSuccess action) =>
         state with { FilteredDateRange = action.FilterDateModel };
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleFilterDate))]
