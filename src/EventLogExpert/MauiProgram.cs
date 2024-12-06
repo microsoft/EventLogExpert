@@ -55,6 +55,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
         builder.Services.AddSingleton<IGitHubService, GitHubService>();
         builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
+        builder.Services.AddSingleton<ISettingsService, SettingsService>();
+        builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
 
         // Provider Services
         builder.Services.AddSingleton<IEnabledDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();

@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Store.Settings;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
@@ -22,7 +21,7 @@ public partial class DebugLogModal
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<SettingsAction.OpenDebugLog>(action => Open().AndForget());
+        TraceLogger.DebugLogLoaded += () => Open().AndForget();
 
         base.OnInitialized();
     }

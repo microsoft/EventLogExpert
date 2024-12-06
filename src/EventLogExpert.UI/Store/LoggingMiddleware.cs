@@ -7,12 +7,10 @@ using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store;
 
@@ -20,8 +18,6 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
 {
     private readonly ITraceLogger _debugLogger = debugLogger;
     private readonly JsonSerializerOptions _serializerOptions = new();
-
-    private IStore? _store;
 
     public override void BeforeDispatch(object action)
     {
@@ -58,10 +54,6 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
             case FilterPaneAction.ApplyFilterGroup:
             case FilterPaneAction.SetFilter:
             case FilterPaneAction.SetFilterDateRange:
-            case SettingsAction.LoadDatabasesCompleted:
-            case SettingsAction.LoadSettingsCompleted:
-            case SettingsAction.Save:
-            case SettingsAction.SaveCompleted:
                 _debugLogger.Trace($"Action: {action.GetType()}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:
@@ -89,11 +81,5 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
 
                 break;
         }
-    }
-
-    public override Task InitializeAsync(IDispatcher dispatcher, IStore store)
-    {
-        _store = store;
-        return Task.CompletedTask;
     }
 }

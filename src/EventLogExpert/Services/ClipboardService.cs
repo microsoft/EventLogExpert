@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Text;
@@ -22,16 +22,16 @@ public sealed class ClipboardService : IClipboardService
 {
     private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
     private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
-    private readonly IState<SettingsState> _settingsState;
+    private readonly ISettingsService _settings;
 
     public ClipboardService(
         IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
-        IState<SettingsState> settingsState)
+        ISettingsService settings)
     {
         _eventTableColumns = eventTableColumns;
         _selectedEvents = selectedEvents;
-        _settingsState = settingsState;
+        _settings = settings;
 
         _eventTableColumns.Select(s => s.Columns);
         _selectedEvents.Select(s => s.SelectedEvents);
@@ -60,7 +60,7 @@ public sealed class ClipboardService : IClipboardService
 
     private string GetFormattedEvent(CopyType? copyType, DisplayEventModel @event)
     {
-        switch (copyType ?? _settingsState.Value.Config.CopyType)
+        switch (copyType ?? _settings.CopyType)
         {
             case CopyType.Default:
                 StringBuilder defaultEvent = new();
@@ -73,7 +73,7 @@ public sealed class ClipboardService : IClipboardService
                             defaultEvent.Append($"\"{@event.Level}\" ");
                             break;
                         case ColumnName.DateAndTime:
-                            defaultEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                            defaultEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
                             break;
                         case ColumnName.ActivityId:
                             defaultEvent.Append($"\"{@event.ActivityId}\" ");
@@ -113,7 +113,7 @@ public sealed class ClipboardService : IClipboardService
                 StringBuilder simpleEvent = new();
 
                 simpleEvent.Append($"\"{@event.Level}\" ");
-                simpleEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}\" ");
+                simpleEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
                 simpleEvent.Append($"\"{@event.Source}\" ");
                 simpleEvent.Append($"\"{@event.Id}\" ");
                 simpleEvent.Append($"\"{@event.Description}\"");
@@ -129,7 +129,7 @@ public sealed class ClipboardService : IClipboardService
 
                 fullEvent.AppendLine($"Log Name: {@event.LogName}");
                 fullEvent.AppendLine($"Source: {@event.Source}");
-                fullEvent.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settingsState.Value.Config.TimeZoneInfo)}");
+                fullEvent.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}");
                 fullEvent.AppendLine($"Event ID: {@event.Id}");
                 fullEvent.AppendLine($"Task Category: {@event.TaskCategory}");
                 fullEvent.AppendLine($"Level: {@event.Level}");

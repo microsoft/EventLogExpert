@@ -2,14 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Services;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
@@ -21,35 +20,33 @@ public sealed partial class App : Application
     private readonly MainPage _mainPage;
 
     public App(
-        IActionSubscriber actionSubscriber,
         IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
         IStateSelection<FilterPaneState, bool> filterPaneIsXmlEnabledState,
-        IStateSelection<SettingsState, IEnumerable<string>> loadedDatabasesState,
-        IState<SettingsState> settingsState,
+        IDatabaseService databaseService,
+        ISettingsService settings,
         IAlertDialogService dialogService,
         IClipboardService clipboardService,
         IUpdateService updateService,
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
-        ITraceLogger traceLogger)
+        IFileLogger traceLogger)
     {
         InitializeComponent();
 
         _mainPage = new MainPage(
-            actionSubscriber,
             fluxorDispatcher,
             databaseCollectionProvider,
             activeLogsState,
             continuouslyUpdateState,
             filterPaneIsEnabledState,
             filterPaneIsXmlEnabledState,
-            loadedDatabasesState,
-            settingsState,
+            databaseService,
+            settings,
             dialogService,
             clipboardService,
             updateService,

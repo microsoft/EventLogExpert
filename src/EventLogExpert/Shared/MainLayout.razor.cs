@@ -1,10 +1,9 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using IDispatcher = Fluxor.IDispatcher;
@@ -19,7 +18,7 @@ public sealed partial class MainLayout
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     [Inject] private IUpdateService UpdateService { get; init; } = null!;
 
@@ -29,7 +28,7 @@ public sealed partial class MainLayout
         {
             if (CurrentVersionProvider.IsSupportedOS(DeviceInfo.Version))
             {
-                await UpdateService.CheckForUpdates(SettingsState.Value.Config.IsPreReleaseEnabled, false);
+                await UpdateService.CheckForUpdates(Settings.IsPreReleaseEnabled, false);
             }
 
             AppTitleService.SetLogName(null);
