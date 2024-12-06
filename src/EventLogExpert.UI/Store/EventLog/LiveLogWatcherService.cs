@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -26,9 +25,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly ITraceLogger _debugLogger;
     private readonly IDispatcher _dispatcher;
     private readonly List<string> _logsToWatch = [];
-    private readonly IEventResolverCache _resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory;
-    private readonly IState<SettingsState> _settingsState;
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
     private readonly Lock _watchersLock = new();
 
@@ -36,15 +33,11 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         IStateSelection<EventLogState, bool> bufferFullStateSelection,
         ITraceLogger debugLogger,
         IDispatcher dispatcher,
-        IEventResolverCache resolverCache,
-        IServiceScopeFactory serviceScopeFactory,
-        IState<SettingsState> settingsState)
+        IServiceScopeFactory serviceScopeFactory)
     {
         _debugLogger = debugLogger;
         _dispatcher = dispatcher;
-        _resolverCache = resolverCache;
         _serviceScopeFactory = serviceScopeFactory;
-        _settingsState = settingsState;
 
         bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
 

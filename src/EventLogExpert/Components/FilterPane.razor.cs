@@ -2,11 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
@@ -33,16 +33,14 @@ public sealed partial class FilterPane
 
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
-    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
-
-    [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneState { get; init; } = null!;
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected override void OnInitialized()
     {
         SubscribeToAction<FilterPaneAction.ClearAllFilters>(action => { _canEditDate = false; });
         SubscribeToAction<FilterPaneAction.SetFilterDateRangeSuccess>(action => { UpdateFilterDate(action.FilterDateModel); });
 
-        TimeZoneState.Select(x => x.Config.TimeZoneInfo, selectedValueChanged: UpdateFilterDateTimeZone);
+        Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
 
         base.OnInitialized();
     }
@@ -77,7 +75,7 @@ public sealed partial class FilterPane
 
     private void AddDateFilter()
     {
-        _currentTimeZone = SettingsState.Value.Config.TimeZoneInfo;
+        _currentTimeZone = Settings.TimeZoneInfo;
 
         long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
@@ -162,7 +160,7 @@ public sealed partial class FilterPane
         _model.After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone);
     }
 
-    private void UpdateFilterDateTimeZone(TimeZoneInfo timeZoneInfo)
+    private void UpdateFilterDateTimeZone(object? sender, TimeZoneInfo timeZoneInfo)
     {
         _model.Before = _model.Before is not null ?
             TimeZoneInfo.ConvertTime(_model.Before.Value, _currentTimeZone, timeZoneInfo) : null;

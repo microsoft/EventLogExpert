@@ -1,13 +1,14 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -16,12 +17,18 @@ namespace EventLogExpert.Shared.Components;
 public sealed partial class SettingsModal
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
-
+    
+    private CopyType _copyType;
     private bool _databaseRemoved = false;
-    private SettingsModel _request = new();
+    private bool _isPreReleaseEnabled;
+    private LogLevel _logLevel;
     private bool _shouldReload = false;
+    private bool _showDisplayPaneOnSelectionChange;
+    private string _timeZoneId = string.Empty;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
@@ -29,18 +36,13 @@ public sealed partial class SettingsModal
 
     [Inject] private FileLocationOptions FileLocationOptions { get; init; } = null!;
 
-    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected internal override async Task Close()
     {
         if (_databaseRemoved)
         {
-            Dispatcher.Dispatch(
-                new SettingsAction.SaveDisabledDatabases(
-                    _databases
-                        .Where(db => !db.isEnabled)
-                        .Select(db => db.name)
-                        .ToList()));
+            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
         }
 
         if (_shouldReload)
@@ -54,7 +56,7 @@ public sealed partial class SettingsModal
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<SettingsAction.OpenMenu>(action => Load().AndForget());
+        Settings.Loaded += () => Load().AndForget();
 
         base.OnInitialized();
     }
@@ -73,10 +75,10 @@ public sealed partial class SettingsModal
 
         try
         {
-            var result = (await FilePicker.Default.PickMultipleAsync(options)).ToList();
+            var result = (await FilePicker.Default.PickMultipleAsync(options)).ToArray();
 
             // User canceled or no files selected
-            if (result.Count <= 0) { return; }
+            if (result.Length <= 0) { return; }
 
             Directory.CreateDirectory(FileLocationOptions.DatabasePath);
 
@@ -92,9 +94,9 @@ public sealed partial class SettingsModal
                 }
             }
 
-            var message = result.Count > 1 ?
-                $"{result.Count} databases have successfully been imported" :
-                $"{result.First().FileName} has successfully been imported";
+            var message = result.Length > 1 ?
+                $"{result.Length} databases have successfully been imported" :
+                $"{result[0].FileName} has successfully been imported";
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 
@@ -109,23 +111,27 @@ public sealed partial class SettingsModal
             return;
         }
 
-        Dispatcher.Dispatch(new SettingsAction.LoadDatabases());
+        DatabaseService.LoadDatabases();
 
         await ReloadOpenLogs();
     }
 
     private async Task Load()
     {
-        _request = SettingsState.Value.Config with { };
+        _copyType = Settings.CopyType;
+        _isPreReleaseEnabled = Settings.IsPreReleaseEnabled;
+        _logLevel = Settings.LogLevel;
+        _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;
+        _timeZoneId = Settings.TimeZoneId;
 
         _databases.Clear();
 
-        foreach (var database in SettingsState.Value.LoadedDatabases)
+        foreach (var database in DatabaseService.LoadedDatabases)
         {
             _databases.Add((database, true, false));
         }
 
-        foreach (var database in SettingsState.Value.DisabledDatabases)
+        foreach (var database in DatabaseService.DisabledDatabases)
         {
             var index = _databases.FindIndex(x => string.Equals(x.name, database));
 
@@ -190,19 +196,15 @@ public sealed partial class SettingsModal
 
     private async Task Save()
     {
-        if (!SettingsState.Value.Config.Equals(_request))
-        {
-            Dispatcher.Dispatch(new SettingsAction.Save(_request));
-        }
+        Settings.CopyType = _copyType;
+        Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
+        Settings.LogLevel = _logLevel;
+        Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
+        Settings.TimeZoneId = _timeZoneId;
 
         if (_databases.Any(database => database.hasChanged))
         {
-            Dispatcher.Dispatch(
-                new SettingsAction.SaveDisabledDatabases(
-                    _databases
-                        .Where(db => !db.isEnabled)
-                        .Select(db => db.name)
-                        .ToList()));
+            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
 
             _shouldReload = true;
         }

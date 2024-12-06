@@ -4,8 +4,8 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -29,7 +29,7 @@ public sealed partial class DetailsPane
 
     [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventSelection { get; init; } = null!;
 
-    [Inject] private IState<SettingsState> SettingsState { get; init; } = null!;
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -49,8 +49,7 @@ public sealed partial class DetailsPane
         {
             SelectedEvent = selectedEvents.LastOrDefault();
 
-            if (SelectedEvent is null ||
-                (_hasOpened && !SettingsState.Value.Config.ShowDisplayPaneOnSelectionChange))
+            if (SelectedEvent is null || (_hasOpened && !Settings.ShowDisplayPaneOnSelectionChange))
             {
                 return;
             }

@@ -4,8 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
-using EventLogExpert.UI.Store.Settings;
-using Fluxor;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
@@ -20,39 +18,23 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly Lock _firstChanceLock = new();
+    private readonly ISettingsService _settings;
 
     private bool _firstChanceLoggingEnabled;
-    private LogLevel _logLevel;
 
-    public DebugLogService(
-        FileLocationOptions fileLocationOptions,
-        IPreferencesProvider preferencesProvider,
-        IStateSelection<SettingsState, LogLevel> logLevelState)
+    public DebugLogService(FileLocationOptions fileLocationOptions, ISettingsService settings)
     {
         _fileLocationOptions = fileLocationOptions;
-        // Pulling from preferences to make sure Informational isn't overriding desired logging until SettingsState is populated
-        _logLevel = preferencesProvider.LogLevelPreference;
-
-        logLevelState.Select(state => state.Config.LogLevel);
-
-        logLevelState.SelectedValueChanged += (_, logLevel) =>
-        {
-            if (_logLevel == logLevel) { return; }
-
-            if (_firstChanceLoggingEnabled)
-            {
-                AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
-            }
-
-            _logLevel = logLevel;
-
-            InitTracing();
-        };
+        _settings = settings;
 
         InitTracing();
 
+        _settings.LogLevelChanged += OnLogLevelChanged;
+
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
+
+    public Action? DebugLogLoaded { get; set; }
 
     public async Task ClearAsync()
     {
@@ -76,6 +58,8 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         {
             AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
         }
+
+        _settings.LogLevelChanged -= OnLogLevelChanged;
     }
 
     public async IAsyncEnumerable<string> LoadAsync()
@@ -95,9 +79,11 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         }
     }
 
+    public void LoadDebugLog() => DebugLogLoaded?.Invoke();
+
     public void Trace(string message, LogLevel level = LogLevel.Information)
     {
-        if (level < _logLevel) { return; }
+        if (level < _settings.LogLevel) { return; }
 
         string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
@@ -134,7 +120,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         // Disabling first chance exception logging unless LogLevel is at Trace level
         // since it is noisy and is logging double information for exceptions that are being handled.
         // This also saves any potential performance hit for when we aren't worried about tracking first chance exceptions.
-        if (_logLevel > LogLevel.Trace) { return; }
+        if (_settings.LogLevel > LogLevel.Trace) { return; }
 
         _firstChanceLoggingEnabled = true;
 
@@ -161,6 +147,16 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         {
             _firstChanceLock.Exit();
         }
+    }
+
+    private void OnLogLevelChanged()
+    {
+        if (_firstChanceLoggingEnabled)
+        {
+            AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
+        }
+
+        InitTracing();
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)

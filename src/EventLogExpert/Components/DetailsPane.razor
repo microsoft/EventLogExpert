@@ -26,7 +26,7 @@
                         @SelectedEvent.KeywordsDisplayNames.GetEventKeywords()
                     </div>
                 }
-                <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(SettingsState.Value.Config.TimeZoneInfo)</div>
+                <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
             </div>
 
             <div>Description:</div>

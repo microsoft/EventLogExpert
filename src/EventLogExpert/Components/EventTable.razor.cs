@@ -5,11 +5,11 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -40,12 +40,11 @@ public sealed partial class EventTable
 
     [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventState { get; init; } = null!;
 
-    [Inject] private IStateSelection<SettingsState, TimeZoneInfo> TimeZoneSettings { get; init; } = null!;
+    [Inject] private ISettingsService Settings { get; init; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvents);
-        TimeZoneSettings.Select(settings => settings.Config.TimeZoneInfo);
 
         SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
         SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => RegisterTableEventHandlers().AndForget());
@@ -57,7 +56,7 @@ public sealed partial class EventTable
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
         _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
         _selectedEventState = SelectedEventState.Value;
-        _timeZoneSettings = TimeZoneSettings.Value;
+        _timeZoneSettings = Settings.TimeZoneInfo;
 
         await base.OnInitializedAsync();
     }
@@ -66,14 +65,14 @@ public sealed partial class EventTable
     {
         if (ReferenceEquals(EventTableState.Value, _eventTableState) &&
             ReferenceEquals(SelectedEventState.Value, _selectedEventState) &&
-            TimeZoneSettings.Value.Equals(_timeZoneSettings)) { return false; }
+            Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
 
         _eventTableState = EventTableState.Value;
 
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
         _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
         _selectedEventState = SelectedEventState.Value;
-        _timeZoneSettings = TimeZoneSettings.Value;
+        _timeZoneSettings = Settings.TimeZoneInfo;
 
         return true;
     }
@@ -91,9 +90,9 @@ public sealed partial class EventTable
         _selectedEventState.Contains(@event) ? "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
 
     private string GetDateColumnHeader() =>
-        TimeZoneSettings.Value.Equals(TimeZoneInfo.Local) ?
+        Settings.TimeZoneInfo.Equals(TimeZoneInfo.Local) ?
             "Date and Time" :
-            $"Date and Time {TimeZoneSettings.Value.DisplayName.Split(" ").First()}";
+            $"Date and Time {Settings.TimeZoneInfo.DisplayName.Split(" ").First()}";
 
     private string GetHighlightedColor(DisplayEventModel @event)
     {

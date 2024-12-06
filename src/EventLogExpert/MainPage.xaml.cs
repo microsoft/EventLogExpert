@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
@@ -14,7 +15,6 @@ using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.Settings;
 using Fluxor;
 using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
@@ -35,32 +35,32 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
     private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
+    private readonly IDatabaseService _databaseService;
     private readonly IAlertDialogService _dialogService;
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsXmlEnabledState;
     private readonly IDispatcher _fluxorDispatcher;
-    private readonly IState<SettingsState> _settingsState;
-    private readonly ITraceLogger _traceLogger;
+    private readonly ISettingsService _settings;
+    private readonly IFileLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
     private CancellationTokenSource _cancellationTokenSource = new();
 
     public MainPage(
-        IActionSubscriber actionSubscriber,
         IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
         IStateSelection<FilterPaneState, bool> filterPaneIsXmlEnabledState,
-        IStateSelection<SettingsState, IEnumerable<string>> loadedProvidersState,
-        IState<SettingsState> settingsState,
+        IDatabaseService databaseService,
+        ISettingsService settings,
         IAlertDialogService dialogService,
         IClipboardService clipboardService,
         IUpdateService updateService,
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
-        ITraceLogger traceLogger)
+        IFileLogger traceLogger)
     {
         InitializeComponent();
         PopulateOtherLogsMenu();
@@ -68,9 +68,10 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _activeLogsState = activeLogsState;
         _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
+        _databaseService = databaseService;
         _filterPaneIsXmlEnabledState = filterPaneIsXmlEnabledState;
         _fluxorDispatcher = fluxorDispatcher;
-        _settingsState = settingsState;
+        _settings = settings;
         _dialogService = dialogService;
         _traceLogger = traceLogger;
         _updateService = updateService;
@@ -103,18 +104,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
             await MainThread.InvokeOnMainThreadAsync(() =>
                 EnableXmlFilteringMenuItem.Text = $"Enable Xml Filtering{(isEnabled ? " ✓" : "")}");
 
-        loadedProvidersState.Select(s => s.LoadedDatabases);
-
-        loadedProvidersState.SelectedValueChanged += (sender, loadedProviders) =>
+        _databaseService.LoadedDatabasesChanged += (sender, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
                 Path.Join(fileLocationOptions.DatabasePath, path)));
 
-        actionSubscriber.SubscribeToAction<SettingsAction.LoadSettingsCompleted>(this, _ => { SetCopyKeyboardAccelerator(); });
-        actionSubscriber.SubscribeToAction<SettingsAction.SaveCompleted>(this, _ => { SetCopyKeyboardAccelerator(); });
+        _settings.CopyTypeChanged += SetCopyKeyboardAccelerator;
 
         fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
-        fluxorDispatcher.Dispatch(new SettingsAction.LoadSettings());
-        fluxorDispatcher.Dispatch(new SettingsAction.LoadDatabases());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
         fluxorDispatcher.Dispatch(new FilterGroupAction.LoadGroups());
 
@@ -158,7 +154,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             return;
         }
 
-        await _updateService.CheckForUpdates(_settingsState.Value.Config.IsPreReleaseEnabled, manualScan: true);
+        await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, manualScan: true);
     }
 
     private void ClearAllFilters_Clicked(object? sender, EventArgs e) =>
@@ -233,7 +229,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private async void DropGestureRecognizer_OnDragOver(object sender, DragEventArgs e)
+    private async void DropGestureRecognizer_OnDragOver(object? sender, DragEventArgs e)
     {
         if (e.PlatformArgs is null) { return; }
 
@@ -266,7 +262,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         deferral.Complete();
     }
 
-    private async void DropGestureRecognizer_OnDrop(object sender, DropEventArgs e)
+    private async void DropGestureRecognizer_OnDrop(object? sender, DropEventArgs e)
     {
         if (e.PlatformArgs is null || !e.PlatformArgs.DragEventArgs.DataView.Contains(StandardDataFormats.StorageItems))
         {
@@ -400,8 +396,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
     }
 
-    private void OpenSettingsModal_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.OpenMenu());
+    private void OpenSettingsModal_Clicked(object sender, EventArgs e) => _settings.Load();
 
     private void PopulateOtherLogsMenu()
     {
@@ -434,7 +429,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             CopySelectedXml.KeyboardAccelerators.Clear();
             CopySelectedFull.KeyboardAccelerators.Clear();
 
-            switch (_settingsState.Value.Config.CopyType)
+            switch (_settings.CopyType)
             {
                 case CopyType.Default:
                     CopySelected.KeyboardAccelerators.Add(s_copyShortcut);
@@ -472,8 +467,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private void ViewFilterGroups_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterGroupAction.OpenMenu());
 
-    private void ViewLogs_Clicked(object? sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new SettingsAction.OpenDebugLog());
+    private void ViewLogs_Clicked(object? sender, EventArgs e) => _traceLogger.LoadDebugLog();
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
