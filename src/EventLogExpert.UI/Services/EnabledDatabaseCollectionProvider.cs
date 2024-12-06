@@ -62,7 +62,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         if (disabledDatabases.Any())
         {
             databases.RemoveAll(enabled => disabledDatabases
-                .Any(disabled => string.Equals(enabled, disabled, StringComparison.InvariantCultureIgnoreCase)));
+                .Any(disabled => string.Equals(enabled, disabled, StringComparison.OrdinalIgnoreCase)));
         }
 
         return databases;
