@@ -14,9 +14,18 @@ public sealed partial class DatabaseService(
         enabledDatabaseCollectionProvider;
     private readonly IPreferencesProvider _preferences = preferences;
 
-    public IEnumerable<string> LoadedDatabases { get; private set; } = [];
+    public IEnumerable<string> LoadedDatabases
+    {
+        get
+        {
+            _loadedDatabases ??= SortDatabases(_enabledDatabaseCollectionProvider.GetEnabledDatabases());
+
+            return _loadedDatabases;
+        }
+    }
 
     private IEnumerable<string>? _disabledDatabases;
+    private IEnumerable<string>? _loadedDatabases;
 
     public IEnumerable<string> DisabledDatabases
     {
@@ -28,8 +37,8 @@ public sealed partial class DatabaseService(
         }
         private set
         {
-            _disabledDatabases = value;
-            _preferences.DisabledDatabasesPreference = value;
+            _disabledDatabases = value.ToList().AsReadOnly();
+            _preferences.DisabledDatabasesPreference = _disabledDatabases;
         }
     }
 
@@ -37,7 +46,7 @@ public sealed partial class DatabaseService(
 
     public void LoadDatabases()
     {
-        LoadedDatabases = SortDatabases(_enabledDatabaseCollectionProvider.GetEnabledDatabases());
+        _loadedDatabases = SortDatabases(_enabledDatabaseCollectionProvider.GetEnabledDatabases());
 
         LoadedDatabasesChanged?.Invoke(this, LoadedDatabases);
     }
