@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
@@ -43,16 +44,16 @@ public partial class EventResolverBase
         { 0x80000000000000, "Classic" }
     };
 
-    protected readonly IEventResolverCache? cache;
     protected readonly ITraceLogger? logger;
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
 
+    private readonly IEventResolverCache? _cache;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
     protected EventResolverBase(IEventResolverCache? cache = null, ITraceLogger? logger = null)
     {
-        this.cache = cache;
+        _cache = cache;
         this.logger = logger;
     }
 
@@ -60,15 +61,15 @@ public partial class EventResolverBase
         new(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
-            ComputerName = cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
+            ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
             Description = ResolveDescription(eventRecord),
             Id = eventRecord.Id,
             KeywordsDisplayNames = GetKeywordsFromBitmask(eventRecord),
             Level = Severity.GetString(eventRecord.Level),
-            LogName = cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
+            LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,
             RecordId = eventRecord.RecordId,
-            Source = cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
+            Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
             TaskCategory = ResolveTaskName(eventRecord),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
@@ -76,10 +77,9 @@ public partial class EventResolverBase
             Xml = eventRecord.Xml ?? string.Empty
         };
 
-    private static string CleanupFormatting(ReadOnlySpan<char> unformattedString)
+    private static void CleanupFormatting(ReadOnlySpan<char> unformattedString, ref Span<char> buffer, out int bufferIndex)
     {
-        Span<char> buffer = stackalloc char[unformattedString.Length * 2];
-        int bufferIndex = 0;
+        bufferIndex = 0;
 
         for (int i = 0; i < unformattedString.Length; i++)
         {
@@ -134,8 +134,6 @@ public partial class EventResolverBase
                     break;
             }
         }
-
-        return new string(buffer[..bufferIndex]);
     }
 
     private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
@@ -265,16 +263,20 @@ public partial class EventResolverBase
                 properties[0].TrimEnd('\0', '\r', '\n') :
                 "Unable to resolve description, see XML for more details.";
 
-            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
 
-        ReadOnlySpan<char> description = CleanupFormatting(descriptionTemplate);
+        Span<char> description = stackalloc char[descriptionTemplate.Length * 2];
+
+        CleanupFormatting(descriptionTemplate, ref description, out int length);
+
+        description = description[..length];
 
         if (properties.Count <= 0)
         {
             returnDescription = description.ToString();
 
-            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
 
         char[] buffer = ArrayPool<char>.Shared.Rent(description.Length * 2);
@@ -287,7 +289,7 @@ public partial class EventResolverBase
 
             foreach (var match in _sectionsToReplace.EnumerateMatches(description))
             {
-                ReadOnlySpan<char> sectionToAdd = description[lastIndex..match.Index];
+                var sectionToAdd = description[lastIndex..match.Index];
 
                 if (currentLength + sectionToAdd.Length > updatedDescription.Length)
                 {
@@ -303,6 +305,9 @@ public partial class EventResolverBase
                 {
                     if (propIndex - 1 >= properties.Count)
                     {
+                        logger?.Trace($"{nameof(FormatDescription)}: Number of event properties does not match the description template\n" +
+                            $"Properties: {properties} \nTemplate: {descriptionTemplate}", LogLevel.Warning);
+
                         return "Unable to resolve description, see XML for more details.";
                     }
 
@@ -356,18 +361,20 @@ public partial class EventResolverBase
 
             returnDescription = new string(updatedDescription[..currentLength]);
 
-            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException ex)
         {
+            logger?.Trace($"{nameof(FormatDescription)}: Invalid operation exception was caught: {ex}", LogLevel.Warning);
+
             // If the regex fails to match, then we just return the original description.
             returnDescription = description.ToString();
 
-            return cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
+            return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
         catch (Exception ex)
         {
-            logger?.Trace($"FormatDescription exception was caught: {ex}");
+            logger?.Trace($"{nameof(FormatDescription)}: Exception was caught: {ex}", LogLevel.Warning);
 
             return "Failed to resolve description, see XML for more details.";
         }
@@ -388,7 +395,7 @@ public partial class EventResolverBase
             if ((eventRecord.Keywords.Value & k) == k)
             {
                 var keyword = s_standardKeywords[k].TrimEnd('\0');
-                returnValue.Add(cache?.GetOrAddValue(keyword) ?? keyword);
+                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
             }
         }
 
@@ -408,7 +415,7 @@ public partial class EventResolverBase
                 if ((lower32 & k) == k)
                 {
                     var keyword = details.Keywords[k].TrimEnd('\0');
-                    returnValue.Add(cache?.GetOrAddValue(keyword) ?? keyword);
+                    returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
                 }
             }
         }
@@ -448,7 +455,7 @@ public partial class EventResolverBase
         if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
         {
             taskName = taskName.TrimEnd('\0');
-            return cache?.GetOrAddValue(taskName) ?? taskName;
+            return _cache?.GetOrAddValue(taskName) ?? taskName;
         }
 
         if (!eventRecord.Task.HasValue)
@@ -461,7 +468,7 @@ public partial class EventResolverBase
         if (taskName is not null)
         {
             taskName = taskName.TrimEnd('\0');
-            return cache?.GetOrAddValue(taskName) ?? taskName;
+            return _cache?.GetOrAddValue(taskName) ?? taskName;
         }
 
         var potentialTaskNames = details.Messages
@@ -487,6 +494,6 @@ public partial class EventResolverBase
         }
 
         taskName = taskName.TrimEnd('\0');
-        return cache?.GetOrAddValue(taskName) ?? taskName;
+        return _cache?.GetOrAddValue(taskName) ?? taskName;
     }
 }
