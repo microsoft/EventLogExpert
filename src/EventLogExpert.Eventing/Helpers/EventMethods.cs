@@ -41,8 +41,6 @@ internal enum EvtFormatMessageFlags
     Xml
 }
 
-internal enum EvtLoginClass { EvtRpcLogin = 1 }
-
 internal enum EvtLogPropertyId
 {
     CreationTime,
@@ -507,70 +505,6 @@ internal static partial class EventMethods
         return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer[..(bufferUsed - 1)]);
     }
 
-    /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
-    /// <param name="eventBuffer">Pointer to a buffer returned from <see cref="EvtRender" /></param>
-    /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
-    /// <returns></returns>
-    internal static EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
-    {
-        EventRecord properties = new();
-
-        for (int i = 0; i < propertyCount; i++)
-        {
-            var property = Marshal.PtrToStructure<EvtVariant>(eventBuffer + (i * Marshal.SizeOf<EvtVariant>()));
-            var variant = ConvertVariant(property);
-
-            // Properties are returned in the order defined in EVT_SYSTEM_PROPERTY_ID enum
-            switch (i)
-            {
-                case (int)EvtSystemPropertyId.ActivityId:
-                    properties.ActivityId = (Guid?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Computer:
-                    properties.ComputerName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.EventId:
-                    properties.Id = (ushort)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.Keywords:
-                    properties.Keywords = (long?)(ulong?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Level:
-                    properties.Level = (byte?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Channel:
-                    properties.LogName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.ProcessID:
-                    properties.ProcessId = (int?)(uint?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.EventRecordId:
-                    properties.RecordId = (long?)(ulong?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.ProviderName:
-                    properties.ProviderName = (string)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.Task:
-                    properties.Task = (ushort?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.ThreadID:
-                    properties.ThreadId = (int?)(uint?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.TimeCreated:
-                    properties.TimeCreated = (DateTime)variant!;
-                    break;
-                case (int)EvtSystemPropertyId.UserID:
-                    properties.UserId = (SecurityIdentifier?)variant;
-                    break;
-                case (int)EvtSystemPropertyId.Version:
-                    properties.Version = (byte?)variant;
-                    break;
-            }
-        }
-
-        return properties;
-    }
-
     internal static object GetObjectArrayProperty(
         EvtHandle array,
         int index,
@@ -815,5 +749,69 @@ internal static partial class EventMethods
             default:
                 throw new Exception(message);
         }
+    }
+
+    /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
+    /// <param name="eventBuffer">Pointer to a buffer returned from <see cref="EvtRender" /></param>
+    /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
+    /// <returns></returns>
+    private static EventRecord GetEventRecord(IntPtr eventBuffer, int propertyCount)
+    {
+        EventRecord properties = new();
+
+        for (int i = 0; i < propertyCount; i++)
+        {
+            var property = Marshal.PtrToStructure<EvtVariant>(eventBuffer + (i * Marshal.SizeOf<EvtVariant>()));
+            var variant = ConvertVariant(property);
+
+            // Properties are returned in the order defined in EVT_SYSTEM_PROPERTY_ID enum
+            switch (i)
+            {
+                case (int)EvtSystemPropertyId.ActivityId:
+                    properties.ActivityId = (Guid?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.Computer:
+                    properties.ComputerName = (string)variant!;
+                    break;
+                case (int)EvtSystemPropertyId.EventId:
+                    properties.Id = (ushort)variant!;
+                    break;
+                case (int)EvtSystemPropertyId.Keywords:
+                    properties.Keywords = (long?)(ulong?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.Level:
+                    properties.Level = (byte?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.Channel:
+                    properties.LogName = (string)variant!;
+                    break;
+                case (int)EvtSystemPropertyId.ProcessID:
+                    properties.ProcessId = (int?)(uint?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.EventRecordId:
+                    properties.RecordId = (long?)(ulong?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.ProviderName:
+                    properties.ProviderName = (string)variant!;
+                    break;
+                case (int)EvtSystemPropertyId.Task:
+                    properties.Task = (ushort?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.ThreadID:
+                    properties.ThreadId = (int?)(uint?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.TimeCreated:
+                    properties.TimeCreated = (DateTime)variant!;
+                    break;
+                case (int)EvtSystemPropertyId.UserID:
+                    properties.UserId = (SecurityIdentifier?)variant;
+                    break;
+                case (int)EvtSystemPropertyId.Version:
+                    properties.Version = (byte?)variant;
+                    break;
+            }
+        }
+
+        return properties;
     }
 }
