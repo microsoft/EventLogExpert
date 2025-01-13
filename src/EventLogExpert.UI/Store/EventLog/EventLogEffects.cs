@@ -245,11 +245,10 @@ public sealed class EventLogEffects(
         IEnumerable<DisplayEventModel> eventsToDistribute)
     {
         var newLogs = logsToUpdate;
-        var events = eventsToDistribute;
 
         foreach (var log in logsToUpdate.Values)
         {
-            var newEventsForThisLog = events.Where(e => e.OwningLog == log.Name);
+            var newEventsForThisLog = eventsToDistribute.Where(e => e.OwningLog == log.Name);
 
             if (newEventsForThisLog.Any()) { continue; }
 

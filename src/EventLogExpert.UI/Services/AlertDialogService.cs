@@ -9,9 +9,9 @@ public interface IAlertDialogService
 
     Task<bool> ShowAlert(string title, string message, string accept, string cancel);
 
-    Task<string> DisplayPrompt(string title, string mesage);
+    Task<string> DisplayPrompt(string title, string message);
 
-    Task<string> DisplayPrompt(string title, string mesage, string initialValue);
+    Task<string> DisplayPrompt(string title, string message, string initialValue);
 }
 
 public sealed class AlertDialogService(

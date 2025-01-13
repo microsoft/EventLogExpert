@@ -26,7 +26,7 @@ internal enum RestartFlags
     RESTART_NO_REBOOT = 8
 }
 
-internal sealed partial class NativeMethods
+internal static partial class NativeMethods
 {
     // https://learn.microsoft.com/en-us/windows/msix/non-store-developer-updates
     /// <summary>Registers the active instance of an application for restart.</summary>

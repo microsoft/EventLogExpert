@@ -9,21 +9,20 @@ namespace EventLogExpert.Eventing.Providers;
 
 public partial class RegistryProvider(string? computerName, ITraceLogger? logger = null)
 {
+    private readonly string? _computerName = computerName;
     private readonly ITraceLogger? _logger = logger;
-
-    public string? ComputerName { get; } = computerName;
 
     /// <summary>sounds Returns the file paths for the message files for this provider.</summary>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _logger?.Trace($"GetLegacyProviderFiles called for provider {providerName} on computer {ComputerName}");
+        _logger?.Trace($"GetLegacyProviderFiles called for provider {providerName} on computer {_computerName}");
 
-        var hklm = string.IsNullOrEmpty(ComputerName)
+        var hklm = string.IsNullOrEmpty(_computerName)
             ? Registry.LocalMachine
-            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, ComputerName);
+            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
 
         var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
-            throw new OpenEventLogRegistryKeyFailedException(ComputerName ?? string.Empty);
+            throw new OpenEventLogRegistryKeyFailedException(_computerName ?? string.Empty);
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
@@ -77,24 +76,12 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
         return [];
     }
 
-    public string? GetSystemRoot()
-    {
-        var hklm = string.IsNullOrEmpty(ComputerName)
-            ? Registry.LocalMachine
-            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, ComputerName);
-
-        var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
-        var systemRoot = currentVersion?.GetValue("SystemRoot") as string;
-
-        return systemRoot;
-    }
-
     [GeneratedRegex("^[A-Z]:")]
     private static partial Regex ConvertRootPath();
 
     private IEnumerable<string> GetExpandedFilePaths(IEnumerable<string> paths)
     {
-        if (string.IsNullOrEmpty(ComputerName))
+        if (string.IsNullOrEmpty(_computerName))
         {
             // For local computer, do it the easy way
             return paths.Select(Environment.ExpandEnvironmentVariables);
@@ -104,7 +91,7 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
         // TODO: Support variables other than SystemRoot?
         var systemRoot = GetSystemRoot() ??
             throw new ExpandFilePathsFailedException(
-                $"Could not get SystemRoot from remote registry: {ComputerName}");
+                $"Could not get SystemRoot from remote registry: {_computerName}");
 
         paths = paths.Select(p =>
         {
@@ -116,13 +103,25 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
             if (match.Success)
             {
-                newPath = $@"\\{ComputerName}\{match.Value[0]}${newPath[2..]}";
+                newPath = $@"\\{_computerName}\{match.Value[0]}${newPath[2..]}";
             }
 
             return newPath;
         });
 
         return paths;
+    }
+
+    private string? GetSystemRoot()
+    {
+        var hklm = string.IsNullOrEmpty(_computerName)
+            ? Registry.LocalMachine
+            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
+
+        var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
+        var systemRoot = currentVersion?.GetValue("SystemRoot") as string;
+
+        return systemRoot;
     }
 
     private class ExpandFilePathsFailedException(string msg) : Exception(msg) {}

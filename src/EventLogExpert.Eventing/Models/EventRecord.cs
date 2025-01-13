@@ -44,7 +44,7 @@ public sealed record EventRecord
 
     public string? Xml { get; set; }
 
-    public string? Error { get; set; }
+    public string? Error { get; init; }
 
     public bool IsSuccess => string.IsNullOrEmpty(Error);
 }

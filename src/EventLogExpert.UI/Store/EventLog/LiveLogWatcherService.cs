@@ -79,13 +79,6 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         }
     }
 
-    public bool IsWatching()
-    {
-        using var scope = _watchersLock.EnterScope();
-
-        return _watchers.Keys.Count > 0;
-    }
-
     public void RemoveAll()
     {
         using var scope = _watchersLock.EnterScope();
@@ -105,23 +98,20 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         StopWatching(logName);
     }
 
-    public void StartWatching()
+    private bool IsWatching()
+    {
+        using var scope = _watchersLock.EnterScope();
+
+        return _watchers.Keys.Count > 0;
+    }
+
+    private void StartWatching()
     {
         using var scope = _watchersLock.EnterScope();
 
         foreach (var logName in _logsToWatch)
         {
             StartWatching(logName);
-        }
-    }
-
-    public void StopWatching()
-    {
-        using var scope = _watchersLock.EnterScope();
-
-        foreach (var logName in _watchers.Keys)
-        {
-            StopWatching(logName);
         }
     }
 
@@ -145,8 +135,6 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
 
             _debugLogger.Trace("EventRecordWritten callback was called.");
-            // TODO: Not sure if we need to save current bookmark unless we plan on stopping and starting the watcher
-            //_bookmarks[logName] = eventArgs.Bookmark;
 
             if (eventResolver is null)
             {
@@ -170,6 +158,16 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
             _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {logName}.");
         });
+    }
+
+    private void StopWatching()
+    {
+        using var scope = _watchersLock.EnterScope();
+
+        foreach (var logName in _watchers.Keys)
+        {
+            StopWatching(logName);
+        }
     }
 
     private void StopWatching(string logName)

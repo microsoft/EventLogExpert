@@ -27,7 +27,7 @@ internal enum LoadLibraryFlags : uint
     LOAD_WITH_ALTERED_SEARCH_PATH = 0x00000008
 }
 
-internal sealed partial class NativeMethods
+internal static partial class NativeMethods
 {
     internal const int RT_MESSAGETABLE = 11;
 
