@@ -49,14 +49,11 @@ public sealed partial class DetailsPane
         {
             SelectedEvent = selectedEvents.LastOrDefault();
 
-            if (SelectedEvent is null || (_hasOpened && !Settings.ShowDisplayPaneOnSelectionChange))
-            {
-                return;
-            }
+            if (SelectedEvent is null) { return; }
 
             await SelectedEvent.ResolveXml();
 
-            _isVisible = true;
+            if (!_hasOpened || Settings.ShowDisplayPaneOnSelectionChange) { _isVisible = true; }
 
             StateHasChanged();
         };
