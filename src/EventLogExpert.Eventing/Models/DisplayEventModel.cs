@@ -11,6 +11,8 @@ public sealed record DisplayEventModel(
     string OwningLog /*This is the name of the log file or the live log, which we use internally*/,
     PathType PathType)
 {
+    private string _xml = string.Empty;
+
     public Guid? ActivityId { get; init; }
 
     public string ComputerName { get; init; } = string.Empty;
@@ -40,13 +42,13 @@ public sealed record DisplayEventModel(
 
     public SecurityIdentifier? UserId { get; init; }
 
-    public string Xml { get; set; } = string.Empty;
+    public string Xml { get => _xml; init => _xml = value; }
 
-    public async Task<string> ResolveXml()
+    public async Task ResolveXml()
     {
-        if (!string.IsNullOrEmpty(Xml)) { return Xml; }
+        if (!string.IsNullOrEmpty(Xml)) { return; }
 
-        return Xml = await Task.Run(() =>
+        await Task.Run(() =>
             {
                 using EvtHandle handle = EventMethods.EvtQuery(
                     EventLogSession.GlobalSession.Handle,
@@ -54,20 +56,20 @@ public sealed record DisplayEventModel(
                     $"*[System[EventRecordID='{RecordId}']]",
                     PathType);
 
-                if (handle.IsInvalid) { return Xml = string.Empty; }
+                if (handle.IsInvalid) { return; }
 
                 var buffer = new IntPtr[1];
                 int count = 0;
 
                 bool success = EventMethods.EvtNext(handle, buffer.Length, buffer, 0, 0, ref count);
 
-                if (!success) { return string.Empty; }
+                if (!success) { return; }
 
                 using EvtHandle eventHandle = new(buffer[0]);
 
-                if (eventHandle.IsInvalid) { return string.Empty; }
+                if (eventHandle.IsInvalid) { return; }
 
-                return Xml = EventMethods.RenderEventXml(eventHandle) ?? string.Empty;
+                _xml = EventMethods.RenderEventXml(eventHandle) ?? string.Empty;
             }
         );
     }
