@@ -19,7 +19,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fluxor.Blazor.Web" Version="6.1.0" />
+    <PackageReference Include="Fluxor.Blazor.Web" Version="6.5.2" />
   </ItemGroup>
 
   <ItemGroup>
