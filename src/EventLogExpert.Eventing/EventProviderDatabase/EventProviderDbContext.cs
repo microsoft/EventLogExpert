@@ -9,7 +9,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
-public class EventProviderDbContext : DbContext
+public sealed class EventProviderDbContext : DbContext
 {
     private readonly bool _readOnly;
 
@@ -30,7 +30,7 @@ public class EventProviderDbContext : DbContext
 
     public string Name { get; }
 
-    public string Path { get; }
+    private string Path { get; }
 
     public DbSet<ProviderDetails> ProviderDetails { get; set; }
 

@@ -60,19 +60,22 @@ public sealed class CreateDatabaseCommand : DbToolCommand
 
         HashSet<string> skipProviderNames = [];
 
-        if (!File.Exists(skipProvidersInFile))
+        if (!string.IsNullOrWhiteSpace(skipProvidersInFile))
         {
-            Console.WriteLine($"File not found: {skipProvidersInFile}");
-        }
+            if (!File.Exists(skipProvidersInFile))
+            {
+                Console.WriteLine($"File not found: {skipProvidersInFile}");
+            }
 
-        using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
-        foreach (var provider in skipDbContext.ProviderDetails)
-        {
-            skipProviderNames.Add(provider.ProviderName);
-        }
+            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
+            foreach (var provider in skipDbContext.ProviderDetails)
+            {
+                skipProviderNames.Add(provider.ProviderName);
+            }
 
-        Console.WriteLine($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. " +
-            "These will not be included in the new database.");
+            Console.WriteLine($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. " +
+                "These will not be included in the new database.");
+        }
 
         var providerNames = GetLocalProviderNames(filter);
 
