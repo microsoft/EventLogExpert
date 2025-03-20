@@ -11,9 +11,9 @@ namespace EventLogExpert.Shared;
 
 public sealed partial class MainLayout
 {
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
-
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
+
+    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
