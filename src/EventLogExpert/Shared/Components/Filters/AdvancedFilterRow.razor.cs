@@ -50,6 +50,13 @@ public sealed partial class AdvancedFilterRow
     {
         if (!string.IsNullOrEmpty(_errorMessage)) { return; }
 
+        if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
+        {
+            _errorMessage = "Cannot save an empty filter";
+
+            return;
+        }
+
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(Value with { IsEditing = false, IsEnabled = true }));
     }
 
