@@ -76,6 +76,11 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _traceLogger = traceLogger;
         _updateService = updateService;
 
+        if (_currentVersionProvider.IsSupportedOS(DeviceInfo.Version))
+        {
+            _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, false).AndForget();
+        }
+
         activeLogsState.Select(e => e.ActiveLogs);
 
         activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
