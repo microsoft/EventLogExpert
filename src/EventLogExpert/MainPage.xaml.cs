@@ -120,15 +120,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
         fluxorDispatcher.Dispatch(new FilterGroupAction.LoadGroups());
 
-        var args = Environment.GetCommandLineArgs();
-
-        foreach (var arg in args)
-        {
-            if (arg.EndsWith(".evtx"))
-            {
-                OpenLog(arg, PathType.FilePath).AndForget();
-            }
-        }
+        ProcessCommandLine();
     }
 
     public void Dispose()
@@ -447,6 +439,21 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         CreateFlyoutMenu(AddOtherLogsFlyoutSubitem, names, true);
         CreateFlyoutMenu(OpenOtherLogsFlyoutSubitem, names);
+    }
+
+    private void ProcessCommandLine()
+    {
+        var args = Environment.GetCommandLineArgs();
+
+        foreach (var arg in args)
+        {
+            switch (arg)
+            {
+                case not null when arg.EndsWith(".evtx"):
+                    OpenLog(arg, PathType.FilePath).AndForget();
+                    break;
+            }
+        }
     }
 
     private async void ReleaseNotes_Clicked(object sender, EventArgs e) => await _updateService.GetReleaseNotes();
