@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
@@ -136,19 +137,36 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _cancellationTokenSource.Dispose();
     }
 
-    private static async Task<IEnumerable<FileResult?>> GetFilePickerResult()
+    private static async Task<IEnumerable<FileResult>> GetFilePickerResultAsync()
     {
         var options = new PickOptions
         {
             FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.WinUI, [".evtx"] }
-                }
-            )
+                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, [".evtx"] } })
         };
 
         return await FilePicker.Default.PickMultipleAsync(options);
+    }
+
+    private static async Task<IEnumerable<FileResult>> GetFolderPickerResultAsync()
+    {
+        string? folderPath = await FolderPickerHelper.PickFolderAsync();
+
+        if (folderPath is null)
+        {
+            return [];
+        }
+
+        List<FileResult> fileResults = [];
+
+        foreach (string file in Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly))
+        {
+            var fileResult = new FileResult(file);
+
+            fileResults.Add(fileResult);
+        }
+
+        return fileResults;
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -326,11 +344,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         bool shouldAddLog = item.CommandParameter is true;
 
-        var result = await GetFilePickerResult();
+        var files = await GetFilePickerResultAsync();
 
-        var logs = result.Where(f => f is not null).ToList();
-
-        if (logs.Count <= 0) { return; }
+        if (!files.Any()) { return; }
 
         if (!shouldAddLog)
         {
@@ -338,9 +354,31 @@ public sealed partial class MainPage : ContentPage, IDisposable
             _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
         }
 
-        foreach (var file in logs)
+        foreach (var file in files)
         {
-            await OpenLog(file!.FullPath, PathType.FilePath, shouldAddLog: true);
+            await OpenLog(file.FullPath, PathType.FilePath, shouldAddLog: true);
+        }
+    }
+
+    private async void OpenFolder_Clicked(object sender, EventArgs e)
+    {
+        if (sender is not MenuFlyoutItem item) { return; }
+
+        bool shouldAddLog = item.CommandParameter is true;
+
+        var files = await GetFolderPickerResultAsync();
+
+        if (!files.Any()) { return; }
+
+        if (!shouldAddLog)
+        {
+            await _cancellationTokenSource.CancelAsync();
+            _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
+        }
+
+        foreach (var file in files)
+        {
+            await OpenLog(file.FullPath, PathType.FilePath, shouldAddLog: true);
         }
     }
 

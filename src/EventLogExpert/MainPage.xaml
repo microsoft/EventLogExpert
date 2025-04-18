@@ -14,6 +14,7 @@
                         <KeyboardAccelerator Modifiers="Ctrl" Key="O" />
                     </MenuFlyoutItem.KeyboardAccelerators>
                 </MenuFlyoutItem>
+                <MenuFlyoutItem Text="Folder" Clicked="OpenFolder_Clicked" />
                 <MenuFlyoutSubItem Text="Live Event Log" >
                     <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
                     <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
@@ -23,6 +24,7 @@
             </MenuFlyoutSubItem>
             <MenuFlyoutSubItem Text="Add Another Log To This View">
                 <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" CommandParameter="{StaticResource True}" />
+                <MenuFlyoutItem Text="Folder" Clicked="OpenFolder_Clicked" CommandParameter="{StaticResource True}" />
                 <MenuFlyoutSubItem Text="Live Event Log" >
                     <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
                     <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
