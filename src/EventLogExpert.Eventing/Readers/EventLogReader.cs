@@ -26,10 +26,13 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
         GC.SuppressFinalize(this);
     }
 
-    // BatchSize can cause some weird behavior if it's too large
-    // Tested 1024 which returned failure way too early, 512 caused weird memory bloat
-    // and there was barely a noticeable speed difference between 64 and 512
-    public bool TryGetEvents(out EventRecord[] events, int batchSize = 64)
+    // Pre-Windows 11, a batch being returned can be maximum of (2 MB of data, batchSize count of events).
+    // If the requested number of events in batchSize exceeded 2 MB, the call failed.
+    // With a maximum event size of 64 KB, the maximum batchSize that won't exceed the maximum buffer
+    // size is 30 (32 minus some overhead; refer to MS-EVEN6 for details).
+    // Windows 11 and later will stop filling out the buffer when the maximum size is reached, regardless
+    // of whether the requested batchSize was reached (but it will not exceed the requested count).
+    public bool TryGetEvents(out EventRecord[] events, int batchSize = 30)
     {
         var buffer = new IntPtr[batchSize];
         int count = 0;
