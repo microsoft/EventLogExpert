@@ -101,6 +101,8 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
                     @event = new EventRecord { RecordId = null, Error = ex.Message };
                 }
 
+                @event.PathName = path;
+
                 EventRecordWritten?.Invoke(this, @event);
             }
         } while (success);

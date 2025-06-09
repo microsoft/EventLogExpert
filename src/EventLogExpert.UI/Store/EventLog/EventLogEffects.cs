@@ -250,7 +250,7 @@ public sealed class EventLogEffects(
         {
             var newEventsForThisLog = eventsToDistribute.Where(e => e.OwningLog == log.Name);
 
-            if (newEventsForThisLog.Any()) { continue; }
+            if (!newEventsForThisLog.Any()) { continue; }
 
             var newLogData = AddEventsToOneLog(log, newEventsForThisLog);
             newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);
