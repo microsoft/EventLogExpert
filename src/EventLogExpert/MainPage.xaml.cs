@@ -129,7 +129,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _cancellationTokenSource.Dispose();
     }
 
-    private static async Task<IEnumerable<FileResult>> GetFilePickerResultAsync()
+    private static async Task<IEnumerable<FileResult?>> GetFilePickerResultAsync()
     {
         var options = new PickOptions
         {
@@ -260,7 +260,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         foreach (var item in items)
         {
-            if (item is not StorageFile file || !extensions.Contains(file.FileType))
+            if (item is not StorageFile file || !extensions.Contains(file.FileType, StringComparer.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -336,9 +336,10 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         bool shouldAddLog = item.CommandParameter is true;
 
+        // Returns null if cancelled
         var files = await GetFilePickerResultAsync();
 
-        if (!files.Any()) { return; }
+        if (files is null || !files.Any()) { return; }
 
         if (!shouldAddLog)
         {
