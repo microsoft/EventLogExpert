@@ -24,7 +24,6 @@
         <!-- Versions -->
         <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
         <ApplicationVersion>1</ApplicationVersion>
-        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
     </PropertyGroup>
 
     <ItemGroup>
