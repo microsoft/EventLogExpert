@@ -27,7 +27,7 @@ extends:
         - task: UseDotNet@2
           displayName: 'Install .NET SDK'
           inputs:
-            version: '9.x'
+            version: '10.x'
             performMultiLevelLookup: true
         - script: dotnet workload restore src/EventLogExpert.sln
           displayName: 'dotnet workload restore'
