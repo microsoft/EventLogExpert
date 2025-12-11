@@ -15,36 +15,48 @@ public sealed class CreateDatabaseCommand : DbToolCommand
 
     public static Command GetCommand()
     {
-        var createDatabaseCommand = new Command(
-            name: "create",
-            description: "Creates a new event database.");
-        var fileArgument = new Argument<string>(
-            name: "file",
-            description: "File to create. Must have a .db extension.");
-        var filterOption = new Option<string>(
-            name: "--filter",
-            description: "Only providers matching specified regex string will be added to the database.");
-        var skipProvidersInFileOption = new Option<string>(
-            name: "--skip-providers-in-file",
-            description: "Any providers found in the specified database file will not be included in the new database. " +
+        Command createDatabaseCommand = new("create", "Creates a new event database.");
+
+        Argument<string> fileArgument = new("file")
+        {
+            Description = "File to create. Must have a .db extension."
+        };
+
+        Option<string> filterOption = new("--filter")
+        {
+            Description = "Only providers matching specified regex string will be added to the database."
+        };
+
+        Option<string> skipProvidersInFileOption = new("--skip-providers-in-file")
+        {
+            Description =
+                "Any providers found in the specified database file will not be included in the new database. " +
                 "For example, when creating a database of event providers for Exchange Server, it may be useful " +
                 "to provide a database of all providers from a fresh OS install with no other products. That way, all the " +
                 "OS providers are skipped, and only providers added by Exchange or other installed products " +
-                "would be saved in the new database.");
-        var verboseOption = new Option<bool>(
-            name: "--verbose",
-            description: "Enable verbose logging. May be useful for troubleshooting.");
+                "would be saved in the new database."
+        };
 
-        createDatabaseCommand.AddArgument(fileArgument);
-        createDatabaseCommand.AddOption(filterOption);
-        createDatabaseCommand.AddOption(skipProvidersInFileOption);
-        createDatabaseCommand.AddOption(verboseOption);
-        createDatabaseCommand.SetHandler(CreateDatabase, fileArgument, filterOption, verboseOption, skipProvidersInFileOption);
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Enable verbose logging. May be useful for troubleshooting."
+        };
+
+        createDatabaseCommand.Arguments.Add(fileArgument);
+        createDatabaseCommand.Options.Add(filterOption);
+        createDatabaseCommand.Options.Add(skipProvidersInFileOption);
+        createDatabaseCommand.Options.Add(verboseOption);
+
+        createDatabaseCommand.SetAction(result => CreateDatabase(
+            result.GetRequiredValue(fileArgument),
+            result.GetValue(filterOption),
+            result.GetValue(verboseOption),
+            result.GetValue(skipProvidersInFileOption)));
 
         return createDatabaseCommand;
     }
 
-    public static void CreateDatabase(string path, string filter, bool verboseLogging, string skipProvidersInFile)
+    private static void CreateDatabase(string path, string? filter, bool verboseLogging, string? skipProvidersInFile)
     {
         if (File.Exists(path))
         {
@@ -67,7 +79,8 @@ public sealed class CreateDatabaseCommand : DbToolCommand
                 Console.WriteLine($"File not found: {skipProvidersInFile}");
             }
 
-            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, readOnly: true);
+            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, true);
+
             foreach (var provider in skipDbContext.ProviderDetails)
             {
                 skipProviderNames.Add(provider.ProviderName);
@@ -88,12 +101,13 @@ public sealed class CreateDatabaseCommand : DbToolCommand
         var providerNamesNotSkipped = providerNames.Where(name => !skipProviderNames.Contains(name)).ToList();
 
         var numberSkipped = providerNames.Count - providerNamesNotSkipped.Count;
+
         if (numberSkipped > 0)
         {
             Console.WriteLine($"{numberSkipped} providers were skipped due to being present in the specified database.");
         }
 
-        using var dbContext = new EventProviderDbContext(path, readOnly: false);
+        using var dbContext = new EventProviderDbContext(path, false);
 
         LogProviderDetailHeader(providerNamesNotSkipped);
 

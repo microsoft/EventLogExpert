@@ -14,37 +14,41 @@ public class ShowLocalCommand : DbToolCommand
 
     public static Command GetCommand()
     {
-        var showProvidersCommand = new Command(
-            name: "showlocal",
-            description: "List the event providers on the local machine.");
-        var filterOption = new Option<string>(
-            name: "--filter",
-            description: "Filter for provider names matching the specified regex string.");
-        var verboseOption = new Option<bool>(
-            name: "--verbose",
-            description: "Verbose logging. May be useful for troubleshooting.");
-        showProvidersCommand.AddOption(filterOption);
-        showProvidersCommand.AddOption(verboseOption);
-        showProvidersCommand.SetHandler(ShowProviderInfo, filterOption, verboseOption);
+        Command showProvidersCommand = new(
+            "showlocal",
+            "List the event providers on the local machine.");
+
+        Option<string> filterOption = new("--filter")
+        {
+            Description = "Filter for provider names matching the specified regex string."
+        };
+
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Verbose logging. May be useful for troubleshooting."
+        };
+
+        showProvidersCommand.Options.Add(filterOption);
+        showProvidersCommand.Options.Add(verboseOption);
+
+        showProvidersCommand.SetAction(action =>
+            ShowProviderInfo(action.GetValue(filterOption), action.GetValue(verboseOption)));
 
         return showProvidersCommand;
     }
 
-    public static void ShowProviderInfo(string filter, bool verbose)
+    private static void ShowProviderInfo(string? filter, bool verbose)
     {
         var providerNames = GetLocalProviderNames(filter);
 
         LogProviderDetailHeader(providerNames);
+
         foreach (var providerName in providerNames)
         {
             var provider = new EventMessageProvider(providerName, verbose ? s_logger : null);
             var details = provider.LoadProviderDetails();
-            if (details != null)
-            {
-                LogProviderDetails(details);
 
-                details = null;
-            }
+            LogProviderDetails(details);
         }
     }
 }

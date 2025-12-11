@@ -10,23 +10,30 @@ public class UpgradeDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
-        var upgradeDatabaseCommand = new Command(
-            name: "upgrade",
-            description: "Upgrades the database schema");
-        var fileArgument = new Argument<string>(
-            name: "file",
-            description: "The database file to upgrade.");
-        var verboseOption = new Option<bool>(
-            name: "--verbose",
-            description: "Verbose logging. May be useful for troubleshooting.");
-        upgradeDatabaseCommand.AddArgument(fileArgument);
-        upgradeDatabaseCommand.AddOption(verboseOption);
-        upgradeDatabaseCommand.SetHandler(UpgradeDatabase, fileArgument, verboseOption);
+        Command upgradeDatabaseCommand = new(
+            "upgrade",
+            "Upgrades the database schema");
+
+        Argument<string> fileArgument = new("file")
+        {
+            Description = "The database file to upgrade."
+        };
+
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Verbose logging. May be useful for troubleshooting."
+        };
+
+        upgradeDatabaseCommand.Arguments.Add(fileArgument);
+        upgradeDatabaseCommand.Options.Add(verboseOption);
+
+        upgradeDatabaseCommand.SetAction(action =>
+            UpgradeDatabase(action.GetRequiredValue(fileArgument), action.GetValue(verboseOption)));
 
         return upgradeDatabaseCommand;
     }
 
-    public static void UpgradeDatabase(string file, bool verbose)
+    private static void UpgradeDatabase(string file, bool verbose)
     {
         if (!File.Exists(file))
         {
@@ -34,7 +41,7 @@ public class UpgradeDatabaseCommand : DbToolCommand
             return;
         }
 
-        using var dbContext = new EventProviderDbContext(file, readOnly: false);
+        using var dbContext = new EventProviderDbContext(file, false);
 
         var (needsV2, needsV3) = dbContext.IsUpgradeNeeded();
 

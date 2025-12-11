@@ -9,20 +9,15 @@ internal class Program
 {
     private static async Task<int> Main(string[] args)
     {
-        var rootCommand = new RootCommand("Tool used to create and modify databases for use with EventLogExpert");
+        RootCommand rootCommand = new("Tool used to create and modify databases for use with EventLogExpert");
 
-        rootCommand.AddCommand(ShowLocalCommand.GetCommand());
+        rootCommand.Subcommands.Add(ShowLocalCommand.GetCommand());
+        rootCommand.Subcommands.Add(ShowDatabaseCommand.GetCommand());
+        rootCommand.Subcommands.Add(CreateDatabaseCommand.GetCommand());
+        rootCommand.Subcommands.Add(MergeDatabaseCommand.GetCommand());
+        rootCommand.Subcommands.Add(DiffDatabaseCommand.GetCommand());
+        rootCommand.Subcommands.Add(UpgradeDatabaseCommand.GetCommand());
 
-        rootCommand.AddCommand(ShowDatabaseCommand.GetCommand());
-
-        rootCommand.AddCommand(CreateDatabaseCommand.GetCommand());
-
-        rootCommand.AddCommand(MergeDatabaseCommand.GetCommand());
-
-        rootCommand.AddCommand(DiffDatabaseCommand.GetCommand());
-
-        rootCommand.AddCommand(UpgradeDatabaseCommand.GetCommand());
-
-        return await rootCommand.InvokeAsync(args);
+        return await rootCommand.Parse(args).InvokeAsync();
     }
 }
