@@ -11,27 +11,36 @@ public class ShowDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
-        var showDatabaseCommand = new Command(
-            name: "showdatabase",
-            description: "List the event providers from a database created with this tool.");
-        var fileArgument = new Argument<string>(
-            name: "file",
-            description: "The database file to show.");
-        var filterOption = new Option<string>(
-            name: "--filter",
-            description: "Filter for provider names matching the specified regex string.");
-        var verboseOption = new Option<bool>(
-            name: "--verbose",
-            description: "Verbose logging. May be useful for troubleshooting.");
-        showDatabaseCommand.AddArgument(fileArgument);
-        showDatabaseCommand.AddOption(filterOption);
-        showDatabaseCommand.AddOption(verboseOption);
-        showDatabaseCommand.SetHandler(ShowProviderInfo, fileArgument, filterOption, verboseOption);
+        Command showDatabaseCommand = new (name: "showdatabase", description: "List the event providers from a database created with this tool.");
+
+        Argument<string> fileArgument = new("file")
+        {
+            Description = "The database file to show."
+        };
+
+        Option<string> filterOption = new("--filter")
+        {
+            Description = "Filter for provider names matching the specified regex string."
+        };
+
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Verbose logging. May be useful for troubleshooting."
+        };
+
+        showDatabaseCommand.Arguments.Add(fileArgument);
+        showDatabaseCommand.Options.Add(filterOption);
+        showDatabaseCommand.Options.Add(verboseOption);
+
+        showDatabaseCommand.SetAction(action => ShowProviderInfo(
+            action.GetRequiredValue(fileArgument),
+            action.GetValue(filterOption),
+            action.GetValue(verboseOption)));
 
         return showDatabaseCommand;
     }
 
-    public static void ShowProviderInfo(string file, string filter, bool verbose)
+    private static void ShowProviderInfo(string file, string? filter, bool verbose)
     {
         if (!File.Exists(file))
         {

@@ -11,40 +11,53 @@ public class DiffDatabaseCommand : DbToolCommand
 {
     public static Command GetCommand()
     {
-        var diffDatabaseCommand = new Command(
-            name: "diff",
-            description: "Given two databases, produces a third database containing all providers " +
-                "from the second database which are not in the first database.");
-        var dbOneArgument = new Argument<string>(
-            name: "first db",
-            description: "The first database to compare.");
-        var dbTwoArgument = new Argument<string>(
-            name: "second db",
-            description: "The second database to compare.");
-        var newDbArgument = new Argument<string>(
-            name: "new db",
-            description: "The new database containing only the providers in the second db which are not in the first db. Must have a .db extension.");
-        var verboseOption = new Option<bool>(
-            name: "--verbose",
-            description: "Verbose logging. May be useful for troubleshooting.");
-        diffDatabaseCommand.AddArgument(dbOneArgument);
-        diffDatabaseCommand.AddArgument(dbTwoArgument);
-        diffDatabaseCommand.AddArgument(newDbArgument);
-        diffDatabaseCommand.AddOption(verboseOption);
-        diffDatabaseCommand.SetHandler(DiffDatabase, dbOneArgument, dbTwoArgument, newDbArgument, verboseOption);
+        Command diffDatabaseCommand = new(
+            "diff",
+            "Given two databases, produces a third database containing all providers " +
+            "from the second database which are not in the first database.");
+
+        Argument<string> dbOneArgument = new("first db")
+        {
+            Description = "The first database to compare."
+        };
+
+        Argument<string> dbTwoArgument = new("second db")
+        {
+            Description = "The second database to compare."
+        };
+
+        Argument<string> newDbArgument = new("new db")
+        {
+            Description = "The new database containing only the providers in the second db which are not in the first db. Must have a .db extension."
+        };
+
+        Option<bool> verboseOption = new("--verbose")
+        {
+            Description = "Verbose logging. May be useful for troubleshooting."
+        };
+
+        diffDatabaseCommand.Arguments.Add(dbOneArgument);
+        diffDatabaseCommand.Arguments.Add(dbTwoArgument);
+        diffDatabaseCommand.Arguments.Add(newDbArgument);
+        diffDatabaseCommand.Options.Add(verboseOption);
+
+        diffDatabaseCommand.SetAction(action => DiffDatabase(
+            action.GetRequiredValue(dbOneArgument),
+            action.GetRequiredValue(dbTwoArgument),
+            action.GetRequiredValue(newDbArgument),
+            action.GetValue(verboseOption)));
 
         return diffDatabaseCommand;
     }
 
-    public static void DiffDatabase(string dbOne, string dbTwo, string newDb, bool verbose)
+    private static void DiffDatabase(string dbOne, string dbTwo, string newDb, bool verbose)
     {
         foreach (var path in new[] { dbOne, dbTwo })
         {
-            if (!File.Exists(path))
-            {
-                Console.WriteLine($"File not found: {path}");
-                return;
-            }
+            if (File.Exists(path)) { continue; }
+
+            Console.WriteLine($"File not found: {path}");
+            return;
         }
 
         if (File.Exists(newDb))
@@ -55,32 +68,38 @@ public class DiffDatabaseCommand : DbToolCommand
 
         if (Path.GetExtension(newDb) != ".db")
         {
-            Console.WriteLine($"New db path must have a .db extension.");
+            Console.WriteLine("New db path must have a .db extension.");
             return;
         }
 
         var dbOneProviderNames = new HashSet<string>();
 
-        using (var dbOneContext = new EventProviderDbContext(dbOne, readOnly: true))
+        using (var dbOneContext = new EventProviderDbContext(dbOne, true))
         {
-            dbOneContext.ProviderDetails.Select(p => p.ProviderName).ToList().ForEach(name => dbOneProviderNames.Add(name));
+            dbOneContext.ProviderDetails.Select(p => p.ProviderName).ToList()
+                .ForEach(name => dbOneProviderNames.Add(name));
         }
 
         var providersCopied = new List<ProviderDetails>();
 
-        using var dbTwoContext = new EventProviderDbContext(dbTwo, readOnly: true);
-        using var newDbContext = new EventProviderDbContext(newDb, readOnly: false);
+        using var dbTwoContext = new EventProviderDbContext(dbTwo, true);
+        using var newDbContext = new EventProviderDbContext(newDb, false);
 
         foreach (var details in dbTwoContext.ProviderDetails)
         {
             if (dbOneProviderNames.Contains(details.ProviderName))
             {
-                if (verbose) Console.WriteLine($"Skipping {details.ProviderName} because it is present in both databases.");
-                continue;
+                if (verbose)
+                {
+                    Console.WriteLine($"Skipping {details.ProviderName} because it is present in both databases.");
+                }
             }
             else
             {
-                if (verbose) Console.WriteLine($"Copying {details.ProviderName} because it is present in second db but not first db.");
+                if (verbose)
+                {
+                    Console.WriteLine($"Copying {details.ProviderName} because it is present in second db but not first db.");
+                }
 
                 newDbContext.ProviderDetails.Add(new ProviderDetails
                 {
@@ -103,6 +122,7 @@ public class DiffDatabaseCommand : DbToolCommand
             Console.WriteLine("Providers copied to new database:");
             Console.WriteLine();
             LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
+
             foreach (var provider in providersCopied)
             {
                 LogProviderDetails(provider);
