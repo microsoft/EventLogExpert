@@ -10,6 +10,8 @@
     --clr-green: #5AC358;
     --clr-yellow: #F8C84B;
 
+    --clr-placeholder: #A3A1A1;
+
     --clr-statusbar: #3C64E7;
 
     --background-dark: #222222;
@@ -50,6 +52,8 @@
 }
 
 ::-webkit-scrollbar-thumb { background: var(--clr-statusbar); }
+
+::placeholder { color: var(--clr-placeholder); }
 
 html, body {
     height: 100%;
