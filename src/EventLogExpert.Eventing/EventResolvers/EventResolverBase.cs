@@ -14,6 +14,10 @@ namespace EventLogExpert.Eventing.EventResolvers;
 
 public partial class EventResolverBase
 {
+    private const string DefaultFailedDescription = "Failed to resolve description, see XML for more details.";
+    private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details";
+    private const string DefaultNoProviderDescription = "No matching provider available, see XML for more details.";
+
     /// <summary>
     ///     The mappings from the outType attribute in the EventModel XML template to determine if it should be displayed
     ///     as Hex.
@@ -261,7 +265,7 @@ public partial class EventResolverBase
             // Found a few providers that have their properties wrapped with \r\n for some reason
             returnDescription = properties.Count == 1 ?
                 properties[0].TrimEnd('\0', '\r', '\n') :
-                "Unable to resolve description, see XML for more details.";
+                DefaultFailedDescription;
 
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
@@ -305,10 +309,9 @@ public partial class EventResolverBase
                 {
                     if (propIndex - 1 >= properties.Count)
                     {
-                        logger?.Trace($"{nameof(FormatDescription)}: Number of event properties does not match the description template\n" +
-                            $"Properties: {properties} \nTemplate: {descriptionTemplate}", LogLevel.Warning);
+                        logger?.Trace($"{nameof(FormatDescription)}: Number of event properties does not match the description template", LogLevel.Warning);
 
-                        return "Unable to resolve description, see XML for more details.";
+                        return DefaultFailedDescription;
                     }
 
                     propString = properties[propIndex - 1];
@@ -376,7 +379,7 @@ public partial class EventResolverBase
         {
             logger?.Trace($"{nameof(FormatDescription)}: Exception was caught: {ex}", LogLevel.Warning);
 
-            return "Failed to resolve description, see XML for more details.";
+            return DefaultFailedDescription;
         }
         finally
         {
@@ -428,18 +431,32 @@ public partial class EventResolverBase
     {
         if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
         {
-            return "Description not found. No provider available.";
+            return DefaultNoProviderDescription;
         }
 
         var @event = GetModernEvent(eventRecord, details);
         var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
 
-        return string.IsNullOrEmpty(@event?.Description) ?
-            FormatDescription(
-                properties,
-                details.Messages.FirstOrDefault(m => m.ShortId == eventRecord.Id)?.Text,
-                details.Parameters) :
-            FormatDescription(properties, @event.Description, details.Parameters);
+        if (!string.IsNullOrEmpty(@event?.Description))
+        {
+            return FormatDescription(properties, @event?.Description, details.Parameters);
+        }
+
+        // Legacy provider message lookup, if there is multiple messages then move on so we don't show wrong description
+        var legacyMessage = details.Messages.Where(m => m.ShortId == eventRecord.Id).ToList();
+
+        if (legacyMessage.Count == 1)
+        {
+            return FormatDescription(properties, legacyMessage.First().Text, details.Parameters);
+        }
+
+        // Some events store the description in the event properties
+        if (properties.Count > 0)
+        {
+            return FormatDescription(properties, null, details.Parameters);
+        }
+
+        return DefaultNoMatchingDescription;
     }
 
     /// <summary>Resolve event task names from an event record.</summary>
