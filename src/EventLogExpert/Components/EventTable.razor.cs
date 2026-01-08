@@ -107,11 +107,44 @@ public sealed partial class EventTable
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {
+        int? currentIndex;
+        DisplayEventModel? lastEvent;
+        DisplayEventModel? nextEvent;
+
         // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
         switch (args)
         {
             case { CtrlKey: true, Code: "KeyC" }:
                 ClipboardService.CopySelectedEvent();
+
+                return;
+            case { Code: "ArrowUp" }:
+                lastEvent = _selectedEventState.LastOrDefault();
+
+                if (lastEvent is null) { return; }
+
+                currentIndex = _currentTable?.DisplayedEvents.IndexOf(lastEvent);
+
+                nextEvent = currentIndex > 0 ? _currentTable?.DisplayedEvents.ElementAtOrDefault(currentIndex.Value - 1) : null;
+
+                if (nextEvent is null) { return; }
+
+                Dispatcher.Dispatch(new EventLogAction.SelectEvent(nextEvent));
+
+                return;
+            case { Code: "ArrowDown" }:
+                lastEvent = _selectedEventState.LastOrDefault();
+
+                if (lastEvent is null) { return; }
+
+                currentIndex = _currentTable?.DisplayedEvents.IndexOf(lastEvent);
+
+                nextEvent = currentIndex < _currentTable?.DisplayedEvents.Count ? _currentTable?.DisplayedEvents.ElementAtOrDefault(currentIndex.Value + 1) : null;
+
+                if (nextEvent is null) { return; }
+
+                Dispatcher.Dispatch(new EventLogAction.SelectEvent(nextEvent));
+
                 return;
         }
     }
