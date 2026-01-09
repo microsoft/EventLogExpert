@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
@@ -14,6 +15,17 @@ public sealed partial class MainLayout
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private ISettingsService Settings { get; init; } = null!;
+
+    [Inject] private IUpdateService UpdateService { get; init; } = null!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await UpdateService.CheckForUpdates(Settings.IsPreReleaseEnabled, false);
+
+        await base.OnInitializedAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
