@@ -19,13 +19,13 @@
                 <span>
                     @if (Value.IsExcluded)
                     {
-                        <text>Exclude Expression: </text>
+                        <label for="@Id">Exclude Expression: </label>
                     }
                     else
                     {
-                        <text>Expression: </text>
+                        <label for="@Id">Expression: </label>
                     }
-                    <input class="input advanced-filter" @oninput="OnInputChanged"
+                    <input class="input advanced-filter" @oninput="OnInputChanged" id="@Id"
                         placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
                         type="text" value="@Value.Comparison.Value" />
                 </span>
