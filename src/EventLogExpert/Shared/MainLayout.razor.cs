@@ -23,18 +23,9 @@ public sealed partial class MainLayout
     protected override async Task OnInitializedAsync()
     {
         await UpdateService.CheckForUpdates(Settings.IsPreReleaseEnabled, false);
+        AppTitleService.SetLogName(null);
 
         await base.OnInitializedAsync();
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            AppTitleService.SetLogName(null);
-        }
-
-        await base.OnAfterRenderAsync(firstRender);
     }
 
     private void HandleKeyUp(KeyboardEventArgs args)
