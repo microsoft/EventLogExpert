@@ -114,7 +114,19 @@ public sealed partial class FilterGroup
     {
         var newName = await AlertDialogService.DisplayPrompt("Group Name", "What would you like to name this group?", Group.Name);
 
-        if (string.IsNullOrEmpty(newName) || string.Equals(newName, Group.Name)) { return; }
+        if (string.IsNullOrEmpty(newName))
+        {
+            await AlertDialogService.ShowAlert("Rename Failed", "Name cannot be empty", "OK");
+
+            return;
+        }
+
+        if (string.Equals(newName, Group.Name))
+        {
+            await AlertDialogService.ShowAlert("Rename Failed", "Name cannot be the same as previous name", "OK");
+
+            return;
+        }
 
         Dispatcher.Dispatch(new FilterGroupAction.SetGroup(Group with { Name = newName }));
     }
