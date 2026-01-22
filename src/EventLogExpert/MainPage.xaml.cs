@@ -79,33 +79,29 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         activeLogsState.Select(e => e.ActiveLogs);
 
-        activeLogsState.SelectedValueChanged += (sender, activeLogs) =>
+        activeLogsState.SelectedValueChanged += (_, activeLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
-            {
-                appTitleService.SetLogName(
-                    activeLogs == ImmutableDictionary<string, EventLogData>.Empty ?
-                        null : string.Join(" | ", activeLogs.Values.Select(l => l.Name)));
-            });
+                appTitleService.SetLogName(activeLogs.Count <= 0 ? null : string.Join(" | ", activeLogs.Values.Select(l => l.Name))));
 
         continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
 
-        continuouslyUpdateState.SelectedValueChanged += (sender, continuouslyUpdate) =>
+        continuouslyUpdateState.SelectedValueChanged += (_, continuouslyUpdate) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}");
 
         filterPaneIsEnabledState.Select(e => e.IsEnabled);
 
-        filterPaneIsEnabledState.SelectedValueChanged += (sender, isEnabled) =>
+        filterPaneIsEnabledState.SelectedValueChanged += (_, isEnabled) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
 
         filterPaneIsXmlEnabledState.Select(e => e.IsXmlEnabled);
 
-        filterPaneIsXmlEnabledState.SelectedValueChanged += async (sender, isEnabled) =>
+        filterPaneIsXmlEnabledState.SelectedValueChanged += async (_, isEnabled) =>
             await MainThread.InvokeOnMainThreadAsync(() =>
                 EnableXmlFilteringMenuItem.Text = $"Enable Xml Filtering{(isEnabled ? " ✓" : "")}");
 
-        _databaseService.LoadedDatabasesChanged += (sender, loadedProviders) =>
+        _databaseService.LoadedDatabasesChanged += (_, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
                 Path.Join(fileLocationOptions.DatabasePath, path)));
 
