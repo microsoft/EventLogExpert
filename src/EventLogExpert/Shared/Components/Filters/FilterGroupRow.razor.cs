@@ -11,8 +11,10 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class FilterGroupRow
 {
-    private Timer? _debounceTimer = null;
+    private Timer? _debounceTimer;
     private string _errorMessage = string.Empty;
+
+    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [Parameter] public FilterGroupId ParentId { get; set; }
 

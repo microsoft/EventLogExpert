@@ -11,8 +11,10 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class AdvancedFilterRow
 {
-    private Timer? _debounceTimer = null;
+    private Timer? _debounceTimer;
     private string _errorMessage = string.Empty;
+
+    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
@@ -62,6 +64,5 @@ public sealed partial class AdvancedFilterRow
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
 
-    private void ToggleFilterExclusion() =>
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
+    private void ToggleFilterExclusion() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
 }
