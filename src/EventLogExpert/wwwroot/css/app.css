@@ -202,8 +202,6 @@ a,
     text-align: center;
     cursor: default;
     user-select: none;
-
-    &:focus { outline: none; }
 }
 
 input[type="text"].input { padding: 0; }
