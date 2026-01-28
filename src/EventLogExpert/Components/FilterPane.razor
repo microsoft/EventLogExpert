@@ -47,7 +47,7 @@
                 </div>
             }
 
-            <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu">
+            <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
                 <i class="bi bi-caret-up"></i>
             </span>
         }

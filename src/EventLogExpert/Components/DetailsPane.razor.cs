@@ -8,6 +8,7 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 
@@ -62,6 +63,22 @@ public sealed partial class DetailsPane
     }
 
     private void CopyEvent() => ClipboardService.CopySelectedEvent(CopyType.Full);
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            ToggleMenu();
+        }
+    }
+
+    private void HandleKeyDownXml(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            ToggleXml();
+        }
+    }
 
     private void ToggleMenu()
     {
