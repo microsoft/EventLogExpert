@@ -9,6 +9,7 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
@@ -142,6 +143,14 @@ public sealed partial class FilterPane
         count += FilterPaneState.Value.Filters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
 
         return count;
+    }
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            ToggleMenu();
+        }
     }
 
     private void RemoveDateFilter()

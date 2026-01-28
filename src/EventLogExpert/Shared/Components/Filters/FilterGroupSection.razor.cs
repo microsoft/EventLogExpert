@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
@@ -19,4 +20,12 @@ public sealed partial class FilterGroupSection
     private string MenuState => _menuState.ToString().ToLower();
 
     private void ToggleMenu() => _menuState = !_menuState;
+
+    private void HandleKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key is "Enter" or " ")
+        {
+            ToggleMenu();
+        }
+    }
 }

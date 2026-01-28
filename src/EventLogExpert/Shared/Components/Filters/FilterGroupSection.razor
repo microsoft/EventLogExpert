@@ -1,7 +1,7 @@
 @using EventLogExpert.UI.Models
 
 <div>
-    <div class="flex-space-between my-1" @onclick="ToggleMenu">
+    <div class="flex-space-between my-1" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
         <span>@Name</span>
 
         <span class="menu-toggle" data-rotate="@MenuState">
