@@ -394,6 +394,12 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     &[selected] { filter: brightness(0.9); }
 }
 
+@media (forced-colors: active) {
+    :root {
+        forced-color-adjust: none;
+    }
+}
+
 /*@supports (-webkit-touch-callout: none) {
     .status-bar-safe-area {
         display: flex;
