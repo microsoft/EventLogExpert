@@ -6,7 +6,7 @@
         {
             if (!Value.IsExcluded)
             {
-                <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
+                <ValueSelect AriaLabel="Highlight Color" CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")" T="HighlightColor" @bind-Value="Value.Color">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
                         <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
@@ -16,13 +16,13 @@
 
             if (Value.IsExcluded)
             {
-                <span>Exclude On: </span>
+                <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
             }
             else
             {
-                <span>Filter On: </span>
+                <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
             }
-            <ValueSelect CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
+            <ValueSelect AriaLabelledBy="@($"{Id}_IsExcluded")" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
                 @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
                 {
                     if (item == FilterCategory.Xml && !FilterService.IsXmlEnabled) { continue; }
@@ -31,23 +31,23 @@
                 }
             </ValueSelect>
 
-            <span>Comparison: </span>
-            <ValueSelect CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
+            <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
+            <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
                 @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
                 {
                     <ValueSelectItem T="FilterEvaluator" Value="item" />
                 }
             </ValueSelect>
 
-            <span>Value: </span>
+            <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
             <div>
                 @if (Value.Data.Category is FilterCategory.Description)
                 {
-                    <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
+                    <TextInput aria-labelledby="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
                 }
                 else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
                 {
-                    <ValueSelect CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
+                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
                         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
                         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in Items)
@@ -58,7 +58,7 @@
                 }
                 else
                 {
-                    <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
+                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
                     <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in FilteredItems)
                         {

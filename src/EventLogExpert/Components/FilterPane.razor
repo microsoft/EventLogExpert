@@ -47,7 +47,8 @@
                 </div>
             }
 
-            <span class="menu-toggle justify-self-right" data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
+            <span aria-label="Toggle filter pane" class="menu-toggle justify-self-right" data-rotate="@MenuState"
+                @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
                 <i class="bi bi-caret-up"></i>
             </span>
         }
@@ -56,14 +57,14 @@
     <div class="filter-group" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
-            <EditForm id="filter-form" class="flex-row" Model="_model">
+            <EditForm class="flex-row" id="filter-form" Model="_model">
                 <span>
-                    After: <InputDate class="input filter-datetime" Type="InputDateType.DateTimeLocal"
-                        @bind-Value="_model.After" disabled="@(!_canEditDate)" />
+                    After: <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"
+                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
                 <span>
-                    Before: <InputDate class="input filter-datetime" Type="InputDateType.DateTimeLocal"
-                        @bind-Value="_model.Before" disabled="@(!_canEditDate)" />
+                    Before: <InputDate aria-label="Before" @bind-Value="_model.Before" class="input filter-datetime"
+                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
 
                 @if (_canEditDate)
@@ -72,7 +73,7 @@
                         <i class="bi bi-check-circle"></i> Apply
                     </button>
 
-                    <button class="button button-red" type="button" @onclick="RemoveDateFilter">
+                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
                 }
@@ -82,7 +83,7 @@
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
-                    <button class="button button-red" type="button" @onclick="RemoveDateFilter">
+                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
 

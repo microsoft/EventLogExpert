@@ -14,7 +14,7 @@
                 </ValueSelect>
             }
 
-            <span>Cache Type: </span>
+            <label aria-label="Cache Type">Cache Type: </label>
             <ValueSelect CssClass="input filter-dropdown" T="CacheType" @bind-Value="_cacheType" ToStringFunc="x => x.ToFullString()">
                 @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
                 {
@@ -24,11 +24,11 @@
 
             if (Value.IsExcluded)
             {
-                <span>Exclude Value: </span>
+                <label aria-label="Exclude Value">Exclude Value: </label>
             }
             else
             {
-                <span>Value: </span>
+                <label aria-label="Value">Value: </label>
             }
             <ValueSelect CssClass="input cache-dropdown" T="string" @bind-Value="_filterValue" IsInput>
                 @if (Items.Any())

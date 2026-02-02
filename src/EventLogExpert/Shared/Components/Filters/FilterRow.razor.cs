@@ -16,6 +16,8 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class FilterRow
 {
+    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;

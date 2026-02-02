@@ -24,6 +24,7 @@ public sealed partial class EventTable
     private EventTableModel? _currentTable;
     private ColumnName[] _enabledColumns = null!;
     private EventTableState _eventTableState = null!;
+    private string _headerName = string.Empty;
     private int _rowIndex = 0;
     private ImmutableList<DisplayEventModel> _selectedEventState = [];
     private TimeZoneInfo _timeZoneSettings = null!;
