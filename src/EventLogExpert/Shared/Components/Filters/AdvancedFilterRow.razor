@@ -1,5 +1,4 @@
 @using EventLogExpert.UI
-@using EventLogExpert.UI.Store.FilterPane
 
 <div class="flex-space-between">
     <div class="flex-align-center">
@@ -19,11 +18,11 @@
             <span>
                 @if (Value.IsExcluded)
                 {
-                    <label for="@Id">Exclude Expression: </label>
+                    <label aria-label="Exclude Expression" for="@Id">Exclude Expression: </label>
                 }
                 else
                 {
-                    <label for="@Id">Expression: </label>
+                    <label aria-label="Expression" for="@Id">Expression: </label>
                 }
                 <input class="input advanced-filter" @oninput="OnInputChanged" id="@Id"
                     placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"

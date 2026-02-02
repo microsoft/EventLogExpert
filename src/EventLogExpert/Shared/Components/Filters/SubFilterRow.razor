@@ -13,22 +13,22 @@
             }
         </ValueSelect>
 
-        <span>Comparison: </span>
-        <ValueSelect CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
+        <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
+        <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
             {
                 <ValueSelectItem T="FilterEvaluator" Value="item" />
             }
         </ValueSelect>
 
-        <span>Value: </span>
+        <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
         @if (Value.Data.Category is FilterCategory.Description)
         {
-            <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
+            <TextInput aria-labelledby="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
         }
         else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
         {
-            <ValueSelect CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
+            <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
                 ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
                 <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                 @foreach (var item in Items)
@@ -39,7 +39,7 @@
         }
         else
         {
-            <ValueSelect CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
+            <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
                 <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                 @foreach (var item in FilteredItems)
                 {

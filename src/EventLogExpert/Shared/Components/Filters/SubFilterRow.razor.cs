@@ -17,6 +17,8 @@ public sealed partial class SubFilterRow
 {
     [Parameter] public FilterId ParentId { get; set; }
 
+    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;

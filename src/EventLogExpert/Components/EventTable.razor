@@ -9,14 +9,16 @@
         <tr role="row">
             @foreach (ColumnName column in _enabledColumns)
             {
-                <th class="@column.ToString().ToLower()" role="columnheader">
+                _headerName = column.ToFullString();
+
+                <th aria-label="@_headerName" class="@column.ToString().ToLower()" role="columnheader">
                     @if (column == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>
                     }
                     else
                     {
-                        @column.ToFullString()
+                        @_headerName
                     }
                     @if (_eventTableState.OrderBy == column)
                     {
@@ -35,7 +37,8 @@
         {
             <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
                 @{ _rowIndex = _currentTable.DisplayedEvents.IndexOf(evt); }
-                <tr class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+                    <tr aria-selected="@_selectedEventState.Contains(evt)" class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")"
+                        @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
                     @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
                         <td aria-label="Row @(_rowIndex), Column @(i + 1)" role="gridcell">
