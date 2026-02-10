@@ -1,7 +1,8 @@
 @using EventLogExpert.UI.Models
 
 <div>
-    <div class="flex-space-between my-1" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
+    <div aria-label="@(_menuState ? "Collapse Group" : "Expand Group")" class="flex-space-between my-1"
+        @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
         <span>@Name</span>
 
         <span class="menu-toggle" data-rotate="@MenuState">

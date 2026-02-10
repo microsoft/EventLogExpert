@@ -47,8 +47,8 @@
                 </div>
             }
 
-            <span aria-label="Toggle filter pane" class="menu-toggle justify-self-right" data-rotate="@MenuState"
-                @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
+            <span aria-label="@(_isFilterListVisible ? "Collapse Filters" : "Expand Filters")" class="menu-toggle justify-self-right"
+                data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
                 <i class="bi bi-caret-up"></i>
             </span>
         }

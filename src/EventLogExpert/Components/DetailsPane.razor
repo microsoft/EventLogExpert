@@ -4,7 +4,8 @@
 <div data-toggle="@IsVisible" hidden="@(SelectedEvent is null)" id="details-pane">
     <div id="details-resizer"></div>
 
-    <div class="flex-space-between" id="details-header" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
+    <div aria-label="@(_isVisible ? "Collapse Details" : "Expand Details")" class="flex-space-between" id="details-header"
+        @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
         <div>Details</div>
 
         <span class="menu-toggle" data-rotate="@IsVisible">
@@ -35,7 +36,7 @@
 
         <hr />
 
-        <div class="details-row-xml" @onclick="ToggleXml" @onkeydown="HandleKeyDownXml" tabindex="0">
+        <div aria-label="@(_isXmlVisible ? "Collapse XML" : "Expand XML")" class="details-row-xml" @onclick="ToggleXml" @onkeydown="HandleKeyDownXml" tabindex="0">
             <div>XML</div>
             <div class="justify-self-center">
                 <button class="button" @onclick="CopyEvent">Copy Event</button>
