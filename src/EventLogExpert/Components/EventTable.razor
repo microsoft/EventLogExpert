@@ -4,7 +4,7 @@
 <SplitLogTabPane />
 
 <div class="table-container">
-    <table id="eventTable" @onkeydown="HandleKeyDown" role="grid">
+    <table aria-label="Event Log Table" id="eventTable" @onkeydown="HandleKeyDown" role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr role="row">
             @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
