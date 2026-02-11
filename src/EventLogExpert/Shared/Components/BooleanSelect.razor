@@ -2,9 +2,9 @@
 @inherits BaseComponent<bool>
 
 <div aria-label="@AriaLabel" class="toggle" role="radiogroup">
-    <input aria-label="@AriaLabel @DisabledString" checked="@(!Value)" id="@Id false" name="@Id" @onchange="UpdateValue" type="radio" value="false" />
-    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id false">@DisabledString</label>
+    <input aria-label="@AriaLabel @DisabledString" checked="@(!Value)" id="@($"{Id}_false")" name="@Id" @onchange="UpdateValue" type="radio" value="false" />
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@($"{Id}_false")">@DisabledString</label>
 
-    <input aria-label="@AriaLabel @EnabledString" checked="@(Value)" id="@Id true" name="@Id" @onchange="UpdateValue" type="radio" value="true" />
-    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@Id true">@EnabledString</label>
+    <input aria-label="@AriaLabel @EnabledString" checked="@(Value)" id="@($"{Id}_true")" name="@Id" @onchange="UpdateValue" type="radio" value="true" />
+    <label data-single-color="@IsSingleColor.ToString().ToLower()" for="@($"{Id}_true")">@EnabledString</label>
 </div>
