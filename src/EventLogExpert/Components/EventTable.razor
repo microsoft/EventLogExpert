@@ -7,12 +7,14 @@
     <table id="eventTable" @onkeydown="HandleKeyDown" role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr role="row">
-            @foreach (ColumnName column in _enabledColumns)
+            @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
             {
-                _headerName = column.ToFullString();
+                var columnHeader = _enabledColumns[columnIndex];
+                _headerName = columnHeader.ToFullString();
 
-                <th aria-label="@_headerName" class="@column.ToString().ToLower()" role="columnheader">
-                    @if (column == ColumnName.DateAndTime)
+                <th aria-colindex="@(columnIndex + 1)" aria-sort="@(_eventTableState.OrderBy == columnHeader ? (_eventTableState.IsDescending ? "descending" : "ascending") : "none")"
+                    class="@columnHeader.ToString().ToLower()" role="columnheader">
+                    @if (columnHeader == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>
                     }
@@ -20,7 +22,7 @@
                     {
                         @_headerName
                     }
-                    @if (_eventTableState.OrderBy == column)
+                    @if (_eventTableState.OrderBy == columnHeader)
                     {
                         <span class="menu-toggle" data-rotate="@_eventTableState.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
@@ -29,7 +31,7 @@
                 </th>
             }
 
-            <th class="description">Description</th>
+            <th aria-colindex="@(_enabledColumns.Length + 1)" class="description" role="columnheader">Description</th>
         </tr>
         </thead>
         <tbody @oncontextmenu="InvokeContextMenu">
@@ -37,11 +39,11 @@
         {
             <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
                 @{ _rowIndex = _currentTable.DisplayedEvents.IndexOf(evt); }
-                    <tr aria-selected="@_selectedEventState.Contains(evt)" class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")"
-                        @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+                    <tr aria-rowindex="@(_rowIndex + 2)" aria-selected="@(_selectedEventState.Contains(evt).ToString().ToLower())"
+                        class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
                     @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
-                        <td aria-label="Row @(_rowIndex), Column @(i + 1)" role="gridcell">
+                        <td aria-colindex="@(i + 1)" role="gridcell">
                             @switch (_enabledColumns[i])
                             {
                                 case ColumnName.Level:
@@ -84,7 +86,7 @@
                         </td>
                     }
 
-                    <td aria-label="Row @(_rowIndex), Column @(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
+                    <td aria-colindex="@(_enabledColumns.Length + 1)" role="gridcell">@evt.Description</td>
                 </tr>
             </Virtualize>
         }
