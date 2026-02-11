@@ -1,7 +1,8 @@
 @typeparam T
 
-<div aria-selected="@_isSelected" class="@CssClass" highlighted="@(_parent.HighlightedItem?.Equals(this) ?? false)"
-    @onmousedown="SelectItem" @onmouseenter="HighlightItem" role="option" selected="@_isSelected">
+<div aria-selected="@_isSelected.ToString().ToLower()" class="@CssClass" highlighted="@(_parent.HighlightedItem?.Equals(this) ?? false)"
+    id="@ItemId" @onmousedown="SelectItem" @onmouseenter="HighlightItem" role="option">
+
     @if (ChildContent is not null)
     {
         @ChildContent

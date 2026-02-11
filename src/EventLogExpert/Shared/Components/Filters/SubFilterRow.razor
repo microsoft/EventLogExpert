@@ -24,7 +24,7 @@
         <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
         @if (Value.Data.Category is FilterCategory.Description)
         {
-            <TextInput aria-labelledby="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
+            <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
         }
         else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
         {
