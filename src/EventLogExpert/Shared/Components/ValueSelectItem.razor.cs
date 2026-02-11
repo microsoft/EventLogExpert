@@ -23,6 +23,8 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     [Parameter]
     public bool IsDisabled { get; set; }
 
+    public string ItemId { get; } = $"_{Guid.NewGuid().ToString()[..8]}";
+
     [Parameter]
     public T Value { get; set; } = default!;
 

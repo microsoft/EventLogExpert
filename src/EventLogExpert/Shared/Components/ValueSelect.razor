@@ -3,10 +3,10 @@
 @inherits BaseComponent<T>
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @onkeydown:preventDefault="_preventDefault" @ref="_selectComponent">
-    <input aria-expanded="false" aria-label="@AriaLabel" aria-labelledby="@AriaLabelledBy" class="@CssClass" @oninput="OnInputChange"
-        readonly="@(!IsInput || IsMultiSelect)" role="listbox" tabindex="0" type="text" value="@DisplayString" />
+    <input aria-activedescendant="@HighlightedItem?.ItemId" aria-controls="@_itemId" aria-expanded="@IsOpen" aria-label="@AriaLabel" aria-labelledby="@AriaLabelledBy"
+        class="@CssClass" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
 
-    <div class="dropdown-list" tabindex="-1">
+    <div class="dropdown-list" id="@_itemId" role="listbox" tabindex="-1">
         <CascadingValue Value="this">
             @ChildContent
         </CascadingValue>
