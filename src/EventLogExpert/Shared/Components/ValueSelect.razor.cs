@@ -15,7 +15,6 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
     private readonly HashSet<T> _selectedValues = [];
 
     private ValueSelectItem<T>? _highlightedItem;
-    private bool _isOpen;
     private bool _preventDefault;
     private ElementReference _selectComponent;
 
@@ -41,8 +40,6 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     [Parameter]
     public bool IsMultiSelect { get; set; }
-
-    public string IsOpen => _isOpen.ToString().ToLower();
 
     private string? DisplayString
     {
@@ -90,17 +87,9 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     public void ClearSelected() => _selectedValues.Clear();
 
-    public async Task CloseDropDown()
-    {
-        _isOpen = false;
-        await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
-    }
+    public async Task CloseDropDown() => await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
 
-    public async Task OpenDropDown()
-    {
-        _isOpen = true;
-        await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
-    }
+    public async Task OpenDropDown() => await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
 
     public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
 

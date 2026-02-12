@@ -2,9 +2,9 @@
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
-        <BooleanSelect @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
+        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
 
-        <ValueSelect CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
+        <ValueSelect AriaLabel="Category" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
                 if (item == FilterCategory.Xml && !FilterService.IsXmlEnabled) { continue; }
