@@ -10,6 +10,7 @@ window.registerDropdown = (root) => {
 
             dropdown.removeAttribute("data-toggle");
             dropdown.setAttribute("aria-expanded", "false");
+            dropdown.setAttribute("aria-hidden", "true");
 
             dropdown.style.position = false;
             dropdown.style.top = false;
@@ -40,6 +41,7 @@ window.registerDropdown = (root) => {
 
         dropdown.setAttribute("data-toggle", "");
         dropdown.setAttribute("aria-expanded", "true");
+        dropdown.setAttribute("aria-hidden", "false");
 
         scrollToSelectedItem();
     }
@@ -67,6 +69,7 @@ window.closeDropdown = (root) => {
 
     dropdown.removeAttribute("data-toggle");
     dropdown.setAttribute("aria-expanded", "false");
+    dropdown.setAttribute("aria-hidden", "true");
 
     dropdown.style.position = false;
     dropdown.style.top = false;
@@ -87,6 +90,7 @@ window.openDropdown = (root) => {
 
     dropdown.setAttribute("data-toggle", "");
     dropdown.setAttribute("aria-expanded", "true");
+    dropdown.setAttribute("aria-hidden", "false");
 
     scrollToSelectedItem(root);
 };

@@ -8,14 +8,14 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class ValueSelectItem<T> : IDisposable
 {
-    private bool _isSelected = false;
+    private bool _isSelected;
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
 
     [Parameter]
-    public bool ClearItem { get; set; } = false;
+    public bool ClearItem { get; set; }
 
     [Parameter]
     public string CssClass { get; set; } = string.Empty;
