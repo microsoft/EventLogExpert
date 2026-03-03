@@ -75,6 +75,9 @@ public enum FilterCategory
     [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
     Source,
     [EnumMember(Value = "Task Category")] TaskCategory,
+    [EnumMember(Value = "Process ID")] ProcessId,
+    [EnumMember(Value = "Thread ID")] ThreadId,
+    [EnumMember(Value = "User ID")] UserId,
     Description,
     Xml
 }
