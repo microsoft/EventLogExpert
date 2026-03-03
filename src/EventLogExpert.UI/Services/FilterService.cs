@@ -155,22 +155,30 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
 
     private static string GetComparisonString(FilterCategory type, FilterEvaluator evaluator) => evaluator switch
     {
-        FilterEvaluator.Equals => type is FilterCategory.KeywordsDisplayNames ?
-            $"{type}.Any(e => string.Equals(e, " :
-            $"{type} == ",
+        FilterEvaluator.Equals => type switch
+        {
+            FilterCategory.KeywordsDisplayNames => $"{type}.Any(e => string.Equals(e, ",
+            FilterCategory.UserId => $"{type} != null && {type}.Value == ",
+            _ => $"{type} == "
+        },
         FilterEvaluator.Contains => type switch
         {
             FilterCategory.Id or FilterCategory.ActivityId => $"{type}.ToString().Contains",
             FilterCategory.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
+            FilterCategory.UserId => $"{type} != null && {type}.Value.Contains",
             _ => $"{type}.Contains"
         },
-        FilterEvaluator.NotEqual => type is FilterCategory.KeywordsDisplayNames ?
-            $"!{type}.Any(e => string.Equals(e, " :
-            $"{type} != ",
+        FilterEvaluator.NotEqual => type switch
+        {
+            FilterCategory.KeywordsDisplayNames => $"!{type}.Any(e => string.Equals(e, ",
+            FilterCategory.UserId => $"{type} != null && {type}.Value != ",
+            _ => $"{type} != ",
+        },
         FilterEvaluator.NotContains => type switch
         {
             FilterCategory.Id or FilterCategory.ActivityId => $"!{type}.ToString().Contains",
             FilterCategory.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
+            FilterCategory.UserId => $"{type} != null && !{type}.Value.Contains",
             _ => $"!{type}.Contains"
         },
         FilterEvaluator.MultiSelect => type switch
