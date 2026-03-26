@@ -140,6 +140,32 @@ public partial class EventResolverBase
         }
     }
 
+    private static bool DoesTemplateMatchPropertyCount(string? template, int eventPropertyCount)
+    {
+        if (string.IsNullOrEmpty(template)) { return false; }
+
+        int templateDataNodeCount = 0;
+        ReadOnlySpan<char> templateSpan = template.AsSpan();
+        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
+
+        int currentIndex = 0;
+
+        while (currentIndex < templateSpan.Length)
+        {
+            int foundIndex = templateSpan[currentIndex..].IndexOf(outTypeAttribute, StringComparison.Ordinal);
+
+            if (foundIndex == -1)
+            {
+                break;
+            }
+
+            templateDataNodeCount++;
+            currentIndex += foundIndex + outTypeAttribute.Length;
+        }
+
+        return templateDataNodeCount == 0 || templateDataNodeCount == eventPropertyCount;
+    }
+
     private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
     {
         string[]? dataNodes = null;
@@ -225,20 +251,45 @@ public partial class EventResolverBase
             return null;
         }
 
+        int eventPropertyCount = eventRecord.Properties?.Count() ?? 0;
+
         EventModel? modernEvent = details.Events
             .FirstOrDefault(e => e.Id == eventRecord.Id &&
                 e.Version == eventRecord.Version &&
                 e.LogName == eventRecord.LogName);
 
-        if (modernEvent is not null)
+        if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
         {
             return modernEvent;
         }
 
+        var matchingEvents = details.Events
+            .Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName)
+            .ToList();
+
+        foreach (var @event in matchingEvents)
+        {
+            if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
+            {
+                return @event;
+            }
+        }
+
         // Try again forcing the long to a short and with no log name.
         // This is needed for providers such as Microsoft-Windows-Complus
-        return details.Events
-            .FirstOrDefault(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version);
+        var shortIdEvents = details.Events
+            .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version)
+            .ToList();
+
+        foreach (var @event in shortIdEvents)
+        {
+            if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
+            {
+                return @event;
+            }
+        }
+
+        return matchingEvents.FirstOrDefault() ?? shortIdEvents.FirstOrDefault();
     }
 
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
