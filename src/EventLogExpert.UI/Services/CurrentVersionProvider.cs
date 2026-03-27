@@ -1,8 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using System.Security.Principal;
-using Windows.ApplicationModel;
+using EventLogExpert.UI.Interfaces;
 
 namespace EventLogExpert.UI.Services;
 
@@ -17,26 +16,16 @@ public interface ICurrentVersionProvider
     bool IsSupportedOS(Version currentVersion);
 }
 
-public class CurrentVersionProvider : ICurrentVersionProvider
+public sealed class CurrentVersionProvider(
+    IPackageVersionProvider packageVersionProvider,
+    IWindowsIdentityProvider identityProvider) : ICurrentVersionProvider
 {
-    public CurrentVersionProvider()
-    {
-        PackageVersion packageVersion = Package.Current.Id.Version;
-        CurrentVersion = new($"{packageVersion.Major}.{packageVersion.Minor}.{packageVersion.Build}.{packageVersion.Revision}");
-    }
+    private readonly IWindowsIdentityProvider _identityProvider = identityProvider;
+    private readonly IPackageVersionProvider _packageVersionProvider = packageVersionProvider;
 
-    public Version CurrentVersion { get; init; }
+    public Version CurrentVersion => _packageVersionProvider.GetPackageVersion();
 
-    public bool IsAdmin
-    {
-        get
-        {
-            var identity = WindowsIdentity.GetCurrent();
-            WindowsPrincipal principal = new(identity);
-
-            return principal.IsInRole(WindowsBuiltInRole.Administrator);
-        }
-    }
+    public bool IsAdmin => _identityProvider.IsUserInAdministratorRole();
 
     public bool IsDevBuild => CurrentVersion.Major <= 1;
 
