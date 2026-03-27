@@ -140,30 +140,39 @@ public partial class EventResolverBase
         }
     }
 
-    private static bool DoesTemplateMatchPropertyCount(string? template, int eventPropertyCount)
+    private static bool DoesTemplateMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
-        if (string.IsNullOrEmpty(template)) { return false; }
+        if (template.IsEmpty) { return false; }
 
-        int templateDataNodeCount = 0;
-        ReadOnlySpan<char> templateSpan = template.AsSpan();
-        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
+        var cache = s_formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
 
-        int currentIndex = 0;
-
-        while (currentIndex < templateSpan.Length)
+        if (cache.TryGetValue(template, out string[]? dataNodes))
         {
-            int foundIndex = templateSpan[currentIndex..].IndexOf(outTypeAttribute, StringComparison.Ordinal);
-
-            if (foundIndex == -1)
-            {
-                break;
-            }
-
-            templateDataNodeCount++;
-            currentIndex += foundIndex + outTypeAttribute.Length;
+            return dataNodes.Length == eventPropertyCount;
         }
 
-        return templateDataNodeCount == 0 || templateDataNodeCount == eventPropertyCount;
+        List<string> temp = [];
+        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
+
+        foreach (var line in template.EnumerateLines())
+        {
+            int templateIndex = line.IndexOf(outTypeAttribute, StringComparison.Ordinal);
+
+            if (templateIndex == -1) { continue; }
+
+            templateIndex += outTypeAttribute.Length;
+            int endIndex = line[templateIndex..].IndexOf('"');
+
+            if (endIndex != -1)
+            {
+                temp.Add(new string(line.Slice(templateIndex, endIndex)));
+            }
+        }
+
+        dataNodes = [.. temp];
+        cache.TryAdd(template, dataNodes);
+
+        return dataNodes.Length == 0 || dataNodes.Length == eventPropertyCount;
     }
 
     private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
@@ -289,7 +298,7 @@ public partial class EventResolverBase
             }
         }
 
-        return matchingEvents.FirstOrDefault() ?? shortIdEvents.FirstOrDefault();
+        return null;
     }
 
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
