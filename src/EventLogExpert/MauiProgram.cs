@@ -50,6 +50,17 @@ public static class MauiProgram
         builder.Services.AddSingleton(fileLocationOptions);
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
 
+        builder.Services.AddSingleton<HttpClient>(_ =>
+        {
+            HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/") };
+
+            client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
+            client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+            client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
+
+            return client;
+        });
+
         // Build Services
         builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
