@@ -1,4 +1,7 @@
-﻿using EventLogExpert.UI.Interfaces;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using NSubstitute;
@@ -7,77 +10,271 @@ namespace EventLogExpert.UI.Tests.Services;
 
 public sealed class AppTitleServiceTests
 {
-    private readonly ICurrentVersionProvider _mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-    private readonly ITitleProvider _mockTitleProvider = Substitute.For<ITitleProvider>();
-
-    public AppTitleServiceTests()
+    [Fact]
+    public void SetIsPrerelease_WhenAdminAndPrerelease_ShouldSetTitle()
     {
-        _mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsAdmin.Returns(true);
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetIsPrerelease(true);
+        titleService.SetLogName(Constants.LogName);
+
+        // Assert
+        mockTitleProvider.Received(1)
+            .SetTitle($"{Constants.LogName} - {Constants.AppName} (Preview) {Constants.AppInstalledVersion} (Admin)");
     }
 
     [Fact]
     public void SetIsPrerelease_WhenLogName_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
 
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetIsPrerelease(true);
         titleService.SetLogName(Constants.LogName);
 
-        _mockTitleProvider.Received(1)
+        // Assert
+        mockTitleProvider.Received(1)
             .SetTitle($"{Constants.LogName} - {Constants.AppName} (Preview) {Constants.AppInstalledVersion}");
+    }
+
+    [Fact]
+    public void SetLogName_WhenAdminAndDevBuild_ShouldSetTitle()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(true);
+        mockCurrentVersionProvider.IsAdmin.Returns(true);
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetLogName(null);
+
+        // Assert
+        mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} (Development) (Admin)");
+    }
+
+    [Fact]
+    public void SetLogName_WhenAdminAndLogName_ShouldSetTitle()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsAdmin.Returns(true);
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetLogName(Constants.LogName);
+
+        // Assert
+        mockTitleProvider.Received(1)
+            .SetTitle($"{Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion} (Admin)");
     }
 
     [Fact]
     public void SetLogName_WhenDevBuild_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(true);
 
-        _mockCurrentVersionProvider.IsDevBuild.Returns(true);
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
 
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetLogName(null);
 
-        _mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} (Development)");
+        // Assert
+        mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} (Development)");
     }
 
     [Fact]
     public void SetLogName_WhenLogName_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
 
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetLogName(Constants.LogName);
 
-        _mockTitleProvider.Received(1)
+        // Assert
+        mockTitleProvider.Received(1)
             .SetTitle($"{Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion}");
     }
 
     [Fact]
     public void SetLogName_WhenNullLogName_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
 
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetLogName(null);
 
-        _mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion}");
+        // Assert
+        mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion}");
+    }
+
+    [Fact]
+    public void SetProgressString_WhenAdminAndProgress_ShouldSetTitle()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsAdmin.Returns(true);
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetProgressString(Constants.Percentage);
+
+        // Assert
+        mockTitleProvider.Received(1)
+            .SetTitle($"{Constants.Percentage} - {Constants.AppName} {Constants.AppInstalledVersion} (Admin)");
+    }
+
+    [Fact]
+    public void SetProgressString_WhenClearedAfterSet_ShouldSetTitleWithoutProgress()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetProgressString(Constants.Percentage);
+        titleService.SetProgressString(null);
+
+        // Assert
+        mockTitleProvider.Received(1)
+            .SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion}");
     }
 
     [Fact]
     public void SetProgressString_WhenNullProgress_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
 
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetProgressString(null);
 
-        _mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion}");
+        // Assert
+        mockTitleProvider.Received(1).SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion}");
     }
 
     [Fact]
     public void SetProgressString_WhenProgress_ShouldSetTitle()
     {
-        AppTitleService titleService = new(_mockCurrentVersionProvider, _mockTitleProvider);
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
 
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
         titleService.SetProgressString(Constants.Percentage);
 
-        _mockTitleProvider.Received(1)
+        // Assert
+        mockTitleProvider.Received(1)
             .SetTitle($"{Constants.Percentage} - {Constants.AppName} {Constants.AppInstalledVersion}");
+    }
+
+    [Fact]
+    public void SetProgressString_WhenProgressAndLogName_ShouldSetTitleWithBoth()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+
+        var mockTitleProvider = Substitute.For<ITitleProvider>();
+
+        var titleService = CreateAppTitleService(
+            mockCurrentVersionProvider,
+            mockTitleProvider);
+
+        // Act
+        titleService.SetLogName(Constants.LogName);
+        titleService.SetProgressString(Constants.Percentage);
+
+        // Assert
+        mockTitleProvider.Received(1)
+            .SetTitle(
+                $"{Constants.Percentage} - {Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion}");
+    }
+
+    private static AppTitleService CreateAppTitleService(
+        ICurrentVersionProvider? currentVersionProvider = null,
+        ITitleProvider? titleProvider = null)
+    {
+        return new AppTitleService(
+            currentVersionProvider ?? Substitute.For<ICurrentVersionProvider>(),
+            titleProvider ?? Substitute.For<ITitleProvider>());
     }
 }
