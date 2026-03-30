@@ -13,33 +13,33 @@ public interface IGitHubService
     Task<IEnumerable<GitReleaseModel>> GetReleases();
 }
 
-public sealed class GitHubService(ITraceLogger traceLogger) : IGitHubService
+public sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogger) : IGitHubService
 {
+    private readonly HttpClient _httpClient = httpClient;
+    private readonly ITraceLogger _traceLogger = traceLogger;
+
     public async Task<IEnumerable<GitReleaseModel>> GetReleases()
     {
-        HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/"), };
-
-        client.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
-        client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
-        client.DefaultRequestHeaders.UserAgent.TryParseAdd("request");
-
-        var response = await client.GetAsync("/repos/microsoft/EventLogExpert/releases");
+        var response = await _httpClient.GetAsync("/repos/microsoft/EventLogExpert/releases");
 
         if (response.IsSuccessStatusCode is not true)
         {
-            traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} failed: {response.StatusCode}.", LogLevel.Warning);
-            throw new Exception($"Failed to retrieve GitHub releases. StatusCode: {response.StatusCode}");
+            _traceLogger.Trace(
+                $"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} failed: {response.StatusCode}.",
+                LogLevel.Warning);
+
+            throw new HttpRequestException($"Failed to retrieve GitHub releases. StatusCode: {response.StatusCode}");
         }
 
-        traceLogger.Trace($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.");
+        _traceLogger.Trace(
+            $"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.");
 
         var stream = await response.Content.ReadAsStreamAsync();
         var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
 
         if (content is not null) { return content; }
 
-        traceLogger.Trace($"{nameof(GetReleases)} Failed to deserialize response stream.", LogLevel.Warning);
-        throw new Exception($"{nameof(GetReleases)} Failed to deserialize response stream.");
-
+        _traceLogger.Trace($"{nameof(GetReleases)} Failed to deserialize response stream.", LogLevel.Warning);
+        throw new JsonException($"{nameof(GetReleases)} Failed to deserialize response stream.");
     }
 }
