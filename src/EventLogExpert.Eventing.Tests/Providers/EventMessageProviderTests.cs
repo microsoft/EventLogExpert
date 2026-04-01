@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using Castle.Core.Logging;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
