@@ -7,16 +7,35 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogWatcher(string path, string? bookmark, bool renderXml = false) : IDisposable
+public sealed partial class EventLogWatcher : IDisposable
 {
-    private readonly string? _bookmark = bookmark;
+    private readonly string? _bookmark;
     private readonly AutoResetEvent _newEvents = new(false);
-    private readonly EvtHandle _queryHandle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
-    private readonly bool _renderXml = renderXml;
+    private readonly string _path;
+    private readonly EvtHandle _queryHandle;
+    private readonly bool _renderXml;
 
     private bool _isSubscribed;
     private EvtHandle _subscriptionHandle = EvtHandle.Zero;
     private RegisteredWaitHandle? _waitHandle;
+
+    public EventLogWatcher(string path, string? bookmark, bool renderXml = false)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+
+        _path = path;
+        _bookmark = bookmark;
+        _renderXml = renderXml;
+
+        // Validate the log exists by attempting to open it
+        _queryHandle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
+        int error = Marshal.GetLastWin32Error();
+
+        if (_queryHandle is { IsInvalid: false }) { return; }
+
+        _queryHandle.Dispose();
+        EventMethods.ThrowEventLogException(error);
+    }
 
     public EventLogWatcher(string path, bool renderXml = false) : this(path, null, renderXml) { }
 
@@ -60,7 +79,7 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
             Unsubscribe();
         }
 
-        if (!_queryHandle.IsInvalid)
+        if (_queryHandle is { IsInvalid: false })
         {
             _queryHandle.Dispose();
         }
@@ -101,7 +120,7 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
                     @event = new EventRecord { RecordId = null, Error = ex.Message };
                 }
 
-                @event.PathName = path;
+                @event.PathName = _path;
 
                 EventRecordWritten?.Invoke(this, @event);
             }
@@ -116,29 +135,37 @@ public sealed partial class EventLogWatcher(string path, string? bookmark, bool 
             EvtSubscribeFlags.ToFutureEvents :
             EvtSubscribeFlags.StartAfterBookmark;
 
-        using EvtHandle bookmarkHandle = EventMethods.EvtCreateBookmark(_bookmark);
-        int error = Marshal.GetLastWin32Error();
+        EvtHandle bookmarkHandle = string.IsNullOrEmpty(_bookmark) ?
+            EvtHandle.Zero :
+            EventMethods.EvtCreateBookmark(_bookmark);
 
-        if (bookmarkHandle.IsInvalid)
+        if (!string.IsNullOrEmpty(_bookmark) && bookmarkHandle.IsInvalid)
         {
+            int error = Marshal.GetLastWin32Error();
+            bookmarkHandle.Dispose();
             EventMethods.ThrowEventLogException(error);
         }
 
         _subscriptionHandle = EventMethods.EvtSubscribe(
             EventLogSession.GlobalSession.Handle,
             _newEvents.SafeWaitHandle,
-            path,
+            _path,
             null,
             bookmarkHandle,
             IntPtr.Zero,
             IntPtr.Zero,
             flag);
 
-        error = Marshal.GetLastWin32Error();
+        if (!string.IsNullOrEmpty(_bookmark))
+        {
+            bookmarkHandle.Dispose();
+        }
+
+        int subscriptionError = Marshal.GetLastWin32Error();
 
         if (_subscriptionHandle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(error);
+            EventMethods.ThrowEventLogException(subscriptionError);
         }
 
         _isSubscribed = true;
