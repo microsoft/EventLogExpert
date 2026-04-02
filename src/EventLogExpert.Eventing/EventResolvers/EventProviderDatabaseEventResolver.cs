@@ -10,7 +10,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-internal sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
+internal sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
 {
     private readonly Lock _databaseAccessLock = new();
 
@@ -21,9 +21,32 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
         IEventResolverCache? cache = null,
         ITraceLogger? logger = null) : base(cache, logger)
     {
+        ArgumentNullException.ThrowIfNull(dbCollection);
+
         logger?.Trace($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
 
         LoadDatabases(dbCollection.ActiveDatabases);
+    }
+
+    public void Dispose()
+    {
+        _databaseAccessLock.Enter();
+
+        try
+        {
+            foreach (var context in _dbContexts)
+            {
+                context.Dispose();
+            }
+
+            _dbContexts = [];
+        }
+        finally
+        {
+            _databaseAccessLock.Exit();
+        }
+
+        providerDetailsLock.Dispose();
     }
 
     public void ResolveProviderDetails(EventRecord eventRecord)
@@ -79,7 +102,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
     /// </summary>
     /// <param name="databasePaths"></param>
     /// <returns></returns>
-    private static IEnumerable<string> SortDatabases(IEnumerable<string> databasePaths)
+    internal static IEnumerable<string> SortDatabases(IEnumerable<string> databasePaths)
     {
         if (!databasePaths.Any())
         {
