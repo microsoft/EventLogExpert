@@ -14,6 +14,7 @@ public sealed partial class Constants
     public const string SecurityAuditingLogName = "Microsoft-Windows-Security-Auditing";
     public const string ServiceControlManagerLogName = "Service Control Manager";
 
+    public const string NonExistentDatabaseFullPath = @"C:\Test\NonExistentDatabase.db";
     public const string NonExistentDll = "NonExistent.dll";
     public const string NonExistentDllFullPath = @"C:\Windows\System32\NonExistent.dll";
     public const string NonExistentDllSystemRootFullPath = @"%SystemRoot%\System32\NonExistent.dll";
