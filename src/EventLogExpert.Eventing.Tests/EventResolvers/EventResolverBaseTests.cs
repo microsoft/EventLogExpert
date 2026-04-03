@@ -9,9 +9,6 @@ using EventLogExpert.Eventing.Tests.TestUtils;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.Concurrent;
-using static System.Net.Mime.MediaTypeNames;
-using static System.Net.WebRequestMethods;
-using static System.Reflection.Metadata.BlobBuilder;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
@@ -88,7 +85,7 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Equal(Constants.ExchangeFormatedDescription, displayEvent.Description);
+        Assert.Equal(Constants.ExchangeFormattedDescription, displayEvent.Description);
         Assert.Equal("Service", displayEvent.TaskCategory);
     }
 

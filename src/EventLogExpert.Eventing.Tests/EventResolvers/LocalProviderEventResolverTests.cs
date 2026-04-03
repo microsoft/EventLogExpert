@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Tests.TestUtils;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
+using System.Collections.Concurrent;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
@@ -70,6 +71,70 @@ public sealed class LocalProviderEventResolverTests
 
         // Assert
         Assert.NotNull(resolver);
+    }
+
+    [Fact]
+    public void Dispose_CalledMultipleTimes_ShouldNotThrow()
+    {
+        // Arrange
+        var resolver = new LocalProviderEventResolver();
+
+        // Act & Assert
+        resolver.Dispose();
+        resolver.Dispose(); // Second call should not throw
+        resolver.Dispose(); // Third call should not throw
+    }
+
+    [Fact]
+    public void Dispose_MultipleConcurrentDisposeCalls_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        var resolver = new LocalProviderEventResolver();
+        var exceptions = new ConcurrentBag<Exception>();
+
+        // Act - Multiple threads trying to dispose simultaneously
+        Parallel.For(0, 10, i =>
+            {
+                try
+                {
+                    resolver.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
+            });
+
+        // Assert - Should not throw any exceptions
+        Assert.Empty(exceptions);
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var resolver = new LocalProviderEventResolver();
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveProviderDetails_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var resolver = new LocalProviderEventResolver();
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveProviderDetails(eventRecord));
     }
 
     [Fact]

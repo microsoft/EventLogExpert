@@ -5,12 +5,18 @@ using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.EntityFrameworkCore;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-internal sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver, IDisposable
+/// <summary>
+/// Event resolver that uses SQLite databases to resolve event provider details.
+/// This class implements IDisposable and manages EF DbContext instances.
+/// IMPORTANT: Callers must dispose this resolver to ensure database files are not left locked.
+/// </summary>
+internal sealed partial class EventProviderDatabaseEventResolver : EventResolverBase, IEventResolver
 {
     private readonly Lock _databaseAccessLock = new();
 
@@ -28,25 +34,44 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
-    public void Dispose()
+    protected override void Dispose(bool disposing)
     {
-        _databaseAccessLock.Enter();
+        if (!disposing || disposed) { return; }
 
-        try
+        ImmutableArray<EventProviderDbContext> contextsToDispose;
+
+        // Use EnterScope() for exception-safe lock management.
+        // This ensures the lock is always released even if an exception occurs.
+        using (_databaseAccessLock.EnterScope())
         {
-            foreach (var context in _dbContexts)
+            // Double-check disposed after acquiring lock for thread safety
+            if (disposed)
             {
-                context.Dispose();
+                return;
             }
 
+            // Swap out _dbContexts to ensure exactly-once context disposal.
+            // Only one thread will get the non-empty array; others get empty.
+            // The lock synchronizes with ResolveProviderDetails to prevent use-after-dispose.
+            contextsToDispose = _dbContexts;
             _dbContexts = [];
-        }
-        finally
-        {
-            _databaseAccessLock.Exit();
+
+            // Set disposed inside the lock before releasing it.
+            // This prevents other threads from acquiring the lock and passing the disposed check,
+            // reducing unnecessary lock contention.
+            disposed = true;
         }
 
-        providerDetailsLock.Dispose();
+        // Dispose contexts outside the lock to minimize lock hold time.
+        // Safe because we have the only reference to these contexts now.
+        foreach (var context in contextsToDispose)
+        {
+            context.Dispose();
+        }
+
+        // Call base to dispose providerDetailsLock.
+        // Base.Dispose() is idempotent (checks disposed flag which we already set).
+        base.Dispose(disposing);
     }
 
     public void ResolveProviderDetails(EventRecord eventRecord)
@@ -55,6 +80,11 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
         try
         {
+            // Early disposed check for fail-fast behavior. This is a defensive check only;
+            // the authoritative check is inside _databaseAccessLock below.
+            // A race window exists here, but it's handled by the check inside the lock.
+            ObjectDisposedException.ThrowIf(disposed, nameof(EventProviderDatabaseEventResolver));
+
             if (providerDetails.ContainsKey(eventRecord.ProviderName))
             {
                 return;
@@ -64,21 +94,43 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
             try
             {
-                _databaseAccessLock.Enter();
-
-                foreach (var dbContext in _dbContexts)
+                // Double-check after acquiring write lock - another thread may have added this provider
+                if (providerDetails.ContainsKey(eventRecord.ProviderName))
                 {
-                    var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName.ToLower() == eventRecord.ProviderName.ToLower());
+                    return;
+                }
 
-                    if (details is null) { continue; }
+                // Use EnterScope() for exception-safe lock management
+                using (_databaseAccessLock.EnterScope())
+                {
+                    // Check disposed inside the database lock to prevent race with Dispose().
+                    // This ensures we don't proceed if Dispose() has swapped out _dbContexts.
+                    ObjectDisposedException.ThrowIf(disposed, nameof(EventProviderDatabaseEventResolver));
 
-                    logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
-                    providerDetails.TryAdd(eventRecord.ProviderName, details);
+                    foreach (var dbContext in _dbContexts)
+                    {
+                        // Use EF.Functions.Collate() with NOCASE on both sides for case-insensitive comparison.
+                        // Applying to both sides ensures the comparison is case-insensitive regardless of the
+                        // case in eventRecord.ProviderName. SQLite will use NOCASE collation for the comparison.
+                        // Note: The loop over databases is intentional for priority-based resolution.
+                        var details = dbContext.ProviderDetails.FirstOrDefault(p =>
+                            EF.Functions.Collate(p.ProviderName, "NOCASE") ==
+                            EF.Functions.Collate(eventRecord.ProviderName, "NOCASE"));
+
+                        if (details is null) { continue; }
+
+                        logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
+                        providerDetails.TryAdd(eventRecord.ProviderName, details);
+
+                        // Exit after first match - databases are sorted by priority (SortDatabases),
+                        // so the first database containing the provider is the preferred source.
+                        // TryAdd would prevent duplicates anyway, but breaking early avoids unnecessary queries.
+                        break;
+                    }
                 }
             }
             finally
             {
-                _databaseAccessLock.Exit();
                 providerDetailsLock.ExitWriteLock();
             }
 
@@ -120,11 +172,21 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
                 if (m.Success)
                 {
+                    var versionString = m.Groups[2].Value;
+
+                    // Strip file extension if present for numeric parsing
+                    var versionWithoutExtension = Path.GetFileNameWithoutExtension(versionString);
+
+                    // Try to parse the version as a number for proper numeric ordering.
+                    // This ensures "10" sorts after "2" rather than before it (lexicographic).
+                    int? numericVersion = int.TryParse(versionWithoutExtension, out var parsed) ? parsed : null;
+
                     return new
                     {
                         Directory = directory,
                         FirstPart = m.Groups[1].Value + " ",
-                        SecondPart = m.Groups[2].Value
+                        SecondPart = versionString,
+                        NumericVersion = numericVersion
                     };
                 }
 
@@ -132,10 +194,12 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
                 {
                     Directory = directory,
                     FirstPart = name,
-                    SecondPart = ""
+                    SecondPart = "",
+                    NumericVersion = (int?)null
                 };
             })
             .OrderBy(n => n.FirstPart)
+            .ThenByDescending(n => n.NumericVersion ?? int.MinValue)
             .ThenByDescending(n => n.SecondPart)
             .Select(n => Path.Join(n.Directory, n.FirstPart + n.SecondPart));
     }

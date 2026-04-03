@@ -27,6 +27,6 @@ public sealed class Constants
     public const string TestProviderLongName = "Microsoft-Windows-EventLogExpert";
     public const string TestProviderName = "EventLogExpert";
 
-    public const string ExchangeFormatedDescription =
+    public const string ExchangeFormattedDescription =
         "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 }

@@ -12,7 +12,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-public partial class EventResolverBase
+public partial class EventResolverBase : IDisposable
 {
     private const string DefaultFailedDescription = "Failed to resolve description, see XML for more details.";
     private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details";
@@ -52,6 +52,8 @@ public partial class EventResolverBase
     protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
     protected readonly ReaderWriterLockSlim providerDetailsLock = new();
 
+    protected volatile bool disposed;
+
     private readonly IEventResolverCache? _cache;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
 
@@ -61,8 +63,17 @@ public partial class EventResolverBase
         this.logger = logger;
     }
 
-    public DisplayEventModel ResolveEvent(EventRecord eventRecord) =>
-        new(eventRecord.PathName, eventRecord.PathType)
+    public void Dispose()
+    {
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
+    }
+
+    public virtual DisplayEventModel ResolveEvent(EventRecord eventRecord)
+    {
+        ObjectDisposedException.ThrowIf(disposed, this);
+
+        return new DisplayEventModel(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
@@ -80,6 +91,36 @@ public partial class EventResolverBase
             UserId = eventRecord.UserId,
             Xml = eventRecord.Xml ?? string.Empty
         };
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposing || disposed) { return; }
+
+        disposed = true;
+
+        // Attempt to dispose the lock to avoid leaking wait handles.
+        // If other threads are still waiting to acquire the lock (rare race condition),
+        // ReaderWriterLockSlim.Dispose() will throw SynchronizationLockException.
+        // In that case, we suppress the exception to avoid crashing during disposal.
+        // This is a pragmatic trade-off: accept a potential wait handle leak in an
+        // extremely rare concurrent disposal scenario rather than crash the application.
+        try
+        {
+            providerDetailsLock.Dispose();
+        }
+        catch (SynchronizationLockException)
+        {
+            // Lock is still being used by other threads. This is extremely rare but can happen
+            // in concurrent disposal scenarios. We suppress the exception to prevent disposal
+            // from throwing, accepting a potential wait handle leak as the lesser evil.
+        }
+        catch (ObjectDisposedException)
+        {
+            // Lock was already disposed. This can happen in race conditions with concurrent disposal.
+            // Safe to ignore since the resource is already cleaned up.
+        }
+    }
 
     private static void CleanupFormatting(ReadOnlySpan<char> unformattedString, ref Span<char> buffer, out int bufferIndex)
     {

@@ -24,7 +24,7 @@ public sealed class VersatileEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var resolver = new VersatileEventResolver(cache: cache, tracer: logger);
+        using var resolver = new VersatileEventResolver(cache: cache, tracer: logger);
 
         // Assert
         Assert.NotNull(resolver);
@@ -46,11 +46,11 @@ public sealed class VersatileEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            // Act
-            var resolver = new VersatileEventResolver(dbCollection);
-
-            // Assert
-            Assert.NotNull(resolver);
+            // Act & Assert
+            using (var resolver = new VersatileEventResolver(dbCollection))
+            {
+                Assert.NotNull(resolver);
+            }
         }
         finally
         {
@@ -59,9 +59,7 @@ public sealed class VersatileEventResolverTests
                 SqliteConnection.ClearAllPools();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-
-                try { File.Delete(dbPath); }
-                catch { }
+                File.Delete(dbPath);
             }
         }
     }
@@ -74,27 +72,162 @@ public sealed class VersatileEventResolverTests
         dbCollection.ActiveDatabases.Returns(ImmutableList<string>.Empty);
 
         // Act
-        var resolver = new VersatileEventResolver(dbCollection);
+        using var resolver = new VersatileEventResolver(dbCollection);
 
         // Assert
         Assert.NotNull(resolver);
+    }
+
+    [Fact]
+    public void Constructor_WithLogger_ShouldLogInstantiation()
+    {
+        // Arrange
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        using var resolver = new VersatileEventResolver(tracer: logger);
+
+        // Assert
+        logger.Received().Trace(Arg.Is<string>(s => s.Contains("VersatileEventResolver")));
     }
 
     [Fact]
     public void Constructor_WithNoDatabaseCollection_ShouldUseLocalResolver()
     {
         // Act
-        var resolver = new VersatileEventResolver(null);
+        using var resolver = new VersatileEventResolver(null);
 
         // Assert
         Assert.NotNull(resolver);
     }
 
     [Fact]
-    public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
+    public void Dispose_CalledMultipleTimes_ShouldNotThrow()
     {
         // Arrange
         var resolver = new VersatileEventResolver();
+
+        // Act & Assert
+        resolver.Dispose();
+        resolver.Dispose(); // Second call should not throw
+        resolver.Dispose(); // Third call should not throw
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_WithDatabaseResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
+
+        try
+        {
+            using (var context = new EventProviderDbContext(dbPath, false))
+            {
+                context.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+
+            var resolver = new VersatileEventResolver(dbCollection);
+            var eventRecord = EventUtils.CreateBasicEvent();
+
+            // Act
+            resolver.Dispose();
+
+            // Assert
+            Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_WithLocalResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var resolver = new VersatileEventResolver(); // Uses local resolver
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert - Should throw even though local resolver doesn't hold resources
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveProviderDetails_WithDatabaseResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
+
+        try
+        {
+            using (var context = new EventProviderDbContext(dbPath, false))
+            {
+                context.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+
+            var resolver = new VersatileEventResolver(dbCollection);
+            var eventRecord = new EventRecord
+            {
+                ProviderName = Constants.TestProviderName,
+                Id = 1000
+            };
+
+            // Act
+            resolver.Dispose();
+
+            // Assert
+            Assert.Throws<ObjectDisposedException>(() => resolver.ResolveProviderDetails(eventRecord));
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveProviderDetails_WithLocalResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var resolver = new VersatileEventResolver(); // Uses local resolver
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000
+        };
+
+        // Act
+        resolver.Dispose();
+
+        // Assert - Should throw even though local resolver doesn't hold resources
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveProviderDetails(eventRecord));
+    }
+
+    [Fact]
+    public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        using var resolver = new VersatileEventResolver();
         var exceptions = new Exception?[50];
 
         // Act
@@ -128,7 +261,7 @@ public sealed class VersatileEventResolverTests
     {
         // Arrange
         var cache = new EventResolverCache();
-        var resolver = new VersatileEventResolver(cache: cache);
+        using var resolver = new VersatileEventResolver(cache: cache);
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -163,8 +296,6 @@ public sealed class VersatileEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new VersatileEventResolver(dbCollection);
-
             var eventRecord = new EventRecord
             {
                 ProviderName = "TestProvider",
@@ -175,7 +306,11 @@ public sealed class VersatileEventResolverTests
             };
 
             // Act
-            var displayEvent = resolver.ResolveEvent(eventRecord);
+            DisplayEventModel displayEvent;
+            using (var resolver = new VersatileEventResolver(dbCollection))
+            {
+                displayEvent = resolver.ResolveEvent(eventRecord);
+            }
 
             // Assert
             Assert.NotNull(displayEvent);
@@ -188,9 +323,7 @@ public sealed class VersatileEventResolverTests
                 SqliteConnection.ClearAllPools();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-
-                try { File.Delete(dbPath); }
-                catch { }
+                File.Delete(dbPath);
             }
         }
     }
@@ -199,16 +332,8 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_WithLocalResolver_ShouldResolveEvent()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.ApplicationLogName,
-            Id = 1000,
-            ComputerName = "TestComputer",
-            LogName = Constants.ApplicationLogName,
-            TimeCreated = DateTime.UtcNow
-        };
+        using var resolver = new VersatileEventResolver();
+        var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
         var displayEvent = resolver.ResolveEvent(eventRecord);
@@ -220,33 +345,10 @@ public sealed class VersatileEventResolverTests
     }
 
     [Fact]
-    public void ResolveEvent_WithLogger_ShouldLogActivity()
-    {
-        // Arrange
-        var logger = Substitute.For<ITraceLogger>();
-        var resolver = new VersatileEventResolver(tracer: logger);
-
-        // Act
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1000,
-            ComputerName = "TestComputer",
-            LogName = Constants.ApplicationLogName
-        };
-
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        logger.Received().Trace(Arg.Is<string>(s => s.Contains("VersatileEventResolver")));
-    }
-
-    [Fact]
     public void ResolveEvent_WithMultipleProviders_ShouldResolveAll()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        using var resolver = new VersatileEventResolver();
 
         var providers = new[]
         {
@@ -276,7 +378,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_WithNonExistentProvider_ShouldReturnDefaultDescription()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        using var resolver = new VersatileEventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -298,7 +400,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_CalledTwice_ShouldHandleCorrectly()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        using var resolver = new VersatileEventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -318,7 +420,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        using var resolver = new VersatileEventResolver();
         var exceptions = new Exception?[50];
 
         // Act
@@ -360,8 +462,6 @@ public sealed class VersatileEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new VersatileEventResolver(dbCollection);
-
             var eventRecord = new EventRecord
             {
                 ProviderName = "TestProvider",
@@ -369,7 +469,11 @@ public sealed class VersatileEventResolverTests
             };
 
             // Act
-            var exception = Record.Exception(() => resolver.ResolveProviderDetails(eventRecord));
+            Exception? exception;
+            using (var resolver = new VersatileEventResolver(dbCollection))
+            {
+                exception = Record.Exception(() => resolver.ResolveProviderDetails(eventRecord));
+            }
 
             // Assert
             Assert.Null(exception);
@@ -381,9 +485,7 @@ public sealed class VersatileEventResolverTests
                 SqliteConnection.ClearAllPools();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-
-                try { File.Delete(dbPath); }
-                catch { }
+                File.Delete(dbPath);
             }
         }
     }
@@ -392,7 +494,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_WithLocalResolver_ShouldResolve()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        using var resolver = new VersatileEventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -411,8 +513,6 @@ public sealed class VersatileEventResolverTests
     public void SwitchBetweenResolvers_WithDifferentInstances_ShouldWorkIndependently()
     {
         // Arrange
-        var localResolver = new VersatileEventResolver();
-
         string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
 
         try
@@ -424,13 +524,22 @@ public sealed class VersatileEventResolverTests
 
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
-            var databaseResolver = new VersatileEventResolver(dbCollection);
 
             var eventRecord = EventUtils.CreateBasicEvent();
 
             // Act
-            var localEvent = localResolver.ResolveEvent(eventRecord);
-            var databaseEvent = databaseResolver.ResolveEvent(eventRecord);
+            DisplayEventModel localEvent;
+            DisplayEventModel databaseEvent;
+
+            using (var localResolver = new VersatileEventResolver())
+            {
+                localEvent = localResolver.ResolveEvent(eventRecord);
+            }
+
+            using (var databaseResolver = new VersatileEventResolver(dbCollection))
+            {
+                databaseEvent = databaseResolver.ResolveEvent(eventRecord);
+            }
 
             // Assert
             Assert.NotNull(localEvent);
@@ -444,9 +553,7 @@ public sealed class VersatileEventResolverTests
                 SqliteConnection.ClearAllPools();
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-
-                try { File.Delete(dbPath); }
-                catch { }
+                File.Delete(dbPath);
             }
         }
     }

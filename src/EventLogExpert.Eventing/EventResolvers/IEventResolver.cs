@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Models;
 namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>Resolves event details from an <see cref="EventRecord" />.</summary>
-public interface IEventResolver
+public interface IEventResolver : IDisposable
 {
     public DisplayEventModel ResolveEvent(EventRecord eventRecord);
 
