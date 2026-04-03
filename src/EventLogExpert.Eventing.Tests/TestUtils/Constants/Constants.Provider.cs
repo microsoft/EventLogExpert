@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Eventing.Tests.TestUtils.Constants;
 
-public sealed partial class Constants
+public sealed class Constants
 {
     public const string ApplicationLogName = "Application";
     public const string SystemLogName = "System";
@@ -26,4 +26,7 @@ public sealed partial class Constants
 
     public const string TestProviderLongName = "Microsoft-Windows-EventLogExpert";
     public const string TestProviderName = "EventLogExpert";
+
+    public const string ExchangeFormatedDescription =
+        "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";
 }
