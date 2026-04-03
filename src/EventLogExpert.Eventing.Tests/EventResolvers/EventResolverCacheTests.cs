@@ -12,17 +12,34 @@ public sealed class EventResolverCacheTests
     {
         // Arrange
         var cache = new EventResolverCache();
-        cache.GetOrAddDescription("Test Description");
-        cache.GetOrAddValue("Test Value");
+
+        // Force new string instances to avoid string interning
+        var testDesc = new string("Test Description".ToCharArray());
+        var testValue = new string("Test Value".ToCharArray());
+
+        var oldDesc = cache.GetOrAddDescription(testDesc);
+        var oldValue = cache.GetOrAddValue(testValue);
 
         // Act
         cache.ClearAll();
 
         // Assert
-        // After clearing, new instances should be added (not return cached references)
-        var desc1 = cache.GetOrAddDescription("Test Description");
-        var desc2 = cache.GetOrAddDescription("Test Description");
-        Assert.Same(desc1, desc2); // Should cache the new instance
+        // After clearing, calling GetOrAdd with new instances should return those new instances
+        var newDescInput = new string("Test Description".ToCharArray());
+        var newValueInput = new string("Test Value".ToCharArray());
+
+        var newDesc = cache.GetOrAddDescription(newDescInput);
+        var newValue = cache.GetOrAddValue(newValueInput);
+
+        Assert.NotSame(oldDesc, newDesc); // Different reference after clear (description cache)
+        Assert.NotSame(oldValue, newValue); // Different reference after clear (value cache)
+
+        // But subsequent calls with the same inputs should return cached instances
+        var desc2 = cache.GetOrAddDescription(new string("Test Description".ToCharArray()));
+        var value2 = cache.GetOrAddValue(new string("Test Value".ToCharArray()));
+
+        Assert.Same(newDesc, desc2); // Should cache the new description instance
+        Assert.Same(newValue, value2); // Should cache the new value instance
     }
 
     [Fact]
@@ -37,11 +54,15 @@ public sealed class EventResolverCacheTests
         }
 
         // Act
-        Parallel.For(0, 10, _ => cache.ClearAll());
+        var exception = Record.Exception(() => Parallel.For(0, 10, _ => cache.ClearAll()));
 
         // Assert
-        // If we get here without exceptions, thread safety is maintained
-        Assert.True(true);
+        Assert.Null(exception);
+
+        // Verify post-condition: after clear, new inputs return new instances
+        var newInput = new string("PostClear".ToCharArray());
+        var result = cache.GetOrAddDescription(newInput);
+        Assert.Same(newInput, result);
     }
 
     [Fact]
@@ -51,10 +72,10 @@ public sealed class EventResolverCacheTests
         var cache = new EventResolverCache();
 
         // Act
-        cache.ClearAll();
+        var exception = Record.Exception(() => cache.ClearAll());
 
         // Assert
-        Assert.True(true); // If we get here, no exception was thrown
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -246,21 +267,21 @@ public sealed class EventResolverCacheTests
         var cache = new EventResolverCache();
 
         // Act
-        Parallel.For(0, 100, i =>
-        {
-            if (i % 2 == 0)
+        var exception = Record.Exception(() =>
+            Parallel.For(0, 100, i =>
             {
-                cache.GetOrAddDescription($"Description{i % 10}");
-            }
-            else
-            {
-                cache.GetOrAddValue($"Value{i % 10}");
-            }
-        });
+                if (i % 2 == 0)
+                {
+                    cache.GetOrAddDescription($"Description{i % 10}");
+                }
+                else
+                {
+                    cache.GetOrAddValue($"Value{i % 10}");
+                }
+            }));
 
         // Assert
-        // If we get here without exceptions, thread safety is maintained
-        Assert.True(true);
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -270,34 +291,34 @@ public sealed class EventResolverCacheTests
         var cache = new EventResolverCache();
 
         // Act
-        Parallel.Invoke(
-            () =>
-            {
-                for (int i = 0; i < 100; i++)
+        var exception = Record.Exception(() =>
+            Parallel.Invoke(
+                () =>
                 {
-                    cache.GetOrAddDescription($"Description{i}");
-                }
-            },
-            () =>
-            {
-                for (int i = 0; i < 100; i++)
+                    for (int i = 0; i < 100; i++)
+                    {
+                        cache.GetOrAddDescription($"Description{i}");
+                    }
+                },
+                () =>
                 {
-                    cache.GetOrAddValue($"Value{i}");
-                }
-            },
-            () =>
-            {
-                for (int i = 0; i < 10; i++)
+                    for (int i = 0; i < 100; i++)
+                    {
+                        cache.GetOrAddValue($"Value{i}");
+                    }
+                },
+                () =>
                 {
-                    Thread.Sleep(5);
-                    cache.ClearAll();
+                    for (int i = 0; i < 10; i++)
+                    {
+                        Thread.Sleep(5);
+                        cache.ClearAll();
+                    }
                 }
-            }
-        );
+            ));
 
         // Assert
-        // If we get here without exceptions, thread safety is maintained
-        Assert.True(true);
+        Assert.Null(exception);
     }
 
     [Fact]

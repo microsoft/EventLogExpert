@@ -63,7 +63,7 @@ public static class EventUtils
             ProviderName = "MSExchangeRepl",
             RecordId = 9518530,
             Task = 1,
-            TimeCreated = DateTime.Parse("1/7/2023 10:02:00 AM"),
+            TimeCreated = new DateTime(2023, 1, 7, 10, 2, 0, DateTimeKind.Unspecified),
             ProcessId = 1234,
             ThreadId = 5678
         };

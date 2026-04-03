@@ -6,8 +6,11 @@ using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Tests.TestUtils;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
+using Microsoft.Data.Sqlite;
 using NSubstitute;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
@@ -24,7 +27,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection, cache, logger);
+        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, cache, logger);
 
         // Assert
         Assert.NotNull(resolver);
@@ -42,7 +45,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // This will throw FileNotFoundException, but we can still check logging
         try
         {
-            _ = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
         }
         catch (FileNotFoundException)
         {
@@ -63,7 +66,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        _ = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
 
         // Assert
         logger.Received(1).Trace(Arg.Is<string>(s => s.Contains("EventProviderDatabaseEventResolver")));
@@ -93,7 +96,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         dbCollection.ActiveDatabases.Returns([]);
 
         // Act
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection, cache: null);
+        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -118,7 +121,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         dbCollection.ActiveDatabases.Returns([]);
 
         // Act
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: null);
+        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -132,7 +135,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context = new EventProviderDbContext(dbPath, readOnly: false))
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
                 context.ProviderDetails.Add(new ProviderDetails { ProviderName = Constants.TestProviderName });
                 context.SaveChanges();
@@ -154,6 +157,174 @@ public sealed class EventProviderDatabaseEventResolverTests
     }
 
     [Fact]
+    public void Dispose_CalledMultipleTimes_ShouldNotThrow()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+        // Act & Assert
+        resolver.Dispose();
+        resolver.Dispose(); // Second call should not throw
+        resolver.Dispose(); // Third call should not throw
+    }
+
+    [Fact]
+    public async Task Dispose_ConcurrentWithResolveProviderDetails_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
+
+        try
+        {
+            await using (var context = new EventProviderDbContext(dbPath, false))
+            {
+                for (int i = 0; i < 100; i++)
+                {
+                    context.ProviderDetails.Add(new ProviderDetails
+                    {
+                        ProviderName = $"Provider{i}",
+                        Messages = new List<MessageModel>()
+                    });
+                }
+
+                await context.SaveChangesAsync();
+            }
+
+            var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+            var exceptions = new ConcurrentBag<Exception>();
+
+            // Act - Start concurrent operations and dispose while they're running
+            var tasks = Enumerable.Range(0, 10).Select(i =>
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        for (int j = 0; j < 100; j++)
+                        {
+                            var eventRecord = new EventRecord
+                            {
+                                ProviderName = $"Provider{i % 100}",
+                                Id = 1000
+                            };
+
+                            resolver.ResolveProviderDetails(eventRecord);
+                        }
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // Expected - operations may fail if Dispose completes first
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                })).ToList();
+
+            // Call Dispose while operations are running - it should just work
+            tasks.Add(Task.Run(() => resolver.Dispose()));
+
+            await Task.WhenAll(tasks);
+
+            // Assert - Should not have any unexpected exceptions
+            Assert.Empty(exceptions);
+        }
+        finally
+        {
+            DeleteDatabaseFile(dbPath);
+        }
+    }
+
+    [Fact]
+    public void Dispose_MultipleConcurrentDisposeCalls_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+        var exceptions = new ConcurrentBag<Exception>();
+
+        // Act - Multiple threads trying to dispose simultaneously
+        Parallel.For(0, 10, i =>
+            {
+                try
+                {
+                    resolver.Dispose();
+                }
+                catch (Exception ex)
+                {
+                    exceptions.Add(ex);
+                }
+            });
+
+        // Assert - Should not throw any exceptions
+        Assert.Empty(exceptions);
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        EventProviderDatabaseEventResolver resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+        // Type as base class to verify override (not 'new') is used
+        EventResolverBase baseResolver = resolver;
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert - This should throw because ResolveEvent is overridden, not hidden with 'new'
+        Assert.Throws<ObjectDisposedException>(() => baseResolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveProviderDetails_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000
+        };
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveProviderDetails(eventRecord));
+    }
+
+    [Fact]
     public void ResolveProviderDetails_CalledTwiceForSameProvider_ShouldResolveOnlyOnce()
     {
         // Arrange
@@ -161,13 +332,14 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context = new EventProviderDbContext(dbPath, readOnly: false))
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
                 context.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = Constants.TestProviderName,
                     Messages = new List<MessageModel>()
                 });
+
                 context.SaveChanges();
             }
 
@@ -205,7 +377,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context = new EventProviderDbContext(dbPath, readOnly: false))
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
                 for (int i = 0; i < 10; i++)
                 {
@@ -225,19 +397,20 @@ public sealed class EventProviderDatabaseEventResolverTests
             using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
 
             // Act
-            Parallel.For(0, 10, i =>
-            {
-                var eventRecord = new EventRecord
+            var exception = Record.Exception(() =>
+                Parallel.For(0, 10, i =>
                 {
-                    ProviderName = $"Provider{i}",
-                    Id = (ushort)(1000 + i)
-                };
-                resolver.ResolveProviderDetails(eventRecord);
-            });
+                    var eventRecord = new EventRecord
+                    {
+                        ProviderName = $"Provider{i}",
+                        Id = (ushort)(1000 + i)
+                    };
+
+                    resolver.ResolveProviderDetails(eventRecord);
+                }));
 
             // Assert
-            // If we get here without exceptions, thread safety is maintained
-            Assert.True(true);
+            Assert.Null(exception);
         }
         finally
         {
@@ -254,7 +427,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context1 = new EventProviderDbContext(dbPath1, readOnly: false))
+            using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
                 for (int i = 0; i < 5; i++)
                 {
@@ -268,7 +441,7 @@ public sealed class EventProviderDatabaseEventResolverTests
                 context1.SaveChanges();
             }
 
-            using (var context2 = new EventProviderDbContext(dbPath2, readOnly: false))
+            using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
                 for (int i = 0; i < 5; i++)
                 {
@@ -288,21 +461,23 @@ public sealed class EventProviderDatabaseEventResolverTests
             using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
 
             // Act
-            Parallel.For(0, 10, i =>
-            {
-                var dbPrefix = i < 5 ? "DB1" : "DB2";
-                var providerIndex = i % 5;
-                var eventRecord = new EventRecord
+            var exception = Record.Exception(() =>
+                Parallel.For(0, 10, i =>
                 {
-                    ProviderName = $"{dbPrefix}Provider{providerIndex}",
-                    Id = (ushort)(1000 + i)
-                };
-                resolver.ResolveProviderDetails(eventRecord);
-            });
+                    var dbPrefix = i < 5 ? "DB1" : "DB2";
+                    var providerIndex = i % 5;
+
+                    var eventRecord = new EventRecord
+                    {
+                        ProviderName = $"{dbPrefix}Provider{providerIndex}",
+                        Id = (ushort)(1000 + i)
+                    };
+
+                    resolver.ResolveProviderDetails(eventRecord);
+                }));
 
             // Assert
-            // If we get here without exceptions, concurrent access from multiple databases works
-            Assert.True(true);
+            Assert.Null(exception);
         }
         finally
         {
@@ -319,13 +494,14 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context = new EventProviderDbContext(dbPath, readOnly: false))
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
                 context.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = Constants.TestProviderName,
                     Messages = new List<MessageModel>()
                 });
+
                 context.SaveChanges();
             }
 
@@ -363,23 +539,25 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context1 = new EventProviderDbContext(dbPath1, readOnly: false))
+            using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
                 context1.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = Constants.TestProviderName,
                     Messages = new List<MessageModel>()
                 });
+
                 context1.SaveChanges();
             }
 
-            using (var context2 = new EventProviderDbContext(dbPath2, readOnly: false))
+            using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
                 context2.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = Constants.TestProviderName,
                     Messages = new List<MessageModel>()
                 });
+
                 context2.SaveChanges();
             }
 
@@ -420,7 +598,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context = new EventProviderDbContext(dbPath, readOnly: false))
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
                 context.ProviderDetails.Add(new ProviderDetails
                 {
@@ -428,6 +606,7 @@ public sealed class EventProviderDatabaseEventResolverTests
                     Messages = new List<MessageModel>(),
                     Events = new List<EventModel>()
                 });
+
                 context.SaveChanges();
             }
 
@@ -467,23 +646,25 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context1 = new EventProviderDbContext(dbPath1, readOnly: false))
+            using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
                 context1.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = "Provider1",
                     Messages = new List<MessageModel>()
                 });
+
                 context1.SaveChanges();
             }
 
-            using (var context2 = new EventProviderDbContext(dbPath2, readOnly: false))
+            using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
                 context2.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = "Provider2",
                     Messages = new List<MessageModel>()
                 });
+
                 context2.SaveChanges();
             }
 
@@ -496,12 +677,14 @@ public sealed class EventProviderDatabaseEventResolverTests
             var eventRecord2 = new EventRecord { ProviderName = "Provider2", Id = 2000 };
 
             // Act
-            resolver.ResolveProviderDetails(eventRecord1);
-            resolver.ResolveProviderDetails(eventRecord2);
+            var exception = Record.Exception(() =>
+            {
+                resolver.ResolveProviderDetails(eventRecord1);
+                resolver.ResolveProviderDetails(eventRecord2);
+            });
 
             // Assert
-            // If we get here, both providers were resolved successfully
-            Assert.True(true);
+            Assert.Null(exception);
         }
         finally
         {
@@ -519,19 +702,20 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         try
         {
-            using (var context1 = new EventProviderDbContext(dbPath1, readOnly: false))
+            using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
                 // Empty database
                 context1.SaveChanges();
             }
 
-            using (var context2 = new EventProviderDbContext(dbPath2, readOnly: false))
+            using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
                 context2.ProviderDetails.Add(new ProviderDetails
                 {
                     ProviderName = Constants.TestProviderName,
                     Messages = new List<MessageModel>()
                 });
+
                 context2.SaveChanges();
             }
 
@@ -569,7 +753,8 @@ public sealed class EventProviderDatabaseEventResolverTests
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
 
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+
         var eventRecord = new EventRecord
         {
             ProviderName = Constants.TestProviderName,
@@ -577,13 +762,16 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        resolver.ResolveProviderDetails(eventRecord);
+        var exception = Record.Exception(() =>
+        {
+            resolver.ResolveProviderDetails(eventRecord);
 
-        // Second call should not throw (provider details should be cached)
-        resolver.ResolveProviderDetails(eventRecord);
+            // Second call should not throw (provider details should be cached)
+            resolver.ResolveProviderDetails(eventRecord);
+        });
 
         // Assert
-        Assert.True(true); // If we get here, the method handled the unknown provider correctly
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -696,11 +884,11 @@ public sealed class EventProviderDatabaseEventResolverTests
         var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
 
         // Assert
-        // String comparison (descending): "20" > "2" > "10" (lexicographic)
+        // Numeric comparison (descending): 20 > 10 > 2
         Assert.Equal(3, sorted.Count);
         Assert.Equal(@"C:\Test\Product 20.db", sorted[0]);
-        Assert.Equal(@"C:\Test\Product 2.db", sorted[1]);
-        Assert.Equal(@"C:\Test\Product 10.db", sorted[2]);
+        Assert.Equal(@"C:\Test\Product 10.db", sorted[1]);
+        Assert.Equal(@"C:\Test\Product 2.db", sorted[2]);
     }
 
     [Fact]
@@ -742,14 +930,14 @@ public sealed class EventProviderDatabaseEventResolverTests
 
     private static void DeleteDatabaseFile(string path, int maxRetries = 10)
     {
-        if (!File.Exists(path)) return;
+        if (!File.Exists(path)) { return; }
 
         for (int i = 0; i < maxRetries; i++)
         {
             try
             {
                 // Clear SQLite connection pool
-                Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+                SqliteConnection.ClearAllPools();
 
                 GC.Collect();
                 GC.WaitForPendingFinalizers();

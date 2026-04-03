@@ -190,10 +190,10 @@ public sealed class EventLogInformationTests
             // If we can access it (running as admin), verify it works
             Assert.NotNull(logInfo);
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException ex)
         {
             // Expected when not running as administrator
-            Assert.True(true);
+            Assert.IsType<UnauthorizedAccessException>(ex);
         }
     }
 

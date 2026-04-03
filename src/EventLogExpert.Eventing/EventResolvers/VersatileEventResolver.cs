@@ -6,11 +6,17 @@ using EventLogExpert.Eventing.Models;
 
 namespace EventLogExpert.Eventing.EventResolvers;
 
-/// <summary>This IEventResolver uses event databases if any are available, and falls back to local providers if not.</summary>
+/// <summary>
+/// This IEventResolver uses event databases if any are available, and falls back to local providers if not.
+/// IMPORTANT: This class implements IDisposable because it may hold database resources.
+/// Callers must dispose this resolver to ensure database files are not left locked.
+/// </summary>
 public sealed class VersatileEventResolver : IEventResolver
 {
     private readonly EventProviderDatabaseEventResolver? _databaseResolver;
     private readonly LocalProviderEventResolver? _localResolver;
+
+    private volatile bool _disposed;
 
     public VersatileEventResolver(
         IDatabaseCollectionProvider? dbCollection = null,
@@ -30,8 +36,23 @@ public sealed class VersatileEventResolver : IEventResolver
             $"Database Resolver is {dbCollection?.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        _databaseResolver?.Dispose();
+        _localResolver?.Dispose();
+    }
+
     public DisplayEventModel ResolveEvent(EventRecord eventRecord)
     {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(VersatileEventResolver));
+
         ResolveProviderDetails(eventRecord);
 
         if (_databaseResolver is not null)
@@ -49,6 +70,8 @@ public sealed class VersatileEventResolver : IEventResolver
 
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
+        ObjectDisposedException.ThrowIf(_disposed, nameof(VersatileEventResolver));
+
         if (_databaseResolver is not null)
         {
             _databaseResolver.ResolveProviderDetails(eventRecord);

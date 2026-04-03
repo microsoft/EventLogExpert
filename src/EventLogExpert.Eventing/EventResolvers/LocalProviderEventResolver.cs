@@ -20,20 +20,16 @@ internal sealed class LocalProviderEventResolver(IEventResolverCache? cache = nu
 
         try
         {
-            if (providerDetails.ContainsKey(eventRecord.ProviderName))
-            {
-                return;
-            }
+            ObjectDisposedException.ThrowIf(disposed, nameof(LocalProviderEventResolver));
+
+            if (providerDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
             providerDetailsLock.EnterWriteLock();
 
             try
             {
                 // Double-check in case another thread added the provider details while we were waiting.
-                if (providerDetails.ContainsKey(eventRecord.ProviderName))
-                {
-                    return;
-                }
+                if (providerDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
                 var details = new EventMessageProvider(eventRecord.ProviderName, logger).LoadProviderDetails();
 

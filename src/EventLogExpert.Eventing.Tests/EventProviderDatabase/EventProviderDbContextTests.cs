@@ -262,6 +262,9 @@ public sealed class EventProviderDbContextTests : IDisposable
             Tasks = new Dictionary<int, string>()
         };
 
+        // Calculate uncompressed data size: 100 messages * 1000 chars = ~100KB of text data
+        const int UncompressedDataSize = 100 * 1000;
+
         // Act
         using (var context = new EventProviderDbContext(dbPath, false))
         {
@@ -271,7 +274,12 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         // Assert
         var fileSize = new FileInfo(dbPath).Length;
-        Assert.True(fileSize < 100000);
+
+        // Compression should result in file size significantly smaller than uncompressed data
+        // Allow for SQLite overhead but verify compression achieved at least 2x reduction
+        Assert.True(fileSize < UncompressedDataSize / 2, 
+            $"Expected compressed file size to be less than {UncompressedDataSize / 2} bytes, but was {fileSize} bytes. " +
+            $"This suggests compression may not be working effectively.");
 
         using (var context = new EventProviderDbContext(dbPath, true))
         {
