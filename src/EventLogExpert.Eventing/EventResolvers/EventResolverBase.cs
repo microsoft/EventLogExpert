@@ -73,13 +73,16 @@ public partial class EventResolverBase : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
 
+        var keywords = GetKeywordsFromBitmask(eventRecord);
+
         return new DisplayEventModel(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
             Description = ResolveDescription(eventRecord),
             Id = eventRecord.Id,
-            KeywordsDisplayNames = GetKeywordsFromBitmask(eventRecord),
+            Keywords = keywords,
+            KeywordsDisplayName = string.Join(", ", keywords),
             Level = Severity.GetString(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,
@@ -313,11 +316,7 @@ public partial class EventResolverBase : IDisposable
             return modernEvent;
         }
 
-        var matchingEvents = details.Events
-            .Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName)
-            .ToList();
-
-        foreach (var @event in matchingEvents)
+        foreach (var @event in details.Events.Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName))
         {
             if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
             {
@@ -327,11 +326,7 @@ public partial class EventResolverBase : IDisposable
 
         // Try again forcing the long to a short and with no log name.
         // This is needed for providers such as Microsoft-Windows-Complus
-        var shortIdEvents = details.Events
-            .Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version)
-            .ToList();
-
-        foreach (var @event in shortIdEvents)
+        foreach (var @event in details.Events.Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version))
         {
             if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
             {

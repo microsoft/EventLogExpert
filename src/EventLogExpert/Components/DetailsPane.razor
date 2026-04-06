@@ -21,10 +21,10 @@
                 <div>Source: @SelectedEvent.Source</div>
                 <div>Event Id: @SelectedEvent.Id</div>
                 <div>Level: @SelectedEvent.Level</div>
-                @if (SelectedEvent.KeywordsDisplayNames.Any())
+                @if (SelectedEvent.Keywords.Any())
                 {
                     <div>
-                        @SelectedEvent.KeywordsDisplayNames.GetEventKeywords()
+                        "Keywords: @SelectedEvent.KeywordsDisplayName"
                     </div>
                 }
                 <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
