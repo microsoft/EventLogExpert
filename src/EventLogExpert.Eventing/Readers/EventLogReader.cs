@@ -13,6 +13,8 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
     private readonly EvtHandle _handle =
         EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
 
+    private bool _disposed;
+
     ~EventLogReader()
     {
         Dispose(disposing: false);
@@ -143,11 +145,16 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
     private void Dispose(bool disposing)
     {
-        if (disposing) { return; }
+        if (_disposed) { return; }
 
-        if (_handle is { IsInvalid: false })
+        if (disposing)
         {
-            _handle.Dispose();
+            if (_handle is { IsInvalid: false })
+            {
+                _handle.Dispose();
+            }
         }
+
+        _disposed = true;
     }
 }

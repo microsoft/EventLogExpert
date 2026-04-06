@@ -28,7 +28,7 @@ public sealed record EventRecord
 
     public long? RecordId { get; set; }
 
-    public IEnumerable<object> Properties { get; set; } = [];
+    public IReadOnlyList<object> Properties { get; set; } = [];
 
     public string ProviderName { get; set; } = string.Empty;
 

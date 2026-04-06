@@ -19,7 +19,7 @@ public sealed class FilterGroupReducers
         {
             Groups = state.Groups
                 .Remove(group)
-                .Add(group with { Filters = group.Filters.Concat([new FilterModel { IsEditing = true }]) })
+                .Add(group with { Filters = [.. group.Filters, new FilterModel { IsEditing = true }] })
         };
     }
 

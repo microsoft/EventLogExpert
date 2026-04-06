@@ -130,20 +130,16 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void Dispose_AfterDispose_TryGetEventsStillWorks()
+    public void Dispose_AfterDispose_TryGetEventsShouldThrow()
     {
         // Arrange
         var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
 
         // Act
         reader.Dispose();
-        bool success = reader.TryGetEvents(out var events);
 
-        // Assert
-        // The Dispose method only acts during finalization (disposing: false)
-        // Direct calls with disposing: true return immediately, so TryGetEvents still works
-        Assert.True(success);
-        Assert.NotNull(events);
+        // Assert - After Dispose, the handle is disposed and TryGetEvents should throw
+        Assert.Throws<ObjectDisposedException>(() => reader.TryGetEvents(out _));
     }
 
     [Fact]

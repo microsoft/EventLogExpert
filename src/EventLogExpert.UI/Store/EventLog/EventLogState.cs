@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -22,8 +21,7 @@ public sealed record EventLogState
 
     public bool ContinuouslyUpdate { get; init; } = false;
 
-    public ReadOnlyCollection<DisplayEventModel> NewEventBuffer { get; init; } =
-        new List<DisplayEventModel>().AsReadOnly();
+    public IReadOnlyList<DisplayEventModel> NewEventBuffer { get; init; } = [];
 
     public bool NewEventBufferIsFull { get; init; }
 

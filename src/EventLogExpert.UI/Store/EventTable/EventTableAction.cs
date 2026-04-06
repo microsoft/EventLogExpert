@@ -30,7 +30,7 @@ public sealed record EventTableAction
 
     public sealed record UpdateCombinedEvents;
 
-    public sealed record UpdateDisplayedEvents(IDictionary<EventLogId, IEnumerable<DisplayEventModel>> ActiveLogs);
+    public sealed record UpdateDisplayedEvents(IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> ActiveLogs);
 
-    public sealed record UpdateTable(EventLogId LogId, IEnumerable<DisplayEventModel> Events);
+    public sealed record UpdateTable(EventLogId LogId, IReadOnlyList<DisplayEventModel> Events);
 }

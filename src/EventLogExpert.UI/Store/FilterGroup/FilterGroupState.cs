@@ -4,7 +4,6 @@
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.FilterGroup;
 
@@ -13,6 +12,6 @@ public sealed record FilterGroupState
 {
     public ImmutableList<FilterGroupModel> Groups { get; init; } = [];
 
-    public ReadOnlyDictionary<string, FilterGroupData> DisplayGroups { get; init; } =
-        new Dictionary<string, FilterGroupData>().AsReadOnly();
+    public IReadOnlyDictionary<string, FilterGroupData> DisplayGroups { get; init; } =
+        ImmutableDictionary<string, FilterGroupData>.Empty;
 }

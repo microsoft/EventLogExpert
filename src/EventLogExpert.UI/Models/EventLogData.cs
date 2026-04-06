@@ -3,14 +3,13 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Models;
 
 public sealed record EventLogData(
     string Name,
     PathType Type,
-    ReadOnlyCollection<DisplayEventModel> Events)
+    IReadOnlyList<DisplayEventModel> Events)
 {
     public EventLogId Id { get; } = EventLogId.Create();
 

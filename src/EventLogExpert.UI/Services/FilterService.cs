@@ -17,11 +17,11 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
 
     public bool IsXmlEnabled => _filterPaneState.Value.IsXmlEnabled;
 
-    public IDictionary<EventLogId, IEnumerable<DisplayEventModel>> FilterActiveLogs(
+    public IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter)
     {
-        Dictionary<EventLogId, IEnumerable<DisplayEventModel>> activeLogsFiltered = [];
+        Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>> activeLogsFiltered = [];
 
         foreach (var data in logData)
         {
@@ -31,15 +31,16 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         return activeLogsFiltered;
     }
 
-    public IEnumerable<DisplayEventModel> GetFilteredEvents(
+    public IReadOnlyList<DisplayEventModel> GetFilteredEvents(
         IEnumerable<DisplayEventModel> events,
         EventFilter eventFilter)
     {
-        if (!FilterMethods.IsFilteringEnabled(eventFilter)) { return events; }
+        if (!FilterMethods.IsFilteringEnabled(eventFilter)) { return [.. events]; }
 
         return events.AsParallel()
             .Where(e => e.FilterByDate(eventFilter.DateFilter)
-                .Filter(eventFilter.Filters, IsXmlEnabled));
+                .Filter(eventFilter.Filters, IsXmlEnabled))
+            .ToList();
     }
 
     public bool TryParse(FilterModel filterModel, out string comparison)

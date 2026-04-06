@@ -12,11 +12,11 @@ public interface IFilterService
 {
     bool IsXmlEnabled { get; }
 
-    IDictionary<EventLogId, IEnumerable<DisplayEventModel>> FilterActiveLogs(
+    IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter);
 
-    IEnumerable<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter);
+    IReadOnlyList<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter);
 
     bool TryParse(FilterModel filterModel, out string comparison);
 

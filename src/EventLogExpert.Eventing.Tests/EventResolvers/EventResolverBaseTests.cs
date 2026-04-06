@@ -411,7 +411,7 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Empty(displayEvent.KeywordsDisplayNames);
+        Assert.Empty(displayEvent.Keywords);
     }
 
     [Fact]
@@ -513,8 +513,8 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Contains("CustomKeyword1", displayEvent.KeywordsDisplayNames);
-        Assert.Contains("CustomKeyword2", displayEvent.KeywordsDisplayNames);
+        Assert.Contains("CustomKeyword1", displayEvent.Keywords);
+        Assert.Contains("CustomKeyword2", displayEvent.Keywords);
     }
 
     [Fact]
@@ -599,7 +599,7 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Contains("Classic", displayEvent.KeywordsDisplayNames);
+        Assert.Contains("Classic", displayEvent.Keywords);
     }
 
     [Fact]
@@ -729,7 +729,7 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Empty(displayEvent.KeywordsDisplayNames);
+        Assert.Empty(displayEvent.Keywords);
     }
 
     private class TestEventResolver : EventResolverBase, IEventResolver

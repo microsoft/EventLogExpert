@@ -15,7 +15,7 @@ public sealed record FilterGroupModel
     [JsonIgnore]
     public string DisplayName => Name.Split('\\').Last();
 
-    public IEnumerable<FilterModel> Filters { get; init; } = [];
+    public IReadOnlyList<FilterModel> Filters { get; init; } = [];
 
     [JsonIgnore]
     public bool IsEditing { get; init; }

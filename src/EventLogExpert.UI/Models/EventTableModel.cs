@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Models;
 
@@ -17,8 +16,7 @@ public sealed record EventTableModel(EventLogId Id)
 
     public PathType PathType { get; init; }
 
-    public ReadOnlyCollection<DisplayEventModel> DisplayedEvents { get; init; } =
-        new List<DisplayEventModel>().AsReadOnly();
+    public IReadOnlyList<DisplayEventModel> DisplayedEvents { get; init; } = [];
 
     public bool IsCombined { get; init; }
 

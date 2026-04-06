@@ -12,7 +12,7 @@ public sealed record EventLogAction
 {
     public sealed record AddEvent(DisplayEventModel NewEvent);
 
-    public sealed record AddEventBuffered(IEnumerable<DisplayEventModel> UpdatedBuffer, bool IsFull);
+    public sealed record AddEventBuffered(IReadOnlyList<DisplayEventModel> UpdatedBuffer, bool IsFull);
 
     public sealed record AddEventSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
 
