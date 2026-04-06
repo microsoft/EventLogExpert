@@ -94,7 +94,7 @@ public sealed class ClipboardService : IClipboardService
                             defaultEvent.Append($"\"{@event.TaskCategory}\" ");
                             break;
                         case ColumnName.Keywords:
-                            defaultEvent.Append($"\"{string.Join(", ", @event.KeywordsDisplayNames)}\" ");
+                            defaultEvent.Append($"\"{@event.KeywordsDisplayName}\" ");
                             break;
                         case ColumnName.ProcessId:
                             defaultEvent.Append($"\"{@event.ProcessId}\" ");
@@ -133,7 +133,7 @@ public sealed class ClipboardService : IClipboardService
                 fullEvent.AppendLine($"Event ID: {@event.Id}");
                 fullEvent.AppendLine($"Task Category: {@event.TaskCategory}");
                 fullEvent.AppendLine($"Level: {@event.Level}");
-                fullEvent.AppendLine(@event.KeywordsDisplayNames.GetEventKeywords());
+                fullEvent.AppendLine($"Keywords: {@event.KeywordsDisplayName}");
                 fullEvent.AppendLine($"User: {@event.UserId}");
                 fullEvent.AppendLine($"Computer: {@event.ComputerName}");
                 fullEvent.AppendLine("Description:");

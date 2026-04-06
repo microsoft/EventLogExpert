@@ -21,7 +21,9 @@ public sealed record DisplayEventModel(
 
     public int Id { get; init; }
 
-    public IEnumerable<string> KeywordsDisplayNames { get; init; } = [];
+    public IReadOnlyList<string> Keywords { get; init; } = [];
+
+    public string KeywordsDisplayName { get; init; } = string.Empty;
 
     public string Level { get; init; } = string.Empty;
 

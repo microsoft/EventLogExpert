@@ -71,7 +71,7 @@
                                     @evt.TaskCategory
                                     break;
                                 case ColumnName.Keywords:
-                                    <text>@string.Join(", ", evt.KeywordsDisplayNames)</text>
+                                    @evt.KeywordsDisplayName
                                     break;
                                 case ColumnName.ProcessId:
                                     @evt.ProcessId

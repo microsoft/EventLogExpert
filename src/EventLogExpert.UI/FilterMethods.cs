@@ -106,8 +106,8 @@ public static class FilterMethods
                 events.OrderByDescending(e => e.TaskCategory) :
                 events.OrderBy(e => e.TaskCategory),
             ColumnName.Keywords => isDescending ?
-                events.OrderByDescending(e => e.KeywordsDisplayNames) :
-                events.OrderBy(e => e.KeywordsDisplayNames),
+                events.OrderByDescending(e => e.Keywords) :
+                events.OrderBy(e => e.Keywords),
             ColumnName.ProcessId => isDescending ?
                 events.OrderByDescending(e => e.ProcessId) :
                 events.OrderBy(e => e.ProcessId),
