@@ -1,10 +1,11 @@
-﻿@using EventLogExpert.UI
+﻿@using EventLogExpert.Eventing.Models
+@using EventLogExpert.UI
 @inherits FluxorComponent
 
 <SplitLogTabPane />
 
 <div class="table-container">
-    <table aria-label="Event Log Table" id="eventTable" @onkeydown="HandleKeyDown" role="grid">
+    <table aria-label="Event Log Table" aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)" id="eventTable" @onkeydown="HandleKeyDown" role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr role="row">
             @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
@@ -37,7 +38,7 @@
         <tbody @oncontextmenu="InvokeContextMenu">
         @if (_currentTable is not null)
         {
-            <Virtualize Context="evt" Items="_currentTable.DisplayedEvents">
+            <Virtualize Context="evt" Items="@((_currentTable.DisplayedEvents as ICollection<DisplayEventModel>) ?? [])">
                 @{ _rowIndex = _currentTable.DisplayedEvents.IndexOf(evt); }
                     <tr aria-rowindex="@(_rowIndex + 2)" aria-selected="@(_selectedEventState.Contains(evt).ToString().ToLower())"
                         class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">

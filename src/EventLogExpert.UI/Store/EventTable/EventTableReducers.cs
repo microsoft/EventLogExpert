@@ -6,7 +6,6 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI.Store.EventTable;
 
@@ -198,7 +197,7 @@ public sealed class EventTableReducers
         };
     }
 
-    private static ReadOnlyCollection<DisplayEventModel> GetCombinedEvents(
+    private static List<DisplayEventModel> GetCombinedEvents(
         IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
     {
         List<DisplayEventModel> combinedEvents = [];
@@ -208,7 +207,7 @@ public sealed class EventTableReducers
             combinedEvents.AddRange(eventList);
         }
 
-        return combinedEvents.AsReadOnly();
+        return combinedEvents;
     }
 
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)

@@ -57,8 +57,8 @@ public sealed class EventLogEffects(
         }
         else
         {
-            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer);
-            var full = updatedBuffer.Count() >= EventLogState.MaxNewEvents;
+            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer).ToList();
+            var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
             dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
         }
@@ -233,9 +233,9 @@ public sealed class EventLogEffects(
     /// <summary>Adds new events to the currently opened log</summary>
     private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
     {
-        var newEvents = eventsToAdd.Concat(logData.Events);
+        var newEvents = eventsToAdd.Concat(logData.Events).ToList();
 
-        var updatedLogData = logData with { Events = newEvents.ToList().AsReadOnly() };
+        var updatedLogData = logData with { Events = newEvents };
 
         return updatedLogData;
     }
@@ -267,6 +267,6 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
-        dispatcher.Dispatch(new EventLogAction.AddEventBuffered(new List<DisplayEventModel>().AsReadOnly(), false));
+        dispatcher.Dispatch(new EventLogAction.AddEventBuffered([], false));
     }
 }

@@ -617,7 +617,7 @@ internal static partial class EventMethods
         }
     }
 
-    internal static IList<object> RenderEventProperties(EvtHandle eventHandle)
+    internal static IReadOnlyList<object> RenderEventProperties(EvtHandle eventHandle)
     {
         bool success = EvtRender(
             EventLogSession.GlobalSession.UserRenderContext,
@@ -676,7 +676,9 @@ internal static partial class EventMethods
             }
         }
 
-        return properties.AsReadOnly();
+        // Dropping AsReadOnly since this is a hot path and since this is only used internally,
+        // we can ensure immutability through documentation and code reviews
+        return properties;
     }
 
     internal static string? RenderEventXml(EvtHandle eventHandle)

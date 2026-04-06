@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
-using System.Collections.ObjectModel;
 
 namespace EventLogExpert.UI;
 
@@ -43,46 +42,30 @@ public static class FilterMethods
         return group;
     }
 
-    public static bool Filter(this DisplayEventModel? @event, IEnumerable<FilterModel> filters, bool isXmlEnabled)
-    {
-        if (@event is null) { return false; }
-
-        bool isEmpty = true;
-        bool isFiltered = false;
-
-        foreach (var filter in filters)
-        {
-            if (!isXmlEnabled && filter.Comparison.Value.Contains("xml.", StringComparison.OrdinalIgnoreCase)) { return false; }
-
-            if (filter.IsExcluded && filter.Comparison.Expression(@event)) { return false; }
-
-            if (!filter.IsExcluded) { isEmpty = false; }
-
-            if (!filter.IsExcluded && filter.Comparison.Expression(@event)) { isFiltered = true; }
-        }
-
-        return isEmpty || isFiltered;
-    }
-
-    public static DisplayEventModel? FilterByDate(this DisplayEventModel? @event, FilterDateModel? dateFilter)
-    {
-        if (@event is null) { return null; }
-
-        if (dateFilter is null) { return @event; }
-
-        return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before ? @event : null;
-    }
-
     public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
         updated.DateFilter?.Equals(original.DateFilter) is false ||
         updated.Filters.Equals(original.Filters) is false;
+
+    /// <summary>Returns the index of the specified item in the list, or -1 if not found.</summary>
+    public static int IndexOf<T>(this IReadOnlyList<T> list, T item)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            if (EqualityComparer<T>.Default.Equals(list[i], item))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     public static bool IsFilteringEnabled(EventFilter eventFilter) =>
         eventFilter.DateFilter?.IsEnabled is true ||
         eventFilter.Filters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified</summary>
-    public static ReadOnlyCollection<DisplayEventModel> SortEvents(
+    public static IReadOnlyList<DisplayEventModel> SortEvents(
         this IEnumerable<DisplayEventModel> events,
         ColumnName? orderBy = null,
         bool isDescending = false)
@@ -118,6 +101,39 @@ public static class FilterMethods
             _ => isDescending ? events.OrderByDescending(e => e.RecordId) : events.OrderBy(e => e.RecordId)
         };
 
-        return sortedEvents.ToList().AsReadOnly();
+        return [.. sortedEvents];
+    }
+
+    extension(DisplayEventModel? @event)
+    {
+        public bool Filter(IEnumerable<FilterModel> filters, bool isXmlEnabled)
+        {
+            if (@event is null) { return false; }
+
+            bool isEmpty = true;
+            bool isFiltered = false;
+
+            foreach (var filter in filters)
+            {
+                if (!isXmlEnabled && filter.Comparison.Value.Contains("xml.", StringComparison.OrdinalIgnoreCase)) { return false; }
+
+                if (filter.IsExcluded && filter.Comparison.Expression(@event)) { return false; }
+
+                if (!filter.IsExcluded) { isEmpty = false; }
+
+                if (!filter.IsExcluded && filter.Comparison.Expression(@event)) { isFiltered = true; }
+            }
+
+            return isEmpty || isFiltered;
+        }
+
+        public DisplayEventModel? FilterByDate(FilterDateModel? dateFilter)
+        {
+            if (@event is null) { return null; }
+
+            if (dateFilter is null) { return @event; }
+
+            return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before ? @event : null;
+        }
     }
 }
