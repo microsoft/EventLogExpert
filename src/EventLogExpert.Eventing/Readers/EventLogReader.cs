@@ -15,17 +15,18 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
     private bool _disposed;
 
-    ~EventLogReader()
-    {
-        Dispose(disposing: false);
-    }
-
     public string? LastBookmark { get; private set; }
 
     public void Dispose()
     {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        if (_disposed) { return; }
+
+        if (_handle is { IsInvalid: false })
+        {
+            _handle.Dispose();
+        }
+
+        _disposed = true;
     }
 
     // Pre-Windows 11, a batch being returned can be maximum of (2 MB of data, batchSize count of events).
@@ -141,20 +142,5 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
         }
 
         return bufferUsed - 1 <= 0 ? null : new string(buffer[..^1]);
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (_disposed) { return; }
-
-        if (disposing)
-        {
-            if (_handle is { IsInvalid: false })
-            {
-                _handle.Dispose();
-            }
-        }
-
-        _disposed = true;
     }
 }
