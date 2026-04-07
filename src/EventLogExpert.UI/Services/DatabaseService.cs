@@ -60,6 +60,8 @@ public sealed partial class DatabaseService(
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {
+        if (!databases.Any()) { return []; }
+
         var r = SplitFileName();
 
         return databases
@@ -67,11 +69,31 @@ public sealed partial class DatabaseService(
             {
                 var m = r.Match(name);
 
-                return m.Success
-                    ? new { FirstPart = m.Groups[1].Value + " ", SecondPart = m.Groups[2].Value }
-                    : new { FirstPart = name, SecondPart = "" };
+                if (m.Success)
+                {
+                    var versionString = m.Groups[2].Value;
+
+                    // Try to parse the version as a number for proper numeric ordering.
+                    // This ensures "10" sorts after "2" rather than before it (lexicographic).
+                    int? numericVersion = int.TryParse(versionString, out var parsed) ? parsed : null;
+
+                    return new
+                    {
+                        FirstPart = m.Groups[1].Value + " ",
+                        SecondPart = versionString,
+                        NumericVersion = numericVersion
+                    };
+                }
+
+                return new
+                {
+                    FirstPart = name,
+                    SecondPart = "",
+                    NumericVersion = (int?)null
+                };
             })
             .OrderBy(n => n.FirstPart)
+            .ThenByDescending(n => n.NumericVersion ?? int.MinValue)
             .ThenByDescending(n => n.SecondPart)
             .Select(n => n.FirstPart + n.SecondPart);
     }

@@ -3,14 +3,9 @@
 
 namespace EventLogExpert.UI.Options;
 
-public class FileLocationOptions
+public class FileLocationOptions(string basePath)
 {
-    private readonly string _basePath;
-
-    public FileLocationOptions(string basePath)
-    {
-        _basePath = basePath;
-    }
+    private readonly string _basePath = basePath;
 
     public string DatabasePath => Path.Join(_basePath, "Databases");
 
