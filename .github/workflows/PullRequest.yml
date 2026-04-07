@@ -1,0 +1,32 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: PullRequest Merge Validation
+
+on:
+  pull_request:
+    branches: [ "*" ]
+
+jobs:
+  build:
+
+    runs-on: windows-2022
+
+    defaults:
+      run:
+        working-directory: src
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 10.x
+    - name: Restore workloads
+      run: dotnet workload restore EventLogExpert.sln
+    - name: Restore dependencies
+      run: dotnet restore EventLogExpert.sln
+    - name: Build
+      run: dotnet build EventLogExpert.sln --no-restore
+    - name: Test
+      run: dotnet test EventLogExpert.sln --no-build --verbosity normal
