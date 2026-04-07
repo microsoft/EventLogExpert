@@ -72,7 +72,7 @@ public enum FilterCategory
     [EnumMember(Value = "Event ID")] Id,
     [EnumMember(Value = "Activity ID")] ActivityId,
     Level,
-    [EnumMember(Value = "Keywords")] KeywordsDisplayNames,
+    Keywords,
     Source,
     [EnumMember(Value = "Task Category")] TaskCategory,
     [EnumMember(Value = "Process ID")] ProcessId,

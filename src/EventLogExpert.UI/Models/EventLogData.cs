@@ -20,7 +20,7 @@ public sealed record EventLogData(
             FilterCategory.Id => Events.Select(e => e.Id.ToString()).Distinct(),
             FilterCategory.ActivityId => Events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
             FilterCategory.Level => Enum.GetNames<SeverityLevel>(),
-            FilterCategory.KeywordsDisplayNames => Events.SelectMany(e => e.Keywords).Distinct(),
+            FilterCategory.Keywords => Events.SelectMany(e => e.Keywords).Distinct(),
             FilterCategory.Source => Events.Select(e => e.Source).Distinct(),
             FilterCategory.TaskCategory => Events.Select(e => e.TaskCategory).Distinct(),
             _ => [],

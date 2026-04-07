@@ -56,7 +56,7 @@ public sealed partial class ContextMenu
             FilterCategory.Id => selectedEvent.Id.ToString(),
             FilterCategory.ActivityId => selectedEvent.ActivityId.ToString()!,
             FilterCategory.Level => selectedEvent.Level,
-            FilterCategory.KeywordsDisplayNames => selectedEvent.KeywordsDisplayName,
+            FilterCategory.Keywords => selectedEvent.KeywordsDisplayName,
             FilterCategory.Source => selectedEvent.Source,
             FilterCategory.TaskCategory => selectedEvent.TaskCategory,
             _ => string.Empty,

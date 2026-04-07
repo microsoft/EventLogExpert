@@ -659,9 +659,9 @@ internal static partial class EventMethods
             ThrowEventLogException(error);
         }
 
-        List<object> properties = [];
+        if (propertyCount <= 0) { return []; }
 
-        if (propertyCount <= 0) { return properties; }
+        var properties = new object[propertyCount];
 
         for (int i = 0; i < propertyCount; i++)
         {
@@ -671,13 +671,11 @@ internal static partial class EventMethods
                 {
                     var property = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr + (i * Marshal.SizeOf<EvtVariant>()));
 
-                    properties.Add(ConvertVariant(property) ?? throw new InvalidDataException());
+                    properties[i] = ConvertVariant(property) ?? throw new InvalidDataException();
                 }
             }
         }
 
-        // Dropping AsReadOnly since this is a hot path and since this is only used internally,
-        // we can ensure immutability through documentation and code reviews
         return properties;
     }
 

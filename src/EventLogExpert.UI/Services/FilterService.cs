@@ -35,7 +35,10 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         IEnumerable<DisplayEventModel> events,
         EventFilter eventFilter)
     {
-        if (!FilterMethods.IsFilteringEnabled(eventFilter)) { return [.. events]; }
+        if (!FilterMethods.IsFilteringEnabled(eventFilter))
+        {
+            return events as IReadOnlyList<DisplayEventModel> ?? [.. events];
+        }
 
         return events.AsParallel()
             .Where(e => e.FilterByDate(eventFilter.DateFilter)
@@ -61,7 +64,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         StringBuilder stringBuilder = new();
 
         if (filterModel.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
+            filterModel.Data.Category is FilterCategory.Keywords)
         {
             stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
         }
@@ -70,7 +73,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         {
             case FilterEvaluator.Equals:
             case FilterEvaluator.NotEqual:
-                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (filterModel.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"\"{filterModel.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -82,7 +85,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
                 break;
             case FilterEvaluator.Contains:
             case FilterEvaluator.NotContains:
-                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (filterModel.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"(\"{filterModel.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -93,7 +96,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
 
                 break;
             case FilterEvaluator.MultiSelect:
-                if (filterModel.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (filterModel.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.Data.Values)}\"}}).Contains(e))");
                 }
@@ -106,7 +109,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
             default: return false;
         }
 
-        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.KeywordsDisplayNames })
+        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
         {
             stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
         }
@@ -158,34 +161,34 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
     {
         FilterEvaluator.Equals => type switch
         {
-            FilterCategory.KeywordsDisplayNames => $"{type}.Any(e => string.Equals(e, ",
+            FilterCategory.Keywords => $"{type}.Any(e => string.Equals(e, ",
             FilterCategory.UserId => $"{type} != null && {type}.Value == ",
             _ => $"{type} == "
         },
         FilterEvaluator.Contains => type switch
         {
             FilterCategory.Id or FilterCategory.ActivityId => $"{type}.ToString().Contains",
-            FilterCategory.KeywordsDisplayNames => $"{type}.Any(e => e.Contains",
+            FilterCategory.Keywords => $"{type}.Any(e => e.Contains",
             FilterCategory.UserId => $"{type} != null && {type}.Value.Contains",
             _ => $"{type}.Contains"
         },
         FilterEvaluator.NotEqual => type switch
         {
-            FilterCategory.KeywordsDisplayNames => $"!{type}.Any(e => string.Equals(e, ",
+            FilterCategory.Keywords => $"!{type}.Any(e => string.Equals(e, ",
             FilterCategory.UserId => $"{type} != null && {type}.Value != ",
             _ => $"{type} != ",
         },
         FilterEvaluator.NotContains => type switch
         {
             FilterCategory.Id or FilterCategory.ActivityId => $"!{type}.ToString().Contains",
-            FilterCategory.KeywordsDisplayNames => $"!{type}.Any(e => e.Contains",
+            FilterCategory.Keywords => $"!{type}.Any(e => e.Contains",
             FilterCategory.UserId => $"{type} != null && !{type}.Value.Contains",
             _ => $"!{type}.Contains"
         },
         FilterEvaluator.MultiSelect => type switch
         {
             FilterCategory.Id or FilterCategory.Level => $"{type}.ToString())",
-            FilterCategory.KeywordsDisplayNames => $"{type}.Any",
+            FilterCategory.Keywords => $"{type}.Any",
             _ => $"{type})"
         },
         _ => string.Empty
@@ -202,7 +205,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         StringBuilder stringBuilder = new(subFilter.ShouldCompareAny ? " || " : " && ");
 
         if (subFilter.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
+            subFilter.Data.Category is FilterCategory.Keywords)
         {
             stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
         }
@@ -211,7 +214,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         {
             case FilterEvaluator.Equals:
             case FilterEvaluator.NotEqual:
-                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (subFilter.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"\"{subFilter.Data.Value?.Replace("\"", "\\\"")}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -223,7 +226,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
                 break;
             case FilterEvaluator.Contains:
             case FilterEvaluator.NotContains:
-                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (subFilter.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"(\"{subFilter.Data.Value?.Replace("\"", "\'")}\", StringComparison.OrdinalIgnoreCase))");
                 }
@@ -234,7 +237,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
 
                 break;
             case FilterEvaluator.MultiSelect:
-                if (subFilter.Data.Category is FilterCategory.KeywordsDisplayNames)
+                if (subFilter.Data.Category is FilterCategory.Keywords)
                 {
                     stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.Data.Values)}\"}}).Contains(e))");
                 }
@@ -247,7 +250,7 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
             default: return null;
         }
 
-        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.KeywordsDisplayNames })
+        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
         {
             stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
         }

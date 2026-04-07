@@ -23,9 +23,7 @@
                 <div>Level: @SelectedEvent.Level</div>
                 @if (SelectedEvent.Keywords.Any())
                 {
-                    <div>
-                        "Keywords: @SelectedEvent.KeywordsDisplayName"
-                    </div>
+                    <div>Keywords: @SelectedEvent.KeywordsDisplayName</div>
                 }
                 <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
             </div>
