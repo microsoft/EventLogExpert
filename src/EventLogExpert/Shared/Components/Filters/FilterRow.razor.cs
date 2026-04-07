@@ -42,8 +42,8 @@ public sealed partial class FilterRow
                 .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
                 .Distinct().Order()],
             FilterCategory.Level => [.. Enum.GetNames<SeverityLevel>()],
-            FilterCategory.KeywordsDisplayNames => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.KeywordsDisplayNames))
+            FilterCategory.Keywords => [.. EventLogState.Value.ActiveLogs.Values
+                .SelectMany(log => log.GetCategoryValues(FilterCategory.Keywords))
                 .Distinct().Order()],
             FilterCategory.Source => [.. EventLogState.Value.ActiveLogs.Values
                 .SelectMany(log => log.GetCategoryValues(FilterCategory.Source))
