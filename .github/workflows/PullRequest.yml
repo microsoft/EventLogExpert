@@ -8,7 +8,7 @@ on:
     branches: [ "*" ]
 
 jobs:
-  build:
+  build-and-test:
 
     runs-on: windows-2022
 
