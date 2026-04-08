@@ -82,9 +82,11 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        // Create a file larger than 10MB (MaxLogSize)
-        var largeContent = new string('x', 11 * 1024 * 1024);
-        File.WriteAllText(_testLogPath, largeContent);
+        // Create a file larger than 10MB (MaxLogSize) without allocating a large string
+        using (var fs = new FileStream(_testLogPath, FileMode.Create, FileAccess.Write))
+        {
+            fs.SetLength(11 * 1024 * 1024);
+        }
 
         // Act
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);

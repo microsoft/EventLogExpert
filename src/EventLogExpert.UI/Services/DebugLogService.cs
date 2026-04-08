@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Services;
