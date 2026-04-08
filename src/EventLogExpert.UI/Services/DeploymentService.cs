@@ -2,64 +2,53 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Options;
 using System.Reflection;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
 namespace EventLogExpert.UI.Services;
 
-public interface IDeploymentService
-{
-    void RestartNowAndUpdate(string downloadPath);
-
-    void UpdateOnNextRestart(string downloadPath);
-}
-
 public class DeploymentService(
     ITraceLogger traceLogger,
     IAppTitleService appTitleService,
     IMainThreadService mainThreadService,
-    IAlertDialogService alertDialogService) : IDeploymentService
+    IAlertDialogService alertDialogService,
+    IApplicationRestartService applicationRestartService,
+    IPackageDeploymentService packageDeploymentService) : IDeploymentService
 {
-    private readonly ITraceLogger _traceLogger = traceLogger;
+    private readonly IAlertDialogService _alertDialogService = alertDialogService;
+    private readonly IApplicationRestartService _applicationRestartService = applicationRestartService;
     private readonly IAppTitleService _appTitleService = appTitleService;
     private readonly IMainThreadService _mainThreadService = mainThreadService;
-    private readonly IAlertDialogService _alertDialogService = alertDialogService;
+    private readonly IPackageDeploymentService _packageDeploymentService = packageDeploymentService;
+    private readonly ITraceLogger _traceLogger = traceLogger;
 
     public void RestartNowAndUpdate(string downloadPath)
     {
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(NativeMethods.RegisterApplicationRestart)}.");
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_applicationRestartService.RegisterApplicationRestart)}.");
 
-        uint res = NativeMethods.RegisterApplicationRestart(null, RestartFlags.NONE);
+        bool registrationSuccessful = _applicationRestartService.RegisterApplicationRestart();
 
-        if (res != 0) { return; }
+        if (!registrationSuccessful) { return; }
 
-        PackageManager packageManager = new();
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
-
-        var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
-            new AddPackageOptions
-            {
-                ForceUpdateFromAnyVersion = true,
-                ForceTargetAppShutdown = true
-            });
+        var deployment = _packageDeploymentService.AddPackageAsync(
+            new Uri(downloadPath),
+            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, ForceTargetAppShutdown: true));
 
         SetCallbacks(deployment);
     }
 
     public void UpdateOnNextRestart(string downloadPath)
     {
-        PackageManager packageManager = new();
+        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(packageManager.AddPackageByUriAsync)}.");
-
-        var deployment = packageManager.AddPackageByUriAsync(new Uri(downloadPath),
-            new AddPackageOptions
-            {
-                DeferRegistrationWhenPackagesAreInUse = true,
-                ForceUpdateFromAnyVersion = true
-            });
+        var deployment = _packageDeploymentService.AddPackageAsync(
+            new Uri(downloadPath),
+            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
 
         SetCallbacks(deployment);
     }

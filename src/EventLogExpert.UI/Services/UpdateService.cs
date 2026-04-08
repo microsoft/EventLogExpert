@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 using System.Text;
