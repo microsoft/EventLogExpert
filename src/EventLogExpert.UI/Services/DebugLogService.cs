@@ -63,23 +63,41 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async IAsyncEnumerable<string> LoadAsync()
     {
-        string[] lines;
-
-        await s_loggingFileLock.WaitAsync();
+        // Copy to a temp file under the lock so writers are blocked only briefly
+        string tempPath = Path.GetTempFileName();
 
         try
         {
-            lines = await File.ReadAllLinesAsync(_fileLocationOptions.LoggingPath);
+            await s_loggingFileLock.WaitAsync();
+
+            try
+            {
+                File.Copy(_fileLocationOptions.LoggingPath, tempPath, overwrite: true);
+            }
+            finally
+            {
+                s_loggingFileLock.Release();
+            }
+
+            // Stream lines from the snapshot so memory stays bounded and writers aren't blocked
+            await using var stream = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                yield return line;
+            }
         }
         finally
         {
-            s_loggingFileLock.Release();
-        }
-
-        // Yield outside the lock so writers aren't blocked during iteration
-        foreach (var line in lines)
-        {
-            yield return line;
+            try
+            {
+                File.Delete(tempPath);
+            }
+            catch
+            {
+                // Best effort cleanup
+            }
         }
     }
 
