@@ -1,4 +1,5 @@
 ﻿using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.UI.Tests.Models;
 
@@ -8,7 +9,7 @@ public sealed class FilterDataTests
     public void Category_WhenChanged_ShouldClearValue()
     {
         // Arrange
-        FilterData model = new() { Category = FilterCategory.Id, Value = "100" };
+        FilterData model = new() { Category = FilterCategory.Id, Value = Constants.FilterValue100 };
 
         // Act
         model.Category = FilterCategory.Level;
@@ -21,7 +22,7 @@ public sealed class FilterDataTests
     public void Category_WhenChanged_ShouldClearValues()
     {
         // Arrange
-        FilterData model = new() { Category = FilterCategory.Id, Values = ["100", "1000"] };
+        FilterData model = new() { Category = FilterCategory.Id, Values = [Constants.FilterValue100, Constants.FilterValue1000] };
 
         // Act
         model.Category = FilterCategory.Level;
@@ -47,14 +48,14 @@ public sealed class FilterDataTests
     public void Category_WhenChangedMultipleTimes_ShouldClearValueEachTime()
     {
         // Arrange
-        FilterData model = new() { Category = FilterCategory.Id, Value = "100" };
+        FilterData model = new() { Category = FilterCategory.Id, Value = Constants.FilterValue100 };
 
         // Act & Assert - First change
         model.Category = FilterCategory.Level;
         Assert.Null(model.Value);
 
         // Re-set value
-        model.Value = "Error";
+        model.Value = Constants.EventLevelError;
 
         // Act & Assert - Second change
         model.Category = FilterCategory.Source;
@@ -65,7 +66,7 @@ public sealed class FilterDataTests
     public void Category_WhenChangedToSameCategory_ShouldStillClearValue()
     {
         // Arrange
-        FilterData model = new() { Category = FilterCategory.Id, Value = "100" };
+        FilterData model = new() { Category = FilterCategory.Id, Value = Constants.FilterValue100 };
 
         // Act
         model.Category = FilterCategory.Id;
@@ -78,7 +79,7 @@ public sealed class FilterDataTests
     public void Category_WhenChangedToSameCategory_ShouldStillClearValues()
     {
         // Arrange
-        FilterData model = new() { Category = FilterCategory.Id, Values = ["100", "200"] };
+        FilterData model = new() { Category = FilterCategory.Id, Values = [Constants.FilterValue100, Constants.FilterValue200] };
 
         // Act
         model.Category = FilterCategory.Id;
@@ -94,8 +95,8 @@ public sealed class FilterDataTests
         FilterData model = new()
         {
             Category = FilterCategory.Id,
-            Value = "100",
-            Values = ["200", "300"]
+            Value = Constants.FilterValue100,
+            Values = [Constants.FilterValue200, Constants.FilterValue300]
         };
 
         // Act
@@ -138,7 +139,7 @@ public sealed class FilterDataTests
         {
             Category = FilterCategory.Id,
             Evaluator = FilterEvaluator.NotEqual,
-            Value = "100"
+            Value = Constants.FilterValue100
         };
 
         // Act
@@ -200,10 +201,10 @@ public sealed class FilterDataTests
         FilterData model = new() { Category = FilterCategory.Id };
 
         // Act
-        model.Value = "500";
+        model.Value = Constants.FilterValue500;
 
         // Assert
-        Assert.Equal("500", model.Value);
+        Assert.Equal(Constants.FilterValue500, model.Value);
     }
 
     [Fact]
@@ -213,13 +214,13 @@ public sealed class FilterDataTests
         FilterData model = new() { Category = FilterCategory.Id };
 
         // Act
-        model.Values.Add("100");
-        model.Values.Add("200");
+        model.Values.Add(Constants.FilterValue100);
+        model.Values.Add(Constants.FilterValue200);
 
         // Assert
         Assert.Equal(2, model.Values.Count);
-        Assert.Contains("100", model.Values);
-        Assert.Contains("200", model.Values);
+        Assert.Contains(Constants.FilterValue100, model.Values);
+        Assert.Contains(Constants.FilterValue200, model.Values);
     }
 
     [Fact]
@@ -229,12 +230,12 @@ public sealed class FilterDataTests
         FilterData model = new() { Category = FilterCategory.Id };
 
         // Act
-        model.Values = ["100", "200", "300"];
+        model.Values = [Constants.FilterValue100, Constants.FilterValue200, Constants.FilterValue300];
 
         // Assert
         Assert.Equal(3, model.Values.Count);
-        Assert.Contains("100", model.Values);
-        Assert.Contains("200", model.Values);
-        Assert.Contains("300", model.Values);
+        Assert.Contains(Constants.FilterValue100, model.Values);
+        Assert.Contains(Constants.FilterValue200, model.Values);
+        Assert.Contains(Constants.FilterValue300, model.Values);
     }
 }
