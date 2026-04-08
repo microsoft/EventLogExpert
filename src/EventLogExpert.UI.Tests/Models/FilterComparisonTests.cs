@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Tests.TestUtils;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Linq.Dynamic.Core.Exceptions;
 
 namespace EventLogExpert.UI.Tests.Models;
@@ -14,10 +15,10 @@ public sealed class FilterComparisonTests
     public void Expression_WhenCompoundCondition_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id == 100 && Level == \"Error\"" };
-        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(100, level: "Error");
-        DisplayEventModel nonMatchingIdEvent = EventUtils.CreateTestEvent(200, level: "Error");
-        DisplayEventModel nonMatchingLevelEvent = EventUtils.CreateTestEvent(100, level: "Information");
+        FilterComparison model = new() { Value = Constants.FilterIdEquals100AndLevelError };
+        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
+        DisplayEventModel nonMatchingIdEvent = EventUtils.CreateTestEvent(200, level: Constants.EventLevelError);
+        DisplayEventModel nonMatchingLevelEvent = EventUtils.CreateTestEvent(100, level: Constants.EventLevelInformation);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -34,9 +35,9 @@ public sealed class FilterComparisonTests
     public void Expression_WhenComputerNameEquals_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "ComputerName == \"SERVER01\"" };
-        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(computerName: "SERVER01");
-        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(computerName: "SERVER02");
+        FilterComparison model = new() { Value = Constants.FilterComputerNameEqualsServer01 };
+        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(computerName: Constants.EventComputerServer01);
+        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(computerName: Constants.EventComputerServer02);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -51,13 +52,13 @@ public sealed class FilterComparisonTests
     public void Expression_WhenDescriptionContains_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Description.Contains(\"error occurred\")" };
+        FilterComparison model = new() { Value = Constants.FilterDescriptionContainsErrorOccurred };
 
         DisplayEventModel matchingEvent =
-            EventUtils.CreateTestEvent(description: "An error occurred in the application");
+            EventUtils.CreateTestEvent(description: Constants.EventDescriptionErrorOccurred);
 
         DisplayEventModel nonMatchingEvent =
-            EventUtils.CreateTestEvent(description: "Operation completed successfully");
+            EventUtils.CreateTestEvent(description: Constants.EventDescriptionSuccess);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -72,7 +73,7 @@ public sealed class FilterComparisonTests
     public void Expression_WhenIdEquals_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id == 100" };
+        FilterComparison model = new() { Value = Constants.FilterIdEquals100 };
         DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(100);
         DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(200);
 
@@ -89,7 +90,7 @@ public sealed class FilterComparisonTests
     public void Expression_WhenIdGreaterThan_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id > 100" };
+        FilterComparison model = new() { Value = Constants.FilterIdGreaterThan100 };
         DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(150);
         DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(50);
 
@@ -106,7 +107,7 @@ public sealed class FilterComparisonTests
     public void Expression_WhenIdNotEquals_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id != 100" };
+        FilterComparison model = new() { Value = Constants.FilterIdNotEquals100 };
         DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(200);
         DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(100);
 
@@ -123,9 +124,9 @@ public sealed class FilterComparisonTests
     public void Expression_WhenLevelEquals_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Level == \"Error\"" };
-        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(level: "Error");
-        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(level: "Information");
+        FilterComparison model = new() { Value = Constants.FilterLevelEqualsError };
+        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(level: Constants.EventLevelError);
+        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(level: Constants.EventLevelInformation);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -140,7 +141,7 @@ public sealed class FilterComparisonTests
     public void Expression_WhenOrCondition_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id == 100 || Id == 200" };
+        FilterComparison model = new() { Value = Constants.FilterIdEquals100Or200 };
         DisplayEventModel matchingEvent1 = EventUtils.CreateTestEvent(100);
         DisplayEventModel matchingEvent2 = EventUtils.CreateTestEvent(200);
         DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(300);
@@ -160,9 +161,9 @@ public sealed class FilterComparisonTests
     public void Expression_WhenSourceContains_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Source.Contains(\"Test\")" };
-        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(source: "TestSource");
-        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(source: "OtherSource");
+        FilterComparison model = new() { Value = Constants.FilterSourceContainsTest };
+        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(source: Constants.EventSourceTestSource);
+        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(source: Constants.EventSourceOtherSource);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -177,9 +178,9 @@ public sealed class FilterComparisonTests
     public void Expression_WhenTaskCategoryContains_ShouldMatchCorrectEvent()
     {
         // Arrange
-        FilterComparison model = new() { Value = "TaskCategory.Contains(\"Security\")" };
-        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(taskCategory: "Security Audit");
-        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(taskCategory: "System");
+        FilterComparison model = new() { Value = Constants.FilterTaskCategoryContainsSecurity };
+        DisplayEventModel matchingEvent = EventUtils.CreateTestEvent(taskCategory: Constants.EventTaskCategorySecurity);
+        DisplayEventModel nonMatchingEvent = EventUtils.CreateTestEvent(taskCategory: Constants.EventTaskCategorySystem);
 
         // Act
         bool matchResult = model.Expression(matchingEvent);
@@ -197,7 +198,7 @@ public sealed class FilterComparisonTests
         FilterComparison model = new();
 
         // Act
-        model.Value = "Id == 100";
+        model.Value = Constants.FilterIdEquals100;
 
         // Assert
         Assert.NotNull(model.Expression);
@@ -207,14 +208,14 @@ public sealed class FilterComparisonTests
     public void Expression_WhenValueUpdated_ShouldUpdateExpression()
     {
         // Arrange
-        FilterComparison model = new() { Value = "Id == 100" };
+        FilterComparison model = new() { Value = Constants.FilterIdEquals100 };
         DisplayEventModel event100 = EventUtils.CreateTestEvent(100);
         DisplayEventModel event200 = EventUtils.CreateTestEvent(200);
 
         // Act
         bool initialMatch100 = model.Expression(event100);
         bool initialMatch200 = model.Expression(event200);
-        model.Value = "Id == 200";
+        model.Value = Constants.FilterIdEquals200;
         bool updatedMatch100 = model.Expression(event100);
         bool updatedMatch200 = model.Expression(event200);
 
@@ -242,7 +243,7 @@ public sealed class FilterComparisonTests
         FilterComparison model = new();
 
         // Act & Assert
-        Assert.Throws<ParseException>(() => model.Value = "InvalidProperty == 100");
+        Assert.Throws<ParseException>(() => model.Value = Constants.FilterInvalidProperty);
     }
 
     [Fact]
@@ -252,6 +253,6 @@ public sealed class FilterComparisonTests
         FilterComparison model = new();
 
         // Act & Assert
-        Assert.Throws<ParseException>(() => model.Value = "Id == invalid");
+        Assert.Throws<ParseException>(() => model.Value = Constants.FilterInvalidValue);
     }
 }

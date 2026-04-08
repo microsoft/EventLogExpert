@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Services;
@@ -14,7 +15,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns(["InitialDisabled"]);
+        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.InitialDisabled]);
 
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([]);
@@ -24,13 +25,13 @@ public sealed class DatabaseServiceTests
             mockPreferencesProvider);
 
         // Act
-        databaseService.UpdateDisabledDatabases(["NewDisabled1", "NewDisabled2"]);
+        databaseService.UpdateDisabledDatabases([Constants.NewDisabled1, Constants.NewDisabled2]);
         var result = databaseService.DisabledDatabases.ToList();
 
         // Assert
         Assert.Equal(2, result.Count);
-        Assert.Contains("NewDisabled1", result);
-        Assert.Contains("NewDisabled2", result);
+        Assert.Contains(Constants.NewDisabled1, result);
+        Assert.Contains(Constants.NewDisabled2, result);
     }
 
     [Fact]
@@ -38,7 +39,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns(["DisabledDb1", "DisabledDb2"]);
+        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.DisabledDb1, Constants.DisabledDb2]);
 
         var databaseService = CreateDatabaseService(preferencesProvider: mockPreferencesProvider);
 
@@ -47,8 +48,8 @@ public sealed class DatabaseServiceTests
 
         // Assert
         Assert.Equal(2, result.Count);
-        Assert.Contains("DisabledDb1", result);
-        Assert.Contains("DisabledDb2", result);
+        Assert.Contains(Constants.DisabledDb1, result);
+        Assert.Contains(Constants.DisabledDb2, result);
     }
 
     [Fact]
@@ -56,7 +57,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns(["DisabledDb"]);
+        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.DisabledDb]);
 
         var databaseService = CreateDatabaseService(preferencesProvider: mockPreferencesProvider);
 
@@ -74,7 +75,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns(["Database A"]);
+        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -93,7 +94,7 @@ public sealed class DatabaseServiceTests
         // Assert
         Assert.NotNull(receivedDatabases);
         Assert.Same(databaseService, receivedSender);
-        Assert.Contains("Database A", receivedDatabases);
+        Assert.Contains(Constants.DatabaseA, receivedDatabases);
     }
 
     [Fact]
@@ -103,7 +104,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Database A"], ["Database B", "Database C"]);
+            .Returns([Constants.DatabaseA], [Constants.DatabaseB, Constants.DatabaseC]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -114,10 +115,10 @@ public sealed class DatabaseServiceTests
 
         // Assert
         Assert.Single(initialResult);
-        Assert.Equal("Database A", initialResult[0]);
+        Assert.Equal(Constants.DatabaseA, initialResult[0]);
         Assert.Equal(2, refreshedResult.Count);
-        Assert.Contains("Database B", refreshedResult);
-        Assert.Contains("Database C", refreshedResult);
+        Assert.Contains(Constants.DatabaseB, refreshedResult);
+        Assert.Contains(Constants.DatabaseC, refreshedResult);
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns(["Database A"]);
+        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -142,7 +143,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Database C", "Database A", "Database B"]);
+            .Returns([Constants.DatabaseC, Constants.DatabaseA, Constants.DatabaseB]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -153,9 +154,9 @@ public sealed class DatabaseServiceTests
         // "Database X" splits to FirstPart="Database " + SecondPart="X"
         // Sorted by FirstPart asc, then SecondPart desc: C, B, A
         Assert.Equal(3, result.Count);
-        Assert.Equal("Database C", result[0]);
-        Assert.Equal("Database B", result[1]);
-        Assert.Equal("Database A", result[2]);
+        Assert.Equal(Constants.DatabaseC, result[0]);
+        Assert.Equal(Constants.DatabaseB, result[1]);
+        Assert.Equal(Constants.DatabaseA, result[2]);
     }
 
     [Fact]
@@ -165,7 +166,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Database A"]);
+            .Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -201,7 +202,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Windows 10", "Windows 11", "Windows 9", "Linux 1"]);
+            .Returns([Constants.Windows10, Constants.Windows11, Constants.Windows9, Constants.Linux1]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -210,10 +211,10 @@ public sealed class DatabaseServiceTests
 
         // Assert - Numeric sorting: 11 > 10 > 9, 1
         Assert.Equal(4, result.Count);
-        Assert.Equal("Linux 1", result[0]);
-        Assert.Equal("Windows 11", result[1]);
-        Assert.Equal("Windows 10", result[2]);
-        Assert.Equal("Windows 9", result[3]);
+        Assert.Equal(Constants.Linux1, result[0]);
+        Assert.Equal(Constants.Windows11, result[1]);
+        Assert.Equal(Constants.Windows10, result[2]);
+        Assert.Equal(Constants.Windows9, result[3]);
     }
 
     [Fact]
@@ -224,7 +225,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Server 2", "Server 10", "Server 1", "Server 20"]);
+            .Returns([Constants.Server2, Constants.Server10, Constants.Server1, Constants.Server20]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -233,10 +234,10 @@ public sealed class DatabaseServiceTests
 
         // Assert - Numeric descending: 20, 10, 2, 1
         Assert.Equal(4, result.Count);
-        Assert.Equal("Server 20", result[0]);
-        Assert.Equal("Server 10", result[1]);
-        Assert.Equal("Server 2", result[2]);
-        Assert.Equal("Server 1", result[3]);
+        Assert.Equal(Constants.Server20, result[0]);
+        Assert.Equal(Constants.Server10, result[1]);
+        Assert.Equal(Constants.Server2, result[2]);
+        Assert.Equal(Constants.Server1, result[3]);
     }
 
     [Fact]
@@ -244,7 +245,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns(["Database A"]);
+        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
         databaseService.LoadedDatabasesChanged = null;
@@ -261,7 +262,7 @@ public sealed class DatabaseServiceTests
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
 
         mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns(["Windows 10", "SimpleDatabase", "Windows 11", "AnotherDb"]);
+            .Returns([Constants.Windows10, Constants.SimpleDatabase, Constants.Windows11, Constants.AnotherDb]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -270,10 +271,10 @@ public sealed class DatabaseServiceTests
 
         // Assert - Non-versioned first (no space pattern), then versioned with numeric sort
         Assert.Equal(4, result.Count);
-        Assert.Equal("AnotherDb", result[0]);
-        Assert.Equal("SimpleDatabase", result[1]);
-        Assert.Equal("Windows 11", result[2]);
-        Assert.Equal("Windows 10", result[3]);
+        Assert.Equal(Constants.AnotherDb, result[0]);
+        Assert.Equal(Constants.SimpleDatabase, result[1]);
+        Assert.Equal(Constants.Windows11, result[2]);
+        Assert.Equal(Constants.Windows10, result[3]);
     }
 
     [Fact]
@@ -281,7 +282,7 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns(["Database A"]);
+        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
@@ -289,7 +290,7 @@ public sealed class DatabaseServiceTests
         databaseService.LoadedDatabasesChanged += (_, _) => eventInvoked = true;
 
         // Act
-        databaseService.UpdateDisabledDatabases(["DisabledDb"]);
+        databaseService.UpdateDisabledDatabases([Constants.DisabledDb]);
 
         // Assert
         Assert.True(eventInvoked);
@@ -300,12 +301,12 @@ public sealed class DatabaseServiceTests
     {
         // Arrange
         var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns(["Database A"]);
+        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
 
         var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
 
         // Act
-        databaseService.UpdateDisabledDatabases(["DisabledDb"]);
+        databaseService.UpdateDisabledDatabases([Constants.DisabledDb]);
 
         // Assert - GetEnabledDatabases should be called once for reload (LoadedDatabases not accessed before)
         mockEnabledDatabaseCollectionProvider.Received(1).GetEnabledDatabases();
@@ -323,14 +324,14 @@ public sealed class DatabaseServiceTests
             mockEnabledDatabaseCollectionProvider,
             mockPreferencesProvider);
 
-        var newDisabledDatabases = new List<string> { "NewDisabled1", "NewDisabled2" };
+        var newDisabledDatabases = new List<string> { Constants.NewDisabled1, Constants.NewDisabled2 };
 
         // Act
         databaseService.UpdateDisabledDatabases(newDisabledDatabases);
 
         // Assert
         mockPreferencesProvider.Received(1).DisabledDatabasesPreference =
-            Arg.Is<IEnumerable<string>>(x => x.Contains("NewDisabled1") && x.Contains("NewDisabled2"));
+            Arg.Is<IEnumerable<string>>(x => x.Contains(Constants.NewDisabled1) && x.Contains(Constants.NewDisabled2));
     }
 
     [Fact]

@@ -4,6 +4,7 @@
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -28,7 +29,7 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        await File.WriteAllTextAsync(_testLogPath, "Existing log content\nLine 2\nLine 3");
+        await File.WriteAllTextAsync(_testLogPath, $"{Constants.DebugLogExistingContent}\n{Constants.DebugLogLine2}\n{Constants.DebugLogLine3}");
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
@@ -99,17 +100,16 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        var existingContent = "Existing log content";
-        File.WriteAllText(_testLogPath, existingContent);
+        File.WriteAllText(_testLogPath, Constants.DebugLogExistingContent);
 
         // Act
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
-        debugLogService.Trace("New message");
+        debugLogService.Trace(Constants.DebugLogNewMessage);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
-        Assert.Contains("Existing log content", content);
-        Assert.Contains("New message", content);
+        Assert.Contains(Constants.DebugLogExistingContent, content);
+        Assert.Contains(Constants.DebugLogNewMessage, content);
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        var expectedLines = new[] { "Line 1", "Line 2", "Line 3" };
+        var expectedLines = new[] { Constants.DebugLogLine1, Constants.DebugLogLine2, Constants.DebugLogLine3 };
         await File.WriteAllLinesAsync(_testLogPath, expectedLines);
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
@@ -208,9 +208,9 @@ public sealed class DebugLogServiceTests : IDisposable
 
         // Assert
         Assert.Equal(3, lines.Count);
-        Assert.Equal("Line 1", lines[0]);
-        Assert.Equal("Line 2", lines[1]);
-        Assert.Equal("Line 3", lines[2]);
+        Assert.Equal(Constants.DebugLogLine1, lines[0]);
+        Assert.Equal(Constants.DebugLogLine2, lines[1]);
+        Assert.Equal(Constants.DebugLogLine3, lines[2]);
     }
 
     [Fact]
@@ -275,7 +275,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Test message");
+        debugLogService.Trace(Constants.DebugLogTestMessage);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
@@ -293,7 +293,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Test message");
+        debugLogService.Trace(Constants.DebugLogTestMessage);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
@@ -311,15 +311,15 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("First message");
-        debugLogService.Trace("Second message");
-        debugLogService.Trace("Third message", LogLevel.Warning);
+        debugLogService.Trace(Constants.DebugLogFirstMessage);
+        debugLogService.Trace(Constants.DebugLogSecondMessage);
+        debugLogService.Trace(Constants.DebugLogThirdMessage, LogLevel.Warning);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
-        Assert.Contains("First message", content);
-        Assert.Contains("Second message", content);
-        Assert.Contains("Third message", content);
+        Assert.Contains(Constants.DebugLogFirstMessage, content);
+        Assert.Contains(Constants.DebugLogSecondMessage, content);
+        Assert.Contains(Constants.DebugLogThirdMessage, content);
     }
 
     [Theory]
@@ -355,11 +355,11 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Error message", LogLevel.Error);
+        debugLogService.Trace(Constants.DebugLogErrorMessage, LogLevel.Error);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
-        Assert.Contains("Error message", content);
+        Assert.Contains(Constants.DebugLogErrorMessage, content);
         Assert.Contains("[Error]", content);
     }
 
@@ -373,10 +373,10 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Test message");
+        debugLogService.Trace(Constants.DebugLogTestMessage);
 
         // Assert
-        Assert.False(File.Exists(_testLogPath) && File.ReadAllText(_testLogPath).Contains("Test message"));
+        Assert.False(File.Exists(_testLogPath) && File.ReadAllText(_testLogPath).Contains(Constants.DebugLogTestMessage));
     }
 
     [Fact]
@@ -389,11 +389,11 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Test message");
+        debugLogService.Trace(Constants.DebugLogTestMessage);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
-        Assert.Contains("Test message", content);
+        Assert.Contains(Constants.DebugLogTestMessage, content);
         Assert.Contains("[Information]", content);
     }
 
@@ -407,12 +407,12 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Trace("Default level message");
+        debugLogService.Trace(Constants.DebugLogDefaultLevelMessage);
 
         // Assert
         var content = File.ReadAllText(_testLogPath);
         Assert.Contains("[Information]", content);
-        Assert.Contains("Default level message", content);
+        Assert.Contains(Constants.DebugLogDefaultLevelMessage, content);
     }
 
     private static ISettingsService CreateMockSettingsService(LogLevel logLevel)
