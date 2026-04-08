@@ -65,6 +65,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
         builder.Services.AddSingleton<IGitHubService, GitHubService>();
+        builder.Services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
+        builder.Services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
         builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
