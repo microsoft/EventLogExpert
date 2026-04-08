@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Services;
@@ -14,7 +13,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
-    private static readonly ReaderWriterLockSlim s_loggingFileLock = new();
+    private static readonly SemaphoreSlim s_loggingFileLock = new(1, 1);
 
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly Lock _firstChanceLock = new();
@@ -38,7 +37,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async Task ClearAsync()
     {
-        s_loggingFileLock.EnterWriteLock();
+        await s_loggingFileLock.WaitAsync();
 
         try
         {
@@ -46,7 +45,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         }
         finally
         {
-            s_loggingFileLock.ExitWriteLock();
+            s_loggingFileLock.Release();
         }
     }
 
@@ -64,18 +63,23 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async IAsyncEnumerable<string> LoadAsync()
     {
-        s_loggingFileLock.EnterReadLock();
+        string[] lines;
+
+        await s_loggingFileLock.WaitAsync();
 
         try
         {
-            await foreach (var line in File.ReadLinesAsync(_fileLocationOptions.LoggingPath))
-            {
-                yield return line;
-            }
+            lines = await File.ReadAllLinesAsync(_fileLocationOptions.LoggingPath);
         }
         finally
         {
-            s_loggingFileLock.ExitReadLock();
+            s_loggingFileLock.Release();
+        }
+
+        // Yield outside the lock so writers aren't blocked during iteration
+        foreach (var line in lines)
+        {
+            yield return line;
         }
     }
 
@@ -87,7 +91,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
         string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
 
-        s_loggingFileLock.EnterWriteLock();
+        s_loggingFileLock.Wait();
 
         try
         {
@@ -97,7 +101,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         }
         finally
         {
-            s_loggingFileLock.ExitWriteLock();
+            s_loggingFileLock.Release();
         }
 
 #if DEBUG
