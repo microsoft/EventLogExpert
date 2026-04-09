@@ -403,7 +403,7 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Keywords_WhenAccessedConcurrently_ShouldReturnValidData()
+    public async Task Keywords_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
         using var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
@@ -416,7 +416,7 @@ public sealed class ProviderMetadataTests
             Task.Run(() => metadata?.Keywords)
         };
 
-        Task.WaitAll(tasks);
+        await Task.WhenAll(tasks);
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
@@ -581,7 +581,7 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Opcodes_WhenAccessedConcurrently_ShouldReturnValidData()
+    public async Task Opcodes_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
         using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
@@ -594,7 +594,7 @@ public sealed class ProviderMetadataTests
             Task.Run(() => metadata?.Opcodes)
         };
 
-        Task.WaitAll(tasks);
+        await Task.WhenAll(tasks);
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
@@ -724,7 +724,7 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Tasks_WhenAccessedConcurrently_ShouldReturnValidData()
+    public async Task Tasks_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
         using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
@@ -737,7 +737,7 @@ public sealed class ProviderMetadataTests
             Task.Run(() => metadata?.Tasks)
         };
 
-        Task.WaitAll(tasks);
+        await Task.WhenAll(tasks);
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
