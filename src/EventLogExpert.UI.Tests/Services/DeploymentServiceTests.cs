@@ -43,7 +43,8 @@ public sealed class DeploymentServiceTests
         // Assert
         mockApplicationRestartService.Received(1).RegisterApplicationRestart();
 
-        mockPackageDeploymentService.DidNotReceive()
+        // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
+        _ = mockPackageDeploymentService.DidNotReceive()
             .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>());
     }
 
@@ -71,7 +72,8 @@ public sealed class DeploymentServiceTests
         // Assert
         mockApplicationRestartService.Received(1).RegisterApplicationRestart();
 
-        mockPackageDeploymentService.Received(1)
+        // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
+        _ = mockPackageDeploymentService.Received(1)
             .AddPackageAsync(
                 Arg.Is<Uri>(uri => uri.LocalPath == Constants.DownloadPath),
                 Arg.Is<PackageDeploymentOptions>(opt =>
@@ -224,7 +226,7 @@ public sealed class DeploymentServiceTests
 
         // Assert
         await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
-        mockAlertDialogService.Received(1).ShowAlert(
+        await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
             Arg.Is<string>(msg => msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);
@@ -287,7 +289,8 @@ public sealed class DeploymentServiceTests
         deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
 
         // Assert
-        mockPackageDeploymentService.Received(1)
+        // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
+        _ = mockPackageDeploymentService.Received(1)
             .AddPackageAsync(
                 Arg.Is<Uri>(uri => uri.LocalPath == Constants.DownloadPath),
                 Arg.Is<PackageDeploymentOptions>(opt =>
@@ -412,7 +415,7 @@ public sealed class DeploymentServiceTests
 
         // Assert
         await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
-        mockAlertDialogService.Received(1).ShowAlert(
+        await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
             Arg.Is<string>(msg => msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);

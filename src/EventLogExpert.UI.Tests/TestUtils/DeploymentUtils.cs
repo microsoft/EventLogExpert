@@ -15,10 +15,6 @@ public static class DeploymentUtils
 
         public AsyncOperationWithProgressCompletedHandler<DeploymentResult, DeploymentProgress>? Completed { get; set; }
 
-        /// <summary>
-        /// Returns the error that occurred during the async operation.
-        /// Returns null when Status is not AsyncStatus.Error, matching real IAsyncInfo behavior.
-        /// </summary>
         public Exception ErrorCode => _errorCode!;
 
         public uint Id => 0;
@@ -40,9 +36,7 @@ public static class DeploymentUtils
             Completed?.Invoke(this, status);
         }
 
-        public void SimulateProgress(uint percentage)
-        {
+        public void SimulateProgress(uint percentage) =>
             Progress?.Invoke(this, new DeploymentProgress { percentage = percentage });
-        }
     }
 }
