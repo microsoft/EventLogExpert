@@ -31,4 +31,14 @@ public sealed partial class Constants
     // Non-versioned database names
     public const string SimpleDatabase = "SimpleDatabase";
     public const string AnotherDb = "AnotherDb";
+
+    // Test database file names (EnabledDatabaseCollectionProviderTests)
+    public const string TestDb1 = "TestDb1.db";
+    public const string TestDb2 = "TestDb2.db";
+    public const string TestDb3 = "TestDb3.db";
+
+    // Test database full paths
+    public const string TestDbPath1 = @"C:\Databases\TestDb1.db";
+    public const string TestDbPath2 = @"C:\Databases\TestDb2.db";
+    public const string TestDbPath3 = @"C:\Databases\TestDb3.db";
 }
