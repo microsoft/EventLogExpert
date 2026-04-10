@@ -1,37 +1,21 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using System.Reflection;
 using System.Runtime.Serialization;
-using System.Text;
 
 namespace EventLogExpert;
 
 internal static class ExtensionMethods
 {
-    internal static void AndForget(this Task task, ITraceLogger? logger = null)
+    extension(DateTime time)
     {
-        if (!task.IsCompleted || task.IsFaulted) { _ = ForgetAwaited(task, logger); }
+        internal DateTime ConvertTimeZone(TimeZoneInfo? destinationTime) =>
+            destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
 
-        static async Task ForgetAwaited(Task task, ITraceLogger? logger = null)
-        {
-            try
-            {
-                await task.ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                logger?.Trace(ex.Message);
-            }
-        }
+        internal DateTime ConvertTimeZoneToUtc(TimeZoneInfo? destinationTime) =>
+            destinationTime is null ? time : TimeZoneInfo.ConvertTimeToUtc(time, destinationTime);
     }
-
-    internal static DateTime ConvertTimeZone(this DateTime time, TimeZoneInfo? destinationTime) =>
-        destinationTime is null ? time : TimeZoneInfo.ConvertTimeFromUtc(time, destinationTime);
-
-    internal static DateTime ConvertTimeZoneToUtc(this DateTime time, TimeZoneInfo? destinationTime) =>
-        destinationTime is null ? time : TimeZoneInfo.ConvertTimeToUtc(time, destinationTime);
 
     internal static string ToFullString(this Enum value)
     {

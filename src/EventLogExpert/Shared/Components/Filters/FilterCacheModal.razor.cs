@@ -25,7 +25,7 @@ public sealed partial class FilterCacheModal
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<FilterCacheAction.OpenMenu>(action => Open().AndForget());
+        SubscribeToAction<FilterCacheAction.OpenMenu>(action => InvokeAsync(Open));
 
         base.OnInitialized();
     }
@@ -44,7 +44,7 @@ public sealed partial class FilterCacheModal
                     IsEnabled = true
                 }));
 
-        Close().AndForget();
+        InvokeAsync(Close);
     }
 
     private async Task ExportFavorites()

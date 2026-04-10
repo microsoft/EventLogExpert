@@ -111,7 +111,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
         fluxorDispatcher.Dispatch(new FilterGroupAction.LoadGroups());
 
-        ProcessCommandLine();
+        _ = ProcessCommandLine();
     }
 
     public void Dispose()
@@ -437,7 +437,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         CreateFlyoutMenu(OpenOtherLogsFlyoutSubitem, names);
     }
 
-    private void ProcessCommandLine()
+    private async Task ProcessCommandLine()
     {
         var args = Environment.GetCommandLineArgs();
 
@@ -446,7 +446,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             switch (arg)
             {
                 case not null when arg.EndsWith(".evtx"):
-                    OpenLog(arg, PathType.FilePath).AndForget();
+                    await OpenLog(arg, PathType.FilePath);
                     break;
             }
         }

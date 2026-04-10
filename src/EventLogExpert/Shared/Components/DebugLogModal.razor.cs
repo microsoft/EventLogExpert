@@ -21,7 +21,7 @@ public partial class DebugLogModal
 
     protected override void OnInitialized()
     {
-        TraceLogger.DebugLogLoaded += () => Open().AndForget();
+        TraceLogger.DebugLogLoaded += () => InvokeAsync(Open);
 
         base.OnInitialized();
     }

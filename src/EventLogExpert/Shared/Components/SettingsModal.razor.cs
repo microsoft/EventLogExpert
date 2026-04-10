@@ -56,7 +56,7 @@ public sealed partial class SettingsModal
 
     protected override void OnInitialized()
     {
-        Settings.Loaded += () => Load().AndForget();
+        Settings.Loaded += () => InvokeAsync(Load);
 
         base.OnInitialized();
     }
@@ -101,7 +101,7 @@ public sealed partial class SettingsModal
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 
-            Close().AndForget();
+            await InvokeAsync(Close);
         }
         catch (Exception ex)
         {
