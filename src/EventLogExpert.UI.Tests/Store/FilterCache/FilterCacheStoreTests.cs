@@ -5,7 +5,7 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.FilterCache;
 
 public sealed class FilterCacheStoreTests
 {

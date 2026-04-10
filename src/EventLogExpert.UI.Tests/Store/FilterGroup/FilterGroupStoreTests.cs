@@ -5,7 +5,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.FilterGroup;
 
 public sealed class FilterGroupStoreTests
 {

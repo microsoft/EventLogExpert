@@ -8,7 +8,7 @@ using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.EventTable;
 
 public sealed class EventTableStoreTests
 {

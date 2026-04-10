@@ -9,7 +9,7 @@ using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.FilterGroup;
 
 public sealed class FilterGroupEffectsTests
 {
