@@ -7,7 +7,7 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IFileLogger
 {
-    Action? DebugLogLoaded { get; set; }
+    event Action? DebugLogLoaded;
 
     Task ClearAsync();
 

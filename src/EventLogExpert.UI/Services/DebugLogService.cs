@@ -34,7 +34,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
-    public Action? DebugLogLoaded { get; set; }
+    public event Action? DebugLogLoaded;
 
     public async Task ClearAsync()
     {
