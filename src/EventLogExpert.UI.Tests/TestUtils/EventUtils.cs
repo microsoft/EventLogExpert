@@ -31,7 +31,7 @@ internal static class EventUtils
             ComputerName = computerName,
             TaskCategory = taskCategory,
             LogName = logName,
-            TimeCreated = timeCreated ?? DateTime.Now,
+            TimeCreated = timeCreated ?? new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc),
             RecordId = recordId,
             ActivityId = activityId,
             ProcessId = processId,
