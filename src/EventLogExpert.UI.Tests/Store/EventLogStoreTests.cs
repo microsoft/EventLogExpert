@@ -758,8 +758,9 @@ public sealed class EventLogStoreTests
         // Arrange
         var state = new EventLogState();
 
-        var newFilter = new EventFilter(new FilterDateModel { After = DateTime.Now, Before = DateTime.Now.AddDays(1) },
-            []);
+        var after = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var before = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
+        var newFilter = new EventFilter(new FilterDateModel { After = after, Before = before }, []);
 
         var action = new EventLogAction.SetFilters(newFilter);
 
