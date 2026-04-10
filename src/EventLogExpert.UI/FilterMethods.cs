@@ -43,8 +43,8 @@ public static class FilterMethods
     }
 
     public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
-        updated.DateFilter?.Equals(original.DateFilter) is false ||
-        updated.Filters.Equals(original.Filters) is false;
+        !Equals(updated.DateFilter, original.DateFilter) ||
+        !updated.Filters.Equals(original.Filters);
 
     /// <summary>Returns the index of the specified item in the list, or -1 if not found.</summary>
     public static int IndexOf<T>(this IReadOnlyList<T> list, T item)

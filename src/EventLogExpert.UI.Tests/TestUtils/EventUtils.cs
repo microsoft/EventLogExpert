@@ -15,7 +15,13 @@ internal static class EventUtils
         string description = "Test description",
         string computerName = "TestComputer",
         string taskCategory = "TestCategory",
-        string logName = "Application") =>
+        string logName = "Application",
+        DateTime? timeCreated = null,
+        long? recordId = null,
+        Guid? activityId = null,
+        int? processId = null,
+        int? threadId = null,
+        string keywordsDisplayName = "") =>
         new("TestLog", PathType.LogName)
         {
             Id = id,
@@ -25,6 +31,11 @@ internal static class EventUtils
             ComputerName = computerName,
             TaskCategory = taskCategory,
             LogName = logName,
-            TimeCreated = DateTime.Now
+            TimeCreated = timeCreated ?? DateTime.Now,
+            RecordId = recordId,
+            ActivityId = activityId,
+            ProcessId = processId,
+            ThreadId = threadId,
+            KeywordsDisplayName = keywordsDisplayName
         };
 }
