@@ -147,7 +147,7 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
-    public void DebugLogLoaded_WhenSet_ShouldBeRetrievable()
+    public void DebugLogLoaded_WhenSubscribed_ShouldBeInvocable()
     {
         // Arrange
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
@@ -155,13 +155,14 @@ public sealed class DebugLogServiceTests : IDisposable
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
-        Action testAction = () => { };
+        var wasInvoked = false;
+        debugLogService.DebugLogLoaded += () => wasInvoked = true;
 
         // Act
-        debugLogService.DebugLogLoaded = testAction;
+        debugLogService.LoadDebugLog();
 
         // Assert
-        Assert.Same(testAction, debugLogService.DebugLogLoaded);
+        Assert.True(wasInvoked);
     }
 
     public void Dispose()
@@ -234,22 +235,21 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
-    public void LoadDebugLog_WhenDebugLogLoadedIsNull_ShouldNotThrow()
+    public void LoadDebugLog_WhenNoSubscribers_ShouldNotThrow()
     {
         // Arrange
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
-        debugLogService.DebugLogLoaded = null;
 
-        // Act & Assert
+        // Act & Assert - no subscribers attached
         var exception = Record.Exception(() => debugLogService.LoadDebugLog());
         Assert.Null(exception);
     }
 
     [Fact]
-    public void LoadDebugLog_WhenDebugLogLoadedIsSet_ShouldInvokeAction()
+    public void LoadDebugLog_WhenSubscribed_ShouldInvokeHandler()
     {
         // Arrange
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
@@ -258,7 +258,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         var actionInvoked = false;
-        debugLogService.DebugLogLoaded = () => actionInvoked = true;
+        debugLogService.DebugLogLoaded += () => actionInvoked = true;
 
         // Act
         debugLogService.LoadDebugLog();
