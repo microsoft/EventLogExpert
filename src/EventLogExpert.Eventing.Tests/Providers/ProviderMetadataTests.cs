@@ -32,7 +32,7 @@ public sealed class ProviderMetadataTests
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
         Assert.All(results, Assert.NotNull);
-        Assert.All(results, Assert.NotEmpty);
+        Assert.All(results, r => Assert.NotEmpty(r!));
     }
 
     [Fact]
@@ -598,8 +598,8 @@ public sealed class ProviderMetadataTests
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r => Assert.NotNull(r));
-        Assert.All(results, r => Assert.NotEmpty(r));
+        Assert.All(results, Assert.NotNull);
+        Assert.All(results, r => Assert.NotEmpty(r!));
     }
 
     [Fact]
@@ -741,8 +741,8 @@ public sealed class ProviderMetadataTests
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, r => Assert.NotNull(r));
-        Assert.All(results, r => Assert.NotEmpty(r));
+        Assert.All(results, Assert.NotNull);
+        Assert.All(results, r => Assert.NotEmpty(r!));
     }
 
     [Fact]

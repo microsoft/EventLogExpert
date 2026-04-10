@@ -17,7 +17,7 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.EventLog;
 
 public sealed class EventLogEffectsTests
 {

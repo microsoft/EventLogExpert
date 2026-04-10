@@ -84,19 +84,20 @@ public sealed partial class SettingsModal
 
             foreach (var item in result)
             {
+                if (item?.FileName is null) { continue; }
+
                 var destination = Path.Join(FileLocationOptions.DatabasePath, item.FileName);
                 File.Copy(item.FullPath, destination, true);
 
-                if (Path.GetExtension(destination) == ".zip")
-                {
-                    ZipFile.ExtractToDirectory(destination, FileLocationOptions.DatabasePath, overwriteFiles: true);
-                    File.Delete(destination);
-                }
+                if (Path.GetExtension(destination) != ".zip") { continue; }
+
+                await ZipFile.ExtractToDirectoryAsync(destination, FileLocationOptions.DatabasePath, overwriteFiles: true);
+                File.Delete(destination);
             }
 
             var message = result.Length > 1 ?
                 $"{result.Length} databases have successfully been imported" :
-                $"{result[0].FileName} has successfully been imported";
+                $"{result[0]?.FileName ?? "Database"} has successfully been imported";
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 

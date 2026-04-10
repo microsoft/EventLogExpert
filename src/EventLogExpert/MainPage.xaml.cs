@@ -340,6 +340,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         foreach (var file in files)
         {
+            if (file?.FullPath is null) { continue; }
+
             await OpenLog(file.FullPath, PathType.FilePath, shouldAddLog: true);
         }
     }
@@ -362,6 +364,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         foreach (var file in files)
         {
+            if (file?.FullPath is null) { continue; }
+
             await OpenLog(file.FullPath, PathType.FilePath, shouldAddLog: true);
         }
     }

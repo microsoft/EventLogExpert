@@ -6,7 +6,7 @@ using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.EventTable;
 
 public sealed class EventTableEffectsTests
 {

@@ -451,7 +451,7 @@ public sealed class EventLogWatcherTests
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotNull(capturedEvent);
-        Assert.NotNull(capturedEvent.TimeCreated);
+        Assert.NotEqual(default(DateTime), capturedEvent.TimeCreated);
         Assert.True(capturedEvent.TimeCreated >= beforeWrite.AddSeconds(-1));
         Assert.True(capturedEvent.TimeCreated <= afterWrite);
     }

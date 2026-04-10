@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 
@@ -608,12 +607,12 @@ public sealed class EventLogReaderTests
         // Assert
         Assert.True(success);
 
-        if (events.Length > 0 && !string.IsNullOrEmpty(events[0].Xml))
+        if (events.Length > 0 && events[0].Xml is { } xml && !string.IsNullOrEmpty(xml))
         {
             // XML should start with <?xml or <Event
             Assert.True(
-                events[0].Xml.StartsWith("<?xml") || events[0].Xml.StartsWith("<Event"),
-                $"Expected XML to start with '<?xml' or '<Event', but got: {events[0].Xml[..Math.Min(50, events[0].Xml.Length)]}");
+                xml.StartsWith("<?xml") || xml.StartsWith("<Event"),
+                $"Expected XML to start with '<?xml' or '<Event', but got: {xml[..Math.Min(50, xml.Length)]}");
         }
     }
 

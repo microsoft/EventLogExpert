@@ -4,7 +4,7 @@
 using EventLogExpert.UI.Store.StatusBar;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store;
+namespace EventLogExpert.UI.Tests.Store.StatusBar;
 
 public sealed class StatusBarStateTests
 {
