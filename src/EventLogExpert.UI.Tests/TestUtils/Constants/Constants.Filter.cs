@@ -38,4 +38,14 @@ public sealed partial class Constants
     public const string FilterValue300 = "300";
     public const string FilterValue500 = "500";
     public const string FilterValue1000 = "1000";
+
+    // Filter group names
+    public const string FilterGroupSection = "TestSection";
+    public const string FilterGroupSubSection = "SubSection";
+    public const string FilterGroupName = "TestSection\\TestGroup";
+    public const string FilterGroupNameNested = "TestSection\\SubSection\\TestGroup";
+    public const string FilterGroupDisplayName = "TestGroup";
+
+    // XML filter expressions
+    public const string FilterXmlContainsData = "xml.Contains(\"data\")";
 }
