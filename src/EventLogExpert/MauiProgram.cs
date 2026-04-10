@@ -42,8 +42,9 @@ public static class MauiProgram
         });
 
         // Core Services
-        builder.Services.AddSingleton<ITraceLogger, DebugLogService>();
-        builder.Services.AddSingleton<IFileLogger, DebugLogService>();
+        builder.Services.AddSingleton<DebugLogService>();
+        builder.Services.AddSingleton<ITraceLogger>(sp => sp.GetRequiredService<DebugLogService>());
+        builder.Services.AddSingleton<IFileLogger>(sp => sp.GetRequiredService<DebugLogService>());
         builder.Services.AddSingleton<ILogWatcherService, LiveLogWatcherService>();
 
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
