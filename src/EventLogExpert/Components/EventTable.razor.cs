@@ -47,10 +47,10 @@ public sealed partial class EventTable
     {
         SelectedEventState.Select(s => s.SelectedEvents);
 
-        SubscribeToAction<EventTableAction.SetActiveTable>(action => ScrollToSelectedEvent().AndForget());
-        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => RegisterTableEventHandlers().AndForget());
-        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => ScrollToSelectedEvent().AndForget());
-        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => ScrollToSelectedEvent().AndForget());
+        SubscribeToAction<EventTableAction.SetActiveTable>(action => InvokeAsync(ScrollToSelectedEvent));
+        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => InvokeAsync(RegisterTableEventHandlers));
+        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => InvokeAsync(ScrollToSelectedEvent));
+        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => InvokeAsync(ScrollToSelectedEvent));
 
         _eventTableState = EventTableState.Value;
 

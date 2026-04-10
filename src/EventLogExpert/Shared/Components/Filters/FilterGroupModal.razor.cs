@@ -23,7 +23,7 @@ public sealed partial class FilterGroupModal
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<FilterGroupAction.OpenMenu>(action => Open().AndForget());
+        SubscribeToAction<FilterGroupAction.OpenMenu>(action => InvokeAsync(Open));
 
         base.OnInitialized();
     }

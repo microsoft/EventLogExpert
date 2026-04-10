@@ -28,12 +28,12 @@ public sealed partial class FilterGroup
     private void ApplyFilters()
     {
         Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(Group));
-        Parent.Close().AndForget();
+        InvokeAsync(Parent.Close);
     }
 
-    private void CopyGroup() => Clipboard.SetTextAsync(Group.Filters.Count() > 1 ?
+    private void CopyGroup() => Clipboard.SetTextAsync(Group.Filters.Count > 1 ?
         string.Join(" || ", Group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
-        Group.Filters.First().Comparison.Value);
+        Group.Filters[0].Comparison.Value);
 
     private async Task ExportGroup()
     {
