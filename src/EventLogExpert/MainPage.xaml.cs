@@ -116,6 +116,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     public void Dispose()
     {
+        _settings.CopyTypeChanged -= SetCopyKeyboardAccelerator;
+
         _cancellationTokenSource.Cancel();
         _cancellationTokenSource.Dispose();
     }
@@ -447,7 +449,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
             {
                 switch (arg)
                 {
-                    case not null when arg.EndsWith(".evtx"):
+                    case not null when arg.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase):
                         await OpenLog(arg, PathType.FilePath);
                         break;
                 }

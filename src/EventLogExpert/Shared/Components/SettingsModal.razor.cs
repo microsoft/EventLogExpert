@@ -14,7 +14,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class SettingsModal
+public sealed partial class SettingsModal : IDisposable
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
 
@@ -39,6 +39,8 @@ public sealed partial class SettingsModal
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+
+    public void Dispose() => Settings.Loaded -= OnSettingsLoaded;
 
     protected internal override async Task Close()
     {
@@ -84,22 +86,32 @@ public sealed partial class SettingsModal
 
             Directory.CreateDirectory(FileLocationOptions.DatabasePath);
 
+            List<string> importedFiles = [];
+
             foreach (var item in result)
             {
-                if (item?.FileName is null) { continue; }
+                if (string.IsNullOrEmpty(item?.FileName) || string.IsNullOrEmpty(item.FullPath)) { continue; }
 
                 var destination = Path.Join(FileLocationOptions.DatabasePath, item.FileName);
                 File.Copy(item.FullPath, destination, true);
 
-                if (Path.GetExtension(destination) != ".zip") { continue; }
+                importedFiles.Add(item.FileName);
+
+                if (!Path.GetExtension(destination).Equals(".zip", StringComparison.OrdinalIgnoreCase)) { continue; }
 
                 await ZipFile.ExtractToDirectoryAsync(destination, FileLocationOptions.DatabasePath, overwriteFiles: true);
                 File.Delete(destination);
             }
 
-            var message = result.Length > 1 ?
-                $"{result.Length} databases have successfully been imported" :
-                $"{result[0]?.FileName ?? "Database"} has successfully been imported";
+            if (importedFiles.Count == 0)
+            {
+                await AlertDialogService.ShowAlert("Import Failed", "No valid database files were selected.", "OK");
+                return;
+            }
+
+            var message = importedFiles.Count > 1 ?
+                $"{importedFiles.Count} databases have successfully been imported" :
+                $"{importedFiles[0]} has successfully been imported";
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 

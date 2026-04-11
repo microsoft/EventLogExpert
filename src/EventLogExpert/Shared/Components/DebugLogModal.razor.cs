@@ -7,11 +7,17 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Shared.Components;
 
-public partial class DebugLogModal
+public partial class DebugLogModal : IDisposable
 {
     private readonly List<string> _data = [];
 
     [Inject] private IFileLogger TraceLogger { get; set; } = null!;
+
+    public void Dispose()
+    {
+        TraceLogger.DebugLogLoaded -= OnDebugLogLoaded;
+        GC.SuppressFinalize(this);
+    }
 
     protected internal override async Task Open()
     {
