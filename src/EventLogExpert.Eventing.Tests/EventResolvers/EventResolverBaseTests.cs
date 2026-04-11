@@ -171,6 +171,45 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithTrailingPercentN_ShouldNotThrowIndexOutOfRange()
+    {
+        // Arrange
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1001,
+                    Text = "Message ends with newline%n"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1001,
+            Properties = []
+        };
+
+        // Act - should not throw IndexOutOfRangeException
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.EndsWith("\r\n", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithHexPropertyType_ShouldFormatAsHex()
     {
         // Arrange
