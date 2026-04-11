@@ -17,7 +17,7 @@ public class EventModel
 
     public int Task { get; set; }
 
-    public long[] Keywords { get; set; }
+    public required long[] Keywords { get; set; }
 
     public string? Template { get; set; }
 

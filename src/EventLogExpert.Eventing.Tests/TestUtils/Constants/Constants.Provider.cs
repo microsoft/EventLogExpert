@@ -18,14 +18,16 @@ public sealed class Constants
     public const string NonExistentDll = "NonExistent.dll";
     public const string NonExistentDllFullPath = @"C:\Windows\System32\NonExistent.dll";
     public const string NonExistentDllSystemRootFullPath = @"%SystemRoot%\System32\NonExistent.dll";
+    public const string NonExistentProviderName = "NonExistentProvider";
 
     public const string Localhost = "localhost";
 
     public const string LocalComputer = "LocalComputer";
     public const string RemoteComputer = "RemoteComputer";
+    public const string TestComputer = "TestComputer";
 
     public const string TestProviderLongName = "Microsoft-Windows-EventLogExpert";
-    public const string TestProviderName = "EventLogExpert";
+    public const string TestProviderName = "TestProvider";
 
     public const string ExchangeFormattedDescription =
         "Database redundancy health check passed.\r\nDatabase copy: SERVER1\r\nRedundancy count: 4\r\nIsSuppressed: False\r\n\r\nErrors:\r\nLots of copy status text";

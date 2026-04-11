@@ -248,7 +248,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
 
         var largeMessages = Enumerable.Range(1, 100)
-            .Select(i => new MessageModel { RawId = i, Text = new string('A', 1000) })
+            .Select(i => new MessageModel { ProviderName = "LargeProvider", RawId = i, Text = new string('A', 1000) })
             .ToList();
 
         var provider = new ProviderDetails
@@ -301,7 +301,7 @@ public sealed class EventProviderDbContextTests : IDisposable
             context.ProviderDetails.Add(new ProviderDetails
             {
                 ProviderName = providerName,
-                Messages = [new MessageModel { RawId = 1, Text = "Original" }],
+                Messages = [new MessageModel { ProviderName = providerName, RawId = 1, Text = "Original" }],
                 Parameters = [],
                 Events = [],
                 Keywords = new Dictionary<long, string>(),
@@ -316,7 +316,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         using (var context = new EventProviderDbContext(dbPath, false))
         {
             var provider = context.ProviderDetails.First(p => p.ProviderName == providerName);
-            provider.Messages = [new MessageModel { RawId = 1, Text = "Updated" }];
+            provider.Messages = [new MessageModel { ProviderName = providerName, RawId = 1, Text = "Updated" }];
             context.SaveChanges();
         }
 
@@ -339,19 +339,19 @@ public sealed class EventProviderDbContextTests : IDisposable
             ProviderName = "ComplexProvider",
             Messages =
             [
-                new MessageModel { RawId = 1, Text = "Message1" },
-                new MessageModel { RawId = 2, Text = "Message2" },
-                new MessageModel { RawId = 3, Text = "Message3" }
+                new MessageModel { ProviderName = "ComplexProvider", RawId = 1, Text = "Message1" },
+                new MessageModel { ProviderName = "ComplexProvider", RawId = 2, Text = "Message2" },
+                new MessageModel { ProviderName = "ComplexProvider", RawId = 3, Text = "Message3" }
             ],
             Parameters =
             [
-                new MessageModel { RawId = 10, Text = "Param1" },
-                new MessageModel { RawId = 11, Text = "Param2" }
+                new MessageModel { ProviderName = "ComplexProvider", RawId = 10, Text = "Param1" },
+                new MessageModel { ProviderName = "ComplexProvider", RawId = 11, Text = "Param2" }
             ],
             Events =
             [
-                new EventModel { Id = 100, Description = "Event1" },
-                new EventModel { Id = 101, Description = "Event2" }
+                new EventModel { Id = 100, Keywords = [], Description = "Event1" },
+                new EventModel { Id = 101, Keywords = [], Description = "Event2" }
             ],
             Keywords = new Dictionary<long, string>
             {
@@ -482,7 +482,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         var provider = new ProviderDetails
         {
             ProviderName = "Special\"Provider'With<>Chars",
-            Messages = [new MessageModel { RawId = 1, Text = "Message with \"quotes\" and 'apostrophes'" }],
+            Messages = [new MessageModel { ProviderName = "Special\"Provider'With<>Chars", RawId = 1, Text = "Message with \"quotes\" and 'apostrophes'" }],
             Parameters = [],
             Events = [],
             Keywords = new Dictionary<long, string>(),
