@@ -64,45 +64,25 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async IAsyncEnumerable<string> LoadAsync()
     {
-        // Copy to a temp file under the lock so writers are blocked only briefly
-        string tempPath = Path.GetTempFileName();
-
-        try
+        // Read directly from the source file. Writers use File.AppendText which opens with
+        // FileShare.Read, allowing concurrent readers. We open with FileShare.ReadWrite to
+        // allow concurrent writers. This avoids the overhead of copying to a temp file and
+        // eliminates lock contention between readers and writers.
+        var options = new FileStreamOptions
         {
-            await s_loggingFileLock.WaitAsync();
+            Mode = FileMode.Open,
+            Access = FileAccess.Read,
+            Share = FileShare.ReadWrite,
+            Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            BufferSize = 4096
+        };
 
-            try
-            {
-                // Use FileStream copy instead of File.Copy to avoid copying encryption attributes
-                // which can fail if source is encrypted but temp folder doesn't support encryption
-                await using var sourceStream = new FileStream(_fileLocationOptions.LoggingPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                await using var destStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
-                await sourceStream.CopyToAsync(destStream);
-            }
-            finally
-            {
-                s_loggingFileLock.Release();
-            }
+        await using var stream = new FileStream(_fileLocationOptions.LoggingPath, options);
+        using var reader = new StreamReader(stream);
 
-            // Stream lines from the snapshot so memory stays bounded and writers aren't blocked
-            await using var stream = new FileStream(tempPath, FileMode.Open, FileAccess.Read, FileShare.Read, bufferSize: 4096, useAsync: true);
-            using var reader = new StreamReader(stream);
-
-            while (await reader.ReadLineAsync() is { } line)
-            {
-                yield return line;
-            }
-        }
-        finally
+        while (await reader.ReadLineAsync() is { } line)
         {
-            try
-            {
-                File.Delete(tempPath);
-            }
-            catch
-            {
-                // Best effort cleanup
-            }
+            yield return line;
         }
     }
 
