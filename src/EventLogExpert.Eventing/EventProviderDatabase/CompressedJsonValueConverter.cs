@@ -8,17 +8,15 @@ using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
-public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T : class
+public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => ConvertToCompressedJson(v),
+    v => ConvertFromCompressedJson(v))
+    where T : class
 {
-    public CompressedJsonValueConverter() :
-      base(v => ConvertToCompressedJson(v), v => ConvertFromCompressedJson(v))
-    { }
-
     public static byte[] ConvertToCompressedJson(T value)
     {
         var json = JsonSerializer.Serialize(value);
         var buffer = Encoding.UTF8.GetBytes(json);
-        MemoryStream memoryStream = new();
+        using MemoryStream memoryStream = new();
         using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize))
         {
             gZipStream.Write(buffer, 0, buffer.Length);
