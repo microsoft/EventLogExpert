@@ -57,7 +57,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
         _parent.HighlightedItem = this;
     }
 
-    private async void SelectItem()
+    private async Task SelectItem()
     {
         if (IsDisabled) { return; }
 

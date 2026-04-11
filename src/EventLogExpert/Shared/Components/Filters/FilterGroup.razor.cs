@@ -31,9 +31,16 @@ public sealed partial class FilterGroup
         await InvokeAsync(Parent.Close);
     }
 
-    private void CopyGroup() => Clipboard.SetTextAsync(Group.Filters.Count > 1 ?
-        string.Join(" || ", Group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
-        Group.Filters[0].Comparison.Value);
+    private void CopyGroup()
+    {
+        if (Group.Filters.Count <= 0) { return; }
+
+        var text = Group.Filters.Count > 1 ?
+            string.Join(" || ", Group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
+            Group.Filters[0].Comparison.Value;
+
+        _ = Clipboard.SetTextAsync(text);
+    }
 
     private async Task ExportGroup()
     {

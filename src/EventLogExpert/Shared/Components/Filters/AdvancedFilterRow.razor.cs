@@ -42,7 +42,7 @@ public sealed partial class AdvancedFilterRow
                     _errorMessage = message;
                 }
 
-                InvokeAsync(StateHasChanged);
+                _ = InvokeAsync(StateHasChanged);
             }, e.Value, 250, 0);
     }
 
