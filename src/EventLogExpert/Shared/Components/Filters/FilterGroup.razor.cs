@@ -28,7 +28,7 @@ public sealed partial class FilterGroup
     private async Task ApplyFilters()
     {
         Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(Group));
-        await InvokeAsync(Parent.Close);
+        await Parent.Close();
     }
 
     private void CopyGroup()
