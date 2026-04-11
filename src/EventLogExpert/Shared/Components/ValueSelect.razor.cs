@@ -137,7 +137,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    private async void HandleKeyDown(KeyboardEventArgs args)
+    private async Task HandleKeyDown(KeyboardEventArgs args)
     {
         switch (args.Code)
         {
@@ -184,7 +184,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         _preventDefault = false;
     }
 
-    private async void OnInputChange(ChangeEventArgs args)
+    private async Task OnInputChange(ChangeEventArgs args)
     {
         Value = (T)Convert.ChangeType(args.Value, typeof(T))!;
         await ValueChanged.InvokeAsync(Value);
@@ -239,6 +239,6 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         }
     }
 
-    private async void ToggleDropDownVisibility() =>
+    private async Task ToggleDropDownVisibility() =>
         await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent);
 }

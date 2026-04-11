@@ -37,7 +37,7 @@ public sealed partial class FilterCacheModal
     private void AddFavorite(string filter) =>
         Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
 
-    private async void AddFilter(string filter)
+    private async Task AddFilter(string filter)
     {
         Dispatcher.Dispatch(
             new FilterPaneAction.AddFilter(
