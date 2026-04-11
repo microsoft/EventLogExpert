@@ -189,7 +189,7 @@ public sealed class EventProviderDatabaseEventResolverTests
                     });
                 }
 
-                await context.SaveChangesAsync();
+                await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
 
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
@@ -226,7 +226,7 @@ public sealed class EventProviderDatabaseEventResolverTests
                 })).ToList();
 
             // Call Dispose while operations are running - it should just work
-            tasks.Add(Task.Run(() => resolver.Dispose()));
+            tasks.Add(Task.Run(() => resolver.Dispose(), TestContext.Current.CancellationToken));
 
             await Task.WhenAll(tasks);
 

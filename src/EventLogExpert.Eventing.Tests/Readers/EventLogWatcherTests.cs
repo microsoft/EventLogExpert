@@ -366,7 +366,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after resubscribe", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -413,7 +413,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for record ID", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -445,7 +445,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for timestamp", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         var afterWrite = DateTime.UtcNow.AddSeconds(1); // Add buffer for processing
 
         // Assert
@@ -477,7 +477,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for path validation", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -506,7 +506,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for properties", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -535,7 +535,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for sender validation", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -574,7 +574,7 @@ public sealed class EventLogWatcherTests
         Thread.Sleep(50);
         eventLog.WriteEntry("Event C", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10));
+        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive all events within timeout period");
@@ -613,7 +613,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for error case", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -646,7 +646,7 @@ public sealed class EventLogWatcherTests
         eventLog.WriteEntry("Test event 2", EventLogEntryType.Warning);
         eventLog.WriteEntry("Test event 3", EventLogEntryType.Error);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10));
+        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive all events within timeout period");
@@ -691,7 +691,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for EventLogWatcher", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -726,7 +726,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after bookmark", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -761,35 +761,35 @@ public sealed class EventLogWatcherTests
                 using var log = new EventLog(Constants.ApplicationLogName);
                 log.Source = Constants.ApplicationLogName;
                 log.WriteEntry("Concurrent event 1", EventLogEntryType.Information);
-            }),
+            }, TestContext.Current.CancellationToken),
             Task.Run(() =>
             {
                 using var log = new EventLog(Constants.ApplicationLogName);
                 log.Source = Constants.ApplicationLogName;
                 log.WriteEntry("Concurrent event 2", EventLogEntryType.Information);
-            }),
+            }, TestContext.Current.CancellationToken),
             Task.Run(() =>
             {
                 using var log = new EventLog(Constants.ApplicationLogName);
                 log.Source = Constants.ApplicationLogName;
                 log.WriteEntry("Concurrent event 3", EventLogEntryType.Information);
-            }),
+            }, TestContext.Current.CancellationToken),
             Task.Run(() =>
             {
                 using var log = new EventLog(Constants.ApplicationLogName);
                 log.Source = Constants.ApplicationLogName;
                 log.WriteEntry("Concurrent event 4", EventLogEntryType.Information);
-            }),
+            }, TestContext.Current.CancellationToken),
             Task.Run(() =>
             {
                 using var log = new EventLog(Constants.ApplicationLogName);
                 log.Source = Constants.ApplicationLogName;
                 log.WriteEntry("Concurrent event 5", EventLogEntryType.Information);
-            })
+            }, TestContext.Current.CancellationToken)
         };
 
         await Task.WhenAll(tasks);
-        bool received = countdown.Wait(TimeSpan.FromSeconds(10));
+        bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, $"Did not receive all events within timeout period. Got {receivedEvents.Count} events");
@@ -835,7 +835,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for multiple subscribers", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(5));
+        bool received = countdown.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive events in all subscribers within timeout period");
@@ -883,7 +883,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event without XML", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -912,7 +912,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for XML rendering", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5));
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive event within timeout period");
@@ -967,7 +967,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for multiple watchers", EventLogEntryType.Information);
 
-        bool received = countdown.Wait(TimeSpan.FromSeconds(5));
+        bool received = countdown.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(received, "Did not receive events in all watchers within timeout period");
