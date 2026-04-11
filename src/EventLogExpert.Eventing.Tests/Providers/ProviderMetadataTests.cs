@@ -17,7 +17,7 @@ public sealed class ProviderMetadataTests
     public async Task Channels_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = new[]
@@ -39,7 +39,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenCalledMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels1 = metadata?.Channels;
@@ -55,7 +55,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenProviderHasChannels_ShouldHaveValidKeys()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels = metadata?.Channels;
@@ -75,7 +75,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenProviderHasNoDuplicateChannelIds_ShouldNotLoseData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels = metadata?.Channels;
@@ -90,7 +90,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenValidProvider_ShouldContainData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels = metadata?.Channels;
@@ -104,7 +104,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenValidProvider_ShouldReturnDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels = metadata?.Channels;
@@ -118,7 +118,7 @@ public sealed class ProviderMetadataTests
     public void Channels_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var channels = metadata?.Channels;
@@ -132,8 +132,8 @@ public sealed class ProviderMetadataTests
     public void Create_WhenCalledConcurrently_ShouldHandleMultipleInstances()
     {
         // Arrange & Act
-        using var metadata1 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-        using var metadata2 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata1 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata2 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Assert
         Assert.NotNull(metadata1);
@@ -148,7 +148,7 @@ public sealed class ProviderMetadataTests
     public void Create_WhenCommonProviders_ShouldReturnMetadata(string providerName)
     {
         // Arrange & Act
-        using var metadata = ProviderMetadata.Create(providerName);
+        var metadata = ProviderMetadata.Create(providerName);
 
         // Assert
         // Note: These tests may fail if the provider doesn't exist on the test machine
@@ -166,7 +166,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var metadata = ProviderMetadata.Create(string.Empty, mockLogger);
+        var metadata = ProviderMetadata.Create(string.Empty, mockLogger);
 
         // Assert
         // Empty provider name is treated as valid by Windows
@@ -178,7 +178,7 @@ public sealed class ProviderMetadataTests
     public void Create_WhenEmptyProviderName_ShouldReturnMetadata()
     {
         // Arrange & Act
-        using var metadata = ProviderMetadata.Create(string.Empty);
+        var metadata = ProviderMetadata.Create(string.Empty);
 
         // Assert
         // Windows treats empty string as a valid provider name
@@ -193,7 +193,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var metadata = ProviderMetadata.Create(providerName, mockLogger);
+        var metadata = ProviderMetadata.Create(providerName, mockLogger);
 
         // Assert
         mockLogger.Received(1).Trace(
@@ -208,7 +208,7 @@ public sealed class ProviderMetadataTests
         var providerName = "NonExistentProvider_" + Guid.NewGuid();
 
         // Act
-        using var metadata = ProviderMetadata.Create(providerName);
+        var metadata = ProviderMetadata.Create(providerName);
 
         // Assert
         Assert.Null(metadata);
@@ -218,7 +218,7 @@ public sealed class ProviderMetadataTests
     public void Create_WhenSpecialCharactersInProviderName_ShouldReturnNull()
     {
         // Arrange & Act
-        using var metadata = ProviderMetadata.Create("Invalid<>Provider|Name");
+        var metadata = ProviderMetadata.Create("Invalid<>Provider|Name");
 
         // Assert
         Assert.Null(metadata);
@@ -231,7 +231,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, mockLogger);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, mockLogger);
 
         // Assert
         Assert.NotNull(metadata);
@@ -244,7 +244,7 @@ public sealed class ProviderMetadataTests
     public void Create_WhenValidProvider_ShouldReturnMetadata()
     {
         // Arrange & Act
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Assert
         Assert.NotNull(metadata);
@@ -254,51 +254,10 @@ public sealed class ProviderMetadataTests
     public void Create_WhenWhitespaceProviderName_ShouldReturnNull()
     {
         // Arrange & Act
-        using var metadata = ProviderMetadata.Create("   ");
+        var metadata = ProviderMetadata.Create("   ");
 
         // Assert
         Assert.Null(metadata);
-    }
-
-    [Fact]
-    public void Dispose_AfterDispose_PropertiesShouldStillBeAccessible()
-    {
-        // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Cache properties before dispose
-        var channelsBefore = metadata?.Channels;
-
-        // Act
-        metadata?.Dispose();
-        var channelsAfter = metadata?.Channels;
-
-        // Assert
-        Assert.NotNull(channelsBefore);
-        Assert.NotNull(channelsAfter);
-        Assert.Same(channelsBefore, channelsAfter);
-    }
-
-    [Fact]
-    public void Dispose_WhenCalled_ShouldNotThrow()
-    {
-        // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act & Assert
-        metadata?.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
-    {
-        // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act & Assert
-        metadata?.Dispose();
-        metadata?.Dispose();
-        metadata?.Dispose();
     }
 
     [Fact]
@@ -309,7 +268,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var metadata = ProviderMetadata.Create(providerName, mockLogger);
+        var metadata = ProviderMetadata.Create(providerName, mockLogger);
 
         // Assert
         Assert.Null(metadata);
@@ -322,7 +281,7 @@ public sealed class ProviderMetadataTests
     public void Events_WhenCalledTwice_ShouldReturnDifferentEnumerableInstances()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var events1 = metadata?.Events;
@@ -337,7 +296,7 @@ public sealed class ProviderMetadataTests
     public void Events_WhenProviderHasEvents_ShouldHaveValidEventMetadata()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var events = metadata?.Events?.ToList();
@@ -356,7 +315,7 @@ public sealed class ProviderMetadataTests
     public void Events_WhenValidProvider_ShouldContainEventMetadata()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var events = metadata?.Events?.ToList();
@@ -378,7 +337,7 @@ public sealed class ProviderMetadataTests
     public void Events_WhenValidProvider_ShouldContainEvents()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var events = metadata?.Events?.ToList();
@@ -392,7 +351,7 @@ public sealed class ProviderMetadataTests
     public void Events_WhenValidProvider_ShouldReturnEnumerable()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var events = metadata?.Events;
@@ -406,7 +365,7 @@ public sealed class ProviderMetadataTests
     public async Task Keywords_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
+        var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
 
         // Act
         var tasks = new[]
@@ -430,7 +389,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenCalledMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var keywords1 = metadata?.Keywords;
@@ -446,7 +405,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenProviderHasKeywords_ShouldContainData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
+        var metadata = ProviderMetadata.Create(Constants.PowerShellLogName);
 
         // Act
         var keywords = metadata?.Keywords;
@@ -465,7 +424,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenProviderHasKeywords_ShouldHaveValidValues()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var keywords = metadata?.Keywords;
@@ -484,7 +443,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenProviderHasNoDuplicateKeywordValues_ShouldNotLoseData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var keywords = metadata?.Keywords;
@@ -499,7 +458,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenValidProvider_ShouldReturnDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var keywords = metadata?.Keywords;
@@ -513,7 +472,7 @@ public sealed class ProviderMetadataTests
     public void Keywords_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var keywords = metadata?.Keywords;
@@ -527,7 +486,7 @@ public sealed class ProviderMetadataTests
     public void MessageFilePath_WhenCalledMultipleTimes_ShouldReturnConsistentPath()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var path1 = metadata?.MessageFilePath;
@@ -543,7 +502,7 @@ public sealed class ProviderMetadataTests
     public void MessageFilePath_WhenValidProvider_ShouldContainDllExtension()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var messageFilePath = metadata?.MessageFilePath;
@@ -557,7 +516,7 @@ public sealed class ProviderMetadataTests
     public void MessageFilePath_WhenValidProvider_ShouldNotBeEmpty()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var messageFilePath = metadata?.MessageFilePath;
@@ -571,7 +530,7 @@ public sealed class ProviderMetadataTests
     public void MessageFilePath_WhenValidProvider_ShouldReturnPath()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var messageFilePath = metadata?.MessageFilePath;
@@ -584,7 +543,7 @@ public sealed class ProviderMetadataTests
     public async Task Opcodes_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = new[]
@@ -606,7 +565,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenCalledMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes1 = metadata?.Opcodes;
@@ -622,7 +581,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenProviderHasNoDuplicateOpcodeValues_ShouldNotLoseData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes = metadata?.Opcodes;
@@ -637,7 +596,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenProviderHasOpcodes_ShouldHaveValidValues()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes = metadata?.Opcodes;
@@ -656,7 +615,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenValidProvider_ShouldContainData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes = metadata?.Opcodes;
@@ -670,7 +629,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenValidProvider_ShouldReturnDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes = metadata?.Opcodes;
@@ -684,7 +643,7 @@ public sealed class ProviderMetadataTests
     public void Opcodes_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var opcodes = metadata?.Opcodes;
@@ -698,7 +657,7 @@ public sealed class ProviderMetadataTests
     public void ParameterFilePath_WhenCalledMultipleTimes_ShouldReturnConsistentPath()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var path1 = metadata?.ParameterFilePath;
@@ -714,7 +673,7 @@ public sealed class ProviderMetadataTests
     public void ParameterFilePath_WhenValidProvider_ShouldReturnPath()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var parameterFilePath = metadata?.ParameterFilePath;
@@ -727,7 +686,7 @@ public sealed class ProviderMetadataTests
     public async Task Tasks_WhenAccessedConcurrently_ShouldReturnValidData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = new[]
@@ -749,7 +708,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenCalledMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks1 = metadata?.Tasks;
@@ -765,7 +724,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenProviderHasNoDuplicateTaskValues_ShouldNotLoseData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = metadata?.Tasks;
@@ -780,7 +739,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenProviderHasTasks_ShouldHaveValidValues()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = metadata?.Tasks;
@@ -799,7 +758,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenValidProvider_ShouldContainData()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = metadata?.Tasks;
@@ -813,7 +772,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenValidProvider_ShouldReturnDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = metadata?.Tasks;
@@ -827,7 +786,7 @@ public sealed class ProviderMetadataTests
     public void Tasks_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
-        using var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         // Act
         var tasks = metadata?.Tasks;

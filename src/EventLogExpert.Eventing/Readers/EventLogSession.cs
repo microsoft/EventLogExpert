@@ -7,14 +7,18 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogSession : IDisposable
+/// <summary>
+///     Represents a session for querying event logs. This class uses a singleton pattern via
+///     <see cref="GlobalSession" />.
+/// </summary>
+/// <remarks>
+///     This class does not implement <see cref="IDisposable" />. The underlying <see cref="EvtHandle" /> resources
+///     are <see cref="SafeHandle" /> instances that clean themselves up via their own finalizers. The singleton is
+///     intended to live for the application's lifetime.
+/// </remarks>
+public sealed partial class EventLogSession
 {
     private EventLogSession() { }
-
-    ~EventLogSession()
-    {
-        Dispose(disposing: false);
-    }
 
     public static EventLogSession GlobalSession { get; } = new();
 
@@ -23,12 +27,6 @@ public sealed partial class EventLogSession : IDisposable
     internal EvtHandle SystemRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.System);
 
     internal EvtHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
-
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
 
     public EventLogInformation GetLogInformation(string logName, PathType pathType) => new(this, logName, pathType);
 
@@ -168,25 +166,5 @@ public sealed partial class EventLogSession : IDisposable
         }
 
         return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (disposing) { return; }
-
-        if (Handle is { IsInvalid: false })
-        {
-            Handle.Dispose();
-        }
-
-        if (SystemRenderContext is { IsInvalid: false })
-        {
-            SystemRenderContext.Dispose();
-        }
-
-        if (UserRenderContext is { IsInvalid: false })
-        {
-            UserRenderContext.Dispose();
-        }
     }
 }
