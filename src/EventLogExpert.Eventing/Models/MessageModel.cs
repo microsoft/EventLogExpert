@@ -14,7 +14,7 @@ public class MessageModel
     public string? LogLink { get; set; }
 
     /// <summary>The provider name for this message</summary>
-    public required string ProviderName { get; set; }
+    public string ProviderName { get; set; } = string.Empty;
 
     /// <summary>For raw ID format, see https://msdn.microsoft.com/en-us/library/windows/desktop/aa363651(v=vs.85).aspx</summary>
     public long RawId { get; set; }
@@ -32,5 +32,5 @@ public class MessageModel
     public string? Template { get; set; }
 
     /// <summary>The text of the message</summary>
-    public required string Text { get; set; }
+    public string Text { get; set; } = string.Empty;
 }
