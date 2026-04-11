@@ -134,18 +134,18 @@ public partial class EventResolverBase : IDisposable
             switch (unformattedString[i])
             {
                 case '%' when i + 1 < unformattedString.Length:
-                    switch (unformattedString[i + 1])
-                    {
-                        case 'n':
-                            if (unformattedString[i + 2] != '\r')
-                            {
-                                buffer[bufferIndex++] = '\r';
-                                buffer[bufferIndex++] = '\n';
-                            }
+                        switch (unformattedString[i + 1])
+                        {
+                            case 'n':
+                                if (i + 2 >= unformattedString.Length || unformattedString[i + 2] != '\r')
+                                {
+                                    buffer[bufferIndex++] = '\r';
+                                    buffer[bufferIndex++] = '\n';
+                                }
 
-                            i++;
+                                i++;
 
-                            break;
+                                break;
                         case 't':
                             buffer[bufferIndex++] = '\t';
                             i++;
