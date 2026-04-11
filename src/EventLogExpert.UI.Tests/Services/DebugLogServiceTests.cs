@@ -259,6 +259,41 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_WhenLogFileDeletedDuringRead_ShouldAllowDeletion()
+    {
+        // Arrange
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        var expectedLines = new[] { Constants.DebugLogLine1, Constants.DebugLogLine2, Constants.DebugLogLine3 };
+        await File.WriteAllLinesAsync(_testLogPath, expectedLines, TestContext.Current.CancellationToken);
+
+        using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        // Act - Start enumeration and delete the file while the reader holds a handle
+        await using var enumerator = debugLogService.LoadAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
+
+        // Read first line to ensure the file is open
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(Constants.DebugLogLine1, enumerator.Current);
+
+        // Delete should succeed because FileShare.Delete is set
+        var deleteException = Record.Exception(() => File.Delete(_testLogPath));
+
+        // Assert - Deletion should not throw
+        Assert.Null(deleteException);
+
+        // Continue reading remaining lines (file content is still accessible via open handle)
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(Constants.DebugLogLine2, enumerator.Current);
+
+        Assert.True(await enumerator.MoveNextAsync());
+        Assert.Equal(Constants.DebugLogLine3, enumerator.Current);
+
+        Assert.False(await enumerator.MoveNextAsync());
+    }
+
+    [Fact]
     public void LoadDebugLog_WhenNoSubscribers_ShouldNotThrow()
     {
         // Arrange

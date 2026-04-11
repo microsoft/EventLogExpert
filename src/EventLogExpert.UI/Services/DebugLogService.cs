@@ -64,32 +64,40 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async IAsyncEnumerable<string> LoadAsync()
     {
-        // If the log file doesn't exist yet (fresh install, or before first write),
-        // yield no lines instead of throwing FileNotFoundException.
-        if (!File.Exists(_fileLocationOptions.LoggingPath))
-        {
-            yield break;
-        }
-
         // Read directly from the source file. Writers use File.AppendText which opens with
-        // FileShare.Read, allowing concurrent readers. We open with FileShare.ReadWrite to
-        // allow concurrent writers. This avoids the overhead of copying to a temp file and
-        // eliminates lock contention between readers and writers.
+        // FileShare.Read, allowing concurrent readers. We open with FileShare.ReadWrite | Delete
+        // to allow concurrent writers and log rotation/deletion (e.g., InitTracing deletes oversized logs).
+        // This avoids the overhead of copying to a temp file and eliminates lock contention.
         var options = new FileStreamOptions
         {
             Mode = FileMode.Open,
             Access = FileAccess.Read,
-            Share = FileShare.ReadWrite,
+            Share = FileShare.ReadWrite | FileShare.Delete,
             Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             BufferSize = 4096
         };
 
-        await using var stream = new FileStream(_fileLocationOptions.LoggingPath, options);
-        using var reader = new StreamReader(stream);
+        FileStream stream;
 
-        while (await reader.ReadLineAsync() is { } line)
+        try
         {
-            yield return line;
+            stream = new FileStream(_fileLocationOptions.LoggingPath, options);
+        }
+        catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
+        {
+            // The log file doesn't exist yet (fresh install, before first write),
+            // or was deleted between check and open (e.g., InitTracing deletes oversized logs).
+            yield break;
+        }
+
+        await using (stream)
+        {
+            using var reader = new StreamReader(stream);
+
+            while (await reader.ReadLineAsync() is { } line)
+            {
+                yield return line;
+            }
         }
     }
 
