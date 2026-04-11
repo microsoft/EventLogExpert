@@ -25,10 +25,10 @@ public sealed partial class FilterGroup
 
     private void AddFilter() => Dispatcher.Dispatch(new FilterGroupAction.AddFilter(Group.Id));
 
-    private void ApplyFilters()
+    private async Task ApplyFilters()
     {
         Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(Group));
-        InvokeAsync(Parent.Close);
+        await InvokeAsync(Parent.Close);
     }
 
     private void CopyGroup() => Clipboard.SetTextAsync(Group.Filters.Count > 1 ?

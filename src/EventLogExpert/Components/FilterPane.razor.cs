@@ -14,7 +14,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components;
 
-public sealed partial class FilterPane
+public sealed partial class FilterPane : IDisposable
 {
     private readonly FilterDateModel _model = new();
 
@@ -35,6 +35,8 @@ public sealed partial class FilterPane
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
+
+    public void Dispose() => Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
 
     protected override void OnInitialized()
     {
