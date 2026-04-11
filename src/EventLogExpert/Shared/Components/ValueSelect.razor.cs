@@ -142,7 +142,7 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         switch (args.Code)
         {
             case "Space":
-                if (!IsInput) { ToggleDropDownVisibility(); }
+                if (!IsInput) { await ToggleDropDownVisibility(); }
 
                 return;
             case "ArrowUp":

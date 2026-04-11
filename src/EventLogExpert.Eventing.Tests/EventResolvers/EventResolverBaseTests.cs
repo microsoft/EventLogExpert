@@ -136,12 +136,13 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
                 new MessageModel
                 {
+                    ProviderName = Constants.TestProviderName,
                     ShortId = 1000,
                     Text = "Line 1%nLine 2%tTabbed"
                 }
@@ -155,7 +156,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = []
         };
@@ -175,13 +176,14 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events =
             [
                 new EventModel
                 {
                     Id = 1000,
                     Version = 0,
+                    Keywords = [],
                     LogName = Constants.ApplicationLogName,
                     Description = "Error code: %1",
                     Template = "<template><data name=\"ErrorCode\" outType=\"win:HexInt32\"/></template>"
@@ -197,7 +199,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Version = 0,
             LogName = Constants.ApplicationLogName,
@@ -218,7 +220,7 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
@@ -226,7 +228,7 @@ public sealed class EventResolverBaseTests
                 {
                     ShortId = 1000,
                     Text = "Legacy event: %1 with %2",
-                    ProviderName = "TestProvider"
+                    ProviderName = Constants.TestProviderName
                 }
             ],
             Parameters = [],
@@ -238,7 +240,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = ["value1", "value2"]
         };
@@ -257,13 +259,14 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events =
             [
                 new EventModel
                 {
                     Id = 1000,
                     Version = 0,
+                    Keywords = [],
                     LogName = Constants.ApplicationLogName,
                     Description = "Test event with property: %1",
                     Template = "<template><data name=\"Prop1\" outType=\"win:UnicodeString\"/></template>"
@@ -279,7 +282,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Version = 0,
             LogName = Constants.ApplicationLogName,
@@ -300,12 +303,12 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
-                new MessageModel { ShortId = 1000, Text = "Message 1" },
-                new MessageModel { ShortId = 1000, Text = "Message 2" }
+                new MessageModel { ProviderName = Constants.TestProviderName, ShortId = 1000, Text = "Message 1" },
+                new MessageModel { ProviderName = Constants.TestProviderName, ShortId = 1000, Text = "Message 2" }
             ],
             Parameters = [],
             Keywords = new Dictionary<long, string>(),
@@ -316,7 +319,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = []
         };
@@ -335,12 +338,13 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
                 new MessageModel
                 {
+                    ProviderName = Constants.TestProviderName,
                     ShortId = 1000,
                     Text = "Property1: %1, Property2: %2, Property3: %3"
                 }
@@ -354,7 +358,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = ["StringValue", 42, true]
         };
@@ -377,9 +381,9 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "NonExistentProvider",
+            ProviderName = Constants.NonExistentProviderName,
             Id = 1000,
-            ComputerName = "TestComputer",
+            ComputerName = Constants.TestComputer,
             LogName = Constants.ApplicationLogName
         };
 
@@ -400,7 +404,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Keywords = null
         };
@@ -422,7 +426,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Xml = null
         };
@@ -441,12 +445,13 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
                 new MessageModel
                 {
+                    ProviderName = Constants.TestProviderName,
                     ShortId = 1000,
                     Text = "Status: %%1001 for user %1"
                 }
@@ -455,6 +460,7 @@ public sealed class EventResolverBaseTests
             [
                 new MessageModel
                 {
+                    ProviderName = Constants.TestProviderName,
                     RawId = 1001,
                     Text = "Success"
                 }
@@ -467,7 +473,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = ["JohnDoe"]
         };
@@ -487,7 +493,7 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages = [],
             Parameters = [],
@@ -503,7 +509,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Keywords = 0x3 // Both custom keywords
         };
@@ -536,7 +542,7 @@ public sealed class EventResolverBaseTests
         {
             var eventRecord = new EventRecord
             {
-                ProviderName = "TestProvider",
+                ProviderName = Constants.TestProviderName,
                 Id = 1000,
                 Level = testCase.Level
             };
@@ -555,7 +561,7 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages = [],
             Parameters = [],
@@ -567,7 +573,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Properties = ["This is the description from property"]
         };
@@ -588,7 +594,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Keywords = 0x80000000000000 // Classic keyword
         };
@@ -608,13 +614,14 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events =
             [
                 new EventModel
                 {
                     Id = 1000,
                     Version = 0,
+                    Keywords = [],
                     LogName = Constants.ApplicationLogName,
                     Task = 5,
                     Description = "Test"
@@ -633,7 +640,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Version = 0,
             LogName = Constants.ApplicationLogName,
@@ -654,12 +661,13 @@ public sealed class EventResolverBaseTests
         // Arrange
         var providerDetails = new ProviderDetails
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Events = [],
             Messages =
             [
                 new MessageModel
                 {
+                    ProviderName = Constants.TestProviderName,
                     ShortId = 5,
                     LogLink = Constants.ApplicationLogName,
                     Text = "MessageDerivedTask"
@@ -674,7 +682,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Task = 5,
             LogName = Constants.ApplicationLogName
@@ -697,7 +705,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Xml = xmlContent
         };
@@ -718,7 +726,7 @@ public sealed class EventResolverBaseTests
 
         var eventRecord = new EventRecord
         {
-            ProviderName = "TestProvider",
+            ProviderName = Constants.TestProviderName,
             Id = 1000,
             Keywords = 0
         };
