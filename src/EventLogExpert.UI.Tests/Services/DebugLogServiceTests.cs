@@ -29,7 +29,9 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        await File.WriteAllTextAsync(_testLogPath, $"{Constants.DebugLogExistingContent}\n{Constants.DebugLogLine2}\n{Constants.DebugLogLine3}");
+        await File.WriteAllTextAsync(_testLogPath,
+            $"{Constants.DebugLogExistingContent}\n{Constants.DebugLogLine2}\n{Constants.DebugLogLine3}",
+            TestContext.Current.CancellationToken);
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
@@ -37,7 +39,7 @@ public sealed class DebugLogServiceTests : IDisposable
         await debugLogService.ClearAsync();
 
         // Assert
-        var content = await File.ReadAllTextAsync(_testLogPath);
+        var content = await File.ReadAllTextAsync(_testLogPath, TestContext.Current.CancellationToken);
         Assert.Empty(content);
     }
 
@@ -55,7 +57,7 @@ public sealed class DebugLogServiceTests : IDisposable
 
         // Assert
         Assert.True(File.Exists(_testLogPath));
-        var content = await File.ReadAllTextAsync(_testLogPath);
+        var content = await File.ReadAllTextAsync(_testLogPath, TestContext.Current.CancellationToken);
         Assert.Empty(content);
     }
 
@@ -190,7 +192,7 @@ public sealed class DebugLogServiceTests : IDisposable
         var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act & Assert - Dispose should complete without throwing
-        var exception = Record.Exception(() => debugLogService.Dispose());
+        var exception = Record.Exception(debugLogService.Dispose);
         Assert.Null(exception);
     }
 
@@ -202,12 +204,12 @@ public sealed class DebugLogServiceTests : IDisposable
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
         var expectedLines = new[] { Constants.DebugLogLine1, Constants.DebugLogLine2, Constants.DebugLogLine3 };
-        await File.WriteAllLinesAsync(_testLogPath, expectedLines);
+        await File.WriteAllLinesAsync(_testLogPath, expectedLines, TestContext.Current.CancellationToken);
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        var lines = await debugLogService.LoadAsync().ToListAsync();
+        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(3, lines.Count);
@@ -223,12 +225,34 @@ public sealed class DebugLogServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
-        await File.WriteAllTextAsync(_testLogPath, string.Empty);
+        await File.WriteAllTextAsync(_testLogPath, string.Empty, TestContext.Current.CancellationToken);
 
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        var lines = await debugLogService.LoadAsync().ToListAsync();
+        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(lines);
+    }
+
+    [Fact]
+    public async Task LoadAsync_WhenLogFileDoesNotExist_ShouldReturnNoLines()
+    {
+        // Arrange
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        // Ensure the log file does not exist (fresh install scenario)
+        if (File.Exists(_testLogPath))
+        {
+            File.Delete(_testLogPath);
+        }
+
+        using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        // Act
+        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Empty(lines);
@@ -244,7 +268,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act & Assert - no subscribers attached
-        var exception = Record.Exception(() => debugLogService.LoadDebugLog());
+        var exception = Record.Exception(debugLogService.LoadDebugLog);
         Assert.Null(exception);
     }
 

@@ -64,6 +64,13 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public async IAsyncEnumerable<string> LoadAsync()
     {
+        // If the log file doesn't exist yet (fresh install, or before first write),
+        // yield no lines instead of throwing FileNotFoundException.
+        if (!File.Exists(_fileLocationOptions.LoggingPath))
+        {
+            yield break;
+        }
+
         // Read directly from the source file. Writers use File.AppendText which opens with
         // FileShare.Read, allowing concurrent readers. We open with FileShare.ReadWrite to
         // allow concurrent writers. This avoids the overhead of copying to a temp file and
