@@ -160,7 +160,7 @@ public sealed partial class SettingsModal : IDisposable
             }
         }
 
-        await InvokeAsync(StateHasChanged);
+        StateHasChanged();
 
         await Open();
     }

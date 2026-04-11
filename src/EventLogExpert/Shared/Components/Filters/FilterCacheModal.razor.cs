@@ -48,14 +48,7 @@ public sealed partial class FilterCacheModal
                     IsEnabled = true
                 }));
 
-        try
-        {
-            await InvokeAsync(Close);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Trace($"Failed to close filter cache modal: {e}", LogLevel.Error);
-        }
+        await Close();
     }
 
     private async Task ExportFavorites()
