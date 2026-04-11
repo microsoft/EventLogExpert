@@ -10,45 +10,6 @@ namespace EventLogExpert.Eventing.Tests.Readers;
 public sealed class EventLogSessionTests
 {
     [Fact]
-    public void Dispose_AfterDispose_MethodsStillWork()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        session.Dispose();
-        var logNames = session.GetLogNames();
-
-        // Assert
-        // Dispose only acts during finalization (disposing: false)
-        // Direct calls with disposing: true return immediately, so methods still work
-        Assert.NotNull(logNames);
-        Assert.NotEmpty(logNames);
-    }
-
-    [Fact]
-    public void Dispose_WhenCalled_ShouldNotThrow()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act & Assert
-        session.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act & Assert
-        session.Dispose();
-        session.Dispose();
-        session.Dispose();
-    }
-
-    [Fact]
     public void GetLogInformation_WhenApplicationLog_ShouldReturnInformation()
     {
         // Arrange

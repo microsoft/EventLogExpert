@@ -9,7 +9,13 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Providers;
 
-internal sealed partial class ProviderMetadata : IDisposable
+/// <summary>Provides metadata about an event log provider.</summary>
+/// <remarks>
+///     This class does not implement <see cref="IDisposable" />. The underlying <see cref="EvtHandle" /> is a
+///     <see cref="SafeHandle" /> that cleans itself up via its own finalizer. Instances are cached in
+///     <see cref="EventResolverBase" /> and are intended to be long-lived.
+/// </remarks>
+internal sealed partial class ProviderMetadata
 {
     private readonly Lock _providerLock = new();
     private readonly EvtHandle _publisherMetadataHandle;
@@ -28,11 +34,6 @@ internal sealed partial class ProviderMetadata : IDisposable
         {
             Error = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
         }
-    }
-
-    ~ProviderMetadata()
-    {
-        Dispose(disposing: false);
     }
 
     public IDictionary<uint, string> Channels
@@ -283,12 +284,6 @@ internal sealed partial class ProviderMetadata : IDisposable
 
     internal string? Error { get; private set; }
 
-    public void Dispose()
-    {
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
-    }
-
     internal static ProviderMetadata? Create(string providerName, ITraceLogger? logger = null)
     {
         ProviderMetadata metadata = new(providerName);
@@ -351,16 +346,6 @@ internal sealed partial class ProviderMetadata : IDisposable
         }
         
         return null;
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (disposing) { return; }
-
-        if (_publisherMetadataHandle is { IsInvalid: false })
-        {
-            _publisherMetadataHandle.Dispose();
-        }
     }
 
     private string GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId propertyId)
