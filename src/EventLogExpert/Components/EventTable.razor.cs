@@ -13,6 +13,7 @@ using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
@@ -43,14 +44,16 @@ public sealed partial class EventTable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
+    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+
     protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvents);
 
-        SubscribeToAction<EventTableAction.SetActiveTable>(action => InvokeAsync(ScrollToSelectedEvent));
-        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(action => InvokeAsync(RegisterTableEventHandlers));
-        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(action => InvokeAsync(ScrollToSelectedEvent));
-        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(action => InvokeAsync(ScrollToSelectedEvent));
+        SubscribeToAction<EventTableAction.SetActiveTable>(OnSetActiveTable);
+        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(OnLoadColumnsCompleted);
+        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(OnUpdateCombinedEvents);
+        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(OnUpdateDisplayedEvents);
 
         _eventTableState = EventTableState.Value;
 
@@ -155,6 +158,54 @@ public sealed partial class EventTable
 
     private async Task InvokeTableColumnMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeTableColumnMenu", args.ClientX, args.ClientY);
+
+    private async void OnLoadColumnsCompleted(EventTableAction.LoadColumnsCompleted action)
+    {
+        try
+        {
+            await InvokeAsync(RegisterTableEventHandlers);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to register table event handlers: {e}", LogLevel.Error);
+        }
+    }
+
+    private async void OnSetActiveTable(EventTableAction.SetActiveTable action)
+    {
+        try
+        {
+            await InvokeAsync(ScrollToSelectedEvent);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to scroll to selected event on set active table: {e}", LogLevel.Error);
+        }
+    }
+
+    private async void OnUpdateCombinedEvents(EventTableAction.UpdateCombinedEvents action)
+    {
+        try
+        {
+            await InvokeAsync(ScrollToSelectedEvent);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to scroll to selected event on update combined events: {e}", LogLevel.Error);
+        }
+    }
+
+    private async void OnUpdateDisplayedEvents(EventTableAction.UpdateDisplayedEvents action)
+    {
+        try
+        {
+            await InvokeAsync(ScrollToSelectedEvent);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to scroll to selected event on update displayed events: {e}", LogLevel.Error);
+        }
+    }
 
     private async Task RegisterTableEventHandlers() => await JSRuntime.InvokeVoidAsync("registerTableEvents");
 
