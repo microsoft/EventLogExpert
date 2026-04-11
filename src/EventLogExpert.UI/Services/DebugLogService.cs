@@ -73,7 +73,11 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
             try
             {
-                File.Copy(_fileLocationOptions.LoggingPath, tempPath, overwrite: true);
+                // Use FileStream copy instead of File.Copy to avoid copying encryption attributes
+                // which can fail if source is encrypted but temp folder doesn't support encryption
+                await using var sourceStream = new FileStream(_fileLocationOptions.LoggingPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                await using var destStream = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None);
+                await sourceStream.CopyToAsync(destStream);
             }
             finally
             {
