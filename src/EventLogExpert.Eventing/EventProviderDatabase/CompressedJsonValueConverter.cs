@@ -33,11 +33,13 @@ public class CompressedJsonValueConverter<T> : ValueConverter<T, byte[]> where T
         using GZipStream gZipStream = new(memoryStream, CompressionMode.Decompress);
         using StreamReader streamReader = new(gZipStream);
 
-        return JsonSerializer.Deserialize<T>(streamReader.ReadToEnd())!;
+        return JsonSerializer.Deserialize<T>(streamReader.ReadToEnd())
+            ?? throw new JsonException($"Failed to deserialize compressed JSON to type {typeof(T).Name}. The deserialized value was null.");
     }
 
     private static T ConvertFromJson(string value)
     {
-        return JsonSerializer.Deserialize<T>(value)!;
+        return JsonSerializer.Deserialize<T>(value)
+            ?? throw new JsonException($"Failed to deserialize JSON to type {typeof(T).Name}. The deserialized value was null.");
     }
 }
