@@ -439,16 +439,23 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private async Task ProcessCommandLine()
     {
-        var args = Environment.GetCommandLineArgs();
-
-        foreach (var arg in args)
+        try
         {
-            switch (arg)
+            var args = Environment.GetCommandLineArgs();
+
+            foreach (var arg in args)
             {
-                case not null when arg.EndsWith(".evtx"):
-                    await OpenLog(arg, PathType.FilePath);
-                    break;
+                switch (arg)
+                {
+                    case not null when arg.EndsWith(".evtx"):
+                        await OpenLog(arg, PathType.FilePath);
+                        break;
+                }
             }
+        }
+        catch (Exception e)
+        {
+            _traceLogger.Trace($"Failed to process command line arguments: {e}", LogLevel.Error);
         }
     }
 

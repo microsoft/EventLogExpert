@@ -17,7 +17,7 @@ namespace EventLogExpert.Shared.Components;
 public sealed partial class SettingsModal
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
-    
+
     private CopyType _copyType;
     private bool _databaseRemoved = false;
     private bool _isPreReleaseEnabled;
@@ -38,6 +38,8 @@ public sealed partial class SettingsModal
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
+    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+
     protected internal override async Task Close()
     {
         if (_databaseRemoved)
@@ -56,7 +58,7 @@ public sealed partial class SettingsModal
 
     protected override void OnInitialized()
     {
-        Settings.Loaded += () => InvokeAsync(Load);
+        Settings.Loaded += OnSettingsLoaded;
 
         base.OnInitialized();
     }
@@ -149,6 +151,18 @@ public sealed partial class SettingsModal
         await InvokeAsync(StateHasChanged);
 
         await Open();
+    }
+
+    private async void OnSettingsLoaded()
+    {
+        try
+        {
+            await InvokeAsync(Load);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to load settings modal: {e}", LogLevel.Error);
+        }
     }
 
     private async Task ReloadOpenLogs()

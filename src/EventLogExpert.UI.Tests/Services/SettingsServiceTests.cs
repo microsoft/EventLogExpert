@@ -247,7 +247,7 @@ public sealed class SettingsServiceTests
         var settingsService = CreateSettingsService();
 
         var eventInvoked = false;
-        settingsService.Loaded = () => eventInvoked = true;
+        settingsService.Loaded += () => eventInvoked = true;
 
         // Act
         settingsService.Load();
@@ -257,14 +257,13 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void Load_WhenLoadedIsNull_ShouldNotThrow()
+    public void Load_WhenNoSubscribers_ShouldNotThrow()
     {
         // Arrange
         var settingsService = CreateSettingsService();
-        settingsService.Loaded = null;
 
-        // Act
-        var exception = Record.Exception(() => settingsService.Load());
+        // Act - no subscribers attached
+        var exception = Record.Exception(settingsService.Load);
 
         // Assert
         Assert.Null(exception);

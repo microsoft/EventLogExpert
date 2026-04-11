@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Interfaces;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Shared.Components;
 
@@ -21,7 +22,7 @@ public partial class DebugLogModal
 
     protected override void OnInitialized()
     {
-        TraceLogger.DebugLogLoaded += () => InvokeAsync(Open);
+        TraceLogger.DebugLogLoaded += OnDebugLogLoaded;
 
         base.OnInitialized();
     }
@@ -33,6 +34,18 @@ public partial class DebugLogModal
         await TraceLogger.ClearAsync();
 
         StateHasChanged();
+    }
+
+    private async void OnDebugLogLoaded()
+    {
+        try
+        {
+            await InvokeAsync(Open);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to open debug log modal: {e}", LogLevel.Error);
+        }
     }
 
     private async Task Refresh()

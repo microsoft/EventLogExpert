@@ -1,11 +1,13 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -21,9 +23,11 @@ public sealed partial class FilterGroupModal
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
+    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+
     protected override void OnInitialized()
     {
-        SubscribeToAction<FilterGroupAction.OpenMenu>(action => InvokeAsync(Open));
+        SubscribeToAction<FilterGroupAction.OpenMenu>(OnOpenMenu);
 
         base.OnInitialized();
     }
@@ -97,6 +101,18 @@ public sealed partial class FilterGroupModal
             await AlertDialogService.ShowAlert("Import Failed",
                 $"An exception occurred while importing groups: {ex.Message}",
                 "OK");
+        }
+    }
+
+    private async void OnOpenMenu(FilterGroupAction.OpenMenu action)
+    {
+        try
+        {
+            await InvokeAsync(Open);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Trace($"Failed to open filter group modal: {e}", LogLevel.Error);
         }
     }
 }

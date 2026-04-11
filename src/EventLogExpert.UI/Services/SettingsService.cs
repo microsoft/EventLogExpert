@@ -53,7 +53,7 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
         }
     }
 
-    public Action? Loaded { get; set; }
+    public event Action? Loaded;
 
     public LogLevel LogLevel
     {

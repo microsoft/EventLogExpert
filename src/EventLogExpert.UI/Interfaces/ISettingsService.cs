@@ -13,7 +13,7 @@ public interface ISettingsService
 
     bool IsPreReleaseEnabled { get; set; }
 
-    Action? Loaded { get; set; }
+    event Action? Loaded;
 
     LogLevel LogLevel { get; set; }
 
