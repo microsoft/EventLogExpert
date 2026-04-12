@@ -29,14 +29,14 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
     {
         ArgumentNullException.ThrowIfNull(dbCollection);
 
-        logger?.Trace($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
+        Logger?.Trace($"{nameof(EventProviderDatabaseEventResolver)} was instantiated at:\n{Environment.StackTrace}");
 
         LoadDatabases(dbCollection.ActiveDatabases);
     }
 
     protected override void Dispose(bool disposing)
     {
-        if (!disposing || disposed) { return; }
+        if (!disposing) { return; }
 
         ImmutableArray<EventProviderDbContext> contextsToDispose;
 
@@ -44,8 +44,8 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
         // This ensures the lock is always released even if an exception occurs.
         using (_databaseAccessLock.EnterScope())
         {
-            // Double-check disposed after acquiring lock for thread safety
-            if (disposed)
+            // Check if already disposed
+            if (IsDisposed)
             {
                 return;
             }
@@ -55,11 +55,6 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
             // The lock synchronizes with ResolveProviderDetails to prevent use-after-dispose.
             contextsToDispose = _dbContexts;
             _dbContexts = [];
-
-            // Set disposed inside the lock before releasing it.
-            // This prevents other threads from acquiring the lock and passing the disposed check,
-            // reducing unnecessary lock contention.
-            disposed = true;
         }
 
         // Dispose contexts outside the lock to minimize lock hold time.
@@ -69,33 +64,32 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
             context.Dispose();
         }
 
-        // Call base to dispose providerDetailsLock.
-        // Base.Dispose() is idempotent (checks disposed flag which we already set).
+        // Call base to dispose providerDetailsLock and set IsDisposed flag.
         base.Dispose(disposing);
     }
 
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
-        providerDetailsLock.EnterUpgradeableReadLock();
+        ProviderDetailsLock.EnterUpgradeableReadLock();
 
         try
         {
             // Early disposed check for fail-fast behavior. This is a defensive check only;
             // the authoritative check is inside _databaseAccessLock below.
             // A race window exists here, but it's handled by the check inside the lock.
-            ObjectDisposedException.ThrowIf(disposed, nameof(EventProviderDatabaseEventResolver));
+            ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
 
-            if (providerDetails.ContainsKey(eventRecord.ProviderName))
+            if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
             {
                 return;
             }
 
-            providerDetailsLock.EnterWriteLock();
+            ProviderDetailsLock.EnterWriteLock();
 
             try
             {
                 // Double-check after acquiring write lock - another thread may have added this provider
-                if (providerDetails.ContainsKey(eventRecord.ProviderName))
+                if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
                 {
                     return;
                 }
@@ -105,7 +99,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
                 {
                     // Check disposed inside the database lock to prevent race with Dispose().
                     // This ensures we don't proceed if Dispose() has swapped out _dbContexts.
-                    ObjectDisposedException.ThrowIf(disposed, nameof(EventProviderDatabaseEventResolver));
+                    ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
 
                     foreach (var dbContext in _dbContexts)
                     {
@@ -119,8 +113,8 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
                         if (details is null) { continue; }
 
-                        logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
-                        providerDetails.TryAdd(eventRecord.ProviderName, details);
+                        Logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
+                        ProviderDetails.TryAdd(eventRecord.ProviderName, details);
 
                         // Exit after first match - databases are sorted by priority (SortDatabases),
                         // so the first database containing the provider is the preferred source.
@@ -131,17 +125,17 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
             }
             finally
             {
-                providerDetailsLock.ExitWriteLock();
+                ProviderDetailsLock.ExitWriteLock();
             }
 
-            if (!providerDetails.ContainsKey(eventRecord.ProviderName))
+            if (!ProviderDetails.ContainsKey(eventRecord.ProviderName))
             {
-                providerDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
+                ProviderDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
             }
         }
         finally
         {
-            providerDetailsLock.ExitUpgradeableReadLock();
+            ProviderDetailsLock.ExitUpgradeableReadLock();
         }
     }
 
@@ -213,11 +207,11 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        logger?.Trace($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
+        Logger?.Trace($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
 
         foreach (var databasePath in databasePaths)
         {
-            logger?.Trace($"  {databasePath}");
+            Logger?.Trace($"  {databasePath}");
         }
 
         foreach (var context in _dbContexts)
@@ -238,7 +232,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
                 throw new FileNotFoundException(file);
             }
 
-            var c = new EventProviderDbContext(file, readOnly: true, logger);
+            var c = new EventProviderDbContext(file, readOnly: true, Logger);
             var (needsv2, needsv3) = c.IsUpgradeNeeded();
             if (needsv2 || needsv3)
             {

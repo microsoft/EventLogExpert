@@ -48,20 +48,24 @@ public partial class EventResolverBase : IDisposable
         { 0x80000000000000, "Classic" }
     };
 
-    protected readonly ITraceLogger? logger;
-    protected readonly ConcurrentDictionary<string, ProviderDetails?> providerDetails = new();
-    protected readonly ReaderWriterLockSlim providerDetailsLock = new();
-
-    protected volatile bool disposed;
+    protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails = new();
+    protected readonly ReaderWriterLockSlim ProviderDetailsLock = new();
 
     private readonly IEventResolverCache? _cache;
+    private readonly ITraceLogger? _logger;
     private readonly Regex _sectionsToReplace = WildcardWithNumberRegex();
+
+    private int _disposed;
 
     protected EventResolverBase(IEventResolverCache? cache = null, ITraceLogger? logger = null)
     {
         _cache = cache;
-        this.logger = logger;
+        _logger = logger;
     }
+
+    protected bool IsDisposed => Volatile.Read(ref _disposed) != 0;
+
+    protected ITraceLogger? Logger => _logger;
 
     public void Dispose()
     {
@@ -71,7 +75,7 @@ public partial class EventResolverBase : IDisposable
 
     public virtual DisplayEventModel ResolveEvent(EventRecord eventRecord)
     {
-        ObjectDisposedException.ThrowIf(disposed, this);
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
 
         var keywords = GetKeywordsFromBitmask(eventRecord);
 
@@ -98,9 +102,14 @@ public partial class EventResolverBase : IDisposable
 
     protected virtual void Dispose(bool disposing)
     {
-        if (!disposing || disposed) { return; }
+        if (!disposing) { return; }
 
-        disposed = true;
+        // Use Interlocked.CompareExchange for atomic check-and-set.
+        // Only one thread will successfully change _disposed from 0 to 1.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed by another thread
+        }
 
         // Attempt to dispose the lock to avoid leaking wait handles.
         // If other threads are still waiting to acquire the lock (rare race condition),
@@ -110,7 +119,7 @@ public partial class EventResolverBase : IDisposable
         // extremely rare concurrent disposal scenario rather than crash the application.
         try
         {
-            providerDetailsLock.Dispose();
+            ProviderDetailsLock.Dispose();
         }
         catch (SynchronizationLockException)
         {
@@ -120,8 +129,7 @@ public partial class EventResolverBase : IDisposable
         }
         catch (ObjectDisposedException)
         {
-            // Lock was already disposed. This can happen in race conditions with concurrent disposal.
-            // Safe to ignore since the resource is already cleaned up.
+            // Lock has already been disposed by another thread. Suppress to ensure disposal never throws.
         }
     }
 
@@ -297,46 +305,6 @@ public partial class EventResolverBase : IDisposable
         return providers;
     }
 
-    private static EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
-    {
-        if (eventRecord is { Version: null, LogName: null })
-        {
-            return null;
-        }
-
-        int eventPropertyCount = eventRecord.Properties?.Count() ?? 0;
-
-        EventModel? modernEvent = details.Events
-            .FirstOrDefault(e => e.Id == eventRecord.Id &&
-                e.Version == eventRecord.Version &&
-                e.LogName == eventRecord.LogName);
-
-        if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
-        {
-            return modernEvent;
-        }
-
-        foreach (var @event in details.Events.Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName))
-        {
-            if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
-            {
-                return @event;
-            }
-        }
-
-        // Try again forcing the long to a short and with no log name.
-        // This is needed for providers such as Microsoft-Windows-Complus
-        foreach (var @event in details.Events.Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version))
-        {
-            if (DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount))
-            {
-                return @event;
-            }
-        }
-
-        return null;
-    }
-
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
     {
         char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
@@ -405,7 +373,8 @@ public partial class EventResolverBase : IDisposable
                 {
                     if (propIndex - 1 >= properties.Count)
                     {
-                        logger?.Trace($"{nameof(FormatDescription)}: Number of event properties does not match the description template", LogLevel.Warning);
+                        Logger?.Trace($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}",
+                            LogLevel.Warning);
 
                         return DefaultFailedDescription;
                     }
@@ -464,7 +433,8 @@ public partial class EventResolverBase : IDisposable
         }
         catch (InvalidOperationException ex)
         {
-            logger?.Trace($"{nameof(FormatDescription)}: Invalid operation exception was caught: {ex}", LogLevel.Warning);
+            Logger?.Trace($"{nameof(FormatDescription)}: InvalidOperationException - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex.Message}",
+                LogLevel.Warning);
 
             // If the regex fails to match, then we just return the original description.
             returnDescription = description.ToString();
@@ -473,7 +443,8 @@ public partial class EventResolverBase : IDisposable
         }
         catch (Exception ex)
         {
-            logger?.Trace($"{nameof(FormatDescription)}: Exception was caught: {ex}", LogLevel.Warning);
+            Logger?.Trace($"{nameof(FormatDescription)}: Unexpected exception - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex}",
+                LogLevel.Warning);
 
             return DefaultFailedDescription;
         }
@@ -498,7 +469,7 @@ public partial class EventResolverBase : IDisposable
             }
         }
 
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
         {
             return returnValue;
         }
@@ -522,11 +493,75 @@ public partial class EventResolverBase : IDisposable
         return returnValue;
     }
 
+    private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
+    {
+        if (eventRecord is { Version: null, LogName: null })
+        {
+            Logger?.Trace($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and LogName",
+                LogLevel.Debug);
+
+            return null;
+        }
+
+        int eventPropertyCount = eventRecord.Properties.Count;
+
+        EventModel? modernEvent = details.Events
+            .FirstOrDefault(e => e.Id == eventRecord.Id &&
+                e.Version == eventRecord.Version &&
+                e.LogName == eventRecord.LogName);
+
+        if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
+        {
+            Logger?.Trace($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}",
+                LogLevel.Debug);
+
+            return modernEvent;
+        }
+
+        if (modernEvent is not null)
+        {
+            Logger?.Trace($"{nameof(GetModernEvent)}: Exact match found but template property count mismatch - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}",
+                LogLevel.Debug);
+        }
+
+        foreach (var @event in details.Events.Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName))
+        {
+            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+
+            Logger?.Trace($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}",
+                LogLevel.Debug);
+
+            return @event;
+        }
+
+        // Try again forcing the long to a short and with no log name.
+        // This is needed for providers such as Microsoft-Windows-Complus
+        foreach (var @event in details.Events.Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version))
+        {
+            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+
+            Logger?.Trace($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}",
+                LogLevel.Debug);
+
+            return @event;
+        }
+
+        var candidateCount = details.Events.Count(e => e.Id == eventRecord.Id);
+
+        Logger?.Trace($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateCount}",
+            LogLevel.Debug);
+
+        return null;
+    }
+
     /// <summary>Resolve event descriptions from an event record.</summary>
     private string ResolveDescription(EventRecord eventRecord)
     {
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
         {
+            Logger?.Trace($"{nameof(ResolveDescription)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}",
+                LogLevel.Debug);
+
             return DefaultNoProviderDescription;
         }
 
@@ -535,6 +570,9 @@ public partial class EventResolverBase : IDisposable
 
         if (!string.IsNullOrEmpty(@event?.Description))
         {
+            Logger?.Trace($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
+                LogLevel.Debug);
+
             return FormatDescription(properties, @event?.Description, details.Parameters);
         }
 
@@ -543,14 +581,29 @@ public partial class EventResolverBase : IDisposable
 
         if (legacyMessage.Count == 1)
         {
+            Logger?.Trace($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
+                LogLevel.Debug);
+
             return FormatDescription(properties, legacyMessage.First().Text, details.Parameters);
+        }
+
+        if (legacyMessage.Count > 1)
+        {
+            Logger?.Trace($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessage.Count}",
+                LogLevel.Debug);
         }
 
         // Some events store the description in the event properties
         if (properties.Count > 0)
         {
+            Logger?.Trace($"{nameof(ResolveDescription)}: Using property-based description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
+                LogLevel.Debug);
+
             return FormatDescription(properties, null, details.Parameters);
         }
+
+        Logger?.Trace($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}",
+            LogLevel.Debug);
 
         return DefaultNoMatchingDescription;
     }
@@ -558,7 +611,7 @@ public partial class EventResolverBase : IDisposable
     /// <summary>Resolve event task names from an event record.</summary>
     private string ResolveTaskName(EventRecord eventRecord)
     {
-        if (!providerDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
         {
             return string.Empty;
         }
@@ -594,11 +647,11 @@ public partial class EventResolverBase : IDisposable
 
             if (potentialTaskNames.Count > 1)
             {
-                logger?.Trace("More than one matching task ID was found.");
-                logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
-                logger?.Trace("   Potential matches:");
+                Logger?.Trace("More than one matching task ID was found.");
+                Logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
+                Logger?.Trace("   Potential matches:");
 
-                potentialTaskNames.ForEach(t => logger?.Trace($"    {t.LogLink} {t.Text}"));
+                potentialTaskNames.ForEach(t => Logger?.Trace($"    {t.LogLink} {t.Text}"));
             }
         }
         else
@@ -607,6 +660,7 @@ public partial class EventResolverBase : IDisposable
         }
 
         taskName = taskName.TrimEnd('\0');
+
         return _cache?.GetOrAddValue(taskName) ?? taskName;
     }
 }

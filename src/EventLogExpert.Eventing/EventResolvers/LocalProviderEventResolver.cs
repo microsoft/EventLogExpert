@@ -8,41 +8,43 @@ using EventLogExpert.Eventing.Providers;
 namespace EventLogExpert.Eventing.EventResolvers;
 
 /// <summary>
-///     Resolves event descriptions by using our own logic to look up
-///     message strings in the providers available on the local machine.
+///     Resolves event descriptions by using our own logic to look up message strings in the providers available on
+///     the local machine.
 /// </summary>
-internal sealed class LocalProviderEventResolver(IEventResolverCache? cache = null, ITraceLogger? logger = null)
-    : EventResolverBase(cache, logger), IEventResolver
+internal sealed class LocalProviderEventResolver : EventResolverBase, IEventResolver
 {
+    internal LocalProviderEventResolver(IEventResolverCache? cache = null, ITraceLogger? logger = null)
+        : base(cache, logger) { }
+
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
-        providerDetailsLock.EnterUpgradeableReadLock();
+        ProviderDetailsLock.EnterUpgradeableReadLock();
 
         try
         {
-            ObjectDisposedException.ThrowIf(disposed, nameof(LocalProviderEventResolver));
+            ObjectDisposedException.ThrowIf(IsDisposed, nameof(LocalProviderEventResolver));
 
-            if (providerDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+            if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-            providerDetailsLock.EnterWriteLock();
+            ProviderDetailsLock.EnterWriteLock();
 
             try
             {
                 // Double-check in case another thread added the provider details while we were waiting.
-                if (providerDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+                if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-                var details = new EventMessageProvider(eventRecord.ProviderName, logger).LoadProviderDetails();
+                var details = new EventMessageProvider(eventRecord.ProviderName, Logger).LoadProviderDetails();
 
-                providerDetails.TryAdd(eventRecord.ProviderName, details);
+                ProviderDetails.TryAdd(eventRecord.ProviderName, details);
             }
             finally
             {
-                providerDetailsLock.ExitWriteLock();
+                ProviderDetailsLock.ExitWriteLock();
             }
         }
         finally
         {
-            providerDetailsLock.ExitUpgradeableReadLock();
+            ProviderDetailsLock.ExitUpgradeableReadLock();
         }
     }
 }

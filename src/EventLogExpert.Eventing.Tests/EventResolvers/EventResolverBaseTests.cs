@@ -171,45 +171,6 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithTrailingPercentN_ShouldNotThrowIndexOutOfRange()
-    {
-        // Arrange
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 1001,
-                    Text = "Message ends with newline%n"
-                }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1001,
-            Properties = []
-        };
-
-        // Act - should not throw IndexOutOfRangeException
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.EndsWith("\r\n", displayEvent.Description);
-    }
-
-    [Fact]
     public void ResolveEvent_WithHexPropertyType_ShouldFormatAsHex()
     {
         // Arrange
@@ -736,6 +697,45 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithTrailingPercentN_ShouldNotThrowIndexOutOfRange()
+    {
+        // Arrange
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1001,
+                    Text = "Message ends with newline%n"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1001,
+            Properties = []
+        };
+
+        // Act - should not throw IndexOutOfRangeException
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.EndsWith("\r\n", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithXmlProperty_ShouldPreserveXml()
     {
         // Arrange
@@ -790,19 +790,19 @@ public sealed class EventResolverBaseTests
             ITraceLogger? logger = null)
             : base(cache, logger)
         {
-            providerDetailsList.ForEach(p => providerDetails.TryAdd(p.ProviderName, p));
+            providerDetailsList.ForEach(p => ProviderDetails.TryAdd(p.ProviderName, p));
         }
 
-        public ConcurrentDictionary<string, ProviderDetails?> GetProviderDetails() => providerDetails;
+        public ConcurrentDictionary<string, ProviderDetails?> GetProviderDetails() => ProviderDetails;
 
         public void ResolveProviderDetails(EventRecord eventRecord)
         {
-            if (providerDetails.ContainsKey(eventRecord.ProviderName))
+            if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
             {
                 return;
             }
 
-            providerDetails.TryAdd(eventRecord.ProviderName, null);
+            ProviderDetails.TryAdd(eventRecord.ProviderName, null);
         }
     }
 }

@@ -15,6 +15,7 @@ public sealed partial class EventLogWatcher : IDisposable
     private readonly EvtHandle _queryHandle;
     private readonly bool _renderXml;
 
+    private int _disposed;
     private bool _isSubscribed;
     private EvtHandle _subscriptionHandle = EvtHandle.Zero;
     private RegisteredWaitHandle? _waitHandle;
@@ -74,6 +75,13 @@ public sealed partial class EventLogWatcher : IDisposable
 
     private void Dispose(bool disposing)
     {
+        // Use Interlocked.CompareExchange for atomic check-and-set.
+        // Only one thread will successfully change _disposed from 0 to 1.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed by another thread
+        }
+
         if (disposing)
         {
             Unsubscribe();
