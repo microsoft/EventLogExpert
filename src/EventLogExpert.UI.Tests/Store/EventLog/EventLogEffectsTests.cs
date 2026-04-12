@@ -32,10 +32,7 @@ public sealed class EventLogEffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var (effects, mockDispatcher) = CreateEffects(
-            false,
-            activeLogs,
-            existingBuffer);
+        var (effects, mockDispatcher) = CreateEffects(false, activeLogs, existingBuffer);
 
         var newEvent = EventUtils.CreateTestEvent(1000, logName: Constants.LogNameTestLog);
         var action = new EventLogAction.AddEvent(newEvent);
@@ -145,11 +142,10 @@ public sealed class EventLogEffectsTests
     public async Task HandleLoadEvents_ShouldFilterAndDispatchUpdateTable()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
-        {
+        var events = ImmutableArray.Create(
             EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
             EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
-        };
+        );
 
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
         var (effects, mockDispatcher, _, _, mockFilterService) = CreateEffectsWithServices();

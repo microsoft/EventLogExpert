@@ -599,8 +599,8 @@ public partial class EventResolverBase : IDisposable
             return FormatDescription(properties, modernEvent?.Description, details.Parameters);
         }
 
-        // Legacy provider message lookup using indexed dictionary
-        var legacyMessages = details.GetMessagesByShortId((short)eventRecord.Id);
+        // Legacy provider message lookup
+        var legacyMessages = details.GetMessagesByShortId(eventRecord.Id);
 
         if (legacyMessages.Count == 1)
         {
@@ -658,8 +658,7 @@ public partial class EventResolverBase : IDisposable
             return _cache?.GetOrAddValue(taskName) ?? taskName;
         }
 
-        // Use indexed lookup instead of linear scan with .ToList()
-        var messagesByShortId = details.GetMessagesByShortId((short)eventRecord.Task);
+        var messagesByShortId = details.GetMessagesByShortId(eventRecord.Task.Value);
 
         List<MessageModel>? potentialTaskNames = null;
 

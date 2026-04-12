@@ -20,7 +20,7 @@ public sealed record EventLogAction
 
     public sealed record CloseLog(EventLogId LogId, string LogName);
 
-    public sealed record LoadEvents(EventLogData LogData, IReadOnlyList<DisplayEventModel> Events);
+    public sealed record LoadEvents(EventLogData LogData, ImmutableArray<DisplayEventModel> Events);
 
     public sealed record LoadNewEvents;
 
