@@ -371,7 +371,15 @@ public partial class EventResolverBase : IDisposable
 
                 if (!propString.StartsWith("%%") && int.TryParse(propString.Trim(['{', '}', '%']), out var propIndex))
                 {
-                    if (propIndex - 1 >= properties.Count)
+                    // %0 is a Windows Event Log message terminator - skip it entirely
+                    if (propIndex == 0)
+                    {
+                        lastIndex = match.Index + match.Length;
+
+                        continue;
+                    }
+
+                    if (propIndex > properties.Count)
                     {
                         Logger?.Trace($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}",
                             LogLevel.Warning);
