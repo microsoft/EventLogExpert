@@ -244,7 +244,7 @@ public sealed class EventMessageProvider
             _logger?.Trace($"Failed to load Tasks for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
-        _logger?.Trace($"Returning {provider.Events.Count()} events for provider {_providerName}");
+        _logger?.Trace($"Returning {provider.Events.Count} events for provider {_providerName}");
 
         return provider;
     }

@@ -70,15 +70,18 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
+
+        // Fast path: ConcurrentDictionary is thread-safe for reads, so we can check
+        // without any lock. This avoids serializing all 8 parallel reader threads on
+        // the UpgradeableReadLock for providers that are already cached.
+        if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+
         ProviderDetailsLock.EnterUpgradeableReadLock();
 
         try
         {
-            // Early disposed check for fail-fast behavior. This is a defensive check only;
-            // the authoritative check is inside _databaseAccessLock below.
-            // A race window exists here, but it's handled by the check inside the lock.
-            ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
-
+            // Re-check after acquiring lock - another thread may have added this provider
             if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
             {
                 return;
@@ -88,7 +91,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
             try
             {
-                // Double-check after acquiring write lock - another thread may have added this provider
+                // Triple-check after acquiring write lock
                 if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
                 {
                     return;

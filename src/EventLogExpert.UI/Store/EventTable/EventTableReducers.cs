@@ -73,8 +73,10 @@ public sealed class EventTableReducers
                 var combinedTable = new EventTableModel(EventLogId.Create())
                 {
                     IsCombined = true,
-                    DisplayedEvents = GetCombinedEvents(updatedTables.Select(log => log.DisplayedEvents))
-                        .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
+                    DisplayedEvents = GetCombinedEvents(
+                        updatedTables.Select(log => log.DisplayedEvents),
+                        state.OrderBy ?? ColumnName.DateAndTime,
+                        state.IsDescending)
                 };
 
                 return state with
@@ -149,8 +151,9 @@ public sealed class EventTableReducers
                     DisplayedEvents = GetCombinedEvents(
                             state.EventTables
                                 .Where(table => !table.IsCombined)
-                                .Select(table => table.DisplayedEvents))
-                        .SortEvents(state.OrderBy ?? ColumnName.DateAndTime, state.IsDescending)
+                                .Select(table => table.DisplayedEvents),
+                            state.OrderBy ?? ColumnName.DateAndTime,
+                            state.IsDescending)
                 })
         };
     }
@@ -198,7 +201,9 @@ public sealed class EventTableReducers
     }
 
     private static List<DisplayEventModel> GetCombinedEvents(
-        IEnumerable<IEnumerable<DisplayEventModel>> eventLists)
+        IEnumerable<IEnumerable<DisplayEventModel>> eventLists,
+        ColumnName? orderBy = null,
+        bool isDescending = false)
     {
         List<DisplayEventModel> combinedEvents = [];
 
@@ -206,6 +211,9 @@ public sealed class EventTableReducers
         {
             combinedEvents.AddRange(eventList);
         }
+
+        // Sort in-place instead of creating a new list
+        combinedEvents.Sort(FilterMethods.GetComparer(orderBy, isDescending));
 
         return combinedEvents;
     }
