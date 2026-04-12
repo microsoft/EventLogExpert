@@ -13,20 +13,23 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
     private readonly EvtHandle _handle =
         EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
 
-    private bool _disposed;
+    private int _disposed;
 
     public string? LastBookmark { get; private set; }
 
     public void Dispose()
     {
-        if (_disposed) { return; }
+        // Use Interlocked.CompareExchange for atomic check-and-set.
+        // Only one thread will successfully change _disposed from 0 to 1.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
+        {
+            return; // Already disposed by another thread
+        }
 
         if (_handle is { IsInvalid: false })
         {
             _handle.Dispose();
         }
-
-        _disposed = true;
     }
 
     // Pre-Windows 11, a batch being returned can be maximum of (2 MB of data, batchSize count of events).
