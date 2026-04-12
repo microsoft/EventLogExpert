@@ -200,7 +200,7 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(
             new EventLogAction.LoadEvents(
                 logData,
-                events.OrderByDescending(e => e.RecordId).ToList()));
+                [.. events.OrderByDescending(e => e.RecordId)]));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 

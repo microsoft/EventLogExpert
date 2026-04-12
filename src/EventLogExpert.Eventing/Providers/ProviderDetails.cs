@@ -10,7 +10,7 @@ public class ProviderDetails
     private IReadOnlyList<EventModel> _events = [];
     private IReadOnlyList<MessageModel> _messages = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;
-    private Dictionary<short, List<MessageModel>>? _messagesByShortIdLookup;
+    private Dictionary<int, List<MessageModel>>? _messagesByShortIdLookup;
 
     public string ProviderName { get; set; } = string.Empty;
 
@@ -53,8 +53,10 @@ public class ProviderDetails
         return _eventsByIdLookup.TryGetValue(id, out var list) ? list : [];
     }
 
-    /// <summary>Gets messages matching the given ShortId using a pre-built lookup dictionary.</summary>
-    internal IReadOnlyList<MessageModel> GetMessagesByShortId(short shortId)
+    /// <summary>Gets messages matching the given ShortId using a pre-built lookup dictionary.
+    /// The lookup uses int keys to preserve the original implicit promotion semantics
+    /// when comparing ShortId (short) with event record Id/Task (ushort).</summary>
+    internal IReadOnlyList<MessageModel> GetMessagesByShortId(int shortId)
     {
         _messagesByShortIdLookup ??= BuildMessagesByShortIdLookup();
 
@@ -79,16 +81,18 @@ public class ProviderDetails
         return lookup;
     }
 
-    private Dictionary<short, List<MessageModel>> BuildMessagesByShortIdLookup()
+    private Dictionary<int, List<MessageModel>> BuildMessagesByShortIdLookup()
     {
-        var lookup = new Dictionary<short, List<MessageModel>>();
+        var lookup = new Dictionary<int, List<MessageModel>>();
 
         foreach (var m in _messages)
         {
-            if (!lookup.TryGetValue(m.ShortId, out var list))
+            int key = m.ShortId;
+
+            if (!lookup.TryGetValue(key, out var list))
             {
                 list = [];
-                lookup[m.ShortId] = list;
+                lookup[key] = list;
             }
 
             list.Add(m);

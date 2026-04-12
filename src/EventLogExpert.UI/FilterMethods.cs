@@ -78,9 +78,7 @@ public static class FilterMethods
 
     internal static Comparison<DisplayEventModel> GetComparer(ColumnName? orderBy, bool isDescending)
     {
-        // To reverse sort direction we swap operands (a,b) rather than negating the
-        // comparison result, because Compare/CompareTo may return arbitrary negative
-        // values (not just -1) and multiplying by -1 can overflow int.MinValue.
+        // To reverse sort direction we swap operands (a,b)
         Comparison<DisplayEventModel> comparer = orderBy switch
         {
             ColumnName.Level => (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b),
@@ -106,11 +104,10 @@ public static class FilterMethods
         return isDescending ? (a, b) => comparer(b, a) : comparer;
     }
 
-    /// <summary>Falls back to RecordId, then OwningLog and Id to guarantee a total order for List.Sort stability.</summary>
     private static int WithTieBreaker(int primaryResult, DisplayEventModel a, DisplayEventModel b) =>
         primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
 
-    /// <summary>Ensures distinct events never compare as equal so List.Sort (unstable) produces deterministic results.</summary>
+    /// <summary>Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.</summary>
     private static int FallbackTieBreaker(int recordIdResult, DisplayEventModel a, DisplayEventModel b) =>
         recordIdResult != 0 ? recordIdResult : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
 
