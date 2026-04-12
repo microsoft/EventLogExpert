@@ -961,6 +961,48 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void SortEvents_WhenTiedOnPrimaryKey_ShouldBreakTieByRecordId()
+    {
+        // Arrange - all events have the same TimeCreated but different RecordIds
+        var baseTime = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var events = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 3),
+            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 1),
+            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 2)
+        };
+
+        // Act
+        var result = events.SortEvents(ColumnName.DateAndTime);
+
+        // Assert - should be deterministic, ordered by RecordId ascending
+        Assert.Equal(1L, result[0].RecordId);
+        Assert.Equal(2L, result[1].RecordId);
+        Assert.Equal(3L, result[2].RecordId);
+    }
+
+    [Fact]
+    public void SortEvents_WhenTiedOnPrimaryKeyDescending_ShouldBreakTieByRecordIdDescending()
+    {
+        // Arrange
+        var events = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(id: 100, recordId: 1),
+            EventUtils.CreateTestEvent(id: 100, recordId: 3),
+            EventUtils.CreateTestEvent(id: 100, recordId: 2)
+        };
+
+        // Act
+        var result = events.SortEvents(ColumnName.EventId, true);
+
+        // Assert - tied on Id, should fall back to RecordId descending
+        Assert.Equal(3L, result[0].RecordId);
+        Assert.Equal(2L, result[1].RecordId);
+        Assert.Equal(1L, result[2].RecordId);
+    }
+
+    [Fact]
     public void SortEvents_WhenSingleItem_ShouldReturnSingleItem()
     {
         // Arrange

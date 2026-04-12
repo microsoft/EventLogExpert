@@ -18,19 +18,22 @@ internal sealed class LocalProviderEventResolver : EventResolverBase, IEventReso
 
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
+        ObjectDisposedException.ThrowIf(IsDisposed, nameof(LocalProviderEventResolver));
+
+        // Fast path: ConcurrentDictionary is thread-safe for reads
+        if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+
         ProviderDetailsLock.EnterUpgradeableReadLock();
 
         try
         {
-            ObjectDisposedException.ThrowIf(IsDisposed, nameof(LocalProviderEventResolver));
-
+            // Re-check after acquiring lock
             if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
             ProviderDetailsLock.EnterWriteLock();
 
             try
             {
-                // Double-check in case another thread added the provider details while we were waiting.
                 if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
                 var details = new EventMessageProvider(eventRecord.ProviderName, Logger).LoadProviderDetails();

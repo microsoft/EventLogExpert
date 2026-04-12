@@ -44,7 +44,7 @@ public sealed class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Messages)
-            .HasConversion<CompressedJsonValueConverter<IEnumerable<MessageModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IReadOnlyList<MessageModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Parameters)
@@ -52,7 +52,7 @@ public sealed class EventProviderDbContext : DbContext
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Events)
-            .HasConversion<CompressedJsonValueConverter<IEnumerable<EventModel>>>();
+            .HasConversion<CompressedJsonValueConverter<IReadOnlyList<EventModel>>>();
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Keywords)
@@ -137,8 +137,6 @@ public sealed class EventProviderDbContext : DbContext
                 };
                 allProviderDetails.Add(p);
             }
-
-            detailsReader.Close();
         }
         else
         {
@@ -156,9 +154,9 @@ public sealed class EventProviderDbContext : DbContext
                 };
                 allProviderDetails.Add(p);
             }
-
-            detailsReader.Close();
         }
+
+        detailsReader.Close();
 
         command.CommandText = "DROP TABLE \"ProviderDetails\"";
         command.ExecuteNonQuery();

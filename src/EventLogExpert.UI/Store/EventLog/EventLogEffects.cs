@@ -41,14 +41,11 @@ public sealed class EventLogEffects(
         // make sure the events being added are for a log that is still "open".
         if (!_eventLogState.Value.ActiveLogs.ContainsKey(action.NewEvent.OwningLog)) { return Task.CompletedTask; }
 
-        var newEvent = new[]
-        {
-            action.NewEvent
-        };
-
         if (_eventLogState.Value.ContinuouslyUpdate)
         {
-            var activeLogs = DistributeEventsToManyLogs(_eventLogState.Value.ActiveLogs, newEvent);
+            var activeLogs = DistributeEventsToManyLogs(
+                _eventLogState.Value.ActiveLogs,
+                [action.NewEvent]);
 
             var filteredActiveLogs = _filterService.FilterActiveLogs(activeLogs.Values, _eventLogState.Value.AppliedFilter);
 
@@ -57,7 +54,13 @@ public sealed class EventLogEffects(
         }
         else
         {
-            var updatedBuffer = newEvent.Concat(_eventLogState.Value.NewEventBuffer).ToList();
+            var updatedBuffer = new List<DisplayEventModel>(_eventLogState.Value.NewEventBuffer.Count + 1)
+            {
+                action.NewEvent
+            };
+
+            updatedBuffer.AddRange(_eventLogState.Value.NewEventBuffer);
+
             var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
             dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
@@ -197,7 +200,7 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(
             new EventLogAction.LoadEvents(
                 logData,
-                events.OrderByDescending(e => e.RecordId)));
+                events.OrderByDescending(e => e.RecordId).ToList()));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
@@ -231,29 +234,40 @@ public sealed class EventLogEffects(
     }
 
     /// <summary>Adds new events to the currently opened log</summary>
-    private static EventLogData AddEventsToOneLog(EventLogData logData, IEnumerable<DisplayEventModel> eventsToAdd)
+    private static EventLogData AddEventsToOneLog(EventLogData logData, List<DisplayEventModel> eventsToAdd)
     {
-        var newEvents = eventsToAdd.Concat(logData.Events).ToList();
+        eventsToAdd.AddRange(logData.Events);
 
-        var updatedLogData = logData with { Events = newEvents };
-
-        return updatedLogData;
+        return logData with { Events = eventsToAdd };
     }
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
         ImmutableDictionary<string, EventLogData> logsToUpdate,
         IEnumerable<DisplayEventModel> eventsToDistribute)
     {
+        // Group events by owning log once to avoid repeated enumeration
+        var eventsByLog = new Dictionary<string, List<DisplayEventModel>>();
+
+        foreach (var e in eventsToDistribute)
+        {
+            if (!logsToUpdate.ContainsKey(e.OwningLog)) { continue; }
+
+            if (!eventsByLog.TryGetValue(e.OwningLog, out var list))
+            {
+                list = [];
+                eventsByLog[e.OwningLog] = list;
+            }
+
+            list.Add(e);
+        }
+
         var newLogs = logsToUpdate;
 
-        foreach (var log in logsToUpdate.Values)
+        foreach (var (logName, newEvents) in eventsByLog)
         {
-            var newEventsForThisLog = eventsToDistribute.Where(e => e.OwningLog == log.Name);
-
-            if (!newEventsForThisLog.Any()) { continue; }
-
-            var newLogData = AddEventsToOneLog(log, newEventsForThisLog);
-            newLogs = newLogs.Remove(log.Name).Add(log.Name, newLogData);
+            var log = logsToUpdate[logName];
+            var newLogData = AddEventsToOneLog(log, newEvents);
+            newLogs = newLogs.SetItem(logName, newLogData);
         }
 
         return newLogs;
