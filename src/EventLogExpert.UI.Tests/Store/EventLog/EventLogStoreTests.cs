@@ -106,18 +106,14 @@ public sealed class EventLogStoreTests
         // Arrange
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
 
-        var events = new List<DisplayEventModel>
-        {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
-        };
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
 
         // Act
         var action = new EventLogAction.LoadEvents(logData, events);
 
         // Assert
         Assert.Equal(logData, action.LogData);
-        Assert.Equal(2, action.Events.Count());
+        Assert.Equal(2, action.Events.Length);
     }
 
     [Fact]
@@ -352,12 +348,11 @@ public sealed class EventLogStoreTests
 
         var logData = state.ActiveLogs[Constants.LogNameTestLog];
 
-        var events = new List<DisplayEventModel>
-        {
+        var events = ImmutableArray.Create(
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200),
             EventUtils.CreateTestEvent(300)
-        };
+        );
 
         // Act - Load events
         state = EventLogReducers.ReduceLoadEvents(state, new EventLogAction.LoadEvents(logData, events));
@@ -574,11 +569,7 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = new List<DisplayEventModel>
-        {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
-        };
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
 
         var action = new EventLogAction.LoadEvents(logData, events);
 
@@ -600,22 +591,19 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = new List<DisplayEventModel>
-        {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
-        };
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
 
         var action = new EventLogAction.LoadEvents(logData, events);
 
         // Act
         var newState = EventLogReducers.ReduceLoadEvents(state, action);
 
-        // Mutate the original list after state was created
-        events.Add(EventUtils.CreateTestEvent(300));
+        // ImmutableArray is inherently isolated — creating a new one doesn't affect the state
+        var extendedEvents = events.Add(EventUtils.CreateTestEvent(300));
 
-        // Assert - state should not reflect the mutation
+        // Assert - state should not reflect the extension
         Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
+        Assert.Equal(3, extendedEvents.Length);
     }
 
     [Fact]
