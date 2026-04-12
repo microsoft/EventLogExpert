@@ -79,11 +79,15 @@ public partial class EventResolverBase : IDisposable
 
         var keywords = GetKeywordsFromBitmask(eventRecord);
 
+        // Resolve the modern event once and reuse for both description and task name
+        ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details);
+        var modernEvent = details is not null ? GetModernEvent(eventRecord, details) : null;
+
         return new DisplayEventModel(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
-            Description = ResolveDescription(eventRecord),
+            Description = ResolveDescription(eventRecord, details, modernEvent),
             Id = eventRecord.Id,
             Keywords = keywords,
             KeywordsDisplayName = string.Join(", ", keywords),
@@ -92,7 +96,7 @@ public partial class EventResolverBase : IDisposable
             ProcessId = eventRecord.ProcessId,
             RecordId = eventRecord.RecordId,
             Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
-            TaskCategory = ResolveTaskName(eventRecord),
+            TaskCategory = ResolveTaskName(eventRecord, details, modernEvent),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
             UserId = eventRecord.UserId,
@@ -322,6 +326,7 @@ public partial class EventResolverBase : IDisposable
         IEnumerable<MessageModel> parameters)
     {
         string returnDescription;
+
         if (string.IsNullOrWhiteSpace(descriptionTemplate))
         {
             // If there is only one property then this is what certain EventRecords look like
@@ -470,11 +475,10 @@ public partial class EventResolverBase : IDisposable
 
         foreach (var k in s_standardKeywords.Keys)
         {
-            if ((eventRecord.Keywords.Value & k) == k)
-            {
-                var keyword = s_standardKeywords[k].TrimEnd('\0');
-                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
-            }
+            if ((eventRecord.Keywords.Value & k) != k) { continue; }
+
+            var keyword = s_standardKeywords[k].TrimEnd('\0');
+            returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
         }
 
         if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
@@ -486,18 +490,16 @@ public partial class EventResolverBase : IDisposable
         // so let's skip those.
         var lower32 = eventRecord.Keywords.Value & 0xFFFFFFFF;
 
-        if (lower32 != 0)
+        if (lower32 == 0) { return returnValue; }
+        
+        foreach (var k in details.Keywords.Keys)
         {
-            foreach (var k in details.Keywords.Keys)
-            {
-                if ((lower32 & k) == k)
-                {
-                    var keyword = details.Keywords[k].TrimEnd('\0');
-                    returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
-                }
-            }
-        }
+            if ((lower32 & k) != k) { continue; }
 
+            var keyword = details.Keywords[k].TrimEnd('\0');
+            returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+        }
+        
         return returnValue;
     }
 
@@ -513,10 +515,22 @@ public partial class EventResolverBase : IDisposable
 
         int eventPropertyCount = eventRecord.Properties.Count;
 
-        EventModel? modernEvent = details.Events
-            .FirstOrDefault(e => e.Id == eventRecord.Id &&
-                e.Version == eventRecord.Version &&
-                e.LogName == eventRecord.LogName);
+        // Use indexed lookup instead of linear scan
+        var candidateEvents = details.GetEventsById(eventRecord.Id);
+
+        EventModel? modernEvent = null;
+
+        foreach (var e in candidateEvents)
+        {
+            if (e.Id != eventRecord.Id || e.Version != eventRecord.Version || e.LogName != eventRecord.LogName)
+            {
+                continue;
+            }
+
+            modernEvent = e;
+
+            break;
+        }
 
         if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
         {
@@ -532,8 +546,10 @@ public partial class EventResolverBase : IDisposable
                 LogLevel.Debug);
         }
 
-        foreach (var @event in details.Events.Where(e => e.Id == eventRecord.Id && e.LogName == eventRecord.LogName))
+        foreach (var @event in candidateEvents)
         {
+            if (@event.LogName != eventRecord.LogName) { continue; }
+
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             Logger?.Trace($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}",
@@ -544,8 +560,10 @@ public partial class EventResolverBase : IDisposable
 
         // Try again forcing the long to a short and with no log name.
         // This is needed for providers such as Microsoft-Windows-Complus
-        foreach (var @event in details.Events.Where(e => (short)e.Id == eventRecord.Id && e.Version == eventRecord.Version))
+        foreach (var @event in details.Events)
         {
+            if ((short)@event.Id != eventRecord.Id || @event.Version != eventRecord.Version) { continue; }
+
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             Logger?.Trace($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}",
@@ -554,18 +572,16 @@ public partial class EventResolverBase : IDisposable
             return @event;
         }
 
-        var candidateCount = details.Events.Count(e => e.Id == eventRecord.Id);
-
-        Logger?.Trace($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateCount}",
+        Logger?.Trace($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}",
             LogLevel.Debug);
 
         return null;
     }
 
     /// <summary>Resolve event descriptions from an event record.</summary>
-    private string ResolveDescription(EventRecord eventRecord)
+    private string ResolveDescription(EventRecord eventRecord, ProviderDetails? details, EventModel? modernEvent)
     {
-        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        if (details is null)
         {
             Logger?.Trace($"{nameof(ResolveDescription)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}",
                 LogLevel.Debug);
@@ -573,31 +589,30 @@ public partial class EventResolverBase : IDisposable
             return DefaultNoProviderDescription;
         }
 
-        var @event = GetModernEvent(eventRecord, details);
-        var properties = GetFormattedProperties(@event?.Template, eventRecord.Properties);
+        var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties);
 
-        if (!string.IsNullOrEmpty(@event?.Description))
+        if (!string.IsNullOrEmpty(modernEvent?.Description))
         {
             Logger?.Trace($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
                 LogLevel.Debug);
 
-            return FormatDescription(properties, @event?.Description, details.Parameters);
+            return FormatDescription(properties, modernEvent?.Description, details.Parameters);
         }
 
-        // Legacy provider message lookup, if there is multiple messages then move on so we don't show wrong description
-        var legacyMessage = details.Messages.Where(m => m.ShortId == eventRecord.Id).ToList();
+        // Legacy provider message lookup using indexed dictionary
+        var legacyMessages = details.GetMessagesByShortId((short)eventRecord.Id);
 
-        if (legacyMessage.Count == 1)
+        if (legacyMessages.Count == 1)
         {
             Logger?.Trace($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
                 LogLevel.Debug);
 
-            return FormatDescription(properties, legacyMessage.First().Text, details.Parameters);
+            return FormatDescription(properties, legacyMessages[0].Text, details.Parameters);
         }
 
-        if (legacyMessage.Count > 1)
+        if (legacyMessages.Count > 1)
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessage.Count}",
+            Logger?.Trace($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}",
                 LogLevel.Debug);
         }
 
@@ -617,16 +632,14 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>Resolve event task names from an event record.</summary>
-    private string ResolveTaskName(EventRecord eventRecord)
+    private string ResolveTaskName(EventRecord eventRecord, ProviderDetails? details, EventModel? modernEvent)
     {
-        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
+        if (details is null)
         {
             return string.Empty;
         }
 
-        var @event = GetModernEvent(eventRecord, details);
-
-        if (@event?.Task is not null && details.Tasks.TryGetValue(@event.Task, out var taskName))
+        if (modernEvent?.Task is not null && details.Tasks.TryGetValue(modernEvent.Task, out var taskName))
         {
             taskName = taskName.TrimEnd('\0');
             return _cache?.GetOrAddValue(taskName) ?? taskName;
@@ -645,9 +658,18 @@ public partial class EventResolverBase : IDisposable
             return _cache?.GetOrAddValue(taskName) ?? taskName;
         }
 
-        var potentialTaskNames = details.Messages
-            .Where(m => m.ShortId == eventRecord.Task && m.LogLink != null && m.LogLink == eventRecord.LogName)
-            .ToList();
+        // Use indexed lookup instead of linear scan with .ToList()
+        var messagesByShortId = details.GetMessagesByShortId((short)eventRecord.Task);
+
+        List<MessageModel>? potentialTaskNames = null;
+
+        foreach (var m in messagesByShortId)
+        {
+            if (m.LogLink is null || m.LogLink != eventRecord.LogName) { continue; }
+
+            potentialTaskNames ??= [];
+            potentialTaskNames.Add(m);
+        }
 
         if (potentialTaskNames is { Count: > 0 })
         {

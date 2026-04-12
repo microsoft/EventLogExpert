@@ -590,6 +590,35 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceLoadEvents_ShouldIsolateStateFromOriginalList()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+
+        var state = new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
+        };
+
+        var events = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100),
+            EventUtils.CreateTestEvent(200)
+        };
+
+        var action = new EventLogAction.LoadEvents(logData, events);
+
+        // Act
+        var newState = EventLogReducers.ReduceLoadEvents(state, action);
+
+        // Mutate the original list after state was created
+        events.Add(EventUtils.CreateTestEvent(300));
+
+        // Assert - state should not reflect the mutation
+        Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
+    }
+
+    [Fact]
     public void ReduceOpenLog_ShouldAddEmptyLogData()
     {
         // Arrange

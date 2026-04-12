@@ -53,7 +53,7 @@ public sealed class EventLogReducers
         {
             ActiveLogs = newLogsCollection.Add(
                 action.LogData.Name,
-                action.LogData with { Events = [.. action.Events] })
+                action.LogData with { Events = action.Events.ToImmutableArray() })
         };
     }
 

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using System.Buffers;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
@@ -40,50 +41,57 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
     // of whether the requested batchSize was reached (but it will not exceed the requested count).
     public bool TryGetEvents(out EventRecord[] events, int batchSize = 30)
     {
-        var buffer = new IntPtr[batchSize];
+        var buffer = ArrayPool<IntPtr>.Shared.Rent(batchSize);
         int count = 0;
 
-        bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
-
-        if (!success)
+        try
         {
-            events = [];
-            return false;
-        }
+            bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
 
-        using (_eventLock.EnterScope())
-        {
-            LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
-        }
-
-        events = new EventRecord[count];
-
-        for (int i = 0; i < count; i++)
-        {
-            using var eventHandle = new EvtHandle(buffer[i]);
-
-            try
+            if (!success)
             {
-                events[i] = EventMethods.RenderEvent(eventHandle);
-                events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
+                events = [];
+                return false;
+            }
 
-                if (renderXml)
+            using (_eventLock.EnterScope())
+            {
+                LastBookmark = CreateBookmark(new EvtHandle(buffer[count - 1], false));
+            }
+
+            events = new EventRecord[count];
+
+            for (int i = 0; i < count; i++)
+            {
+                using var eventHandle = new EvtHandle(buffer[i]);
+
+                try
                 {
-                    events[i].Xml = EventMethods.RenderEventXml(eventHandle);
+                    events[i] = EventMethods.RenderEvent(eventHandle);
+                    events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
+
+                    if (renderXml)
+                    {
+                        events[i].Xml = EventMethods.RenderEventXml(eventHandle);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    events[i] = new EventRecord { RecordId = null, Error = ex.Message };
+                }
+                finally
+                {
+                    events[i].PathName = path;
+                    events[i].PathType = pathType;
                 }
             }
-            catch (Exception ex)
-            {
-                events[i] = new EventRecord { RecordId = null, Error = ex.Message };
-            }
-            finally
-            {
-                events[i].PathName = path;
-                events[i].PathType = pathType;
-            }
-        }
 
-        return true;
+            return true;
+        }
+        finally
+        {
+            ArrayPool<IntPtr>.Shared.Return(buffer);
+        }
     }
 
     private static string? CreateBookmark(EvtHandle eventHandle)
