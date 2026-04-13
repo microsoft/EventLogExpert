@@ -47,7 +47,7 @@ public sealed class GitHubServiceTests
 
         // Assert
         mockTraceLogger.Received(1)
-            .Warn(Arg.Is<WarnLogHandler>(h => h.ToString().Contains("failed") && h.ToString().Contains(nameof(GitHubService.GetReleases))));
+            .Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("failed") && h.ToString().Contains(nameof(GitHubService.GetReleases))));
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class GitHubServiceTests
 
         // Assert
         mockTraceLogger.Received(1)
-            .Warn(Arg.Is<WarnLogHandler>(h => h.ToString().Contains("Failed to deserialize")));
+            .Error(Arg.Is<ErrorLogHandler>(h => h.ToString().Contains("Failed to deserialize")));
     }
 
     [Fact]

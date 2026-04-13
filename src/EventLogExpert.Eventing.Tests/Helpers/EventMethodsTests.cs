@@ -504,6 +504,31 @@ public sealed class EventMethodsTests
     }
 
     [Fact]
+    public void ConvertVariant_WhenXml_ShouldReturnString()
+    {
+        // Arrange
+        var testXml = "<Event><Data>TestValue</Data></Event>";
+        IntPtr xmlPtr = Marshal.StringToHGlobalUni(testXml);
+
+        try
+        {
+            var variant = CreateVariant(EvtVariantType.Xml, xmlPtr);
+
+            // Act
+            var result = EventMethods.ConvertVariant(variant);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.IsType<string>(result);
+            Assert.Equal(testXml, result);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(xmlPtr);
+        }
+    }
+
+    [Fact]
     public void ThrowEventLogException_WhenAccessDenied_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
@@ -666,6 +691,7 @@ public sealed class EventMethodsTests
                 {
                     case EvtVariantType.String:
                     case EvtVariantType.AnsiString:
+                    case EvtVariantType.Xml:
                     case EvtVariantType.Sid:
                     case EvtVariantType.Guid:
                     case EvtVariantType.SysTime:
