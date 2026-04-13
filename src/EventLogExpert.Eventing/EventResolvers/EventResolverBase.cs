@@ -48,7 +48,7 @@ public partial class EventResolverBase : IDisposable
     };
 
     protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails = new();
-    protected readonly ReaderWriterLockSlim ProviderDetailsLock = new();
+    protected readonly Lock ProviderDetailsLock = new();
 
     private readonly IEventResolverCache? _cache;
     private readonly ITraceLogger? _logger;
@@ -112,27 +112,6 @@ public partial class EventResolverBase : IDisposable
         if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
         {
             return; // Already disposed by another thread
-        }
-
-        // Attempt to dispose the lock to avoid leaking wait handles.
-        // If other threads are still waiting to acquire the lock (rare race condition),
-        // ReaderWriterLockSlim.Dispose() will throw SynchronizationLockException.
-        // In that case, we suppress the exception to avoid crashing during disposal.
-        // This is a pragmatic trade-off: accept a potential wait handle leak in an
-        // extremely rare concurrent disposal scenario rather than crash the application.
-        try
-        {
-            ProviderDetailsLock.Dispose();
-        }
-        catch (SynchronizationLockException)
-        {
-            // Lock is still being used by other threads. This is extremely rare but can happen
-            // in concurrent disposal scenarios. We suppress the exception to prevent disposal
-            // from throwing, accepting a potential wait handle leak as the lesser evil.
-        }
-        catch (ObjectDisposedException)
-        {
-            // Lock has already been disposed by another thread. Suppress to ensure disposal never throws.
         }
     }
 
