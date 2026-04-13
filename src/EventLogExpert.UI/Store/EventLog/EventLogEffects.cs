@@ -195,10 +195,10 @@ public sealed class EventLogEffects(
             return;
         }
 
-        dispatcher.Dispatch(
-            new EventLogAction.LoadEvents(
-                logData,
-                [.. events.OrderByDescending(e => e.RecordId)]));
+        var sortedEvents = events.ToList();
+        sortedEvents.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
+
+        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, sortedEvents));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 

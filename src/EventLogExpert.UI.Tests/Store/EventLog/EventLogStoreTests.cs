@@ -113,7 +113,7 @@ public sealed class EventLogStoreTests
 
         // Assert
         Assert.Equal(logData, action.LogData);
-        Assert.Equal(2, action.Events.Length);
+        Assert.Equal(2, action.Events.Count);
     }
 
     [Fact]
