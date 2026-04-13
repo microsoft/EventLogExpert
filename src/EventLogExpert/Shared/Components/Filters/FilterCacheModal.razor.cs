@@ -1,15 +1,14 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -25,7 +24,7 @@ public sealed partial class FilterCacheModal
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
-    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     protected override void OnInitialized()
     {
@@ -131,7 +130,7 @@ public sealed partial class FilterCacheModal
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to open filter cache modal: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to open filter cache modal: {e}");
         }
     }
 

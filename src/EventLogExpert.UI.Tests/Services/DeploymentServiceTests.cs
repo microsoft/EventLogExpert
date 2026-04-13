@@ -7,7 +7,6 @@ using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using Windows.Foundation;
 
@@ -107,7 +106,7 @@ public sealed class DeploymentServiceTests
         deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
 
         // Assert
-        mockTraceLogger.Received(2).Trace(Arg.Any<string>(), Arg.Any<LogLevel>());
+        mockTraceLogger.Received(2).Debug(Arg.Any<DebugLogHandler>());
     }
 
     [Theory]
@@ -344,7 +343,7 @@ public sealed class DeploymentServiceTests
         deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
 
         // Assert
-        mockTraceLogger.Received(1).Trace(Arg.Any<string>(), Arg.Any<LogLevel>());
+        mockTraceLogger.Received(1).Debug(Arg.Any<DebugLogHandler>());
     }
 
     [Fact]

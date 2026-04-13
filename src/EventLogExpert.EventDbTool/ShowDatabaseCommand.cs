@@ -2,16 +2,18 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
+using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
 
-public class ShowDatabaseCommand : DbToolCommand
+public class ShowDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 {
     public static Command GetCommand()
     {
-        Command showDatabaseCommand = new (name: "showdatabase", description: "List the event providers from a database created with this tool.");
+        Command showDatabaseCommand = new(name: "showdatabase", description: "List the event providers from a database created with this tool.");
 
         Argument<string> fileArgument = new("file")
         {
@@ -32,23 +34,27 @@ public class ShowDatabaseCommand : DbToolCommand
         showDatabaseCommand.Options.Add(filterOption);
         showDatabaseCommand.Options.Add(verboseOption);
 
-        showDatabaseCommand.SetAction(action => ShowProviderInfo(
-            action.GetRequiredValue(fileArgument),
-            action.GetValue(filterOption),
-            action.GetValue(verboseOption)));
+        showDatabaseCommand.SetAction(action =>
+        {
+            using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
+            new ShowDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
+                .ShowProviderInfo(
+                    action.GetRequiredValue(fileArgument),
+                    action.GetValue(filterOption));
+        });
 
         return showDatabaseCommand;
     }
 
-    private static void ShowProviderInfo(string file, string? filter, bool verbose)
+    private void ShowProviderInfo(string file, string? filter)
     {
         if (!File.Exists(file))
         {
-            Console.WriteLine($"File not found: {file}");
+            Logger.Error($"File not found: {file}");
             return;
         }
 
-        using var dbContext = new EventProviderDbContext(file, readOnly: true);
+        using var dbContext = new EventProviderDbContext(file, readOnly: true, Logger);
 
         var providerNames = dbContext.ProviderDetails.Select(p => p.ProviderName).OrderBy(name => name).ToList();
 

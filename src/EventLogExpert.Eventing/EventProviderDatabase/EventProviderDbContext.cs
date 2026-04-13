@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -19,7 +19,7 @@ public sealed class EventProviderDbContext : DbContext
     {
         _logger = logger;
 
-        _logger?.Trace($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}");
+        _logger?.Debug($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}");
 
         Name = System.IO.Path.GetFileNameWithoutExtension(path);
         Path = path;
@@ -94,7 +94,7 @@ public sealed class EventProviderDbContext : DbContext
 
         var needsUpgrade = needsV2Upgrade || needsV3Upgrade;
 
-        _logger?.Trace($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}");
+        _logger?.Debug($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}");
 
         return (needsV2Upgrade, needsV3Upgrade);
     }
@@ -110,7 +110,7 @@ public sealed class EventProviderDbContext : DbContext
 
         var size = new FileInfo(Path).Length;
 
-        _logger?.Trace($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}");
+        _logger?.Info($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}");
 
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
@@ -174,6 +174,6 @@ public sealed class EventProviderDbContext : DbContext
 
         size = new FileInfo(Path).Length;
 
-        _logger?.Trace($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}");
+        _logger?.Info($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}");
     }
 }

@@ -13,7 +13,6 @@ using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
@@ -44,7 +43,7 @@ public sealed partial class EventTable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     protected override async Task OnInitializedAsync()
     {
@@ -167,7 +166,7 @@ public sealed partial class EventTable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to register table event handlers: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to register table event handlers: {e}");
         }
     }
 
@@ -179,7 +178,7 @@ public sealed partial class EventTable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to scroll to selected event on set active table: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to scroll to selected event: {e}");
         }
     }
 
@@ -191,7 +190,7 @@ public sealed partial class EventTable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to scroll to selected event on update combined events: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to scroll to selected event: {e}");
         }
     }
 
@@ -203,7 +202,7 @@ public sealed partial class EventTable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to scroll to selected event on update displayed events: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to scroll to selected event: {e}");
         }
     }
 

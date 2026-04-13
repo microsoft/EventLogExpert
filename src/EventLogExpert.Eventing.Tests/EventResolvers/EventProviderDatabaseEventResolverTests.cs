@@ -53,8 +53,8 @@ public sealed class EventProviderDatabaseEventResolverTests
         }
 
         // Assert
-        logger.Received(1).Trace(Arg.Is<string>(s => s.Contains("LoadDatabases") && s.Contains("databasePaths")));
-        logger.Received(1).Trace(Arg.Is<string>(s => s.Contains(Constants.NonExistentDatabaseFullPath)));
+        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("LoadDatabases") && h.ToString().Contains("databasePaths")));
+        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains(Constants.NonExistentDatabaseFullPath)));
     }
 
     [Fact]
@@ -69,7 +69,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
 
         // Assert
-        logger.Received(1).Trace(Arg.Is<string>(s => s.Contains("EventProviderDatabaseEventResolver")));
+        logger.Received(1).Trace(Arg.Is<TraceLogHandler>(h => h.ToString().Contains("EventProviderDatabaseEventResolver")));
     }
 
     [Fact]
@@ -361,7 +361,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
             // Assert
             logger.Received(1)
-                .Trace(Arg.Is<string>(s => s.Contains("Resolved") && s.Contains(Constants.TestProviderName)));
+                .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Resolved") && h.ToString().Contains(Constants.TestProviderName)));
         }
         finally
         {
@@ -522,7 +522,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
             // Assert
             logger.Received(1)
-                .Trace(Arg.Is<string>(s => s.Contains("Resolved") && s.Contains(Constants.TestProviderName.ToLower())));
+                .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Resolved") && h.ToString().Contains(Constants.TestProviderName.ToLower())));
         }
         finally
         {
@@ -578,10 +578,10 @@ public sealed class EventProviderDatabaseEventResolverTests
 
             // Assert
             // Should use Exchange database (first in sorted order)
-            logger.Received(1).Trace(Arg.Is<string>(s =>
-                s.Contains("Resolved") &&
-                s.Contains(Constants.TestProviderName) &&
-                s.Contains("Exchange")));
+            logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("Resolved") &&
+                h.ToString().Contains(Constants.TestProviderName) &&
+                h.ToString().Contains("Exchange")));
         }
         finally
         {
@@ -626,10 +626,10 @@ public sealed class EventProviderDatabaseEventResolverTests
             resolver.ResolveProviderDetails(eventRecord);
 
             // Assert
-            logger.Received(1).Trace(Arg.Is<string>(s =>
-                s.Contains("Resolved") &&
-                s.Contains(Constants.TestProviderName) &&
-                s.Contains("database")));
+            logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("Resolved") &&
+                h.ToString().Contains(Constants.TestProviderName) &&
+                h.ToString().Contains("database")));
         }
         finally
         {
@@ -735,9 +735,9 @@ public sealed class EventProviderDatabaseEventResolverTests
             resolver.ResolveProviderDetails(eventRecord);
 
             // Assert
-            logger.Received(1).Trace(Arg.Is<string>(s =>
-                s.Contains("Resolved") &&
-                s.Contains(Constants.TestProviderName)));
+            logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("Resolved") &&
+                h.ToString().Contains(Constants.TestProviderName)));
         }
         finally
         {

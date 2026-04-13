@@ -38,7 +38,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         using var context = new EventProviderDbContext(dbPath, false, logger);
 
         // Assert
-        logger.Received(1).Trace(Arg.Is<string>(s => s.Contains("Instantiating EventProviderDbContext")));
+        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Instantiating EventProviderDbContext")));
     }
 
     [Fact]
@@ -135,10 +135,10 @@ public sealed class EventProviderDbContextTests : IDisposable
         var result = context.IsUpgradeNeeded();
 
         // Assert
-        logger.Received(1).Trace(Arg.Is<string>(s =>
-            s.Contains(nameof(EventProviderDbContext.IsUpgradeNeeded)) &&
-            s.Contains("needsV2Upgrade") &&
-            s.Contains("needsV3Upgrade")));
+        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
+            h.ToString().Contains(nameof(EventProviderDbContext.IsUpgradeNeeded)) &&
+            h.ToString().Contains("needsV2Upgrade") &&
+            h.ToString().Contains("needsV3Upgrade")));
     }
 
     [Fact]

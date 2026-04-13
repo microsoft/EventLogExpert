@@ -4,15 +4,13 @@
 using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public sealed class CreateDatabaseCommand : DbToolCommand
+public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 {
-    private static readonly ITraceLogger s_logger = new TraceLogger(LogLevel.Information);
-
     public static Command GetCommand()
     {
         Command createDatabaseCommand = new("create", "Creates a new event database.");
@@ -47,26 +45,30 @@ public sealed class CreateDatabaseCommand : DbToolCommand
         createDatabaseCommand.Options.Add(skipProvidersInFileOption);
         createDatabaseCommand.Options.Add(verboseOption);
 
-        createDatabaseCommand.SetAction(result => CreateDatabase(
-            result.GetRequiredValue(fileArgument),
-            result.GetValue(filterOption),
-            result.GetValue(verboseOption),
-            result.GetValue(skipProvidersInFileOption)));
+        createDatabaseCommand.SetAction(result =>
+        {
+            using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
+            new CreateDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
+                .CreateDatabase(
+                    result.GetRequiredValue(fileArgument),
+                    result.GetValue(filterOption),
+                    result.GetValue(skipProvidersInFileOption));
+        });
 
         return createDatabaseCommand;
     }
 
-    private static void CreateDatabase(string path, string? filter, bool verboseLogging, string? skipProvidersInFile)
+    private void CreateDatabase(string path, string? filter, string? skipProvidersInFile)
     {
         if (File.Exists(path))
         {
-            Console.WriteLine($"Cannot create database because file already exists: {path}");
+            Logger.Error($"Cannot create database because file already exists: {path}");
             return;
         }
 
         if (Path.GetExtension(path) != ".db")
         {
-            Console.WriteLine("File extension must be .db.");
+            Logger.Error($"File extension must be .db.");
             return;
         }
 
@@ -76,25 +78,25 @@ public sealed class CreateDatabaseCommand : DbToolCommand
         {
             if (!File.Exists(skipProvidersInFile))
             {
-                Console.WriteLine($"File not found: {skipProvidersInFile}");
+                Logger.Error($"File not found: {skipProvidersInFile}");
+                return;
             }
 
-            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, true);
+            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, true, Logger);
 
             foreach (var provider in skipDbContext.ProviderDetails)
             {
                 skipProviderNames.Add(provider.ProviderName);
             }
 
-            Console.WriteLine($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. " +
-                "These will not be included in the new database.");
+            Logger.Info($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. These will not be included in the new database.");
         }
 
         var providerNames = GetLocalProviderNames(filter);
 
         if (!providerNames.Any())
         {
-            Console.WriteLine($"No providers found matching filter {filter}.");
+            Logger.Warn($"No providers found matching filter {filter}.");
             return;
         }
 
@@ -104,16 +106,16 @@ public sealed class CreateDatabaseCommand : DbToolCommand
 
         if (numberSkipped > 0)
         {
-            Console.WriteLine($"{numberSkipped} providers were skipped due to being present in the specified database.");
+            Logger.Info($"{numberSkipped} providers were skipped due to being present in the specified database.");
         }
 
-        using var dbContext = new EventProviderDbContext(path, false);
+        using var dbContext = new EventProviderDbContext(path, false, Logger);
 
         LogProviderDetailHeader(providerNamesNotSkipped);
 
         foreach (var providerName in providerNamesNotSkipped)
         {
-            var provider = new EventMessageProvider(providerName, verboseLogging ? s_logger : null);
+            var provider = new EventMessageProvider(providerName, Logger);
 
             var details = provider.LoadProviderDetails();
 
@@ -122,11 +124,11 @@ public sealed class CreateDatabaseCommand : DbToolCommand
             LogProviderDetails(details);
         }
 
-        Console.WriteLine();
-        Console.WriteLine("Saving database. Please wait...");
+        Logger.Info($"");
+        Logger.Info($"Saving database. Please wait...");
 
         dbContext.SaveChanges();
 
-        Console.WriteLine("Done!");
+        Logger.Info($"Done!");
     }
 }

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -34,7 +35,8 @@ public sealed partial class App : Application
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
-        IFileLogger traceLogger)
+        ITraceLogger traceLogger,
+        IFileLogger fileLogger)
     {
         InitializeComponent();
 
@@ -53,7 +55,8 @@ public sealed partial class App : Application
             currentVersionProvider,
             appTitleService,
             fileLocationOptions,
-            traceLogger);
+            traceLogger,
+            fileLogger);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
