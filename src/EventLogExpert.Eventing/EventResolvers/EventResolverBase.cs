@@ -1,10 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
@@ -386,8 +385,7 @@ public partial class EventResolverBase : IDisposable
 
                     if (propIndex > properties.Count)
                     {
-                        Logger?.Trace($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}",
-                            LogLevel.Warning);
+                        Logger?.Warn($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}");
 
                         return DefaultFailedDescription;
                     }
@@ -446,8 +444,7 @@ public partial class EventResolverBase : IDisposable
         }
         catch (InvalidOperationException ex)
         {
-            Logger?.Trace($"{nameof(FormatDescription)}: InvalidOperationException - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex.Message}",
-                LogLevel.Warning);
+            Logger?.Warn($"{nameof(FormatDescription)}: InvalidOperationException - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex.Message}");
 
             // If the regex fails to match, then we just return the original description.
             returnDescription = description.ToString();
@@ -456,8 +453,7 @@ public partial class EventResolverBase : IDisposable
         }
         catch (Exception ex)
         {
-            Logger?.Trace($"{nameof(FormatDescription)}: Unexpected exception - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex}",
-                LogLevel.Warning);
+            Logger?.Warn($"{nameof(FormatDescription)}: Unexpected exception - PropertyCount={properties.Count}, Template={descriptionTemplate}, Exception={ex}");
 
             return DefaultFailedDescription;
         }
@@ -507,8 +503,7 @@ public partial class EventResolverBase : IDisposable
     {
         if (eventRecord is { Version: null, LogName: null })
         {
-            Logger?.Trace($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and LogName",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and LogName");
 
             return null;
         }
@@ -534,16 +529,14 @@ public partial class EventResolverBase : IDisposable
 
         if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
         {
-            Logger?.Trace($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}");
 
             return modernEvent;
         }
 
         if (modernEvent is not null)
         {
-            Logger?.Trace($"{nameof(GetModernEvent)}: Exact match found but template property count mismatch - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found but template property count mismatch - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
         }
 
         foreach (var @event in candidateEvents)
@@ -552,8 +545,7 @@ public partial class EventResolverBase : IDisposable
 
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
-            Logger?.Trace($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(GetModernEvent)}: Match by Id/LogName with template - EventId={eventRecord.Id}, LogName={eventRecord.LogName}, MatchedVersion={@event.Version}");
 
             return @event;
         }
@@ -566,14 +558,12 @@ public partial class EventResolverBase : IDisposable
 
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
-            Logger?.Trace($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}");
 
             return @event;
         }
 
-        Logger?.Trace($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}",
-            LogLevel.Debug);
+        Logger?.Debug($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}");
 
         return null;
     }
@@ -583,8 +573,7 @@ public partial class EventResolverBase : IDisposable
     {
         if (details is null)
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(ResolveDescription)}: No provider details available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, RecordId={eventRecord.RecordId}");
 
             return DefaultNoProviderDescription;
         }
@@ -593,8 +582,7 @@ public partial class EventResolverBase : IDisposable
 
         if (!string.IsNullOrEmpty(modernEvent?.Description))
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, modernEvent?.Description, details.Parameters);
         }
@@ -604,29 +592,25 @@ public partial class EventResolverBase : IDisposable
 
         if (legacyMessages.Count == 1)
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, legacyMessages[0].Text, details.Parameters);
         }
 
         if (legacyMessages.Count > 1)
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
         }
 
         // Some events store the description in the event properties
         if (properties.Count > 0)
         {
-            Logger?.Trace($"{nameof(ResolveDescription)}: Using property-based description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}",
-                LogLevel.Debug);
+            Logger?.Debug($"{nameof(ResolveDescription)}: Using property-based description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, null, details.Parameters);
         }
 
-        Logger?.Trace($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}",
-            LogLevel.Debug);
+        Logger?.Debug($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
         return DefaultNoMatchingDescription;
     }
@@ -676,11 +660,11 @@ public partial class EventResolverBase : IDisposable
 
             if (potentialTaskNames.Count > 1)
             {
-                Logger?.Trace("More than one matching task ID was found.");
-                Logger?.Trace($"  eventRecord.Task: {eventRecord.Task}");
-                Logger?.Trace("   Potential matches:");
+                Logger?.Debug($"More than one matching task ID was found.");
+                Logger?.Debug($"  eventRecord.Task: {eventRecord.Task}");
+                Logger?.Debug($"   Potential matches:");
 
-                potentialTaskNames.ForEach(t => Logger?.Trace($"    {t.LogLink} {t.Text}"));
+                potentialTaskNames.ForEach(t => Logger?.Debug($"    {t.LogLink} {t.Text}"));
             }
         }
         else

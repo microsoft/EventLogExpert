@@ -88,7 +88,7 @@ public sealed class VersatileEventResolverTests
         using var resolver = new VersatileEventResolver(tracer: logger);
 
         // Assert
-        logger.Received().Trace(Arg.Is<string>(s => s.Contains("VersatileEventResolver")));
+        logger.Received().Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("VersatileEventResolver")));
     }
 
     [Fact]

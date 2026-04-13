@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EventLogExpert.Eventing.Tests.Providers;
@@ -100,9 +99,8 @@ public sealed class RegistryProviderTests
         _ = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
         // Assert
-        mockLogger.Received(1).Trace(
-            Arg.Is<string>(s => s.Contains("GetLegacyProviderFiles called") && s.Contains(providerName)),
-            Arg.Any<LogLevel>());
+        mockLogger.Received(1).Debug(
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("GetLegacyProviderFiles called") && h.ToString().Contains(providerName)));
     }
 
     [Fact]
@@ -318,7 +316,7 @@ public sealed class RegistryProviderTests
             
             // Found a provider, verify logging
             mockLogger.Received()
-                .Trace(Arg.Is<string>(s => s.Contains("Found message file for legacy provider")), Arg.Any<LogLevel>());
+                .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Found message file for legacy provider")));
 
             return;
         }

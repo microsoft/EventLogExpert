@@ -1,10 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using Microsoft.Extensions.Logging;
 using System.Text;
 
 namespace EventLogExpert.UI.Services;
@@ -28,12 +27,12 @@ public sealed class UpdateService(
 
     public async Task CheckForUpdates(bool usePreRelease, bool manualScan)
     {
-        traceLogger.Trace($"{nameof(CheckForUpdates)} was called. {nameof(usePreRelease)} is {usePreRelease}. " +
+        traceLogger.Debug($"{nameof(CheckForUpdates)} was called. {nameof(usePreRelease)} is {usePreRelease}. " +
             $"{nameof(manualScan)} is {manualScan}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
 
         if (versionProvider.IsDevBuild)
         {
-            traceLogger.Trace($"{nameof(CheckForUpdates)} {nameof(versionProvider.IsDevBuild)}: {versionProvider.IsDevBuild}. Skipping update check.");
+            traceLogger.Debug($"{nameof(CheckForUpdates)} {nameof(versionProvider.IsDevBuild)}: {versionProvider.IsDevBuild}. Skipping update check.");
 
             return;
         }
@@ -51,11 +50,11 @@ public sealed class UpdateService(
                 throw new FileNotFoundException("No releases available");
             }
 
-            traceLogger.Trace($"{nameof(CheckForUpdates)} Found the following releases:");
+            traceLogger.Debug($"{nameof(CheckForUpdates)} Found the following releases:");
 
             foreach (var release in releases)
             {
-                traceLogger.Trace($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
+                traceLogger.Debug($"{nameof(CheckForUpdates)}   Version: {release.Version} " +
                     $"ReleaseDate: {release.ReleaseDate} IsPreRelease: {release.IsPreRelease}");
 
                 if (!usePreRelease && release.IsPreRelease) { continue; }
@@ -91,7 +90,7 @@ public sealed class UpdateService(
         }
         catch (Exception ex)
         {
-            traceLogger.Trace($"{nameof(CheckForUpdates)} failed while retrieving releases: {ex.Message}.", LogLevel.Warning);
+            traceLogger.Error($"{nameof(CheckForUpdates)} failed while retrieving releases: {ex.Message}.");
             
             await alertDialogService.ShowAlert("Update Failure",
                 $"Failed to retrieve latest releases:\r\n{ex.Message}",
@@ -100,7 +99,7 @@ public sealed class UpdateService(
             return;
         }
 
-        traceLogger.Trace($"{nameof(CheckForUpdates)} Found latest release {latest.Value.Version}. IsPreRelease: {latest.Value.IsPreRelease}");
+        traceLogger.Debug($"{nameof(CheckForUpdates)} Found latest release {latest.Value.Version}. IsPreRelease: {latest.Value.IsPreRelease}");
 
         try
         {
@@ -108,7 +107,7 @@ public sealed class UpdateService(
 
             if (string.IsNullOrEmpty(downloadPath))
             {
-                traceLogger.Trace($"{nameof(CheckForUpdates)} Could not get asset download path.", LogLevel.Warning);
+                traceLogger.Warn($"{nameof(CheckForUpdates)} Could not get asset download path.");
 
                 return;
             }

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
@@ -6,7 +6,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -134,12 +133,11 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             using var serviceScope = _serviceScopeFactory.CreateScope();
             var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
 
-            _debugLogger.Trace("EventRecordWritten callback was called.");
+            _debugLogger.Trace($"EventRecordWritten callback was called.");
 
             if (eventResolver is null)
             {
-                _debugLogger.Trace(
-                    $"{nameof(LiveLogWatcherService)} event resolver is null in EventRecordWritten callback.", LogLevel.Error);
+                _debugLogger.Warn($"{nameof(LiveLogWatcherService)} event resolver is null in EventRecordWritten callback.");
 
                 return;
             }
@@ -156,7 +154,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         {
             watcher.Enabled = true;
 
-            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} started watching {logName}.");
+            _debugLogger.Info($"{nameof(LiveLogWatcherService)} started watching {logName}.");
         });
     }
 
@@ -187,10 +185,9 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         {
             watcher.Dispose();
 
-            _debugLogger.Trace($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
+            _debugLogger.Info($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
         });
 
-        _debugLogger.Trace(
-            $"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
+        _debugLogger.Debug($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
     }
 }

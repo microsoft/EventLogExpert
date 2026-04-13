@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -293,7 +293,7 @@ internal sealed partial class ProviderMetadata
             return metadata;
         }
 
-        logger?.Trace($"Failed to create metadata for {providerName} provider: {metadata.Error}");
+        logger?.Debug($"Failed to create metadata for {providerName} provider: {metadata.Error}");
 
         return null;
     }

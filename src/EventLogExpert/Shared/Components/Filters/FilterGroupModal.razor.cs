@@ -1,13 +1,12 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using Windows.Storage.Pickers;
 using WinRT.Interop;
@@ -23,7 +22,7 @@ public sealed partial class FilterGroupModal
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
-    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     protected override void OnInitialized()
     {
@@ -112,7 +111,7 @@ public sealed partial class FilterGroupModal
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to open filter group modal: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to open filter group modal: {e}");
         }
     }
 }

@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using System.Collections.ObjectModel;
 
@@ -171,7 +170,7 @@ public sealed class ProviderMetadataTests
         // Assert
         // Empty provider name is treated as valid by Windows
         mockLogger.DidNotReceive()
-            .Trace(Arg.Is<string>(s => s.Contains("Failed to create metadata")), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Failed to create metadata")));
     }
 
     [Fact]
@@ -196,9 +195,8 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(providerName, mockLogger);
 
         // Assert
-        mockLogger.Received(1).Trace(
-            Arg.Is<string>(s => s.Contains("Failed to create metadata") && s.Contains(providerName)),
-            Arg.Any<LogLevel>());
+        mockLogger.Received(1).Debug(
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Failed to create metadata") && h.ToString().Contains(providerName)));
     }
 
     [Fact]
@@ -237,7 +235,7 @@ public sealed class ProviderMetadataTests
         Assert.NotNull(metadata);
 
         mockLogger.DidNotReceive()
-            .Trace(Arg.Is<string>(s => s.Contains("Failed to create metadata")), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Failed to create metadata")));
     }
 
     [Fact]
@@ -274,7 +272,7 @@ public sealed class ProviderMetadataTests
         Assert.Null(metadata);
 
         mockLogger.Received(1)
-            .Trace(Arg.Is<string>(s => !string.IsNullOrEmpty(s)), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => !string.IsNullOrEmpty(h.ToString())));
     }
 
     [Fact]

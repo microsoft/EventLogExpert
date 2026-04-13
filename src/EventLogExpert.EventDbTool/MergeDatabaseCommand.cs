@@ -2,12 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public class MergeDatabaseCommand : DbToolCommand
+public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 {
     public static Command GetCommand()
     {
@@ -41,33 +43,37 @@ public class MergeDatabaseCommand : DbToolCommand
         mergeDatabaseCommand.Options.Add(overwriteOption);
         mergeDatabaseCommand.Options.Add(verboseOption);
 
-        mergeDatabaseCommand.SetAction(action => MergeDatabase(
-            action.GetRequiredValue(sourceDatabaseArgument),
-            action.GetRequiredValue(targetDatabaseArgument),
-            action.GetValue(overwriteOption),
-            action.GetValue(verboseOption)));
+        mergeDatabaseCommand.SetAction(action =>
+        {
+            using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
+            new MergeDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
+                .MergeDatabase(
+                    action.GetRequiredValue(sourceDatabaseArgument),
+                    action.GetRequiredValue(targetDatabaseArgument),
+                    action.GetValue(overwriteOption));
+        });
 
         return mergeDatabaseCommand;
     }
 
-    private static void MergeDatabase(string sourceFile, string targetFile, bool overwriteProviders, bool verbose)
+    private void MergeDatabase(string sourceFile, string targetFile, bool overwriteProviders)
     {
         foreach (var path in new[] { sourceFile, targetFile })
         {
             if (File.Exists(path)) { continue; }
 
-            Console.WriteLine($"File not found: {path}");
+            Logger.Error($"File not found: {path}");
             return;
         }
 
         var sourceProviders = new List<ProviderDetails>();
 
-        using (var sourceContext = new EventProviderDbContext(sourceFile, true))
+        using (var sourceContext = new EventProviderDbContext(sourceFile, true, Logger))
         {
             sourceProviders.AddRange(sourceContext.ProviderDetails.ToList());
         }
 
-        using var targetContext = new EventProviderDbContext(targetFile, false);
+        using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
 
         var providersAlreadyInTarget = new Dictionary<string, ProviderDetails>();
 
@@ -83,11 +89,11 @@ public class MergeDatabaseCommand : DbToolCommand
 
         if (providersAlreadyInTarget.Count > 0)
         {
-            Console.WriteLine($"The target database contains {providersAlreadyInTarget.Count} providers that are in the source.");
+            Logger.Info($"The target database contains {providersAlreadyInTarget.Count} providers that are in the source.");
 
             if (overwriteProviders)
             {
-                Console.WriteLine("Removing these providers from the target database...");
+                Logger.Info($"Removing these providers from the target database...");
 
                 foreach (var provider in providersAlreadyInTarget.Values)
                 {
@@ -95,15 +101,15 @@ public class MergeDatabaseCommand : DbToolCommand
                 }
 
                 targetContext.SaveChanges();
-                Console.WriteLine($"Removal of {providersAlreadyInTarget.Count} completed.");
+                Logger.Info($"Removal of {providersAlreadyInTarget.Count} completed.");
             }
             else
             {
-                Console.WriteLine("These providers will not be copied from the source.");
+                Logger.Info($"These providers will not be copied from the source.");
             }
         }
 
-        Console.WriteLine("Copying providers from the source...");
+        Logger.Info($"Copying providers from the source...");
 
         var providersCopied = new List<ProviderDetails>();
 
@@ -111,7 +117,7 @@ public class MergeDatabaseCommand : DbToolCommand
         {
             if (providersAlreadyInTarget.ContainsKey(provider.ProviderName) && !overwriteProviders)
             {
-                Console.WriteLine($"Skipping provider: {provider.ProviderName}");
+                Logger.Info($"Skipping provider: {provider.ProviderName}");
                 continue;
             }
 
@@ -131,8 +137,8 @@ public class MergeDatabaseCommand : DbToolCommand
 
         targetContext.SaveChanges();
 
-        Console.WriteLine("Providers copied:");
-        Console.WriteLine();
+        Logger.Info($"Providers copied:");
+        Logger.Info($"");
         LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
 
         foreach (var provider in providersCopied)

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -15,7 +15,7 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
     /// <summary>sounds Returns the file paths for the message files for this provider.</summary>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _logger?.Trace($"GetLegacyProviderFiles called for provider {providerName} on computer {_computerName}");
+        _logger?.Debug($"GetLegacyProviderFiles called for provider {providerName} on computer {_computerName}");
 
         var hklm = string.IsNullOrEmpty(_computerName)
             ? Registry.LocalMachine
@@ -40,7 +40,7 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
                 continue;
             }
 
-            _logger?.Trace($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
+            _logger?.Debug($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
 
             // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
             // and trying to load that causes an access violation.

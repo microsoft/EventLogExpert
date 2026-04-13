@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 using System.Net;
 using System.Text.Json;
@@ -48,7 +47,7 @@ public sealed class GitHubServiceTests
 
         // Assert
         mockTraceLogger.Received(1)
-            .Trace(Arg.Is<string>(s => s.Contains("failed") && s.Contains(nameof(GitHubService.GetReleases))), LogLevel.Warning);
+            .Warn(Arg.Is<WarnLogHandler>(h => h.ToString().Contains("failed") && h.ToString().Contains(nameof(GitHubService.GetReleases))));
     }
 
     [Fact]
@@ -126,7 +125,7 @@ public sealed class GitHubServiceTests
 
         // Assert
         mockTraceLogger.Received(1)
-            .Trace(Arg.Is<string>(s => s.Contains("Failed to deserialize")), LogLevel.Warning);
+            .Warn(Arg.Is<WarnLogHandler>(h => h.ToString().Contains("Failed to deserialize")));
     }
 
     [Fact]
@@ -157,9 +156,8 @@ public sealed class GitHubServiceTests
         await gitHubService.GetReleases();
 
         // Assert
-        mockTraceLogger.Received(1).Trace(
-            Arg.Is<string>(s => s.Contains("succeeded") && s.Contains(nameof(GitHubService.GetReleases))),
-            Arg.Any<LogLevel>());
+        mockTraceLogger.Received(1).Debug(
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("succeeded") && h.ToString().Contains(nameof(GitHubService.GetReleases))));
     }
 
     [Fact]
