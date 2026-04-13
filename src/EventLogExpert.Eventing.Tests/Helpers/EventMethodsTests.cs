@@ -202,10 +202,10 @@ public sealed class EventMethodsTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenInt16_ShouldReturnByte()
+    public void ConvertVariant_WhenInt16_ShouldReturnShort()
     {
         // Arrange
-        byte expectedValue = 100;
+        short expectedValue = -1234;
         var variant = CreateVariant(EvtVariantType.Int16, expectedValue);
 
         // Act
@@ -213,6 +213,7 @@ public sealed class EventMethodsTests
 
         // Assert
         Assert.NotNull(result);
+        Assert.IsType<short>(result);
         Assert.Equal(expectedValue, result);
     }
 
@@ -258,8 +259,8 @@ public sealed class EventMethodsTests
         var exception = Assert.Throws<InvalidDataException>(
             () => EventMethods.ConvertVariant(variant));
 
-        Assert.Contains("Invalid", exception.Message);
         Assert.Contains(nameof(EvtVariantType), exception.Message);
+        Assert.Contains("9999", exception.Message);
     }
 
     [Fact]
@@ -674,8 +675,10 @@ public sealed class EventMethodsTests
                         break;
                     case EvtVariantType.SByte:
                     case EvtVariantType.Byte:
-                    case EvtVariantType.Int16:
                         *(byte*)buffer = (byte)value;
+                        break;
+                    case EvtVariantType.Int16:
+                        *(short*)buffer = (short)value;
                         break;
                     case EvtVariantType.UInt16:
                         *(ushort*)buffer = (ushort)value;
