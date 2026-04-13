@@ -140,21 +140,25 @@ public sealed class EventTableReducers
 
         if (state.EventTables.Any(table => table.IsLoading)) { return state; }
 
-        var updatedTable = state.EventTables.First(table => table.IsCombined);
+        var existingCombinedTable = state.EventTables.First(table => table.IsCombined);
+
+        var combinedEvents = GetCombinedEvents(
+            state.EventTables
+                .Where(table => !table.IsCombined)
+                .Select(table => table.DisplayedEvents),
+            state.OrderBy ?? ColumnName.DateAndTime,
+            state.IsDescending);
+
+        if (combinedEvents.SequenceEqual(existingCombinedTable.DisplayedEvents))
+        {
+            return state;
+        }
 
         return state with
         {
             EventTables = state.EventTables
-                .Remove(updatedTable)
-                .Add(updatedTable with
-                {
-                    DisplayedEvents = GetCombinedEvents(
-                            state.EventTables
-                                .Where(table => !table.IsCombined)
-                                .Select(table => table.DisplayedEvents),
-                            state.OrderBy ?? ColumnName.DateAndTime,
-                            state.IsDescending)
-                })
+                .Remove(existingCombinedTable)
+                .Add(existingCombinedTable with { DisplayedEvents = combinedEvents })
         };
     }
 
