@@ -201,7 +201,7 @@ public partial class EventResolverBase : IDisposable
 
         string[] dataNodes = GetOrParseTemplateDataNodes(template);
 
-        return dataNodes.Length == 0 || dataNodes.Length == eventPropertyCount;
+        return dataNodes.Length == eventPropertyCount;
     }
 
     private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
@@ -271,18 +271,34 @@ public partial class EventResolverBase : IDisposable
         }
 
         List<string> temp = [];
-        ReadOnlySpan<char> dataElement = "<data ";
+        ReadOnlySpan<char> dataTag = "<data";
         ReadOnlySpan<char> outTypeAttribute = "outType=\"";
 
         int searchStart = 0;
 
         while (searchStart < template.Length)
         {
-            int dataIndex = template[searchStart..].IndexOf(dataElement, StringComparison.OrdinalIgnoreCase);
+            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
 
             if (dataIndex == -1) { break; }
 
             dataIndex += searchStart;
+
+            // Verify the character after "<data" is whitespace, '/', or '>'
+            // to avoid matching tags like "<dataSource"
+            int nextCharIndex = dataIndex + dataTag.Length;
+
+            if (nextCharIndex < template.Length)
+            {
+                char next = template[nextCharIndex];
+
+                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
+                {
+                    searchStart = nextCharIndex;
+
+                    continue;
+                }
+            }
 
             // Find the end of this element
             int elementEnd = template[dataIndex..].IndexOf("/>");

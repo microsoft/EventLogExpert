@@ -68,33 +68,72 @@ public static class EventUtils
             ThreadId = 5678
         };
 
-    public static ProviderDetails CreateExchangeProviderDetails() => new()
-    {
-        Events = [],
-        Keywords = new Dictionary<long, string>(),
-        Messages =
-        [
-            new MessageModel
-            {
-                LogLink = null,
-                ProviderName = "MSExchangeRepl",
-                RawId = 1074008082,
-                ShortId = 4114,
-                Tag = null,
-                Template = null,
-                Text = "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
-            }
-        ],
-        Opcodes = new Dictionary<int, string>(),
-        ProviderName = "MSExchangeRepl",
-        Tasks = new Dictionary<int, string>
+    public static ProviderDetails CreateExchangeProviderDetails() =>
+        new()
         {
-            { 1, "Service" },
-            { 2, "Exchange VSS Writer" },
-            { 3, "Move" },
-            { 4, "Upgrade" },
-            { 5, "Action" },
-            { 6, "ExRes" }
+            Events = [],
+            Keywords = new Dictionary<long, string>(),
+            Messages =
+            [
+                new MessageModel
+                {
+                    LogLink = null,
+                    ProviderName = "MSExchangeRepl",
+                    RawId = 1074008082,
+                    ShortId = 4114,
+                    Tag = null,
+                    Template = null,
+                    Text = "Database redundancy health check passed.%nDatabase copy: %1%nRedundancy count: %2%nIsSuppressed: %4%n%nErrors:%n%3\r\n"
+                }
+            ],
+            Opcodes = new Dictionary<int, string>(),
+            ProviderName = "MSExchangeRepl",
+            Tasks = new Dictionary<int, string>
+            {
+                { 1, "Service" },
+                { 2, "Exchange VSS Writer" },
+                { 3, "Move" },
+                { 4, "Upgrade" },
+                { 5, "Action" },
+                { 6, "ExRes" }
+            }
+        };
+
+    /// <summary>Creates a modern event with a template and description for property resolution tests.</summary>
+    public static (ProviderDetails Details, EventRecord Record) CreateModernEvent(
+        string description,
+        string template,
+        IReadOnlyList<object> properties,
+        ushort id = 1000,
+        byte version = 0) =>
+    (
+        new ProviderDetails
+        {
+            ProviderName = TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = id,
+                    Version = version,
+                    Keywords = [],
+                    LogName = ApplicationLogName,
+                    Description = description,
+                    Template = template
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        },
+        new EventRecord
+        {
+            ProviderName = TestProviderName,
+            Id = id,
+            Version = version,
+            LogName = ApplicationLogName,
+            Properties = properties
         }
-    };
+    );
 }
