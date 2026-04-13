@@ -73,7 +73,7 @@ public static class FilterMethods
         var sorted = new List<DisplayEventModel>(events);
         sorted.Sort(GetComparer(orderBy, isDescending));
 
-        return sorted;
+        return sorted.AsReadOnly();
     }
 
     internal static Comparison<DisplayEventModel> GetComparer(ColumnName? orderBy, bool isDescending)
