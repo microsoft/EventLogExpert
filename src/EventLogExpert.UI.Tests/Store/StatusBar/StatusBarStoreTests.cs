@@ -190,6 +190,23 @@ public sealed class StatusBarReducerTests
     }
 
     [Fact]
+    public void ReduceSetEventsLoading_WithUnchangedValues_ShouldReturnSameState()
+    {
+        var activityId = Guid.NewGuid();
+
+        var state = new StatusBarState
+        {
+            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
+        };
+
+        var action = new StatusBarAction.SetEventsLoading(activityId, 100, 5);
+
+        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
     public void ReduceSetEventsLoading_WithZeroCount_ShouldRemoveActivity()
     {
         var activityId = Guid.NewGuid();

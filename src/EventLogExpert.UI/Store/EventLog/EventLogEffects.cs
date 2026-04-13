@@ -144,7 +144,7 @@ public sealed class EventLogEffects(
             _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count, failed)); },
             null,
             TimeSpan.Zero,
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(3));
 
         using var reader = new EventLogReader(action.LogName, action.PathType, filterState?.Value.IsXmlEnabled ?? false);
 
