@@ -247,6 +247,8 @@ internal static partial class EventMethods
                 return variant.ULong;
             case (int)EvtVariantType.Handle:
                 return new EvtHandle(variant.Handle);
+            case (int)EvtVariantType.Xml:
+                return Marshal.PtrToStringUni(variant.StringVal);
             case (int)EvtVariantType.StringArray:
                 if (variant.Count == 0)
                 {
@@ -264,7 +266,7 @@ internal static partial class EventMethods
 
                 return stringArray;
             default:
-                throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}");
+                return $"[Unknown EvtVariantType: {variant.Type}]";
         }
     }
 
