@@ -65,7 +65,7 @@ public sealed class EventLogEffects(
 
             var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
-            dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
+            dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer.AsReadOnly(), full));
         }
 
         return Task.CompletedTask;
@@ -151,7 +151,7 @@ public sealed class EventLogEffects(
         List<DisplayEventModel> events = [];
 
         await using Timer timer = new(
-            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), failed)); },
+            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed))); },
             null,
             TimeSpan.Zero,
             TimeSpan.FromSeconds(3));
@@ -200,6 +200,9 @@ public sealed class EventLogEffects(
 
                     try
                     {
+                        List<DisplayEventModel> localBatch = new(batch.Length);
+                        int localResolved = 0;
+
                         foreach (var @event in batch)
                         {
                             token.ThrowIfCancellationRequested();
@@ -215,16 +218,20 @@ public sealed class EventLogEffects(
                                     continue;
                                 }
 
-                                var resolvedEvent = eventResolver.ResolveEvent(@event);
-
-                                lock (events) { events.Add(resolvedEvent); }
-
-                                Interlocked.Increment(ref resolved);
+                                localBatch.Add(eventResolver.ResolveEvent(@event));
+                                localResolved++;
                             }
                             catch (Exception ex)
                             {
                                 _logger?.Warn($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
                             }
+                        }
+
+                        if (localBatch.Count > 0)
+                        {
+                            lock (events) { events.AddRange(localBatch); }
+
+                            Interlocked.Add(ref resolved, localResolved);
                         }
                     }
                     finally
@@ -237,17 +244,31 @@ public sealed class EventLogEffects(
 
             lastEvent = reader.LastBookmark;
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
+            await StopProducerAsync(producerTask);
+
             dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
             dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
+
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Error($"Failed to load log {action.LogName}: {ex.Message}");
+
+            await StopProducerAsync(producerTask);
+
+            dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to load {action.LogName}"));
 
             return;
         }
 
         events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
 
-        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events));
+        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.AsReadOnly()));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
@@ -285,7 +306,7 @@ public sealed class EventLogEffects(
     {
         eventsToAdd.AddRange(logData.Events);
 
-        return logData with { Events = eventsToAdd };
+        return logData with { Events = eventsToAdd.AsReadOnly() };
     }
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
@@ -318,6 +339,17 @@ public sealed class EventLogEffects(
         }
 
         return newLogs;
+    }
+
+    /// <summary>
+    ///     Awaits the producer task, suppressing all exceptions.
+    ///     The sole purpose is to ensure the producer has fully stopped before
+    ///     the reader is disposed. Any meaningful errors are handled by the caller.
+    /// </summary>
+    private static async Task StopProducerAsync(Task producerTask)
+    {
+        try { await producerTask; }
+        catch { /* Intentionally swallowed — caller handles error reporting */ }
     }
 
     private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)

@@ -47,13 +47,15 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
             return collection
                 .Where(e => e.FilterByDate(eventFilter.DateFilter)
                     .Filter(eventFilter.Filters, IsXmlEnabled))
-                .ToList();
+                .ToList()
+                .AsReadOnly();
         }
 
         return events.AsParallel()
             .Where(e => e.FilterByDate(eventFilter.DateFilter)
                 .Filter(eventFilter.Filters, IsXmlEnabled))
-            .ToList();
+            .ToList()
+            .AsReadOnly();
     }
 
     public bool TryParse(FilterModel filterModel, out string comparison)
