@@ -3,15 +3,13 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
-using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool;
 
-public class ShowLocalCommand : DbToolCommand
+public class ShowLocalCommand(ITraceLogger logger) : DbToolCommand(logger)
 {
-    private static readonly ITraceLogger s_logger = new TraceLogger(LogLevel.Information);
-
     public static Command GetCommand()
     {
         Command showProvidersCommand = new(
@@ -32,12 +30,16 @@ public class ShowLocalCommand : DbToolCommand
         showProvidersCommand.Options.Add(verboseOption);
 
         showProvidersCommand.SetAction(action =>
-            ShowProviderInfo(action.GetValue(filterOption), action.GetValue(verboseOption)));
+        {
+            using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
+            new ShowLocalCommand(sp.GetRequiredService<ITraceLogger>())
+                .ShowProviderInfo(action.GetValue(filterOption));
+        });
 
         return showProvidersCommand;
     }
 
-    private static void ShowProviderInfo(string? filter, bool verbose)
+    private void ShowProviderInfo(string? filter)
     {
         var providerNames = GetLocalProviderNames(filter);
 
@@ -45,7 +47,7 @@ public class ShowLocalCommand : DbToolCommand
 
         foreach (var providerName in providerNames)
         {
-            var provider = new EventMessageProvider(providerName, verbose ? s_logger : null);
+            var provider = new EventMessageProvider(providerName, Logger);
             var details = provider.LoadProviderDetails();
 
             LogProviderDetails(details);

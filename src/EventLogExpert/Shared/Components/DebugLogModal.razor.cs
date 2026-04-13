@@ -1,9 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using Microsoft.AspNetCore.Components;
-using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Shared.Components;
 
@@ -11,11 +11,13 @@ public partial class DebugLogModal : IDisposable
 {
     private readonly List<string> _data = [];
 
-    [Inject] private IFileLogger TraceLogger { get; set; } = null!;
+    [Inject] private IFileLogger FileLogger { get; set; } = null!;
+
+    [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
 
     public void Dispose()
     {
-        TraceLogger.DebugLogLoaded -= OnDebugLogLoaded;
+        FileLogger.DebugLogLoaded -= OnDebugLogLoaded;
         GC.SuppressFinalize(this);
     }
 
@@ -28,7 +30,7 @@ public partial class DebugLogModal : IDisposable
 
     protected override void OnInitialized()
     {
-        TraceLogger.DebugLogLoaded += OnDebugLogLoaded;
+        FileLogger.DebugLogLoaded += OnDebugLogLoaded;
 
         base.OnInitialized();
     }
@@ -37,7 +39,7 @@ public partial class DebugLogModal : IDisposable
     {
         _data.Clear();
 
-        await TraceLogger.ClearAsync();
+        await FileLogger.ClearAsync();
 
         StateHasChanged();
     }
@@ -50,7 +52,7 @@ public partial class DebugLogModal : IDisposable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to open debug log modal: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to open debug log modal: {e}");
         }
     }
 
@@ -58,7 +60,7 @@ public partial class DebugLogModal : IDisposable
     {
         _data.Clear();
 
-        await foreach (var line in TraceLogger.LoadAsync())
+        await foreach (var line in FileLogger.LoadAsync())
         {
             _data.Add(line);
         }

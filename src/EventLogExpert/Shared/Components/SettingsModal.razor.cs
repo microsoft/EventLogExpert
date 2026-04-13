@@ -1,6 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
@@ -38,7 +39,7 @@ public sealed partial class SettingsModal : IDisposable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     public void Dispose() => Settings.Loaded -= OnSettingsLoaded;
 
@@ -173,7 +174,7 @@ public sealed partial class SettingsModal : IDisposable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to load settings modal: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to load settings modal: {e}");
         }
     }
 

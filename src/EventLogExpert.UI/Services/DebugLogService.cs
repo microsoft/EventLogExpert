@@ -5,8 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Runtime.ExceptionServices;
+using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.UI.Services;
 
@@ -14,18 +13,18 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
-    private static readonly SemaphoreSlim s_loggingFileLock = new(1, 1);
-
     private readonly FileLocationOptions _fileLocationOptions;
-    private readonly Lock _firstChanceLock = new();
     private readonly ISettingsService _settings;
+    private readonly Lock _writeLock = new();
 
-    private bool _firstChanceLoggingEnabled;
+    private volatile LogLevel _cachedLogLevel;
+    private StreamWriter? _writer;
 
     public DebugLogService(FileLocationOptions fileLocationOptions, ISettingsService settings)
     {
         _fileLocationOptions = fileLocationOptions;
         _settings = settings;
+        _cachedLogLevel = _settings.LogLevel;
 
         InitTracing();
 
@@ -36,30 +35,57 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public event Action? DebugLogLoaded;
 
-    public async Task ClearAsync()
-    {
-        await s_loggingFileLock.WaitAsync();
+    public LogLevel MinimumLevel => _cachedLogLevel;
 
-        try
+    public Task ClearAsync()
+    {
+        using (_writeLock.EnterScope())
         {
-            await File.WriteAllTextAsync(_fileLocationOptions.LoggingPath, string.Empty);
+            CloseWriter();
+            File.WriteAllText(_fileLocationOptions.LoggingPath, string.Empty);
         }
-        finally
-        {
-            s_loggingFileLock.Release();
-        }
+
+        return Task.CompletedTask;
+    }
+
+    public void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler)
+    {
+        if (!handler.IsEnabled) { return; }
+
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Critical);
+    }
+
+    public void Debug([InterpolatedStringHandlerArgument("")] DebugLogHandler handler)
+    {
+        if (!handler.IsEnabled) { return; }
+
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Debug);
     }
 
     public void Dispose()
     {
         AppDomain.CurrentDomain.UnhandledException -= OnUnhandledException;
 
-        if (_firstChanceLoggingEnabled)
-        {
-            AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
-        }
-
         _settings.LogLevelChanged -= OnLogLevelChanged;
+
+        using (_writeLock.EnterScope())
+        {
+            CloseWriter();
+        }
+    }
+
+    public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler)
+    {
+        if (!handler.IsEnabled) { return; }
+
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Error);
+    }
+
+    public void Info([InterpolatedStringHandlerArgument("")] InfoLogHandler handler)
+    {
+        if (!handler.IsEnabled) { return; }
+
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Information);
     }
 
     public async IAsyncEnumerable<string> LoadAsync()
@@ -103,86 +129,72 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     public void LoadDebugLog() => DebugLogLoaded?.Invoke();
 
-    public void Trace(string message, LogLevel level = LogLevel.Information)
+    public void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler)
     {
-        if (level < _settings.LogLevel) { return; }
+        if (!handler.IsEnabled) { return; }
 
-        string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Trace);
+    }
 
-        s_loggingFileLock.Wait();
+    public void Warn([InterpolatedStringHandlerArgument("")] WarnLogHandler handler)
+    {
+        if (!handler.IsEnabled) { return; }
 
-        try
-        {
-            using StreamWriter writer = File.AppendText(_fileLocationOptions.LoggingPath);
+        WriteTrace(handler.ToStringAndClear(), LogLevel.Warning);
+    }
 
-            writer.WriteLine(output);
-        }
-        finally
-        {
-            s_loggingFileLock.Release();
-        }
+    private void CloseWriter()
+    {
+        _writer?.Dispose();
+        _writer = null;
+    }
 
-#if DEBUG
-        Debug.WriteLine(output);
-#endif
+    private void EnsureWriter()
+    {
+        if (_writer is not null) { return; }
+
+        var stream = new FileStream(
+            _fileLocationOptions.LoggingPath,
+            FileMode.Append,
+            FileAccess.Write,
+            FileShare.Read | FileShare.Delete,
+            bufferSize: 4096);
+
+        _writer = new StreamWriter(stream) { AutoFlush = true };
     }
 
     private void InitTracing()
     {
-        _firstChanceLoggingEnabled = false;
-
-        // Set up tracing to a file
         var fileInfo = new FileInfo(_fileLocationOptions.LoggingPath);
 
         if (fileInfo is { Exists: true, Length: > MaxLogSize })
         {
             fileInfo.Delete();
         }
-
-        // Disabling first chance exception logging unless LogLevel is at Trace level
-        // since it is noisy and is logging double information for exceptions that are being handled.
-        // This also saves any potential performance hit for when we aren't worried about tracking first chance exceptions.
-        if (_settings.LogLevel > LogLevel.Trace) { return; }
-
-        _firstChanceLoggingEnabled = true;
-
-        // Trace all exceptions
-        AppDomain.CurrentDomain.FirstChanceException += OnFirstChanceException;
-    }
-
-    private void OnFirstChanceException(object? sender, FirstChanceExceptionEventArgs e)
-    {
-        // Unless we're already tracing one.
-        //
-        // When an instance of EventLogExpert is launched by double-clicking an evtx file
-        // and no databases are present, we get into a condition where we're trying to trace
-        // a first-chance exception, and the act of tracing causes another first-chance
-        // exception, which we then try to trace, until we hit a stack overflow.
-
-        if (!_firstChanceLock.TryEnter(100)) { return; }
-
-        try
-        {
-            Trace($"{e.Exception}", LogLevel.Trace);
-        }
-        finally
-        {
-            _firstChanceLock.Exit();
-        }
     }
 
     private void OnLogLevelChanged()
     {
-        if (_firstChanceLoggingEnabled)
-        {
-            AppDomain.CurrentDomain.FirstChanceException -= OnFirstChanceException;
-        }
-
-        InitTracing();
+        _cachedLogLevel = _settings.LogLevel;
     }
 
     private void OnUnhandledException(object sender, UnhandledExceptionEventArgs e)
     {
-        Trace($"Unhandled Exception: {e.ExceptionObject}", LogLevel.Critical);
+        WriteTrace($"Unhandled Exception: {e.ExceptionObject}", LogLevel.Critical);
+    }
+
+    private void WriteTrace(string message, LogLevel level)
+    {
+        string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
+
+        using (_writeLock.EnterScope())
+        {
+            EnsureWriter();
+            _writer?.WriteLine(output);
+        }
+
+#if DEBUG
+        System.Diagnostics.Debug.WriteLine(output);
+#endif
     }
 }

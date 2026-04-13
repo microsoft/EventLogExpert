@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
@@ -116,7 +116,7 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
 
                         if (details is null) { continue; }
 
-                        Logger?.Trace($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
+                        Logger?.Debug($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
                         ProviderDetails.TryAdd(eventRecord.ProviderName, details);
 
                         // Exit after first match - databases are sorted by priority (SortDatabases),
@@ -210,11 +210,11 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
     /// </summary>
     private void LoadDatabases(IEnumerable<string> databasePaths)
     {
-        Logger?.Trace($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
+        Logger?.Debug($"{nameof(LoadDatabases)} was called with {databasePaths.Count()} {nameof(databasePaths)}.");
 
         foreach (var databasePath in databasePaths)
         {
-            Logger?.Trace($"  {databasePath}");
+            Logger?.Debug($"  {databasePath}");
         }
 
         foreach (var context in _dbContexts)

@@ -6,9 +6,7 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Services;
 
@@ -64,9 +62,8 @@ public sealed class EnabledDatabaseCollectionProviderTests : IDisposable
             mockTraceLogger);
 
         // Assert
-        mockTraceLogger.Received(1).Trace(
-            Arg.Is<string>(s => s.Contains(nameof(EnabledDatabaseCollectionProvider.SetActiveDatabases))),
-            Arg.Any<LogLevel>());
+        mockTraceLogger.Received(1).Debug(
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains(nameof(EnabledDatabaseCollectionProvider.SetActiveDatabases))));
     }
 
     [Fact]
@@ -305,11 +302,10 @@ public sealed class EnabledDatabaseCollectionProviderTests : IDisposable
         provider.SetActiveDatabases([Constants.TestDbPath1, Constants.TestDbPath2]);
 
         // Assert
-        mockTraceLogger.Received(1).Trace(
-            Arg.Is<string>(s =>
-                s.Contains(nameof(EnabledDatabaseCollectionProvider.SetActiveDatabases)) &&
-                s.Contains('2')),
-            Arg.Any<LogLevel>());
+        mockTraceLogger.Received(1).Debug(
+            Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains(nameof(EnabledDatabaseCollectionProvider.SetActiveDatabases)) &&
+                h.ToString().Contains('2')));
     }
 
     [Fact]

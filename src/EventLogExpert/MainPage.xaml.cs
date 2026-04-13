@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
@@ -17,7 +17,6 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
-using Microsoft.Extensions.Logging;
 using Microsoft.UI.Xaml;
 using System.Collections.Immutable;
 using Windows.ApplicationModel.DataTransfer;
@@ -41,7 +40,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsXmlEnabledState;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly ISettingsService _settings;
-    private readonly IFileLogger _traceLogger;
+    private readonly IFileLogger _fileLogger;
+    private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
     private CancellationTokenSource _cancellationTokenSource = new();
@@ -61,7 +61,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
         ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
-        IFileLogger traceLogger)
+        ITraceLogger traceLogger,
+        IFileLogger fileLogger)
     {
         InitializeComponent();
         PopulateOtherLogsMenu();
@@ -71,6 +72,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _currentVersionProvider = currentVersionProvider;
         _databaseService = databaseService;
         _filterPaneIsXmlEnabledState = filterPaneIsXmlEnabledState;
+        _fileLogger = fileLogger;
         _fluxorDispatcher = fluxorDispatcher;
         _settings = settings;
         _dialogService = dialogService;
@@ -158,7 +160,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         if (!_currentVersionProvider.IsSupportedOS(DeviceInfo.Version))
         {
-            _traceLogger.Trace("Update API does not work on versions older than 10.0.19041.0", LogLevel.Warning);
+            _traceLogger.Warn($"Update API does not work on versions older than 10.0.19041.0");
             return;
         }
 
@@ -457,7 +459,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
         catch (Exception e)
         {
-            _traceLogger.Trace($"Failed to process command line arguments: {e}", LogLevel.Error);
+            _traceLogger.Error($"Failed to process command line arguments: {e}");
         }
     }
 
@@ -522,7 +524,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private void ViewFilterGroups_Clicked(object? sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterGroupAction.OpenMenu());
 
-    private void ViewLogs_Clicked(object? sender, EventArgs e) => _traceLogger.LoadDebugLog();
+    private void ViewLogs_Clicked(object? sender, EventArgs e) => _fileLogger.LoadDebugLog();
 
     private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());

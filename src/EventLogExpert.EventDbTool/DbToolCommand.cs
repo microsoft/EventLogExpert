@@ -1,15 +1,18 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
 
-public class DbToolCommand
+public class DbToolCommand(ITraceLogger logger)
 {
-    private static string s_providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
+    private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8}";
+
+    protected ITraceLogger Logger => logger;
 
     protected static List<string> GetLocalProviderNames(string? filter)
     {
@@ -23,24 +26,29 @@ public class DbToolCommand
         return providers;
     }
 
-    protected static void LogProviderDetailHeader(IEnumerable<string> providerNames)
+    protected void LogProviderDetailHeader(IEnumerable<string> providerNames)
     {
         var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
-        if (maxNameLength < 14) maxNameLength = 14;
-        s_providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
-        Console.WriteLine(s_providerDetailFormat, "Provider Name", "Events", "Parameters", "Keywords", "Opcodes", "Tasks", "Messages");
+        if (maxNameLength < 14) { maxNameLength = 14; }
+
+        _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
+
+        var header = string.Format(_providerDetailFormat, "Provider Name", "Events", "Parameters", "Keywords", "Opcodes", "Tasks", "Messages");
+        Logger.Info($"{header}");
     }
 
-    protected static void LogProviderDetails(ProviderDetails details)
+    protected void LogProviderDetails(ProviderDetails details)
     {
-        Console.WriteLine(
-            s_providerDetailFormat,
+        var line = string.Format(
+            _providerDetailFormat,
             details.ProviderName,
-            details.Events.Count(),
+            details.Events.Count,
             details.Parameters.Count(),
             details.Keywords.Count,
             details.Opcodes.Count,
             details.Tasks.Count,
-            details.Messages.Count());
+            details.Messages.Count);
+
+        Logger.Info($"{line}");
     }
 }

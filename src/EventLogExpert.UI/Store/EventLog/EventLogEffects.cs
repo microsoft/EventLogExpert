@@ -12,7 +12,6 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
@@ -169,7 +168,7 @@ public sealed class EventLogEffects(
                                 if (!@event.IsSuccess) {
                                     Interlocked.Increment(ref failed);
 
-                                    _logger.Trace($"{@event.PathName}: Bad Event: {@event.Error}", LogLevel.Error);
+                                    _logger?.Warn($"{@event.PathName}: Bad Event: {@event.Error}");
 
                                     continue;
                                 }
@@ -178,8 +177,7 @@ public sealed class EventLogEffects(
                             }
                             catch (Exception ex)
                             {
-                                _logger.Trace($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}",
-                                    LogLevel.Error);
+                                _logger?.Warn($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
                             }
                         }
                     }

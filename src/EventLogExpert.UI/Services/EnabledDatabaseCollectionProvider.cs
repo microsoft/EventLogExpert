@@ -1,11 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
-using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Services;
@@ -54,7 +53,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
         }
         catch (Exception ex)
         {
-            _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(GetEnabledDatabases)} failed: {ex}", LogLevel.Warning);
+            _traceLogger.Warn($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(GetEnabledDatabases)} failed: {ex}");
         }
 
         var disabledDatabases = _preferencesProvider.DisabledDatabasesPreference;
@@ -74,7 +73,7 @@ public class EnabledDatabaseCollectionProvider : IDatabaseCollectionProvider, IE
     /// <param name="activeDatabases"></param>
     public void SetActiveDatabases(IEnumerable<string> activeDatabases)
     {
-        _traceLogger.Trace($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.");
+        _traceLogger.Debug($"{nameof(EnabledDatabaseCollectionProvider)}.{nameof(SetActiveDatabases)} was called with {activeDatabases.Count()} databases.");
         ActiveDatabases = activeDatabases.ToImmutableList();
     }
 }

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -32,8 +32,7 @@ public sealed class VersatileEventResolver : IEventResolver
             _databaseResolver = new EventProviderDatabaseEventResolver(dbCollection, cache, tracer);
         }
 
-        tracer?.Trace(
-            $"Database Resolver is {dbCollection?.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
+        tracer?.Debug($"Database Resolver is {dbCollection?.ActiveDatabases.IsEmpty} in {nameof(VersatileEventResolver)} constructor.");
     }
 
     public void Dispose()

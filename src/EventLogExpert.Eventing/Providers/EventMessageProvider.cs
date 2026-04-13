@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -57,10 +57,7 @@ public sealed class EventMessageProvider
 
             if (msgTableInfo.IsInvalid)
             {
-                logger?.Trace(
-                    $"No message table found. Returning 0 messages from file:\n" +
-                    $"{file}\n" +
-                    $"Error: {error}");
+                logger?.Debug($"No message table found. Returning 0 messages from file:\n{file}\nError: {error}");
 
                 continue;
             }
@@ -133,11 +130,11 @@ public sealed class EventMessageProvider
         {
             if (string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
             {
-                _logger?.Trace($"No message files found for provider {_providerName}. Returning null.");
+                _logger?.Debug($"No message files found for provider {_providerName}. Returning null.");
             }
             else
             {
-                _logger?.Trace($"No message files found for provider {_providerName}. Using message file from modern provider.");
+                _logger?.Debug($"No message files found for provider {_providerName}. Using message file from modern provider.");
 
                 provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
             }
@@ -158,13 +155,13 @@ public sealed class EventMessageProvider
     /// <returns></returns>
     private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
     {
-        _logger?.Trace($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}");
+        _logger?.Debug($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}");
 
         try
         {
             var messages = GetMessages(messageFilePaths, _providerName, _logger);
 
-            _logger?.Trace($"Returning {messages.Count} messages for provider {_providerName}");
+            _logger?.Debug($"Returning {messages.Count} messages for provider {_providerName}");
 
             return messages;
         }
@@ -172,7 +169,7 @@ public sealed class EventMessageProvider
         {
             // Hide the failure. We want to allow the results from the modern provider
             // to return even if we failed to load the legacy provider.
-            _logger?.Trace($"Failed to load legacy provider data for {_providerName}.\n{ex}");
+            _logger?.Debug($"Failed to load legacy provider data for {_providerName}.\n{ex}");
         }
 
         return [];
@@ -184,13 +181,13 @@ public sealed class EventMessageProvider
     /// </summary>
     private ProviderDetails LoadMessagesFromModernProvider(ProviderMetadata providerMetadata)
     {
-        _logger?.Trace($"LoadMessagesFromModernProvider called for provider {_providerName}");
+        _logger?.Debug($"{nameof(LoadMessagesFromModernProvider)} called for provider {_providerName}");
 
         var provider = new ProviderDetails { ProviderName = _providerName };
 
         if (!s_allProviderNames.Contains(_providerName))
         {
-            _logger?.Trace($"{_providerName} modern provider is not present. Returning empty provider.");
+            _logger?.Debug($"{_providerName} modern provider is not present. Returning empty provider.");
 
             return provider;
         }
@@ -213,7 +210,7 @@ public sealed class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _logger?.Trace($"Failed to load Events for modern provider: {_providerName}. Exception:\n{ex}");
+            _logger?.Debug($"Failed to load Events for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
         try
@@ -223,7 +220,7 @@ public sealed class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _logger?.Trace($"Failed to load Keywords for modern provider: {_providerName}. Exception:\n{ex}");
+            _logger?.Debug($"Failed to load Keywords for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
         try
@@ -232,7 +229,7 @@ public sealed class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _logger?.Trace($"Failed to load Opcodes for modern provider: {_providerName}. Exception:\n{ex}");
+            _logger?.Debug($"Failed to load Opcodes for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
         try
@@ -241,10 +238,10 @@ public sealed class EventMessageProvider
         }
         catch (Exception ex)
         {
-            _logger?.Trace($"Failed to load Tasks for modern provider: {_providerName}. Exception:\n{ex}");
+            _logger?.Debug($"Failed to load Tasks for modern provider: {_providerName}. Exception:\n{ex}");
         }
 
-        _logger?.Trace($"Returning {provider.Events.Count} events for provider {_providerName}");
+        _logger?.Debug($"Returning {provider.Events.Count} events for provider {_providerName}");
 
         return provider;
     }

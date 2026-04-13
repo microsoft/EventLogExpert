@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -27,13 +27,13 @@ public class DeploymentService(
 
     public void RestartNowAndUpdate(string downloadPath)
     {
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_applicationRestartService.RegisterApplicationRestart)}.");
+        _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_applicationRestartService.RegisterApplicationRestart)}.");
 
         bool registrationSuccessful = _applicationRestartService.RegisterApplicationRestart();
 
         if (!registrationSuccessful) { return; }
 
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
+        _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
         var deployment = _packageDeploymentService.AddPackageAsync(
             new Uri(downloadPath),
@@ -44,7 +44,7 @@ public class DeploymentService(
 
     public void UpdateOnNextRestart(string downloadPath)
     {
-        _traceLogger.Trace($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
+        _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
         var deployment = _packageDeploymentService.AddPackageAsync(
             new Uri(downloadPath),

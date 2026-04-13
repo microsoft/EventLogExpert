@@ -1,6 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
@@ -10,7 +11,6 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Components;
@@ -33,7 +33,7 @@ public sealed partial class DetailsPane : IDisposable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    [Inject] private IFileLogger TraceLogger { get; init; } = null!;
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     public void Dispose() => SelectedEventSelection.SelectedValueChanged -= OnSelectedEventChanged;
 
@@ -90,7 +90,7 @@ public sealed partial class DetailsPane : IDisposable
         }
         catch (Exception e)
         {
-            TraceLogger.Trace($"Failed to handle selected event change: {e}", LogLevel.Error);
+            TraceLogger.Error($"Failed to handle selected event change: {e}");
         }
     }
 

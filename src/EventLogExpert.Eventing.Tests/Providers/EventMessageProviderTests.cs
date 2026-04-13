@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
-using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace EventLogExpert.Eventing.Tests.Providers;
@@ -62,7 +61,7 @@ public sealed class EventMessageProviderTests
 
         // Should process both (even though they're the same file)
         mockLogger.Received(2)
-            .Trace(Arg.Is<string>(s => s.Contains("No message table found")), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
     }
 
     [Fact]
@@ -125,7 +124,7 @@ public sealed class EventMessageProviderTests
 
         // Assert
         mockLogger.Received()
-            .Trace(Arg.Is<string>(s => s.Contains("No message table found")), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
     }
 
     [Fact]
@@ -154,7 +153,7 @@ public sealed class EventMessageProviderTests
 
         // Assert
         mockLogger.Received(2)
-            .Trace(Arg.Is<string>(s => s.Contains("No message table found")), Arg.Any<LogLevel>());
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
     }
 
     [Fact]
@@ -192,7 +191,7 @@ public sealed class EventMessageProviderTests
         provider.LoadProviderDetails();
 
         // Assert
-        mockLogger.Received().Trace(Arg.Any<string>(), Arg.Any<LogLevel>());
+        mockLogger.Received().Debug(Arg.Any<DebugLogHandler>());
     }
 
     [Fact]
