@@ -23,31 +23,13 @@ internal sealed class LocalProviderEventResolver : EventResolverBase, IEventReso
         // Fast path: ConcurrentDictionary is thread-safe for reads
         if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-        ProviderDetailsLock.EnterUpgradeableReadLock();
-
-        try
+        using (ProviderDetailsLock.EnterScope())
         {
-            // Re-check after acquiring lock
             if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-            ProviderDetailsLock.EnterWriteLock();
+            var details = new EventMessageProvider(eventRecord.ProviderName, Logger).LoadProviderDetails();
 
-            try
-            {
-                if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
-
-                var details = new EventMessageProvider(eventRecord.ProviderName, Logger).LoadProviderDetails();
-
-                ProviderDetails.TryAdd(eventRecord.ProviderName, details);
-            }
-            finally
-            {
-                ProviderDetailsLock.ExitWriteLock();
-            }
-        }
-        finally
-        {
-            ProviderDetailsLock.ExitUpgradeableReadLock();
+            ProviderDetails.TryAdd(eventRecord.ProviderName, details);
         }
     }
 }
