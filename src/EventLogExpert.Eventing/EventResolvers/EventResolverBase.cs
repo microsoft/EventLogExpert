@@ -199,33 +199,7 @@ public partial class EventResolverBase : IDisposable
     {
         if (template.IsEmpty) { return false; }
 
-        var cache = s_formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (cache.TryGetValue(template, out string[]? dataNodes))
-        {
-            return dataNodes.Length == eventPropertyCount;
-        }
-
-        List<string> temp = [];
-        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
-
-        foreach (var line in template.EnumerateLines())
-        {
-            int templateIndex = line.IndexOf(outTypeAttribute, StringComparison.Ordinal);
-
-            if (templateIndex == -1) { continue; }
-
-            templateIndex += outTypeAttribute.Length;
-            int endIndex = line[templateIndex..].IndexOf('"');
-
-            if (endIndex != -1)
-            {
-                temp.Add(new string(line.Slice(templateIndex, endIndex)));
-            }
-        }
-
-        dataNodes = [.. temp];
-        cache.TryAdd(template, dataNodes);
+        string[] dataNodes = GetOrParseTemplateDataNodes(template);
 
         return dataNodes.Length == 0 || dataNodes.Length == eventPropertyCount;
     }
@@ -235,30 +209,9 @@ public partial class EventResolverBase : IDisposable
         string[]? dataNodes = null;
         List<string> providers = [];
 
-        var cache = s_formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
-
-        if (!template.IsEmpty && !cache.TryGetValue(template, out dataNodes))
+        if (!template.IsEmpty)
         {
-            List<string> temp = [];
-            ReadOnlySpan<char> outTypeAttribute = "outType=\"";
-
-            foreach (var line in template.EnumerateLines())
-            {
-                int templateIndex = line.IndexOf(outTypeAttribute, StringComparison.Ordinal);
-
-                if (templateIndex == -1) { continue; }
-
-                templateIndex += outTypeAttribute.Length;
-                int endIndex = line[templateIndex..].IndexOf('"');
-
-                if (endIndex != -1)
-                {
-                    temp.Add(new string(line.Slice(templateIndex, endIndex)));
-                }
-            }
-
-            dataNodes = [.. temp];
-            cache.TryAdd(template, dataNodes);
+            dataNodes = GetOrParseTemplateDataNodes(template);
         }
 
         int index = 0;
@@ -306,6 +259,67 @@ public partial class EventResolverBase : IDisposable
         }
 
         return providers;
+    }
+
+    private static string[] GetOrParseTemplateDataNodes(ReadOnlySpan<char> template)
+    {
+        var cache = s_formattedPropertiesCache.GetAlternateLookup<ReadOnlySpan<char>>();
+
+        if (cache.TryGetValue(template, out string[]? dataNodes))
+        {
+            return dataNodes;
+        }
+
+        List<string> temp = [];
+        ReadOnlySpan<char> dataElement = "<data ";
+        ReadOnlySpan<char> outTypeAttribute = "outType=\"";
+
+        int searchStart = 0;
+
+        while (searchStart < template.Length)
+        {
+            int dataIndex = template[searchStart..].IndexOf(dataElement, StringComparison.OrdinalIgnoreCase);
+
+            if (dataIndex == -1) { break; }
+
+            dataIndex += searchStart;
+
+            // Find the end of this element
+            int elementEnd = template[dataIndex..].IndexOf("/>");
+
+            if (elementEnd == -1)
+            {
+                elementEnd = template[dataIndex..].IndexOf('>');
+            }
+
+            if (elementEnd == -1) { break; }
+
+            elementEnd += dataIndex;
+
+            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
+            int outTypeIndex = element.IndexOf(outTypeAttribute, StringComparison.Ordinal);
+
+            if (outTypeIndex != -1)
+            {
+                outTypeIndex += outTypeAttribute.Length;
+                int endIndex = element[outTypeIndex..].IndexOf('"');
+
+                temp.Add(endIndex != -1 ?
+                    new string(element.Slice(outTypeIndex, endIndex)) :
+                    string.Empty);
+            }
+            else
+            {
+                temp.Add(string.Empty);
+            }
+
+            searchStart = elementEnd + 1;
+        }
+
+        dataNodes = [.. temp];
+        cache.TryAdd(template, dataNodes);
+
+        return dataNodes;
     }
 
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)

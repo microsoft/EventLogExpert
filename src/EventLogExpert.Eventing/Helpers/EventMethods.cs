@@ -266,7 +266,7 @@ internal static partial class EventMethods
 
                 return stringArray;
             default:
-                return $"[Unknown EvtVariantType: {variant.Type}]";
+                throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}: {variant.Type}");
         }
     }
 
