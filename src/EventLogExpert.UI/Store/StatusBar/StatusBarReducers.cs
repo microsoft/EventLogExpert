@@ -27,10 +27,9 @@ public sealed class StatusBarReducers
     [ReducerMethod]
     public static StatusBarState ReduceSetEventsLoading(StatusBarState state, StatusBarAction.SetEventsLoading action)
     {
-        return state with
-        {
-            EventsLoading = CommonLoadingReducer(state.EventsLoading, action.ActivityId, action.Count, action.FailedCount)
-        };
+        var newLoading = CommonLoadingReducer(state.EventsLoading, action.ActivityId, action.Count, action.FailedCount);
+
+        return ReferenceEquals(newLoading, state.EventsLoading) ? state : state with { EventsLoading = newLoading };
     }
 
     [ReducerMethod]
@@ -44,11 +43,13 @@ public sealed class StatusBarReducers
         int count,
         int failedCount)
     {
-        if (loadingEntries.ContainsKey(activityId))
+        if (loadingEntries.TryGetValue(activityId, out var existing) && existing == (count, failedCount))
         {
-            loadingEntries = loadingEntries.Remove(activityId);
+            return loadingEntries;
         }
 
-        return count == 0 ? loadingEntries : loadingEntries.Add(activityId, (count, failedCount));
+        var updated = loadingEntries.Remove(activityId);
+
+        return count == 0 ? updated : updated.Add(activityId, (count, failedCount));
     }
 }

@@ -1,17 +1,8 @@
-﻿@using EventLogExpert.UI.Store.EventLog
-@using EventLogExpert.UI.Store.EventTable
-@using EventLogExpert.UI.Store.FilterPane
-@using EventLogExpert.UI.Store.StatusBar
-@using EventLogExpert.UI
+﻿@using EventLogExpert.UI
 @inherits FluxorComponent
 
-@inject IState<EventLogState> EventLogState
-@inject IState<EventTableState> EventTableState
-@inject IState<FilterPaneState> FilterPaneState
-@inject IState<StatusBarState> StatusBarState
-
 <div class="status-bar">
-    @foreach (var loadingProgress in StatusBarState.Value.EventsLoading)
+    @foreach (var loadingProgress in _statusBarState.EventsLoading)
     {
         <span>Loading: @loadingProgress.Value.Item1</span>
 
@@ -21,42 +12,42 @@
         }
     }
 
-    <span>Events Loaded: @EventLogState.Value.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
+    <span>Events Loaded: @_eventLogState.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (EventTableState.Value.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(EventLogState.Value.AppliedFilter))
+    @if (_eventTableState.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(_eventLogState.AppliedFilter))
     {
-        var activeTable = EventTableState.Value.EventTables.FirstOrDefault(table => table.Id == EventTableState.Value.ActiveEventLogId);
+        var activeTable = _eventTableState.EventTables.FirstOrDefault(table => table.Id == _eventTableState.ActiveEventLogId);
 
         if (activeTable is null) { return; }
 
         var totalEvents = activeTable.IsCombined ?
-            EventLogState.Value.ActiveLogs.Sum(l => l.Value.Events.Count) :
-            EventLogState.Value.ActiveLogs[activeTable.LogName].Events.Count;
+            _eventLogState.ActiveLogs.Sum(l => l.Value.Events.Count) :
+            _eventLogState.ActiveLogs[activeTable.LogName].Events.Count;
 
         var filteredEvents = activeTable.DisplayedEvents.Count;
 
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
-    @if (EventLogState.Value.ActiveLogs.Values.Any(l => l.Type == PathType.LogName))
+    @if (_eventLogState.ActiveLogs.Values.Any(l => l.Type == PathType.LogName))
     {
-        @if (EventLogState.Value.ContinuouslyUpdate)
+        @if (_eventLogState.ContinuouslyUpdate)
         {
             <span>Continuously Updating</span>
         }
         else
         {
-            <span>New Events: @EventLogState.Value.NewEventBuffer.Count</span>
+            <span>New Events: @_eventLogState.NewEventBuffer.Count</span>
 
-            @if (EventLogState.Value.NewEventBufferIsFull)
+            @if (_eventLogState.NewEventBufferIsFull)
             {
                 <span>Buffer Full</span>
             }
         }
     }
 
-    @if (!string.IsNullOrEmpty(StatusBarState.Value.ResolverStatus))
+    @if (!string.IsNullOrEmpty(_statusBarState.ResolverStatus))
     {
-        <span>@StatusBarState.Value.ResolverStatus</span>
+        <span>@_statusBarState.ResolverStatus</span>
     }
 </div>
