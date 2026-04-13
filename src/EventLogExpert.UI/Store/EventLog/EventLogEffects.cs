@@ -12,8 +12,8 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -26,6 +26,9 @@ public sealed class EventLogEffects(
     IEventResolverCache resolverCache,
     IServiceScopeFactory serviceScopeFactory)
 {
+    private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
+    private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
+
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
@@ -135,37 +138,76 @@ public sealed class EventLogEffects(
         var activityId = Guid.NewGuid();
         string? lastEvent;
         int failed = 0;
+        int resolved = 0;
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
-        ConcurrentQueue<DisplayEventModel> events = new();
+        var channel = Channel.CreateBounded<EventRecord[]>(new BoundedChannelOptions(s_maxGlobalConcurrency * 2)
+        {
+            SingleWriter = true,
+            FullMode = BoundedChannelFullMode.Wait
+        });
+
+        List<DisplayEventModel> events = [];
 
         await using Timer timer = new(
-            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count, failed)); },
+            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), failed)); },
             null,
             TimeSpan.Zero,
             TimeSpan.FromSeconds(3));
 
         using var reader = new EventLogReader(action.LogName, action.PathType, filterState?.Value.IsXmlEnabled ?? false);
 
+        // Producer: single thread reads batches from EventLogReader
+        var producerTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (reader.TryGetEvents(out EventRecord[] batch))
+                {
+                    action.Token.ThrowIfCancellationRequested();
+
+                    if (batch.Length == 0) { continue; }
+
+                    await channel.Writer.WriteAsync(batch, action.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                channel.Writer.Complete(ex);
+
+                throw;
+            }
+
+            channel.Writer.Complete();
+        }, action.Token);
+
         try
         {
+            // Consumers: parallel resolution of event batches from the channel.
+            // The global semaphore limits total concurrent resolution threads across
+            // all HandleOpenLog calls, preventing CPU saturation when loading multiple logs.
             await Parallel.ForEachAsync(
-                Enumerable.Range(1, 8),
-                action.Token,
-                (_, token) =>
+                channel.Reader.ReadAllAsync(action.Token),
+                new ParallelOptions
                 {
-                    while (reader.TryGetEvents(out EventRecord[]? eventRecords))
+                    CancellationToken = action.Token,
+                    MaxDegreeOfParallelism = s_maxGlobalConcurrency
+                },
+                async (batch, token) =>
+                {
+                    await s_resolutionThrottle.WaitAsync(token);
+
+                    try
                     {
-                        token.ThrowIfCancellationRequested();
-
-                        if (eventRecords.Length == 0) { continue; }
-
-                        foreach (var @event in eventRecords)
+                        foreach (var @event in batch)
                         {
+                            token.ThrowIfCancellationRequested();
+
                             try
                             {
-                                if (!@event.IsSuccess) {
+                                if (!@event.IsSuccess)
+                                {
                                     Interlocked.Increment(ref failed);
 
                                     _logger?.Warn($"{@event.PathName}: Bad Event: {@event.Error}");
@@ -173,7 +215,11 @@ public sealed class EventLogEffects(
                                     continue;
                                 }
 
-                                events.Enqueue(eventResolver.ResolveEvent(@event));
+                                var resolvedEvent = eventResolver.ResolveEvent(@event);
+
+                                lock (events) { events.Add(resolvedEvent); }
+
+                                Interlocked.Increment(ref resolved);
                             }
                             catch (Exception ex)
                             {
@@ -181,9 +227,13 @@ public sealed class EventLogEffects(
                             }
                         }
                     }
-
-                    return ValueTask.CompletedTask;
+                    finally
+                    {
+                        s_resolutionThrottle.Release();
+                    }
                 });
+
+            await producerTask;
 
             lastEvent = reader.LastBookmark;
         }
@@ -195,10 +245,9 @@ public sealed class EventLogEffects(
             return;
         }
 
-        var sortedEvents = events.ToList();
-        sortedEvents.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
+        events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
 
-        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, sortedEvents));
+        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
