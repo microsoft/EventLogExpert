@@ -200,7 +200,7 @@ internal static partial class EventMethods
             case (int)EvtVariantType.Byte:
                 return variant.UInt8;
             case (int)EvtVariantType.Int16:
-                return variant.SByte;
+                return variant.Short;
             case (int)EvtVariantType.UInt16:
                 return variant.UShort;
             case (int)EvtVariantType.Int32:
