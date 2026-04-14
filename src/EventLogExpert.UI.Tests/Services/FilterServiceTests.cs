@@ -99,6 +99,72 @@ public sealed class FilterServiceTests
         Assert.Equal(2, result[logId].Count);
     }
 
+    [Theory]
+    [InlineData(100)]
+    [InlineData(9_999)]
+    [InlineData(10_000)]
+    [InlineData(10_001)]
+    public void GetFilteredEvents_WhenFilteringEnabled_ShouldFilterCorrectlyAcrossThreshold(int eventCount)
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        // Create events: half before cutoff, half after
+        var events = Enumerable.Range(0, eventCount)
+            .Select(i => EventUtils.CreateTestEvent(
+                id: i,
+                timeCreated: baseTime.AddMinutes(i),
+                recordId: i))
+            .ToList();
+
+        var cutoff = baseTime.AddMinutes(eventCount / 2);
+        var dateFilter = new FilterDateModel { After = cutoff, Before = baseTime.AddMinutes(eventCount), IsEnabled = true };
+        var eventFilter = new EventFilter(dateFilter, []);
+
+        // Act
+        var result = filterService.GetFilteredEvents(events, eventFilter);
+
+        // Assert — should return only events at or after the cutoff
+        var expectedCount = events.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(eventCount));
+        Assert.Equal(expectedCount, result.Count);
+        Assert.All(result, e => Assert.True(e.TimeCreated >= cutoff));
+    }
+
+    [Fact]
+    public void GetFilteredEvents_WhenFilteringSmallCollection_ShouldReturnSameResultsAsLargeCollection()
+    {
+        // Arrange — verify both paths produce identical results
+        var filterService = CreateFilterService();
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var cutoff = baseTime.AddMinutes(50);
+
+        var dateFilter = new FilterDateModel { After = cutoff, Before = baseTime.AddMinutes(200), IsEnabled = true };
+        var eventFilter = new EventFilter(dateFilter, []);
+
+        // Small collection (sequential path)
+        var smallEvents = Enumerable.Range(0, 100)
+            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .ToList();
+
+        // Large collection (PLINQ path) with the same first 100 events
+        var largeEvents = Enumerable.Range(0, 15_000)
+            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .ToList();
+
+        // Act
+        var smallResult = filterService.GetFilteredEvents(smallEvents, eventFilter);
+        var largeResult = filterService.GetFilteredEvents(largeEvents, eventFilter);
+
+        // Assert — small result should match the first 100 events' filtered subset
+        var expectedSmallCount = smallEvents.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(200));
+        Assert.Equal(expectedSmallCount, smallResult.Count);
+
+        // Large result should include the same events as small result (plus more from the larger set)
+        Assert.True(largeResult.Count > smallResult.Count);
+        Assert.All(smallResult, e => Assert.Contains(e, largeResult));
+    }
+
     [Fact]
     public void GetFilteredEvents_WhenNoFiltersEnabled_ShouldReturnAllEvents()
     {

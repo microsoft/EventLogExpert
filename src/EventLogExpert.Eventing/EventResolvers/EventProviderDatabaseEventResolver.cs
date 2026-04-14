@@ -73,72 +73,48 @@ internal sealed partial class EventProviderDatabaseEventResolver : EventResolver
         ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
 
         // Fast path: ConcurrentDictionary is thread-safe for reads, so we can check
-        // without any lock. This avoids serializing all 8 parallel reader threads on
-        // the UpgradeableReadLock for providers that are already cached.
+        // without any lock. This avoids serializing all parallel reader threads for
+        // providers that are already cached.
         if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-        ProviderDetailsLock.EnterUpgradeableReadLock();
-
-        try
+        using (ProviderDetailsLock.EnterScope())
         {
             // Re-check after acquiring lock - another thread may have added this provider
-            if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
-            {
-                return;
-            }
+            if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
-            ProviderDetailsLock.EnterWriteLock();
-
-            try
+            // Use EnterScope() for exception-safe lock management
+            using (_databaseAccessLock.EnterScope())
             {
-                // Triple-check after acquiring write lock
-                if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
+                // Check disposed inside the database lock to prevent race with Dispose().
+                // This ensures we don't proceed if Dispose() has swapped out _dbContexts.
+                ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
+
+                foreach (var dbContext in _dbContexts)
                 {
-                    return;
+                    // Use EF.Functions.Collate() with NOCASE on both sides for case-insensitive comparison.
+                    // Applying to both sides ensures the comparison is case-insensitive regardless of the
+                    // case in eventRecord.ProviderName. SQLite will use NOCASE collation for the comparison.
+                    // Note: The loop over databases is intentional for priority-based resolution.
+                    var details = dbContext.ProviderDetails.FirstOrDefault(p =>
+                        EF.Functions.Collate(p.ProviderName, "NOCASE") ==
+                        EF.Functions.Collate(eventRecord.ProviderName, "NOCASE"));
+
+                    if (details is null) { continue; }
+
+                    Logger?.Debug($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
+                    ProviderDetails.TryAdd(eventRecord.ProviderName, details);
+
+                    // Exit after first match - databases are sorted by priority (SortDatabases),
+                    // so the first database containing the provider is the preferred source.
+                    // TryAdd would prevent duplicates anyway, but breaking early avoids unnecessary queries.
+                    break;
                 }
-
-                // Use EnterScope() for exception-safe lock management
-                using (_databaseAccessLock.EnterScope())
-                {
-                    // Check disposed inside the database lock to prevent race with Dispose().
-                    // This ensures we don't proceed if Dispose() has swapped out _dbContexts.
-                    ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventProviderDatabaseEventResolver));
-
-                    foreach (var dbContext in _dbContexts)
-                    {
-                        // Use EF.Functions.Collate() with NOCASE on both sides for case-insensitive comparison.
-                        // Applying to both sides ensures the comparison is case-insensitive regardless of the
-                        // case in eventRecord.ProviderName. SQLite will use NOCASE collation for the comparison.
-                        // Note: The loop over databases is intentional for priority-based resolution.
-                        var details = dbContext.ProviderDetails.FirstOrDefault(p =>
-                            EF.Functions.Collate(p.ProviderName, "NOCASE") ==
-                            EF.Functions.Collate(eventRecord.ProviderName, "NOCASE"));
-
-                        if (details is null) { continue; }
-
-                        Logger?.Debug($"Resolved {eventRecord.ProviderName} provider from database {dbContext.Name}.");
-                        ProviderDetails.TryAdd(eventRecord.ProviderName, details);
-
-                        // Exit after first match - databases are sorted by priority (SortDatabases),
-                        // so the first database containing the provider is the preferred source.
-                        // TryAdd would prevent duplicates anyway, but breaking early avoids unnecessary queries.
-                        break;
-                    }
-                }
-            }
-            finally
-            {
-                ProviderDetailsLock.ExitWriteLock();
             }
 
             if (!ProviderDetails.ContainsKey(eventRecord.ProviderName))
             {
                 ProviderDetails.TryAdd(eventRecord.ProviderName, new ProviderDetails { ProviderName = eventRecord.ProviderName });
             }
-        }
-        finally
-        {
-            ProviderDetailsLock.ExitUpgradeableReadLock();
         }
     }
 

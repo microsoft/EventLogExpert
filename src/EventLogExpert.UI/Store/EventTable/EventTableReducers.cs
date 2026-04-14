@@ -138,23 +138,29 @@ public sealed class EventTableReducers
     {
         if (state.EventTables.Count <= 1) { return state; }
 
-        if (state.EventTables.Any(table => table.IsLoading)) { return state; }
+        var existingCombinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
 
-        var updatedTable = state.EventTables.First(table => table.IsCombined);
+        if (existingCombinedTable is null) { return state; }
+
+        var combinedEvents = GetCombinedEvents(
+            state.EventTables
+                .Where(table => !table.IsCombined)
+                .Select(table => table.DisplayedEvents),
+            state.OrderBy ?? ColumnName.DateAndTime,
+            state.IsDescending);
+
+        if (combinedEvents.Count == existingCombinedTable.DisplayedEvents.Count &&
+            combinedEvents.Select(e => e.RecordId)
+                .SequenceEqual(existingCombinedTable.DisplayedEvents.Select(e => e.RecordId)))
+        {
+            return state;
+        }
 
         return state with
         {
             EventTables = state.EventTables
-                .Remove(updatedTable)
-                .Add(updatedTable with
-                {
-                    DisplayedEvents = GetCombinedEvents(
-                            state.EventTables
-                                .Where(table => !table.IsCombined)
-                                .Select(table => table.DisplayedEvents),
-                            state.OrderBy ?? ColumnName.DateAndTime,
-                            state.IsDescending)
-                })
+                .Remove(existingCombinedTable)
+                .Add(existingCombinedTable with { DisplayedEvents = combinedEvents })
         };
     }
 
@@ -200,7 +206,7 @@ public sealed class EventTableReducers
         };
     }
 
-    private static List<DisplayEventModel> GetCombinedEvents(
+    private static IReadOnlyList<DisplayEventModel> GetCombinedEvents(
         IEnumerable<IEnumerable<DisplayEventModel>> eventLists,
         ColumnName? orderBy = null,
         bool isDescending = false)
@@ -215,7 +221,7 @@ public sealed class EventTableReducers
         // Sort in-place instead of creating a new list
         combinedEvents.Sort(FilterMethods.GetComparer(orderBy, isDescending));
 
-        return combinedEvents;
+        return combinedEvents.AsReadOnly();
     }
 
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)

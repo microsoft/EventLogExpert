@@ -12,8 +12,8 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
-using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.Store.EventLog;
@@ -26,6 +26,9 @@ public sealed class EventLogEffects(
     IEventResolverCache resolverCache,
     IServiceScopeFactory serviceScopeFactory)
 {
+    private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
+    private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
+
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
@@ -62,7 +65,7 @@ public sealed class EventLogEffects(
 
             var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
-            dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer, full));
+            dispatcher.Dispatch(new EventLogAction.AddEventBuffered(updatedBuffer.AsReadOnly(), full));
         }
 
         return Task.CompletedTask;
@@ -135,37 +138,79 @@ public sealed class EventLogEffects(
         var activityId = Guid.NewGuid();
         string? lastEvent;
         int failed = 0;
+        int resolved = 0;
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
-        ConcurrentQueue<DisplayEventModel> events = new();
+        var channel = Channel.CreateBounded<EventRecord[]>(new BoundedChannelOptions(s_maxGlobalConcurrency * 2)
+        {
+            SingleWriter = true,
+            FullMode = BoundedChannelFullMode.Wait
+        });
+
+        List<DisplayEventModel> events = [];
 
         await using Timer timer = new(
-            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, events.Count, failed)); },
+            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed))); },
             null,
             TimeSpan.Zero,
-            TimeSpan.FromSeconds(1));
+            TimeSpan.FromSeconds(3));
 
         using var reader = new EventLogReader(action.LogName, action.PathType, filterState?.Value.IsXmlEnabled ?? false);
 
+        // Producer: single thread reads batches from EventLogReader
+        var producerTask = Task.Run(async () =>
+        {
+            try
+            {
+                while (reader.TryGetEvents(out EventRecord[] batch))
+                {
+                    action.Token.ThrowIfCancellationRequested();
+
+                    if (batch.Length == 0) { continue; }
+
+                    await channel.Writer.WriteAsync(batch, action.Token);
+                }
+            }
+            catch (Exception ex)
+            {
+                channel.Writer.Complete(ex);
+
+                throw;
+            }
+
+            channel.Writer.Complete();
+        }, action.Token);
+
         try
         {
+            // Consumers: parallel resolution of event batches from the channel.
+            // The global semaphore limits total concurrent resolution threads across
+            // all HandleOpenLog calls, preventing CPU saturation when loading multiple logs.
             await Parallel.ForEachAsync(
-                Enumerable.Range(1, 8),
-                action.Token,
-                (_, token) =>
+                channel.Reader.ReadAllAsync(action.Token),
+                new ParallelOptions
                 {
-                    while (reader.TryGetEvents(out EventRecord[]? eventRecords))
+                    CancellationToken = action.Token,
+                    MaxDegreeOfParallelism = s_maxGlobalConcurrency
+                },
+                async (batch, token) =>
+                {
+                    await s_resolutionThrottle.WaitAsync(token);
+
+                    try
                     {
-                        token.ThrowIfCancellationRequested();
+                        List<DisplayEventModel> localBatch = new(batch.Length);
+                        int localResolved = 0;
 
-                        if (eventRecords.Length == 0) { continue; }
-
-                        foreach (var @event in eventRecords)
+                        foreach (var @event in batch)
                         {
+                            token.ThrowIfCancellationRequested();
+
                             try
                             {
-                                if (!@event.IsSuccess) {
+                                if (!@event.IsSuccess)
+                                {
                                     Interlocked.Increment(ref failed);
 
                                     _logger?.Warn($"{@event.PathName}: Bad Event: {@event.Error}");
@@ -173,32 +218,57 @@ public sealed class EventLogEffects(
                                     continue;
                                 }
 
-                                events.Enqueue(eventResolver.ResolveEvent(@event));
+                                localBatch.Add(eventResolver.ResolveEvent(@event));
+                                localResolved++;
                             }
                             catch (Exception ex)
                             {
                                 _logger?.Warn($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
                             }
                         }
-                    }
 
-                    return ValueTask.CompletedTask;
+                        if (localBatch.Count > 0)
+                        {
+                            lock (events) { events.AddRange(localBatch); }
+
+                            Interlocked.Add(ref resolved, localResolved);
+                        }
+                    }
+                    finally
+                    {
+                        s_resolutionThrottle.Release();
+                    }
                 });
+
+            await producerTask;
 
             lastEvent = reader.LastBookmark;
         }
-        catch (TaskCanceledException)
+        catch (OperationCanceledException)
         {
+            await StopProducerAsync(producerTask);
+
             dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
             dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
 
             return;
         }
+        catch (Exception ex)
+        {
+            _logger?.Error($"Failed to load log {action.LogName}: {ex.Message}");
 
-        dispatcher.Dispatch(
-            new EventLogAction.LoadEvents(
-                logData,
-                [.. events.OrderByDescending(e => e.RecordId)]));
+            await StopProducerAsync(producerTask);
+
+            dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
+            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to load {action.LogName}"));
+
+            return;
+        }
+
+        events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
+
+        dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.AsReadOnly()));
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
@@ -236,7 +306,7 @@ public sealed class EventLogEffects(
     {
         eventsToAdd.AddRange(logData.Events);
 
-        return logData with { Events = eventsToAdd };
+        return logData with { Events = eventsToAdd.AsReadOnly() };
     }
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
@@ -269,6 +339,17 @@ public sealed class EventLogEffects(
         }
 
         return newLogs;
+    }
+
+    /// <summary>
+    ///     Awaits the producer task, suppressing all exceptions.
+    ///     The sole purpose is to ensure the producer has fully stopped before
+    ///     the reader is disposed. Any meaningful errors are handled by the caller.
+    /// </summary>
+    private static async Task StopProducerAsync(Task producerTask)
+    {
+        try { await producerTask; }
+        catch { /* Intentionally swallowed — caller handles error reporting */ }
     }
 
     private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)

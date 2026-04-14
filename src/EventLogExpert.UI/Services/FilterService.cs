@@ -40,10 +40,22 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
             return events as IReadOnlyList<DisplayEventModel> ?? [.. events];
         }
 
+        // For small collections, PLINQ's thread scheduling overhead exceeds the
+        // parallelism benefit. Use sequential filtering below the threshold.
+        if (events is IReadOnlyCollection<DisplayEventModel> { Count: < 10_000 } collection)
+        {
+            return collection
+                .Where(e => e.FilterByDate(eventFilter.DateFilter)
+                    .Filter(eventFilter.Filters, IsXmlEnabled))
+                .ToList()
+                .AsReadOnly();
+        }
+
         return events.AsParallel()
             .Where(e => e.FilterByDate(eventFilter.DateFilter)
                 .Filter(eventFilter.Filters, IsXmlEnabled))
-            .ToList();
+            .ToList()
+            .AsReadOnly();
     }
 
     public bool TryParse(FilterModel filterModel, out string comparison)
