@@ -169,7 +169,9 @@ internal enum EvtVariantType
     // Array types (base type | EVT_VARIANT_TYPE_ARRAY)
     StringArray = 129,
     ByteArray = 132,
-    UInt32Array = 136
+    UInt16Array = 134,
+    UInt32Array = 136,
+    HexInt32Array = 148
 }
 
 [Flags]
@@ -220,8 +222,21 @@ internal static partial class EventMethods
             case (int)EvtVariantType.Boolean:
                 return variant.Bool != 0;
             case (int)EvtVariantType.Binary:
-                byte[] bytes = new byte[variant.Count];
-                Marshal.Copy(variant.Binary, bytes, 0, bytes.Length);
+                if (variant.Count == 0)
+                {
+                    return Array.Empty<byte>();
+                }
+
+                int byteCount = CheckedCount(variant.Count, EvtVariantType.Binary);
+
+                if (variant.Binary == IntPtr.Zero)
+                {
+                    throw new InvalidDataException(
+                        $"Null reference with non-zero count {variant.Count} for {nameof(EvtVariantType)}.{EvtVariantType.Binary}");
+                }
+
+                byte[] bytes = new byte[byteCount];
+                Marshal.Copy(variant.Binary, bytes, 0, byteCount);
                 return bytes;
             case (int)EvtVariantType.Guid:
                 return Marshal.PtrToStructure<Guid>(variant.GuidReference);
@@ -257,9 +272,17 @@ internal static partial class EventMethods
                     return Array.Empty<string>();
                 }
 
-                var stringArray = new string[variant.Count];
+                int stringCount = CheckedCount(variant.Count, EvtVariantType.StringArray);
 
-                for (int i = 0; i < variant.Count; i++)
+                if (variant.Reference == IntPtr.Zero)
+                {
+                    throw new InvalidDataException(
+                        $"Null reference with non-zero count {variant.Count} for {nameof(EvtVariantType)}.{EvtVariantType.StringArray}");
+                }
+
+                var stringArray = new string[stringCount];
+
+                for (int i = 0; i < stringCount; i++)
                 {
                     IntPtr stringRef = Marshal.ReadIntPtr(variant.Reference, i * IntPtr.Size);
 
@@ -268,30 +291,13 @@ internal static partial class EventMethods
 
                 return stringArray;
             case (int)EvtVariantType.ByteArray:
-                if (variant.Count == 0)
-                {
-                    return Array.Empty<byte>();
-                }
-
-                var byteArray = new byte[variant.Count];
-                Marshal.Copy(variant.Reference, byteArray, 0, byteArray.Length);
-
-                return byteArray;
+                return ReadBlittableArray<byte>(variant.Reference, variant.Count, EvtVariantType.ByteArray);
+            case (int)EvtVariantType.UInt16Array:
+                return ReadBlittableArray<ushort>(variant.Reference, variant.Count, EvtVariantType.UInt16Array);
             case (int)EvtVariantType.UInt32Array:
-                if (variant.Count == 0)
-                {
-                    return Array.Empty<uint>();
-                }
-
-                var uintArray = new uint[variant.Count];
-
-                unsafe
-                {
-                    var source = new ReadOnlySpan<uint>((void*)variant.Reference, (int)variant.Count);
-                    source.CopyTo(uintArray);
-                }
-
-                return uintArray;
+                return ReadBlittableArray<uint>(variant.Reference, variant.Count, EvtVariantType.UInt32Array);
+            case (int)EvtVariantType.HexInt32Array:
+                return ReadBlittableArray<int>(variant.Reference, variant.Count, EvtVariantType.HexInt32Array);
             default:
                 throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}: {variant.Type}");
         }
@@ -780,6 +786,19 @@ internal static partial class EventMethods
         }
     }
 
+    private static int CheckedCount(uint count, EvtVariantType type)
+    {
+        try
+        {
+            return checked((int)count);
+        }
+        catch (OverflowException ex)
+        {
+            throw new InvalidDataException(
+                $"Invalid {nameof(EvtVariant)} count {count} for {nameof(EvtVariantType)}.{type}", ex);
+        }
+    }
+
     /// <summary>Converts a buffer that was returned from <see cref="EvtRender" /> to an <see cref="EventRecord" /></summary>
     /// <param name="eventBuffer">Pointer to a buffer returned from <see cref="EvtRender" /></param>
     /// <param name="propertyCount">Number of properties returned from <see cref="EvtRender" /></param>
@@ -842,5 +861,26 @@ internal static partial class EventMethods
         }
 
         return properties;
+    }
+
+    private static unsafe T[] ReadBlittableArray<T>(IntPtr reference, uint count, EvtVariantType type) where T : unmanaged
+    {
+        if (count == 0)
+        {
+            return [];
+        }
+
+        int length = CheckedCount(count, type);
+
+        if (reference == IntPtr.Zero)
+        {
+            throw new InvalidDataException(
+                $"Null reference with non-zero count {count} for {nameof(EvtVariantType)}.{type}");
+        }
+
+        var result = new T[length];
+        new ReadOnlySpan<T>((void*)reference, length).CopyTo(result);
+
+        return result;
     }
 }
