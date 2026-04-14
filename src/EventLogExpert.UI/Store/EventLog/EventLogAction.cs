@@ -22,6 +22,8 @@ public sealed record EventLogAction
 
     public sealed record LoadEvents(EventLogData LogData, IReadOnlyList<DisplayEventModel> Events);
 
+    public sealed record LoadEventsPartial(EventLogData LogData, IReadOnlyList<DisplayEventModel> Events);
+
     public sealed record LoadNewEvents;
 
     public sealed record OpenLog(string LogName, PathType PathType, CancellationToken Token = default);

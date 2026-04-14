@@ -10,6 +10,14 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider)
 {
     private readonly IPreferencesProvider _preferencesProvider = preferencesProvider;
 
+    [EffectMethod(typeof(EventTableAction.AppendTableEvents))]
+    public static Task HandleAppendTableEvents(IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(EventTableAction.UpdateDisplayedEvents))]
     public static Task HandleUpdateDisplayedEvents(IDispatcher dispatcher)
     {

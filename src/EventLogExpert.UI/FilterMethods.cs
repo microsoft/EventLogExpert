@@ -104,12 +104,46 @@ public static class FilterMethods
         return isDescending ? (a, b) => comparer(b, a) : comparer;
     }
 
-    private static int WithTieBreaker(int primaryResult, DisplayEventModel a, DisplayEventModel b) =>
-        primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
+    /// <summary>
+    /// Merges an already-sorted existing list with a new batch by sorting only the batch
+    /// and performing a linear merge. O(n + k log k) where n is existing count and k is batch count.
+    /// </summary>
+    internal static IReadOnlyList<DisplayEventModel> MergeSorted(
+        IReadOnlyList<DisplayEventModel> existing,
+        IReadOnlyList<DisplayEventModel> batch,
+        ColumnName? orderBy,
+        bool isDescending)
+    {
+        if (batch.Count == 0) { return existing; }
+
+        if (existing.Count == 0) { return batch.SortEvents(orderBy, isDescending); }
+
+        var comparer = GetComparer(orderBy, isDescending);
+
+        var sortedBatch = new List<DisplayEventModel>(batch);
+        sortedBatch.Sort(comparer);
+
+        var result = new List<DisplayEventModel>(existing.Count + sortedBatch.Count);
+        int i = 0, j = 0;
+
+        while (i < existing.Count && j < sortedBatch.Count)
+        {
+            result.Add(comparer(existing[i], sortedBatch[j]) <= 0 ? existing[i++] : sortedBatch[j++]);
+        }
+
+        while (i < existing.Count) { result.Add(existing[i++]); }
+
+        while (j < sortedBatch.Count) { result.Add(sortedBatch[j++]); }
+
+        return result.AsReadOnly();
+    }
 
     /// <summary>Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.</summary>
     private static int FallbackTieBreaker(int recordIdResult, DisplayEventModel a, DisplayEventModel b) =>
         recordIdResult != 0 ? recordIdResult : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
+
+    private static int WithTieBreaker(int primaryResult, DisplayEventModel a, DisplayEventModel b) =>
+        primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
 
     extension(DisplayEventModel? @event)
     {

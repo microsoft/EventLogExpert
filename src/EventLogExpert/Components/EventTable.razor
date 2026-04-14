@@ -39,9 +39,8 @@
         @if (_currentTable is not null)
         {
             <Virtualize Context="evt" Items="@((_currentTable.DisplayedEvents as ICollection<DisplayEventModel>) ?? [])">
-                @{ _rowIndex = _currentTable.DisplayedEvents.IndexOf(evt); }
-                    <tr aria-rowindex="@(_rowIndex + 2)" aria-selected="@(_selectedEventState.Contains(evt).ToString().ToLower())"
-                        class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+                    <tr aria-rowindex="@GetRowIndex(evt)" aria-selected="@(_selectedEventState.Contains(evt).ToString().ToLower())"
+                        class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
                     @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
                         <td aria-colindex="@(i + 1)" role="gridcell">

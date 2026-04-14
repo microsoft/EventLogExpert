@@ -415,6 +415,123 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceAppendTableEvents_ShouldAppendEventsToExistingDisplayedEvents()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState();
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var initialEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100, recordId: 1),
+            EventUtils.CreateTestEvent(200, recordId: 2)
+        };
+
+        state = EventTableReducers.ReduceAppendTableEvents(
+            state,
+            new EventTableAction.AppendTableEvents(logData.Id, initialEvents));
+
+        var deltaEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(300, recordId: 3),
+            EventUtils.CreateTestEvent(400, recordId: 4)
+        };
+
+        var action = new EventTableAction.AppendTableEvents(logData.Id, deltaEvents);
+
+        // Act
+        var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
+
+        // Assert
+        var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
+        Assert.Equal(4, updatedTable.DisplayedEvents.Count);
+    }
+
+    [Fact]
+    public void ReduceAppendTableEvents_ShouldNotChangeIsLoading()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState();
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        // Table should be in loading state after AddTable
+        Assert.True(state.EventTables.First(t => t.Id == logData.Id).IsLoading);
+
+        var action = new EventTableAction.AppendTableEvents(
+            logData.Id,
+            new List<DisplayEventModel> { EventUtils.CreateTestEvent(100, recordId: 1) });
+
+        // Act
+        var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
+
+        // Assert - IsLoading should still be true (partial update doesn't complete loading)
+        var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
+        Assert.True(updatedTable.IsLoading);
+        Assert.Single(updatedTable.DisplayedEvents);
+    }
+
+    [Fact]
+    public void ReduceAppendTableEvents_ShouldPreserveSortOrder()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState();
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var initialEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100, recordId: 10),
+            EventUtils.CreateTestEvent(200, recordId: 20)
+        };
+
+        state = EventTableReducers.ReduceAppendTableEvents(
+            state,
+            new EventTableAction.AppendTableEvents(logData.Id, initialEvents));
+
+        // Append events with record IDs that should sort between and after existing
+        var deltaEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(300, recordId: 5),
+            EventUtils.CreateTestEvent(400, recordId: 15)
+        };
+
+        var action = new EventTableAction.AppendTableEvents(logData.Id, deltaEvents);
+
+        // Act
+        var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
+
+        // Assert - default sort is by RecordId descending (IsDescending defaults to true)
+        var displayedEvents = newState.EventTables.First(t => t.Id == logData.Id).DisplayedEvents;
+        Assert.Equal(4, displayedEvents.Count);
+
+        var recordIds = displayedEvents.Select(e => e.RecordId).ToList();
+        Assert.Equal(recordIds.OrderByDescending(x => x).ToList(), recordIds);
+    }
+
+    [Fact]
+    public void ReduceAppendTableEvents_WhenTableNotFound_ShouldReturnUnchangedState()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState();
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var unknownLogId = EventLogId.Create();
+
+        var action = new EventTableAction.AppendTableEvents(
+            unknownLogId,
+            new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) });
+
+        // Act
+        var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
     public void ReduceCloseAll_ShouldClearAllTables()
     {
         // Arrange
@@ -518,7 +635,7 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
-    public void ReduceSetActiveTable_WhenTableIsLoading_ShouldNotChangeActive()
+    public void ReduceSetActiveTable_WhenTableIsLoading_ShouldChangeActive()
     {
         // Arrange
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
@@ -531,7 +648,7 @@ public sealed class EventTableStoreTests
         var newState = EventTableReducers.ReduceSetActiveTable(state, action);
 
         // Assert
-        Assert.Equal(state.ActiveEventLogId, newState.ActiveEventLogId);
+        Assert.Equal(logData.Id, newState.ActiveEventLogId);
     }
 
     [Fact]
@@ -632,7 +749,7 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
-    public void ReduceUpdateCombinedEvents_WhenAnyTableIsLoading_ShouldReturnSameState()
+    public void ReduceUpdateCombinedEvents_WhenAllTablesAreLoading_ShouldReturnSameState()
     {
         // Arrange
         var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);

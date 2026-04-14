@@ -45,15 +45,26 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
+    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action) =>
+        UpdateActiveLog(state, action.LogData, action.Events);
+
+    [ReducerMethod]
+    public static EventLogState ReduceLoadEventsPartial(EventLogState state, EventLogAction.LoadEventsPartial action)
     {
-        var newLogsCollection = state.ActiveLogs.Remove(action.LogData.Name);
+        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existingLog))
+        {
+            return state;
+        }
+
+        var merged = new List<DisplayEventModel>(existingLog.Events.Count + action.Events.Count);
+        merged.AddRange(existingLog.Events);
+        merged.AddRange(action.Events);
 
         return state with
         {
-            ActiveLogs = newLogsCollection.Add(
-                action.LogData.Name,
-                action.LogData with { Events = action.Events })
+            ActiveLogs = state.ActiveLogs
+                .Remove(action.LogData.Name)
+                .Add(action.LogData.Name, existingLog with { Events = merged.AsReadOnly() })
         };
     }
 
@@ -119,4 +130,15 @@ public sealed class EventLogReducers
 
     private static EventLogData GetEmptyLogData(string logName, PathType pathType) =>
         new(logName, pathType, new List<DisplayEventModel>().AsReadOnly());
+
+    private static EventLogState UpdateActiveLog(
+        EventLogState state,
+        EventLogData logData,
+        IReadOnlyList<DisplayEventModel> events) =>
+        state with
+        {
+            ActiveLogs = state.ActiveLogs
+                .Remove(logData.Name)
+                .Add(logData.Name, logData with { Events = events })
+        };
 }
