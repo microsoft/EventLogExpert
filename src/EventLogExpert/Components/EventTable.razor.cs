@@ -25,7 +25,8 @@ public sealed partial class EventTable
     private ColumnName[] _enabledColumns = null!;
     private EventTableState _eventTableState = null!;
     private string _headerName = string.Empty;
-    private int _rowIndex = 0;
+    private IReadOnlyList<DisplayEventModel>? _lastDisplayedEvents;
+    private Dictionary<DisplayEventModel, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
     private ImmutableList<DisplayEventModel> _selectedEventState = [];
     private TimeZoneInfo _timeZoneSettings = null!;
 
@@ -61,6 +62,8 @@ public sealed partial class EventTable
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = Settings.TimeZoneInfo;
 
+        RebuildRowIndexMap();
+
         await base.OnInitializedAsync();
     }
 
@@ -76,6 +79,8 @@ public sealed partial class EventTable
         _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = Settings.TimeZoneInfo;
+
+        RebuildRowIndexMap();
 
         return true;
     }
@@ -107,6 +112,9 @@ public sealed partial class EventTable
 
         return string.Empty;
     }
+
+    private int GetRowIndex(DisplayEventModel evt) =>
+        _rowIndexMap.TryGetValue(evt, out int index) ? index + 2 : 2;
 
     private void HandleKeyDown(KeyboardEventArgs args)
     {
@@ -203,6 +211,23 @@ public sealed partial class EventTable
         catch (Exception e)
         {
             TraceLogger.Error($"Failed to scroll to selected event: {e}");
+        }
+    }
+
+    private void RebuildRowIndexMap()
+    {
+        var displayedEvents = _currentTable?.DisplayedEvents;
+
+        if (ReferenceEquals(displayedEvents, _lastDisplayedEvents)) { return; }
+
+        _lastDisplayedEvents = displayedEvents;
+        _rowIndexMap = new(displayedEvents?.Count ?? 0, ReferenceEqualityComparer.Instance);
+
+        if (displayedEvents is null) { return; }
+
+        for (int i = 0; i < displayedEvents.Count; i++)
+        {
+            _rowIndexMap[displayedEvents[i]] = i;
         }
     }
 

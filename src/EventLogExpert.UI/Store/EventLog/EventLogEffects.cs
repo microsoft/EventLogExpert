@@ -104,6 +104,16 @@ public sealed class EventLogEffects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod]
+    public Task HandleLoadEventsPartial(EventLogAction.LoadEventsPartial action, IDispatcher dispatcher)
+    {
+        var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
+
+        dispatcher.Dispatch(new EventTableAction.AppendTableEvents(action.LogData.Id, filteredEvents));
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(EventLogAction.LoadNewEvents))]
     public Task HandleLoadNewEvents(IDispatcher dispatcher)
     {
@@ -139,6 +149,8 @@ public sealed class EventLogEffects(
         string? lastEvent;
         int failed = 0;
         int resolved = 0;
+        int lastPartialIndex = 0;
+        int timerTick = 0;
 
         dispatcher.Dispatch(new EventTableAction.AddTable(logData));
 
@@ -150,8 +162,29 @@ public sealed class EventLogEffects(
 
         List<DisplayEventModel> events = [];
 
-        await using Timer timer = new(
-            _ => { dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed))); },
+        await using var timer = new Timer(
+            _ =>
+            {
+                dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, Volatile.Read(ref resolved), Volatile.Read(ref failed)));
+
+                // Skip the immediate first tick (dueTime = 0) so the first partial
+                // is dispatched after ~3 seconds of loading.
+                if (Interlocked.Increment(ref timerTick) <= 1) { return; }
+
+                List<DisplayEventModel> delta;
+
+                lock (events)
+                {
+                    int fromIndex = Volatile.Read(ref lastPartialIndex);
+
+                    if (events.Count <= fromIndex) { return; }
+
+                    delta = events.GetRange(fromIndex, events.Count - fromIndex);
+                    Volatile.Write(ref lastPartialIndex, events.Count);
+                }
+
+                dispatcher.Dispatch(new EventLogAction.LoadEventsPartial(logData, delta.AsReadOnly()));
+            },
             null,
             TimeSpan.Zero,
             TimeSpan.FromSeconds(3));

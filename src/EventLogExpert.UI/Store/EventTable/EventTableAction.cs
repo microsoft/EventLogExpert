@@ -10,6 +10,8 @@ public sealed record EventTableAction
 {
     public sealed record AddTable(EventLogData LogData);
 
+    public sealed record AppendTableEvents(EventLogId LogId, IReadOnlyList<DisplayEventModel> Events);
+
     public sealed record CloseAll;
 
     public sealed record CloseLog(EventLogId LogId);

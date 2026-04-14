@@ -49,6 +49,28 @@ public sealed class EventTableReducers
         };
     }
 
+    [ReducerMethod]
+    public static EventTableState ReduceAppendTableEvents(EventTableState state, EventTableAction.AppendTableEvents action)
+    {
+        var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
+
+        if (table is null) { return state; }
+
+        var merged = FilterMethods.MergeSorted(
+            table.DisplayedEvents,
+            action.Events,
+            state.OrderBy,
+            state.IsDescending);
+
+        return state with
+        {
+            EventTables = state.EventTables.Replace(table, table with
+            {
+                DisplayedEvents = merged
+            })
+        };
+    }
+
     [ReducerMethod(typeof(EventTableAction.CloseAll))]
     public static EventTableState ReduceCloseAll(EventTableState state) =>
         state with { EventTables = [], ActiveEventLogId = null };
@@ -103,8 +125,6 @@ public sealed class EventTableReducers
     {
         var activeTable = state.EventTables.First(table => table.Id == action.LogId);
 
-        if (activeTable.IsLoading) { return state; }
-
         return state with { ActiveEventLogId = activeTable.Id };
     }
 
@@ -137,6 +157,10 @@ public sealed class EventTableReducers
     public static EventTableState ReduceUpdateCombinedEvents(EventTableState state)
     {
         if (state.EventTables.Count <= 1) { return state; }
+
+        var nonCombinedTables = state.EventTables.Where(table => !table.IsCombined);
+
+        if (nonCombinedTables.All(table => table.IsLoading)) { return state; }
 
         var existingCombinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
 
@@ -198,7 +222,7 @@ public sealed class EventTableReducers
 
         return state with
         {
-            EventTables = state.EventTables.Remove(table).Add(table with
+            EventTables = state.EventTables.Replace(table, table with
             {
                 DisplayedEvents = action.Events.SortEvents(state.OrderBy, state.IsDescending),
                 IsLoading = false
