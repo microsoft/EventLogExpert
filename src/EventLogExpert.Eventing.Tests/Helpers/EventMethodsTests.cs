@@ -109,6 +109,48 @@ public sealed class EventMethodsTests
     }
 
     [Fact]
+    public void ConvertVariant_WhenByteArray_ShouldReturnByteArray()
+    {
+        // Arrange
+        byte[] expectedBytes = [10, 20, 30, 40, 50];
+        IntPtr arrayPtr = Marshal.AllocHGlobal(expectedBytes.Length);
+
+        try
+        {
+            Marshal.Copy(expectedBytes, 0, arrayPtr, expectedBytes.Length);
+
+            var variant = CreateVariantWithCount(EvtVariantType.ByteArray, arrayPtr, (uint)expectedBytes.Length);
+
+            // Act
+            var result = EventMethods.ConvertVariant(variant);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.IsType<byte[]>(result);
+            Assert.Equal(expectedBytes, (byte[])result);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(arrayPtr);
+        }
+    }
+
+    [Fact]
+    public void ConvertVariant_WhenByteArrayEmpty_ShouldReturnEmptyArray()
+    {
+        // Arrange
+        var variant = CreateVariantWithCount(EvtVariantType.ByteArray, IntPtr.Zero, 0);
+
+        // Act
+        var result = EventMethods.ConvertVariant(variant);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<byte[]>(result);
+        Assert.Empty((byte[])result);
+    }
+
+    [Fact]
     public void ConvertVariant_WhenDouble_ShouldReturnDouble()
     {
         // Arrange
@@ -488,6 +530,52 @@ public sealed class EventMethodsTests
     }
 
     [Fact]
+    public void ConvertVariant_WhenUInt32Array_ShouldReturnUInt32Array()
+    {
+        // Arrange
+        uint[] expectedValues = [100, 200, 300, 400];
+        IntPtr arrayPtr = Marshal.AllocHGlobal(sizeof(uint) * expectedValues.Length);
+
+        try
+        {
+            unsafe
+            {
+                var dest = new Span<uint>((void*)arrayPtr, expectedValues.Length);
+                expectedValues.CopyTo(dest);
+            }
+
+            var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, arrayPtr, (uint)expectedValues.Length);
+
+            // Act
+            var result = EventMethods.ConvertVariant(variant);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.IsType<uint[]>(result);
+            Assert.Equal(expectedValues, (uint[])result);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(arrayPtr);
+        }
+    }
+
+    [Fact]
+    public void ConvertVariant_WhenUInt32ArrayEmpty_ShouldReturnEmptyArray()
+    {
+        // Arrange
+        var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, IntPtr.Zero, 0);
+
+        // Act
+        var result = EventMethods.ConvertVariant(variant);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<uint[]>(result);
+        Assert.Empty((uint[])result);
+    }
+
+    [Fact]
     public void ConvertVariant_WhenUInt64_ShouldReturnUInt64()
     {
         // Arrange
@@ -697,6 +785,8 @@ public sealed class EventMethodsTests
                     case EvtVariantType.SysTime:
                     case EvtVariantType.Binary:
                     case EvtVariantType.StringArray:
+                    case EvtVariantType.ByteArray:
+                    case EvtVariantType.UInt32Array:
                         *(nint*)buffer = (IntPtr)value;
                         break;
                     case EvtVariantType.SByte:

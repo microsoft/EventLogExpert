@@ -166,8 +166,10 @@ internal enum EvtVariantType
     Handle,
     Xml,
 
-    // Custom types
-    StringArray = 129 // String masked with EVT_VARIANT_TYPE_ARRAY
+    // Array types (base type | EVT_VARIANT_TYPE_ARRAY)
+    StringArray = 129,
+    ByteArray = 132,
+    UInt32Array = 136
 }
 
 [Flags]
@@ -265,6 +267,31 @@ internal static partial class EventMethods
                 }
 
                 return stringArray;
+            case (int)EvtVariantType.ByteArray:
+                if (variant.Count == 0)
+                {
+                    return Array.Empty<byte>();
+                }
+
+                var byteArray = new byte[variant.Count];
+                Marshal.Copy(variant.Reference, byteArray, 0, byteArray.Length);
+
+                return byteArray;
+            case (int)EvtVariantType.UInt32Array:
+                if (variant.Count == 0)
+                {
+                    return Array.Empty<uint>();
+                }
+
+                var uintArray = new uint[variant.Count];
+
+                unsafe
+                {
+                    var source = new ReadOnlySpan<uint>((void*)variant.Reference, (int)variant.Count);
+                    source.CopyTo(uintArray);
+                }
+
+                return uintArray;
             default:
                 throw new InvalidDataException($"Invalid {nameof(EvtVariantType)}: {variant.Type}");
         }
