@@ -11,7 +11,7 @@ using System.Collections.Concurrent;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
-public sealed class LocalProviderEventResolverTests
+public sealed class EventResolverLocalProviderTests
 {
     [Fact]
     public void Constructor_WithCacheAndLogger_ShouldCreateInstance()
@@ -21,7 +21,7 @@ public sealed class LocalProviderEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var resolver = new LocalProviderEventResolver(cache, logger);
+        var resolver = new EventResolver(cache: cache, logger: logger);
 
         // Assert
         Assert.NotNull(resolver);
@@ -31,7 +31,7 @@ public sealed class LocalProviderEventResolverTests
     public void Constructor_WithNoParameters_ShouldCreateInstance()
     {
         // Act
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
 
         // Assert
         Assert.NotNull(resolver);
@@ -41,7 +41,7 @@ public sealed class LocalProviderEventResolverTests
     public void Constructor_WithNullCache_ShouldCreateInstance()
     {
         // Act
-        var resolver = new LocalProviderEventResolver(null);
+        var resolver = new EventResolver(cache: null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -54,7 +54,7 @@ public sealed class LocalProviderEventResolverTests
         var cache = new EventResolverCache();
 
         // Act
-        var resolver = new LocalProviderEventResolver(cache, null);
+        var resolver = new EventResolver(cache: cache, logger: null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -67,7 +67,7 @@ public sealed class LocalProviderEventResolverTests
         var cache = new EventResolverCache();
 
         // Act
-        var resolver = new LocalProviderEventResolver(cache);
+        var resolver = new EventResolver(cache: cache);
 
         // Assert
         Assert.NotNull(resolver);
@@ -77,7 +77,7 @@ public sealed class LocalProviderEventResolverTests
     public void Dispose_CalledMultipleTimes_ShouldNotThrow()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
 
         // Act & Assert
         resolver.Dispose();
@@ -89,7 +89,7 @@ public sealed class LocalProviderEventResolverTests
     public void Dispose_MultipleConcurrentDisposeCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var exceptions = new ConcurrentBag<Exception>();
 
         // Act - Multiple threads trying to dispose simultaneously
@@ -113,7 +113,7 @@ public sealed class LocalProviderEventResolverTests
     public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -127,7 +127,7 @@ public sealed class LocalProviderEventResolverTests
     public void Dispose_ThenResolveProviderDetails_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -141,8 +141,8 @@ public sealed class LocalProviderEventResolverTests
     public void MultipleResolvers_WithDifferentInstances_ShouldResolveSeparately()
     {
         // Arrange
-        var resolver1 = new LocalProviderEventResolver();
-        var resolver2 = new LocalProviderEventResolver();
+        var resolver1 = new EventResolver();
+        var resolver2 = new EventResolver();
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -163,8 +163,8 @@ public sealed class LocalProviderEventResolverTests
     {
         // Arrange
         var sharedCache = new EventResolverCache();
-        var resolver1 = new LocalProviderEventResolver(sharedCache);
-        var resolver2 = new LocalProviderEventResolver(sharedCache);
+        var resolver1 = new EventResolver(cache: sharedCache);
+        var resolver2 = new EventResolver(cache: sharedCache);
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -188,7 +188,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveEvent_WithMultipleProviders_ShouldResolveEachCorrectly()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecords = EventUtils.CreateDifferentEvents().ToList();
 
         // Act
@@ -209,7 +209,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveEvent_WithoutCallingResolveProviderDetails_ShouldStillResolve()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -226,7 +226,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_CalledTwiceForSameProvider_ShouldNotThrow()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -243,7 +243,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
 
         var providerNames = new[]
         {
@@ -282,7 +282,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_ConcurrentCallsForSameProvider_ShouldHandleThreadSafely()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var exceptions = new Exception?[50];
 
         // Act
@@ -309,7 +309,7 @@ public sealed class LocalProviderEventResolverTests
     {
         // Arrange
         var cache = new EventResolverCache();
-        var resolver = new LocalProviderEventResolver(cache);
+        var resolver = new EventResolver(cache: cache);
 
         var providerNames = new[]
         {
@@ -347,7 +347,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_ThenResolveEvent_ShouldReturnPopulatedModel()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -370,7 +370,7 @@ public sealed class LocalProviderEventResolverTests
     {
         // Arrange
         var cache = new EventResolverCache();
-        var resolver = new LocalProviderEventResolver(cache);
+        var resolver = new EventResolver(cache: cache);
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -391,7 +391,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_WithDifferentProviders_ShouldResolveEachIndependently()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var eventRecords = EventUtils.CreateDifferentEvents().ToList();
 
         // Act
@@ -411,7 +411,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_WithEmptyProviderName_ShouldResolveWithoutException()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -434,7 +434,7 @@ public sealed class LocalProviderEventResolverTests
     public void ResolveProviderDetails_WithNonExistentProvider_ShouldResolveWithDefaultDescription()
     {
         // Arrange
-        var resolver = new LocalProviderEventResolver();
+        var resolver = new EventResolver();
         var nonExistentProvider = "NonExistentProvider_" + Guid.NewGuid();
 
         var eventRecord = new EventRecord

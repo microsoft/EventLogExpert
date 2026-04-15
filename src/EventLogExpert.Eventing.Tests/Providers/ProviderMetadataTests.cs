@@ -165,7 +165,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        var metadata = ProviderMetadata.Create(string.Empty, mockLogger);
+        var metadata = ProviderMetadata.Create(string.Empty, logger: mockLogger);
 
         // Assert
         // Empty provider name is treated as valid by Windows
@@ -192,7 +192,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        var metadata = ProviderMetadata.Create(providerName, mockLogger);
+        var metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
 
         // Assert
         mockLogger.Received(1).Debug(
@@ -229,7 +229,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, mockLogger);
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName, logger: mockLogger);
 
         // Assert
         Assert.NotNull(metadata);
@@ -266,7 +266,7 @@ public sealed class ProviderMetadataTests
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act
-        var metadata = ProviderMetadata.Create(providerName, mockLogger);
+        var metadata = ProviderMetadata.Create(providerName, logger: mockLogger);
 
         // Assert
         Assert.Null(metadata);

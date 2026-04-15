@@ -143,6 +143,28 @@ public sealed class EventLogEffects(
             return;
         }
 
+        // Detect locale metadata files for exported logs
+        if (action.PathType == PathType.FilePath && eventResolver is EventResolver concreteResolver)
+        {
+            var logDir = Path.GetDirectoryName(action.LogName);
+
+            if (logDir is not null)
+            {
+                var localeDir = Path.Combine(logDir, "LocaleMetaData");
+
+                if (Directory.Exists(localeDir))
+                {
+                    var mtaFiles = Directory.GetFiles(localeDir, "*.MTA");
+
+                    if (mtaFiles.Length > 0)
+                    {
+                        concreteResolver.SetMetadataPaths(mtaFiles);
+                        _logger?.Info($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
+                    }
+                }
+            }
+        }
+
         var filterState = serviceScope.ServiceProvider.GetService<IState<FilterPaneState>>();
 
         var activityId = Guid.NewGuid();
