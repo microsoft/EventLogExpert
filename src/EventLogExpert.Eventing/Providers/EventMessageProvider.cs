@@ -9,22 +9,23 @@ using System.Runtime.InteropServices;
 namespace EventLogExpert.Eventing.Providers;
 
 /// <summary>Represents an event provider from a particular machine.</summary>
-public sealed class EventMessageProvider
+public sealed class EventMessageProvider(
+    string providerName,
+    string? computerName,
+    IReadOnlyList<string>? logFilePaths = null,
+    ITraceLogger? logger = null)
 {
     private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
 
-    private readonly ITraceLogger? _logger;
-    private readonly string _providerName;
-    private readonly RegistryProvider _registryProvider;
+    private readonly string? _computerName = computerName;
+    private readonly IReadOnlyList<string>? _logFilePaths = logFilePaths;
+    private readonly ITraceLogger? _logger = logger;
+    private readonly string _providerName = providerName;
 
-    public EventMessageProvider(string providerName, string? computerName, ITraceLogger? logger = null)
-    {
-        _providerName = providerName;
-        _logger = logger;
-        _registryProvider = new RegistryProvider(computerName, _logger);
-    }
+    private RegistryProvider? _registryProvider;
 
-    public EventMessageProvider(string providerName, ITraceLogger? logger = null) : this(providerName, null, logger) { }
+    public EventMessageProvider(string providerName, ITraceLogger? logger = null)
+        : this(providerName, null, null, logger) { }
 
     public static List<MessageModel> GetMessages(
         IEnumerable<string> legacyProviderFiles,
@@ -114,11 +115,20 @@ public sealed class EventMessageProvider
 
     public ProviderDetails LoadProviderDetails()
     {
-        var providerMetadata = ProviderMetadata.Create(_providerName, _logger);
+        var providerMetadata = ProviderMetadata.Create(_providerName, _logFilePaths, _logger);
 
         ProviderDetails provider = providerMetadata is not null
             ? LoadMessagesFromModernProvider(providerMetadata)
             : new ProviderDetails { ProviderName = _providerName };
+
+        // When logFilePaths are provided, this is an MTA-only resolution path.
+        // Skip registry and DLL lookups entirely.
+        if (_logFilePaths is { Count: > 0 })
+        {
+            return provider;
+        }
+
+        _registryProvider ??= new RegistryProvider(_computerName, _logger);
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
@@ -134,7 +144,8 @@ public sealed class EventMessageProvider
             }
             else
             {
-                _logger?.Debug($"No message files found for provider {_providerName}. Using message file from modern provider.");
+                _logger?.Debug(
+                    $"No message files found for provider {_providerName}. Using message file from modern provider.");
 
                 provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
             }
@@ -149,8 +160,8 @@ public sealed class EventMessageProvider
     }
 
     /// <summary>
-    ///     Loads the messages for a legacy provider from the files specified in
-    ///     the registry. This information is stored at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
+    ///     Loads the messages for a legacy provider from the files specified in the registry. This information is stored
+    ///     at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
     /// </summary>
     /// <returns></returns>
     private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
@@ -185,7 +196,7 @@ public sealed class EventMessageProvider
 
         var provider = new ProviderDetails { ProviderName = _providerName };
 
-        if (!s_allProviderNames.Contains(_providerName))
+        if (!providerMetadata.IsLocaleMetadata && !s_allProviderNames.Contains(_providerName))
         {
             _logger?.Debug($"{_providerName} modern provider is not present. Returning empty provider.");
 
@@ -194,19 +205,18 @@ public sealed class EventMessageProvider
 
         try
         {
-            provider.Events = providerMetadata.Events.Select(
-                e => new EventModel
-                {
-                    Description = e.Description,
-                    Id = e.Id,
-                    Keywords = e.Keywords.ToArray(),
-                    Level = e.Level,
-                    LogName = e.LogName,
-                    Opcode = e.Opcode,
-                    Task = e.Task,
-                    Template = e.Template,
-                    Version = e.Version
-                }).ToArray();
+            provider.Events = providerMetadata.Events.Select(e => new EventModel
+            {
+                Description = e.Description,
+                Id = e.Id,
+                Keywords = e.Keywords.ToArray(),
+                Level = e.Level,
+                LogName = e.LogName,
+                Opcode = e.Opcode,
+                Task = e.Task,
+                Template = e.Template,
+                Version = e.Version
+            }).ToArray();
         }
         catch (Exception ex)
         {
@@ -216,7 +226,6 @@ public sealed class EventMessageProvider
         try
         {
             provider.Keywords = providerMetadata.Keywords;
-
         }
         catch (Exception ex)
         {

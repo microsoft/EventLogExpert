@@ -15,7 +15,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
-public sealed class EventProviderDatabaseEventResolverTests
+public sealed class EventResolverDatabaseTests
 {
     [Fact]
     public void Constructor_WithCacheAndLogger_ShouldCreateInstance()
@@ -27,7 +27,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, cache, logger);
+        using var resolver = new EventResolver(dbCollection, cache, logger);
 
         // Assert
         Assert.NotNull(resolver);
@@ -45,7 +45,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // This will throw FileNotFoundException, but we can still check logging
         try
         {
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
         }
         catch (FileNotFoundException)
         {
@@ -66,10 +66,10 @@ public sealed class EventProviderDatabaseEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+        using var resolver = new EventResolver(dbCollection, logger: logger);
 
         // Assert
-        logger.Received(1).Trace(Arg.Is<TraceLogHandler>(h => h.ToString().Contains("EventProviderDatabaseEventResolver")));
+        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("EventResolver")));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
         // Act
         var exception = Assert.Throws<FileNotFoundException>(() =>
-            new EventProviderDatabaseEventResolver(dbCollection));
+            new EventResolver(dbCollection));
 
         // Assert
         Assert.Contains(nonExistentPath, exception.Message);
@@ -96,21 +96,20 @@ public sealed class EventProviderDatabaseEventResolverTests
         dbCollection.ActiveDatabases.Returns([]);
 
         // Act
-        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, null);
+        using var resolver = new EventResolver(dbCollection, null);
 
         // Assert
         Assert.NotNull(resolver);
     }
 
     [Fact]
-    public void Constructor_WithNullDatabaseCollection_ShouldThrowArgumentNullException()
+    public void Constructor_WithNullDatabaseCollection_ShouldCreateInstance()
     {
         // Act
-        var exception = Assert.Throws<ArgumentNullException>(() =>
-            new EventProviderDatabaseEventResolver(null!));
+        using var resolver = new EventResolver(null);
 
         // Assert
-        Assert.Equal("dbCollection", exception.ParamName);
+        Assert.NotNull(resolver);
     }
 
     [Fact]
@@ -121,7 +120,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         dbCollection.ActiveDatabases.Returns([]);
 
         // Act
-        using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: null);
+        using var resolver = new EventResolver(dbCollection, logger: null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -145,7 +144,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
             // Act
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection);
 
             // Assert
             Assert.NotNull(resolver);
@@ -162,7 +161,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // Arrange
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection);
 
         // Act & Assert
         resolver.Dispose();
@@ -194,7 +193,7 @@ public sealed class EventProviderDatabaseEventResolverTests
 
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
-            var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection);
 
             var exceptions = new ConcurrentBag<Exception>();
 
@@ -245,7 +244,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // Arrange
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection);
 
         var exceptions = new ConcurrentBag<Exception>();
 
@@ -272,7 +271,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // Arrange
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection);
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -289,7 +288,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // Arrange
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        EventProviderDatabaseEventResolver resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        EventResolver resolver = new EventResolver(dbCollection);
 
         // Type as base class to verify override (not 'new') is used
         EventResolverBase baseResolver = resolver;
@@ -309,7 +308,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         // Arrange
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection);
 
         var eventRecord = new EventRecord
         {
@@ -347,7 +346,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
 
             var eventRecord = new EventRecord
             {
@@ -394,7 +393,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection);
 
             // Act
             var exception = Record.Exception(() =>
@@ -458,7 +457,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection);
 
             // Act
             var exception = Record.Exception(() =>
@@ -509,7 +508,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
 
             var eventRecord = new EventRecord
             {
@@ -565,7 +564,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
 
             var eventRecord = new EventRecord
             {
@@ -614,7 +613,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
 
             var eventRecord = new EventRecord
             {
@@ -671,7 +670,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection);
 
             var eventRecord1 = new EventRecord { ProviderName = "Provider1", Id = 1000 };
             var eventRecord2 = new EventRecord { ProviderName = "Provider2", Id = 2000 };
@@ -723,7 +722,7 @@ public sealed class EventProviderDatabaseEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventProviderDatabaseEventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger);
 
             var eventRecord = new EventRecord
             {
@@ -753,7 +752,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
         dbCollection.ActiveDatabases.Returns([]);
 
-        using var resolver = new EventProviderDatabaseEventResolver(dbCollection);
+        using var resolver = new EventResolver(dbCollection);
 
         var eventRecord = new EventRecord
         {
@@ -785,7 +784,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.All(sorted, path => Assert.True(Path.IsPathRooted(path)));
@@ -805,7 +804,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.Equal(3, sorted.Count);
@@ -819,7 +818,7 @@ public sealed class EventProviderDatabaseEventResolverTests
     public void SortDatabases_WithEmptyList_ShouldReturnEmptyList()
     {
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases([]);
+        var sorted = EventResolver.SortDatabases([]);
 
         // Assert
         Assert.Empty(sorted);
@@ -838,7 +837,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.Equal(4, sorted.Count);
@@ -860,7 +859,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.Equal(3, sorted.Count);
@@ -881,7 +880,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         // Numeric comparison (descending): 20 > 10 > 2
@@ -904,7 +903,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.Equal(4, sorted.Count);
@@ -921,7 +920,7 @@ public sealed class EventProviderDatabaseEventResolverTests
         var databases = new[] { @"C:\Test\Windows 2019.db" };
 
         // Act
-        var sorted = EventProviderDatabaseEventResolver.SortDatabases(databases).ToList();
+        var sorted = EventResolver.SortDatabases(databases).ToList();
 
         // Assert
         Assert.Single(sorted);

@@ -25,9 +25,9 @@ internal sealed partial class ProviderMetadata
     private ReadOnlyDictionary<int, string>? _opcodes;
     private ReadOnlyDictionary<int, string>? _tasks;
 
-    private ProviderMetadata(string providerName)
+    private ProviderMetadata(string providerName, string? metadataPath = null)
     {
-        _publisherMetadataHandle = EventMethods.EvtOpenPublisherMetadata(EventLogSession.GlobalSession.Handle, providerName, null, 0, 0);
+        _publisherMetadataHandle = EventMethods.EvtOpenPublisherMetadata(EventLogSession.GlobalSession.Handle, providerName, metadataPath, 0, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (_publisherMetadataHandle.IsInvalid)
@@ -284,8 +284,31 @@ internal sealed partial class ProviderMetadata
 
     internal string? Error { get; private set; }
 
-    internal static ProviderMetadata? Create(string providerName, ITraceLogger? logger = null)
+    internal bool IsLocaleMetadata { get; private init; }
+
+    internal static ProviderMetadata? Create(
+        string providerName,
+        IReadOnlyList<string>? metadataPath = null,
+        ITraceLogger? logger = null)
     {
+        if (metadataPath is { Count: > 0 })
+        {
+            foreach (var path in metadataPath)
+            {
+                ProviderMetadata localeMetadata = new(providerName, path) { IsLocaleMetadata = true };
+
+                if (localeMetadata.Error is not null) { continue; }
+
+                logger?.Debug($"Resolved {providerName} from locale metadata: {path}");
+
+                return localeMetadata;
+            }
+
+            logger?.Debug($"Locale metadata did not contain {providerName}.");
+
+            return null;
+        }
+
         ProviderMetadata metadata = new(providerName);
 
         if (metadata.Error is null)

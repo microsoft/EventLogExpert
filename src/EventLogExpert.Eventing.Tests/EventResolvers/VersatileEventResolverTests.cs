@@ -14,7 +14,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Eventing.Tests.EventResolvers;
 
-public sealed class VersatileEventResolverTests
+public sealed class EventResolverTests
 {
     [Fact]
     public void Constructor_WithCacheAndLogger_ShouldCreateInstance()
@@ -24,7 +24,7 @@ public sealed class VersatileEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var resolver = new VersatileEventResolver(cache: cache, tracer: logger);
+        using var resolver = new EventResolver(cache: cache, logger: logger);
 
         // Assert
         Assert.NotNull(resolver);
@@ -47,7 +47,7 @@ public sealed class VersatileEventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
             // Act & Assert
-            using (var resolver = new VersatileEventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection))
             {
                 Assert.NotNull(resolver);
             }
@@ -72,7 +72,7 @@ public sealed class VersatileEventResolverTests
         dbCollection.ActiveDatabases.Returns(ImmutableList<string>.Empty);
 
         // Act
-        using var resolver = new VersatileEventResolver(dbCollection);
+        using var resolver = new EventResolver(dbCollection);
 
         // Assert
         Assert.NotNull(resolver);
@@ -85,17 +85,17 @@ public sealed class VersatileEventResolverTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var resolver = new VersatileEventResolver(tracer: logger);
+        using var resolver = new EventResolver(logger: logger);
 
         // Assert
-        logger.Received().Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("VersatileEventResolver")));
+        logger.Received().Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("EventResolver")));
     }
 
     [Fact]
     public void Constructor_WithNoDatabaseCollection_ShouldUseLocalResolver()
     {
         // Act
-        using var resolver = new VersatileEventResolver(null);
+        using var resolver = new EventResolver(null);
 
         // Assert
         Assert.NotNull(resolver);
@@ -105,7 +105,7 @@ public sealed class VersatileEventResolverTests
     public void Dispose_CalledMultipleTimes_ShouldNotThrow()
     {
         // Arrange
-        var resolver = new VersatileEventResolver();
+        var resolver = new EventResolver();
 
         // Act & Assert
         resolver.Dispose();
@@ -129,7 +129,7 @@ public sealed class VersatileEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new VersatileEventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection);
             var eventRecord = EventUtils.CreateBasicEvent();
 
             // Act
@@ -154,7 +154,7 @@ public sealed class VersatileEventResolverTests
     public void Dispose_ThenResolveEvent_WithLocalResolver_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var resolver = new VersatileEventResolver(); // Uses local resolver
+        var resolver = new EventResolver(); // Uses local resolver
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -180,7 +180,7 @@ public sealed class VersatileEventResolverTests
             var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new VersatileEventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection);
             var eventRecord = new EventRecord
             {
                 ProviderName = Constants.TestProviderName,
@@ -209,7 +209,7 @@ public sealed class VersatileEventResolverTests
     public void Dispose_ThenResolveProviderDetails_WithLocalResolver_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var resolver = new VersatileEventResolver(); // Uses local resolver
+        var resolver = new EventResolver(); // Uses local resolver
         var eventRecord = new EventRecord
         {
             ProviderName = Constants.TestProviderName,
@@ -227,7 +227,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
         var exceptions = new Exception?[50];
 
         // Act
@@ -261,7 +261,7 @@ public sealed class VersatileEventResolverTests
     {
         // Arrange
         var cache = new EventResolverCache();
-        using var resolver = new VersatileEventResolver(cache: cache);
+        using var resolver = new EventResolver(cache: cache);
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -307,7 +307,7 @@ public sealed class VersatileEventResolverTests
 
             // Act
             DisplayEventModel displayEvent;
-            using (var resolver = new VersatileEventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection))
             {
                 displayEvent = resolver.ResolveEvent(eventRecord);
             }
@@ -332,7 +332,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_WithLocalResolver_ShouldResolveEvent()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
@@ -348,7 +348,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_WithMultipleProviders_ShouldResolveAll()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
 
         var providers = new[]
         {
@@ -378,7 +378,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveEvent_WithNonExistentProvider_ShouldReturnDefaultDescription()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -400,7 +400,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_CalledTwice_ShouldHandleCorrectly()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -420,7 +420,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
         var exceptions = new Exception?[50];
 
         // Act
@@ -470,7 +470,7 @@ public sealed class VersatileEventResolverTests
 
             // Act
             Exception? exception;
-            using (var resolver = new VersatileEventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection))
             {
                 exception = Record.Exception(() => resolver.ResolveProviderDetails(eventRecord));
             }
@@ -494,7 +494,7 @@ public sealed class VersatileEventResolverTests
     public void ResolveProviderDetails_WithLocalResolver_ShouldResolve()
     {
         // Arrange
-        using var resolver = new VersatileEventResolver();
+        using var resolver = new EventResolver();
 
         var eventRecord = new EventRecord
         {
@@ -531,12 +531,12 @@ public sealed class VersatileEventResolverTests
             DisplayEventModel localEvent;
             DisplayEventModel databaseEvent;
 
-            using (var localResolver = new VersatileEventResolver())
+            using (var localResolver = new EventResolver())
             {
                 localEvent = localResolver.ResolveEvent(eventRecord);
             }
 
-            using (var databaseResolver = new VersatileEventResolver(dbCollection))
+            using (var databaseResolver = new EventResolver(dbCollection))
             {
                 databaseEvent = databaseResolver.ResolveEvent(eventRecord);
             }
