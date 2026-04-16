@@ -46,8 +46,11 @@ public partial class EventResolverBase : IDisposable
         { 0x40000000000000, "Correlation Hint" },
         { 0x80000000000000, "Classic" }
     };
+    private static readonly ConcurrentDictionary<string, string[]> s_visibleOutTypesCache = [];
+    private static readonly ConcurrentDictionary<string, int> s_visiblePropertyCountCache = [];
 
-    protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails = new();
+    protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails =
+        new(StringComparer.OrdinalIgnoreCase);
     protected readonly Lock ProviderDetailsLock = new();
 
     private readonly IEventResolverCache? _cache;
@@ -82,25 +85,40 @@ public partial class EventResolverBase : IDisposable
         ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details);
         var modernEvent = details is not null ? GetModernEvent(eventRecord, details) : null;
 
-        return new DisplayEventModel(eventRecord.PathName, eventRecord.PathType)
+        // If the primary provider couldn't match this event, try a supplemental source.
+        // This handles cases where MTA/DB has partial coverage for a provider.
+        // Only load supplemental when primary has neither modern events nor legacy messages,
+        // to avoid unnecessary local provider loading when primary data is sufficient.
+        var descriptionDetails = details;
+        ProviderDetails? supplemental = null;
+
+        if (modernEvent is not null ||
+            details is null ||
+            details.GetMessagesByShortId(eventRecord.Id).Count != 0)
         {
-            ActivityId = eventRecord.ActivityId,
-            ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
-            Description = ResolveDescription(eventRecord, details, modernEvent),
-            Id = eventRecord.Id,
-            Keywords = keywords,
-            KeywordsDisplayName = string.Join(", ", keywords),
-            Level = Severity.GetString(eventRecord.Level),
-            LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
-            ProcessId = eventRecord.ProcessId,
-            RecordId = eventRecord.RecordId,
-            Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
-            TaskCategory = ResolveTaskName(eventRecord, details, modernEvent),
-            ThreadId = eventRecord.ThreadId,
-            TimeCreated = eventRecord.TimeCreated,
-            UserId = eventRecord.UserId,
-            Xml = eventRecord.Xml ?? string.Empty
-        };
+            return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
+        }
+
+        supplemental = TryGetSupplementalDetails(eventRecord);
+
+        if (supplemental is null)
+        {
+            return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
+        }
+
+        modernEvent = GetModernEvent(eventRecord, supplemental);
+
+        if (modernEvent is not null)
+        {
+            descriptionDetails = supplemental;
+        }
+        else if (supplemental.GetMessagesByShortId(eventRecord.Id).Count > 0)
+        {
+            // Supplemental has legacy messages for this EventId
+            descriptionDetails = supplemental;
+        }
+
+        return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -114,6 +132,13 @@ public partial class EventResolverBase : IDisposable
             return; // Already disposed by another thread
         }
     }
+
+    /// <summary>
+    ///     Override in derived classes to provide a supplemental ProviderDetails
+    ///     when the primary source (MTA/DB) has partial coverage for a provider.
+    ///     Called only when the primary provider exists but couldn't match the event.
+    /// </summary>
+    protected virtual ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => null;
 
     private static void CleanupFormatting(ReadOnlySpan<char> unformattedString, ref Span<char> buffer, out int bufferIndex)
     {
@@ -174,23 +199,173 @@ public partial class EventResolverBase : IDisposable
         }
     }
 
+    /// <summary>
+    ///     Counts the number of "visible" template properties by excluding length-prefixed
+    ///     binary data length fields. When a &lt;data&gt; element has a <c>length</c> attribute
+    ///     referencing another &lt;data&gt; element's <c>name</c>, Windows consumes the referenced
+    ///     length field internally and does not surface it as a user property via EvtRender.
+    /// </summary>
+    private static int CountVisibleTemplateProperties(ReadOnlySpan<char> template)
+    {
+        var cache = s_visiblePropertyCountCache.GetAlternateLookup<ReadOnlySpan<char>>();
+
+        if (cache.TryGetValue(template, out int cachedCount)) { return cachedCount; }
+
+        List<string> names = [];
+        HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
+
+        ReadOnlySpan<char> dataTag = "<data";
+        ReadOnlySpan<char> nameAttr = "name=\"";
+        ReadOnlySpan<char> lengthAttr = "length=\"";
+
+        int searchStart = 0;
+
+        while (searchStart < template.Length)
+        {
+            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
+
+            if (dataIndex == -1) { break; }
+
+            dataIndex += searchStart;
+
+            int nextCharIndex = dataIndex + dataTag.Length;
+
+            if (nextCharIndex < template.Length)
+            {
+                char next = template[nextCharIndex];
+
+                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
+                {
+                    searchStart = nextCharIndex;
+
+                    continue;
+                }
+            }
+
+            int elementEnd = template[dataIndex..].IndexOf("/>");
+
+            if (elementEnd == -1)
+            {
+                elementEnd = template[dataIndex..].IndexOf('>');
+            }
+
+            if (elementEnd == -1) { break; }
+
+            elementEnd += dataIndex;
+
+            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
+
+            names.Add(ExtractAttribute(element, nameAttr) ?? string.Empty);
+
+            // If this element has a length attribute, the referenced element is a length
+            // provider that Windows consumes internally.
+            string? lengthRef = ExtractAttribute(element, lengthAttr);
+
+            if (lengthRef is not null)
+            {
+                lengthProviderNames.Add(lengthRef);
+            }
+
+            searchStart = elementEnd + 1;
+        }
+
+        if (lengthProviderNames.Count == 0)
+        {
+            cache.TryAdd(template, names.Count);
+
+            return names.Count;
+        }
+
+        // Exclude only the length provider elements; the binary data elements
+        // themselves are still surfaced as properties by Windows.
+        int visibleCount = 0;
+
+        for (int i = 0; i < names.Count; i++)
+        {
+            if (string.IsNullOrEmpty(names[i]) || !lengthProviderNames.Contains(names[i]))
+            {
+                visibleCount++;
+            }
+        }
+
+        cache.TryAdd(template, visibleCount);
+
+        return visibleCount;
+    }
+
+    /// <summary>
+    ///     Relaxed template match for exact Id+Version+LogName matches only.
+    ///     Allows the template to have exactly 1 more data node than the event
+    ///     has properties, which handles version mismatches where the manifest
+    ///     added an optional field in a newer version.
+    /// </summary>
+    private static bool DoesTemplateApproximatelyMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
+    {
+        if (template.IsEmpty || eventPropertyCount <= 0) { return false; }
+
+        int templateCount = CountVisibleTemplateProperties(template);
+
+        if (templateCount == 0)
+        {
+            templateCount = GetOrParseTemplateDataNodes(template).Length;
+        }
+
+        int diff = templateCount - eventPropertyCount;
+
+        // Template may have exactly 1 more field than the event
+        return diff == 1;
+    }
+
     private static bool DoesTemplateMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
         if (template.IsEmpty) { return false; }
 
         string[] dataNodes = GetOrParseTemplateDataNodes(template);
 
-        return dataNodes.Length == eventPropertyCount;
+        if (dataNodes.Length == eventPropertyCount) { return true; }
+
+        // Account for length-prefixed binary data pairs that Windows does not
+        // surface as separate user properties via EvtRender.
+        return CountVisibleTemplateProperties(template) == eventPropertyCount;
     }
 
-    private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IEnumerable<object> properties)
+    private static string? ExtractAttribute(ReadOnlySpan<char> element, ReadOnlySpan<char> attributePrefix)
+    {
+        int index = element.IndexOf(attributePrefix, StringComparison.Ordinal);
+
+        if (index == -1) { return null; }
+
+        index += attributePrefix.Length;
+        int endIndex = element[index..].IndexOf('"');
+
+        return endIndex != -1 ? new string(element.Slice(index, endIndex)) : null;
+    }
+
+    private static List<string> GetFormattedProperties(ReadOnlySpan<char> template, IReadOnlyList<object> properties)
     {
         string[]? dataNodes = null;
-        List<string> providers = [];
+        List<string> formattedValues = [];
 
         if (!template.IsEmpty)
         {
-            dataNodes = GetOrParseTemplateDataNodes(template);
+            // EvtRender may or may not include hidden length-provider fields in its output.
+            // Choose the outType array whose length matches the actual property count.
+            // If neither matches, skip outType formatting to avoid misalignment.
+            var visibleOutTypes = GetVisibleTemplateOutTypes(template);
+
+            if (visibleOutTypes.Length == properties.Count)
+            {
+                dataNodes = visibleOutTypes;
+            }
+            else
+            {
+                var allOutTypes = GetOrParseTemplateDataNodes(template);
+
+                if (allOutTypes.Length == properties.Count)
+                {
+                    dataNodes = allOutTypes;
+                }
+            }
         }
 
         int index = 0;
@@ -201,34 +376,67 @@ public partial class EventResolverBase : IDisposable
 
             switch (property)
             {
+                case bool boolValue:
+                    formattedValues.Add(boolValue ? "true" : "false");
+
+                    break;
                 case DateTime eventTime:
-                    providers.Add(eventTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
+                    formattedValues.Add(eventTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffff00K"));
 
                     break;
                 case byte[] bytes:
-                    providers.Add(Convert.ToHexString(bytes));
+                    formattedValues.Add(Convert.ToHexString(bytes));
 
                     break;
                 case SecurityIdentifier sid:
-                    providers.Add(sid.Value);
+                    formattedValues.Add(sid.Value);
 
                     break;
                 default:
                     if (string.IsNullOrEmpty(outType))
                     {
-                        providers.Add($"{property}");
+                        formattedValues.Add($"{property}");
                     }
                     else if (s_displayAsHexTypes.Contains(outType, StringComparer.OrdinalIgnoreCase))
                     {
-                        providers.Add($"0x{property:X}");
+                        formattedValues.Add(property switch
+                        {
+                            byte b => $"0x{b:X}",
+                            sbyte sb => $"0x{sb:X}",
+                            short s => $"0x{s:X}",
+                            ushort us => $"0x{us:X}",
+                            int i => $"0x{i:X}",
+                            uint ui => $"0x{ui:X}",
+                            long l => $"0x{l:X}",
+                            ulong ul => $"0x{ul:X}",
+                            _ => $"{property}"
+                        });
                     }
                     else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) && property is int hResult)
                     {
-                        providers.Add(ResolverMethods.GetErrorMessage((uint)hResult));
+                        formattedValues.Add(ResolverMethods.GetErrorMessage((uint)hResult));
+                    }
+                    else if (string.Equals(outType, "win:NTStatus", StringComparison.OrdinalIgnoreCase))
+                    {
+                        uint statusCode = property switch
+                        {
+                            uint ui => ui,
+                            int i => (uint)i,
+                            ulong ul => (uint)ul,
+                            long l => (uint)l,
+                            ushort us => us,
+                            short s => (uint)s,
+                            byte b => b,
+                            _ => 0
+                        };
+
+                        formattedValues.Add(property is uint or int or ulong or long or ushort or short or byte
+                            ? ResolverMethods.GetNtStatusMessage(statusCode)
+                            : $"{property}");
                     }
                     else
                     {
-                        providers.Add($"{property}");
+                        formattedValues.Add($"{property}");
                     }
 
                     break;
@@ -237,7 +445,7 @@ public partial class EventResolverBase : IDisposable
             index++;
         }
 
-        return providers;
+        return formattedValues;
     }
 
     private static string[] GetOrParseTemplateDataNodes(ReadOnlySpan<char> template)
@@ -317,6 +525,100 @@ public partial class EventResolverBase : IDisposable
         return dataNodes;
     }
 
+    /// <summary>
+    ///     Returns the outType values for only visible template properties, excluding hidden
+    ///     length-provider fields that Windows consumes internally. This ensures the outType
+    ///     array aligns correctly with the properties surfaced by EvtRender.
+    /// </summary>
+    private static string[] GetVisibleTemplateOutTypes(ReadOnlySpan<char> template)
+    {
+        var cache = s_visibleOutTypesCache.GetAlternateLookup<ReadOnlySpan<char>>();
+
+        if (cache.TryGetValue(template, out string[]? cached)) { return cached; }
+
+        List<(string name, string outType)> elements = [];
+        HashSet<string> lengthProviderNames = new(StringComparer.OrdinalIgnoreCase);
+
+        ReadOnlySpan<char> dataTag = "<data";
+        ReadOnlySpan<char> nameAttr = "name=\"";
+        ReadOnlySpan<char> outTypeAttr = "outType=\"";
+        ReadOnlySpan<char> lengthAttr = "length=\"";
+
+        int searchStart = 0;
+
+        while (searchStart < template.Length)
+        {
+            int dataIndex = template[searchStart..].IndexOf(dataTag, StringComparison.OrdinalIgnoreCase);
+
+            if (dataIndex == -1) { break; }
+
+            dataIndex += searchStart;
+
+            int nextCharIndex = dataIndex + dataTag.Length;
+
+            if (nextCharIndex < template.Length)
+            {
+                char next = template[nextCharIndex];
+
+                if (next != ' ' && next != '\t' && next != '\r' && next != '\n' && next != '/' && next != '>')
+                {
+                    searchStart = nextCharIndex;
+
+                    continue;
+                }
+            }
+
+            int elementEnd = template[dataIndex..].IndexOf("/>");
+
+            if (elementEnd == -1)
+            {
+                elementEnd = template[dataIndex..].IndexOf('>');
+            }
+
+            if (elementEnd == -1) { break; }
+
+            elementEnd += dataIndex;
+
+            ReadOnlySpan<char> element = template[dataIndex..elementEnd];
+
+            string name = ExtractAttribute(element, nameAttr) ?? string.Empty;
+            string outType = ExtractAttribute(element, outTypeAttr) ?? string.Empty;
+
+            elements.Add((name, outType));
+
+            string? lengthRef = ExtractAttribute(element, lengthAttr);
+
+            if (lengthRef is not null)
+            {
+                lengthProviderNames.Add(lengthRef);
+            }
+
+            searchStart = elementEnd + 1;
+        }
+
+        string[] result;
+
+        if (lengthProviderNames.Count == 0)
+        {
+            result = elements.Select(e => e.outType).ToArray();
+        }
+        else
+        {
+            result = elements
+                .Where(e => string.IsNullOrEmpty(e.name) || !lengthProviderNames.Contains(e.name))
+                .Select(e => e.outType)
+                .ToArray();
+        }
+
+        cache.TryAdd(template, result);
+
+        return result;
+    }
+
+    /// <summary>Treats null and empty string as equivalent for LogName comparison.</summary>
+    private static bool LogNamesMatch(string? a, string? b) =>
+        string.IsNullOrEmpty(a) ? string.IsNullOrEmpty(b) : string.Equals(a, b, StringComparison.Ordinal);
+
     private static void ResizeBuffer(ref char[] buffer, ref Span<char> source, int sizeToAdd)
     {
         char[] newBuffer = ArrayPool<char>.Shared.Rent(source.Length + sizeToAdd);
@@ -327,6 +629,32 @@ public partial class EventResolverBase : IDisposable
 
     [GeneratedRegex("%+[0-9]+")]
     private static partial Regex WildcardWithNumberRegex();
+
+    private DisplayEventModel CreateEventModel(
+        EventRecord eventRecord,
+        List<string> keywords,
+        EventModel? modernEvent,
+        ProviderDetails? descriptionDetails,
+        ProviderDetails? supplemental) =>
+        new(eventRecord.PathName, eventRecord.PathType)
+        {
+            ActivityId = eventRecord.ActivityId,
+            ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
+            Description = ResolveDescription(eventRecord, descriptionDetails, modernEvent, supplemental),
+            Id = eventRecord.Id,
+            Keywords = keywords,
+            KeywordsDisplayName = string.Join(", ", keywords),
+            Level = Severity.GetString(eventRecord.Level),
+            LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
+            ProcessId = eventRecord.ProcessId,
+            RecordId = eventRecord.RecordId,
+            Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
+            TaskCategory = ResolveTaskName(eventRecord, descriptionDetails, modernEvent),
+            ThreadId = eventRecord.ThreadId,
+            TimeCreated = eventRecord.TimeCreated,
+            UserId = eventRecord.UserId,
+            Xml = eventRecord.Xml ?? string.Empty
+        };
 
     private string FormatDescription(
         List<string> properties,
@@ -347,15 +675,24 @@ public partial class EventResolverBase : IDisposable
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
 
-        Span<char> description = stackalloc char[descriptionTemplate.Length * 2];
+        // Guard against stack overflow from very large templates
+        const int maxStackAllocChars = 4096;
+        int cleanupBufferSize = descriptionTemplate.Length * 2;
+        char[]? cleanupRented = null;
+
+        Span<char> description = cleanupBufferSize <= maxStackAllocChars
+            ? stackalloc char[cleanupBufferSize]
+            : (cleanupRented = ArrayPool<char>.Shared.Rent(cleanupBufferSize));
 
         CleanupFormatting(descriptionTemplate, ref description, out int length);
 
         description = description[..length];
 
-        if (properties.Count <= 0)
+        if (properties.Count <= 0 && description.IndexOf("%%".AsSpan()) < 0)
         {
             returnDescription = description.ToString();
+
+            if (cleanupRented is not null) { ArrayPool<char>.Shared.Return(cleanupRented); }
 
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
@@ -394,18 +731,27 @@ public partial class EventResolverBase : IDisposable
 
                     if (propIndex > properties.Count)
                     {
-                        Logger?.Warn($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}");
+                        Logger?.Debug($"{nameof(FormatDescription)}: Property index out of range - RequestedIndex={propIndex}, PropertyCount={properties.Count}, Template={descriptionTemplate}");
 
-                        return DefaultFailedDescription;
+                        // Substitute with empty string rather than failing the entire description.
+                        // This commonly occurs when a manifest template references more properties
+                        // than the event actually supplies (e.g., version mismatch or optional data).
+                        // The available properties are still correctly positional.
+                        propString = ReadOnlySpan<char>.Empty;
                     }
-
-                    propString = properties[propIndex - 1];
+                    else
+                    {
+                        propString = properties[propIndex - 1];
+                    }
                 }
 
-                if (propString.StartsWith("%%") && parameters.Any())
+                if (propString.StartsWith("%%"))
                 {
                     int endParameterId = propString.IndexOf(' ');
-                    var parameterIdString = endParameterId > 2 ? propString.Slice(2, endParameterId) : propString[2..];
+
+                    var parameterIdString = endParameterId > 2
+                        ? propString[2..endParameterId]
+                        : propString[2..];
 
                     if (long.TryParse(parameterIdString, out long parameterId))
                     {
@@ -414,12 +760,23 @@ public partial class EventResolverBase : IDisposable
                         ReadOnlySpan<char> parameterMessage =
                             parameters.FirstOrDefault(m => m.RawId == (int)parameterId)?.Text ?? string.Empty;
 
+                        // Fallback to system FormatMessage for Win32 error codes
+                        // when provider parameters aren't available (e.g., MTA/DB resolvers)
+                        if (parameterMessage.IsEmpty && parameterId is > 0 and <= uint.MaxValue)
+                        {
+                            parameterMessage = NativeMethods.FormatSystemMessage((uint)parameterId);
+                        }
+
                         if (!parameterMessage.IsEmpty)
                         {
-                            // Some RawId parameters have a trailing '%0' that needs to be removed
+                            // Remove only an exact trailing "%0" terminator, not individual chars
+                            parameterMessage = parameterMessage.EndsWith("%0")
+                                ? parameterMessage[..^2]
+                                : parameterMessage;
+
                             propString = endParameterId > 2 ?
-                                string.Concat(parameterMessage.TrimEnd(['%', '0']), propString[++endParameterId..]) :
-                                parameterMessage.TrimEnd(['%', '0']);
+                                string.Concat(parameterMessage, propString[(endParameterId + 1)..]) :
+                                parameterMessage;
                         }
                     }
                 }
@@ -469,6 +826,8 @@ public partial class EventResolverBase : IDisposable
         finally
         {
             ArrayPool<char>.Shared.Return(buffer);
+
+            if (cleanupRented is not null) { ArrayPool<char>.Shared.Return(cleanupRented); }
         }
     }
 
@@ -491,15 +850,15 @@ public partial class EventResolverBase : IDisposable
             return returnValue;
         }
 
-        // Some providers re-define the standard keywords in their own metadata,
-        // so let's skip those.
-        var lower32 = eventRecord.Keywords.Value & 0xFFFFFFFF;
+        // Provider-defined keywords use bits 0–47; bits 48–63 are reserved
+        // for Microsoft-defined standard keywords handled above.
+        var providerBits = eventRecord.Keywords.Value & 0x0000_FFFF_FFFF_FFFFL;
 
-        if (lower32 == 0) { return returnValue; }
+        if (providerBits == 0) { return returnValue; }
         
         foreach (var k in details.Keywords.Keys)
         {
-            if ((lower32 & k) != k) { continue; }
+            if ((providerBits & k) != k) { continue; }
 
             var keyword = details.Keywords[k].TrimEnd('\0');
             returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
@@ -510,9 +869,9 @@ public partial class EventResolverBase : IDisposable
 
     private EventModel? GetModernEvent(EventRecord eventRecord, ProviderDetails details)
     {
-        if (eventRecord is { Version: null, LogName: null })
+        if (eventRecord.Version is null && string.IsNullOrEmpty(eventRecord.LogName))
         {
-            Logger?.Debug($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and LogName");
+            Logger?.Debug($"{nameof(GetModernEvent)}: Skipping modern event lookup - EventId={eventRecord.Id}, Provider={eventRecord.ProviderName} has null Version and empty LogName");
 
             return null;
         }
@@ -526,7 +885,9 @@ public partial class EventResolverBase : IDisposable
 
         foreach (var e in candidateEvents)
         {
-            if (e.Id != eventRecord.Id || e.Version != eventRecord.Version || e.LogName != eventRecord.LogName)
+            if (e.Id != eventRecord.Id ||
+                e.Version != eventRecord.Version ||
+                !LogNamesMatch(e.LogName, eventRecord.LogName))
             {
                 continue;
             }
@@ -543,6 +904,17 @@ public partial class EventResolverBase : IDisposable
             return modernEvent;
         }
 
+        // For exact Id+Version+LogName matches, tolerate the template having slightly
+        // more data nodes than the event supplies. This handles version mismatches where
+        // the manifest added optional fields. FormatDescription handles out-of-range
+        // property indices gracefully by substituting empty string.
+        if (modernEvent is not null && DoesTemplateApproximatelyMatchPropertyCount(modernEvent.Template, eventPropertyCount))
+        {
+            Logger?.Debug($"{nameof(GetModernEvent)}: Exact match with relaxed template count - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
+
+            return modernEvent;
+        }
+
         if (modernEvent is not null)
         {
             Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found but template property count mismatch - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}");
@@ -550,7 +922,7 @@ public partial class EventResolverBase : IDisposable
 
         foreach (var @event in candidateEvents)
         {
-            if (@event.LogName != eventRecord.LogName) { continue; }
+            if (!LogNamesMatch(@event.LogName, eventRecord.LogName)) { continue; }
 
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
@@ -561,15 +933,60 @@ public partial class EventResolverBase : IDisposable
 
         // Try again forcing the long to a short and with no log name.
         // This is needed for providers such as Microsoft-Windows-Complus
+        EventModel? shortIdMatch = null;
+
         foreach (var @event in details.Events)
         {
             if ((short)@event.Id != eventRecord.Id || @event.Version != eventRecord.Version) { continue; }
 
             if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
+            if (shortIdMatch is not null)
+            {
+                // Multiple matches — ambiguous
+                shortIdMatch = null;
+
+                break;
+            }
+
+            shortIdMatch = @event;
+        }
+
+        if (shortIdMatch is not null)
+        {
             Logger?.Debug($"{nameof(GetModernEvent)}: Match by short Id/Version fallback - EventId={eventRecord.Id}, Version={eventRecord.Version}");
 
-            return @event;
+            return shortIdMatch;
+        }
+
+        // Final fallback: match by Id+Version ignoring LogName, but only if exactly
+        // one candidate passes template validation. This handles providers that define
+        // events under diagnostic/operational channels but log to Application/System
+        // via eventlog redirects (e.g., Winlogon 6001).
+        EventModel? logNameIgnoredMatch = null;
+
+        foreach (var @event in candidateEvents)
+        {
+            if (@event.Version != eventRecord.Version) { continue; }
+
+            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+
+            if (logNameIgnoredMatch is not null)
+            {
+                // Multiple candidates — ambiguous, don't guess
+                logNameIgnoredMatch = null;
+
+                break;
+            }
+
+            logNameIgnoredMatch = @event;
+        }
+
+        if (logNameIgnoredMatch is not null)
+        {
+            Logger?.Debug($"{nameof(GetModernEvent)}: Unique match by Id/Version ignoring LogName - EventId={eventRecord.Id}, Version={eventRecord.Version}, MatchedLogName={logNameIgnoredMatch.LogName}");
+
+            return logNameIgnoredMatch;
         }
 
         Logger?.Debug($"{nameof(GetModernEvent)}: No matching event found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, PropertyCount={eventPropertyCount}, CandidateEventsWithSameId={candidateEvents.Count}");
@@ -577,8 +994,29 @@ public partial class EventResolverBase : IDisposable
         return null;
     }
 
+    /// <summary>
+    ///     Returns the best available parameter collection for FormatDescription.
+    ///     Only loads supplemental parameters when the primary provider lacks them,
+    ///     which occurs for MTA/DB providers that don't load parameter DLLs.
+    /// </summary>
+    private IEnumerable<MessageModel> GetParametersWithFallback(
+        ProviderDetails details,
+        ref ProviderDetails? supplemental,
+        EventRecord eventRecord)
+    {
+        if (details.Parameters.Any()) { return details.Parameters; }
+
+        supplemental ??= TryGetSupplementalDetails(eventRecord);
+
+        return supplemental?.Parameters ?? details.Parameters;
+    }
+
     /// <summary>Resolve event descriptions from an event record.</summary>
-    private string ResolveDescription(EventRecord eventRecord, ProviderDetails? details, EventModel? modernEvent)
+    private string ResolveDescription(
+        EventRecord eventRecord,
+        ProviderDetails? details,
+        EventModel? modernEvent,
+        ProviderDetails? supplemental)
     {
         if (details is null)
         {
@@ -593,7 +1031,8 @@ public partial class EventResolverBase : IDisposable
         {
             Logger?.Debug($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
-            return FormatDescription(properties, modernEvent?.Description, details.Parameters);
+            return FormatDescription(properties, modernEvent!.Description,
+                GetParametersWithFallback(details, ref supplemental, eventRecord));
         }
 
         // Legacy provider message lookup
@@ -603,12 +1042,72 @@ public partial class EventResolverBase : IDisposable
         {
             Logger?.Debug($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
-            return FormatDescription(properties, legacyMessages[0].Text, details.Parameters);
+            return FormatDescription(properties, legacyMessages[0].Text,
+                GetParametersWithFallback(details, ref supplemental, eventRecord));
         }
 
         if (legacyMessages.Count > 1)
         {
-            Logger?.Debug($"{nameof(ResolveDescription)}: Multiple legacy messages found, skipping - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
+            // Disambiguate by LogLink, matching the pattern used in ResolveTaskName
+            MessageModel? bestMatch = null;
+
+            foreach (var m in legacyMessages)
+            {
+                if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
+                {
+                    bestMatch = m;
+
+                    break;
+                }
+            }
+
+            // If LogLink didn't disambiguate, try severity-based matching.
+            // MC RawId bits 31-30 encode severity: 00=Success, 01=Informational, 10=Warning, 11=Error
+            // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose
+            if (bestMatch is null && eventRecord.Level is not null)
+            {
+                int targetSeverity = eventRecord.Level switch
+                {
+                    1 or 2 => 3,    // Critical/Error → severity 11 (Error)
+                    3 => 2,         // Warning → severity 10 (Warning)
+                    4 or 5 => 1,    // Information/Verbose → severity 01 (Informational)
+                    _ => 0          // LogAlways → severity 00 (Success)
+                };
+
+                MessageModel? severityCandidate = null;
+
+                foreach (var m in legacyMessages)
+                {
+                    int messageSeverity = (int)((m.RawId >> 30) & 0x3);
+
+                    if (messageSeverity != targetSeverity) { continue; }
+
+                    if (severityCandidate is not null)
+                    {
+                        // Multiple matches with same severity — still ambiguous
+                        severityCandidate = null;
+
+                        break;
+                    }
+
+                    severityCandidate = m;
+                }
+
+                bestMatch = severityCandidate;
+
+                if (bestMatch is not null)
+                {
+                    Logger?.Debug($"{nameof(ResolveDescription)}: Disambiguated legacy message by severity - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Level={eventRecord.Level}, Severity={(bestMatch.RawId >> 30) & 0x3}");
+                }
+            }
+
+            if (bestMatch is not null)
+            {
+                return FormatDescription(properties, bestMatch.Text,
+                    GetParametersWithFallback(details, ref supplemental, eventRecord));
+            }
+
+            Logger?.Debug($"{nameof(ResolveDescription)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
         }
 
         // Some events store the description in the event properties
@@ -678,7 +1177,7 @@ public partial class EventResolverBase : IDisposable
         }
         else
         {
-            taskName = (eventRecord.Task == null) | (eventRecord.Task == 0) ? "None" : $"({eventRecord.Task})";
+            taskName = eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
         }
 
         taskName = taskName.TrimEnd('\0');

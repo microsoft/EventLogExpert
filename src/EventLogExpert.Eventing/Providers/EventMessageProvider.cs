@@ -12,13 +12,13 @@ namespace EventLogExpert.Eventing.Providers;
 public sealed class EventMessageProvider(
     string providerName,
     string? computerName,
-    IReadOnlyList<string>? logFilePaths = null,
+    IReadOnlyList<string>? metadataPaths = null,
     ITraceLogger? logger = null)
 {
     private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
 
     private readonly string? _computerName = computerName;
-    private readonly IReadOnlyList<string>? _logFilePaths = logFilePaths;
+    private readonly IReadOnlyList<string>? _metadataPaths = metadataPaths;
     private readonly ITraceLogger? _logger = logger;
     private readonly string _providerName = providerName;
 
@@ -115,15 +115,15 @@ public sealed class EventMessageProvider(
 
     public ProviderDetails LoadProviderDetails()
     {
-        var providerMetadata = ProviderMetadata.Create(_providerName, _logFilePaths, _logger);
+        var providerMetadata = ProviderMetadata.Create(_providerName, _metadataPaths, _logger);
 
         ProviderDetails provider = providerMetadata is not null
             ? LoadMessagesFromModernProvider(providerMetadata)
             : new ProviderDetails { ProviderName = _providerName };
 
-        // When logFilePaths are provided, this is an MTA-only resolution path.
+        // When metadataPaths are provided, this is an MTA-only resolution path.
         // Skip registry and DLL lookups entirely.
-        if (_logFilePaths is { Count: > 0 })
+        if (_metadataPaths is { Count: > 0 })
         {
             return provider;
         }

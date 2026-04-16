@@ -54,8 +54,8 @@ public class ProviderDetails
     }
 
     /// <summary>Gets messages matching the given ShortId using a pre-built lookup dictionary.
-    /// The lookup uses int keys to preserve the original implicit promotion semantics
-    /// when comparing ShortId (short) with event record Id/Task (ushort).</summary>
+    /// The lookup uses int keys derived from unsigned reinterpretation of ShortId,
+    /// matching the implicit ushort-to-int promotion used by callers.</summary>
     internal IReadOnlyList<MessageModel> GetMessagesByShortId(int shortId)
     {
         _messagesByShortIdLookup ??= BuildMessagesByShortIdLookup();
@@ -87,7 +87,9 @@ public class ProviderDetails
 
         foreach (var m in _messages)
         {
-            int key = m.ShortId;
+            // Reinterpret ShortId as unsigned to match ushort-to-int promotion
+            // used by callers (EventRecord.Id and Task are ushort).
+            int key = (ushort)m.ShortId;
 
             if (!lookup.TryGetValue(key, out var list))
             {
