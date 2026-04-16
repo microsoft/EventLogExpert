@@ -13,6 +13,7 @@ using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Immutable;
+using System.Security;
 using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -143,25 +144,35 @@ public sealed class EventLogEffects(
             return;
         }
 
-        // Detect locale metadata files for exported logs
-        if (action.PathType == PathType.FilePath && eventResolver is EventResolver concreteResolver)
+        // Detect locale metadata files for exported logs.
+        // Filesystem probing is best-effort — failures must not abort opening the log.
+        if (action.PathType == PathType.FilePath)
         {
-            var logDir = Path.GetDirectoryName(action.LogName);
-
-            if (logDir is not null)
+            try
             {
-                var localeDir = Path.Combine(logDir, "LocaleMetaData");
+                var logDir = Path.GetDirectoryName(action.LogName);
 
-                if (Directory.Exists(localeDir))
+                if (logDir is not null)
                 {
-                    var mtaFiles = Directory.GetFiles(localeDir, "*.MTA");
+                    var localeDir = Path.Combine(logDir, "LocaleMetaData");
 
-                    if (mtaFiles.Length > 0)
+                    if (Directory.Exists(localeDir))
                     {
-                        concreteResolver.SetMetadataPaths(mtaFiles);
-                        _logger?.Info($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
+                        var mtaFiles = Directory.GetFiles(localeDir, "*.MTA");
+
+                        if (mtaFiles.Length > 0)
+                        {
+                            Array.Sort(mtaFiles, StringComparer.Ordinal);
+                            eventResolver.SetMetadataPaths(mtaFiles);
+                            _logger?.Info($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
+                        }
                     }
                 }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
+                or SecurityException or ArgumentException or NotSupportedException)
+            {
+                _logger?.Warn($"Failed to probe locale metadata for {action.LogName}: {ex.Message}");
             }
         }
 

@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
 
@@ -20,9 +21,11 @@ namespace EventLogExpert.Eventing.EventResolvers;
 public sealed partial class EventResolver : EventResolverBase, IEventResolver
 {
     private readonly Lock _databaseAccessLock = new();
+    private readonly ConcurrentDictionary<string, bool> _providerFromNonLocal = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails = new(StringComparer.OrdinalIgnoreCase);
 
     private ImmutableArray<EventProviderDbContext> _dbContexts = [];
-    private IReadOnlyList<string>? _metadataPaths;
+    private ImmutableArray<string> _metadataPaths = [];
 
     public EventResolver(
         IDatabaseCollectionProvider? dbCollection = null,
@@ -37,6 +40,13 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         Logger?.Debug($"{nameof(EventResolver)} was instantiated.");
     }
 
+    public override DisplayEventModel ResolveEvent(EventRecord eventRecord)
+    {
+        ResolveProviderDetails(eventRecord);
+
+        return base.ResolveEvent(eventRecord);
+    }
+
     public void ResolveProviderDetails(EventRecord eventRecord)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventResolver));
@@ -49,7 +59,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
 
             // 1. Try MTA locale metadata files (primary source for exported logs)
-            if (_metadataPaths is { Count: > 0 } && TryResolveFromMta(eventRecord))
+            if (_metadataPaths.Length > 0 && TryResolveFromMta(eventRecord))
             {
                 return;
             }
@@ -65,11 +75,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         }
     }
 
-    /// <summary>
-    ///     Sets the MTA locale metadata file paths for exported log resolution. Must be called before any events are
-    ///     resolved.
-    /// </summary>
-    public void SetMetadataPaths(IReadOnlyList<string> metadataPaths) => _metadataPaths = metadataPaths;
+    public void SetMetadataPaths(IReadOnlyList<string> metadataPaths) => _metadataPaths = [.. metadataPaths];
 
     /// <summary>
     ///     If the database file name ends in a year or a number, such as Exchange 2019 or Windows 2016, we want to sort
@@ -142,6 +148,21 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         }
 
         base.Dispose(disposing);
+    }
+
+    protected override ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord)
+    {
+        // Only supplement providers that were loaded from MTA/DB
+        if (!_providerFromNonLocal.ContainsKey(eventRecord.ProviderName)) { return null; }
+
+        return _supplementalDetails.GetOrAdd(
+            eventRecord.ProviderName,
+            name =>
+            {
+                Logger?.Debug($"Loading supplemental local provider for {name}");
+
+                return new EventMessageProvider(name, Logger).LoadProviderDetails();
+            });
     }
 
     [GeneratedRegex("^(.+) (\\S+)$")]
@@ -228,6 +249,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
 
                 Logger?.Debug($"Resolved {eventRecord.ProviderName} from database {dbContext.Name}.");
                 ProviderDetails.TryAdd(eventRecord.ProviderName, details);
+                _providerFromNonLocal.TryAdd(eventRecord.ProviderName, true);
 
                 return true;
             }
@@ -244,12 +266,13 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             _metadataPaths,
             Logger).LoadProviderDetails();
 
-        if (details.Events.Count == 0 && details.Keywords.Count == 0)
+        if (details.Events.Count == 0 && details.Keywords.Count == 0 && details.Messages.Count == 0)
         {
             return false;
         }
 
         ProviderDetails.TryAdd(eventRecord.ProviderName, details);
+        _providerFromNonLocal.TryAdd(eventRecord.ProviderName, true);
 
         return true;
     }

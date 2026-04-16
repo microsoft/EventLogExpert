@@ -39,6 +39,31 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void FormatDescription_WithPercentPercentParam_ShouldFallbackToFormatMessage()
+    {
+        // Arrange - %%1053 is Win32 error 1053 (service timeout)
+        // When provider has no parameter files, should fallback to FormatMessage
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Service failed: %%1053",
+            template: """<template><data name="Service" inType="win:UnicodeString"/></template>""",
+            properties: ["TestService"]);
+
+        // Clear parameters to simulate MTA provider without parameter files
+        details.Parameters = [];
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - %%1053 should be resolved to the actual error message
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("%%1053", displayEvent.Description);
+        // The resolved message should not be a raw hex fallback
+        Assert.DoesNotContain("0x00000", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
@@ -128,6 +153,46 @@ public sealed class EventResolverBaseTests
         Assert.Same(event1.ComputerName, event2.ComputerName);
         Assert.Same(event1.LogName, event2.LogName);
         Assert.Same(event1.Source, event2.Source);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithCaseInsensitiveProviderName_ShouldReuseCachedProvider()
+    {
+        // Arrange - provider added with one casing, event uses different casing
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = "Microsoft-Windows-Test",
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = "Microsoft-Windows-Test",
+                    ShortId = 100,
+                    Text = "Test message: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        // Event uses different casing than the cached provider
+        var eventRecord = new EventRecord
+        {
+            ProviderName = "microsoft-windows-test",
+            Id = 100,
+            Properties = ["value1"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should find the cached provider despite case difference
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Test message: value1", displayEvent.Description);
     }
 
     [Fact]
@@ -246,6 +311,26 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithHexOutTypeOnStringProperty_ShouldNotAddHexPrefix()
+    {
+        // Arrange - Even if outType says hex, string properties should not get "0x" prefix
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Value: %1",
+            template: """<template><data name="Value" inType="win:UnicodeString" outType="win:HexInt32"/></template>""",
+            properties: ["SomeStringValue"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("SomeStringValue", displayEvent.Description);
+        Assert.DoesNotContain("0xSomeStringValue", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithHexPropertyType_ShouldFormatAsHex()
     {
         // Arrange
@@ -262,6 +347,113 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("0xFF", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithHiddenLengthField_ShouldAlignOutTypesCorrectly()
+    {
+        // Arrange - template has a hidden length field followed by a hex-formatted property.
+        // The outType for the property AFTER the hidden field must align correctly.
+        var (details, _) = EventUtils.CreateModernEvent(
+            description: "Name: %1, Data: %2, Code: %3",
+            template: """
+                <template>
+                  <data name="Name" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="__binLength" inType="win:UInt32" outType="xs:unsignedInt"/>
+                  <data name="BinaryData" inType="win:Binary" outType="xs:hexBinary" length="__binLength"/>
+                  <data name="ErrorCode" inType="win:UInt32" outType="win:HexInt32"/>
+                </template>
+                """,
+            properties: ["TestName", new byte[] { 0xAB, 0xCD }, 255]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // 3 visible properties: Name, BinaryData, ErrorCode (__binLength is hidden)
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["TestName", new byte[] { 0xAB, 0xCD }, 255]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - ErrorCode (property[2]) should be formatted as hex (0xFF),
+        // not as plain "255" which would happen if outType alignment was shifted
+        Assert.NotNull(displayEvent);
+        Assert.Contains("0xFF", displayEvent.Description);
+        Assert.Contains("TestName", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithHResultOutType_ShouldResolveDynamically()
+    {
+        // Arrange - win:HResult with a common error code should resolve dynamically
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Error: %1",
+            template: """<template><data name="Error" inType="win:Int32" outType="win:HResult"/></template>""",
+            properties: [unchecked((int)0x80070005)]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - 0x80070005 is ACCESS_DENIED; resolved message should not contain the raw hex code
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("0x80070005", displayEvent.Description);
+        Assert.DoesNotContain("0x00000005", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLargeTemplate_ShouldNotOverflowStack()
+    {
+        // Arrange - very large description template that would overflow stackalloc
+        string largeDescription = "Event: " + new string('A', 5000) + " %1";
+        string largeTemplate =
+            "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>";
+
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 1000,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.ApplicationLogName,
+                    Description = largeDescription,
+                    Template = largeTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["TestValue"]
+        };
+
+        // Act - should not throw StackOverflowException
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("TestValue", displayEvent.Description);
     }
 
     [Fact]
@@ -304,6 +496,245 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithLegacyShortIdAbove32767_ShouldResolveLegacyMessage()
+    {
+        // Arrange - ShortId wraps negative for IDs > 32767 due to (short) cast
+        // EventRecord.Id = 49156 (ushort), ShortId = -16380 (short)
+        short shortId = unchecked((short)49156);
+
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = shortId,
+                    RawId = 49156,
+                    Text = "High ID event: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 49156,
+            Properties = ["test_value"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("High ID event: test_value", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLengthPrefixedBinaryData_ShouldMatchTemplate()
+    {
+        // Arrange - template has 4 data elements but __binLength is consumed internally
+        // by Windows as a length provider, so the event surfaces 3 properties (param1,
+        // param2, and the binary blob).
+        var (details, _) = EventUtils.CreateModernEvent(
+            description: "Param1: %1, Param2: %2",
+            template: """
+                <template xmlns="http://schemas.microsoft.com/win/2004/08/events">
+                  <data name="param1" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="param2" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="__binLength" inType="win:UInt32" outType="xs:unsignedInt"/>
+                  <data name="BinaryData" inType="win:Binary" outType="xs:hexBinary" length="__binLength"/>
+                </template>
+                """,
+            properties: ["Value1", "Value2", new byte[] { 0x01, 0x02 }]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Event has 3 properties: param1, param2, and the binary data blob
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["Value1", "Value2", new byte[] { 0x01, 0x02 }]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should match despite template having 4 data nodes for 3 properties
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Param1: Value1, Param2: Value2", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLengthProviderFieldsExcludedByEvtRender_ShouldAlignOutTypesCorrectly()
+    {
+        // Arrange - Same template but EvtRender excluded the length fields (4 properties)
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "The driver %3 failed.\r\nDevice: %1\r\nStatus: %2",
+            template: """
+                <template>
+                  <data name="DriverNameLength" inType="win:UInt32"/>
+                  <data name="DriverName" inType="win:UnicodeString" length="DriverNameLength"/>
+                  <data name="Status" inType="win:UInt32" outType="win:HexInt32"/>
+                  <data name="FailureNameLength" inType="win:UInt32"/>
+                  <data name="FailureName" inType="win:UnicodeString" length="FailureNameLength"/>
+                  <data name="Version" inType="win:UInt32"/>
+                </template>
+                """,
+            properties: ["ROOT\\DEVICE\\0000", (uint)0xC0000365, "\\Driver\\WUDFRd", (uint)0]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - visible outTypes align: DriverName=string, Status=hex, FailureName=string, Version=uint
+        Assert.NotNull(displayEvent);
+        Assert.Contains("0xC0000365", displayEvent.Description);
+        Assert.DoesNotContain("0xROOT", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLengthProviderFieldsIncludedByEvtRender_ShouldAlignOutTypesCorrectly()
+    {
+        // Arrange - Template has length-provider fields (DriverNameLength, FailureNameLength)
+        // but EvtRender includes ALL 6 properties, so outTypes must use the full array.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "The driver %5 failed to load.\r\nDevice: %2\r\nStatus: %3",
+            template: """
+                <template>
+                  <data name="DriverNameLength" inType="win:UInt32"/>
+                  <data name="DriverName" inType="win:UnicodeString" length="DriverNameLength"/>
+                  <data name="Status" inType="win:UInt32" outType="win:HexInt32"/>
+                  <data name="FailureNameLength" inType="win:UInt32"/>
+                  <data name="FailureName" inType="win:UnicodeString" length="FailureNameLength"/>
+                  <data name="Version" inType="win:UInt32"/>
+                </template>
+                """,
+            properties: [(object)(uint)40, "ROOT\\DEVICE\\0000", (uint)0xC0000365, (uint)14, "\\Driver\\WUDFRd", (uint)0]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - Status should be hex, device name should NOT have "0x" prefix
+        Assert.NotNull(displayEvent);
+        Assert.Contains("ROOT\\DEVICE\\0000", displayEvent.Description);
+        Assert.DoesNotContain("0xROOT", displayEvent.Description);
+        Assert.Contains("0xC0000365", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLogNameMismatch_ShouldFallbackToUniqueIdVersionMatch()
+    {
+        // Arrange - event logged to "Application" but manifest defines it under a diagnostic channel
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 6001,
+                    Version = 1,
+                    LogName = "Microsoft-Windows-Winlogon/Diagnostic",
+                    Description = "Winlogon started: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Result\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 6001,
+            Version = 1,
+            LogName = "Application",
+            Properties = [0u]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should match via LogName-ignored fallback since only one candidate
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Winlogon started:", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithLogNameMismatch_ShouldNotMatchWhenAmbiguous()
+    {
+        // Arrange - two events with same Id+Version but different LogNames, neither matching
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 6001,
+                    Version = 1,
+                    LogName = "Channel-A",
+                    Description = "From Channel A: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/></template>"
+                },
+                new EventModel
+                {
+                    Id = 6001,
+                    Version = 1,
+                    LogName = "Channel-B",
+                    Description = "From Channel B: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UInt32\" outType=\"xs:unsignedInt\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 6001,
+            Version = 1,
+            LogName = "Application",
+            Properties = [0u]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should NOT match because it's ambiguous (2 candidates)
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("Channel A", displayEvent.Description);
+        Assert.DoesNotContain("Channel B", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithMismatchedPropertyCount_ShouldNotMatchWrongTemplate()
     {
         // Arrange - template has 5 data elements but event only has 3 properties
@@ -338,6 +769,33 @@ public sealed class EventResolverBaseTests
         // Assert - should NOT use the 5-property template's description
         Assert.NotNull(displayEvent);
         Assert.DoesNotContain("A: val1", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithMismatchedPropertyCount_ShouldSkipOutTypeFormatting()
+    {
+        // Arrange - Template has 3 elements but event has 2 properties (version mismatch).
+        // OutType formatting should be disabled to avoid misalignment.
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Status: %1, Code: %2",
+            template: """
+                <template>
+                  <data name="Name" inType="win:UnicodeString"/>
+                  <data name="Status" inType="win:UInt32" outType="win:HexInt32"/>
+                  <data name="Code" inType="win:UInt32"/>
+                </template>
+                """,
+            properties: [(uint)42, (uint)100]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - No outType formatting applied (count mismatch), values shown as default
+        Assert.NotNull(displayEvent);
+        Assert.Contains("42", displayEvent.Description);
+        Assert.DoesNotContain("0x2A", displayEvent.Description);
     }
 
     [Fact]
@@ -381,9 +839,109 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithMultipleLegacyMessages_ShouldDisambiguateByLogLink()
+    {
+        // Arrange - two messages with same ShortId, but different LogLinks
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1000,
+                    Text = "Application Message",
+                    LogLink = Constants.ApplicationLogName
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1000,
+                    Text = "System Message",
+                    LogLink = Constants.SystemLogName
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["prop1"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Application Message", displayEvent.Description);
+        Assert.DoesNotContain("System Message", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithMultipleLegacyMessages_ShouldDisambiguateBySeverity()
+    {
+        // Arrange - two messages with same ShortId but different RawId severity bits
+        // RawId bits 31-30: 00=Success, 01=Informational, 10=Warning, 11=Error
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 2,
+                    RawId = 2, // severity 00 = Success
+                    Text = "Success: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 2,
+                    RawId = unchecked((long)(0xC0000002)), // severity 11 = Error
+                    Text = "Error: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        // Event with Level=2 (Error) should match the Error-severity message
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2,
+            Level = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["disk defrag"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should pick the error message
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Error: disk defrag", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithMultipleLegacyMessages_ShouldReturnDefaultDescription()
     {
-        // Arrange
+        // Arrange - multiple messages with no LogLink, so disambiguation fails
         var providerDetails = new ProviderDetails
         {
             ProviderName = Constants.TestProviderName,
@@ -413,6 +971,45 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("No matching message", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithMultipleLengthPrefixedBinaryPairs_ShouldMatchTemplate()
+    {
+        // Arrange - template has 6 data elements with 2 length-prefixed binary pairs;
+        // each length provider is consumed internally, so 4 properties are surfaced.
+        var (details, _) = EventUtils.CreateModernEvent(
+            description: "Param1: %1, Param2: %2",
+            template: """
+                <template>
+                  <data name="param1" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="param2" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="__bin1Length" inType="win:UInt32"/>
+                  <data name="BinaryData1" inType="win:Binary" length="__bin1Length"/>
+                  <data name="__bin2Length" inType="win:UInt32"/>
+                  <data name="BinaryData2" inType="win:Binary" length="__bin2Length"/>
+                </template>
+                """,
+            properties: ["Value1", "Value2", new byte[] { 0x01 }, new byte[] { 0x02 }]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // 4 visible properties: param1, param2, BinaryData1, BinaryData2
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["Value1", "Value2", new byte[] { 0x01 }, new byte[] { 0x02 }]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Param1: Value1, Param2: Value2", displayEvent.Description);
     }
 
     [Fact]
@@ -453,7 +1050,7 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("StringValue", displayEvent.Description);
         Assert.Contains("42", displayEvent.Description);
-        Assert.Contains("True", displayEvent.Description);
+        Assert.Contains("true", displayEvent.Description);
     }
 
     [Fact]
@@ -501,6 +1098,81 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithNormalMismatch_ShouldStillReject()
+    {
+        // Arrange - template has 4 data elements with NO length-prefixed binary pairs
+        // and event has 2 properties — this should NOT match
+        var (details, _) = EventUtils.CreateModernEvent(
+            description: "A: %1, B: %2, C: %3, D: %4",
+            template: """
+                <template>
+                  <data name="A" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="B" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="C" inType="win:UnicodeString" outType="xs:string"/>
+                  <data name="D" inType="win:UInt32"/>
+                </template>
+                """,
+            properties: ["val1", "val2", "val3", "val4"]);
+
+        var resolver = new TestEventResolver([details]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["val1", "val2"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should NOT match the 4-property template for a 2-property event
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("A: val1", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNtStatusOutType_ShouldFallbackToHexForUnknownCodes()
+    {
+        // Arrange - Unknown NTStatus should show hex
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Status: %1",
+            template: """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
+            properties: [(uint)0xDEADBEEF]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("0xDEADBEEF", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNtStatusOutType_ShouldResolveToStatusString()
+    {
+        // Arrange - win:NTStatus outType should resolve STATUS_SUCCESS
+        var (details, eventRecord) = EventUtils.CreateModernEvent(
+            description: "Status: %1",
+            template: """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
+            properties: [(uint)0x00000000]);
+
+        var resolver = new TestEventResolver([details]);
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should contain the resolved status string, not "0"
+        Assert.NotNull(displayEvent);
+        Assert.DoesNotContain("Status: 0", displayEvent.Description);
+        Assert.False(string.IsNullOrEmpty(displayEvent.Description));
+    }
+
+    [Fact]
     public void ResolveEvent_WithNullKeywords_ShouldReturnEmptyKeywordList()
     {
         // Arrange
@@ -523,6 +1195,50 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithNullLogNameInEventModel_ShouldMatchEmptyLogNameInRecord()
+    {
+        // Arrange - EventModel.LogName is null, EventRecord.LogName defaults to ""
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 1000,
+                    Version = 1,
+                    Keywords = [],
+                    LogName = null, // null in database/provider
+                    Description = "Matched with null LogName: %1",
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Version = 1,
+            LogName = "", // defaults to empty string
+            Properties = ["hello"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - null LogName in EventModel should match "" in EventRecord
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Matched with null LogName: hello", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithNullXml_ShouldReturnEmptyXml()
     {
         // Arrange
@@ -541,6 +1257,147 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal(string.Empty, displayEvent.Xml);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithOutOfRangePropertyIndex_ShouldKeepPlaceholderAndResolveRest()
+    {
+        // Arrange - legacy message references %7 but only 6 properties exist.
+        // This is modeled after ESENT events where the manifest template can reference
+        // more properties than the event actually supplies (version mismatch).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1000,
+                    Text = "%1 (%2) %3The database engine started a new instance (%4). (Time=%5 seconds)\r\n\r\nAdditional Data:\r\n%7\r\n\r\nInternal Timing Sequence: %6"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Properties = ["SQLEXPRESS", "MSSQL", "\r\n", "1", "3", "[1] 0.000"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - all 6 available properties substituted, missing %7 replaced with empty
+        Assert.NotNull(displayEvent);
+        Assert.Contains("SQLEXPRESS", displayEvent.Description);
+        Assert.Contains("MSSQL", displayEvent.Description);
+        Assert.Contains("Time=3 seconds", displayEvent.Description);
+        Assert.Contains("[1] 0.000", displayEvent.Description);
+        Assert.DoesNotContain("%7", displayEvent.Description);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithParameterEndingInZero_ShouldNotCorruptText()
+    {
+        // Arrange - parameter text ends with "0" or "%" characters that should be preserved
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1000,
+                    Text = "Status: %%2000"
+                }
+            ],
+            Parameters =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    RawId = 2000,
+                    Text = "Version 1.0"
+                }
+            ],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - "Version 1.0" should NOT be truncated to "Version 1."
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Version 1.0", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithParameterHavingPercentZeroTerminator_ShouldRemoveOnlyTerminator()
+    {
+        // Arrange - parameter text has actual %0 terminator that should be removed
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 1000,
+                    Text = "Result: %%3000"
+                }
+            ],
+            Parameters =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    RawId = 3000,
+                    Text = "Success%0"
+                }
+            ],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - "%0" terminator removed, but the rest preserved
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Success", displayEvent.Description);
+        Assert.DoesNotContain("%0", displayEvent.Description);
     }
 
     [Fact]
@@ -633,7 +1490,7 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithPropertyIndexOutOfRange_ShouldReturnFailedDescription()
+    public void ResolveEvent_WithPropertyIndexOutOfRange_ShouldResolveAvailableProperties()
     {
         // Arrange - template references %3 but only 2 properties exist
         var providerDetails = new ProviderDetails
@@ -666,9 +1523,12 @@ public sealed class EventResolverBaseTests
         // Act
         var displayEvent = resolver.ResolveEvent(eventRecord);
 
-        // Assert
+        // Assert - available properties should be substituted, missing %3 replaced with empty
         Assert.NotNull(displayEvent);
-        Assert.Contains("Failed to resolve", displayEvent.Description);
+        Assert.Contains("Property1: Value1", displayEvent.Description);
+        Assert.Contains("Property2: Value2", displayEvent.Description);
+        Assert.Contains("Property3: ", displayEvent.Description);
+        Assert.DoesNotContain("%3", displayEvent.Description);
     }
 
     [Fact]
@@ -705,6 +1565,42 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("CustomKeyword1", displayEvent.Keywords);
         Assert.Contains("CustomKeyword2", displayEvent.Keywords);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithProviderKeywordsInBits32To47_ShouldResolveKeywords()
+    {
+        // Arrange - keyword in bit 32 (0x100000000), which was previously masked out
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>
+            {
+                { 0x100000000L, "HighBitKeyword" },
+                { 0x1, "LowBitKeyword" }
+            },
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Keywords = 0x100000001L // Both high and low provider keywords
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("HighBitKeyword", displayEvent.Keywords);
+        Assert.Contains("LowBitKeyword", displayEvent.Keywords);
     }
 
     [Fact]
@@ -790,6 +1686,72 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("Classic", displayEvent.Keywords);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSupplementalProvider_ShouldFallbackToSupplemental()
+    {
+        // Arrange - primary provider has some events but not the one we need
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 100,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Primary event 100: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        // Supplemental has the event we need
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 200,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental event 200: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 200,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["test_value"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should resolve from supplemental
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Supplemental event 200: test_value", displayEvent.Description);
     }
 
     [Fact]
@@ -900,6 +1862,58 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithTemplateCountDiffOfOne_ShouldMatchExactIdVersionLogName()
+    {
+        // Arrange - template has 3 data nodes, event has 2 properties (diff = 1)
+        // This mimics WER 1001 where manifest added an optional field
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 1001,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Fault: %1, Module: %2, Extra: %3",
+                    Keywords = [],
+                    Template = """
+                        <template>
+                          <data name="AppName" inType="win:UnicodeString" outType="xs:string"/>
+                          <data name="ModName" inType="win:UnicodeString" outType="xs:string"/>
+                          <data name="Extra" inType="win:UnicodeString" outType="xs:string"/>
+                        </template>
+                        """
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1001,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["MyApp.exe", "ntdll.dll"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - should use the template even though event has 1 fewer property
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Fault: MyApp.exe", displayEvent.Description);
+        Assert.Contains("Module: ntdll.dll", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithTrailingPercentN_ShouldNotThrowIndexOutOfRange()
     {
         // Arrange
@@ -982,6 +1996,36 @@ public sealed class EventResolverBaseTests
         Assert.Empty(displayEvent.Keywords);
     }
 
+    private class SupplementalTestResolver : EventResolverBase, IEventResolver
+    {
+        private readonly ProviderDetails? _supplemental;
+
+        public SupplementalTestResolver(
+            List<ProviderDetails> providerDetailsList,
+            ProviderDetails? supplemental,
+            IEventResolverCache? cache = null,
+            ITraceLogger? logger = null)
+            : base(cache, logger)
+        {
+            _supplemental = supplemental;
+            providerDetailsList.ForEach(p => ProviderDetails.TryAdd(p.ProviderName, p));
+        }
+
+        public void ResolveProviderDetails(EventRecord eventRecord)
+        {
+            if (ProviderDetails.ContainsKey(eventRecord.ProviderName))
+            {
+                return;
+            }
+
+            ProviderDetails.TryAdd(eventRecord.ProviderName, null);
+        }
+
+        public void SetMetadataPaths(IReadOnlyList<string> metadataPaths) => throw new NotImplementedException();
+
+        protected override ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => _supplemental;
+    }
+
     private class TestEventResolver : EventResolverBase, IEventResolver
     {
         public TestEventResolver(IEventResolverCache? cache = null, ITraceLogger? logger = null)
@@ -1007,5 +2051,7 @@ public sealed class EventResolverBaseTests
 
             ProviderDetails.TryAdd(eventRecord.ProviderName, null);
         }
+
+        public void SetMetadataPaths(IReadOnlyList<string> metadataPaths) => throw new NotImplementedException();
     }
 }

@@ -297,7 +297,12 @@ internal sealed partial class ProviderMetadata
             {
                 ProviderMetadata localeMetadata = new(providerName, path) { IsLocaleMetadata = true };
 
-                if (localeMetadata.Error is not null) { continue; }
+                if (localeMetadata.Error is not null)
+                {
+                    localeMetadata._publisherMetadataHandle.Dispose();
+
+                    continue;
+                }
 
                 logger?.Debug($"Resolved {providerName} from locale metadata: {path}");
 
@@ -316,6 +321,7 @@ internal sealed partial class ProviderMetadata
             return metadata;
         }
 
+        metadata._publisherMetadataHandle.Dispose();
         logger?.Debug($"Failed to create metadata for {providerName} provider: {metadata.Error}");
 
         return null;

@@ -8,7 +8,9 @@ namespace EventLogExpert.Eventing.EventResolvers;
 /// <summary>Resolves event details from an <see cref="EventRecord" />.</summary>
 public interface IEventResolver : IDisposable
 {
-    public DisplayEventModel ResolveEvent(EventRecord eventRecord);
+    DisplayEventModel ResolveEvent(EventRecord eventRecord);
 
-    public void ResolveProviderDetails(EventRecord eventRecord);
+    void ResolveProviderDetails(EventRecord eventRecord);
+
+    void SetMetadataPaths(IReadOnlyList<string> metadataPaths);
 }

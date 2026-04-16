@@ -492,8 +492,14 @@ public sealed class EventLogReaderTests
         // Arrange
         using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
 
-        int maxIterations = 1000; // Safety limit
-        int iterations = 0;
+        var logInfo = new EventLogInformation(
+            EventLogSession.GlobalSession,
+            Constants.ApplicationLogName,
+            PathType.LogName);
+
+        // Derive iteration limit from actual log size (batch size defaults to 30)
+        long maxIterations = (logInfo.RecordCount ?? 0) / 30 + 100;
+        long iterations = 0;
 
         // Act
         bool success;
