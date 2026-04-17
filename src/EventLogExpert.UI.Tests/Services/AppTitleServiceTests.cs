@@ -30,7 +30,7 @@ public sealed class AppTitleServiceTests
 
         // Assert
         mockTitleProvider.Received(1)
-            .SetTitle($"{Constants.LogName} - {Constants.AppName} (Preview) {Constants.AppInstalledVersion} (Admin)");
+            .SetTitle($"{Constants.AppName} (Preview) {Constants.AppInstalledVersion} (Admin) - {Constants.LogName}");
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public sealed class AppTitleServiceTests
 
         // Assert
         mockTitleProvider.Received(1)
-            .SetTitle($"{Constants.LogName} - {Constants.AppName} (Preview) {Constants.AppInstalledVersion}");
+            .SetTitle($"{Constants.AppName} (Preview) {Constants.AppInstalledVersion} - {Constants.LogName}");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public sealed class AppTitleServiceTests
 
         // Assert
         mockTitleProvider.Received(1)
-            .SetTitle($"{Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion} (Admin)");
+            .SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion} (Admin) - {Constants.LogName}");
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class AppTitleServiceTests
 
         // Assert
         mockTitleProvider.Received(1)
-            .SetTitle($"{Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion}");
+            .SetTitle($"{Constants.AppName} {Constants.AppInstalledVersion} - {Constants.LogName}");
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class AppTitleServiceTests
         // Assert
         mockTitleProvider.Received(1)
             .SetTitle(
-                $"{Constants.Percentage} - {Constants.LogName} - {Constants.AppName} {Constants.AppInstalledVersion}");
+                $"{Constants.Percentage} - {Constants.AppName} {Constants.AppInstalledVersion} - {Constants.LogName}");
     }
 
     private static AppTitleService CreateAppTitleService(
