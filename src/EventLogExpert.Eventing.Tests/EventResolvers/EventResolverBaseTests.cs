@@ -1624,13 +1624,15 @@ public sealed class EventResolverBaseTests
         // Arrange
         var resolver = new TestEventResolver();
 
+        // ETW level 0 is "LogAlways" but Windows Event Viewer renders it as "Information"
         var testCases = new[]
         {
             (Level: (byte)0, Expected: "Information"),
+            (Level: (byte)1, Expected: "Critical"),
             (Level: (byte)2, Expected: "Error"),
             (Level: (byte)3, Expected: "Warning"),
             (Level: (byte)4, Expected: "Information"),
-            (Level: (byte)5, Expected: "5")
+            (Level: (byte)5, Expected: "Verbose")
         };
 
         foreach (var testCase in testCases)
