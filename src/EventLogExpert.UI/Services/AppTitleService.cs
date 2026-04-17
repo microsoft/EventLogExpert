@@ -46,11 +46,6 @@ public sealed class AppTitleService(
             title.Append($"{_progressString} - ");
         }
 
-        if (_logName is not null)
-        {
-            title.Append($"{_logName} - ");
-        }
-
         title.Append("EventLogExpert");
 
         if (versionProvider.IsDevBuild)
@@ -69,6 +64,11 @@ public sealed class AppTitleService(
         if (versionProvider.IsAdmin)
         {
             title.Append(" (Admin)");
+        }
+
+        if (_logName is not null)
+        {
+            title.Append($" - {_logName}");
         }
 
         titleProvider.SetTitle(title.ToString());
