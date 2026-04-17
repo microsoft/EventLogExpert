@@ -559,28 +559,6 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceLoadEvents_ShouldUpdateLogWithEvents()
-    {
-        // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
-
-        var state = new EventLogState
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
-        };
-
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
-
-        var action = new EventLogAction.LoadEvents(logData, events);
-
-        // Act
-        var newState = EventLogReducers.ReduceLoadEvents(state, action);
-
-        // Assert
-        Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
-    }
-
-    [Fact]
     public void ReduceLoadEvents_ShouldIsolateStateFromOriginalList()
     {
         // Arrange
@@ -604,6 +582,125 @@ public sealed class EventLogStoreTests
         // Assert - state should not reflect the extension
         Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
         Assert.Equal(3, extendedEvents.Length);
+    }
+
+    [Fact]
+    public void ReduceLoadEvents_ShouldUpdateLogWithEvents()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+
+        var state = new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
+        };
+
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
+
+        var action = new EventLogAction.LoadEvents(logData, events);
+
+        // Act
+        var newState = EventLogReducers.ReduceLoadEvents(state, action);
+
+        // Assert
+        Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
+    }
+
+    [Fact]
+    public void ReduceLoadEvents_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
+    {
+        // Arrange — open a log, then create stale logData with a different ID
+        var state = new EventLogState();
+
+        state = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+
+        // Create stale logData with a new ID (simulating a previous load instance)
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act — stale LoadEvents with mismatched ID
+        var newState = EventLogReducers.ReduceLoadEvents(state, new EventLogAction.LoadEvents(staleLogData, events));
+
+        // Assert — state unchanged, original log preserved with its ID and empty events
+        var originalId = state.ActiveLogs[Constants.LogNameTestLog].Id;
+        Assert.NotEqual(originalId, staleLogData.Id);
+        Assert.Equal(originalId, newState.ActiveLogs[Constants.LogNameTestLog].Id);
+        Assert.Empty(newState.ActiveLogs[Constants.LogNameTestLog].Events);
+    }
+
+    [Fact]
+    public void ReduceLoadEvents_WhenLogIdMatches_ShouldUpdateLog()
+    {
+        // Arrange
+        var state = new EventLogState();
+
+        state = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+
+        var logData = state.ActiveLogs[Constants.LogNameTestLog];
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act — LoadEvents with matching ID
+        var newState = EventLogReducers.ReduceLoadEvents(state, new EventLogAction.LoadEvents(logData, events));
+
+        // Assert — events applied
+        Assert.Single(newState.ActiveLogs[Constants.LogNameTestLog].Events);
+    }
+
+    [Fact]
+    public void ReduceLoadEvents_WhenLogNotInActiveLogs_ShouldReturnStateUnchanged()
+    {
+        // Arrange — no logs open
+        var state = new EventLogState();
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act — stale LoadEvents arrives for a closed log
+        var newState = EventLogReducers.ReduceLoadEvents(state, new EventLogAction.LoadEvents(logData, events));
+
+        // Assert — state unchanged, log NOT resurrected
+        Assert.Same(state, newState);
+        Assert.Empty(newState.ActiveLogs);
+    }
+
+    [Fact]
+    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
+    {
+        // Arrange
+        var state = new EventLogState();
+
+        state = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act — stale partial with mismatched ID
+        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
+            new EventLogAction.LoadEventsPartial(staleLogData, events));
+
+        // Assert — state unchanged, original log preserved with its ID
+        var originalId = state.ActiveLogs[Constants.LogNameTestLog].Id;
+        Assert.NotEqual(originalId, staleLogData.Id);
+        Assert.Equal(originalId, newState.ActiveLogs[Constants.LogNameTestLog].Id);
+        Assert.Empty(newState.ActiveLogs[Constants.LogNameTestLog].Events);
+    }
+
+    [Fact]
+    public void ReduceLoadEventsPartial_WhenLogNotInActiveLogs_ShouldReturnStateUnchanged()
+    {
+        // Arrange — no logs open
+        var state = new EventLogState();
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act
+        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
+            new EventLogAction.LoadEventsPartial(logData, events));
+
+        // Assert
+        Assert.Same(state, newState);
     }
 
     [Fact]

@@ -139,6 +139,40 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleCloseLog_WhenLastLog_ShouldClearResolverCache()
+    {
+        // Arrange — state has no active logs (reducer already removed the last one)
+        var logId = EventLogId.Create();
+        var (effects, mockDispatcher, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
+        var action = new EventLogAction.CloseLog(logId, Constants.LogNameTestLog);
+
+        // Act
+        await effects.HandleCloseLog(action, mockDispatcher);
+
+        // Assert
+        mockResolverCache.Received(1).ClearAll();
+    }
+
+    [Fact]
+    public async Task HandleCloseLog_WhenOtherLogsRemain_ShouldNotClearResolverCache()
+    {
+        // Arrange — state still has another active log
+        var logData = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameLog1, logData);
+
+        var (effects, mockDispatcher, _, mockResolverCache, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var closingLogId = EventLogId.Create();
+        var action = new EventLogAction.CloseLog(closingLogId, Constants.LogNameTestLog);
+
+        // Act
+        await effects.HandleCloseLog(action, mockDispatcher);
+
+        // Assert
+        mockResolverCache.DidNotReceive().ClearAll();
+    }
+
+    [Fact]
     public async Task HandleLoadEvents_ShouldFilterAndDispatchUpdateTable()
     {
         // Arrange

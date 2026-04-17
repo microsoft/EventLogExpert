@@ -45,13 +45,22 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
-    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action) =>
-        UpdateActiveLog(state, action.LogData, action.Events);
+    public static EventLogState ReduceLoadEvents(EventLogState state, EventLogAction.LoadEvents action)
+    {
+        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existing) ||
+            existing.Id != action.LogData.Id)
+        {
+            return state;
+        }
+
+        return UpdateActiveLog(state, action.LogData, action.Events);
+    }
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEventsPartial(EventLogState state, EventLogAction.LoadEventsPartial action)
     {
-        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existingLog))
+        if (!state.ActiveLogs.TryGetValue(action.LogData.Name, out var existingLog) ||
+            existingLog.Id != action.LogData.Id)
         {
             return state;
         }
