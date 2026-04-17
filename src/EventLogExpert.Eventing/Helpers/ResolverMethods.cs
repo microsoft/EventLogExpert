@@ -7,8 +7,10 @@ namespace EventLogExpert.Eventing.Helpers;
 
 internal static class ResolverMethods
 {
-    private static readonly ConcurrentDictionary<uint, string> s_hResultCache = [];
-    private static readonly ConcurrentDictionary<uint, string> s_ntStatusCache = [];
+    internal const int MaxCacheSize = 4096;
+
+    private static ConcurrentDictionary<uint, string> s_hResultCache = new();
+    private static ConcurrentDictionary<uint, string> s_ntStatusCache = new();
 
     /// <summary>
     ///     Resolves an HRESULT or Win32 error code to a human-readable string.
@@ -17,15 +19,44 @@ internal static class ResolverMethods
     ///     Results are cached to avoid repeated P/Invoke calls.
     /// </summary>
     internal static string GetErrorMessage(uint hResult) =>
-        s_hResultCache.GetOrAdd(hResult, static code =>
+        GetOrAddBounded(ref s_hResultCache, hResult, static code =>
             NativeMethods.FormatSystemMessage(code) ??
             NativeMethods.FormatNtStatusMessage(code) ??
             $"0x{code:X8}");
 
     /// <summary>Resolves an NTSTATUS code to a human-readable string.</summary>
     internal static string GetNtStatusMessage(uint ntStatus) =>
-        s_ntStatusCache.GetOrAdd(ntStatus, static status =>
+        GetOrAddBounded(ref s_ntStatusCache, ntStatus, static status =>
             NativeMethods.FormatNtStatusMessage(status) ??
             NativeMethods.FormatSystemMessage(status) ??
             $"0x{status:X8}");
+
+    /// <summary>
+    ///     Bounded cache lookup with atomic swap eviction. On a cache hit the entry is returned
+    ///     immediately regardless of cache size. On a miss, if the cache has reached
+    ///     <see cref="MaxCacheSize"/> the entire dictionary is atomically swapped with a fresh
+    ///     instance (only one thread performs the swap) before inserting the new entry.
+    /// </summary>
+    private static string GetOrAddBounded(
+        ref ConcurrentDictionary<uint, string> cache,
+        uint key,
+        Func<uint, string> factory)
+    {
+        var snapshot = Volatile.Read(ref cache);
+
+        if (snapshot.TryGetValue(key, out var cached))
+        {
+            return cached;
+        }
+
+        if (snapshot.Count < MaxCacheSize)
+        {
+            return Volatile.Read(ref cache).GetOrAdd(key, factory);
+        }
+
+        var replacement = new ConcurrentDictionary<uint, string>();
+        Interlocked.CompareExchange(ref cache, replacement, snapshot);
+
+        return Volatile.Read(ref cache).GetOrAdd(key, factory);
+    }
 }

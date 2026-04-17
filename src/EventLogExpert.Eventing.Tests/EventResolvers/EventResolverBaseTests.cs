@@ -1137,19 +1137,34 @@ public sealed class EventResolverBaseTests
     public void ResolveEvent_WithNtStatusOutType_ShouldFallbackToHexForUnknownCodes()
     {
         // Arrange - Unknown NTStatus should show hex
+        const uint unknownCode = 0xDEADBEEF;
+
         var (details, eventRecord) = EventUtils.CreateModernEvent(
             description: "Status: %1",
             template: """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
-            properties: [(uint)0xDEADBEEF]);
+            properties: [unknownCode]);
 
         var resolver = new TestEventResolver([details]);
 
         // Act
         var displayEvent = resolver.ResolveEvent(eventRecord);
 
-        // Assert
+        // Assert — if the OS resolves this code to a message, the description
+        // won't contain the hex fallback. Only assert hex when the system has
+        // no message for this code (avoids environment-dependent failures).
         Assert.NotNull(displayEvent);
-        Assert.Contains("0xDEADBEEF", displayEvent.Description);
+
+        var ntStatusMessage = NativeMethods.FormatNtStatusMessage(unknownCode);
+        var systemMessage = NativeMethods.FormatSystemMessage(unknownCode);
+
+        if (ntStatusMessage is null && systemMessage is null)
+        {
+            Assert.Contains("0xDEADBEEF", displayEvent.Description);
+        }
+        else
+        {
+            Assert.NotNull(displayEvent.Description);
+        }
     }
 
     [Fact]

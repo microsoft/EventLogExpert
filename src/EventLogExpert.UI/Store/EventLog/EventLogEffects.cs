@@ -12,6 +12,7 @@ using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Security;
 using System.Threading.Channels;
@@ -32,10 +33,15 @@ public sealed class EventLogEffects(
 
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
+    private readonly Lock _globalCtsLock = new();
+    private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+
+    private long _cancelGeneration;
+    private CancellationTokenSource _globalCts = new();
 
     [EffectMethod]
     public Task HandleAddEvent(EventLogAction.AddEvent action, IDispatcher dispatcher)
@@ -75,6 +81,8 @@ public sealed class EventLogEffects(
     [EffectMethod(typeof(EventLogAction.CloseAll))]
     public Task HandleCloseAll(IDispatcher dispatcher)
     {
+        CancelAllLoads();
+
         _logWatcherService.RemoveAll();
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
@@ -88,9 +96,23 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
+        // Only cancel — don't remove or dispose. HandleOpenLog's finally block
+        // owns CTS disposal after the load has fully unwound, avoiding a race
+        // where disposal here causes ObjectDisposedException in the running load.
+        if (_logCts.TryGetValue(action.LogId, out var cts))
+        {
+            try { cts.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
+
         _logWatcherService.RemoveLog(action.LogName);
 
         dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
+
+        if (_eventLogState.Value.ActiveLogs.IsEmpty)
+        {
+            _resolverCache.ClearAll();
+        }
 
         return Task.CompletedTask;
     }
@@ -126,6 +148,11 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
+        // Snapshot the cancel generation before any state checks. If CancelAllLoads
+        // increments this before we finish linking, we know our load must be canceled
+        // (it may have linked to the post-swap uncanceled global CTS).
+        long startGeneration = Volatile.Read(ref _cancelGeneration);
+
         using var serviceScope = _serviceScopeFactory.CreateScope();
 
         var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
@@ -144,6 +171,163 @@ public sealed class EventLogEffects(
             return;
         }
 
+        // Create a per-load CTS linked to the global CTS and the caller's token so that
+        // either individual HandleCloseLog, a global cancel (CloseAll), or the caller can
+        // stop this load. The lock ensures we always link to the current global CTS.
+        // Not using `using` — disposal is handled by the finally block below.
+        CancellationTokenSource perLoadCts;
+
+        using (_globalCtsLock.EnterScope())
+        {
+            perLoadCts = CancellationTokenSource.CreateLinkedTokenSource(_globalCts.Token, action.Token);
+        }
+
+        _logCts[logData.Id] = perLoadCts;
+
+        // If CancelAllLoads ran between our generation snapshot and now, we may have
+        // linked to the new (uncanceled) global CTS after the swap. CancelAllLoads's
+        // _logCts iteration may also have missed us. Cancel ourselves to be safe.
+        if (Volatile.Read(ref _cancelGeneration) != startGeneration)
+        {
+            try { perLoadCts.Cancel(); }
+            catch (ObjectDisposedException) { }
+        }
+
+        var token = perLoadCts.Token;
+
+        try
+        {
+            await LoadLogAsync(action, logData, eventResolver, serviceScope, dispatcher, token);
+        }
+        finally
+        {
+            // This finally block is the sole owner of per-load CTS removal and
+            // disposal. Cancel/close paths (HandleCloseLog, CancelAllLoads) only
+            // request cancellation — they never remove or dispose entries.
+            if (_logCts.TryRemove(logData.Id, out var removedCts))
+            {
+                removedCts.Dispose();
+            }
+        }
+    }
+
+    [EffectMethod]
+    public Task HandleSetContinuouslyUpdate(EventLogAction.SetContinuouslyUpdate action, IDispatcher dispatcher)
+    {
+        if (action.ContinuouslyUpdate)
+        {
+            ProcessNewEventBuffer(_eventLogState.Value, dispatcher);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    [EffectMethod]
+    public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
+    {
+        var filteredActiveLogs = _filterService.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
+
+        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Adds new events to the currently opened log</summary>
+    private static EventLogData AddEventsToOneLog(EventLogData logData, List<DisplayEventModel> eventsToAdd)
+    {
+        eventsToAdd.AddRange(logData.Events);
+
+        return logData with { Events = eventsToAdd.AsReadOnly() };
+    }
+
+    private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
+        ImmutableDictionary<string, EventLogData> logsToUpdate,
+        IEnumerable<DisplayEventModel> eventsToDistribute)
+    {
+        // Group events by owning log once to avoid repeated enumeration
+        var eventsByLog = new Dictionary<string, List<DisplayEventModel>>();
+
+        foreach (var e in eventsToDistribute)
+        {
+            if (!logsToUpdate.ContainsKey(e.OwningLog)) { continue; }
+
+            if (!eventsByLog.TryGetValue(e.OwningLog, out var list))
+            {
+                list = [];
+                eventsByLog[e.OwningLog] = list;
+            }
+
+            list.Add(e);
+        }
+
+        var newLogs = logsToUpdate;
+
+        foreach (var (logName, newEvents) in eventsByLog)
+        {
+            var log = logsToUpdate[logName];
+            var newLogData = AddEventsToOneLog(log, newEvents);
+            newLogs = newLogs.SetItem(logName, newLogData);
+        }
+
+        return newLogs;
+    }
+
+    /// <summary>
+    ///     Awaits the producer task, suppressing all exceptions.
+    ///     The sole purpose is to ensure the producer has fully stopped before
+    ///     the reader is disposed. Any meaningful errors are handled by the caller.
+    /// </summary>
+    private static async Task StopProducerAsync(Task producerTask)
+    {
+        try { await producerTask; }
+        catch { /* Intentionally swallowed — caller handles error reporting */ }
+    }
+
+    private void CancelAllLoads()
+    {
+        CancellationTokenSource oldGlobalCts;
+
+        // Atomically swap the global CTS so any HandleOpenLog that links after
+        // this point gets a fresh (uncanceled) token, while loads already linked
+        // to the old CTS are canceled. Increment the generation so that any
+        // HandleOpenLog in the window between its ActiveLogs check and linking
+        // can detect the cancel-all and abort.
+        using (_globalCtsLock.EnterScope())
+        {
+            oldGlobalCts = _globalCts;
+            _globalCts = new CancellationTokenSource();
+            Interlocked.Increment(ref _cancelGeneration);
+        }
+
+        oldGlobalCts.Cancel();
+
+        // Don't dispose oldGlobalCts here — per-load linked tokens still
+        // reference it. It will be collected by GC after all linked tokens
+        // are disposed by their HandleOpenLog finally blocks.
+
+        // Cancel per-load tokens for immediate effect (redundant when they are
+        // linked to oldGlobalCts, but ensures cancellation for edge cases).
+        // Don't remove or dispose — HandleOpenLog's finally block owns cleanup
+        // after each load has fully unwound, avoiding a race where disposal
+        // here causes ObjectDisposedException in running async operations.
+        foreach (var key in _logCts.Keys)
+        {
+            if (_logCts.TryGetValue(key, out var cts))
+            {
+                try { cts.Cancel(); }
+                catch (ObjectDisposedException) { }
+            }
+        }
+    }
+
+    private async Task LoadLogAsync(
+        EventLogAction.OpenLog action,
+        EventLogData logData,
+        IEventResolver eventResolver,
+        IServiceScope serviceScope,
+        IDispatcher dispatcher,
+        CancellationToken token)
+    {
         // Detect locale metadata files for exported logs.
         // Filesystem probing is best-effort — failures must not abort opening the log.
         if (action.PathType == PathType.FilePath)
@@ -231,11 +415,11 @@ public sealed class EventLogEffects(
             {
                 while (reader.TryGetEvents(out EventRecord[] batch))
                 {
-                    action.Token.ThrowIfCancellationRequested();
+                    token.ThrowIfCancellationRequested();
 
                     if (batch.Length == 0) { continue; }
 
-                    await channel.Writer.WriteAsync(batch, action.Token);
+                    await channel.Writer.WriteAsync(batch, token);
                 }
             }
             catch (Exception ex)
@@ -246,7 +430,7 @@ public sealed class EventLogEffects(
             }
 
             channel.Writer.Complete();
-        }, action.Token);
+        }, token);
 
         try
         {
@@ -254,15 +438,15 @@ public sealed class EventLogEffects(
             // The global semaphore limits total concurrent resolution threads across
             // all HandleOpenLog calls, preventing CPU saturation when loading multiple logs.
             await Parallel.ForEachAsync(
-                channel.Reader.ReadAllAsync(action.Token),
+                channel.Reader.ReadAllAsync(token),
                 new ParallelOptions
                 {
-                    CancellationToken = action.Token,
+                    CancellationToken = token,
                     MaxDegreeOfParallelism = s_maxGlobalConcurrency
                 },
-                async (batch, token) =>
+                async (batch, innerToken) =>
                 {
-                    await s_resolutionThrottle.WaitAsync(token);
+                    await s_resolutionThrottle.WaitAsync(innerToken);
 
                     try
                     {
@@ -271,7 +455,7 @@ public sealed class EventLogEffects(
 
                         foreach (var @event in batch)
                         {
-                            token.ThrowIfCancellationRequested();
+                            innerToken.ThrowIfCancellationRequested();
 
                             try
                             {
@@ -314,7 +498,14 @@ public sealed class EventLogEffects(
         {
             await StopProducerAsync(producerTask);
 
-            dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            // Only close the log if it still exists with the same ID —
+            // prevents stale cancellation from closing a newly reopened log.
+            if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
+                && currentLog.Id == logData.Id)
+            {
+                dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            }
+
             dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
 
             return;
@@ -325,7 +516,13 @@ public sealed class EventLogEffects(
 
             await StopProducerAsync(producerTask);
 
-            dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            // Only close the log if it still exists with the same ID.
+            if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
+                && currentLog.Id == logData.Id)
+            {
+                dispatcher.Dispatch(new EventLogAction.CloseLog(logData.Id, logData.Name));
+            }
+
             dispatcher.Dispatch(new StatusBarAction.ClearStatus(activityId));
             dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to load {action.LogName}"));
 
@@ -333,6 +530,16 @@ public sealed class EventLogEffects(
         }
 
         events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
+
+        // Re-check cancellation and log identity before committing results —
+        // a close may have arrived after the producer/consumer loop completed.
+        token.ThrowIfCancellationRequested();
+
+        if (!_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var activeLog)
+            || activeLog.Id != logData.Id)
+        {
+            return;
+        }
 
         dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.AsReadOnly()));
 
@@ -344,78 +551,6 @@ public sealed class EventLogEffects(
         }
 
         dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));
-    }
-
-    [EffectMethod]
-    public Task HandleSetContinuouslyUpdate(EventLogAction.SetContinuouslyUpdate action, IDispatcher dispatcher)
-    {
-        if (action.ContinuouslyUpdate)
-        {
-            ProcessNewEventBuffer(_eventLogState.Value, dispatcher);
-        }
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod]
-    public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
-    {
-        var filteredActiveLogs = _filterService.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
-
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
-
-        return Task.CompletedTask;
-    }
-
-    /// <summary>Adds new events to the currently opened log</summary>
-    private static EventLogData AddEventsToOneLog(EventLogData logData, List<DisplayEventModel> eventsToAdd)
-    {
-        eventsToAdd.AddRange(logData.Events);
-
-        return logData with { Events = eventsToAdd.AsReadOnly() };
-    }
-
-    private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
-        ImmutableDictionary<string, EventLogData> logsToUpdate,
-        IEnumerable<DisplayEventModel> eventsToDistribute)
-    {
-        // Group events by owning log once to avoid repeated enumeration
-        var eventsByLog = new Dictionary<string, List<DisplayEventModel>>();
-
-        foreach (var e in eventsToDistribute)
-        {
-            if (!logsToUpdate.ContainsKey(e.OwningLog)) { continue; }
-
-            if (!eventsByLog.TryGetValue(e.OwningLog, out var list))
-            {
-                list = [];
-                eventsByLog[e.OwningLog] = list;
-            }
-
-            list.Add(e);
-        }
-
-        var newLogs = logsToUpdate;
-
-        foreach (var (logName, newEvents) in eventsByLog)
-        {
-            var log = logsToUpdate[logName];
-            var newLogData = AddEventsToOneLog(log, newEvents);
-            newLogs = newLogs.SetItem(logName, newLogData);
-        }
-
-        return newLogs;
-    }
-
-    /// <summary>
-    ///     Awaits the producer task, suppressing all exceptions.
-    ///     The sole purpose is to ensure the producer has fully stopped before
-    ///     the reader is disposed. Any meaningful errors are handled by the caller.
-    /// </summary>
-    private static async Task StopProducerAsync(Task producerTask)
-    {
-        try { await producerTask; }
-        catch { /* Intentionally swallowed — caller handles error reporting */ }
     }
 
     private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)

@@ -123,7 +123,9 @@ public sealed class EventTableReducers
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action)
     {
-        var activeTable = state.EventTables.First(table => table.Id == action.LogId);
+        var activeTable = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
+
+        if (activeTable is null) { return state; }
 
         return state with { ActiveEventLogId = activeTable.Id };
     }
@@ -204,7 +206,12 @@ public sealed class EventTableReducers
                 continue;
             }
 
-            var currentActiveLog = action.ActiveLogs.First(log => log.Key == table.Id).Value;
+            if (!action.ActiveLogs.TryGetValue(table.Id, out var currentActiveLog))
+            {
+                updatedTables.Add(table);
+
+                continue;
+            }
 
             updatedTables.Add(table with
             {
@@ -218,7 +225,9 @@ public sealed class EventTableReducers
     [ReducerMethod]
     public static EventTableState ReduceUpdateTable(EventTableState state, EventTableAction.UpdateTable action)
     {
-        var table = state.EventTables.First(t => action.LogId == t.Id);
+        var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
+
+        if (table is null) { return state; }
 
         return state with
         {

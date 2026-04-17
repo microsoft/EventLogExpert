@@ -674,6 +674,21 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetActiveTable_WhenTableNotFound_ShouldReturnStateUnchanged()
+    {
+        // Arrange
+        var state = new EventTableState();
+        var staleLogId = EventLogId.Create();
+        var action = new EventTableAction.SetActiveTable(staleLogId);
+
+        // Act
+        var newState = EventTableReducers.ReduceSetActiveTable(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
     public void ReduceSetOrderBy_WithNewColumn_ShouldUpdateOrderBy()
     {
         // Arrange
@@ -809,6 +824,24 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceUpdateDisplayedEvents_WhenTableNotInActiveLogs_ShouldPreserveTable()
+    {
+        // Arrange — add a table but provide ActiveLogs that don't include it
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState();
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var emptyActiveLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>();
+        var action = new EventTableAction.UpdateDisplayedEvents(emptyActiveLogs);
+
+        // Act — table not in ActiveLogs should be preserved as-is
+        var newState = EventTableReducers.ReduceUpdateDisplayedEvents(state, action);
+
+        // Assert — table still exists, events unchanged
+        Assert.Single(newState.EventTables);
+    }
+
+    [Fact]
     public void ReduceUpdateTable_ShouldUpdateTableEvents()
     {
         // Arrange
@@ -831,5 +864,21 @@ public sealed class EventTableStoreTests
         var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
         Assert.Equal(2, updatedTable.DisplayedEvents.Count);
         Assert.False(updatedTable.IsLoading);
+    }
+
+    [Fact]
+    public void ReduceUpdateTable_WhenTableNotFound_ShouldReturnStateUnchanged()
+    {
+        // Arrange — empty state, no tables
+        var state = new EventTableState();
+        var staleLogId = EventLogId.Create();
+        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var action = new EventTableAction.UpdateTable(staleLogId, events);
+
+        // Act — stale UpdateTable for a non-existent table
+        var newState = EventTableReducers.ReduceUpdateTable(state, action);
+
+        // Assert — state unchanged, no exception thrown
+        Assert.Same(state, newState);
     }
 }
