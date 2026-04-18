@@ -8,7 +8,7 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class ValueSelect<T> : BaseComponent<T>
+public sealed partial class ValueSelect<T> : BaseComponent<T>, IAsyncDisposable
 {
     private readonly string _itemId = $"select_{Guid.NewGuid().ToString()[..8]}";
     private readonly List<ValueSelectItem<T>> _items = [];
@@ -30,6 +30,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         get => _highlightedItem;
         set
         {
+            if (ReferenceEquals(_highlightedItem, value)) { return; }
+
             _highlightedItem = value;
             StateHasChanged();
         }
@@ -62,46 +64,64 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    public bool AddItem(ValueSelectItem<T> item)
+    public void AddItem(ValueSelectItem<T> item)
     {
-        if (_items.Contains(item))
+        if (!_items.Contains(item))
         {
-            return _selectedValues.Contains(item.Value);
+            _items.Add(item);
         }
-
-        _items.Add(item);
-
-        if (IsMultiSelect && Values.Contains(item.Value))
-        {
-            _selectedValues.Add(item.Value);
-            return true;
-        }
-
-        if (Value?.Equals(item.Value) is not true) { return false; }
-
-        _selectedValues.Clear();
-        _selectedValues.Add(item.Value);
-
-        return true;
     }
 
-    public void ClearSelected() => _selectedValues.Clear();
+    public async Task ClearAll()
+    {
+        _selectedValues.Clear();
+        _highlightedItem = null;
+
+        if (IsMultiSelect)
+        {
+            Values.Clear();
+            await ValuesChanged.InvokeAsync(Values);
+        }
+        else
+        {
+            Value = default!;
+            await ValueChanged.InvokeAsync(Value);
+        }
+    }
 
     public async Task CloseDropDown() => await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
 
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await JSRuntime.InvokeVoidAsync("unregisterDropdown", _selectComponent);
+        }
+        catch (JSDisconnectedException)
+        {
+            // Expected during app shutdown
+        }
+    }
+
+    public bool IsItemSelected(T value) => _selectedValues.Contains(value);
+
     public async Task OpenDropDown() => await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
 
-    public void RemoveItem(ValueSelectItem<T> item) => _items.Remove(item);
+    public void RemoveItem(ValueSelectItem<T> item)
+    {
+        _items.Remove(item);
+
+        if (ReferenceEquals(_highlightedItem, item))
+        {
+            HighlightedItem = null;
+        }
+    }
 
     public async Task UpdateValue(T item)
     {
         if (IsMultiSelect)
         {
-            if (item is null)
-            {
-                Values.Clear();
-            }
-            else if (_selectedValues.Remove(item))
+            if (_selectedValues.Remove(item))
             {
                 Values.Remove(item);
             }
@@ -137,8 +157,27 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override void OnParametersSet()
+    {
+        _selectedValues.Clear();
+
+        if (IsMultiSelect)
+        {
+            foreach (var v in Values)
+            {
+                _selectedValues.Add(v);
+            }
+        }
+        else if (Value is not null)
+        {
+            _selectedValues.Add(Value);
+        }
+    }
+
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
+        _preventDefault = false;
+
         switch (args.Code)
         {
             case "Space":
@@ -164,10 +203,12 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
                 {
                     if (HighlightedItem.ClearItem)
                     {
-                        ClearSelected();
+                        await ClearAll();
                     }
-
-                    await UpdateValue(HighlightedItem.Value);
+                    else
+                    {
+                        await UpdateValue(HighlightedItem.Value);
+                    }
                 }
                 else
                 {
@@ -180,14 +221,15 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
                 return;
         }
-
-        _preventDefault = false;
     }
 
     private async Task OnInputChange(ChangeEventArgs args)
     {
-        Value = (T)Convert.ChangeType(args.Value, typeof(T))!;
-        await ValueChanged.InvokeAsync(Value);
+        if (BindConverter.TryConvertTo<T>($"{args.Value}", null, out var result))
+        {
+            Value = result;
+            await ValueChanged.InvokeAsync(Value);
+        }
     }
 
     private async Task SelectAdjacentItem(int direction)
@@ -196,32 +238,29 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>
 
         if (IsMultiSelect || IsInput)
         {
-            index = _items.FindIndex(x => x.Equals(_items.FirstOrDefault(item => item.Equals(HighlightedItem))));
+            index = HighlightedItem is not null ? _items.IndexOf(HighlightedItem) : -1;
         }
         else
         {
-            index = _items.FindIndex(x => x.Equals(
-                _items.FirstOrDefault(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true)));
+            index = _items.FindIndex(item => item.Value?.Equals(_selectedValues.FirstOrDefault()) is true);
         }
 
-        // Need to account for first item being an empty placeholder
-        if (index < 0) { index = 0; }
+        if (index < 0)
+        {
+            index = direction > 0 ? -1 : _items.Count;
+        }
 
         for (int i = 0; i < _items.Count; i++)
         {
             index += direction;
 
-            if (index < 0) { index = 0; }
-
-            if (index >= _items.Count) { index = _items.Count - 1; }
+            if (index < 0 || index >= _items.Count) { return; }
 
             if (_items[index].IsDisabled) { continue; }
 
             if (IsMultiSelect || IsInput)
             {
                 HighlightedItem = _items[index];
-
-                StateHasChanged();
 
                 await JSRuntime.InvokeVoidAsync("scrollToHighlightedItem", _selectComponent);
             }

@@ -8,7 +8,6 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class ValueSelectItem<T> : IDisposable
 {
-    private bool _isSelected;
     private ValueSelect<T> _parent = null!;
 
     [Parameter]
@@ -37,6 +36,10 @@ public sealed partial class ValueSelectItem<T> : IDisposable
         }
     }
 
+    private bool IsHighlighted => _parent.HighlightedItem?.Equals(this) ?? false;
+
+    private bool IsSelected => _parent.IsItemSelected(Value);
+
     [CascadingParameter]
     private ValueSelect<T> ValueSelect
     {
@@ -44,7 +47,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
         set
         {
             _parent = value;
-            _isSelected = _parent.AddItem(this);
+            _parent.AddItem(this);
         }
     }
 
@@ -52,7 +55,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
 
     private void HighlightItem()
     {
-        if (!_parent.IsMultiSelect) { return; }
+        if (_parent is { IsMultiSelect: false, IsInput: false }) { return; }
 
         _parent.HighlightedItem = this;
     }
@@ -61,10 +64,15 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     {
         if (IsDisabled) { return; }
 
-        if (ClearItem) { ValueSelect.ClearSelected(); }
-
         if (!ValueSelect.IsMultiSelect) { await ValueSelect.CloseDropDown(); }
 
-        await ValueSelect.UpdateValue(Value);
+        if (ClearItem)
+        {
+            await ValueSelect.ClearAll();
+        }
+        else
+        {
+            await ValueSelect.UpdateValue(Value);
+        }
     }
 }

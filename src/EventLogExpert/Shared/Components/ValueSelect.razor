@@ -4,10 +4,11 @@
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @onkeydown:preventDefault="_preventDefault" @ref="_selectComponent">
     <input aria-activedescendant="@HighlightedItem?.ItemId" aria-controls="@_itemId"
+        aria-expanded="false" aria-haspopup="listbox"
         aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)" aria-labelledby="@AriaLabelledBy"
         class="@CssClass" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
 
-    <div class="dropdown-list" id="@_itemId" role="listbox" tabindex="-1">
+    <div class="dropdown-list" id="@_itemId" role="listbox" aria-multiselectable="@(IsMultiSelect ? "true" : null)" tabindex="-1">
         <CascadingValue Value="this">
             @ChildContent
         </CascadingValue>
