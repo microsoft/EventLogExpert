@@ -200,8 +200,12 @@ public sealed class EventTableEffectsTests
         _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
             Arg.Is<IEnumerable<ColumnName>>(o => !o.Any());
 
+        var expectedWidths = ColumnDefaults.Widths.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
         mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
-            action.ColumnWidths.SequenceEqual(ColumnDefaults.Widths) &&
+            action.ColumnWidths.Count == expectedWidths.Count &&
+            action.ColumnWidths.All(kvp =>
+                expectedWidths.ContainsKey(kvp.Key) && expectedWidths[kvp.Key] == kvp.Value) &&
             action.ColumnOrder.SequenceEqual(ColumnDefaults.Order) &&
             action.LoadedColumns[ColumnName.Level] == true &&
             action.LoadedColumns[ColumnName.DateAndTime] == true &&

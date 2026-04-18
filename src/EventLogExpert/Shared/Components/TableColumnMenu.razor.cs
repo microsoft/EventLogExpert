@@ -30,6 +30,13 @@ public sealed partial class TableColumnMenu
 
     private static void HandleActivationKey(KeyboardEventArgs args, Action action)
     {
+        // Ignore auto-repeat so holding Enter/Space doesn't dispatch the action
+        // repeatedly while the key is held down.
+        if (args.Repeat)
+        {
+            return;
+        }
+
         if (args.Key is "Enter" or " ")
         {
             action();
@@ -40,9 +47,6 @@ public sealed partial class TableColumnMenu
 
     private void ResetDefaults() => Dispatcher.Dispatch(new EventTableAction.ResetColumnDefaults());
 
-    private void ToggleColumn(ColumnName columnName)
-    {
+    private void ToggleColumn(ColumnName columnName) =>
         Dispatcher.Dispatch(new EventTableAction.ToggleColumn(columnName));
-        Dispatcher.Dispatch(new EventTableAction.LoadColumns());
-    }
 }

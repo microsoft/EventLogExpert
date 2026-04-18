@@ -15,8 +15,9 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Components;
 
-public sealed partial class DetailsPane : IDisposable
+public sealed partial class DetailsPane
 {
+    private DotNetObjectReference<DetailsPane>? _dotNetRef;
     private bool _hasOpened = false;
     private bool _isVisible = false;
     private bool _isXmlVisible = false;
@@ -27,6 +28,8 @@ public sealed partial class DetailsPane : IDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    [Inject] private IPreferencesProvider PreferencesProvider { get; init; } = null!;
+
     private DisplayEventModel? SelectedEvent { get; set; }
 
     [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventSelection { get; init; } = null!;
@@ -35,13 +38,42 @@ public sealed partial class DetailsPane : IDisposable
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public void Dispose() => SelectedEventSelection.SelectedValueChanged -= OnSelectedEventChanged;
+    [JSInvokable]
+    public void OnDetailsPaneHeightChanged(int height)
+    {
+        if (height > 0)
+        {
+            PreferencesProvider.DetailsPaneHeightPreference = height;
+        }
+    }
+
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            SelectedEventSelection.SelectedValueChanged -= OnSelectedEventChanged;
+
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("disposeDetailsPaneResizer");
+            }
+            catch (JSDisconnectedException) { }
+
+            _dotNetRef?.Dispose();
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("enableDetailsPaneResizer");
+            _dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync(
+                "enableDetailsPaneResizer",
+                _dotNetRef,
+                PreferencesProvider.DetailsPaneHeightPreference);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -60,6 +92,8 @@ public sealed partial class DetailsPane : IDisposable
 
     private void HandleKeyDown(KeyboardEventArgs e)
     {
+        if (e.Repeat) { return; }
+
         if (e.Key is "Enter" or " ")
         {
             ToggleMenu();
@@ -68,6 +102,8 @@ public sealed partial class DetailsPane : IDisposable
 
     private void HandleKeyDownXml(KeyboardEventArgs e)
     {
+        if (e.Repeat) { return; }
+
         if (e.Key is "Enter" or " ")
         {
             ToggleXml();

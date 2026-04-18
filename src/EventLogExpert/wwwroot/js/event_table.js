@@ -1,29 +1,4 @@
 (() => {
-    // Prevent F5 and Ctrl+R from refreshing the WebView
-    document.addEventListener("keydown",
-        function(e) {
-            if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) {
-                e.preventDefault();
-            }
-        },
-        true);
-
-    // Prevent the browser's default Space-key scroll when activating a
-    // role="button"/menuitem inside the column menu (via keyboard). This runs
-    // natively alongside Blazor's @onkeydown so Tab navigation still works.
-    document.addEventListener("keydown",
-        function(e) {
-            if (e.key !== " ") {
-                return;
-            }
-
-            const target = e.target;
-            if (target && target.closest &&
-                target.closest('#table-column-menu [role="button"], #table-column-menu [role="menuitem"]')) {
-                e.preventDefault();
-            }
-        });
-
     let activeDocumentListeners = [];
     let controller = null;
     let dotNetRef = null;
@@ -150,7 +125,9 @@
             const newWidth = parseInt(window.getComputedStyle(column).width, 10);
 
             if (dotNetRef && colName) {
-                dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth);
+                // Catch rejection in case the .NET object was disposed mid-drag
+                // (component teardown, column set change, etc.).
+                dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth).catch(() => { });
             }
 
             // Rebuild dividers after resize
@@ -181,6 +158,11 @@
                 return;
             }
 
+            // Suppress the WebView's default arrow-key scroll while a focused
+            // divider is being keyboard-resized.
+            e.preventDefault();
+            e.stopPropagation();
+
             // Debounce keyboard resize persistence
             if (keyboardResizeTimer) {
                 clearTimeout(keyboardResizeTimer);
@@ -191,7 +173,7 @@
                     const newWidth = parseInt(window.getComputedStyle(column).width, 10);
 
                     if (dotNetRef && colName) {
-                        dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth);
+                        dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth).catch(() => { });
                     }
 
                     keyboardResizeTimer = null;
@@ -237,7 +219,6 @@
                 }
 
                 dragSource = th;
-                th.classList.add("dragging");
 
                 const startX = e.clientX;
                 let hasMoved = false;
@@ -252,7 +233,10 @@
                         return;
                     }
 
-                    hasMoved = true;
+                    if (!hasMoved) {
+                        hasMoved = true;
+                        dragSource.classList.add("dragging");
+                    }
 
                     const allHeaders = Array.from(headerRow.querySelectorAll("th[data-column]"));
                     const sourceIndex = allHeaders.indexOf(dragSource);
@@ -278,7 +262,11 @@
                         dragIndicator.style.left = `${drop.indicatorX}px`;
 
                         document.body.appendChild(dragIndicator);
-                    } else if (drop === false) {
+                    } else {
+                        // Either explicit cancel (drop === false, cursor over
+                        // source) or no header under cursor (drop === null,
+                        // e.g. dragged into the table body). Clear any stale
+                        // pendingTarget/indicator so mouseup doesn't act on it.
                         removeIndicator();
                         pendingTarget = null;
                     }
@@ -298,7 +286,9 @@
                         const sourceColName = getColumnName(dragSource);
 
                         if (dotNetRef && sourceColName) {
-                            dotNetRef.invokeMethodAsync("OnColumnReordered", sourceColName, pendingTarget, pendingInsertAfter);
+                            // Catch rejection in case the .NET object was disposed
+                            // mid-drag (component teardown, column set change, etc.).
+                            dotNetRef.invokeMethodAsync("OnColumnReordered", sourceColName, pendingTarget, pendingInsertAfter).catch(() => { });
                         }
                     }
 
