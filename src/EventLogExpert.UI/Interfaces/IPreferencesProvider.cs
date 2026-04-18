@@ -12,6 +12,8 @@ public interface IPreferencesProvider
 
     IDictionary<ColumnName, int> ColumnWidthsPreference { get; set; }
 
+    int DetailsPaneHeightPreference { get; set; }
+
     IEnumerable<string> DisabledDatabasesPreference { get; set; }
 
     bool DisplayPaneSelectionPreference { get; set; }

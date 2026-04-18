@@ -13,6 +13,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
 {
     private const string ColumnOrder = "column-order";
     private const string ColumnWidths = "column-widths";
+    private const string DetailsPaneHeight = "details-pane-height";
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string EnabledEventTableColumns = "enabled-event-table-columns";
@@ -34,6 +35,12 @@ public sealed class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<Dictionary<ColumnName, int>>(Preferences.Default.Get(ColumnWidths, "{}")) ?? new Dictionary<ColumnName, int>();
         set => Preferences.Default.Set(ColumnWidths, JsonSerializer.Serialize(value));
+    }
+
+    public int DetailsPaneHeightPreference
+    {
+        get => Preferences.Default.Get(DetailsPaneHeight, 0);
+        set => Preferences.Default.Set(DetailsPaneHeight, value);
     }
 
     public IEnumerable<string> DisabledDatabasesPreference
