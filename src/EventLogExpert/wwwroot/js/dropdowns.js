@@ -1,6 +1,7 @@
 window.registerDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
     const input = root.getElementsByTagName("input")[0];
+    const controller = new AbortController();
 
     const closeDropdown = (e, force = false) => {
         const target = e.currentTarget.parentNode;
@@ -9,26 +10,19 @@ window.registerDropdown = (root) => {
             if (force === false && target.contains(document.activeElement)) { return; }
 
             dropdown.removeAttribute("data-toggle");
-            dropdown.setAttribute("aria-expanded", "false");
             dropdown.setAttribute("aria-hidden", "true");
+            input.setAttribute("aria-expanded", "false");
 
-            dropdown.style.position = false;
-            dropdown.style.top = false;
-            dropdown.style.left = false;
-            dropdown.style.width = false;
+            dropdown.style.position = "";
+            dropdown.style.top = "";
+            dropdown.style.left = "";
+            dropdown.style.width = "";
         });
     };
 
     const scrollToSelectedItem = () => {
-        const items = dropdown.getElementsByTagName("div");
-
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].hasAttribute("selected")) {
-                items[i].scrollIntoView({ block: "nearest" });
-
-                return;
-            }
-        }
+        const item = dropdown.querySelector("[aria-selected='true']");
+        item?.scrollIntoView({ block: "nearest" });
     };
 
     const openDropdown = () => {
@@ -40,8 +34,8 @@ window.registerDropdown = (root) => {
         dropdown.style.width = `${bounds.width}px`;
 
         dropdown.setAttribute("data-toggle", "");
-        dropdown.setAttribute("aria-expanded", "true");
         dropdown.setAttribute("aria-hidden", "false");
+        input.setAttribute("aria-expanded", "true");
 
         scrollToSelectedItem();
     }
@@ -58,27 +52,35 @@ window.registerDropdown = (root) => {
         e.stopPropagation();
 
         toggleDropdown(e);
-    });
-    input.addEventListener("blur", (e) => closeDropdown(e));
+    }, { signal: controller.signal });
 
-    dropdown.addEventListener("blur", (e) => closeDropdown(e));
+    input.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
+    dropdown.addEventListener("blur", (e) => closeDropdown(e), { signal: controller.signal });
+
+    root._dropdownController = controller;
+};
+
+window.unregisterDropdown = (root) => {
+    root?._dropdownController?.abort();
 };
 
 window.closeDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const input = root.getElementsByTagName("input")[0];
 
     dropdown.removeAttribute("data-toggle");
-    dropdown.setAttribute("aria-expanded", "false");
     dropdown.setAttribute("aria-hidden", "true");
+    input.setAttribute("aria-expanded", "false");
 
-    dropdown.style.position = false;
-    dropdown.style.top = false;
-    dropdown.style.left = false;
-    dropdown.style.width = false;
+    dropdown.style.position = "";
+    dropdown.style.top = "";
+    dropdown.style.left = "";
+    dropdown.style.width = "";
 };
 
 window.openDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
+    const input = root.getElementsByTagName("input")[0];
     const bounds = root.getBoundingClientRect();
 
     if (dropdown.hasAttribute("data-toggle")) { return; }
@@ -89,44 +91,30 @@ window.openDropdown = (root) => {
     dropdown.style.width = `${bounds.width}px`;
 
     dropdown.setAttribute("data-toggle", "");
-    dropdown.setAttribute("aria-expanded", "true");
     dropdown.setAttribute("aria-hidden", "false");
+    input.setAttribute("aria-expanded", "true");
 
-    scrollToSelectedItem(root);
+    window.scrollToSelectedItem(root);
 };
 
 window.scrollToHighlightedItem = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
-    const items = dropdown.getElementsByTagName("div");
-
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].hasAttribute("highlighted")) {
-            items[i].scrollIntoView({ block: "nearest" });
-
-            return;
-        }
-    }
+    const item = dropdown.querySelector("[highlighted]");
+    item?.scrollIntoView({ block: "nearest" });
 };
 
 window.scrollToSelectedItem = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
-    const items = dropdown.getElementsByTagName("div");
-
-    for (let i = 0; i < items.length; i++) {
-        if (items[i].hasAttribute("selected")) {
-            items[i].scrollIntoView({ block: "nearest" });
-
-            return;
-        }
-    }
+    const item = dropdown.querySelector("[aria-selected='true']");
+    item?.scrollIntoView({ block: "nearest" });
 };
 
 window.toggleDropdown = (root) => {
     const dropdown = root.getElementsByClassName("dropdown-list")[0];
 
     if (dropdown.hasAttribute("data-toggle")) {
-        closeDropdown(root);
+        window.closeDropdown(root);
     } else {
-        openDropdown(root);
+        window.openDropdown(root);
     }
 };
