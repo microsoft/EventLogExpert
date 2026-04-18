@@ -156,28 +156,8 @@ tr {
 
 .table-row.darkpink { background-color: var(--highlight-darkpink) !important; }
 
-.level { width: 100px; }
-
-.dateandtime { width: 160px; }
-
-.activityid { width: 270px; }
-
-.log { width: 100px; }
-
-.computername { width: 100px; }
-
-.source { width: 250px; }
-
-.eventid { width: 80px; }
-
-.taskcategory { width: 180px; }
-
-.keywords { width: 100px; }
-
-.processid { width: 80px; }
-
-.threadid { width: 80px; }
-
-.user { width: 180px; }
-
 .description { width: 100%; }
+
+th.dragging {
+    opacity: 0.5;
+}

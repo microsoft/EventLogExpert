@@ -117,8 +117,29 @@ public sealed class EventTableReducers
         EventTableAction.LoadColumnsCompleted action) =>
         state with
         {
-            Columns = action.LoadedColumns.ToImmutableDictionary()
+            Columns = action.LoadedColumns.ToImmutableDictionary(),
+            ColumnWidths = action.ColumnWidths.ToImmutableDictionary(),
+            ColumnOrder = action.ColumnOrder
         };
+
+    [ReducerMethod]
+    public static EventTableState ReduceReorderColumn(EventTableState state, EventTableAction.ReorderColumn action)
+    {
+        var order = state.ColumnOrder;
+
+        if (!order.Contains(action.ColumnName) || !order.Contains(action.TargetColumn) ||
+            action.ColumnName == action.TargetColumn)
+        {
+            return state;
+        }
+
+        order = order.Remove(action.ColumnName);
+        var targetIndex = order.IndexOf(action.TargetColumn);
+        var insertIndex = action.InsertAfter ? targetIndex + 1 : targetIndex;
+        order = order.Insert(insertIndex, action.ColumnName);
+
+        return state with { ColumnOrder = order };
+    }
 
     [ReducerMethod]
     public static EventTableState ReduceSetActiveTable(EventTableState state, EventTableAction.SetActiveTable action)
@@ -129,6 +150,10 @@ public sealed class EventTableReducers
 
         return state with { ActiveEventLogId = activeTable.Id };
     }
+
+    [ReducerMethod]
+    public static EventTableState ReduceSetColumnWidth(EventTableState state, EventTableAction.SetColumnWidth action) =>
+        state with { ColumnWidths = state.ColumnWidths.SetItem(action.ColumnName, action.Width) };
 
     [ReducerMethod]
     public static EventTableState ReduceSetOrderBy(EventTableState state, EventTableAction.SetOrderBy action) =>

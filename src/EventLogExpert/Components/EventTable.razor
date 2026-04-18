@@ -12,9 +12,10 @@
             {
                 var columnHeader = _enabledColumns[columnIndex];
                 _headerName = columnHeader.ToFullString();
+                var width = GetColumnWidth(columnHeader);
 
-                <th aria-colindex="@(columnIndex + 1)" aria-sort="@(_eventTableState.OrderBy == columnHeader ? (_eventTableState.IsDescending ? "descending" : "ascending") : "none")"
-                    class="@columnHeader.ToString().ToLower()" role="columnheader">
+                <th @key="columnHeader" aria-colindex="@(columnIndex + 1)" aria-sort="@(_eventTableState.OrderBy == columnHeader ? (_eventTableState.IsDescending ? "descending" : "ascending") : "none")"
+                    class="@columnHeader.ToString().ToLower()" data-column="@columnHeader" role="columnheader" style="width: @(width)px">
                     @if (columnHeader == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>

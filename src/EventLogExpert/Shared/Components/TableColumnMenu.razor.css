@@ -54,8 +54,10 @@
             border: 1px solid var(--clr-lightblue);
             background-color: var(--background-dark);
 
+            /* Hidden by default. visibility:hidden removes the items from the
+               tab order so keyboard focus can't land on invisible options. */
+            visibility: hidden;
             opacity: 0;
-            pointer-events: none;
 
             & > li {
                 width: 9em;
@@ -70,8 +72,11 @@
         }
     }
 
-    .sub-menu:hover > ul {
+    /* Reveal submenu on hover OR when keyboard focus is anywhere within it,
+       so keyboard users can open it by tabbing to the trigger. */
+    .sub-menu:hover > ul,
+    .sub-menu:focus-within > ul {
+        visibility: visible;
         opacity: 1;
-        pointer-events: all;
     }
 }

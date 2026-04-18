@@ -16,6 +16,10 @@ public sealed record EventTableState
 
     public ImmutableDictionary<ColumnName, bool> Columns { get; init; } = ImmutableDictionary<ColumnName, bool>.Empty;
 
+    public ImmutableDictionary<ColumnName, int> ColumnWidths { get; init; } = ImmutableDictionary<ColumnName, int>.Empty;
+
+    public ImmutableList<ColumnName> ColumnOrder { get; init; } = [];
+
     public ColumnName? OrderBy { get; init; }
 
     public bool IsDescending { get; init; } = true;

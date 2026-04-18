@@ -7,6 +7,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Store.EventTable;
 
@@ -48,8 +49,16 @@ public sealed class EventTableStoreTests
             { ColumnName.DateAndTime, true }
         };
 
+        var widths = new Dictionary<ColumnName, int>
+        {
+            { ColumnName.Level, 100 },
+            { ColumnName.DateAndTime, 160 }
+        };
+
+        var order = ColumnDefaults.Order;
+
         // Act
-        var action = new EventTableAction.LoadColumnsCompleted(columns);
+        var action = new EventTableAction.LoadColumnsCompleted(columns, widths, order);
 
         // Assert
         Assert.Equal(2, action.LoadedColumns.Count);
@@ -209,6 +218,8 @@ public sealed class EventTableStoreTests
         Assert.Empty(state.EventTables);
         Assert.Null(state.ActiveEventLogId);
         Assert.Empty(state.Columns);
+        Assert.Empty(state.ColumnWidths);
+        Assert.Empty(state.ColumnOrder);
         Assert.Null(state.OrderBy);
         Assert.True(state.IsDescending);
     }
@@ -229,7 +240,7 @@ public sealed class EventTableStoreTests
 
         state = EventTableReducers.ReduceLoadColumnsCompleted(
             state,
-            new EventTableAction.LoadColumnsCompleted(columns));
+            new EventTableAction.LoadColumnsCompleted(columns, new Dictionary<ColumnName, int>(), ColumnDefaults.Order));
 
         // Assert
         Assert.Equal(3, state.Columns.Count);
@@ -623,7 +634,14 @@ public sealed class EventTableStoreTests
             { ColumnName.Source, false }
         };
 
-        var action = new EventTableAction.LoadColumnsCompleted(columns);
+        var widths = new Dictionary<ColumnName, int>
+        {
+            { ColumnName.Level, 120 },
+            { ColumnName.Source, 250 }
+        };
+
+        var order = ColumnDefaults.Order;
+        var action = new EventTableAction.LoadColumnsCompleted(columns, widths, order);
 
         // Act
         var newState = EventTableReducers.ReduceLoadColumnsCompleted(state, action);
@@ -632,6 +650,110 @@ public sealed class EventTableStoreTests
         Assert.Equal(2, newState.Columns.Count);
         Assert.True(newState.Columns[ColumnName.Level]);
         Assert.False(newState.Columns[ColumnName.Source]);
+        Assert.Equal(120, newState.ColumnWidths[ColumnName.Level]);
+        Assert.Equal(250, newState.ColumnWidths[ColumnName.Source]);
+        Assert.Equal(order, newState.ColumnOrder);
+    }
+
+    [Fact]
+    public void ReduceReorderColumn_ShouldInsertAfterTarget()
+    {
+        // Arrange
+        var state = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Level, ColumnName.DateAndTime, ColumnName.Source, ColumnName.EventId]
+        };
+
+        // Move Level after Source (drag right, insertAfter = true)
+        var action = new EventTableAction.ReorderColumn(ColumnName.Level, ColumnName.Source, true);
+
+        // Act
+        var newState = EventTableReducers.ReduceReorderColumn(state, action);
+
+        // Assert
+        Assert.Equal(ColumnName.DateAndTime, newState.ColumnOrder[0]);
+        Assert.Equal(ColumnName.Source, newState.ColumnOrder[1]);
+        Assert.Equal(ColumnName.Level, newState.ColumnOrder[2]);
+        Assert.Equal(ColumnName.EventId, newState.ColumnOrder[3]);
+    }
+
+    [Fact]
+    public void ReduceReorderColumn_ShouldInsertBeforeTarget()
+    {
+        // Arrange
+        var state = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Level, ColumnName.DateAndTime, ColumnName.Source, ColumnName.EventId]
+        };
+
+        // Move Source before Level (drag left, insertAfter = false)
+        var action = new EventTableAction.ReorderColumn(ColumnName.Source, ColumnName.Level, false);
+
+        // Act
+        var newState = EventTableReducers.ReduceReorderColumn(state, action);
+
+        // Assert
+        Assert.Equal(ColumnName.Source, newState.ColumnOrder[0]);
+        Assert.Equal(ColumnName.Level, newState.ColumnOrder[1]);
+        Assert.Equal(ColumnName.DateAndTime, newState.ColumnOrder[2]);
+        Assert.Equal(ColumnName.EventId, newState.ColumnOrder[3]);
+    }
+
+    [Fact]
+    public void ReduceReorderColumn_WhenColumnNotInOrder_ShouldReturnUnchanged()
+    {
+        // Arrange
+        var state = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Level, ColumnName.DateAndTime]
+        };
+
+        var action = new EventTableAction.ReorderColumn(ColumnName.Source, ColumnName.Level, true);
+
+        // Act
+        var newState = EventTableReducers.ReduceReorderColumn(state, action);
+
+        // Assert
+        Assert.Equal(state.ColumnOrder, newState.ColumnOrder);
+    }
+
+    [Fact]
+    public void ReduceReorderColumn_WhenTargetMissing_ShouldReturnUnchanged()
+    {
+        // Arrange
+        var state = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Level, ColumnName.DateAndTime, ColumnName.Source]
+        };
+
+        var action = new EventTableAction.ReorderColumn(ColumnName.Level, ColumnName.EventId, true);
+
+        // Act
+        var newState = EventTableReducers.ReduceReorderColumn(state, action);
+
+        // Assert
+        Assert.Equal(state.ColumnOrder, newState.ColumnOrder);
+    }
+
+    [Fact]
+    public void ReduceReorderColumn_WithDisabledColumnsInterleaved_ShouldInsertRelativeToTarget()
+    {
+        // Arrange — full order has disabled columns interleaved among visible ones
+        var state = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Level, ColumnName.ActivityId, ColumnName.DateAndTime, ColumnName.Log, ColumnName.Source]
+        };
+
+        // Drag Level right and drop "after Source" (insertAfter = true)
+        var action = new EventTableAction.ReorderColumn(ColumnName.Level, ColumnName.Source, true);
+
+        // Act
+        var newState = EventTableReducers.ReduceReorderColumn(state, action);
+
+        // Assert — Level should land immediately after Source, regardless of disabled columns
+        var levelIndex = newState.ColumnOrder.IndexOf(ColumnName.Level);
+        var sourceIndex = newState.ColumnOrder.IndexOf(ColumnName.Source);
+        Assert.Equal(sourceIndex + 1, levelIndex);
     }
 
     [Fact]
@@ -686,6 +808,44 @@ public sealed class EventTableStoreTests
 
         // Assert
         Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReduceSetColumnWidth_ShouldUpdateWidth()
+    {
+        // Arrange
+        var state = new EventTableState
+        {
+            ColumnWidths = new Dictionary<ColumnName, int>
+            {
+                { ColumnName.Level, 100 },
+                { ColumnName.Source, 250 }
+            }.ToImmutableDictionary()
+        };
+
+        var action = new EventTableAction.SetColumnWidth(ColumnName.Level, 150);
+
+        // Act
+        var newState = EventTableReducers.ReduceSetColumnWidth(state, action);
+
+        // Assert
+        Assert.Equal(150, newState.ColumnWidths[ColumnName.Level]);
+        Assert.Equal(250, newState.ColumnWidths[ColumnName.Source]);
+    }
+
+    [Fact]
+    public void ReduceSetColumnWidth_WhenColumnNotYetInWidths_ShouldAddIt()
+    {
+        // Arrange
+        var state = new EventTableState();
+
+        var action = new EventTableAction.SetColumnWidth(ColumnName.EventId, 90);
+
+        // Act
+        var newState = EventTableReducers.ReduceSetColumnWidth(state, action);
+
+        // Assert
+        Assert.Equal(90, newState.ColumnWidths[ColumnName.EventId]);
     }
 
     [Fact]
