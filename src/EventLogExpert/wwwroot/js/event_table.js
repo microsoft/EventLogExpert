@@ -1,114 +1,423 @@
-window.registerTableEvents = () => {
-    const table = document.getElementById("eventTable");
+(() => {
+    // Prevent F5 and Ctrl+R from refreshing the WebView
+    document.addEventListener("keydown",
+        function(e) {
+            if (e.key === "F5" || (e.ctrlKey && (e.key === "r" || e.key === "R"))) {
+                e.preventDefault();
+            }
+        },
+        true);
 
-    if (!table) { return; }
+    // Prevent the browser's default Space-key scroll when activating a
+    // role="button"/menuitem inside the column menu (via keyboard). This runs
+    // natively alongside Blazor's @onkeydown so Tab navigation still works.
+    document.addEventListener("keydown",
+        function(e) {
+            if (e.key !== " ") {
+                return;
+            }
 
-    deleteColumnResize(table);
-    enableColumnResize(table);
+            const target = e.target;
+            if (target && target.closest &&
+                target.closest('#table-column-menu [role="button"], #table-column-menu [role="menuitem"]')) {
+                e.preventDefault();
+            }
+        });
 
-    registerKeyHandlers(table);
-};
+    let activeDocumentListeners = [];
+    let controller = null;
+    let dotNetRef = null;
+    let keyboardResizeTimer = null;
 
-window.deleteColumnResize = (table) => {
-    table.querySelectorAll(".table-divider").forEach(x => x.remove());
-};
+    // Attaches a document-level listener tied to the current AbortController
+    // signal so dispose() guarantees cleanup even if the caller forgets to
+    // untrack. Returns an untrack function that both removes the listener and
+    // drops the tracking entry to prevent unbounded growth across drags.
+    function trackDocumentListener(event, handler) {
+        const entry = { event, handler };
+        const options = controller ? { signal: controller.signal } : undefined;
+        document.addEventListener(event, handler, options);
+        activeDocumentListeners.push(entry);
 
-window.enableColumnResize = (table) => {
-    const columns = table.querySelectorAll("th");
-
-    if (columns != null) {
-        const createResizableColumn = function(column) {
-            let x = 0;
-            let w = 0;
-
-            const divider = document.createElement("div");
-            divider.classList.add("table-divider");
-
-            column.appendChild(divider);
-            divider.tabIndex = 0;
-
-            const mouseMoveHandler = function(e) {
-                const distance = e.clientX - x;
-
-                column.style.width = `${w + distance}px`;
-            };
-
-            const mouseUpHandler = function() {
-                document.removeEventListener("mousemove", mouseMoveHandler);
-                document.removeEventListener("mouseup", mouseUpHandler);
-
-                window.deleteColumnResize(table);
-                window.enableColumnResize(table);
-            };
-
-            const mouseDownHandler = function(e) {
-                x = e.clientX;
-
-                const styles = window.getComputedStyle(column);
-                w = parseInt(styles.width, 10);
-
-                document.addEventListener("mousemove", mouseMoveHandler);
-                document.addEventListener("mouseup", mouseUpHandler);
-            };
-
-            const keyboardResizeHandler = function (e) {
-                const styles = window.getComputedStyle(column);
-                w = parseInt(styles.width, 10);
-
-                if (e.key === "ArrowRight") {
-                    column.style.width = `${w + 10}px`;
-                } else if (e.key === "ArrowLeft") {
-                    column.style.width = `${w - 10}px`;
-                }
-            };
-
-            divider.addEventListener("mousedown", mouseDownHandler);
-            divider.addEventListener("keydown", keyboardResizeHandler);
+        return () => {
+            document.removeEventListener(event, handler);
+            const i = activeDocumentListeners.indexOf(entry);
+            if (i !== -1) {
+                activeDocumentListeners.splice(i, 1);
+            }
         };
+    }
 
-        for (let i = 0; i < columns.length - 1; i++) {
-            createResizableColumn(columns[i]);
+    function removeTrackedListeners() {
+        for (const { event, handler } of activeDocumentListeners) {
+            document.removeEventListener(event, handler);
+        }
+
+        activeDocumentListeners = [];
+    }
+
+    window.initializeTableEvents = (ref) => {
+        window.disposeTableEvents();
+
+        dotNetRef = ref;
+        controller = new AbortController();
+        const signal = controller.signal;
+
+        const table = document.getElementById("eventTable");
+
+        if (!table) {
+            return;
+        }
+
+        enableColumnResize(table, signal);
+        enableColumnReorder(table, signal);
+        registerKeyHandlers(table, signal);
+    };
+
+    window.disposeTableEvents = () => {
+        if (controller) {
+            controller.abort();
+            controller = null;
+        }
+
+        removeTrackedListeners();
+
+        dotNetRef = null;
+
+        if (keyboardResizeTimer) {
+            clearTimeout(keyboardResizeTimer);
+            keyboardResizeTimer = null;
+        }
+
+        const table = document.getElementById("eventTable");
+        if (table) {
+            table.querySelectorAll(".table-divider").forEach(x => x.remove());
+            // Clear any in-progress drag styling so headers don't remain
+            // semi-transparent if dispose runs mid-drag.
+            table.querySelectorAll("th.dragging").forEach(x => x.classList.remove("dragging"));
+        }
+
+        // Drag indicators are appended to document.body, so clean them up there
+        // in case dispose runs mid-drag (before mouseup).
+        document.body.querySelectorAll(".drag-indicator").forEach(x => x.remove());
+    };
+
+    window.refreshColumnResize = () => {
+        const table = document.getElementById("eventTable");
+
+        if (!table || !controller) {
+            return;
+        }
+
+        table.querySelectorAll(".table-divider").forEach(x => x.remove());
+        enableColumnResize(table, controller.signal);
+    };
+
+    function getColumnName(th) {
+        return th.getAttribute("data-column");
+    }
+
+    function enableColumnResize(table, signal) {
+        const columns = table.querySelectorAll("th[data-column]");
+
+        for (const column of columns) {
+            createResizableColumn(table, column, signal);
         }
     }
-};
 
-window.registerKeyHandlers = (table) => {
-    const selectAdjacentRow = function(direction) {
-        const tableRows = table.getElementsByTagName("tr");
-        const focusedRow = document.activeElement;
+    function createResizableColumn(table, column, signal) {
+        let startX = 0;
+        let startW = 0;
+        let untrackMove = null;
+        let untrackUp = null;
 
-        if (focusedRow.tagName.toLowerCase() !== "tr") { return; }
+        const divider = document.createElement("div");
+        divider.classList.add("table-divider");
+        column.appendChild(divider);
+        divider.tabIndex = 0;
 
-        for (let i = 0; i < tableRows.length; i++) {
-            if (tableRows[i] === focusedRow) {
-                tableRows[i + direction].focus();
+        const mouseMoveHandler = function(e) {
+            const distance = e.clientX - startX;
+            const newWidth = Math.max(30, startW + distance);
+            column.style.width = `${newWidth}px`;
+        };
 
-                break;
+        const mouseUpHandler = function() {
+            if (untrackMove) { untrackMove(); untrackMove = null; }
+            if (untrackUp) { untrackUp(); untrackUp = null; }
+
+            const colName = getColumnName(column);
+            const newWidth = parseInt(window.getComputedStyle(column).width, 10);
+
+            if (dotNetRef && colName) {
+                dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth);
+            }
+
+            // Rebuild dividers after resize
+            window.refreshColumnResize();
+        };
+
+        const mouseDownHandler = function(e) {
+            if (e.button !== 0) {
+                return;
+            }
+
+            e.stopPropagation();
+            startX = e.clientX;
+            startW = parseInt(window.getComputedStyle(column).width, 10);
+
+            untrackMove = trackDocumentListener("mousemove", mouseMoveHandler);
+            untrackUp = trackDocumentListener("mouseup", mouseUpHandler);
+        };
+
+        const keyboardResizeHandler = function(e) {
+            const w = parseInt(window.getComputedStyle(column).width, 10);
+
+            if (e.key === "ArrowRight") {
+                column.style.width = `${w + 10}px`;
+            } else if (e.key === "ArrowLeft") {
+                column.style.width = `${Math.max(30, w - 10)}px`;
+            } else {
+                return;
+            }
+
+            // Debounce keyboard resize persistence
+            if (keyboardResizeTimer) {
+                clearTimeout(keyboardResizeTimer);
+            }
+
+            keyboardResizeTimer = setTimeout(() => {
+                    const colName = getColumnName(column);
+                    const newWidth = parseInt(window.getComputedStyle(column).width, 10);
+
+                    if (dotNetRef && colName) {
+                        dotNetRef.invokeMethodAsync("OnColumnResized", colName, newWidth);
+                    }
+
+                    keyboardResizeTimer = null;
+                },
+                300);
+        };
+
+        divider.addEventListener("mousedown", mouseDownHandler, { signal });
+        divider.addEventListener("keydown", keyboardResizeHandler, { signal });
+    }
+
+    function enableColumnReorder(table, signal) {
+        const headerRow = table.querySelector("thead tr");
+
+        if (!headerRow) {
+            return;
+        }
+
+        let dragSource = null;
+        let dragIndicator = null;
+        let pendingTarget = null;
+        let pendingInsertAfter = false;
+
+        // Event delegation: single listener on the header row handles all columns.
+        // This survives Blazor DOM updates that may recreate th elements.
+        headerRow.addEventListener("mousedown",
+            function(e) {
+                // Only start drag on primary (left) button so right-click for
+                // the column context menu isn't intercepted.
+                if (e.button !== 0) {
+                    return;
+                }
+
+                if (e.target.classList.contains("table-divider") ||
+                    e.target.closest(".menu-toggle")) {
+                    return;
+                }
+
+                const th = e.target.closest("th[data-column]");
+
+                if (!th) {
+                    return;
+                }
+
+                dragSource = th;
+                th.classList.add("dragging");
+
+                const startX = e.clientX;
+                let hasMoved = false;
+                let untrackMove = null;
+                let untrackUp = null;
+                pendingTarget = null;
+
+                const moveHandler = function(e) {
+                    const distance = Math.abs(e.clientX - startX);
+
+                    if (distance < 5) {
+                        return;
+                    }
+
+                    hasMoved = true;
+
+                    const allHeaders = Array.from(headerRow.querySelectorAll("th[data-column]"));
+                    const sourceIndex = allHeaders.indexOf(dragSource);
+                    const drop = computeDropInfo(allHeaders, e.clientX, e.clientY, sourceIndex);
+
+                    if (drop) {
+                        removeIndicator();
+                        pendingTarget = drop.targetColumn;
+                        pendingInsertAfter = drop.insertAfter;
+
+                        dragIndicator = document.createElement("div");
+                        dragIndicator.classList.add("drag-indicator");
+
+                        const refRect = drop.refRect;
+
+                        dragIndicator.style.position = "fixed";
+                        dragIndicator.style.top = `${refRect.top}px`;
+                        dragIndicator.style.height = `${refRect.height}px`;
+                        dragIndicator.style.width = "2px";
+                        dragIndicator.style.backgroundColor = "var(--clr-lightblue)";
+                        dragIndicator.style.zIndex = "100";
+                        dragIndicator.style.pointerEvents = "none";
+                        dragIndicator.style.left = `${drop.indicatorX}px`;
+
+                        document.body.appendChild(dragIndicator);
+                    } else if (drop === false) {
+                        removeIndicator();
+                        pendingTarget = null;
+                    }
+                };
+
+                const upHandler = function() {
+                    if (untrackMove) { untrackMove(); untrackMove = null; }
+                    if (untrackUp) { untrackUp(); untrackUp = null; }
+
+                    if (dragSource) {
+                        dragSource.classList.remove("dragging");
+                    }
+
+                    removeIndicator();
+
+                    if (hasMoved && dragSource && pendingTarget) {
+                        const sourceColName = getColumnName(dragSource);
+
+                        if (dotNetRef && sourceColName) {
+                            dotNetRef.invokeMethodAsync("OnColumnReordered", sourceColName, pendingTarget, pendingInsertAfter);
+                        }
+                    }
+
+                    dragSource = null;
+                    pendingTarget = null;
+                };
+
+                untrackMove = trackDocumentListener("mousemove", moveHandler);
+                untrackUp = trackDocumentListener("mouseup", upHandler);
+            },
+            { signal });
+
+        // Returns:
+        //   { targetColumn, insertAfter, indicatorX, refRect } — valid drop position
+        //   false — cursor is over the source column (cancel)
+        //   null — no column found under cursor
+        function computeDropInfo(allHeaders, clientX, clientY, sourceIndex) {
+            let targetIndex = -1;
+
+            const el = document.elementFromPoint(clientX, clientY);
+
+            if (el) {
+                const th = el.closest("th[data-column]");
+
+                if (th) {
+                    targetIndex = allHeaders.indexOf(th);
+                }
+            }
+
+            if (targetIndex === -1) {
+                const firstRect = allHeaders[0].getBoundingClientRect();
+                const lastRect = allHeaders[allHeaders.length - 1].getBoundingClientRect();
+
+                if (clientX < firstRect.left) {
+                    targetIndex = 0;
+                } else if (clientX > lastRect.right) {
+                    targetIndex = allHeaders.length - 1;
+                } else {
+                    return null;
+                }
+            }
+
+            if (targetIndex === sourceIndex) {
+                return false;
+            }
+
+            const targetTh = allHeaders[targetIndex];
+            const targetColumn = getColumnName(targetTh);
+            const targetRect = targetTh.getBoundingClientRect();
+            const insertAfter = targetIndex > sourceIndex;
+
+            // Indicator at the target's far edge (away from source). Drop inserts
+            // the source column on that same far side of target.
+            const indicatorX = insertAfter ? targetRect.right : targetRect.left;
+
+            return { targetColumn, insertAfter, indicatorX, refRect: targetRect };
+        }
+
+        function removeIndicator() {
+            if (dragIndicator) {
+                dragIndicator.remove();
+                dragIndicator = null;
             }
         }
-    };
+    }
 
-    const keyDownHandler = function(e) {
-        if (e.key === "ArrowUp") {
-            e.preventDefault();
-            selectAdjacentRow(-1);
+    function registerKeyHandlers(table, signal) {
+        const selectAdjacentRow = function(direction) {
+            const tableRows = table.getElementsByTagName("tr");
+            const focusedRow = document.activeElement;
+
+            if (focusedRow.tagName.toLowerCase() !== "tr") {
+                return;
+            }
+
+            for (let i = 0; i < tableRows.length; i++) {
+                if (tableRows[i] === focusedRow) {
+                    const next = tableRows[i + direction];
+
+                    if (next) {
+                        next.focus();
+                    }
+
+                    break;
+                }
+            }
+        };
+
+        table.addEventListener("keydown",
+            function(e) {
+                if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    selectAdjacentRow(-1);
+                }
+
+                if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    selectAdjacentRow(+1);
+                }
+            },
+            { signal });
+    }
+
+    window.scrollToRow = (offset) => {
+        const table = document.getElementById("eventTable");
+
+        if (!table) {
+            return;
         }
 
-        if (e.key === "ArrowDown") {
-            e.preventDefault();
-            selectAdjacentRow(+1);
+        const row = table.getElementsByTagName("tr")[0];
+
+        if (!row) {
+            return;
         }
+
+        table.parentNode.scrollTo({
+            top: row.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
+            behavior: "smooth"
+        });
     };
-
-    table.addEventListener("keydown", keyDownHandler);
-};
-
-window.scrollToRow = (offset) => {
-    const table = document.getElementById("eventTable");
-    const row = table.getElementsByTagName("tr")[0];
-
-    table.parentNode.scrollTo({
-        top: row.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
-        behavior: "smooth"
-    });
-};
+})();

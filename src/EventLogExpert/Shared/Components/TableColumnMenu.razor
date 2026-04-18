@@ -3,7 +3,10 @@
 <div id="table-column-menu">
     @foreach (var column in EventTableColumnsState.Value)
     {
-        <div @onclick="() => ToggleColumn(column.Key)">
+        <div @onclick="() => ToggleColumn(column.Key)"
+            @onkeydown="e => HandleActivationKey(e, () => ToggleColumn(column.Key))"
+            role="button"
+            tabindex="0">
             @column.Key.ToFullString()
             @if (column.Value)
             {
@@ -15,11 +18,14 @@
     <hr />
 
     <div class="sub-menu">
-        <div>Order By <i class="bi bi-caret-right"></i></div>
-        <ul>
+        <div aria-haspopup="menu" role="button" tabindex="0">Order By <i class="bi bi-caret-right"></i></div>
+        <ul role="menu">
             @foreach (var column in EventTableColumnsState.Value)
             {
-                <li @onclick="() => OrderColumn(column.Key)">
+                <li @onclick="() => OrderColumn(column.Key)"
+                    @onkeydown="e => HandleActivationKey(e, () => OrderColumn(column.Key))"
+                    role="menuitem"
+                    tabindex="0">
                     @column.Key.ToFullString()
                     @if (EventTableState.Value.OrderBy.Equals(column.Key))
                     {
@@ -28,5 +34,14 @@
                 </li>
             }
         </ul>
+    </div>
+
+    <hr />
+
+    <div @onclick="ResetDefaults"
+        @onkeydown="e => HandleActivationKey(e, ResetDefaults)"
+        role="button"
+        tabindex="0">
+        Reset Column Defaults
     </div>
 </div>

@@ -22,10 +22,12 @@ namespace EventLogExpert.Components;
 public sealed partial class EventTable
 {
     private EventTableModel? _currentTable;
+    private DotNetObjectReference<EventTable>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private EventTableState _eventTableState = null!;
     private string _headerName = string.Empty;
     private IReadOnlyList<DisplayEventModel>? _lastDisplayedEvents;
+    private ColumnName[] _previousEnabledColumns = [];
     private Dictionary<DisplayEventModel, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
     private ImmutableList<DisplayEventModel> _selectedEventState = [];
     private TimeZoneInfo _timeZoneSettings = null!;
@@ -46,19 +48,74 @@ public sealed partial class EventTable
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
+    [JSInvokable]
+    public void OnColumnReordered(string columnName, string targetColumn, bool insertAfter)
+    {
+        if (Enum.TryParse<ColumnName>(columnName, out var column) &&
+            Enum.TryParse<ColumnName>(targetColumn, out var target))
+        {
+            Dispatcher.Dispatch(new EventTableAction.ReorderColumn(column, target, insertAfter));
+        }
+    }
+
+    [JSInvokable]
+    public void OnColumnResized(string columnName, int width)
+    {
+        if (Enum.TryParse<ColumnName>(columnName, out var column))
+        {
+            Dispatcher.Dispatch(new EventTableAction.SetColumnWidth(column, width));
+        }
+    }
+
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            try
+            {
+                await JSRuntime.InvokeVoidAsync("disposeTableEvents");
+            }
+            catch (JSDisconnectedException) { }
+
+            _dotNetRef?.Dispose();
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Reinitialize JS when columns change (add/remove/reorder). This
+        // ensures resize dividers and event listeners target the current DOM.
+        if (firstRender || !_enabledColumns.SequenceEqual(_previousEnabledColumns))
+        {
+            _previousEnabledColumns = _enabledColumns.ToArray();
+
+            try
+            {
+                await InitializeTableEventHandlers();
+            }
+            catch (Exception e)
+            {
+                TraceLogger.Error($"Failed to initialize table event handlers: {e}");
+            }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
     protected override async Task OnInitializedAsync()
     {
         SelectedEventState.Select(s => s.SelectedEvents);
 
         SubscribeToAction<EventTableAction.SetActiveTable>(OnSetActiveTable);
-        SubscribeToAction<EventTableAction.LoadColumnsCompleted>(OnLoadColumnsCompleted);
         SubscribeToAction<EventTableAction.UpdateCombinedEvents>(OnUpdateCombinedEvents);
         SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(OnUpdateDisplayedEvents);
 
         _eventTableState = EventTableState.Value;
 
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
-        _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
+        _enabledColumns = GetOrderedEnabledColumns();
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = Settings.TimeZoneInfo;
 
@@ -76,7 +133,7 @@ public sealed partial class EventTable
         _eventTableState = EventTableState.Value;
 
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
-        _enabledColumns = _eventTableState.Columns.Where(column => column.Value).Select(column => column.Key).ToArray();
+        _enabledColumns = GetOrderedEnabledColumns();
         _selectedEventState = SelectedEventState.Value;
         _timeZoneSettings = Settings.TimeZoneInfo;
 
@@ -93,6 +150,9 @@ public sealed partial class EventTable
             nameof(SeverityLevel.Information) => "bi bi-info-circle",
             _ => string.Empty,
         };
+
+    private int GetColumnWidth(ColumnName column) =>
+        _eventTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
 
     private string GetCss(DisplayEventModel @event) =>
         _selectedEventState.Contains(@event) ? "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
@@ -111,6 +171,25 @@ public sealed partial class EventTable
         }
 
         return string.Empty;
+    }
+
+    private ColumnName[] GetOrderedEnabledColumns()
+    {
+        var enabledSet = _eventTableState.Columns
+            .Where(column => column.Value)
+            .Select(column => column.Key)
+            .ToHashSet();
+
+        if (_eventTableState.ColumnOrder.IsEmpty)
+        {
+            // Use ColumnDefaults.Order for a deterministic fallback rather than
+            // HashSet iteration order, which is not guaranteed.
+            return ColumnDefaults.Order.Where(enabledSet.Contains).ToArray();
+        }
+
+        return _eventTableState.ColumnOrder
+            .Where(enabledSet.Contains)
+            .ToArray();
     }
 
     private int GetRowIndex(DisplayEventModel evt) =>
@@ -160,23 +239,18 @@ public sealed partial class EventTable
         }
     }
 
+    private async Task InitializeTableEventHandlers()
+    {
+        _dotNetRef?.Dispose();
+        _dotNetRef = DotNetObjectReference.Create(this);
+        await JSRuntime.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
+    }
+
     private async Task InvokeContextMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeContextMenu", args.ClientX, args.ClientY);
 
     private async Task InvokeTableColumnMenu(MouseEventArgs args) =>
         await JSRuntime.InvokeVoidAsync("invokeTableColumnMenu", args.ClientX, args.ClientY);
-
-    private async void OnLoadColumnsCompleted(EventTableAction.LoadColumnsCompleted action)
-    {
-        try
-        {
-            await InvokeAsync(RegisterTableEventHandlers);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to register table event handlers: {e}");
-        }
-    }
 
     private async void OnSetActiveTable(EventTableAction.SetActiveTable action)
     {
@@ -230,8 +304,6 @@ public sealed partial class EventTable
             _rowIndexMap[displayedEvents[i]] = i;
         }
     }
-
-    private async Task RegisterTableEventHandlers() => await JSRuntime.InvokeVoidAsync("registerTableEvents");
 
     private async Task ScrollToSelectedEvent()
     {

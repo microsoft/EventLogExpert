@@ -8,6 +8,10 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IPreferencesProvider
 {
+    IEnumerable<ColumnName> ColumnOrderPreference { get; set; }
+
+    IDictionary<ColumnName, int> ColumnWidthsPreference { get; set; }
+
     IEnumerable<string> DisabledDatabasesPreference { get; set; }
 
     bool DisplayPaneSelectionPreference { get; set; }

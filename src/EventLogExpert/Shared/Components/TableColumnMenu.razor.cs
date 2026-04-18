@@ -5,6 +5,7 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -14,11 +15,11 @@ public sealed partial class TableColumnMenu
 {
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
-
     [Inject]
     private IStateSelection<EventTableState, IImmutableDictionary<ColumnName, bool>>
         EventTableColumnsState { get; init; } = null!;
+
+    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
@@ -27,7 +28,17 @@ public sealed partial class TableColumnMenu
         base.OnInitialized();
     }
 
+    private static void HandleActivationKey(KeyboardEventArgs args, Action action)
+    {
+        if (args.Key is "Enter" or " ")
+        {
+            action();
+        }
+    }
+
     private void OrderColumn(ColumnName columnName) => Dispatcher.Dispatch(new EventTableAction.SetOrderBy(columnName));
+
+    private void ResetDefaults() => Dispatcher.Dispatch(new EventTableAction.ResetColumnDefaults());
 
     private void ToggleColumn(ColumnName columnName)
     {

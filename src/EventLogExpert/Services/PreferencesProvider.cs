@@ -11,6 +11,8 @@ namespace EventLogExpert.Services;
 
 public sealed class PreferencesProvider : IPreferencesProvider
 {
+    private const string ColumnOrder = "column-order";
+    private const string ColumnWidths = "column-widths";
     private const string DisabledDatabases = "disabled-databases";
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string EnabledEventTableColumns = "enabled-event-table-columns";
@@ -21,6 +23,18 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string RecentFilters = "recent-filters";
     private const string SavedFilters = "saved-filters";
     private const string TimeZone = "timezone";
+
+    public IEnumerable<ColumnName> ColumnOrderPreference
+    {
+        get => JsonSerializer.Deserialize<List<ColumnName>>(Preferences.Default.Get(ColumnOrder, "[]")) ?? [];
+        set => Preferences.Default.Set(ColumnOrder, JsonSerializer.Serialize(value));
+    }
+
+    public IDictionary<ColumnName, int> ColumnWidthsPreference
+    {
+        get => JsonSerializer.Deserialize<Dictionary<ColumnName, int>>(Preferences.Default.Get(ColumnWidths, "{}")) ?? new Dictionary<ColumnName, int>();
+        set => Preferences.Default.Set(ColumnWidths, JsonSerializer.Serialize(value));
+    }
 
     public IEnumerable<string> DisabledDatabasesPreference
     {

@@ -5,6 +5,7 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using NSubstitute;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Store.EventTable;
 
@@ -27,8 +28,29 @@ public sealed class EventTableEffectsTests
         await effects.HandleLoadColumns(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns.Count == Enum.GetValues<ColumnName>().Length));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns.Count == Enum.GetValues<ColumnName>().Length));
+    }
+
+    [Fact]
+    public async Task HandleLoadColumns_ShouldLoadWidthsFromPreferences()
+    {
+        // Arrange
+        var enabledColumns = new List<ColumnName> { ColumnName.Level };
+        var savedWidths = new Dictionary<ColumnName, int>
+        {
+            { ColumnName.Level, 150 }
+        };
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
+        mockPreferencesProvider.ColumnWidthsPreference.Returns(savedWidths);
+
+        // Act
+        await effects.HandleLoadColumns(mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.ColumnWidths[ColumnName.Level] == 150));
     }
 
     [Fact]
@@ -46,9 +68,9 @@ public sealed class EventTableEffectsTests
         await effects.HandleLoadColumns(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns[ColumnName.Source] == false &&
-            a.LoadedColumns[ColumnName.EventId] == false));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns[ColumnName.Source] == false &&
+            action.LoadedColumns[ColumnName.EventId] == false));
     }
 
     [Fact]
@@ -67,9 +89,60 @@ public sealed class EventTableEffectsTests
         await effects.HandleLoadColumns(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns[ColumnName.Level] == true &&
-            a.LoadedColumns[ColumnName.DateAndTime] == true));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns[ColumnName.Level] == true &&
+            action.LoadedColumns[ColumnName.DateAndTime] == true));
+    }
+
+    [Fact]
+    public async Task HandleLoadColumns_ShouldUseDefaultOrderWhenNotSaved()
+    {
+        // Arrange
+        var enabledColumns = new List<ColumnName> { ColumnName.Level };
+
+        var (effects, mockDispatcher, _) = CreateEffects(enabledColumns);
+
+        // Act
+        await effects.HandleLoadColumns(mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.ColumnOrder.SequenceEqual(ColumnDefaults.Order)));
+    }
+
+    [Fact]
+    public async Task HandleLoadColumns_ShouldUseDefaultWidthsWhenNotSaved()
+    {
+        // Arrange
+        var enabledColumns = new List<ColumnName> { ColumnName.Level };
+
+        var (effects, mockDispatcher, _) = CreateEffects(enabledColumns);
+
+        // Act
+        await effects.HandleLoadColumns(mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.ColumnWidths[ColumnName.Level] == ColumnDefaults.GetWidth(ColumnName.Level)));
+    }
+
+    [Fact]
+    public async Task HandleLoadColumns_ShouldUseSavedOrderWhenPresent()
+    {
+        // Arrange
+        var enabledColumns = new List<ColumnName> { ColumnName.Source, ColumnName.Level };
+        var savedOrder = new List<ColumnName> { ColumnName.Source, ColumnName.Level };
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
+        mockPreferencesProvider.ColumnOrderPreference.Returns(savedOrder);
+
+        // Act
+        await effects.HandleLoadColumns(mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.ColumnOrder[0] == ColumnName.Source &&
+            action.ColumnOrder[1] == ColumnName.Level));
     }
 
     [Fact]
@@ -84,8 +157,82 @@ public sealed class EventTableEffectsTests
         await effects.HandleLoadColumns(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns.All(kvp => kvp.Value == false)));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns.All(kvp => kvp.Value == false)));
+    }
+
+    [Fact]
+    public async Task HandleReorderColumn_ShouldPersistToPreferences()
+    {
+        // Arrange - state reflects post-reducer result (Source moved to index 0)
+        var postReducerState = new EventTableState
+        {
+            ColumnOrder = [ColumnName.Source, ColumnName.Level, ColumnName.DateAndTime]
+        };
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(state: postReducerState);
+
+        var action = new EventTableAction.ReorderColumn(ColumnName.Source, ColumnName.Level, false);
+
+        // Act
+        await effects.HandleReorderColumn(action, mockDispatcher);
+
+        // Assert
+        _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
+            Arg.Is<IEnumerable<ColumnName>>(order => order.First() == ColumnName.Source);
+    }
+
+    [Fact]
+    public async Task HandleResetColumnDefaults_ShouldResetAllColumnSettingsToDefaults()
+    {
+        // Arrange
+        var enabledColumns = new List<ColumnName> { ColumnName.Level, ColumnName.Source };
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(enabledColumns);
+
+        // Act
+        await effects.HandleResetColumnDefaults(mockDispatcher);
+
+        // Assert
+        _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
+            Arg.Is<IEnumerable<ColumnName>>(c => c.SequenceEqual(ColumnDefaults.EnabledColumns));
+        _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
+            Arg.Is<IDictionary<ColumnName, int>>(w => w.Count == 0);
+        _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
+            Arg.Is<IEnumerable<ColumnName>>(o => !o.Any());
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.ColumnWidths.SequenceEqual(ColumnDefaults.Widths) &&
+            action.ColumnOrder.SequenceEqual(ColumnDefaults.Order) &&
+            action.LoadedColumns[ColumnName.Level] == true &&
+            action.LoadedColumns[ColumnName.DateAndTime] == true &&
+            action.LoadedColumns[ColumnName.Source] == true &&
+            action.LoadedColumns[ColumnName.EventId] == true &&
+            action.LoadedColumns[ColumnName.TaskCategory] == true &&
+            action.LoadedColumns[ColumnName.ActivityId] == false));
+    }
+
+    [Fact]
+    public async Task HandleSetColumnWidth_ShouldPersistToPreferences()
+    {
+        // Arrange
+        var postReducerState = new EventTableState
+        {
+            ColumnWidths = new Dictionary<ColumnName, int>
+            {
+                { ColumnName.Level, 200 }
+            }.ToImmutableDictionary()
+        };
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(state: postReducerState);
+
+        var action = new EventTableAction.SetColumnWidth(ColumnName.Level, 200);
+
+        // Act
+        await effects.HandleSetColumnWidth(action, mockDispatcher);
+
+        // Assert
+        _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
+            Arg.Is<IDictionary<ColumnName, int>>(width => width[ColumnName.Level] == 200);
     }
 
     [Fact]
@@ -107,11 +254,11 @@ public sealed class EventTableEffectsTests
         await effects.HandleToggleColumn(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns[ColumnName.Level] == true &&
-            a.LoadedColumns[ColumnName.DateAndTime] == false &&
-            a.LoadedColumns[ColumnName.Source] == true &&
-            a.LoadedColumns[ColumnName.EventId] == true));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns[ColumnName.Level] == true &&
+            action.LoadedColumns[ColumnName.DateAndTime] == false &&
+            action.LoadedColumns[ColumnName.Source] == true &&
+            action.LoadedColumns[ColumnName.EventId] == true));
     }
 
     [Fact]
@@ -132,8 +279,8 @@ public sealed class EventTableEffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
-            Arg.Is<IEnumerable<ColumnName>>(cols =>
-                cols.Contains(ColumnName.Source));
+            Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns.Contains(ColumnName.Source));
     }
 
     [Fact]
@@ -153,10 +300,10 @@ public sealed class EventTableEffectsTests
         await effects.HandleToggleColumn(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns[ColumnName.Level] == true &&
-            a.LoadedColumns[ColumnName.DateAndTime] == true &&
-            a.LoadedColumns[ColumnName.Source] == true));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns[ColumnName.Level] == true &&
+            action.LoadedColumns[ColumnName.DateAndTime] == true &&
+            action.LoadedColumns[ColumnName.Source] == true));
     }
 
     [Fact]
@@ -177,10 +324,10 @@ public sealed class EventTableEffectsTests
         await effects.HandleToggleColumn(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(a =>
-            a.LoadedColumns[ColumnName.Level] == false &&
-            a.LoadedColumns[ColumnName.DateAndTime] == true &&
-            a.LoadedColumns[ColumnName.Source] == true));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.LoadColumnsCompleted>(action =>
+            action.LoadedColumns[ColumnName.Level] == false &&
+            action.LoadedColumns[ColumnName.DateAndTime] == true &&
+            action.LoadedColumns[ColumnName.Source] == true));
     }
 
     [Fact]
@@ -202,11 +349,11 @@ public sealed class EventTableEffectsTests
 
         // Assert
         var _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
-            Arg.Is<IEnumerable<ColumnName>>(cols =>
-                cols.Contains(ColumnName.Level) &&
-                cols.Contains(ColumnName.DateAndTime) &&
-                !cols.Contains(ColumnName.Source) &&
-                cols.Count() == 2);
+            Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns.Contains(ColumnName.Level) &&
+                columns.Contains(ColumnName.DateAndTime) &&
+                !columns.Contains(ColumnName.Source) &&
+                columns.Count() == 2);
     }
 
     [Fact]
@@ -226,10 +373,10 @@ public sealed class EventTableEffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
-            Arg.Is<IEnumerable<ColumnName>>(cols =>
-                cols.Contains(ColumnName.Level) &&
-                cols.Contains(ColumnName.Source) &&
-                cols.Count() == 2);
+            Arg.Is<IEnumerable<ColumnName>>(columns =>
+                columns.Contains(ColumnName.Level) &&
+                columns.Contains(ColumnName.Source) &&
+                columns.Count() == 2);
     }
 
     [Fact]
@@ -259,12 +406,17 @@ public sealed class EventTableEffectsTests
     }
 
     private static (EventTableEffects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
-        CreateEffects(List<ColumnName>? enabledColumns = null)
+        CreateEffects(List<ColumnName>? enabledColumns = null, EventTableState? state = null)
     {
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
         mockPreferencesProvider.EnabledEventTableColumnsPreference.Returns(enabledColumns ?? []);
+        mockPreferencesProvider.ColumnWidthsPreference.Returns(new Dictionary<ColumnName, int>());
+        mockPreferencesProvider.ColumnOrderPreference.Returns([]);
 
-        var effects = new EventTableEffects(mockPreferencesProvider);
+        var mockState = Substitute.For<IState<EventTableState>>();
+        mockState.Value.Returns(state ?? new EventTableState());
+
+        var effects = new EventTableEffects(mockPreferencesProvider, mockState);
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher, mockPreferencesProvider);
