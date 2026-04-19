@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -83,50 +84,120 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
             return;
         }
 
+        if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { return; }
+
         if (source is not null && !ProviderSource.TryValidate(source, Logger)) { return; }
 
-        HashSet<string> skipProviderNames = new(StringComparer.OrdinalIgnoreCase);
-
-        if (!string.IsNullOrWhiteSpace(skipProvidersInFile))
+        try
         {
-            if (!ProviderSource.TryValidate(skipProvidersInFile, Logger)) { return; }
+            HashSet<string> skipProviderNames = new(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var name in ProviderSource.LoadProviderNames(skipProvidersInFile, Logger))
+            if (!string.IsNullOrWhiteSpace(skipProvidersInFile))
             {
-                skipProviderNames.Add(name);
+                if (!ProviderSource.TryValidate(skipProvidersInFile, Logger)) { return; }
+
+                foreach (var name in ProviderSource.LoadProviderNames(skipProvidersInFile, Logger))
+                {
+                    skipProviderNames.Add(name);
+                }
+
+                Logger.Info($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
             }
 
-            Logger.Info($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
+            // Stream details directly into the DbContext. For .evtx sources, scanning the file
+            // is expensive, so we deliberately do NOT pre-scan provider names just to size the
+            // log header — that would cause a second full pass over the .evtx. Instead we
+            // buffer the first batch of resolved details, derive the header column width from
+            // those names, then log the header + buffered rows and continue streaming.
+            const int batchSize = 100;
+            var count = 0;
+            var headerLogged = false;
+            var pendingForHeader = new List<ProviderDetails>(batchSize);
+
+            // Defer creating the DbContext (and therefore the .db file on disk) until we have
+            // at least one provider to persist. This prevents leaving an empty database behind
+            // when no provider details could be resolved (e.g., .evtx without LocaleMetaData).
+            EventProviderDbContext? dbContext = null;
+
+            try
+            {
+                IEnumerable<ProviderDetails> providersToAdd = source is null
+                    ? LoadLocalProviders(regex, skipProviderNames)
+                    : ProviderSource.LoadProviders(source, Logger, regex, skipProviderNames);
+
+                foreach (var details in providersToAdd)
+                {
+                    if (!headerLogged)
+                    {
+                        pendingForHeader.Add(details);
+
+                        if (pendingForHeader.Count < batchSize) { continue; }
+
+                        FlushHeaderAndBuffer(ref dbContext, path, pendingForHeader, ref count);
+                        headerLogged = true;
+                        continue;
+                    }
+
+                    dbContext ??= new EventProviderDbContext(path, false, Logger);
+                    dbContext.ProviderDetails.Add(details);
+                    LogProviderDetails(details);
+                    count++;
+
+                    if (count % batchSize != 0) { continue; }
+                    dbContext.SaveChanges();
+                    dbContext.ChangeTracker.Clear();
+                }
+
+                // Flush any buffered providers when the stream ended before the buffer filled.
+                if (!headerLogged && pendingForHeader.Count > 0)
+                {
+                    FlushHeaderAndBuffer(ref dbContext, path, pendingForHeader, ref count);
+                }
+
+                if (dbContext is null)
+                {
+                    Logger.Warn($"No provider details could be resolved from the source. Database was not created.");
+
+                    return;
+                }
+
+                Logger.Info($"");
+                Logger.Info($"Saving database. Please wait...");
+
+                dbContext.SaveChanges();
+
+                Logger.Info($"Done!");
+            }
+            finally
+            {
+                dbContext?.Dispose();
+            }
         }
-
-        IEnumerable<ProviderDetails> providersToAdd = source is null
-            ? LoadLocalProviders(filter, skipProviderNames)
-            : ProviderSource.LoadProviders(source, Logger, filter, skipProviderNames);
-
-        var providersNotSkipped = providersToAdd.ToList();
-
-        if (providersNotSkipped.Count == 0)
+        catch (RegexMatchTimeoutException)
         {
-            Logger.Warn($"No providers to add to the new database.");
-            return;
+            Logger.Error($"The --filter regex timed out. The pattern may cause catastrophic backtracking.");
         }
+    }
 
-        using var dbContext = new EventProviderDbContext(path, false, Logger);
+    private void FlushHeaderAndBuffer(
+        ref EventProviderDbContext? dbContext,
+        string path,
+        List<ProviderDetails> buffer,
+        ref int count)
+    {
+        LogProviderDetailHeader(buffer.Select(p => p.ProviderName));
 
-        LogProviderDetailHeader(providersNotSkipped.Select(p => p.ProviderName));
+        dbContext ??= new EventProviderDbContext(path, false, Logger);
 
-        foreach (var details in providersNotSkipped)
+        foreach (var details in buffer)
         {
             dbContext.ProviderDetails.Add(details);
             LogProviderDetails(details);
+            count++;
         }
 
-        Logger.Info($"");
-        Logger.Info($"Saving database. Please wait...");
-
         dbContext.SaveChanges();
-
-        Logger.Info($"Done!");
+        dbContext.ChangeTracker.Clear();
+        buffer.Clear();
     }
-
 }

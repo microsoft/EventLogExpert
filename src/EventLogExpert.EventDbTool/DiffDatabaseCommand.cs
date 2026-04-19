@@ -79,43 +79,58 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         var providersCopied = new List<ProviderDetails>();
 
-        using var newDbContext = new EventProviderDbContext(newDb, false, Logger);
+        // Pass firstProviderNames as the skip set so providers present in the first source are
+        // never resolved from the second source's metadata path. This is especially important when
+        // the second source is .evtx+MTA, where each provider triggers an expensive load.
+        Logger.Info($"Skipping up to {firstProviderNames.Count} provider name(s) from the second source that also appear in the first source.");
 
-        foreach (var details in ProviderSource.LoadProviders(secondSource, Logger))
+        // Defer creating the DbContext (and therefore the .db file on disk) until at least one
+        // provider is actually about to be persisted. This prevents leaving an empty database
+        // behind when the second source yields no new providers.
+        EventProviderDbContext? newDbContext = null;
+
+        try
         {
-            if (firstProviderNames.Contains(details.ProviderName))
+            foreach (var details in ProviderSource.LoadProviders(secondSource, Logger, filter: null, skipProviderNames: firstProviderNames))
             {
-                Logger.Info($"Skipping {details.ProviderName} because it is present in both sources.");
-                continue;
+                Logger.Info($"Copying {details.ProviderName} because it is present in second source but not first.");
+
+                newDbContext ??= new EventProviderDbContext(newDb, false, Logger);
+
+                newDbContext.ProviderDetails.Add(new ProviderDetails
+                {
+                    ProviderName = details.ProviderName,
+                    Events = details.Events,
+                    Parameters = details.Parameters,
+                    Keywords = details.Keywords,
+                    Messages = details.Messages,
+                    Opcodes = details.Opcodes,
+                    Tasks = details.Tasks
+                });
+
+                providersCopied.Add(details);
             }
 
-            Logger.Info($"Copying {details.ProviderName} because it is present in second source but not first.");
-
-            newDbContext.ProviderDetails.Add(new ProviderDetails
+            if (newDbContext is null)
             {
-                ProviderName = details.ProviderName,
-                Events = details.Events,
-                Parameters = details.Parameters,
-                Keywords = details.Keywords,
-                Messages = details.Messages,
-                Opcodes = details.Opcodes,
-                Tasks = details.Tasks
-            });
+                Logger.Warn($"No providers in the second source are missing from the first. Database was not created.");
+                return;
+            }
 
-            providersCopied.Add(details);
+            newDbContext.SaveChanges();
+
+            Logger.Info($"Providers copied to new database:");
+            Logger.Info($"");
+            LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
+
+            foreach (var provider in providersCopied)
+            {
+                LogProviderDetails(provider);
+            }
         }
-
-        newDbContext.SaveChanges();
-
-        if (providersCopied.Count <= 0) { return; }
-
-        Logger.Info($"Providers copied to new database:");
-        Logger.Info($"");
-        LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
-
-        foreach (var provider in providersCopied)
+        finally
         {
-            LogProviderDetails(provider);
+            newDbContext?.Dispose();
         }
     }
 }

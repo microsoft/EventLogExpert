@@ -22,7 +22,13 @@ internal static class MtaProviderSource
     public static IReadOnlyList<string> DiscoverProviderNames(
         string evtxPath,
         ITraceLogger logger,
-        string? filter = null)
+        string? filter = null) =>
+        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : DiscoverProviderNamesCore(evtxPath, logger, regex);
+
+    private static IReadOnlyList<string> DiscoverProviderNamesCore(
+        string evtxPath,
+        ITraceLogger logger,
+        Regex? regex)
     {
         if (!File.Exists(evtxPath))
         {
@@ -42,10 +48,11 @@ internal static class MtaProviderSource
                 return [];
             }
 
+            // TryGetEvents returns false both for normal end-of-results (ERROR_NO_MORE_ITEMS) and
+            // for read errors (corruption, access denied, etc.). Check LastErrorCode to surface
+            // non-terminal failures so users can distinguish "0 events" from "could not read the log".
             while (reader.TryGetEvents(out var batch))
             {
-                if (batch.Length == 0) { break; }
-
                 foreach (var record in batch)
                 {
                     if (!string.IsNullOrEmpty(record.ProviderName))
@@ -54,6 +61,13 @@ internal static class MtaProviderSource
                     }
                 }
             }
+
+            if (reader.LastErrorCode is not null)
+            {
+                logger.Warn(
+                    $"Reading {evtxPath} may be incomplete. " +
+                    $"EvtNext failed with Win32 error code {reader.LastErrorCode}.");
+            }
         }
         catch (Exception ex)
         {
@@ -61,14 +75,7 @@ internal static class MtaProviderSource
             return [];
         }
 
-        if (string.IsNullOrEmpty(filter))
-        {
-            return providerNames.ToList();
-        }
-
-        var regex = new Regex(filter, RegexOptions.IgnoreCase);
-
-        return providerNames.Where(n => regex.IsMatch(n)).ToList();
+        return regex is null ? providerNames.ToList() : providerNames.Where(n => regex.IsMatch(n)).ToList();
     }
 
     /// <summary>
@@ -97,7 +104,18 @@ internal static class MtaProviderSource
             return [];
         }
 
-        var mtaFiles = Directory.GetFiles(localeDir, "*.MTA");
+        string[] mtaFiles;
+
+        try
+        {
+            mtaFiles = Directory.GetFiles(localeDir, "*.MTA");
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            logger.Error($"Cannot read LocaleMetaData folder '{localeDir}': {ex.Message}");
+            return [];
+        }
+
         Array.Sort(mtaFiles, StringComparer.Ordinal);
 
         if (mtaFiles.Length == 0)
@@ -122,7 +140,8 @@ internal static class MtaProviderSource
         string evtxPath,
         ITraceLogger logger,
         string? filter = null) =>
-        LoadProvidersCore(evtxPath, logger, string.IsNullOrEmpty(filter) ? null : new Regex(filter, RegexOptions.IgnoreCase), null, null);
+        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] :
+            LoadProvidersCore(evtxPath, logger, regex, null, null);
 
     /// <summary>
     ///     Internal overload used by <see cref="ProviderSource" /> so name-based filtering and the de-dup
@@ -151,7 +170,7 @@ internal static class MtaProviderSource
         IReadOnlySet<string>? skipProviderNames,
         HashSet<string>? seen)
     {
-        var providerNames = DiscoverProviderNames(evtxPath, logger);
+        var providerNames = DiscoverProviderNamesCore(evtxPath, logger, regex);
 
         if (providerNames.Count == 0) { yield break; }
 
@@ -163,9 +182,8 @@ internal static class MtaProviderSource
 
         foreach (var providerName in providerNames)
         {
-            if (regex is not null && !regex.IsMatch(providerName)) { continue; }
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
-            if (seen is not null && !seen.Add(providerName)) { continue; }
+            if (seen is not null && seen.Contains(providerName)) { continue; }
 
             var details = new EventMessageProvider(providerName, null, mtaFiles, logger).LoadProviderDetails();
 
@@ -174,6 +192,10 @@ internal static class MtaProviderSource
                 logger.Warn($"Skipping {providerName}: not found in any MTA file next to {evtxPath}.");
                 continue;
             }
+
+            // Mark as seen only after confirming the provider has data, so that an empty/missing
+            // provider from one .evtx does not block loading it from a later source file.
+            seen?.Add(providerName);
 
             yield return details;
         }

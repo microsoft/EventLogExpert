@@ -5,6 +5,8 @@ using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
@@ -16,6 +18,13 @@ namespace EventLogExpert.EventDbTool;
 /// </summary>
 internal static class ProviderSource
 {
+    /// <summary>
+    ///     Conservative cap on the number of parameters in a single <c>Where(... Contains)</c> SQL IN
+    ///     clause. SQLite's default limit is 999 parameters; we stay well under that so the same code
+    ///     works on older SQLite builds too. Larger requests are split into multiple round-trips.
+    /// </summary>
+    internal const int MaxInClauseParameters = 500;
+
     private const string DbExtension = ".db";
     private const string EvtxExtension = ".evtx";
 
@@ -23,11 +32,15 @@ internal static class ProviderSource
     ///     Returns the distinct provider names available from <paramref name="path" />, applying an optional
     ///     case-insensitive regex <paramref name="filter" />. Does not load full provider details.
     /// </summary>
-    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, string? filter = null)
+    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, string? filter = null) =>
+        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : LoadProviderNames(path, logger, regex);
+
+    /// <inheritdoc cref="LoadProviderNames(string, ITraceLogger, string?)"/>
+    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var file in EnumerateSourceFiles(path))
+        foreach (var file in EnumerateSourceFiles(path, logger))
         {
             foreach (var name in LoadNamesFromFile(file, logger))
             {
@@ -35,7 +48,7 @@ internal static class ProviderSource
             }
         }
 
-        return ApplyFilter(names, filter).ToList();
+        return regex is null ? names.ToList() : names.Where(n => regex.IsMatch(n)).ToList();
     }
 
     /// <summary>
@@ -49,24 +62,37 @@ internal static class ProviderSource
         string path,
         ITraceLogger logger,
         string? filter = null,
-        IReadOnlySet<string>? skipProviderNames = null)
-    {
-        Regex? regex = string.IsNullOrEmpty(filter) ? null : new Regex(filter, RegexOptions.IgnoreCase);
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        IReadOnlySet<string>? skipProviderNames = null) =>
+        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] :
+            LoadProvidersIterator(path, logger, regex, skipProviderNames);
 
-        foreach (var file in EnumerateSourceFiles(path))
-        {
-            foreach (var details in LoadDetailsFromFile(file, logger, regex, skipProviderNames, seen))
-            {
-                yield return details;
-            }
-        }
-    }
+    /// <inheritdoc cref="LoadProviders(string, ITraceLogger, string?, IReadOnlySet{string}?)"/>
+    public static IEnumerable<ProviderDetails> LoadProviders(
+        string path,
+        ITraceLogger logger,
+        Regex? regex,
+        IReadOnlySet<string>? skipProviderNames = null) =>
+        LoadProvidersIterator(path, logger, regex, skipProviderNames);
 
     /// <summary>Validates that <paramref name="path" /> exists and has a recognized form.</summary>
     public static bool TryValidate(string path, ITraceLogger logger)
     {
-        if (Directory.Exists(path)) { return true; }
+        if (Directory.Exists(path))
+        {
+            // Probe directory accessibility up front so callers fail fast with a clear message
+            // rather than silently producing wrong output later when EnumerateSourceFiles falls
+            // back to an empty sequence on an UnauthorizedAccessException/IOException.
+            try
+            {
+                Directory.GetFiles(path);
+                return true;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+            {
+                logger.Error($"Cannot read source folder '{path}': {ex.Message}");
+                return false;
+            }
+        }
 
         if (!File.Exists(path))
         {
@@ -86,50 +112,52 @@ internal static class ProviderSource
         return false;
     }
 
-    internal static bool ShouldInclude(
-        string providerName,
-        Regex? regex,
-        IReadOnlySet<string>? skipProviderNames,
-        HashSet<string> seen)
-    {
-        if (regex is not null && !regex.IsMatch(providerName)) { return false; }
-        if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { return false; }
-
-        return seen.Add(providerName);
-    }
-
-    private static IEnumerable<string> ApplyFilter(IEnumerable<string> names, string? filter)
-    {
-        if (string.IsNullOrEmpty(filter)) { return names; }
-
-        var regex = new Regex(filter, RegexOptions.IgnoreCase);
-
-        return names.Where(n => regex.IsMatch(n));
-    }
-
     /// <summary>
     ///     Expands <paramref name="path" /> into the ordered list of source files: a single .db or .evtx
     ///     when given a file; or all *.db files (sorted) followed by all *.evtx files (sorted) when given a
     ///     folder.
     /// </summary>
-    private static IEnumerable<string> EnumerateSourceFiles(string path)
+    private static IEnumerable<string> EnumerateSourceFiles(string path, ITraceLogger logger)
     {
-        if (Directory.Exists(path))
+        if (!Directory.Exists(path))
         {
-            var dbFiles = Directory.GetFiles(path, "*" + DbExtension);
-            Array.Sort(dbFiles, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var f in dbFiles) { yield return f; }
-
-            var evtxFiles = Directory.GetFiles(path, "*" + EvtxExtension);
-            Array.Sort(evtxFiles, StringComparer.OrdinalIgnoreCase);
-
-            foreach (var f in evtxFiles) { yield return f; }
-
+            yield return path;
             yield break;
         }
 
-        yield return path;
+        // TryValidate already probed accessibility, but a transient IO/permission change between
+        // validation and enumeration is still possible. Catch and log so the tool warns instead
+        // of crashing; an empty result here means the caller sees no source files (handled
+        // elsewhere with a "no providers" warning).
+        string[] allFiles;
+
+        try
+        {
+            allFiles = Directory.GetFiles(path);
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            logger.Error($"Cannot read source folder '{path}': {ex.Message}");
+            yield break;
+        }
+
+        // Use case-insensitive extension comparison so that .DB / .EVTX (and any other case
+        // variants permitted by case-sensitive directories on Windows) are picked up the same
+        // way TryValidate accepts them. Files are bucketed (.db first, then .evtx) and sorted
+        // OrdinalIgnoreCase within each bucket so first-occurrence-wins ordering is stable.
+        var dbFiles = allFiles
+            .Where(f => string.Equals(System.IO.Path.GetExtension(f), DbExtension, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Array.Sort(dbFiles, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in dbFiles) { yield return f; }
+
+        var evtxFiles = allFiles
+            .Where(f => string.Equals(System.IO.Path.GetExtension(f), EvtxExtension, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        Array.Sort(evtxFiles, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var f in evtxFiles) { yield return f; }
     }
 
     private static IEnumerable<ProviderDetails> LoadDetailsFromFile(
@@ -143,26 +171,58 @@ internal static class ProviderSource
 
         if (string.Equals(ext, DbExtension, StringComparison.OrdinalIgnoreCase))
         {
-            using var ctx = new EventProviderDbContext(file, true, logger);
-            ctx.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+            try
+            {
+                using var context = new EventProviderDbContext(file, true, logger);
+                context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
-            // Filter by name first so we never materialize the (potentially large) compressed JSON
-            // payload for providers we are about to discard.
-            var allNames = ctx.ProviderDetails.Select(p => p.ProviderName).ToList();
-            var namesToLoad = allNames
-                .Where(n => ShouldInclude(n, regex, skipProviderNames, seen))
-                .ToList();
+                // Filter by name without mutating `seen` so that a subsequent catch does not
+                // permanently mark these names as loaded when they were never successfully read.
+                var allNames = context.ProviderDetails.Select(p => p.ProviderName).ToList();
+                var namesToLoad = allNames
+                    .Where(name =>
+                    {
+                        if (seen.Contains(name)) { return false; }
+                        if (regex is not null && !regex.IsMatch(name)) { return false; }
 
-            if (namesToLoad.Count == 0) { return []; }
+                        return skipProviderNames is null || !skipProviderNames.Contains(name);
+                    })
+                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                    .ToList();
 
-            return ctx.ProviderDetails
-                .Where(p => namesToLoad.Contains(p.ProviderName))
-                .ToList();
+                if (namesToLoad.Count == 0) { return []; }
+
+                // Chunk the IN-clause to stay below SQLite's parameter limit (default 999).
+                var loaded = new List<ProviderDetails>(namesToLoad.Count);
+
+                for (var offset = 0; offset < namesToLoad.Count; offset += MaxInClauseParameters)
+                {
+                    var chunk = namesToLoad
+                        .Skip(offset)
+                        .Take(MaxInClauseParameters)
+                        .ToList();
+
+                    loaded.AddRange(context.ProviderDetails
+                        .Where(p => chunk.Contains(p.ProviderName))
+                        .OrderBy(p => p.ProviderName));
+                }
+
+                // Mark as seen only after a successful load so a catch for a corrupt file does
+                // not prevent the same provider names from being loaded from a later source file.
+                foreach (var name in namesToLoad) { seen.Add(name); }
+
+                return loaded;
+            }
+            catch (Exception ex) when (ex is DbException or JsonException or InvalidDataException)
+            {
+                logger.Warn($"Skipping invalid database file '{file}': {ex.Message}");
+                return [];
+            }
         }
 
         if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
         {
-            return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen).ToList();
+            return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen);
         }
 
         logger.Warn($"Skipping unsupported source file: {file}");
@@ -176,9 +236,16 @@ internal static class ProviderSource
 
         if (string.Equals(ext, DbExtension, StringComparison.OrdinalIgnoreCase))
         {
-            using var providerContext = new EventProviderDbContext(file, true, logger);
-
-            return providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
+            try
+            {
+                using var providerContext = new EventProviderDbContext(file, true, logger);
+                return providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
+            }
+            catch (DbException ex)
+            {
+                logger.Warn($"Skipping invalid database file '{file}': {ex.Message}");
+                return [];
+            }
         }
 
         if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
@@ -189,5 +256,22 @@ internal static class ProviderSource
         logger.Warn($"Skipping unsupported source file: {file}");
 
         return [];
+    }
+
+    private static IEnumerable<ProviderDetails> LoadProvidersIterator(
+        string path,
+        ITraceLogger logger,
+        Regex? regex,
+        IReadOnlySet<string>? skipProviderNames)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var file in EnumerateSourceFiles(path, logger))
+        {
+            foreach (var details in LoadDetailsFromFile(file, logger, regex, skipProviderNames, seen))
+            {
+                yield return details;
+            }
+        }
     }
 }

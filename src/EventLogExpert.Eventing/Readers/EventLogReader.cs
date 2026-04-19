@@ -25,6 +25,14 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
     public string? LastBookmark { get; private set; }
 
+    /// <summary>
+    ///     When <see cref="TryGetEvents" /> returns <see langword="false" /> due to a Win32 error other
+    ///     than <c>ERROR_NO_MORE_ITEMS</c>, this property contains the Win32 error code. A value of
+    ///     <see langword="null" /> means either no error occurred or the last failure was a normal
+    ///     end-of-results condition.
+    /// </summary>
+    public int? LastErrorCode { get; private set; }
+
     public void Dispose()
     {
         // Use Interlocked.CompareExchange for atomic check-and-set.
@@ -57,9 +65,13 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
             if (!success)
             {
+                var error = Marshal.GetLastWin32Error();
+                LastErrorCode = error != Interop.ERROR_NO_MORE_ITEMS ? error : null;
                 events = [];
                 return false;
             }
+
+            LastErrorCode = null;
 
             using (_eventLock.EnterScope())
             {

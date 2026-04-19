@@ -158,6 +158,38 @@ public sealed class EventProviderDbContextTests : IDisposable
     }
 
     [Fact]
+    public void IsUpgradeNeeded_WithV1Schema_ShouldFlagBothUpgrades()
+    {
+        // Arrange — V1 schema had no Parameters column; Messages stored as JSON TEXT.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: false, parametersType: null, messagesType: "TEXT");
+
+        // Act
+        using var context = new EventProviderDbContext(dbPath, false);
+        var (needsV2, needsV3) = context.IsUpgradeNeeded();
+
+        // Assert
+        Assert.True(needsV2);
+        Assert.True(needsV3);
+    }
+
+    [Fact]
+    public void IsUpgradeNeeded_WithV2Schema_ShouldFlagBothUpgrades()
+    {
+        // Arrange — V2 schema kept TEXT payloads and added Parameters as TEXT.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+
+        // Act
+        using var context = new EventProviderDbContext(dbPath, false);
+        var (needsV2, needsV3) = context.IsUpgradeNeeded();
+
+        // Assert
+        Assert.True(needsV2);
+        Assert.True(needsV3);
+    }
+
+    [Fact]
     public void Name_ShouldNotIncludeFileExtension()
     {
         // Arrange
@@ -187,6 +219,97 @@ public sealed class EventProviderDbContextTests : IDisposable
         // Assert
         var finalSize = new FileInfo(dbPath).Length;
         Assert.Equal(initialSize, finalSize);
+    }
+
+    [Fact]
+    public void PerformUpgradeIfNeeded_WithV1Schema_ShouldUpgradeAndLeaveParametersEmpty()
+    {
+        // Arrange — V1 row has no Parameters column; payloads are JSON TEXT.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: false, parametersType: null, messagesType: "TEXT");
+        InsertLegacyRow(
+            dbPath,
+            providerName: "V1Provider",
+            messagesJson: "[{\"ShortId\":1,\"LogLink\":null,\"RawId\":1,\"Tag\":null,\"Template\":null,\"Text\":\"hello\"}]",
+            parametersJson: null,
+            eventsJson: "[]",
+            keywordsJson: "{}",
+            opcodesJson: "{}",
+            tasksJson: "{}");
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert — schema is now V3 and the existing row is preserved with empty Parameters.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var (needsV2After, needsV3After) = verify.IsUpgradeNeeded();
+        Assert.False(needsV2After);
+        Assert.False(needsV3After);
+
+        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V1Provider");
+        Assert.Single(row.Messages);
+        Assert.Equal("hello", row.Messages[0].Text);
+        Assert.Empty(row.Parameters);
+    }
+
+    [Fact]
+    public void PerformUpgradeIfNeeded_WithV2Schema_ShouldPreserveExistingParametersJson()
+    {
+        // Arrange — V2 row stores Parameters as JSON TEXT.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+        InsertLegacyRow(
+            dbPath,
+            providerName: "V2Provider",
+            messagesJson: "[]",
+            parametersJson: "[{\"ShortId\":2,\"LogLink\":null,\"RawId\":2,\"Tag\":null,\"Template\":null,\"Text\":\"param-text\"}]",
+            eventsJson: "[]",
+            keywordsJson: "{}",
+            opcodesJson: "{}",
+            tasksJson: "{}");
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert — Parameters JSON survived the destructive recreate cycle.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V2Provider");
+        Assert.Single(row.Parameters);
+        Assert.Equal("param-text", row.Parameters.First().Text);
+    }
+
+    [Fact]
+    public void PerformUpgradeIfNeeded_WithV2SchemaAndNullParameters_ShouldYieldEmptyParameters()
+    {
+        // Arrange — V2 row with NULL Parameters column.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+        InsertLegacyRow(
+            dbPath,
+            providerName: "V2NullParams",
+            messagesJson: "[]",
+            parametersJson: null,
+            eventsJson: "[]",
+            keywordsJson: "{}",
+            opcodesJson: "{}",
+            tasksJson: "{}");
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V2NullParams");
+        Assert.Empty(row.Parameters);
     }
 
     [Fact]
@@ -534,6 +657,91 @@ public sealed class EventProviderDbContextTests : IDisposable
         {
             // Cleanup is best effort
         }
+    }
+
+    private static void InsertLegacyRow(
+        string dbPath,
+        string providerName,
+        string messagesJson,
+        string? parametersJson,
+        string eventsJson,
+        string keywordsJson,
+        string opcodesJson,
+        string tasksJson)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        // Detect whether the legacy schema includes Parameters; insert the right column list.
+        bool hasParameters;
+        using (var pragma = connection.CreateCommand())
+        {
+            pragma.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
+            using var pr = pragma.ExecuteReader();
+            hasParameters = false;
+            while (pr.Read())
+            {
+                if (string.Equals(pr["name"]?.ToString(), "Parameters", StringComparison.Ordinal))
+                {
+                    hasParameters = true;
+                    break;
+                }
+            }
+        }
+
+        using var cmd = connection.CreateCommand();
+        if (hasParameters)
+        {
+            cmd.CommandText = "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\", \"Parameters\") " +
+                              "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks, $parameters)";
+            cmd.Parameters.AddWithValue("$parameters", (object?)parametersJson ?? DBNull.Value);
+        }
+        else
+        {
+            cmd.CommandText = "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\") " +
+                              "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks)";
+        }
+
+        cmd.Parameters.AddWithValue("$name", providerName);
+        cmd.Parameters.AddWithValue("$messages", messagesJson);
+        cmd.Parameters.AddWithValue("$events", eventsJson);
+        cmd.Parameters.AddWithValue("$keywords", keywordsJson);
+        cmd.Parameters.AddWithValue("$opcodes", opcodesJson);
+        cmd.Parameters.AddWithValue("$tasks", tasksJson);
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void SeedLegacySchema(
+        string dbPath,
+        bool includeParameters,
+        string? parametersType,
+        string messagesType)
+    {
+        // Build a legacy ProviderDetails table directly via raw SQLite, before any
+        // EventProviderDbContext touches the file. EnsureCreated() will then be a no-op
+        // because the table already exists, so the legacy schema reaches IsUpgradeNeeded
+        // and PerformUpgradeIfNeeded unmodified.
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        var columns = new List<string>
+        {
+            "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY",
+            $"\"Messages\" {messagesType} NOT NULL",
+            $"\"Events\" {messagesType} NOT NULL",
+            $"\"Keywords\" {messagesType} NOT NULL",
+            $"\"Opcodes\" {messagesType} NOT NULL",
+            $"\"Tasks\" {messagesType} NOT NULL"
+        };
+
+        if (includeParameters)
+        {
+            columns.Add($"\"Parameters\" {parametersType}");
+        }
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = $"CREATE TABLE \"ProviderDetails\" ({string.Join(", ", columns)})";
+        cmd.ExecuteNonQuery();
     }
 
     private string CreateTempDatabasePath()
