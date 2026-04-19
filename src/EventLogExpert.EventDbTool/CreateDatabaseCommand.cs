@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventProviderDatabase;
@@ -20,6 +20,14 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
             Description = "File to create. Must have a .db extension."
         };
 
+        Argument<string?> sourceArgument = new("source")
+        {
+            Description = "Optional provider source: a .db file, an exported .evtx file, or a folder containing " +
+                ".db and/or .evtx files (top-level only). When omitted, local providers on this machine are used. " +
+                "When supplied, ONLY the source is used (no fallback to local providers).",
+            Arity = ArgumentArity.ZeroOrOne
+        };
+
         Option<string> filterOption = new("--filter")
         {
             Description = "Only providers matching specified regex string will be added to the database."
@@ -28,7 +36,8 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         Option<string> skipProvidersInFileOption = new("--skip-providers-in-file")
         {
             Description =
-                "Any providers found in the specified database file will not be included in the new database. " +
+                "Any providers found in the specified source (a .db file, an exported .evtx file, or a folder " +
+                "containing them, top-level only) will not be included in the new database. " +
                 "For example, when creating a database of event providers for Exchange Server, it may be useful " +
                 "to provide a database of all providers from a fresh OS install with no other products. That way, all the " +
                 "OS providers are skipped, and only providers added by Exchange or other installed products " +
@@ -41,6 +50,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         };
 
         createDatabaseCommand.Arguments.Add(fileArgument);
+        createDatabaseCommand.Arguments.Add(sourceArgument);
         createDatabaseCommand.Options.Add(filterOption);
         createDatabaseCommand.Options.Add(skipProvidersInFileOption);
         createDatabaseCommand.Options.Add(verboseOption);
@@ -51,6 +61,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
             new CreateDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
                 .CreateDatabase(
                     result.GetRequiredValue(fileArgument),
+                    result.GetValue(sourceArgument),
                     result.GetValue(filterOption),
                     result.GetValue(skipProvidersInFileOption));
         });
@@ -58,7 +69,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         return createDatabaseCommand;
     }
 
-    private void CreateDatabase(string path, string? filter, string? skipProvidersInFile)
+    private void CreateDatabase(string path, string? source, string? filter, string? skipProvidersInFile)
     {
         if (File.Exists(path))
         {
@@ -66,61 +77,47 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
             return;
         }
 
-        if (Path.GetExtension(path) != ".db")
+        if (!string.Equals(Path.GetExtension(path), ".db", StringComparison.OrdinalIgnoreCase))
         {
             Logger.Error($"File extension must be .db.");
             return;
         }
 
-        HashSet<string> skipProviderNames = [];
+        if (source is not null && !ProviderSource.TryValidate(source, Logger)) { return; }
+
+        HashSet<string> skipProviderNames = new(StringComparer.OrdinalIgnoreCase);
 
         if (!string.IsNullOrWhiteSpace(skipProvidersInFile))
         {
-            if (!File.Exists(skipProvidersInFile))
+            if (!ProviderSource.TryValidate(skipProvidersInFile, Logger)) { return; }
+
+            foreach (var name in ProviderSource.LoadProviderNames(skipProvidersInFile, Logger))
             {
-                Logger.Error($"File not found: {skipProvidersInFile}");
-                return;
+                skipProviderNames.Add(name);
             }
 
-            using var skipDbContext = new EventProviderDbContext(skipProvidersInFile, true, Logger);
-
-            foreach (var provider in skipDbContext.ProviderDetails)
-            {
-                skipProviderNames.Add(provider.ProviderName);
-            }
-
-            Logger.Info($"Found {skipProviderNames.Count} providers in file {skipProvidersInFile}. These will not be included in the new database.");
+            Logger.Info($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
         }
 
-        var providerNames = GetLocalProviderNames(filter);
+        IEnumerable<ProviderDetails> providersToAdd = source is null
+            ? LoadLocalProviders(filter, skipProviderNames)
+            : ProviderSource.LoadProviders(source, Logger, filter, skipProviderNames);
 
-        if (!providerNames.Any())
+        var providersNotSkipped = providersToAdd.ToList();
+
+        if (providersNotSkipped.Count == 0)
         {
-            Logger.Warn($"No providers found matching filter {filter}.");
+            Logger.Warn($"No providers to add to the new database.");
             return;
-        }
-
-        var providerNamesNotSkipped = providerNames.Where(name => !skipProviderNames.Contains(name)).ToList();
-
-        var numberSkipped = providerNames.Count - providerNamesNotSkipped.Count;
-
-        if (numberSkipped > 0)
-        {
-            Logger.Info($"{numberSkipped} providers were skipped due to being present in the specified database.");
         }
 
         using var dbContext = new EventProviderDbContext(path, false, Logger);
 
-        LogProviderDetailHeader(providerNamesNotSkipped);
+        LogProviderDetailHeader(providersNotSkipped.Select(p => p.ProviderName));
 
-        foreach (var providerName in providerNamesNotSkipped)
+        foreach (var details in providersNotSkipped)
         {
-            var provider = new EventMessageProvider(providerName, Logger);
-
-            var details = provider.LoadProviderDetails();
-
             dbContext.ProviderDetails.Add(details);
-
             LogProviderDetails(details);
         }
 
@@ -131,4 +128,5 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
 
         Logger.Info($"Done!");
     }
+
 }

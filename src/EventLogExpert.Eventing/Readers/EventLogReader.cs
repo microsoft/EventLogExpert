@@ -16,6 +16,13 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
     private int _disposed;
 
+    /// <summary>
+    ///     <see langword="true" /> when the underlying <c>EvtQuery</c> handle was opened successfully.
+    ///     When <see langword="false" />, the path could not be opened (invalid log name, missing or
+    ///     corrupt .evtx file, access denied, etc.) and <see cref="TryGetEvents" /> will not return events.
+    /// </summary>
+    public bool IsValid => _handle is { IsInvalid: false };
+
     public string? LastBookmark { get; private set; }
 
     public void Dispose()

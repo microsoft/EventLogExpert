@@ -19,8 +19,7 @@ internal class Program
     {
         RootCommand rootCommand = new("Tool used to create and modify databases for use with EventLogExpert");
 
-        rootCommand.Subcommands.Add(ShowLocalCommand.GetCommand());
-        rootCommand.Subcommands.Add(ShowDatabaseCommand.GetCommand());
+        rootCommand.Subcommands.Add(ShowCommand.GetCommand());
         rootCommand.Subcommands.Add(CreateDatabaseCommand.GetCommand());
         rootCommand.Subcommands.Add(MergeDatabaseCommand.GetCommand());
         rootCommand.Subcommands.Add(DiffDatabaseCommand.GetCommand());
