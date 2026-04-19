@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 
@@ -17,9 +18,9 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             "merge",
             "Copies providers from a source into a target database.");
 
-        Argument<string> sourceDatabaseArgument = new("source db")
+        Argument<string> sourceArgument = new("source")
         {
-            Description = "The source database from which to copy providers."
+            Description = "The provider source: a .db file, an exported .evtx file, or a folder containing .db and/or .evtx files (top-level only)."
         };
 
         Argument<string> targetDatabaseArgument = new("target db")
@@ -38,7 +39,7 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             Description = "Enable verbose logging. May be useful for troubleshooting."
         };
 
-        mergeDatabaseCommand.Arguments.Add(sourceDatabaseArgument);
+        mergeDatabaseCommand.Arguments.Add(sourceArgument);
         mergeDatabaseCommand.Arguments.Add(targetDatabaseArgument);
         mergeDatabaseCommand.Options.Add(overwriteOption);
         mergeDatabaseCommand.Options.Add(verboseOption);
@@ -48,7 +49,7 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             new MergeDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
                 .MergeDatabase(
-                    action.GetRequiredValue(sourceDatabaseArgument),
+                    action.GetRequiredValue(sourceArgument),
                     action.GetRequiredValue(targetDatabaseArgument),
                     action.GetValue(overwriteOption));
         });
@@ -56,52 +57,62 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         return mergeDatabaseCommand;
     }
 
-    private void MergeDatabase(string sourceFile, string targetFile, bool overwriteProviders)
+    private void MergeDatabase(string source, string targetFile, bool overwriteProviders)
     {
-        foreach (var path in new[] { sourceFile, targetFile })
-        {
-            if (File.Exists(path)) { continue; }
+        if (!ProviderSource.TryValidate(source, Logger)) { return; }
 
-            Logger.Error($"File not found: {path}");
+        if (!File.Exists(targetFile))
+        {
+            Logger.Error($"File not found: {targetFile}");
             return;
         }
 
-        var sourceProviders = new List<ProviderDetails>();
+        var sourceProviders = ProviderSource.LoadProviders(source, Logger).ToList();
 
-        using (var sourceContext = new EventProviderDbContext(sourceFile, true, Logger))
+        if (sourceProviders.Count == 0)
         {
-            sourceProviders.AddRange(sourceContext.ProviderDetails.ToList());
+            Logger.Warn($"No providers were discovered in the source.");
+            return;
         }
 
         using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
 
-        var providersAlreadyInTarget = new Dictionary<string, ProviderDetails>();
+        // Pre-load all target ProviderName values once (cheap projection), then compute the case-
+        // insensitive overlap with the source in-memory. This replaces a previous N+1 query that
+        // issued one Where(...).ToList() per source provider against the target table.
+        var sourceNames = new HashSet<string>(
+            sourceProviders.Select(p => p.ProviderName),
+            StringComparer.OrdinalIgnoreCase);
 
-        foreach (var sourceProviderDetails in sourceProviders)
+        var targetMatchingNames = targetContext.ProviderDetails
+            .AsNoTracking()
+            .Select(p => p.ProviderName)
+            .ToList()
+            .Where(n => sourceNames.Contains(n))
+            .ToList();
+
+        // Track the source-side provider names whose case-insensitive equivalent exists in target.
+        // ProviderName is the primary key in the target DB, so case-sensitive uniqueness identifies
+        // a row; the case-insensitive HashSet drives the no-overwrite skip check on the source side.
+        var providerNamesInTarget = new HashSet<string>(targetMatchingNames, StringComparer.OrdinalIgnoreCase);
+
+        if (targetMatchingNames.Count > 0)
         {
-            var existingProviderInTarget = targetContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == sourceProviderDetails.ProviderName);
-
-            if (existingProviderInTarget != null)
-            {
-                providersAlreadyInTarget.Add(existingProviderInTarget.ProviderName, existingProviderInTarget);
-            }
-        }
-
-        if (providersAlreadyInTarget.Count > 0)
-        {
-            Logger.Info($"The target database contains {providersAlreadyInTarget.Count} providers that are in the source.");
+            Logger.Info($"The target database contains {targetMatchingNames.Count} provider row(s) matching {providerNamesInTarget.Count} provider name(s) in the source.");
 
             if (overwriteProviders)
             {
                 Logger.Info($"Removing these providers from the target database...");
 
-                foreach (var provider in providersAlreadyInTarget.Values)
-                {
-                    targetContext.Remove(provider);
-                }
+                // Single round-trip to load just the rows we need to remove. Since these names came
+                // from the same DB, exact (binary) matching here is correct.
+                var toRemove = targetContext.ProviderDetails
+                    .Where(p => targetMatchingNames.Contains(p.ProviderName))
+                    .ToList();
 
+                targetContext.RemoveRange(toRemove);
                 targetContext.SaveChanges();
-                Logger.Info($"Removal of {providersAlreadyInTarget.Count} completed.");
+                Logger.Info($"Removal of {toRemove.Count} provider row(s) completed.");
             }
             else
             {
@@ -115,7 +126,7 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         foreach (var provider in sourceProviders)
         {
-            if (providersAlreadyInTarget.ContainsKey(provider.ProviderName) && !overwriteProviders)
+            if (providerNamesInTarget.Contains(provider.ProviderName) && !overwriteProviders)
             {
                 Logger.Info($"Skipping provider: {provider.ProviderName}");
                 continue;

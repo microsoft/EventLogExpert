@@ -15,22 +15,22 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
     {
         Command diffDatabaseCommand = new(
             "diff",
-            "Given two databases, produces a third database containing all providers " +
-            "from the second database which are not in the first database.");
+            "Given two provider sources (each may be a .db, an exported .evtx, or a folder containing them), " +
+            "produces a database containing all providers from the second source which are not in the first source.");
 
-        Argument<string> dbOneArgument = new("first db")
+        Argument<string> firstArgument = new("first source")
         {
-            Description = "The first database to compare."
+            Description = "The first source to compare: a .db, an exported .evtx, or a folder containing .db and/or .evtx files (top-level only)."
         };
 
-        Argument<string> dbTwoArgument = new("second db")
+        Argument<string> secondArgument = new("second source")
         {
-            Description = "The second database to compare."
+            Description = "The second source to compare: a .db, an exported .evtx, or a folder containing .db and/or .evtx files (top-level only)."
         };
 
         Argument<string> newDbArgument = new("new db")
         {
-            Description = "The new database containing only the providers in the second db which are not in the first db. Must have a .db extension."
+            Description = "The new database containing only the providers in the second source which are not in the first source. Must have a .db extension."
         };
 
         Option<bool> verboseOption = new("--verbose")
@@ -38,8 +38,8 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             Description = "Verbose logging. May be useful for troubleshooting."
         };
 
-        diffDatabaseCommand.Arguments.Add(dbOneArgument);
-        diffDatabaseCommand.Arguments.Add(dbTwoArgument);
+        diffDatabaseCommand.Arguments.Add(firstArgument);
+        diffDatabaseCommand.Arguments.Add(secondArgument);
         diffDatabaseCommand.Arguments.Add(newDbArgument);
         diffDatabaseCommand.Options.Add(verboseOption);
 
@@ -48,23 +48,18 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
             new DiffDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
                 .DiffDatabase(
-                    action.GetRequiredValue(dbOneArgument),
-                    action.GetRequiredValue(dbTwoArgument),
+                    action.GetRequiredValue(firstArgument),
+                    action.GetRequiredValue(secondArgument),
                     action.GetRequiredValue(newDbArgument));
         });
 
         return diffDatabaseCommand;
     }
 
-    private void DiffDatabase(string dbOne, string dbTwo, string newDb)
+    private void DiffDatabase(string firstSource, string secondSource, string newDb)
     {
-        foreach (var path in new[] { dbOne, dbTwo })
-        {
-            if (File.Exists(path)) { continue; }
-
-            Logger.Error($"File not found: {path}");
-            return;
-        }
+        if (!ProviderSource.TryValidate(firstSource, Logger)) { return; }
+        if (!ProviderSource.TryValidate(secondSource, Logger)) { return; }
 
         if (File.Exists(newDb))
         {
@@ -72,52 +67,48 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             return;
         }
 
-        if (Path.GetExtension(newDb) != ".db")
+        if (!string.Equals(Path.GetExtension(newDb), ".db", StringComparison.OrdinalIgnoreCase))
         {
             Logger.Error($"New db path must have a .db extension.");
             return;
         }
 
-        var dbOneProviderNames = new HashSet<string>();
-
-        using (var dbOneContext = new EventProviderDbContext(dbOne, true, Logger))
-        {
-            dbOneContext.ProviderDetails.Select(p => p.ProviderName).ToList()
-                .ForEach(name => dbOneProviderNames.Add(name));
-        }
+        var firstProviderNames = new HashSet<string>(
+            ProviderSource.LoadProviderNames(firstSource, Logger),
+            StringComparer.OrdinalIgnoreCase);
 
         var providersCopied = new List<ProviderDetails>();
 
-        using var dbTwoContext = new EventProviderDbContext(dbTwo, true, Logger);
         using var newDbContext = new EventProviderDbContext(newDb, false, Logger);
 
-        foreach (var details in dbTwoContext.ProviderDetails)
+        foreach (var details in ProviderSource.LoadProviders(secondSource, Logger))
         {
-            if (dbOneProviderNames.Contains(details.ProviderName))
+            if (firstProviderNames.Contains(details.ProviderName))
             {
-                Logger.Info($"Skipping {details.ProviderName} because it is present in both databases.");
+                Logger.Info($"Skipping {details.ProviderName} because it is present in both sources.");
+                continue;
             }
-            else
-            {
-                Logger.Info($"Copying {details.ProviderName} because it is present in second db but not first db.");
-                newDbContext.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = details.ProviderName,
-                    Events = details.Events,
-                    Keywords = details.Keywords,
-                    Messages = details.Messages,
-                    Opcodes = details.Opcodes,
-                    Tasks = details.Tasks
-                });
 
-                providersCopied.Add(details);
-            }
+            Logger.Info($"Copying {details.ProviderName} because it is present in second source but not first.");
+
+            newDbContext.ProviderDetails.Add(new ProviderDetails
+            {
+                ProviderName = details.ProviderName,
+                Events = details.Events,
+                Parameters = details.Parameters,
+                Keywords = details.Keywords,
+                Messages = details.Messages,
+                Opcodes = details.Opcodes,
+                Tasks = details.Tasks
+            });
+
+            providersCopied.Add(details);
         }
 
         newDbContext.SaveChanges();
 
         if (providersCopied.Count <= 0) { return; }
-        
+
         Logger.Info($"Providers copied to new database:");
         Logger.Info($"");
         LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));

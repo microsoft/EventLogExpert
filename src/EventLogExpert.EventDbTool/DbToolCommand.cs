@@ -26,6 +26,18 @@ public class DbToolCommand(ITraceLogger logger)
         return providers;
     }
 
+    protected IEnumerable<ProviderDetails> LoadLocalProviders(string? filter, IReadOnlySet<string>? skipProviderNames = null)
+    {
+        foreach (var providerName in GetLocalProviderNames(filter))
+        {
+            // Skip BEFORE resolving so we don't pay the cost of loading metadata for providers we
+            // are about to discard (e.g. when --skip-providers-in-file lists most local providers).
+            if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
+
+            yield return new EventMessageProvider(providerName, Logger).LoadProviderDetails();
+        }
+    }
+
     protected void LogProviderDetailHeader(IEnumerable<string> providerNames)
     {
         var maxNameLength = providerNames.Any() ? providerNames.Max(p => p.Length) : 14;
