@@ -164,6 +164,65 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
+    public void EndOfResults_AfterExhaustion_ShouldKeepBookmarkAndNotSetLastErrorCode()
+    {
+        // Use a small bounded .evtx fixture (max 5 events exported via wevtutil) so the
+        // exhaustion loop completes quickly regardless of the host machine's Application log
+        // size. Reading the live Application log here previously made the test runtime
+        // unbounded and CI-flaky.
+
+        // Arrange
+        using var fixture = new SmallEvtxFixture();
+        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
+
+        // Act — exhaust the reader so TryGetEvents returns false with ERROR_NO_MORE_ITEMS
+        while (reader.TryGetEvents(out _)) { }
+
+        string? bookmarkAfterExhaustion = reader.LastBookmark;
+
+        // One additional read past end-of-results
+        reader.TryGetEvents(out _);
+        string? bookmarkAfterExtraRead = reader.LastBookmark;
+
+        // Assert — bookmark is stable past EOF, and normal end-of-results does NOT set LastErrorCode
+        Assert.Equal(bookmarkAfterExhaustion, bookmarkAfterExtraRead);
+        Assert.Null(reader.LastErrorCode);
+    }
+
+    [Fact]
+    public void IsValid_WhenApplicationLog_ShouldBeTrue()
+    {
+        // Arrange & Act
+        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+
+        // Assert
+        Assert.True(reader.IsValid);
+    }
+
+    [Fact]
+    public void IsValid_WhenEmptyLogName_ShouldBeFalse()
+    {
+        // Arrange & Act
+        using var reader = new EventLogReader(string.Empty, PathType.LogName);
+
+        // Assert
+        Assert.False(reader.IsValid);
+    }
+
+    [Fact]
+    public void IsValid_WhenInvalidLogName_ShouldBeFalse()
+    {
+        // Arrange
+        var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
+
+        // Act
+        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+
+        // Assert
+        Assert.False(reader.IsValid);
+    }
+
+    [Fact]
     public void LastBookmark_AfterTryGetEvents_ShouldBeSet()
     {
         // Arrange
@@ -221,22 +280,27 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void LastBookmark_WhenNoEventsReturned_ShouldRemainUnchanged()
+    public void LastErrorCode_WhenInitialized_ShouldBeNull()
     {
-        // Arrange
+        // Arrange & Act
         using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
 
-        // Read all events
-        while (reader.TryGetEvents(out _)) { }
-
-        string? bookmarkBefore = reader.LastBookmark;
-
-        // Act - Try to read when no events left
-        reader.TryGetEvents(out _);
-        string? bookmarkAfter = reader.LastBookmark;
-
         // Assert
-        Assert.Equal(bookmarkBefore, bookmarkAfter);
+        Assert.Null(reader.LastErrorCode);
+    }
+
+    [Fact]
+    public void LastErrorCode_WhenInvalidHandle_ShouldBeSet()
+    {
+        // Arrange — opening a non-existent log produces an invalid handle
+        var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
+        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+
+        // Act
+        reader.TryGetEvents(out _);
+
+        // Assert — the failure is not a normal EOF, so LastErrorCode should be set
+        Assert.NotNull(reader.LastErrorCode);
     }
 
     [Fact]

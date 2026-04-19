@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
+using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -53,34 +54,42 @@ public class ShowCommand(ITraceLogger logger) : DbToolCommand(logger)
 
     private void ShowProviderInfo(string? source, string? filter)
     {
-        IEnumerable<ProviderDetails> providers;
+        if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { return; }
 
-        if (source is null)
+        try
         {
-            providers = LoadLocalProviders(filter);
+            IReadOnlyList<string> providerNames;
+            IEnumerable<ProviderDetails> providers;
+
+            if (source is null)
+            {
+                providerNames = GetLocalProviderNames(regex);
+                providers = LoadLocalProviders(regex);
+            }
+            else
+            {
+                if (!ProviderSource.TryValidate(source, Logger)) { return; }
+
+                providerNames = ProviderSource.LoadProviderNames(source, Logger, regex);
+                providers = ProviderSource.LoadProviders(source, Logger, regex);
+            }
+
+            if (providerNames.Count == 0)
+            {
+                Logger.Warn($"No providers found.");
+                return;
+            }
+
+            LogProviderDetailHeader(providerNames);
+
+            foreach (var details in providers)
+            {
+                LogProviderDetails(details);
+            }
         }
-        else
+        catch (RegexMatchTimeoutException)
         {
-            if (!ProviderSource.TryValidate(source, Logger)) { return; }
-
-            providers = ProviderSource.LoadProviders(source, Logger, filter);
-        }
-
-        var materialized = providers
-            .OrderBy(p => p.ProviderName, StringComparer.OrdinalIgnoreCase)
-            .ToList();
-
-        if (materialized.Count == 0)
-        {
-            Logger.Warn($"No providers found.");
-            return;
-        }
-
-        LogProviderDetailHeader(materialized.Select(p => p.ProviderName));
-
-        foreach (var details in materialized)
-        {
-            LogProviderDetails(details);
+            Logger.Error($"The --filter regex timed out. The pattern may cause catastrophic backtracking.");
         }
     }
 }

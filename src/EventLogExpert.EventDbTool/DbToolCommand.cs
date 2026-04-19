@@ -14,21 +14,29 @@ public class DbToolCommand(ITraceLogger logger)
 
     protected ITraceLogger Logger => logger;
 
-    protected static List<string> GetLocalProviderNames(string? filter)
+    protected static List<string> GetLocalProviderNames(string? filter, ITraceLogger logger) =>
+        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : GetLocalProviderNames(regex);
+
+    protected static List<string> GetLocalProviderNames(Regex? regex)
     {
         var providers = new List<string>(EventLogSession.GlobalSession.GetProviderNames().Distinct().OrderBy(name => name));
 
-        if (string.IsNullOrEmpty(filter)) { return providers; }
-
-        var regex = new Regex(filter, RegexOptions.IgnoreCase);
-        providers = providers.Where(p => regex.IsMatch(p)).ToList();
-
-        return providers;
+        return regex is null ? providers : providers.Where(p => regex.IsMatch(p)).ToList();
     }
 
     protected IEnumerable<ProviderDetails> LoadLocalProviders(string? filter, IReadOnlySet<string>? skipProviderNames = null)
     {
-        foreach (var providerName in GetLocalProviderNames(filter))
+        if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { yield break; }
+
+        foreach (var details in LoadLocalProviders(regex, skipProviderNames))
+        {
+            yield return details;
+        }
+    }
+
+    protected IEnumerable<ProviderDetails> LoadLocalProviders(Regex? regex, IReadOnlySet<string>? skipProviderNames = null)
+    {
+        foreach (var providerName in GetLocalProviderNames(regex))
         {
             // Skip BEFORE resolving so we don't pay the cost of loading metadata for providers we
             // are about to discard (e.g. when --skip-providers-in-file lists most local providers).
