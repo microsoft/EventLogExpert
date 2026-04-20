@@ -423,6 +423,36 @@ public sealed class UpdateServiceTests
             .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
+    [Fact]
+    public async Task GetReleaseNotes_WithCurrentChangesButNoSubscriber_ShouldFallBackToAlert()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubLatestVersion[1..]));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act — note: no subscriber attached to ReleaseNotesReady.
+        await updateService.CheckForUpdates(false, false);
+        await updateService.GetReleaseNotes();
+
+        // Assert — without a UI subscriber the service must surface notes via the alert dialog
+        // so the user is never left with silent no-op feedback.
+        await mockAlertDialogService.Received(1).ShowAlert(
+            Arg.Is<string>(title => title.Contains("Release notes")),
+            Arg.Is<string>(body => body.Contains("Updated Azure yml to .NET 8")),
+            "Ok");
+    }
+
     private static UpdateService CreateUpdateService(
         ICurrentVersionProvider? currentVersionProvider = null,
         IAppTitleService? appTitleService = null,

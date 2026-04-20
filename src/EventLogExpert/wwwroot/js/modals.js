@@ -1,5 +1,5 @@
 window.openModal = (ref) => {
-    if (ref != null) {
+    if (ref != null && !ref.open) {
         ref.showModal();
     }
 };

@@ -51,8 +51,3 @@
     font-family: Consolas, monospace;
     font-size: 0.95em;
 }
-
-.release-notes-content a {
-    color: var(--clr-lightblue);
-    text-decoration: underline;
-}

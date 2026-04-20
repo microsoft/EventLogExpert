@@ -7,6 +7,24 @@ namespace EventLogExpert.UI.Tests.Services;
 
 public sealed class ReleaseNotesMarkdownRendererTests
 {
+    [Theory]
+    [InlineData("[evil](javascript:alert(1))")]
+    [InlineData("[evil](data:text/html,<script>)")]
+    [InlineData("[evil](file:///etc/passwd)")]
+    [InlineData("[evil](ftp://example.com)")]
+    public void RenderToHtml_AllLinkSchemes_StrippedToTextOnly(string markdown)
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+
+        Assert.DoesNotContain("<a ", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.DoesNotContain("javascript:", html);
+        Assert.DoesNotContain("data:", html);
+        Assert.DoesNotContain("file://", html);
+        Assert.DoesNotContain("ftp://", html);
+        Assert.Contains("evil", html);
+    }
+
     [Fact]
     public void RenderToHtml_BlankLineBetweenBullets_StartsNewList()
     {
@@ -106,19 +124,25 @@ public sealed class ReleaseNotesMarkdownRendererTests
     }
 
     [Fact]
-    public void RenderToHtml_HttpLink_RendersAnchor()
+    public void RenderToHtml_HttpLink_RendersTextOnlyWithoutAnchor()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("[link](http://example.com)");
 
-        Assert.Contains("<a href=\"http://example.com\"", html);
+        Assert.DoesNotContain("<a ", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.DoesNotContain("http://example.com", html);
+        Assert.Contains("link", html);
     }
 
     [Fact]
-    public void RenderToHtml_HttpsLink_RendersAnchor()
+    public void RenderToHtml_HttpsLink_RendersTextOnlyWithoutAnchor()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("see [docs](https://example.com/page)");
 
-        Assert.Contains("<a href=\"https://example.com/page\" target=\"_blank\" rel=\"noopener noreferrer\">docs</a>", html);
+        Assert.DoesNotContain("<a ", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.DoesNotContain("https://example.com/page", html);
+        Assert.Contains("see docs", html);
     }
 
     [Fact]
@@ -185,14 +209,14 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Theory]
     [InlineData("[xss](https://example.com\"onload=alert(1))")]
     [InlineData("[xss](https://example.com'onclick='alert(1))")]
-    public void RenderToHtml_QuotesInUrl_AreEscapedNotInjected(string markdown)
+    public void RenderToHtml_QuotesInUrl_StrippedAlongWithUrl(string markdown)
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
 
-        Assert.DoesNotContain("\" onload=", html);
-        Assert.DoesNotContain("\"onload=", html);
-        Assert.DoesNotContain("\" onclick=", html);
-        Assert.DoesNotContain("'onclick=", html);
+        Assert.DoesNotContain("onload=", html);
+        Assert.DoesNotContain("onclick=", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.Contains("xss", html);
     }
 
     [Fact]
@@ -224,7 +248,9 @@ public sealed class ReleaseNotesMarkdownRendererTests
         Assert.Contains("<h3>Features</h3>", html);
         Assert.Contains("<h3>Bug Fixes</h3>", html);
         Assert.Contains("<strong>Column reordering</strong>", html);
-        Assert.Contains("<a href=\"https://example.com/docs\"", html);
+        Assert.Contains("<li>Support for exported logs</li>", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.DoesNotContain("https://example.com", html);
         Assert.Contains("<li>Fixed crash when opening empty file</li>", html);
     }
 
@@ -263,24 +289,13 @@ public sealed class ReleaseNotesMarkdownRendererTests
         Assert.Contains("**unclosed bold", html);
     }
 
-    [Theory]
-    [InlineData("[evil](javascript:alert(1))")]
-    [InlineData("[evil](data:text/html,<script>)")]
-    [InlineData("[evil](file:///etc/passwd)")]
-    [InlineData("[evil](ftp://example.com)")]
-    public void RenderToHtml_UnsafeLinkSchemes_NotRenderedAsAnchor(string markdown)
-    {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
-
-        Assert.DoesNotContain("<a ", html);
-        Assert.DoesNotContain("href=", html);
-    }
-
     [Fact]
-    public void RenderToHtml_UrlWithAmpersand_PreservesEscapedEntity()
+    public void RenderToHtml_UrlWithAmpersand_NotRenderedInOutput()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("[link](https://example.com/path?a=1&b=2)");
 
-        Assert.Contains("href=\"https://example.com/path?a=1&amp;b=2\"", html);
+        Assert.DoesNotContain("href=", html);
+        Assert.DoesNotContain("https://example.com", html);
+        Assert.Contains("link", html);
     }
 }
