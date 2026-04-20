@@ -1,0 +1,82 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Tests.TestUtils.Constants;
+
+namespace EventLogExpert.UI.Tests.Services;
+
+public sealed class ReleaseNotesNormalizerTests
+{
+    [Fact]
+    public void Normalize_BulletWithoutCommitPrefix_ConvertsToDashStyle()
+    {
+        const string raw = "* Just a description with no commit id";
+
+        var result = ReleaseNotesNormalizer.Normalize(raw);
+
+        Assert.Equal("- Just a description with no commit id", result);
+    }
+
+    [Fact]
+    public void Normalize_LegacyFixture_ProducesCleanBullets()
+    {
+        var result = ReleaseNotesNormalizer.Normalize(Constants.GitHubReleaseNotes);
+
+        Assert.Contains("## Changes:", result);
+        Assert.Contains("- Fixed LF issue in App.xaml and added custom width for ultrawide monitors", result);
+        Assert.Contains("- Updated Azure yml to .NET 8", result);
+        Assert.DoesNotContain("f7f7aff67132dc32c92519a1bc250e1a81606e2b", result);
+        Assert.DoesNotContain("66b7d6883807a5c518ffcd59f92e07e528a5636a", result);
+    }
+
+    [Fact]
+    public void Normalize_LegacyShaBullet_StripsCommitId()
+    {
+        const string raw = "* f7f7aff67132dc32c92519a1bc250e1a81606e2b Fixed LF issue in App.xaml";
+
+        var result = ReleaseNotesNormalizer.Normalize(raw);
+
+        Assert.Equal("- Fixed LF issue in App.xaml", result);
+    }
+
+    [Fact]
+    public void Normalize_MarkdownLinkBullet_StripsLinkPrefix()
+    {
+        const string raw = "* [56cc8e7](https://github.com/microsoft/EventLogExpert/commit/56cc8e79f381b38d0ae32467265e3ca77dd16d74) Fixed CI issue";
+
+        var result = ReleaseNotesNormalizer.Normalize(raw);
+
+        Assert.Equal("- Fixed CI issue", result);
+    }
+
+    [Fact]
+    public void Normalize_NullOrWhitespace_ReturnsEmpty()
+    {
+        Assert.Equal(string.Empty, ReleaseNotesNormalizer.Normalize(null));
+        Assert.Equal(string.Empty, ReleaseNotesNormalizer.Normalize(string.Empty));
+        Assert.Equal(string.Empty, ReleaseNotesNormalizer.Normalize("   \r\n  "));
+    }
+
+    [Fact]
+    public void Normalize_RichAuthoredMarkdown_PassesThroughUnchanged()
+    {
+        const string raw = """
+            ## What's New in v1.2.3
+
+            ### Features
+            - **Column reordering** with persistent sizing
+            - Support for [exported logs](https://example.com/docs)
+
+            ### Bug Fixes
+            - Fixed crash when opening empty file
+            """;
+
+        var result = ReleaseNotesNormalizer.Normalize(raw);
+
+        Assert.Contains("## What's New in v1.2.3", result);
+        Assert.Contains("### Features", result);
+        Assert.Contains("- **Column reordering** with persistent sizing", result);
+        Assert.Contains("[exported logs](https://example.com/docs)", result);
+    }
+}

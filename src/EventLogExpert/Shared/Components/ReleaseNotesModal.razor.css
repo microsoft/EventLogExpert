@@ -1,0 +1,58 @@
+﻿dialog {
+    height: 70%;
+    min-width: 50rem;
+    max-width: 70rem;
+    color: var(--clr-lightblue);
+
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}
+
+.release-notes-content {
+    padding: 0 1rem;
+    line-height: 1.4;
+}
+
+.release-notes-content h1 {
+    font-size: 1.4rem;
+    margin: 0 0 1rem 0;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--clr-statusbar);
+}
+
+.release-notes-content h2 {
+    font-size: 1.2rem;
+    margin: 1.25rem 0 0.5rem 0;
+    color: var(--clr-lightblue);
+}
+
+.release-notes-content h3 {
+    font-size: 1.05rem;
+    margin: 1rem 0 0.4rem 0;
+}
+
+.release-notes-content ul {
+    margin: 0.25rem 0 0.75rem 0;
+    padding-left: 1.5rem;
+}
+
+.release-notes-content li {
+    margin-bottom: 0.25rem;
+}
+
+.release-notes-content p {
+    margin: 0.5rem 0;
+}
+
+.release-notes-content code {
+    padding: 0.1rem 0.3rem;
+    background-color: var(--clr-statusbar);
+    border-radius: 0.2rem;
+    font-family: Consolas, monospace;
+    font-size: 0.95em;
+}
+
+.release-notes-content a {
+    color: var(--clr-lightblue);
+    text-decoration: underline;
+}
