@@ -159,6 +159,18 @@ public sealed class UpdateService(
         var markdown = ReleaseNotesNormalizer.Normalize(_currentRawChanges);
         var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
-        ReleaseNotesReady?.Invoke(new ReleaseNotesContent(title, markdown));
+        var subscribers = ReleaseNotesReady;
+
+        if (subscribers is null)
+        {
+            // No UI is wired up to render the rich modal (e.g., service used
+            // outside the Blazor host). Fall back to a plain alert so the user
+            // still sees something rather than getting silent no-op feedback.
+            await alertDialogService.ShowAlert(title, markdown, "Ok");
+
+            return;
+        }
+
+        subscribers.Invoke(new ReleaseNotesContent(title, markdown));
     }
 }

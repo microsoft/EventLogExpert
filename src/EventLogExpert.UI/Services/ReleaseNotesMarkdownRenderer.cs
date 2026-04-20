@@ -135,10 +135,6 @@ public static partial class ReleaseNotesMarkdownRenderer
     [GeneratedRegex(@"^(#{1,6})\s+(.+)$")]
     private static partial Regex HeadingRegex();
 
-    private static bool IsSafeUrl(string url) =>
-        url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-        url.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
-
     [GeneratedRegex(@"\*([^*\n]+)\*")]
     private static partial Regex ItalicRegex();
 
@@ -160,20 +156,12 @@ public static partial class ReleaseNotesMarkdownRenderer
             return $"{CodePlaceholderSentinel}{codeSpans.Count - 1}{CodePlaceholderSentinel}";
         });
 
-        var withLinks = LinkRegex().Replace(withCodePlaceholders, match =>
-        {
-            var text = match.Groups[1].Value;
-            var url = match.Groups[2].Value;
+        // Render Markdown links as their visible text only. The release notes
+        // modal is intentionally read-only; we do not want users navigating to
+        // external URLs from inside the app.
+        var withLinkTextOnly = LinkRegex().Replace(withCodePlaceholders, match => match.Groups[1].Value);
 
-            if (!IsSafeUrl(url))
-            {
-                return match.Value;
-            }
-
-            return $"<a href=\"{url}\" target=\"_blank\" rel=\"noopener noreferrer\">{text}</a>";
-        });
-
-        var withBold = BoldRegex().Replace(withLinks, "<strong>$1</strong>");
+        var withBold = BoldRegex().Replace(withLinkTextOnly, "<strong>$1</strong>");
         var withItalic = ItalicRegex().Replace(withBold, "<em>$1</em>");
 
         var restored = CodePlaceholderRegex().Replace(withItalic, match =>
