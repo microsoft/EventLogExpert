@@ -375,16 +375,20 @@ public sealed class UpdateServiceTests
 
         var updateService = CreateUpdateService(alertDialogService: mockAlertDialogService);
 
+        ReleaseNotesContent? captured = null;
+        updateService.ReleaseNotesReady += content => captured = content;
+
         // Act
         await updateService.GetReleaseNotes();
 
         // Assert
         await mockAlertDialogService.Received(1)
             .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "Ok");
+        Assert.Null(captured);
     }
 
     [Fact]
-    public async Task GetReleaseNotes_WithCurrentChanges_ShouldShowAlert()
+    public async Task GetReleaseNotes_WithCurrentChanges_ShouldRaiseReleaseNotesReadyEvent()
     {
         // Arrange
         var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
@@ -401,13 +405,22 @@ public sealed class UpdateServiceTests
             gitHubService: mockGitHubService,
             alertDialogService: mockAlertDialogService);
 
+        ReleaseNotesContent? captured = null;
+        updateService.ReleaseNotesReady += content => captured = content;
+
         // Act
         await updateService.CheckForUpdates(false, false);
         await updateService.GetReleaseNotes();
 
         // Assert
-        await mockAlertDialogService.Received(1)
-            .ShowAlert(Arg.Is<string>(s => s.Contains("Release notes")), Arg.Any<string>(), "Ok");
+        Assert.NotNull(captured);
+        Assert.Contains("Release notes", captured!.Value.Title);
+        Assert.Contains(Constants.GitHubLatestVersion[1..], captured!.Value.Title);
+        Assert.Contains("Updated Azure yml to .NET 8", captured!.Value.Markdown);
+        Assert.DoesNotContain("66b7d6883807a5c518ffcd59f92e07e528a5636a", captured!.Value.Markdown);
+
+        await mockAlertDialogService.DidNotReceive()
+            .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
     }
 
     private static UpdateService CreateUpdateService(

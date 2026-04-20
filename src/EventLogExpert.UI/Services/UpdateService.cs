@@ -4,12 +4,15 @@
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using System.Text;
 
 namespace EventLogExpert.UI.Services;
 
+public readonly record struct ReleaseNotesContent(string Title, string Markdown);
+
 public interface IUpdateService
 {
+    event Action<ReleaseNotesContent>? ReleaseNotesReady;
+
     Task CheckForUpdates(bool usePreRelease, bool manualScan);
 
     Task GetReleaseNotes();
@@ -23,7 +26,9 @@ public sealed class UpdateService(
     ITraceLogger traceLogger,
     IAlertDialogService alertDialogService) : IUpdateService
 {
-    private List<string>? _currentChanges;
+    private string? _currentRawChanges;
+
+    public event Action<ReleaseNotesContent>? ReleaseNotesReady;
 
     public async Task CheckForUpdates(bool usePreRelease, bool manualScan)
     {
@@ -66,7 +71,7 @@ public sealed class UpdateService(
                     break;
                 }
 
-                _currentChanges = release.Changes;
+                _currentRawChanges = release.RawChanges;
 
                 if (release.IsPreRelease)
                 {
@@ -142,7 +147,7 @@ public sealed class UpdateService(
 
     public async Task GetReleaseNotes()
     {
-        if (_currentChanges is null)
+        if (string.IsNullOrWhiteSpace(_currentRawChanges))
         {
             await alertDialogService.ShowAlert("Release Notes Failure",
                 "Failed to get release notes for the current version",
@@ -151,13 +156,9 @@ public sealed class UpdateService(
             return;
         }
 
-        StringBuilder formattedChanges = new();
+        var markdown = ReleaseNotesNormalizer.Normalize(_currentRawChanges);
+        var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
-        foreach (var change in _currentChanges)
-        {
-            formattedChanges.AppendLine($"# {change}");
-        }
-
-        await alertDialogService.ShowAlert($"Release notes for {versionProvider.CurrentVersion}", formattedChanges.ToString(), "Ok");
+        ReleaseNotesReady?.Invoke(new ReleaseNotesContent(title, markdown));
     }
 }

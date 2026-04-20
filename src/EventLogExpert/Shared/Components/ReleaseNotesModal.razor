@@ -1,0 +1,14 @@
+@using EventLogExpert.Shared.Base
+@inherits BaseModal
+
+<dialog id="releaseNotesDialog" class="release-notes-dialog" @ref="ElementReference">
+    <div class="dialog-group">
+        <div class="flex-column-scroll release-notes-content">
+            @((MarkupString)_html)
+        </div>
+
+        <div class="footer-group">
+            <button autofocus class="button" @onclick="Close" type="button">Close</button>
+        </div>
+    </div>
+</dialog>
