@@ -21,6 +21,10 @@ public interface ISettingsService
 
     bool ShowDisplayPaneOnSelectionChange { get; set; }
 
+    Theme Theme { get; set; }
+
+    Action? ThemeChanged { get; set; }
+
     EventHandler<TimeZoneInfo>? TimeZoneChanged { get; set; }
 
     string TimeZoneId { get; set; }

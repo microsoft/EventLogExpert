@@ -21,15 +21,30 @@ namespace EventLogExpert.Components;
 
 public sealed partial class EventTable
 {
+    private static readonly Dictionary<HighlightColor, string?> s_highlightNames =
+        Enum.GetValues<HighlightColor>().ToDictionary(
+            color => color,
+            color => color == HighlightColor.None ? null : color.ToString().ToLowerInvariant());
+
+    // Tracks HighlightColor enum values we've already warned about so the
+    // warning is emitted at most once per unknown value across the app's
+    // lifetime, instead of once per matched event in the GetHighlight hot
+    // path. Synchronized because filter updates can flow through Fluxor
+    // effects on background threads.
+    private static readonly HashSet<int> s_warnedUnknownColors = [];
+
     private EventTableModel? _currentTable;
     private DotNetObjectReference<EventTable>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private EventTableState _eventTableState = null!;
+    private ImmutableList<FilterModel> _filters = [];
     private string _headerName = string.Empty;
+    private Dictionary<DisplayEventModel, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
     private IReadOnlyList<DisplayEventModel>? _lastDisplayedEvents;
     private ColumnName[] _previousEnabledColumns = [];
     private Dictionary<DisplayEventModel, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
     private ImmutableList<DisplayEventModel> _selectedEventState = [];
+    private HashSet<DisplayEventModel> _selectedSet = new(ReferenceEqualityComparer.Instance);
     private TimeZoneInfo _timeZoneSettings = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
@@ -117,8 +132,11 @@ public sealed partial class EventTable
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
         _selectedEventState = SelectedEventState.Value;
+        _selectedSet = new HashSet<DisplayEventModel>(_selectedEventState, ReferenceEqualityComparer.Instance);
+        _filters = FilterPaneState.Value.Filters;
         _timeZoneSettings = Settings.TimeZoneInfo;
 
+        WarnOnUnknownFilterColors(_filters);
         RebuildRowIndexMap();
 
         await base.OnInitializedAsync();
@@ -126,15 +144,41 @@ public sealed partial class EventTable
 
     protected override bool ShouldRender()
     {
+        // Snapshot once so the short-circuit check and the field assignment
+        // below see the same reference even if Fluxor publishes a new state
+        // mid-method.
+        var currentFilters = FilterPaneState.Value.Filters;
+        bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
+
         if (ReferenceEquals(EventTableState.Value, _eventTableState) &&
             ReferenceEquals(SelectedEventState.Value, _selectedEventState) &&
+            !filtersChanged &&
             Settings.TimeZoneInfo.Equals(_timeZoneSettings)) { return false; }
+
+        bool selectionChanged = !ReferenceEquals(SelectedEventState.Value, _selectedEventState);
 
         _eventTableState = EventTableState.Value;
 
         _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
-        _selectedEventState = SelectedEventState.Value;
+
+        if (selectionChanged)
+        {
+            _selectedEventState = SelectedEventState.Value;
+            // Reference equality is required because DisplayEventModel is a
+            // record whose Xml field can be mutated post-selection by
+            // ResolveXml(); value-equality hashes would shift and the row
+            // would visibly lose its selected styling on Virtualize re-render.
+            _selectedSet = new HashSet<DisplayEventModel>(_selectedEventState, ReferenceEqualityComparer.Instance);
+        }
+
+        if (filtersChanged)
+        {
+            _filters = currentFilters;
+            _highlightCache.Clear();
+            WarnOnUnknownFilterColors(_filters);
+        }
+
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         RebuildRowIndexMap();
@@ -155,22 +199,46 @@ public sealed partial class EventTable
         _eventTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
 
     private string GetCss(DisplayEventModel @event) =>
-        _selectedEventState.Contains(@event) ? "table-row selected" : $"table-row {GetHighlightedColor(@event)}";
+        _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
 
     private string GetDateColumnHeader() =>
         Settings.TimeZoneInfo.Equals(TimeZoneInfo.Local) ?
             "Date and Time" :
             $"Date and Time {Settings.TimeZoneInfo.DisplayName.Split(" ").First()}";
 
-    private string GetHighlightedColor(DisplayEventModel @event)
+    private string? GetHighlight(DisplayEventModel @event)
     {
-        foreach (var filter in FilterPaneState.Value.Filters.Where(filter =>
-            filter is { IsEnabled: true, IsExcluded: false } && filter.Comparison.Expression(@event)))
+        // Selected rows show selection styling (.selected wins via !important);
+        // skip cache writes so deselecting doesn't require a refill.
+        if (_selectedSet.Contains(@event)) { return null; }
+
+        if (_highlightCache.TryGetValue(@event, out var cached)) { return cached; }
+
+        string? color = null;
+
+        // Preserve existing semantics: first matching enabled+included filter
+        // wins (even if its Color is None, which suppresses any later match).
+        // Editing filters are excluded because their fields can be mutated in
+        // place without producing a new FilterPaneState reference.
+        foreach (var filter in _filters)
         {
-            return filter.Color.Equals(HighlightColor.None) ? string.Empty : filter.Color.ToString().ToLower();
+            if (filter is not { IsEnabled: true, IsExcluded: false, IsEditing: false }) { continue; }
+            if (!filter.Comparison.Expression(@event)) { continue; }
+
+            // Skip filters whose Color is outside the defined HighlightColor
+            // range (e.g., from corrupted persisted state) so they don't
+            // suppress legitimate later matches. Unknown values are reported
+            // once when the filter set changes (see WarnOnUnknownFilterColors)
+            // rather than per-event from this hot path.
+            if (!s_highlightNames.TryGetValue(filter.Color, out var name)) { continue; }
+
+            color = name;
+            break;
         }
 
-        return string.Empty;
+        _highlightCache[@event] = color;
+
+        return color;
     }
 
     private ColumnName[] GetOrderedEnabledColumns()
@@ -296,6 +364,9 @@ public sealed partial class EventTable
 
         _lastDisplayedEvents = displayedEvents;
         _rowIndexMap = new(displayedEvents?.Count ?? 0, ReferenceEqualityComparer.Instance);
+        // New event-list reference means stored DisplayEventModel instances
+        // are stale; clearing prevents memory growth across log reloads.
+        _highlightCache.Clear();
 
         if (displayedEvents is null) { return; }
 
@@ -359,4 +430,26 @@ public sealed partial class EventTable
     }
 
     private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());
+
+    private void WarnOnUnknownFilterColors(IEnumerable<FilterModel> filters)
+    {
+        foreach (var filter in filters)
+        {
+            if (s_highlightNames.ContainsKey(filter.Color)) { continue; }
+
+            int rawValue = (int)filter.Color;
+            bool shouldWarn;
+
+            lock (s_warnedUnknownColors)
+            {
+                shouldWarn = s_warnedUnknownColors.Add(rawValue);
+            }
+
+            if (shouldWarn)
+            {
+                TraceLogger.Warn(
+                    $"Unknown HighlightColor value {rawValue} found in filter set; affected filters will be skipped for highlight resolution.");
+            }
+        }
+    }
 }

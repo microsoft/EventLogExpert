@@ -17,33 +17,114 @@
     --background-dark: #222222;
     --background-darkgray: #353535;
 
-    --highlight-lightred: #EE8F86;
-    --highlight-red: #D03B2D;
-    --highlight-darkred: #73190E;
-    --highlight-lightorange: #FEB95E;
-    --highlight-orange: #FE9100;
-    --highlight-darkorange: #BE660F;
-    --highlight-lightyellow: #FCE393;
-    --highlight-yellow: #F8C84B;
-    --highlight-darkyellow: #F29A3B;
-    --highlight-lightgreen: #A5E1AC;
-    --highlight-green: #5AC358;
-    --highlight-darkgreen: #3C8331;
-    --highlight-lightteal: #5DC2B4;
-    --highlight-teal: #018C76;
-    --highlight-darkteal: #01594C;
-    --highlight-lightblue: #73B8FD;
-    --highlight-blue: #066EE2;
-    --highlight-darkblue: #013B73;
-    --highlight-lightpurple: #B28BF5;
-    --highlight-purple: #7446F2;
-    --highlight-darkpurple: #271296;
-    --highlight-lightmagenta: #E495DD;
-    --highlight-magenta: #C330B9;
-    --highlight-darkmagenta: #9526AF;
-    --highlight-lightpink: #FF74A1;
-    --highlight-pink: #E2074C;
-    --highlight-darkpink: #960131;
+    /* Semantic tokens. Values may differ in light mode. */
+    /* Text color shown on top of an accent fill (e.g. selected rows / menu items
+       whose background is var(--clr-lightblue)). */
+    --accent-on-fill: var(--background-darkgray);
+    /* Always-dark text suitable for use on light highlight tints
+       (--highlight-light* colors). */
+    --clr-on-light-highlight: var(--background-darkgray);
+    /* Default body text color. Component CSS should reference this rather than
+       hardcoding white/black. */
+    --text-primary: var(--clr-lightblue);
+    /* Inverted text for badges / scrollbar thumbs that always appear on the
+       statusbar (blue) background. */
+    --text-on-statusbar: var(--clr-white);
+
+    /* Foreground tokens used by highlight palette below.
+       --hl-fg-light = white text suitable for use on saturated/dark fills.
+       --hl-fg-dark  = always-dark text suitable for use on light tints.
+       Components that opt in via [data-highlight] inherit --hl-bg / --hl-fg
+       and apply them in a single rule rather than per-color CSS classes. */
+}
+
+/* -----------------------------------------------------------------------------
+   Highlight palette.
+   Adding or removing a color requires only updating this block (and the
+   matching enum / serialization). All consumers (table rows, color box,
+   color dropdown items) read --hl-bg / --hl-fg from these declarations.
+   -------------------------------------------------------------------------- */
+[data-highlight="lightred"]     { --hl-bg: #EE8F86; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="red"]          { --hl-bg: #D03B2D; --hl-fg: var(--clr-white); }
+[data-highlight="darkred"]      { --hl-bg: #73190E; --hl-fg: var(--clr-white); }
+[data-highlight="lightorange"]  { --hl-bg: #FEB95E; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="orange"]       { --hl-bg: #FE9100; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="darkorange"]   { --hl-bg: #BE660F; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="lightyellow"]  { --hl-bg: #FCE393; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="yellow"]       { --hl-bg: #F8C84B; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="darkyellow"]   { --hl-bg: #F29A3B; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="lightgreen"]   { --hl-bg: #A5E1AC; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="green"]        { --hl-bg: #5AC358; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="darkgreen"]    { --hl-bg: #3C8331; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="lightteal"]    { --hl-bg: #5DC2B4; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="teal"]         { --hl-bg: #018C76; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="darkteal"]     { --hl-bg: #01594C; --hl-fg: var(--clr-white); }
+[data-highlight="lightblue"]    { --hl-bg: #73B8FD; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="blue"]         { --hl-bg: #066EE2; --hl-fg: var(--clr-white); }
+[data-highlight="darkblue"]     { --hl-bg: #013B73; --hl-fg: var(--clr-white); }
+[data-highlight="lightpurple"]  { --hl-bg: #B28BF5; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="purple"]       { --hl-bg: #7446F2; --hl-fg: var(--clr-white); }
+[data-highlight="darkpurple"]   { --hl-bg: #271296; --hl-fg: var(--clr-white); }
+[data-highlight="lightmagenta"] { --hl-bg: #E495DD; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="magenta"]      { --hl-bg: #C330B9; --hl-fg: var(--clr-white); }
+[data-highlight="darkmagenta"]  { --hl-bg: #9526AF; --hl-fg: var(--clr-white); }
+[data-highlight="lightpink"]    { --hl-bg: #FF74A1; --hl-fg: var(--clr-on-light-highlight); }
+[data-highlight="pink"]         { --hl-bg: #E2074C; --hl-fg: var(--clr-white); }
+[data-highlight="darkpink"]     { --hl-bg: #960131; --hl-fg: var(--clr-white); }
+
+/* -----------------------------------------------------------------------------
+   Light theme palette.
+   Applied when:
+     - User explicitly selects Light (data-theme="light"), OR
+     - User leaves Theme = System (no data-theme attribute) AND OS reports
+       prefers-color-scheme: light.
+   Intentionally NOT applied when data-theme="dark" so an explicit Dark choice
+   wins over the OS preference.
+
+   All foreground/background pairs target WCAG AA contrast (>= 4.5:1) for
+   normal text. Highlight palette is unchanged; --clr-on-light-highlight
+   ensures the dark-on-light-tint text remains readable.
+   -------------------------------------------------------------------------- */
+:root[data-theme="light"] {
+    --clr-lightblue: #155A9E;       /* primary accent - on white ~6.0:1 */
+    --clr-lightgray: #4A4A4A;
+    --clr-red: #C0392B;             /* on white ~5.0:1 */
+    --clr-green: #1E7E34;           /* on white ~5.0:1 */
+    --clr-yellow: #8A6D00;          /* dark olive - true yellow fails AA */
+
+    --clr-placeholder: #6B6B6B;     /* on white ~5.7:1 */
+
+    --clr-statusbar: #2E50C0;       /* white text on it ~6.7:1 */
+
+    --background-dark: #F5F5F5;     /* primary surface - softer than pure white */
+    --background-darkgray: #E4E4E4; /* alt rows / headers / hover */
+
+    --accent-on-fill: var(--clr-white);
+    --clr-on-light-highlight: #1A1A1A;
+    --text-primary: var(--clr-lightblue);
+    --text-on-statusbar: var(--clr-white);
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]):not([data-theme="light"]) {
+        --clr-lightblue: #155A9E;
+        --clr-lightgray: #4A4A4A;
+        --clr-red: #C0392B;
+        --clr-green: #1E7E34;
+        --clr-yellow: #8A6D00;
+
+        --clr-placeholder: #6B6B6B;
+
+        --clr-statusbar: #2E50C0;
+
+        --background-dark: #F5F5F5;
+        --background-darkgray: #E4E4E4;
+
+        --accent-on-fill: var(--clr-white);
+        --clr-on-light-highlight: #1A1A1A;
+        --text-primary: var(--clr-lightblue);
+        --text-on-statusbar: var(--clr-white);
+    }
 }
 
 ::-webkit-scrollbar {
@@ -66,7 +147,7 @@ html, body {
     flex-direction: column;
     height: 100%;
     background-color: var(--background-dark);
-    color: var(--clr-lightblue);
+    color: var(--text-primary);
 }
 
 .footer-group {
@@ -197,7 +278,7 @@ a,
     background: none;
     border: none;
     border-bottom: 1px solid var(--clr-lightblue);
-    color: white;
+    color: var(--text-primary);
     margin: 0 .5rem;
     text-align: center;
     cursor: default;
@@ -227,6 +308,18 @@ input[type="text"].input { padding: 0; }
 .input.filter-datetime { width: 200px; }
 
     .input.filter-datetime::-webkit-calendar-picker-indicator { filter: invert(1); }
+
+/* In light mode the page is bright, so the icon is naturally dark - don't
+   re-invert it. Applies to explicit light and system-light only. */
+:root[data-theme="light"] .input.filter-datetime::-webkit-calendar-picker-indicator {
+    filter: none;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]):not([data-theme="light"]) .input.filter-datetime::-webkit-calendar-picker-indicator {
+        filter: none;
+    }
+}
 
 .menu-toggle { cursor: pointer; }
 
@@ -306,13 +399,13 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
         display:block;
         clear: both;
 
-        color: #fff;
+        color: var(--text-primary);
 
         &:hover,
         &[highlighted] { background-color: var(--background-darkgray); }
 
         &[aria-selected="true"] {
-            color: var(--background-darkgray);
+            color: var(--accent-on-fill);
             background-color: var(--clr-lightblue);
         }
     }
@@ -328,62 +421,7 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     border-bottom: 0;
     border: 1px solid var(--clr-lightblue);
     text-indent: 100%;
-
-    &.none { background-color: var(--background-dark) !important; }
-
-    &.lightred { background-color: var(--highlight-lightred) !important; }
-
-    &.red { background-color: var(--highlight-red) !important; }
-
-    &.darkred { background-color: var(--highlight-darkred) !important; }
-
-    &.lightorange { background-color: var(--highlight-lightorange) !important; }
-
-    &.orange { background-color: var(--highlight-orange) !important; }
-
-    &.darkorange { background-color: var(--highlight-darkorange) !important; }
-
-    &.lightyellow { background-color: var(--highlight-lightyellow) !important; }
-
-    &.yellow { background-color: var(--highlight-yellow) !important; }
-
-    &.darkyellow { background-color: var(--highlight-darkyellow) !important; }
-
-    &.lightgreen { background-color: var(--highlight-lightgreen) !important; }
-
-    &.green { background-color: var(--highlight-green) !important; }
-
-    &.darkgreen { background-color: var(--highlight-darkgreen) !important; }
-
-    &.lightteal { background-color: var(--highlight-lightteal) !important; }
-
-    &.teal { background-color: var(--highlight-teal) !important; }
-
-    &.darkteal { background-color: var(--highlight-darkteal) !important; }
-
-    &.lightblue { background-color: var(--highlight-lightblue) !important; }
-
-    &.blue { background-color: var(--highlight-blue) !important; }
-
-    &.darkblue { background-color: var(--highlight-darkblue) !important; }
-
-    &.lightpurple { background-color: var(--highlight-lightpurple) !important; }
-
-    &.purple { background-color: var(--highlight-purple) !important; }
-
-    &.darkpurple { background-color: var(--highlight-darkpurple) !important; }
-
-    &.lightmagenta { background-color: var(--highlight-lightmagenta) !important; }
-
-    &.magenta { background-color: var(--highlight-magenta) !important; }
-
-    &.darkmagenta { background-color: var(--highlight-darkmagenta) !important; }
-
-    &.lightpink { background-color: var(--highlight-lightpink) !important; }
-
-    &.pink { background-color: var(--highlight-pink) !important; }
-
-    &.darkpink { background-color: var(--highlight-darkpink) !important; }
+    background-color: var(--hl-bg, var(--background-dark)) !important;
 }
 
 .color-dropdown-item {

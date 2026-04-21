@@ -1,3 +1,5 @@
+@using EventLogExpert.UI
+
 <div class="mb-1">
     <div class="flex-space-between">
         <div class="flex-space-between">
@@ -59,7 +61,7 @@
         else
         {
             <div class="flex-align-center">
-                <div class="mx-2 @($"color-box {filter.Color.ToString().ToLower()}")"></div>
+                <div class="mx-2 color-box" data-highlight="@(filter.Color == HighlightColor.None ? null : filter.Color.ToString().ToLowerInvariant())"></div>
 
                 @if (filter.IsExcluded)
                 {

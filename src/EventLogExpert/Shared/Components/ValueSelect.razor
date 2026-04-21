@@ -6,7 +6,7 @@
     <input aria-activedescendant="@HighlightedItem?.ItemId" aria-controls="@_itemId"
         aria-haspopup="listbox"
         aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)" aria-labelledby="@AriaLabelledBy"
-        class="@CssClass" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
+        class="@CssClass" data-highlight="@DataHighlight" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
 
     <div class="dropdown-list" id="@_itemId" role="listbox" aria-multiselectable="@(IsMultiSelect ? "true" : null)" tabindex="-1">
         <CascadingValue Value="this">

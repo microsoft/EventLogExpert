@@ -489,6 +489,141 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void Theme_WhenAccessedMultipleTimes_ShouldCacheValue()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        mockPreferences.ThemePreference.Returns(Theme.Light);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        _ = settingsService.Theme;
+        _ = settingsService.Theme;
+        _ = settingsService.Theme;
+
+        // Assert
+        _ = mockPreferences.Received(1).ThemePreference;
+    }
+
+    [Fact]
+    public void Theme_WhenFirstAccessed_ShouldReturnFromPreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        mockPreferences.ThemePreference.Returns(Theme.Light);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        var result = settingsService.Theme;
+
+        // Assert
+        Assert.Equal(Theme.Light, result);
+    }
+
+    [Fact]
+    public void Theme_WhenPreferenceIsDefault_ShouldReturnSystem()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        var result = settingsService.Theme;
+
+        // Assert
+        Assert.Equal(Theme.System, result);
+    }
+
+    [Fact]
+    public void Theme_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.Theme = Theme.Dark;
+
+        // Assert
+        mockPreferences.Received(1).ThemePreference = Theme.Dark;
+    }
+
+    [Fact]
+    public void Theme_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        var eventInvoked = false;
+        settingsService.ThemeChanged = () => eventInvoked = true;
+
+        // Act
+        settingsService.Theme = Theme.Light;
+
+        // Assert
+        Assert.True(eventInvoked);
+    }
+
+    [Theory]
+    [InlineData(Theme.System)]
+    [InlineData(Theme.Light)]
+    [InlineData(Theme.Dark)]
+    public void Theme_WhenSetToEachValue_ShouldPersistCorrectly(Theme theme)
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.Theme = theme;
+
+        // Assert
+        mockPreferences.Received(1).ThemePreference = theme;
+    }
+
+    [Fact]
+    public void Theme_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        mockPreferences.ThemePreference.Returns(Theme.Light);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+        _ = settingsService.Theme; // Cache the value
+
+        var eventInvoked = false;
+        settingsService.ThemeChanged = () => eventInvoked = true;
+
+        // Act
+        settingsService.Theme = Theme.Light;
+
+        // Assert
+        Assert.False(eventInvoked);
+    }
+
+    [Fact]
+    public void Theme_WhenSetToSameValue_ShouldNotUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        mockPreferences.ThemePreference.Returns(Theme.Dark);
+
+        var settingsService = CreateSettingsService(mockPreferences);
+        _ = settingsService.Theme; // Cache the value
+        mockPreferences.ClearReceivedCalls();
+
+        // Act
+        settingsService.Theme = Theme.Dark;
+
+        // Assert
+        mockPreferences.DidNotReceive().ThemePreference = Arg.Any<Theme>();
+    }
+
+    [Fact]
     public void TimeZoneId_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange

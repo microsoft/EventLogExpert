@@ -15,7 +15,7 @@
                 var width = GetColumnWidth(columnHeader);
 
                 <th @key="columnHeader" aria-colindex="@(columnIndex + 1)" aria-sort="@(_eventTableState.OrderBy == columnHeader ? (_eventTableState.IsDescending ? "descending" : "ascending") : "none")"
-                    class="@columnHeader.ToString().ToLower()" data-column="@columnHeader" role="columnheader" style="width: @(width)px">
+                    class="@columnHeader.ToString().ToLowerInvariant()" data-column="@columnHeader" role="columnheader" style="width: @(width)px">
                     @if (columnHeader == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>
@@ -40,8 +40,8 @@
         @if (_currentTable is not null)
         {
             <Virtualize Context="evt" Items="@((_currentTable.DisplayedEvents as ICollection<DisplayEventModel>) ?? [])">
-                    <tr aria-rowindex="@GetRowIndex(evt)" aria-selected="@(_selectedEventState.Contains(evt).ToString().ToLower())"
-                        class="@GetCss(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+                    <tr aria-rowindex="@GetRowIndex(evt)" aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
+                        class="@GetCss(evt)" data-highlight="@GetHighlight(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
                     @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
                         <td aria-colindex="@(i + 1)" role="gridcell">

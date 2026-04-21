@@ -47,6 +47,7 @@
 .release-notes-content code {
     padding: 0.1rem 0.3rem;
     background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
     border-radius: 0.2rem;
     font-family: Consolas, monospace;
     font-size: 0.95em;

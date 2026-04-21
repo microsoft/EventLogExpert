@@ -2,7 +2,7 @@
     display: none;
     width: 12em;
     user-select: none;
-    color: #fff;
+    color: var(--text-primary);
     border: 1px solid var(--clr-lightblue);
     background-color: var(--background-dark);
     z-index: 10;
@@ -30,7 +30,7 @@
         }
 
         &[selected] {
-            color: var(--background-darkgray) !important;
+            color: var(--accent-on-fill) !important;
             background-color: var(--clr-lightblue) !important;
         }
     }
