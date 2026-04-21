@@ -165,10 +165,12 @@ public sealed partial class EventTable
         if (selectionChanged)
         {
             _selectedEventState = SelectedEventState.Value;
-            // Reference equality is required because DisplayEventModel is a
-            // record whose Xml field can be mutated post-selection by
-            // ResolveXml(); value-equality hashes would shift and the row
-            // would visibly lose its selected styling on Virtualize re-render.
+            // Reference equality is intentional. Even though DisplayEventModel is
+            // now a fully immutable record (no mutating ResolveXml() workaround),
+            // value-equality requires hashing every string field on every selection
+            // mutation. Reference equality keeps selection bookkeeping O(1) and
+            // also avoids any chance that two distinct event instances that happen
+            // to be value-equal would collapse into a single selected row.
             _selectedSet = new HashSet<DisplayEventModel>(_selectedEventState, ReferenceEqualityComparer.Instance);
         }
 
@@ -263,7 +265,7 @@ public sealed partial class EventTable
     private int GetRowIndex(DisplayEventModel evt) =>
         _rowIndexMap.TryGetValue(evt, out int index) ? index + 2 : 2;
 
-    private void HandleKeyDown(KeyboardEventArgs args)
+    private async Task HandleKeyDown(KeyboardEventArgs args)
     {
         int? currentIndex;
         DisplayEventModel? lastEvent;
@@ -273,7 +275,7 @@ public sealed partial class EventTable
         switch (args)
         {
             case { CtrlKey: true, Code: "KeyC" }:
-                ClipboardService.CopySelectedEvent();
+                await ClipboardService.CopySelectedEvent();
 
                 return;
             case { Code: "ArrowUp" }:

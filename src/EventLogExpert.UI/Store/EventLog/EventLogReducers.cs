@@ -36,11 +36,19 @@ public sealed class EventLogReducers
             .Where(e => e.OwningLog != action.LogName)
             .ToList();
 
+        // Drop selections belonging to the closed log so stale references don't linger
+        // in SelectedEvents. Without this, a reload (which closes and re-opens the log
+        // to load XML) would leave stale entries that prevent the highlight refresh
+        // when the new instances are restored via SelectEvents.
+        var newSelectedEvents = state.SelectedEvents
+            .RemoveAll(e => string.Equals(e.OwningLog, action.LogName, StringComparison.Ordinal));
+
         return state with
         {
             ActiveLogs = state.ActiveLogs.Remove(action.LogName),
             NewEventBuffer = newEventBuffer,
-            NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents
+            NewEventBufferIsFull = newEventBuffer.Count >= EventLogState.MaxNewEvents,
+            SelectedEvents = newSelectedEvents
         };
     }
 

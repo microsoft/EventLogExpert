@@ -22,15 +22,33 @@ public sealed partial class FilterRow
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
+    /// <summary>Wraps <c>Value.Data.Category</c> so that a transition into a text-only category
+    /// (Description / Xml) auto-corrects an incompatible evaluator. Without this, switching from
+    /// e.g. Source (MultiSelect) to Xml would leave Evaluator=MultiSelect with no matching option
+    /// in the comparison dropdown — producing an invalid filter on save.</summary>
+    private FilterCategory CategoryBinding
+    {
+        get => Value.Data.Category;
+        set
+        {
+            Value.Data.Category = value;
+
+            if (IsTextOnlyCategory(value) && Value.Data.Evaluator == FilterEvaluator.MultiSelect)
+            {
+                Value.Data.Evaluator = FilterEvaluator.Contains;
+            }
+        }
+    }
+
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
-    [Inject] private IFilterService FilterService { get; init; } = null!;
-
     private List<string> FilteredItems => Items
         .Where(x => x.Contains(Value.Data.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
+
+    [Inject] private IFilterService FilterService { get; init; } = null!;
 
     private List<string> Items =>
         Value.Data.Category switch
@@ -53,6 +71,11 @@ public sealed partial class FilterRow
                 .Distinct().Order()],
             _ => []
         };
+
+    /// <summary>Categories whose value is free-form text (no fixed enumerable set of options).
+    /// These render as a single text input and disallow MultiSelect comparison.</summary>
+    private static bool IsTextOnlyCategory(FilterCategory category) =>
+        category is FilterCategory.Description or FilterCategory.Xml;
 
     private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
 

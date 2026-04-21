@@ -11,7 +11,7 @@ namespace EventLogExpert.UI.Store.EventLog;
 
 public interface ILogWatcherService
 {
-    void AddLog(string logName, string? bookmark);
+    void AddLog(string logName, string? bookmark, bool renderXml = false);
 
     void RemoveAll();
 
@@ -24,6 +24,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly ITraceLogger _debugLogger;
     private readonly IDispatcher _dispatcher;
     private readonly List<string> _logsToWatch = [];
+    private readonly Dictionary<string, bool> _renderXmlByLog = [];
     private readonly IServiceScopeFactory _serviceScopeFactory;
     private readonly Dictionary<string, EventLogWatcher> _watchers = [];
     private readonly Lock _watchersLock = new();
@@ -53,7 +54,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         };
     }
 
-    public void AddLog(string logName, string? bookmark)
+    public void AddLog(string logName, string? bookmark, bool renderXml = false)
     {
         using var scope = _watchersLock.EnterScope();
 
@@ -65,6 +66,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
         _logsToWatch.Add(logName);
         _bookmarks.Add(logName, bookmark);
+        _renderXmlByLog[logName] = renderXml;
 
         // If this is the first log added, or if we're already watching
         // other logs, then we need to start watching this one.
@@ -94,6 +96,8 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
         _logsToWatch.Remove(logName);
         _bookmarks.Remove(logName);
+        _renderXmlByLog.Remove(logName);
+
         StopWatching(logName);
     }
 
@@ -120,9 +124,11 @@ public sealed class LiveLogWatcherService : ILogWatcherService
 
         if (_watchers.ContainsKey(logName)) { return; }
 
+        bool renderXml = _renderXmlByLog.TryGetValue(logName, out var flag) && flag;
+
         EventLogWatcher watcher = _bookmarks[logName] != null ?
-            new EventLogWatcher(logName, _bookmarks[logName]) :
-            new EventLogWatcher(logName);
+            new EventLogWatcher(logName, _bookmarks[logName], renderXml) :
+            new EventLogWatcher(logName, renderXml);
 
         _watchers.Add(logName, watcher);
 
@@ -143,6 +149,17 @@ public sealed class LiveLogWatcherService : ILogWatcherService
             }
 
             using var scope = _watchersLock.EnterScope();
+
+            // Guard against stale callbacks: a watcher being disposed asynchronously
+            // can still be mid-loop processing buffered events with the old renderXml
+            // setting. If the active watcher for this log is no longer this instance,
+            // discard the event so it doesn't pollute the re-opened log with the
+            // wrong XML state.
+            if (!_watchers.TryGetValue(logName, out var activeWatcher) ||
+                !ReferenceEquals(activeWatcher, watcher))
+            {
+                return;
+            }
 
             _dispatcher.Dispatch(new EventLogAction.AddEvent(eventResolver.ResolveEvent(eventArgs)));
         };

@@ -34,7 +34,7 @@ public sealed partial class FilterGroupRow
             {
                 if (s is not string value) { return; }
 
-                if (FilterService.TryParseExpression(value, out var message, ignoreXml: true))
+                if (FilterService.TryParseExpression(value, out var message))
                 {
                     Value.Comparison.Value = value;
                     _errorMessage = string.Empty;

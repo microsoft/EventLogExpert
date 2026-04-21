@@ -5,11 +5,8 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
-using Fluxor;
-using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Services;
 
@@ -19,7 +16,7 @@ public sealed class FilterServiceTests
     public void Constructor_WhenCalled_ShouldNotThrow()
     {
         // Arrange & Act
-        var exception = Record.Exception(() => CreateFilterService());
+        var exception = Record.Exception(CreateFilterService);
 
         // Assert
         Assert.Null(exception);
@@ -188,51 +185,10 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void IsXmlEnabled_WhenStateIsFalse_ShouldReturnFalse()
+    public void TryParse_WhenCategoryIsXml_ShouldReturnTrue()
     {
         // Arrange
-        var filterService = CreateFilterService(false);
-
-        // Act
-        var result = filterService.IsXmlEnabled;
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void IsXmlEnabled_WhenStateIsTrue_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService(true);
-
-        // Act
-        var result = filterService.IsXmlEnabled;
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void TryParse_WhenCategoryIsXmlAndXmlDisabled_ShouldReturnFalse()
-    {
-        // Arrange
-        var filterService = CreateFilterService(false);
-        var filterModel = CreateFilterModel(FilterCategory.Xml, FilterEvaluator.Contains, "test");
-
-        // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
-
-        // Assert
-        Assert.False(result);
-        Assert.Empty(comparison);
-    }
-
-    [Fact]
-    public void TryParse_WhenCategoryIsXmlAndXmlEnabled_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService(true);
+        var filterService = CreateFilterService();
         var filterModel = CreateFilterModel(FilterCategory.Xml, FilterEvaluator.Contains, "test");
 
         // Act
@@ -581,24 +537,10 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParseExpression_WhenXmlExpressionAndXmlDisabled_ShouldReturnFalse()
+    public void TryParseExpression_WhenXmlExpression_ShouldReturnTrue()
     {
         // Arrange
-        var filterService = CreateFilterService(false);
-
-        // Act
-        var result = filterService.TryParseExpression("Xml.Contains(\"test\")", out var error);
-
-        // Assert
-        Assert.False(result);
-        Assert.Contains("Xml filtering is not enabled", error);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenXmlExpressionAndXmlEnabled_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService(true);
+        var filterService = CreateFilterService();
 
         // Act
         var result = filterService.TryParseExpression("Xml.Contains(\"test\", StringComparison.OrdinalIgnoreCase)",
@@ -609,30 +551,8 @@ public sealed class FilterServiceTests
         Assert.Empty(error);
     }
 
-    [Fact]
-    public void TryParseExpression_WhenXmlExpressionWithIgnoreXml_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService(false);
-
-        // Act
-        var result = filterService.TryParseExpression("Xml.Contains(\"test\", StringComparison.OrdinalIgnoreCase)",
-            out var error,
-            true);
-
-        // Assert
-        Assert.True(result);
-        Assert.Empty(error);
-    }
-
     private static FilterModel CreateFilterModel(FilterCategory category, FilterEvaluator evaluator, string? value) =>
         new() { Data = { Category = category, Evaluator = evaluator, Value = value } };
 
-    private static FilterService CreateFilterService(bool isXmlEnabled = false)
-    {
-        var mockState = Substitute.For<IState<FilterPaneState>>();
-        mockState.Value.Returns(new FilterPaneState { IsXmlEnabled = isXmlEnabled });
-
-        return new FilterService(mockState);
-    }
+    private static FilterService CreateFilterService() => new();
 }

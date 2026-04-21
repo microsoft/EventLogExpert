@@ -4,11 +4,9 @@
     <div class="flex-align-center">
         <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
 
-        <ValueSelect AriaLabel="Category" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="Value.Data.Category" ToStringFunc="x => x.ToFullString()">
+        <ValueSelect AriaLabel="Category" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="CategoryBinding" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
             {
-                if (item == FilterCategory.Xml && !FilterService.IsXmlEnabled) { continue; }
-
                 <ValueSelectItem T="FilterCategory" Value="item" />
             }
         </ValueSelect>
@@ -17,12 +15,16 @@
         <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
             {
+                @if (IsTextOnlyCategory(Value.Data.Category) && item == FilterEvaluator.MultiSelect)
+                {
+                    continue;
+                }
                 <ValueSelectItem T="FilterEvaluator" Value="item" />
             }
         </ValueSelect>
 
         <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
-        @if (Value.Data.Category is FilterCategory.Description)
+        @if (IsTextOnlyCategory(Value.Data.Category))
         {
             <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
         }

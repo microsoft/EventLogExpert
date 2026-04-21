@@ -147,7 +147,7 @@ public static class FilterMethods
 
     extension(DisplayEventModel? @event)
     {
-        public bool Filter(IEnumerable<FilterModel> filters, bool isXmlEnabled)
+        public bool Filter(IEnumerable<FilterModel> filters)
         {
             if (@event is null) { return false; }
 
@@ -156,8 +156,6 @@ public static class FilterMethods
 
             foreach (var filter in filters)
             {
-                if (!isXmlEnabled && filter.Comparison.Value.Contains("xml.", StringComparison.OrdinalIgnoreCase)) { return false; }
-
                 if (filter.IsExcluded && filter.Comparison.Expression(@event)) { return false; }
 
                 if (!filter.IsExcluded) { isEmpty = false; }

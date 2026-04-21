@@ -33,7 +33,7 @@ public sealed partial class ContextMenu
         base.OnInitialized();
     }
 
-    private void CopySelected(CopyType? copyType) => ClipboardService.CopySelectedEvent(copyType);
+    private async Task CopySelected(CopyType? copyType) => await ClipboardService.CopySelectedEvent(copyType);
 
     private void ExcludeAfter() =>
         Dispatcher.Dispatch(

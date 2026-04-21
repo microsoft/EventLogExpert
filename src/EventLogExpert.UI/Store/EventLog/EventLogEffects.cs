@@ -8,7 +8,6 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
-using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +25,7 @@ public sealed class EventLogEffects(
     ITraceLogger logger,
     ILogWatcherService logWatcherService,
     IEventResolverCache resolverCache,
+    IEventXmlResolver xmlResolver,
     IServiceScopeFactory serviceScopeFactory)
 {
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
@@ -36,9 +36,20 @@ public sealed class EventLogEffects(
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
+
+    /// <summary>Tracks which currently-open logs (by <see cref="EventLogData.Id"/>) were loaded
+    /// with renderXml=true. A reload-on-transition only re-opens logs that lack XML; logs that
+    /// already have it are left alone. Removing or disabling an XML filter never triggers a
+    /// reload because the XML data is already in memory and harmless to keep.</summary>
+    private readonly ConcurrentDictionary<EventLogId, byte> _logsLoadedWithXml = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
+
+    /// <summary>Pending selection restore per log name, populated when a filter transition forces
+    /// a reload. Consumed by <see cref="HandleLoadEvents"/> when the reloaded log finishes loading.</summary>
+    private readonly ConcurrentDictionary<string, IReadOnlySet<long>> _pendingSelectionRestore = new();
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
+    private readonly IEventXmlResolver _xmlResolver = xmlResolver;
 
     private long _cancelGeneration;
     private CancellationTokenSource _globalCts = new();
@@ -89,6 +100,9 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
 
         _resolverCache.ClearAll();
+        _xmlResolver.ClearAll();
+        _logsLoadedWithXml.Clear();
+        _pendingSelectionRestore.Clear();
 
         return Task.CompletedTask;
     }
@@ -106,6 +120,12 @@ public sealed class EventLogEffects(
         }
 
         _logWatcherService.RemoveLog(action.LogName);
+        _logsLoadedWithXml.TryRemove(action.LogId, out _);
+        _pendingSelectionRestore.TryRemove(action.LogName, out _);
+
+        // Drop any cached XML for this log; if the same name reopens later (e.g., post-rotation)
+        // a fresh resolve must occur instead of returning stale text from a different file.
+        _xmlResolver.ClearLog(action.LogName);
 
         dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
@@ -123,6 +143,19 @@ public sealed class EventLogEffects(
         var filteredEvents = _filterService.GetFilteredEvents(action.Events, _eventLogState.Value.AppliedFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
+
+        // Restore selection if this load was triggered by a filter-driven reload.
+        if (_pendingSelectionRestore.TryRemove(action.LogData.Name, out var recordIds) && recordIds.Count > 0)
+        {
+            var restored = action.Events
+                .Where(e => e.RecordId.HasValue && recordIds.Contains(e.RecordId.Value))
+                .ToList();
+
+            if (restored.Count > 0)
+            {
+                dispatcher.Dispatch(new EventLogAction.SelectEvents(restored));
+            }
+        }
 
         return Task.CompletedTask;
     }
@@ -225,6 +258,51 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
+        bool newRequiresXml = action.EventFilter.RequiresXml;
+
+        // Identify open logs that lack pre-rendered XML. Disabling/removing an XML filter is a
+        // no-op: XML already in memory is harmless. Re-enabling against logs that were
+        // previously loaded with XML is also a no-op for the same reason. Only logs that
+        // are actually missing XML need to be re-read; logs that already have it are left
+        // intact to avoid unnecessary reloads (and the selection-loss / latency they cause).
+        var logsNeedingReload = newRequiresXml && !_eventLogState.Value.ActiveLogs.IsEmpty
+            ? _eventLogState.Value.ActiveLogs.Values
+                .Where(d => !_logsLoadedWithXml.ContainsKey(d.Id))
+                .Select(d => (d.Id, d.Name, d.Type))
+                .ToList()
+            : [];
+
+        if (logsNeedingReload.Count > 0)
+        {
+            var reloadNames = logsNeedingReload.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+
+            var selectionByLog = _eventLogState.Value.SelectedEvents
+                .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
+                .GroupBy(e => e.OwningLog)
+                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
+
+            // Close + reopen only the logs that lack XML. Other open logs keep their state.
+            // CloseLog is dispatched first (and clears any prior _pendingSelectionRestore entry
+            // for that log name), then we populate the restore map, then OpenLog kicks off the
+            // new load which will consume the restore entry in HandleLoadEvents.
+            foreach (var (id, name, _) in logsNeedingReload)
+            {
+                dispatcher.Dispatch(new EventLogAction.CloseLog(id, name));
+            }
+
+            foreach (var (name, ids) in selectionByLog)
+            {
+                _pendingSelectionRestore[name] = ids;
+            }
+
+            foreach (var (_, name, type) in logsNeedingReload)
+            {
+                dispatcher.Dispatch(new EventLogAction.OpenLog(name, type));
+            }
+
+            return Task.CompletedTask;
+        }
+
         var filteredActiveLogs = _filterService.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
 
         dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
@@ -360,8 +438,6 @@ public sealed class EventLogEffects(
             }
         }
 
-        var filterState = serviceScope.ServiceProvider.GetService<IState<FilterPaneState>>();
-
         var activityId = Guid.NewGuid();
         string? lastEvent;
         int failed = 0;
@@ -406,7 +482,9 @@ public sealed class EventLogEffects(
             TimeSpan.Zero,
             TimeSpan.FromSeconds(3));
 
-        using var reader = new EventLogReader(action.LogName, action.PathType, filterState?.Value.IsXmlEnabled ?? false);
+        bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
+
+        using var reader = new EventLogReader(action.LogName, action.PathType, renderXml);
 
         // Producer: single thread reads batches from EventLogReader
         var producerTask = Task.Run(async () =>
@@ -498,6 +576,8 @@ public sealed class EventLogEffects(
         {
             await StopProducerAsync(producerTask);
 
+            _pendingSelectionRestore.TryRemove(logData.Name, out _);
+
             // Only close the log if it still exists with the same ID —
             // prevents stale cancellation from closing a newly reopened log.
             if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
@@ -515,6 +595,8 @@ public sealed class EventLogEffects(
             _logger?.Error($"Failed to load log {action.LogName}: {ex.Message}");
 
             await StopProducerAsync(producerTask);
+
+            _pendingSelectionRestore.TryRemove(logData.Name, out _);
 
             // Only close the log if it still exists with the same ID.
             if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
@@ -538,7 +620,14 @@ public sealed class EventLogEffects(
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var activeLog)
             || activeLog.Id != logData.Id)
         {
+            _pendingSelectionRestore.TryRemove(logData.Name, out _);
+
             return;
+        }
+
+        if (renderXml)
+        {
+            _logsLoadedWithXml[logData.Id] = 0;
         }
 
         dispatcher.Dispatch(new EventLogAction.LoadEvents(logData, events.AsReadOnly()));
@@ -547,7 +636,7 @@ public sealed class EventLogEffects(
 
         if (action.PathType == PathType.LogName)
         {
-            _logWatcherService.AddLog(action.LogName, lastEvent);
+            _logWatcherService.AddLog(action.LogName, lastEvent, renderXml);
         }
 
         dispatcher.Dispatch(new StatusBarAction.SetResolverStatus(string.Empty));

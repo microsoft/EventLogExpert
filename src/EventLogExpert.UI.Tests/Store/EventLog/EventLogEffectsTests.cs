@@ -8,7 +8,6 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
-using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -105,6 +104,43 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleCloseAll_ShouldClearAllResolvedXml()
+    {
+        // Arrange
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            AppliedFilter = new EventFilter(null, [])
+        });
+
+        var mockXmlResolver = Substitute.For<IEventXmlResolver>();
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(Substitute.For<IServiceProvider>());
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            Substitute.For<IFilterService>(),
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            mockXmlResolver,
+            mockServiceScopeFactory);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        // Act
+        await effects.HandleCloseAll(mockDispatcher);
+
+        // Assert
+        mockXmlResolver.Received(1).ClearAll();
+    }
+
+    [Fact]
     public async Task HandleCloseAll_ShouldRemoveAllLogsAndClearCache()
     {
         // Arrange
@@ -118,6 +154,46 @@ public sealed class EventLogEffectsTests
         mockResolverCache.Received(1).ClearAll();
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.CloseAll>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<StatusBarAction.CloseAll>());
+    }
+
+    [Fact]
+    public async Task HandleCloseLog_ShouldClearResolvedXmlForLog()
+    {
+        // Arrange — verify the IEventXmlResolver entry for the closed log is evicted so a
+        // subsequent reopen doesn't return stale text from the previous log instance.
+        var logId = EventLogId.Create();
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            AppliedFilter = new EventFilter(null, [])
+        });
+
+        var mockXmlResolver = Substitute.For<IEventXmlResolver>();
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(Substitute.For<IServiceProvider>());
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            Substitute.For<IFilterService>(),
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            mockXmlResolver,
+            mockServiceScopeFactory);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+        var action = new EventLogAction.CloseLog(logId, Constants.LogNameTestLog);
+
+        // Act
+        await effects.HandleCloseLog(action, mockDispatcher);
+
+        // Assert
+        mockXmlResolver.Received(1).ClearLog(Constants.LogNameTestLog);
     }
 
     [Fact]
@@ -356,6 +432,136 @@ public sealed class EventLogEffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
     }
 
+    [Fact]
+    public async Task HandleSetFilters_WhenFilterDoesNotRequireXml_ShouldNotReloadLogs()
+    {
+        // Arrange — single active log + non-XML filter (Id-based). RequiresXml should be false,
+        // so HandleSetFilters should fall through to UpdateDisplayedEvents and never close/open logs.
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var nonXmlFilter = new FilterModel
+        {
+            IsEnabled = true,
+            Comparison = new FilterComparison { Value = "Id == 100" }
+        };
+
+        var eventFilter = new EventFilter(null, [nonXmlFilter]);
+        var action = new EventLogAction.SetFilters(eventFilter);
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert — UpdateDisplayedEvents path; no Close/Open dispatches.
+        Assert.False(eventFilter.RequiresXml);
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.CloseLog>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.OpenLog>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_WhenFilterRequiresXml_ShouldRestoreSelectionAfterReload()
+    {
+        // Arrange — active log with one previously-selected event (RecordId=42). After the
+        // XML filter triggers a reload, HandleLoadEvents should consume the pending restore
+        // entry and dispatch SelectEvents with the matching event from the new event set.
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var selectedEvent = EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
+
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = activeLogs,
+            SelectedEvents = [selectedEvent],
+            AppliedFilter = new EventFilter(null, [])
+        });
+
+        var mockFilterService = Substitute.For<IFilterService>();
+
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            mockFilterService,
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        var xmlFilter = new FilterModel
+        {
+            IsEnabled = true,
+            Comparison = new FilterComparison { Value = "Xml.Contains(\"foo\")" }
+        };
+
+        var eventFilter = new EventFilter(null, [xmlFilter]);
+
+        // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
+        await effects.HandleSetFilters(new EventLogAction.SetFilters(eventFilter), mockDispatcher);
+
+        // Act 2: Simulate the subsequent LoadEvents that the new OpenLog produces. The
+        // reloaded events include the previously-selected RecordId=42 plus an unrelated one.
+        var reloadedEvents = ImmutableArray.Create(
+            EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog),
+            EventUtils.CreateTestEvent(200, recordId: 99, logName: Constants.LogNameTestLog));
+
+        await effects.HandleLoadEvents(new EventLogAction.LoadEvents(logData, reloadedEvents), mockDispatcher);
+
+        // Assert — SelectEvents dispatched with exactly the restored event (RecordId=42).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.SelectEvents>(a =>
+            a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_WhenFilterRequiresXmlAndLogLacksXml_ShouldCloseAndReopenLog()
+    {
+        // Arrange — active log has not been loaded with XML, so it must be re-read.
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var xmlFilter = new FilterModel
+        {
+            IsEnabled = true,
+            Comparison = new FilterComparison { Value = "Xml.Contains(\"foo\")" }
+        };
+
+        var eventFilter = new EventFilter(null, [xmlFilter]);
+        var action = new EventLogAction.SetFilters(eventFilter);
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert
+        Assert.True(eventFilter.RequiresXml);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.CloseLog>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.OpenLog>(a =>
+            a.LogName == Constants.LogNameTestLog && a.PathType == PathType.LogName));
+
+        // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+    }
+
     private static (EventLogEffects effects, IDispatcher mockDispatcher) CreateEffects(
         bool continuouslyUpdate = false,
         ImmutableDictionary<string, EventLogData>? activeLogs = null,
@@ -405,16 +611,13 @@ public sealed class EventLogEffectsTests
             mockServiceProvider.GetService(typeof(IEventResolver)).Returns((IEventResolver?)null);
         }
 
-        var mockFilterPaneState = Substitute.For<IState<FilterPaneState>>();
-        mockFilterPaneState.Value.Returns(new FilterPaneState { IsXmlEnabled = false });
-        mockServiceProvider.GetService(typeof(IState<FilterPaneState>)).Returns(mockFilterPaneState);
-
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
             mockLogger,
             mockLogWatcherService,
             mockResolverCache,
+            Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory);
 
         var mockDispatcher = Substitute.For<IDispatcher>();
@@ -466,6 +669,7 @@ public sealed class EventLogEffectsTests
             mockLogger,
             mockLogWatcherService,
             mockResolverCache,
+            Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory);
 
         var mockDispatcher = Substitute.For<IDispatcher>();

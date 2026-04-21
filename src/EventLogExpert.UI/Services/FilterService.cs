@@ -4,19 +4,13 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Store.FilterPane;
-using Fluxor;
 using System.Linq.Dynamic.Core;
 using System.Text;
 
 namespace EventLogExpert.UI.Services;
 
-public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFilterService
+public sealed class FilterService : IFilterService
 {
-    private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
-
-    public bool IsXmlEnabled => _filterPaneState.Value.IsXmlEnabled;
-
     public IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter)
@@ -46,14 +40,14 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         {
             return collection
                 .Where(e => e.FilterByDate(eventFilter.DateFilter)
-                    .Filter(eventFilter.Filters, IsXmlEnabled))
+                    .Filter(eventFilter.Filters))
                 .ToList()
                 .AsReadOnly();
         }
 
         return events.AsParallel()
             .Where(e => e.FilterByDate(eventFilter.DateFilter)
-                .Filter(eventFilter.Filters, IsXmlEnabled))
+                .Filter(eventFilter.Filters))
             .ToList()
             .AsReadOnly();
     }
@@ -61,11 +55,6 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
     public bool TryParse(FilterModel filterModel, out string comparison)
     {
         comparison = string.Empty;
-
-        if (filterModel.Data.Category is FilterCategory.Xml && !IsXmlEnabled)
-        {
-            return false;
-        }
 
         if (string.IsNullOrWhiteSpace(filterModel.Data.Value) &&
             filterModel.Data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
@@ -141,18 +130,11 @@ public sealed class FilterService(IState<FilterPaneState> filterPaneState) : IFi
         return true;
     }
 
-    public bool TryParseExpression(string? expression, out string error, bool ignoreXml = false)
+    public bool TryParseExpression(string? expression, out string error)
     {
         error = string.Empty;
 
         if (string.IsNullOrEmpty(expression)) { return false; }
-
-        if (!IsXmlEnabled && (expression.Contains("Xml.", StringComparison.OrdinalIgnoreCase) && !ignoreXml))
-        {
-            error = "Xml filtering is not enabled";
-
-            return false;
-        }
 
         try
         {

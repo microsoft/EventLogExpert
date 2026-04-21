@@ -11,6 +11,14 @@ namespace EventLogExpert.UI.Tests.Store.FilterPane;
 public sealed class FilterPaneStateTests
 {
     [Fact]
+    public void FilterPaneState_DefaultState_HasNoFilters()
+    {
+        var state = new FilterPaneState();
+
+        Assert.Empty(state.Filters);
+    }
+
+    [Fact]
     public void FilterPaneState_DefaultState_ShouldBeEnabled()
     {
         var state = new FilterPaneState();
@@ -40,14 +48,6 @@ public sealed class FilterPaneStateTests
         var state = new FilterPaneState();
 
         Assert.False(state.IsLoading);
-    }
-
-    [Fact]
-    public void FilterPaneState_DefaultState_ShouldNotBeXmlEnabled()
-    {
-        var state = new FilterPaneState();
-
-        Assert.False(state.IsXmlEnabled);
     }
 }
 
@@ -198,14 +198,6 @@ public sealed class FilterPaneActionTests
     public void ToggleIsLoadingAction_ShouldCreateAction()
     {
         var action = new FilterPaneAction.ToggleIsLoading();
-
-        Assert.NotNull(action);
-    }
-
-    [Fact]
-    public void ToggleIsXmlEnabledAction_ShouldCreateAction()
-    {
-        var action = new FilterPaneAction.ToggleIsXmlEnabled();
 
         Assert.NotNull(action);
     }
@@ -565,26 +557,6 @@ public sealed class FilterPaneReducerTests
 
         Assert.True(result.IsLoading);
     }
-
-    [Fact]
-    public void ReduceToggleIsXmlEnabled_ShouldToggleValue()
-    {
-        var state = new FilterPaneState { IsXmlEnabled = false };
-
-        var result = FilterPaneReducers.ReduceToggleIsXmlEnabled(state);
-
-        Assert.True(result.IsXmlEnabled);
-    }
-
-    [Fact]
-    public void ReduceToggleIsXmlEnabled_ShouldToggleValueToFalse()
-    {
-        var state = new FilterPaneState { IsXmlEnabled = true };
-
-        var result = FilterPaneReducers.ReduceToggleIsXmlEnabled(state);
-
-        Assert.False(result.IsXmlEnabled);
-    }
 }
 
 public sealed class FilterPaneIntegrationTests
@@ -601,7 +573,6 @@ public sealed class FilterPaneIntegrationTests
             ],
             FilteredDateRange = new FilterDateModel { After = DateTime.UtcNow },
             IsEnabled = false,
-            IsXmlEnabled = true,
             IsLoading = true
         };
 
@@ -610,7 +581,6 @@ public sealed class FilterPaneIntegrationTests
         Assert.Empty(state.Filters);
         Assert.Null(state.FilteredDateRange);
         Assert.False(state.IsEnabled);
-        Assert.False(state.IsXmlEnabled);
         Assert.False(state.IsLoading);
     }
 
@@ -803,23 +773,15 @@ public sealed class FilterPaneIntegrationTests
         var state = new FilterPaneState
         {
             IsEnabled = false,
-            IsXmlEnabled = false,
             IsLoading = false
         };
 
         state = FilterPaneReducers.ReduceToggleIsEnabled(state);
         Assert.True(state.IsEnabled);
-        Assert.False(state.IsXmlEnabled);
-        Assert.False(state.IsLoading);
-
-        state = FilterPaneReducers.ReduceToggleIsXmlEnabled(state);
-        Assert.True(state.IsEnabled);
-        Assert.True(state.IsXmlEnabled);
         Assert.False(state.IsLoading);
 
         state = FilterPaneReducers.ReduceToggleIsLoading(state);
         Assert.True(state.IsEnabled);
-        Assert.True(state.IsXmlEnabled);
         Assert.True(state.IsLoading);
     }
 }
