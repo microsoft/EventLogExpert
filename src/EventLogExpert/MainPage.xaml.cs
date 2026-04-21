@@ -40,7 +40,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly IDatabaseService _databaseService;
     private readonly IAlertDialogService _dialogService;
     private readonly IFileLogger _fileLogger;
-    private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsXmlEnabledState;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
@@ -55,7 +54,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
         IStateSelection<EventLogState, bool> continuouslyUpdateState,
         IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
-        IStateSelection<FilterPaneState, bool> filterPaneIsXmlEnabledState,
         IDatabaseService databaseService,
         ISettingsService settings,
         IAlertDialogService dialogService,
@@ -74,7 +72,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
         _databaseService = databaseService;
-        _filterPaneIsXmlEnabledState = filterPaneIsXmlEnabledState;
         _fileLogger = fileLogger;
         _fluxorDispatcher = fluxorDispatcher;
         _settings = settings;
@@ -99,12 +96,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         filterPaneIsEnabledState.SelectedValueChanged += (_, isEnabled) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
-
-        filterPaneIsXmlEnabledState.Select(e => e.IsXmlEnabled);
-
-        filterPaneIsXmlEnabledState.SelectedValueChanged += async (_, isEnabled) =>
-            await MainThread.InvokeOnMainThreadAsync(() =>
-                EnableXmlFilteringMenuItem.Text = $"Enable Xml Filtering{(isEnabled ? " ✓" : "")}");
 
         _databaseService.LoadedDatabasesChanged += (_, loadedProviders) =>
             databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
@@ -202,12 +193,14 @@ public sealed partial class MainPage : ContentPage, IDisposable
             new EventLogAction.SetContinuouslyUpdate(true) :
             new EventLogAction.SetContinuouslyUpdate(false));
 
-    private void CopySelected_Clicked(object sender, EventArgs e)
+    private async void CopySelected_Clicked(object sender, EventArgs e)
     {
         var item = sender as MenuFlyoutItem;
         var param = item?.CommandParameter as CopyType?;
 
-        _clipboardService.CopySelectedEvent(param);
+        // ClipboardService.CopySelectedEvent is best-effort and swallows exceptions internally,
+        // so no caller-side try/catch is needed even from this async void handler.
+        await _clipboardService.CopySelectedEvent(param);
     }
 
     private void CreateFlyoutMenu(MenuFlyoutSubItem rootMenu, IEnumerable<string> logNames, bool shouldAddLog = false)
@@ -307,32 +300,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
             }
 
             await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
-        }
-    }
-
-    private async void EnableXmlFiltering_Clicked(object? sender, EventArgs e)
-    {
-        if (_filterPaneIsXmlEnabledState.Value || _activeLogsState.Value.IsEmpty)
-        {
-            _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsXmlEnabled());
-
-            return;
-        }
-
-        var shouldReload = await _dialogService.ShowAlert("Reload Open Logs Now?",
-            "In order for these changes to take effect, all currently open logs must be reloaded. Would you like to reload all open logs now?",
-            "Yes", "No");
-
-        if (shouldReload is false) { return; }
-
-        var logsToReopen = _activeLogsState.Value;
-
-        _fluxorDispatcher.Dispatch(new EventLogAction.CloseAll());
-        _fluxorDispatcher.Dispatch(new FilterPaneAction.ToggleIsXmlEnabled());
-
-        foreach ((_, EventLogData data) in logsToReopen)
-        {
-            _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(data.Name, data.Type));
         }
     }
 

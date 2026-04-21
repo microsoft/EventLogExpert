@@ -98,7 +98,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -114,7 +114,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { filter };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.True(result);
@@ -130,7 +130,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { filter };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -144,7 +144,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -158,7 +158,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.True(result);
@@ -175,7 +175,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { includeFilter, excludeFilter };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -194,7 +194,7 @@ public sealed class FilterMethodsTests
         };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.True(result);
@@ -213,7 +213,7 @@ public sealed class FilterMethodsTests
         };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -227,7 +227,7 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel>();
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.True(result);
@@ -243,21 +243,21 @@ public sealed class FilterMethodsTests
         var filters = new List<FilterModel> { filter };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenXmlFilterAndXmlDisabled_ShouldReturnFalse()
+    public void Filter_WhenXmlFilterDoesNotMatch_ShouldReturnFalse()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
         var filters = new List<FilterModel> { CreateFilter(Constants.FilterXmlContainsData) };
 
         // Act
-        var result = @event.Filter(filters, false);
+        var result = @event.Filter(filters);
 
         // Assert
         Assert.False(result);
@@ -961,6 +961,20 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void SortEvents_WhenSingleItem_ShouldReturnSingleItem()
+    {
+        // Arrange
+        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+
+        // Act
+        var result = events.SortEvents(ColumnName.EventId);
+
+        // Assert
+        Assert.Single(result);
+        Assert.Equal(100, result[0].Id);
+    }
+
+    [Fact]
     public void SortEvents_WhenTiedOnPrimaryKey_ShouldBreakTieByRecordId()
     {
         // Arrange - all events have the same TimeCreated but different RecordIds
@@ -1000,20 +1014,6 @@ public sealed class FilterMethodsTests
         Assert.Equal(3L, result[0].RecordId);
         Assert.Equal(2L, result[1].RecordId);
         Assert.Equal(1L, result[2].RecordId);
-    }
-
-    [Fact]
-    public void SortEvents_WhenSingleItem_ShouldReturnSingleItem()
-    {
-        // Arrange
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
-
-        // Act
-        var result = events.SortEvents(ColumnName.EventId);
-
-        // Assert
-        Assert.Single(result);
-        Assert.Equal(100, result[0].Id);
     }
 
     private static FilterModel CreateFilter(string expression, bool isExcluded = false)

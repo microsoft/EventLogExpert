@@ -38,6 +38,4 @@ public sealed record FilterPaneAction
     public sealed record ToggleIsEnabled;
 
     public sealed record ToggleIsLoading;
-
-    public sealed record ToggleIsXmlEnabled;
 }

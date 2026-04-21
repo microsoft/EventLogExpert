@@ -1,5 +1,4 @@
-﻿@using System.Xml.Linq
-@inherits FluxorComponent
+﻿@inherits FluxorComponent
 
 <div data-toggle="@IsVisible" hidden="@(SelectedEvent is null)" id="details-pane">
     <div id="details-resizer"></div>
@@ -45,13 +44,17 @@
         </div>
 
         <p class="details-xml" data-toggle="@_isXmlVisible.ToString().ToLower()">
-            @if (!string.IsNullOrEmpty(SelectedEvent.Xml))
+            @if (_resolvedXml is null)
             {
-                @XElement.Parse(SelectedEvent.Xml)
+                <text>Resolving XML...</text>
+            }
+            else if (_resolvedXml.Length > 0)
+            {
+                @GetXmlForDisplay()
             }
             else
             {
-                <text>Resolving XML...</text>
+                <text>No XML available for this event.</text>
             }
         </p>
     }

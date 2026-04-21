@@ -10,8 +10,6 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IFilterService
 {
-    bool IsXmlEnabled { get; }
-
     IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter);
@@ -20,5 +18,5 @@ public interface IFilterService
 
     bool TryParse(FilterModel filterModel, out string comparison);
 
-    bool TryParseExpression(string? expression, out string error, bool ignoreXml = false);
+    bool TryParseExpression(string? expression, out string error);
 }

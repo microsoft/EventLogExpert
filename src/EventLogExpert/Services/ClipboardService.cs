@@ -1,6 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
@@ -15,7 +17,7 @@ namespace EventLogExpert.Services;
 
 public interface IClipboardService
 {
-    void CopySelectedEvent(CopyType? copyType = null);
+    Task CopySelectedEvent(CopyType? copyType = null);
 }
 
 public sealed class ClipboardService : IClipboardService
@@ -23,44 +25,58 @@ public sealed class ClipboardService : IClipboardService
     private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
     private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
     private readonly ISettingsService _settings;
+    private readonly ITraceLogger _traceLogger;
+    private readonly IEventXmlResolver _xmlResolver;
 
     public ClipboardService(
         IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
-        ISettingsService settings)
+        ISettingsService settings,
+        IEventXmlResolver xmlResolver,
+        ITraceLogger traceLogger)
     {
         _eventTableColumns = eventTableColumns;
         _selectedEvents = selectedEvents;
         _settings = settings;
+        _xmlResolver = xmlResolver;
+        _traceLogger = traceLogger;
 
         _eventTableColumns.Select(s => s.Columns);
         _selectedEvents.Select(s => s.SelectedEvents);
     }
 
-    public void CopySelectedEvent(CopyType? copyType = null)
+    public async Task CopySelectedEvent(CopyType? copyType = null)
     {
-        if (_selectedEvents.Value.IsEmpty) { return; }
-
-        if (_selectedEvents.Value.Count == 1)
+        // Copy is best-effort: most callers are Blazor event handlers that don't catch, so any
+        // failure (clipboard unavailable, XML parse, resolver fault) would surface as an
+        // unhandled UI exception. Log and swallow to preserve previous fire-and-forget behavior.
+        try
         {
-            Clipboard.SetTextAsync(GetFormattedEvent(copyType, _selectedEvents.Value[0]));
+            string stringToCopy = await GetFormattedEvent(copyType).ConfigureAwait(false);
 
-            return;
+            await Clipboard.SetTextAsync(stringToCopy).ConfigureAwait(false);
         }
-
-        StringBuilder stringToCopy = new();
-
-        foreach (var selectedEvent in _selectedEvents.Value)
+        catch (Exception ex)
         {
-            stringToCopy.AppendLine(GetFormattedEvent(copyType, selectedEvent));
+            _traceLogger.Error($"ClipboardService: failed to copy selected event(s): {ex}");
         }
-
-        Clipboard.SetTextAsync(stringToCopy.ToString());
     }
 
-    private string GetFormattedEvent(CopyType? copyType, DisplayEventModel @event)
+    private static string FormatXmlForCopy(string xml)
     {
-        switch (copyType ?? _settings.CopyType)
+        try
+        {
+            return XElement.Parse(xml).ToString();
+        }
+        catch (System.Xml.XmlException)
+        {
+            return xml;
+        }
+    }
+
+    private string FormatEventForCopy(CopyType copyType, DisplayEventModel @event, string xml)
+    {
+        switch (copyType)
         {
             case CopyType.Default:
                 StringBuilder defaultEvent = new();
@@ -120,9 +136,7 @@ public sealed class ClipboardService : IClipboardService
 
                 return simpleEvent.ToString();
             case CopyType.Xml:
-                return string.IsNullOrEmpty(@event.Xml) ?
-                    string.Empty :
-                    XElement.Parse(@event.Xml).ToString();
+                return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
             case CopyType.Full:
             default:
                 StringBuilder fullEvent = new();
@@ -140,12 +154,80 @@ public sealed class ClipboardService : IClipboardService
                 fullEvent.AppendLine(@event.Description);
                 fullEvent.AppendLine("Event Xml:");
 
-                if (!string.IsNullOrEmpty(@event.Xml))
+                if (!string.IsNullOrEmpty(xml))
                 {
-                    fullEvent.AppendLine(XElement.Parse(@event.Xml).ToString());
+                    fullEvent.AppendLine(FormatXmlForCopy(xml));
                 }
 
                 return fullEvent.ToString();
+        }
+    }
+
+    private async Task<string> GetFormattedEvent(CopyType? copyType)
+    {
+        // Snapshot the selection once. Re-reading _selectedEvents.Value across awaits could see
+        // a different (or empty) list if selection changes mid-resolve, leading to copying the
+        // wrong event or an IndexOutOfRangeException.
+        var events = _selectedEvents.Value;
+
+        if (events.IsEmpty) { return string.Empty; }
+
+        var resolvedType = copyType ?? _settings.CopyType;
+        bool needsXml = resolvedType is CopyType.Xml or CopyType.Full;
+
+        if (events.Count == 1)
+        {
+            string xml = needsXml ? await _xmlResolver.GetXmlAsync(events[0]) : string.Empty;
+
+            return FormatEventForCopy(resolvedType, events[0], xml);
+        }
+
+        string[] xmlByIndex;
+
+        if (needsXml)
+        {
+            int maxConcurrency = Math.Max(2, Math.Min(events.Count, Environment.ProcessorCount));
+            using var resolverLock = new SemaphoreSlim(maxConcurrency, maxConcurrency);
+
+            var resolveTasks = new Task<string>[events.Count];
+
+            for (int i = 0; i < events.Count; i++)
+            {
+                var evt = events[i];
+
+                resolveTasks[i] = ResolveXmlAsync(evt, resolverLock);
+            }
+
+            xmlByIndex = await Task.WhenAll(resolveTasks);
+        }
+        else
+        {
+            xmlByIndex = [];
+        }
+
+        StringBuilder stringToCopy = new();
+
+        for (int i = 0; i < events.Count; i++)
+        {
+            string xml = needsXml ? xmlByIndex[i] : string.Empty;
+
+            stringToCopy.AppendLine(FormatEventForCopy(resolvedType, events[i], xml));
+        }
+
+        return stringToCopy.ToString();
+    }
+
+    private async Task<string> ResolveXmlAsync(DisplayEventModel evt, SemaphoreSlim resolverLock)
+    {
+        await resolverLock.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            return await _xmlResolver.GetXmlAsync(evt).ConfigureAwait(false);
+        }
+        finally
+        {
+            resolverLock.Release();
         }
     }
 }
