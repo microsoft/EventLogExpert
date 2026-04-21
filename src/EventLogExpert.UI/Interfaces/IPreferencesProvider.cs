@@ -32,5 +32,7 @@ public interface IPreferencesProvider
 
     IEnumerable<FilterGroupModel> SavedFiltersPreference { get; set; }
 
+    Theme ThemePreference { get; set; }
+
     string TimeZonePreference { get; set; }
 }

@@ -57,6 +57,16 @@
             </div>
 
             <div class="flex-center-aligned-row">
+                <text>Theme:</text>
+                <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
+                    @foreach (Theme item in Enum.GetValues(typeof(Theme)))
+                    {
+                        <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
+                    }
+                </ValueSelect>
+            </div>
+
+            <div class="flex-center-aligned-row">
                 <text>Keyboard Copy Behavior:</text>
                 <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyType" CssClass="input filter-dropdown" T="CopyType">
                     @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))

@@ -22,6 +22,8 @@ public sealed partial class ValueSelect<T> : BaseComponent<T>, IAsyncDisposable
 
     [Parameter] public string? AriaLabelledBy { get; set; }
 
+    [Parameter] public string? DataHighlight { get; set; }
+
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 

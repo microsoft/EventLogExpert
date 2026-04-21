@@ -6,11 +6,11 @@
         {
             @if (!Value.IsExcluded)
             {
-                <ValueSelect CssClass="@($"input color-dropdown {Value.Color.ToString().ToLower()}")"
+                <ValueSelect CssClass="input color-dropdown" DataHighlight="@(Value.Color == HighlightColor.None ? null : Value.Color.ToString().ToLowerInvariant())"
                     T="HighlightColor" @bind-Value="Value.Color">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
-                        <ValueSelectItem CssClass="@($"color-dropdown-item {item.ToString().ToLower()}")" T="HighlightColor" Value="item" />
+                        <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
                     }
                 </ValueSelect>
             }
@@ -37,7 +37,7 @@
         {
             @if (Value.Color != HighlightColor.None)
             {
-                <div class="mx-2 @($"color-box {Value.Color.ToString().ToLower()}")"></div>
+                <div class="mx-2 color-box" data-highlight="@Value.Color.ToString().ToLowerInvariant()"></div>
             }
 
             @if (Value.IsExcluded)

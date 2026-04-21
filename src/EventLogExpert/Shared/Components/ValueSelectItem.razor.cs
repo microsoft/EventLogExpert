@@ -20,6 +20,9 @@ public sealed partial class ValueSelectItem<T> : IDisposable
     public string CssClass { get; set; } = string.Empty;
 
     [Parameter]
+    public string? DataHighlight { get; set; }
+
+    [Parameter]
     public bool IsDisabled { get; set; }
 
     public string ItemId { get; } = $"_{Guid.NewGuid().ToString()[..8]}";

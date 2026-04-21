@@ -77,7 +77,7 @@
             <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_OnDrop" DragOver="DropGestureRecognizer_OnDragOver" />
         </Grid.GestureRecognizers>
         
-        <BlazorWebView HostPage="wwwroot/index.html">
+        <BlazorWebView x:Name="MainWebView" HostPage="wwwroot/index.html" BlazorWebViewInitialized="MainWebView_BlazorWebViewInitialized">
             <BlazorWebView.RootComponents>
                 <RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />
             </BlazorWebView.RootComponents>

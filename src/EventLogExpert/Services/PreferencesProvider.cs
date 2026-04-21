@@ -23,6 +23,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
     private const string SavedFilters = "saved-filters";
+    private const string ThemeName = "theme";
     private const string TimeZone = "timezone";
 
     public IEnumerable<ColumnName> ColumnOrderPreference
@@ -74,7 +75,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
 
     public CopyType KeyboardCopyTypePreference
     {
-        get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyType, CopyType.Full.ToString()),
+        get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyType, nameof(CopyType.Full)),
             out CopyType value) ?
             value : CopyType.Full;
         set => Preferences.Default.Set(KeyboardCopyType, value.ToString());
@@ -82,7 +83,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
 
     public LogLevel LogLevelPreference
     {
-        get => Enum.TryParse(Preferences.Default.Get(LoggingLevel, LogLevel.Information.ToString()),
+        get => Enum.TryParse(Preferences.Default.Get(LoggingLevel, nameof(LogLevel.Information)),
             out LogLevel value) ?
             value : LogLevel.Information;
         set => Preferences.Default.Set(LoggingLevel, value.ToString());
@@ -104,6 +105,14 @@ public sealed class PreferencesProvider : IPreferencesProvider
     {
         get => JsonSerializer.Deserialize<List<FilterGroupModel>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
         set => Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value));
+    }
+
+    public Theme ThemePreference
+    {
+        get => Enum.TryParse(Preferences.Default.Get(ThemeName, nameof(Theme.System)),
+            out Theme value) ?
+            value : Theme.System;
+        set => Preferences.Default.Set(ThemeName, value.ToString());
     }
 
     public string TimeZonePreference

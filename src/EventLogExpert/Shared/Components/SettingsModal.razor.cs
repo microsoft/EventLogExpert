@@ -25,6 +25,7 @@ public sealed partial class SettingsModal : IDisposable
     private LogLevel _logLevel;
     private bool _shouldReload = false;
     private bool _showDisplayPaneOnSelectionChange;
+    private Theme _theme;
     private string _timeZoneId = string.Empty;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
@@ -138,6 +139,7 @@ public sealed partial class SettingsModal : IDisposable
         _isPreReleaseEnabled = Settings.IsPreReleaseEnabled;
         _logLevel = Settings.LogLevel;
         _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;
+        _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
 
         _databases.Clear();
@@ -228,6 +230,7 @@ public sealed partial class SettingsModal : IDisposable
         Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
         Settings.LogLevel = _logLevel;
         Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
+        Settings.Theme = _theme;
         Settings.TimeZoneId = _timeZoneId;
 
         if (_databases.Any(database => database.hasChanged))

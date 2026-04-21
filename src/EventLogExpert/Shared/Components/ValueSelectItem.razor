@@ -1,6 +1,7 @@
 @typeparam T
 
 <div aria-disabled="@(IsDisabled ? "true" : null)" aria-selected="@IsSelected.ToString().ToLower()" class="@CssClass"
+    data-highlight="@DataHighlight"
     highlighted="@(IsHighlighted ? "" : null)"
     id="@ItemId" @onmousedown="SelectItem" @onmouseenter="HighlightItem" role="option">
 

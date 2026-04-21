@@ -35,11 +35,14 @@
     box-shadow: none;
     color: var(--clr-black);
 
-    &[data-single-color="true"] { background-color: var(--clr-lightblue); }
+    &[data-single-color="true"] {
+        background-color: var(--clr-lightblue);
+        color: var(--accent-on-fill);
+    }
 }
 
 .toggle input:checked + label:first-of-type { background-color: var(--clr-red); }
 
 .toggle input:checked + label:last-of-type { background-color: var(--clr-green); }
 
-.toggle input:focus + label { border: 1px solid var(--clr-white); }
+.toggle input:focus + label { border: 1px solid var(--clr-statusbar); }

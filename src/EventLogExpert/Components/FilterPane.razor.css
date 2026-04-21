@@ -25,4 +25,4 @@
     border: none;
 }
 
-#filter-form > input { color: #fff; }
+#filter-form > input { color: var(--text-primary); }

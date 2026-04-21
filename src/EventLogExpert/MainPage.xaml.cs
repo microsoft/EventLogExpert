@@ -17,7 +17,9 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
+using Microsoft.AspNetCore.Components.WebView;
 using Microsoft.UI.Xaml;
+using Microsoft.Web.WebView2.Core;
 using System.Collections.Immutable;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
@@ -37,14 +39,15 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IDatabaseService _databaseService;
     private readonly IAlertDialogService _dialogService;
+    private readonly IFileLogger _fileLogger;
     private readonly IStateSelection<FilterPaneState, bool> _filterPaneIsXmlEnabledState;
     private readonly IDispatcher _fluxorDispatcher;
     private readonly ISettingsService _settings;
-    private readonly IFileLogger _fileLogger;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
 
     private CancellationTokenSource _cancellationTokenSource = new();
+    private Microsoft.Web.WebView2.Core.CoreWebView2? _coreWebView;
 
     public MainPage(
         IDispatcher fluxorDispatcher,
@@ -108,6 +111,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
                 Path.Join(fileLocationOptions.DatabasePath, path)));
 
         _settings.CopyTypeChanged += SetCopyKeyboardAccelerator;
+        _settings.ThemeChanged += OnThemeChanged;
 
         fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
         fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
@@ -119,6 +123,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     public void Dispose()
     {
         _settings.CopyTypeChanged -= SetCopyKeyboardAccelerator;
+        _settings.ThemeChanged -= OnThemeChanged;
 
         _cancellationTokenSource.Cancel();
         _cancellationTokenSource.Dispose();
@@ -154,6 +159,19 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
 
         return fileResults;
+    }
+
+    private void ApplyWebViewTheme(Theme theme)
+    {
+        // Keep WebView2's prefers-color-scheme aligned with the user's choice
+        // so the "System" path (data-theme attribute removed) actually follows
+        // the OS, and so explicit Light/Dark stays consistent across the page.
+        _coreWebView?.Profile.PreferredColorScheme = theme switch
+        {
+            Theme.Light => CoreWebView2PreferredColorScheme.Light,
+            Theme.Dark => CoreWebView2PreferredColorScheme.Dark,
+            _ => CoreWebView2PreferredColorScheme.Auto,
+        };
     }
 
     private async void CheckForUpdates_Clicked(object? sender, EventArgs e)
@@ -323,6 +341,38 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private void LoadNewEvents_Clicked(object sender, EventArgs e) =>
         _fluxorDispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+
+    private void MainWebView_BlazorWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
+    {
+        // Inject the saved theme synchronously into every document the WebView2
+        // creates so the page renders with the correct palette on first paint
+        // (avoids the dark→light flash while Blazor boots and calls setTheme).
+        // Also align WebView2's prefers-color-scheme with the saved choice so
+        // the System theme path lights up the right CSS branch immediately.
+        _coreWebView = e.WebView.CoreWebView2;
+
+        if (_coreWebView is null) { return; }
+
+        ApplyWebViewTheme(_settings.Theme);
+
+        var themeAttr = _settings.Theme switch
+        {
+            Theme.Light => "light",
+            Theme.Dark => "dark",
+            _ => null,
+        };
+
+        var script = themeAttr is null
+            ? "document.documentElement.removeAttribute('data-theme');"
+            : $"document.documentElement.setAttribute('data-theme','{themeAttr}');";
+
+        _ = _coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(script);
+    }
+
+    private void OnThemeChanged() =>
+        // ThemeChanged may be raised from non-UI threads; marshal to the UI
+        // thread before touching WebView2's profile.
+        MainThread.BeginInvokeOnMainThread(() => ApplyWebViewTheme(_settings.Theme));
 
     // TODO: Extract this so it can be called from the MainPage keyup handler
     private async void OpenFile_Clicked(object sender, EventArgs e)

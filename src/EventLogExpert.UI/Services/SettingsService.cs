@@ -14,6 +14,7 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
     private bool? _isPreReleaseEnabled;
     private LogLevel? _logLevel;
     private bool? _showDisplayPaneOnSelectionChange;
+    private Theme? _theme;
     private string? _timeZoneId;
 
     public CopyType CopyType
@@ -91,6 +92,26 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
             _preferences.DisplayPaneSelectionPreference = value;
         }
     }
+
+    public Theme Theme
+    {
+        get
+        {
+            _theme ??= _preferences.ThemePreference;
+
+            return _theme ?? Theme.System;
+        }
+        set
+        {
+            if (_theme == value) { return; }
+
+            _theme = value;
+            _preferences.ThemePreference = value;
+            ThemeChanged?.Invoke();
+        }
+    }
+
+    public Action? ThemeChanged { get; set; }
 
     public EventHandler<TimeZoneInfo>? TimeZoneChanged { get; set; }
 
