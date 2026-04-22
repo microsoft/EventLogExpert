@@ -34,7 +34,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 {
     private static readonly KeyboardAccelerator s_copyShortcut = new() { Modifiers = KeyboardAcceleratorModifiers.Ctrl, Key = "C" };
 
-    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogsState;
+    private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogs;
     private readonly IClipboardService _clipboardService;
     private readonly ICurrentVersionProvider _currentVersionProvider;
     private readonly IDatabaseService _databaseService;
@@ -51,9 +51,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
     public MainPage(
         IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
-        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
-        IStateSelection<EventLogState, bool> continuouslyUpdateState,
-        IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
+        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
+        IStateSelection<EventLogState, bool> continuouslyUpdate,
+        IStateSelection<FilterPaneState, bool> filterPaneIsEnabled,
         IDatabaseService databaseService,
         ISettingsService settings,
         IAlertDialogService dialogService,
@@ -68,7 +68,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         InitializeComponent();
         PopulateOtherLogsMenu();
 
-        _activeLogsState = activeLogsState;
+        _activeLogs = activeLogs;
         _clipboardService = clipboardService;
         _currentVersionProvider = currentVersionProvider;
         _databaseService = databaseService;
@@ -79,21 +79,21 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _traceLogger = traceLogger;
         _updateService = updateService;
 
-        activeLogsState.Select(e => e.ActiveLogs);
+        _activeLogs.Select(e => e.ActiveLogs);
 
-        activeLogsState.SelectedValueChanged += (_, activeLogs) =>
+        _activeLogs.SelectedValueChanged += (_, updatedActiveLogs) =>
             MainThread.InvokeOnMainThreadAsync(() =>
-                appTitleService.SetLogName(activeLogs.Count <= 0 ? null : string.Join(" | ", activeLogs.Values.Select(l => l.Name))));
+                appTitleService.SetLogName(updatedActiveLogs.Count <= 0 ? null : string.Join(" | ", updatedActiveLogs.Values.Select(l => l.Name))));
 
-        continuouslyUpdateState.Select(e => e.ContinuouslyUpdate);
+        continuouslyUpdate.Select(e => e.ContinuouslyUpdate);
 
-        continuouslyUpdateState.SelectedValueChanged += (_, continuouslyUpdate) =>
+        continuouslyUpdate.SelectedValueChanged += (_, isContinuouslyUpdating) =>
             MainThread.InvokeOnMainThreadAsync(() =>
-                ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(continuouslyUpdate ? " ✓" : "")}");
+                ContinuouslyUpdateMenuItem.Text = $"Continuously Update{(isContinuouslyUpdating ? " ✓" : "")}");
 
-        filterPaneIsEnabledState.Select(e => e.IsEnabled);
+        filterPaneIsEnabled.Select(e => e.IsEnabled);
 
-        filterPaneIsEnabledState.SelectedValueChanged += (_, isEnabled) =>
+        filterPaneIsEnabled.SelectedValueChanged += (_, isEnabled) =>
             MainThread.InvokeOnMainThreadAsync(() =>
                 ShowAllEventsMenuItem.Text = $"Show All Events{(isEnabled ? "" : " ✓")}");
 
@@ -294,9 +294,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         foreach (var item in items)
         {
-            if (item is not StorageFile file || _activeLogsState.Value.Any(l => l.Key == file.Path))
+            if (item is not StorageFile file || _activeLogs.Value.ContainsKey(file.Path))
             {
-                return;
+                continue;
             }
 
             await OpenLog($"{file.Path}", PathType.FilePath, shouldAddLog: true);
@@ -404,7 +404,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         if (string.IsNullOrWhiteSpace(logPath)) { return; }
 
-        if (_activeLogsState.Value.Any(l => l.Key == logPath)) { return; }
+        if (_activeLogs.Value.ContainsKey(logPath)) { return; }
 
         EventLogInformation? eventLogInformation;
 

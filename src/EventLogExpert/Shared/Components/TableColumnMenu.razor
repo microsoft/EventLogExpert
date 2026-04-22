@@ -1,7 +1,7 @@
 @inherits FluxorComponent
 
 <div id="table-column-menu">
-    @foreach (var column in EventTableColumnsState.Value)
+    @foreach (var column in EventTableColumns.Value)
     {
         <div @onclick="() => ToggleColumn(column.Key)"
             @onkeydown="e => HandleActivationKey(e, () => ToggleColumn(column.Key))"
@@ -20,7 +20,7 @@
     <div class="sub-menu">
         <div aria-haspopup="menu" role="button" tabindex="0">Order By <i class="bi bi-caret-right"></i></div>
         <ul role="menu">
-            @foreach (var column in EventTableColumnsState.Value)
+            @foreach (var column in EventTableColumns.Value)
             {
                 <li @onclick="() => OrderColumn(column.Key)"
                     @onkeydown="e => HandleActivationKey(e, () => OrderColumn(column.Key))"

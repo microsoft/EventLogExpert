@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
@@ -25,9 +25,9 @@ public sealed partial class App : Application
     public App(
         IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
-        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogsState,
-        IStateSelection<EventLogState, bool> continuouslyUpdateState,
-        IStateSelection<FilterPaneState, bool> filterPaneIsEnabledState,
+        IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
+        IStateSelection<EventLogState, bool> continuouslyUpdate,
+        IStateSelection<FilterPaneState, bool> filterPaneIsEnabled,
         IDatabaseService databaseService,
         ISettingsService settings,
         IAlertDialogService dialogService,
@@ -51,9 +51,9 @@ public sealed partial class App : Application
         _mainPage = new MainPage(
             fluxorDispatcher,
             databaseCollectionProvider,
-            activeLogsState,
-            continuouslyUpdateState,
-            filterPaneIsEnabledState,
+            activeLogs,
+            continuouslyUpdate,
+            filterPaneIsEnabled,
             databaseService,
             settings,
             dialogService,

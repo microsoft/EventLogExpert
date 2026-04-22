@@ -30,7 +30,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
     private readonly Lock _watchersLock = new();
 
     public LiveLogWatcherService(
-        IStateSelection<EventLogState, bool> bufferFullStateSelection,
+        IStateSelection<EventLogState, bool> newEventBufferIsFull,
         ITraceLogger debugLogger,
         IDispatcher dispatcher,
         IServiceScopeFactory serviceScopeFactory)
@@ -39,9 +39,9 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         _dispatcher = dispatcher;
         _serviceScopeFactory = serviceScopeFactory;
 
-        bufferFullStateSelection.Select(s => s.NewEventBufferIsFull);
+        newEventBufferIsFull.Select(s => s.NewEventBufferIsFull);
 
-        bufferFullStateSelection.SelectedValueChanged += (sender, isFull) =>
+        newEventBufferIsFull.SelectedValueChanged += (sender, isFull) =>
         {
             if (isFull)
             {
