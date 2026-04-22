@@ -134,10 +134,6 @@ public sealed class FilterPaneEffects(
     public async Task HandleToggleFilterDate(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
 
-    [EffectMethod(typeof(FilterPaneAction.ToggleFilterEditing))]
-    public async Task HandleToggleFilterEditing(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
-
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterEnabled))]
     public async Task HandleToggleFilterEnabled(IDispatcher dispatcher) =>
         await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);

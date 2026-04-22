@@ -435,20 +435,6 @@ public sealed class FilterPaneEffectsTests
     }
 
     [Fact]
-    public async Task HandleToggleFilterEditing_ShouldUpdateEventTableFilters()
-    {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
-
-        // Act
-        await effects.HandleToggleFilterEditing(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
-    }
-
-    [Fact]
     public async Task HandleToggleFilterEnabled_ShouldUpdateEventTableFilters()
     {
         // Arrange
@@ -488,6 +474,31 @@ public sealed class FilterPaneEffectsTests
         // Assert
         mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
+    }
+
+    [Fact]
+    public void ToggleFilterEditing_ShouldNotBeWiredAsAnEffect()
+    {
+        // ToggleFilterEditing only flips a UI flag; it must not trigger a re-filter.
+        // Guard against the previous behavior re-emerging by asserting no effect handler exists,
+        // covering both [EffectMethod(typeof(...))] and parameter-binding [EffectMethod] forms.
+        var hasEffect = typeof(FilterPaneEffects)
+            .GetMethods()
+            .Where(method => method.GetCustomAttributes(typeof(EffectMethodAttribute), inherit: false).Any())
+            .Any(method =>
+            {
+                var explicitMatch = method
+                    .GetCustomAttributes(typeof(EffectMethodAttribute), inherit: false)
+                    .Cast<EffectMethodAttribute>()
+                    .Any(attribute => attribute.ActionType == typeof(FilterPaneAction.ToggleFilterEditing));
+
+                var parameterMatch = method.GetParameters()
+                    .Any(parameter => parameter.ParameterType == typeof(FilterPaneAction.ToggleFilterEditing));
+
+                return explicitMatch || parameterMatch;
+            });
+
+        Assert.False(hasEffect, "ToggleFilterEditing must not have an EffectMethod that triggers a re-filter.");
     }
 
     [Fact]
