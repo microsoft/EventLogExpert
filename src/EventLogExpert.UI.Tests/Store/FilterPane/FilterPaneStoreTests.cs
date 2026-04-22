@@ -266,6 +266,34 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceApplyFilterGroup_ShouldPreserveIsExcludedOnAppliedFilters()
+    {
+        // Regression: previously the IsExcluded flag from grouped filters was dropped when
+        // copying them into the pane.
+        var state = new FilterPaneState();
+
+        var filterGroup = new FilterGroupModel
+        {
+            Filters =
+            [
+                new FilterModel
+                {
+                    Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+                    IsExcluded = true
+                }
+            ]
+        };
+
+        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+
+        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+
+        Assert.Single(result.Filters);
+        Assert.True(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[0].IsEnabled);
+    }
+
+    [Fact]
     public void ReduceApplyFilterGroup_WithDuplicateFilter_ShouldSkipDuplicate()
     {
         var existingFilter = new FilterModel
@@ -325,6 +353,40 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceApplyFilterGroup_WithSameComparisonButDifferentExclusion_ShouldKeepBoth()
+    {
+        // Dedupe key is (Comparison.Value, IsExcluded) so an "Id == 100" include and an
+        // "Id == 100" exclude are treated as semantically different filters.
+        var existingInclude = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsExcluded = false
+        };
+
+        var state = new FilterPaneState { Filters = [existingInclude] };
+
+        var filterGroup = new FilterGroupModel
+        {
+            Filters =
+            [
+                new FilterModel
+                {
+                    Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+                    IsExcluded = true
+                }
+            ]
+        };
+
+        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+
+        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+
+        Assert.Equal(2, result.Filters.Count);
+        Assert.False(result.Filters[0].IsExcluded);
+        Assert.True(result.Filters[1].IsExcluded);
+    }
+
+    [Fact]
     public void ReduceClearFilters_ShouldClearFiltersButPreserveIsEnabled()
     {
         var state = new FilterPaneState
@@ -376,9 +438,8 @@ public sealed class FilterPaneReducerTests
     [Fact]
     public void ReduceRemoveSubFilter_WithValidParentAndSubFilter_ShouldRemoveSubFilter()
     {
-        var parentFilter = new FilterModel();
         var subFilter = new FilterModel();
-        parentFilter.SubFilters.Add(subFilter);
+        var parentFilter = new FilterModel { SubFilters = [subFilter] };
         var state = new FilterPaneState { Filters = [parentFilter] };
         var action = new FilterPaneAction.RemoveSubFilter(parentFilter.Id, subFilter.Id);
 
@@ -407,6 +468,70 @@ public sealed class FilterPaneReducerTests
 
         Assert.Single(result.Filters);
         Assert.Equal(Constants.FilterIdEquals200, result.Filters[0].Comparison.Value);
+    }
+
+    [Fact]
+    public void ReduceSetFilter_WhenIdFound_ShouldNotDuplicate()
+    {
+        var existing = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
+        var state = new FilterPaneState { Filters = [existing] };
+
+        var replacement = existing with
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals200 }
+        };
+
+        var action = new FilterPaneAction.SetFilter(replacement);
+
+        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+
+        Assert.Single(result.Filters);
+        Assert.Equal(existing.Id, result.Filters[0].Id);
+        Assert.Equal(Constants.FilterIdEquals200, result.Filters[0].Comparison.Value);
+    }
+
+    [Fact]
+    public void ReduceSetFilter_WhenIdFound_ShouldReplaceInPlaceWithoutReordering()
+    {
+        // Guards against the previous Where(...).Concat([new]) implementation which reordered
+        // the list by appending the replacement at the end.
+        var first = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
+        var middle = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals200 } };
+        var last = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterLevelEqualsError } };
+
+        var state = new FilterPaneState { Filters = [first, middle, last] };
+
+        var replacement = middle with
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdGreaterThan100 }
+        };
+
+        var action = new FilterPaneAction.SetFilter(replacement);
+
+        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+
+        Assert.Equal(3, result.Filters.Count);
+        Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].Comparison.Value);
+        Assert.Equal(Constants.FilterIdGreaterThan100, result.Filters[1].Comparison.Value);
+        Assert.Equal(Constants.FilterLevelEqualsError, result.Filters[2].Comparison.Value);
+    }
+
+    [Fact]
+    public void ReduceSetFilter_WhenIdNotFound_ShouldAppend()
+    {
+        // Characterizes the upsert contract: ContextMenu and other callers dispatch SetFilter
+        // with a brand-new Id and rely on the reducer appending it.
+        var existing = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
+        var state = new FilterPaneState { Filters = [existing] };
+
+        var newFilter = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals200 } };
+        var action = new FilterPaneAction.SetFilter(newFilter);
+
+        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+
+        Assert.Equal(2, result.Filters.Count);
+        Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].Comparison.Value);
+        Assert.Equal(Constants.FilterIdEquals200, result.Filters[1].Comparison.Value);
     }
 
     [Fact]
