@@ -4,8 +4,8 @@
 
 <SplitLogTabPane />
 
-<div class="table-container">
-    <table aria-label="Event Log Table" aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)" id="eventTable" @onkeydown="HandleKeyDown" role="grid">
+<div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
+    <table aria-label="Event Log Table" aria-multiselectable="true" aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)" id="eventTable" role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu">
         <tr role="row">
             @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)

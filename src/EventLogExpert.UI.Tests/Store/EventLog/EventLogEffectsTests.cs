@@ -523,8 +523,8 @@ public sealed class EventLogEffectsTests
 
         await effects.HandleLoadEvents(new EventLogAction.LoadEvents(logData, reloadedEvents), mockDispatcher);
 
-        // Assert — SelectEvents dispatched with exactly the restored event (RecordId=42).
-        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.SelectEvents>(a =>
+        // Assert — SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.SetSelectedEvents>(a =>
             a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
     }
 

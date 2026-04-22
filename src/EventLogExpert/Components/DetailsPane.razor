@@ -1,6 +1,6 @@
-﻿@inherits FluxorComponent
+@inherits FluxorComponent
 
-<div data-toggle="@IsVisible" hidden="@(SelectedEvent is null)" id="details-pane">
+<div data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" id="details-pane">
     <div id="details-resizer"></div>
 
     <div aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")" class="flex-space-between" id="details-header"
@@ -12,23 +12,23 @@
         </span>
     </div>
 
-    @if (SelectedEvent is not null)
+    @if (_selectedEvent is not null)
     {
         <div class="details-group" data-toggle="@_isXmlVisible.ToString().ToLower()">
             <div class="d-flex flex-row">
-                <div>Log Name: @SelectedEvent.LogName</div>
-                <div>Source: @SelectedEvent.Source</div>
-                <div>Event Id: @SelectedEvent.Id</div>
-                <div>Level: @SelectedEvent.Level</div>
-                @if (SelectedEvent.Keywords.Any())
+                <div>Log Name: @_selectedEvent.LogName</div>
+                <div>Source: @_selectedEvent.Source</div>
+                <div>Event Id: @_selectedEvent.Id</div>
+                <div>Level: @_selectedEvent.Level</div>
+                @if (_selectedEvent.Keywords.Any())
                 {
-                    <div>Keywords: @SelectedEvent.KeywordsDisplayName</div>
+                    <div>Keywords: @_selectedEvent.KeywordsDisplayName</div>
                 }
-                <div>Date and Time: @SelectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
+                <div>Date and Time: @_selectedEvent.TimeCreated.ConvertTimeZone(Settings.TimeZoneInfo)</div>
             </div>
 
             <div>Description:</div>
-            <p class="details-description">@SelectedEvent.Description</p>
+            <p class="details-description">@_selectedEvent.Description</p>
         </div>
 
         <hr />

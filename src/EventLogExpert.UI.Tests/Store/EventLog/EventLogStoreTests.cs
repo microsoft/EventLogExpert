@@ -498,6 +498,20 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceCloseAll_ShouldClearSelectedEvent()
+    {
+        // Arrange
+        var first = EventUtils.CreateTestEvent(100);
+        var state = new EventLogState { SelectedEvents = [first], SelectedEvent = first };
+
+        // Act
+        var newState = EventLogReducers.ReduceCloseAll(state);
+
+        // Assert
+        Assert.Null(newState.SelectedEvent);
+    }
+
+    [Fact]
     public void ReduceCloseLog_ShouldFilterNewEventBuffer()
     {
         // Arrange
@@ -734,6 +748,40 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceSelectEvent_OnToggleOff_ShouldKeepSelectedEvent()
+    {
+        // Arrange — Explorer-style: toggling off a row leaves the cursor on it.
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = first };
+        var action = new EventLogAction.SelectEvent(second, IsMultiSelect: true);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvent(state, action);
+
+        // Assert
+        Assert.DoesNotContain(second, newState.SelectedEvents);
+        Assert.Same(second, newState.SelectedEvent);
+    }
+
+    [Fact]
+    public void ReduceSelectEvent_ShouldSetSelectedEventOnAdd()
+    {
+        // Arrange
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var state = new EventLogState { SelectedEvents = [first], SelectedEvent = first };
+        var action = new EventLogAction.SelectEvent(second, IsMultiSelect: true);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvent(state, action);
+
+        // Assert
+        Assert.Contains(second, newState.SelectedEvents);
+        Assert.Same(second, newState.SelectedEvent);
+    }
+
+    [Fact]
     public void ReduceSelectEvent_WhenEventNotSelected_ShouldAddEvent()
     {
         // Arrange
@@ -801,18 +849,40 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceSelectEvent_WhenShouldStaySelected_ShouldNotModifyState()
+    public void ReduceSelectEvent_WhenShouldStaySelected_ShouldOnlyUpdateSelectedEvent()
     {
-        // Arrange
+        // Arrange — ShouldStaySelected (right-click on an already-selected row)
+        // moves the focus cursor to that row but doesn't change the selection list.
         var selectedEvent = EventUtils.CreateTestEvent(100);
-        var state = new EventLogState { SelectedEvents = [selectedEvent] };
+        var state = new EventLogState { SelectedEvents = [selectedEvent], SelectedEvent = null };
         var action = new EventLogAction.SelectEvent(selectedEvent, false, true);
 
         // Act
         var newState = EventLogReducers.ReduceSelectEvent(state, action);
 
         // Assert
-        Assert.Same(state, newState);
+        Assert.Same(state.SelectedEvents, newState.SelectedEvents);
+        Assert.Same(selectedEvent, newState.SelectedEvent);
+    }
+
+    [Fact]
+    public void ReduceSelectEvent_WhenValueEqualButDifferentReference_ShouldNotMatchExisting()
+    {
+        // Arrange — simulates post-reload state where SelectedEvents holds a
+        // stale reference and the user clicks a value-equal new instance.
+        var staleReference = EventUtils.CreateTestEvent(100, recordId: 5);
+        var freshReference = EventUtils.CreateTestEvent(100, recordId: 5);
+        var state = new EventLogState { SelectedEvents = [staleReference] };
+        var action = new EventLogAction.SelectEvent(freshReference, IsMultiSelect: true);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvent(state, action);
+
+        // Assert — fresh reference should be added (not treated as already
+        // selected), giving us two entries.
+        Assert.Equal(2, newState.SelectedEvents.Count);
+        Assert.Same(staleReference, newState.SelectedEvents[0]);
+        Assert.Same(freshReference, newState.SelectedEvents[1]);
     }
 
     [Fact]
@@ -838,6 +908,23 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceSelectEvents_ShouldPreserveSelectedEventIfStillPresent()
+    {
+        // Arrange
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var third = EventUtils.CreateTestEvent(300);
+        var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = second };
+        var action = new EventLogAction.SelectEvents([second, third]);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvents(state, action);
+
+        // Assert — active was already in incoming so it stays.
+        Assert.Same(second, newState.SelectedEvent);
+    }
+
+    [Fact]
     public void ReduceSelectEvents_WhenAllEventsAlreadySelected_ShouldNotAddDuplicates()
     {
         // Arrange
@@ -850,6 +937,24 @@ public sealed class EventLogStoreTests
 
         // Assert
         Assert.Single(newState.SelectedEvents);
+    }
+
+    [Fact]
+    public void ReduceSelectEvents_WhenSelectedEventDropped_ShouldFallbackToLastIncoming()
+    {
+        // Arrange — additive SelectEvents with a null active event (the prior
+        // selection had no focus) falls back to the last incoming event so the
+        // restore path leaves the user with something focused.
+        var second = EventUtils.CreateTestEvent(200);
+        var third = EventUtils.CreateTestEvent(300);
+        var state = new EventLogState { SelectedEvents = [], SelectedEvent = null };
+        var action = new EventLogAction.SelectEvents([second, third]);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvents(state, action);
+
+        // Assert
+        Assert.Same(third, newState.SelectedEvent);
     }
 
     [Fact]
@@ -895,6 +1000,114 @@ public sealed class EventLogStoreTests
 
         // Act
         var newState = EventLogReducers.ReduceSetFilters(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_ShouldReplaceSelectionPreservingOrder()
+    {
+        // Arrange
+        var existingEvent = EventUtils.CreateTestEvent(100);
+        var state = new EventLogState { SelectedEvents = [existingEvent] };
+        var first = EventUtils.CreateTestEvent(200);
+        var second = EventUtils.CreateTestEvent(300);
+        var third = EventUtils.CreateTestEvent(400);
+        var action = new EventLogAction.SetSelectedEvents([first, second, third], third);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
+
+        // Assert — replaces existingEvent and preserves the caller-provided
+        // selection order. The active/focused event is tracked separately via
+        // EventLogState.SelectedEvent rather than inferred from the tail.
+        Assert.Equal(3, newState.SelectedEvents.Count);
+        Assert.Same(first, newState.SelectedEvents[0]);
+        Assert.Same(second, newState.SelectedEvents[1]);
+        Assert.Same(third, newState.SelectedEvents[2]);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_ShouldSetSelectedEventIndependentOfMembership()
+    {
+        // Arrange — active is not required to be a member of selection.
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var notInSelection = EventUtils.CreateTestEvent(300);
+        var state = new EventLogState();
+        var action = new EventLogAction.SetSelectedEvents([first, second], notInSelection);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
+
+        // Assert
+        Assert.Equal([first, second], newState.SelectedEvents);
+        Assert.Same(notInSelection, newState.SelectedEvent);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_WhenInputContainsDuplicates_ShouldDistinctByReference()
+    {
+        // Arrange
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var state = new EventLogState();
+        var action = new EventLogAction.SetSelectedEvents([first, second, first], first);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
+
+        // Assert
+        Assert.Equal(2, newState.SelectedEvents.Count);
+        Assert.Same(first, newState.SelectedEvents[0]);
+        Assert.Same(second, newState.SelectedEvents[1]);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_WhenInputIsEmpty_ShouldClearSelection()
+    {
+        // Arrange
+        var state = new EventLogState { SelectedEvents = [EventUtils.CreateTestEvent(100)] };
+        var action = new EventLogAction.SetSelectedEvents([], null);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
+
+        // Assert
+        Assert.Empty(newState.SelectedEvents);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_WhenOnlySelectedEventChanged_ShouldUpdateOnlySelectedEvent()
+    {
+        // Arrange
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = first };
+        var action = new EventLogAction.SetSelectedEvents([first, second], second);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
+
+        // Assert — selection list is preserved by reference (no churn) but active changed.
+        Assert.Same(state.SelectedEvents, newState.SelectedEvents);
+        Assert.Same(second, newState.SelectedEvent);
+    }
+
+    [Fact]
+    public void ReduceSetSelectedEvents_WhenSelectionUnchanged_ShouldReturnSameStateReference()
+    {
+        // Arrange — EventTable.ShouldRender uses ReferenceEquals on
+        // SelectedEvents to short-circuit re-renders, so the reducer must
+        // return the same state when selection content is unchanged.
+        var first = EventUtils.CreateTestEvent(100);
+        var second = EventUtils.CreateTestEvent(200);
+        var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = second };
+        var action = new EventLogAction.SetSelectedEvents([first, second], second);
+
+        // Act
+        var newState = EventLogReducers.ReduceSetSelectedEvents(state, action);
 
         // Assert
         Assert.Same(state, newState);
