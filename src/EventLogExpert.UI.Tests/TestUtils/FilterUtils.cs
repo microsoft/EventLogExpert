@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Models;
+using System.Collections.Immutable;
 using static EventLogExpert.UI.Tests.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -17,9 +18,8 @@ internal static class FilterUtils
         bool isEditing = false,
         bool shouldCompareAny = false,
         FilterData? data = null,
-        IEnumerable<FilterModel>? subFilters = null)
-    {
-        var filter = new FilterModel
+        IEnumerable<FilterModel>? subFilters = null) =>
+        new()
         {
             Color = color,
             FilterType = filterType,
@@ -28,16 +28,9 @@ internal static class FilterUtils
             IsEditing = isEditing,
             IsEnabled = isEnabled,
             IsExcluded = isExcluded,
-            Comparison = new FilterComparison { Value = comparisonValue }
+            Comparison = new FilterComparison { Value = comparisonValue },
+            SubFilters = subFilters?.ToImmutableList() ?? []
         };
-
-        if (subFilters is not null)
-        {
-            filter.SubFilters.AddRange(subFilters);
-        }
-
-        return filter;
-    }
 
     internal static FilterEditorModel CreateTestFilterEditor(
         FilterId? id = null,

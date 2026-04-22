@@ -13,23 +13,27 @@ public sealed class FilterPaneReducers
     {
         if (action.FilterModel is null)
         {
-            return state with { Filters = [.. state.Filters, new FilterModel { IsEditing = true }] };
+            return state with { Filters = state.Filters.Add(new FilterModel { IsEditing = true }) };
         }
 
-        return state with { Filters = [.. state.Filters, action.FilterModel] };
+        return state with { Filters = state.Filters.Add(action.FilterModel) };
     }
 
     [ReducerMethod]
     public static FilterPaneState ReduceAddSubFilter(FilterPaneState state, FilterPaneAction.AddSubFilter action)
     {
-        var updatedList = state.Filters.ToList();
-        var parentFilter = updatedList.FirstOrDefault(parent => parent.Id == action.ParentId);
+        var parent = state.Filters.FirstOrDefault(filter => filter.Id == action.ParentId);
 
-        if (parentFilter is null) { return state; } // If not parent filter, something went wrong and bail
+        if (parent is null) { return state; }
 
-        parentFilter.SubFilters.Add(new FilterModel());
+        var index = state.Filters.IndexOf(parent);
 
-        return state with { Filters = [.. updatedList] };
+        return state with
+        {
+            Filters = state.Filters.SetItem(
+                index,
+                parent with { SubFilters = parent.SubFilters.Add(new FilterModel()) })
+        };
     }
 
     [ReducerMethod]
@@ -39,22 +43,27 @@ public sealed class FilterPaneReducers
     {
         if (!action.FilterGroup.Filters.Any()) { return state; }
 
-        List<FilterModel> updatedList = [];
+        // Dedupe on (Comparison.Value, IsExcluded) so an "Id == 100" include and an "Id == 100" exclude
+        // are treated as semantically different filters and both can land in the pane.
+        HashSet<(string Value, bool IsExcluded)> existingKeys =
+            [.. state.Filters.Select(filter => (filter.Comparison.Value, filter.IsExcluded))];
+
+        List<FilterModel> additions = [];
 
         foreach (var filter in action.FilterGroup.Filters)
         {
-            if (state.Filters.FirstOrDefault(f =>
-                string.Equals(f.Comparison.Value, filter.Comparison.Value)) is not null) { continue; }
+            if (!existingKeys.Add((filter.Comparison.Value, filter.IsExcluded))) { continue; }
 
-            updatedList.Add(new FilterModel
+            additions.Add(new FilterModel
             {
                 Color = filter.Color,
                 Comparison = filter.Comparison with { },
-                IsEnabled = true
+                IsEnabled = true,
+                IsExcluded = filter.IsExcluded
             });
         }
 
-        return state with { Filters = state.Filters.AddRange(updatedList) };
+        return additions.Count == 0 ? state : state with { Filters = state.Filters.AddRange(additions) };
     }
 
     [ReducerMethod(typeof(FilterPaneAction.ClearAllFilters))]
@@ -73,26 +82,39 @@ public sealed class FilterPaneReducers
     [ReducerMethod]
     public static FilterPaneState ReduceRemoveSubFilter(FilterPaneState state, FilterPaneAction.RemoveSubFilter action)
     {
-        var parentFilter = state.Filters.FirstOrDefault(parent => parent.Id == action.ParentId);
+        var parent = state.Filters.FirstOrDefault(filter => filter.Id == action.ParentId);
 
-        if (parentFilter is null) { return state; }
+        if (parent is null) { return state; }
 
-        parentFilter.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
+        var updatedSubFilters = parent.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
 
-        return state with { Filters = state.Filters.Remove(parentFilter).Add(parentFilter) };
+        // ImmutableList<T>.RemoveAll returns the same instance when nothing matched.
+        if (ReferenceEquals(updatedSubFilters, parent.SubFilters)) { return state; }
+
+        var index = state.Filters.IndexOf(parent);
+
+        return state with
+        {
+            Filters = state.Filters.SetItem(index, parent with { SubFilters = updatedSubFilters })
+        };
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action) =>
-        state with
+    public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)
+    {
+        // Upsert: replace by Id if present (preserving position), append if not. ContextMenu and
+        // the FilterRow save path both rely on the append branch.
+        var existing = state.Filters.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
+
+        if (existing is null)
         {
-            Filters =
-            [
-                .. state.Filters
-                    .Where(filter => filter.Id != action.FilterModel.Id)
-                    .Concat([action.FilterModel])
-            ]
-        };
+            return state with { Filters = state.Filters.Add(action.FilterModel) };
+        }
+
+        var index = state.Filters.IndexOf(existing);
+
+        return state with { Filters = state.Filters.SetItem(index, action.FilterModel) };
+    }
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetFilterDateRangeSuccess(
@@ -114,62 +136,20 @@ public sealed class FilterPaneReducers
     [ReducerMethod]
     public static FilterPaneState ReduceToggleFilterEditing(
         FilterPaneState state,
-        FilterPaneAction.ToggleFilterEditing action)
-    {
-        List<FilterModel> filters = [];
-
-        foreach (var filterModel in state.Filters)
-        {
-            if (filterModel.Id == action.Id)
-            {
-                filterModel.IsEditing = !filterModel.IsEditing;
-            }
-
-            filters.Add(filterModel);
-        }
-
-        return state with { Filters = [.. filters] };
-    }
+        FilterPaneAction.ToggleFilterEditing action) =>
+        UpdateFilterById(state, action.Id, filter => filter with { IsEditing = !filter.IsEditing });
 
     [ReducerMethod]
     public static FilterPaneState ReduceToggleFilterEnabled(
         FilterPaneState state,
-        FilterPaneAction.ToggleFilterEnabled action)
-    {
-        List<FilterModel> filters = [];
-
-        foreach (var filterModel in state.Filters)
-        {
-            if (filterModel.Id == action.Id)
-            {
-                filterModel.IsEnabled = !filterModel.IsEnabled;
-            }
-
-            filters.Add(filterModel);
-        }
-
-        return state with { Filters = [.. filters] };
-    }
+        FilterPaneAction.ToggleFilterEnabled action) =>
+        UpdateFilterById(state, action.Id, filter => filter with { IsEnabled = !filter.IsEnabled });
 
     [ReducerMethod]
     public static FilterPaneState ReduceToggleFilterExcluded(
         FilterPaneState state,
-        FilterPaneAction.ToggleFilterExcluded action)
-    {
-        List<FilterModel> filters = [];
-
-        foreach (var filterModel in state.Filters)
-        {
-            if (filterModel.Id == action.Id)
-            {
-                filterModel.IsExcluded = !filterModel.IsExcluded;
-            }
-
-            filters.Add(filterModel);
-        }
-
-        return state with { Filters = [.. filters] };
-    }
+        FilterPaneAction.ToggleFilterExcluded action) =>
+        UpdateFilterById(state, action.Id, filter => filter with { IsExcluded = !filter.IsExcluded });
 
     [ReducerMethod(typeof(FilterPaneAction.ToggleIsEnabled))]
     public static FilterPaneState ReduceToggleIsEnabled(FilterPaneState state) =>
@@ -178,4 +158,18 @@ public sealed class FilterPaneReducers
     [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
     public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
         state with { IsLoading = !state.IsLoading };
+
+    private static FilterPaneState UpdateFilterById(
+        FilterPaneState state,
+        FilterId id,
+        Func<FilterModel, FilterModel> transform)
+    {
+        var existing = state.Filters.FirstOrDefault(filter => filter.Id == id);
+
+        if (existing is null) { return state; }
+
+        var index = state.Filters.IndexOf(existing);
+
+        return state with { Filters = state.Filters.SetItem(index, transform(existing)) };
+    }
 }

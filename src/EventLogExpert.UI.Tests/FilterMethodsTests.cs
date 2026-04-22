@@ -109,8 +109,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        filter.IsExcluded = true;
+        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -125,8 +124,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        filter.IsExcluded = true;
+        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -170,8 +168,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
         var includeFilter = CreateFilter(Constants.FilterIdEquals100);
-        var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError);
-        excludeFilter.IsExcluded = true;
+        var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError, isExcluded: true);
         var filters = new List<FilterModel> { includeFilter, excludeFilter };
 
         // Act
@@ -238,8 +235,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        filter.IsExcluded = true;
+        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -584,8 +580,11 @@ public sealed class FilterMethodsTests
     public void HasFilteringChanged_WhenSharedFilterModelMutatedInPlace_ShouldReturnTrue()
     {
         // Arrange - simulates the production aliasing scenario where AppliedFilter and the
-        // pane's filter list share the same FilterModel reference, and a reducer mutates it
-        // in place. The construction-time Signature snapshot must keep the comparison correct.
+        // pane's filter list share the same FilterModel reference, and a UI binding mutates
+        // the inner FilterComparison.Value in place. The construction-time Signature snapshot
+        // must keep the comparison correct. (FilterModel.IsExcluded is now init-only, but
+        // FilterComparison.Value still has a settable property bound from Razor components,
+        // so the aliasing path persists until Step 3c migrates components to FilterEditorModel.)
         var sharedFilter = new FilterModel
         {
             Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
@@ -594,8 +593,8 @@ public sealed class FilterMethodsTests
 
         var original = new EventFilter(null, ImmutableList.Create(sharedFilter));
 
-        // Reducer-style in-place mutation after the original snapshot is captured.
-        sharedFilter.IsExcluded = true;
+        // Aliased mutation through the still-mutable inner FilterComparison.Value setter.
+        sharedFilter.Comparison.Value = Constants.FilterIdEquals200;
 
         var updated = new EventFilter(null, ImmutableList.Create(sharedFilter));
 

@@ -399,7 +399,7 @@ public sealed class FilterServiceTests
         var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
 
         var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
-        filterModel.SubFilters.Add(subFilter);
+        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
 
         // Act
         var result = filterService.TryParse(filterModel, out var comparison);
@@ -419,7 +419,7 @@ public sealed class FilterServiceTests
 
         var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
         subFilter.ShouldCompareAny = true;
-        filterModel.SubFilters.Add(subFilter);
+        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
 
         // Act
         var result = filterService.TryParse(filterModel, out var comparison);
@@ -438,7 +438,7 @@ public sealed class FilterServiceTests
 
         var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
         subFilter.ShouldCompareAny = false;
-        filterModel.SubFilters.Add(subFilter);
+        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
 
         // Act
         var result = filterService.TryParse(filterModel, out var comparison);

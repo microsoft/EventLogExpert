@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.Immutable;
+
 namespace EventLogExpert.UI.Models;
 
 public sealed class FilterEditorModel
@@ -45,27 +47,21 @@ public sealed class FilterEditorModel
     /// Materializes an immutable <see cref="FilterModel"/> from the current draft state, compiling
     /// the comparison expression. Throws if <see cref="ComparisonText"/> is not parseable.
     /// </summary>
-    public FilterModel ToFilterModel()
-    {
-        var model = new FilterModel
+    public FilterModel ToFilterModel() =>
+        new()
         {
             Id = Id,
             Color = Color,
             FilterType = FilterType,
             Data = CloneFilterData(Data),
-            SubFilters = SubFilters.Select(child => child.ToFilterModel()).ToList(),
+            SubFilters = SubFilters.Select(child => child.ToFilterModel()).ToImmutableList(),
             ShouldCompareAny = ShouldCompareAny,
             IsEnabled = IsEnabled,
-            IsExcluded = IsExcluded
+            IsExcluded = IsExcluded,
+            Comparison = string.IsNullOrEmpty(ComparisonText)
+                ? new FilterComparison()
+                : new FilterComparison { Value = ComparisonText }
         };
-
-        if (!string.IsNullOrEmpty(ComparisonText))
-        {
-            model.Comparison = new FilterComparison { Value = ComparisonText };
-        }
-
-        return model;
-    }
 
     private static FilterData CloneFilterData(FilterData source)
     {

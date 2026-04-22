@@ -15,11 +15,13 @@ public sealed class FilterGroupReducers
 
         if (group is null) { return state; }
 
+        var index = state.Groups.IndexOf(group);
+
         return state with
         {
-            Groups = state.Groups
-                .Remove(group)
-                .Add(group with { Filters = [.. group.Filters, new FilterModel { IsEditing = true }] })
+            Groups = state.Groups.SetItem(
+                index,
+                group with { Filters = [.. group.Filters, new FilterModel { IsEditing = true }] })
         };
     }
 
@@ -47,11 +49,13 @@ public sealed class FilterGroupReducers
 
         if (filter is null) { return state; }
 
+        var groupIndex = state.Groups.IndexOf(parent);
+
         return state with
         {
-            Groups = state.Groups
-                .Remove(parent)
-                .Add(parent with { Filters = [.. parent.Filters.Where(x => x.Id != action.Id)] })
+            Groups = state.Groups.SetItem(
+                groupIndex,
+                parent with { Filters = [.. parent.Filters.Where(x => x.Id != action.Id)] })
         };
     }
 
@@ -76,23 +80,23 @@ public sealed class FilterGroupReducers
 
         if (filter is null) { return state; }
 
+        var groupIndex = state.Groups.IndexOf(parent);
+
+        // Preserve all fields not explicitly overridden by the action (IsExcluded, IsEnabled,
+        // Data, SubFilters, etc.). Previously a partial new FilterModel was constructed which
+        // silently dropped those fields.
+        var updatedFilter = filter with
+        {
+            Color = action.Filter.Color,
+            Comparison = action.Filter.Comparison with { },
+            IsEditing = false
+        };
+
         return state with
         {
-            Groups = state.Groups
-                .Remove(parent)
-                .Add(parent with
-                {
-                    Filters =
-                    [
-                        .. parent.Filters.Where(x => x.Id != action.Filter.Id),
-                        new FilterModel
-                        {
-                            Color = action.Filter.Color,
-                            Comparison = action.Filter.Comparison with { },
-                            IsEditing = false
-                        }
-                    ]
-                })
+            Groups = state.Groups.SetItem(
+                groupIndex,
+                parent with { Filters = ReplaceFilterById(parent.Filters, filter.Id, updatedFilter) })
         };
     }
 
@@ -103,11 +107,13 @@ public sealed class FilterGroupReducers
 
         if (group is null) { return state; }
 
+        var index = state.Groups.IndexOf(group);
+
         return state with
         {
-            Groups = state.Groups
-                .Remove(group)
-                .Add(group with
+            Groups = state.Groups.SetItem(
+                index,
+                group with
                 {
                     Name = action.FilterGroup.Name,
                     Filters = action.FilterGroup.Filters,
@@ -117,57 +123,14 @@ public sealed class FilterGroupReducers
     }
 
     [ReducerMethod]
-    public static FilterGroupState ReducerToggleFilter(FilterGroupState state, FilterGroupAction.ToggleFilter action)
-    {
-        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
-
-        if (parent is null) { return state; }
-
-        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Id);
-
-        if (filter is null) { return state; }
-
-        return state with
-        {
-            Groups = state.Groups
-                .Remove(parent)
-                .Add(parent with
-                {
-                    Filters =
-                    [
-                        .. parent.Filters.Where(x => x.Id != action.Id),
-                        filter with { IsEditing = !filter.IsEditing }
-                    ]
-                })
-        };
-    }
+    public static FilterGroupState ReducerToggleFilter(FilterGroupState state, FilterGroupAction.ToggleFilter action) =>
+        UpdateFilterInGroup(state, action.ParentId, action.Id, filter => filter with { IsEditing = !filter.IsEditing });
 
     [ReducerMethod]
     public static FilterGroupState ReducerToggleFilterExcluded(
         FilterGroupState state,
-        FilterGroupAction.ToggleFilterExcluded action)
-    {
-        var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
-
-        if (parent is null) { return state; }
-
-        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Id);
-
-        if (filter is null) { return state; }
-
-        return state with
-        {
-            Groups = state.Groups
-                .Remove(parent)
-                .Add(parent with
-                {
-                    Filters =
-                    [
-                        .. parent.Filters.Where(x => x.Id != action.Id), filter with { IsExcluded = !filter.IsExcluded }
-                    ]
-                })
-        };
-    }
+        FilterGroupAction.ToggleFilterExcluded action) =>
+        UpdateFilterInGroup(state, action.ParentId, action.Id, filter => filter with { IsExcluded = !filter.IsExcluded });
 
     [ReducerMethod]
     public static FilterGroupState ReducerToggleGroup(FilterGroupState state, FilterGroupAction.ToggleGroup action)
@@ -176,11 +139,11 @@ public sealed class FilterGroupReducers
 
         if (group is null) { return state; }
 
+        var index = state.Groups.IndexOf(group);
+
         return state with
         {
-            Groups = state.Groups
-                .Remove(group)
-                .Add(group with { IsEditing = !group.IsEditing })
+            Groups = state.Groups.SetItem(index, group with { IsEditing = !group.IsEditing })
         };
     }
 
@@ -198,5 +161,46 @@ public sealed class FilterGroupReducers
         }
 
         return state with { DisplayGroups = displayGroups.AsReadOnly() };
+    }
+
+    private static IReadOnlyList<FilterModel> ReplaceFilterById(
+        IReadOnlyList<FilterModel> filters,
+        FilterId id,
+        FilterModel replacement)
+    {
+        // Order-preserving replacement. FilterGroupModel.Filters is IReadOnlyList (not ImmutableList)
+        // so we materialize to an array; allocation is O(n) which is fine for the small group sizes used.
+        var result = new FilterModel[filters.Count];
+
+        for (var index = 0; index < filters.Count; index++)
+        {
+            result[index] = filters[index].Id == id ? replacement : filters[index];
+        }
+
+        return result;
+    }
+
+    private static FilterGroupState UpdateFilterInGroup(
+        FilterGroupState state,
+        FilterGroupId parentId,
+        FilterId filterId,
+        Func<FilterModel, FilterModel> transform)
+    {
+        var parent = state.Groups.FirstOrDefault(x => x.Id == parentId);
+
+        if (parent is null) { return state; }
+
+        var filter = parent.Filters.FirstOrDefault(x => x.Id == filterId);
+
+        if (filter is null) { return state; }
+
+        var groupIndex = state.Groups.IndexOf(parent);
+
+        return state with
+        {
+            Groups = state.Groups.SetItem(
+                groupIndex,
+                parent with { Filters = ReplaceFilterById(parent.Filters, filterId, transform(filter)) })
+        };
     }
 }
