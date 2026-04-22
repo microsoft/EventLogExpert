@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
@@ -17,13 +17,13 @@ public sealed partial class TableColumnMenu
 
     [Inject]
     private IStateSelection<EventTableState, IImmutableDictionary<ColumnName, bool>>
-        EventTableColumnsState { get; init; } = null!;
+        EventTableColumns { get; init; } = null!;
 
     [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
 
     protected override void OnInitialized()
     {
-        EventTableColumnsState.Select(s => s.Columns);
+        EventTableColumns.Select(s => s.Columns);
 
         base.OnInitialized();
     }
