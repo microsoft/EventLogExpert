@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
@@ -10,7 +10,6 @@ using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using System.Collections.Immutable;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
@@ -24,11 +23,11 @@ public sealed partial class ContextMenu
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
     [Inject]
-    private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventState { get; init; } = null!;
+    private IStateSelection<EventLogState, DisplayEventModel?> SelectedEvent { get; init; } = null!;
 
     protected override void OnInitialized()
     {
-        SelectedEventState.Select(s => s.SelectedEvents);
+        SelectedEvent.Select(s => s.SelectedEvent);
 
         base.OnInitialized();
     }
@@ -38,18 +37,18 @@ public sealed partial class ContextMenu
     private void ExcludeAfter() =>
         Dispatcher.Dispatch(
             new FilterPaneAction.SetFilterDateRange(
-                new FilterDateModel { After = SelectedEventState.Value.FirstOrDefault()?.TimeCreated }));
+                new FilterDateModel { After = SelectedEvent.Value?.TimeCreated }));
 
     private void ExcludeBefore() =>
         Dispatcher.Dispatch(
             new FilterPaneAction.SetFilterDateRange(
-                new FilterDateModel { Before = SelectedEventState.Value.FirstOrDefault()?.TimeCreated }));
+                new FilterDateModel { Before = SelectedEvent.Value?.TimeCreated }));
 
     private void FilterEvent(FilterCategory filterType, bool shouldExclude = false)
     {
-        if (SelectedEventState.Value.IsEmpty) { return; }
+        var selectedEvent = SelectedEvent.Value;
 
-        var selectedEvent = SelectedEventState.Value.Last();
+        if (selectedEvent is null) { return; }
 
         string filterValue = filterType switch
         {

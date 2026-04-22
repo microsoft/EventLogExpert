@@ -45,8 +45,10 @@ public sealed class EventLogEffects(
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
 
     /// <summary>Pending selection restore per log name, populated when a filter transition forces
-    /// a reload. Consumed by <see cref="HandleLoadEvents"/> when the reloaded log finishes loading.</summary>
-    private readonly ConcurrentDictionary<string, IReadOnlySet<long>> _pendingSelectionRestore = new();
+    /// a reload. Consumed by <see cref="HandleLoadEvents"/> when the reloaded log finishes loading.
+    /// Carries both the selected record-ids and the focused record-id (if any), so reload preserves
+    /// the focused row in addition to the selection.</summary>
+    private readonly ConcurrentDictionary<string, PendingSelectionRestore> _pendingSelectionRestore = new();
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
@@ -145,17 +147,32 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(new EventTableAction.UpdateTable(action.LogData.Id, filteredEvents));
 
         // Restore selection if this load was triggered by a filter-driven reload.
-        if (_pendingSelectionRestore.TryRemove(action.LogData.Name, out var recordIds) && recordIds.Count > 0)
+        // A pending entry can carry a focused row (SelectedId) without any selected
+        // rows (SelectedIds), so we must keep going as long as either is present.
+        if (!_pendingSelectionRestore.TryRemove(action.LogData.Name, out var pending)
+            || (pending.SelectedIds.Count <= 0 && !pending.SelectedId.HasValue))
         {
-            var restored = action.Events
-                .Where(e => e.RecordId.HasValue && recordIds.Contains(e.RecordId.Value))
-                .ToList();
-
-            if (restored.Count > 0)
-            {
-                dispatcher.Dispatch(new EventLogAction.SelectEvents(restored));
-            }
+            return Task.CompletedTask;
         }
+
+        var restored = action.Events
+            .Where(e => e.RecordId.HasValue && pending.SelectedIds.Contains(e.RecordId.Value))
+            .ToList();
+
+        // SelectedEvent (focus cursor) is tracked independently of SelectedEvents,
+        // so resolve the focused row from action.Events directly — it may not be
+        // a member of restored (e.g., user Ctrl+clicked to toggle a row off but
+        // kept it as the focus cursor).
+        DisplayEventModel? selectedRestored = pending.SelectedId.HasValue
+            ? action.Events.FirstOrDefault(e => e.RecordId == pending.SelectedId.Value)
+            : null;
+
+        if (restored.Count <= 0 && selectedRestored is null) { return Task.CompletedTask; }
+
+        // Use SetSelectedEvents (not SelectEvents) so we can restore both
+        // selection and the active focus row atomically.
+        var focused = selectedRestored ?? (restored.Count > 0 ? restored[^1] : null);
+        dispatcher.Dispatch(new EventLogAction.SetSelectedEvents(restored, focused));
 
         return Task.CompletedTask;
     }
@@ -281,6 +298,21 @@ public sealed class EventLogEffects(
                 .GroupBy(e => e.OwningLog)
                 .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
 
+            var selectedEvent = _eventLogState.Value.SelectedEvent;
+            long? selectedRecordId = selectedEvent?.RecordId;
+            string? selectedLogName = selectedEvent?.OwningLog;
+
+            // The focused row may live in a reloading log even when no rows of
+            // that log are selected (Explorer-style cursor without selection).
+            // Ensure a pending entry exists so HandleLoadEvents can restore focus.
+            if (selectedRecordId.HasValue
+                && !string.IsNullOrEmpty(selectedLogName)
+                && reloadNames.Contains(selectedLogName)
+                && !selectionByLog.ContainsKey(selectedLogName))
+            {
+                selectionByLog[selectedLogName] = new HashSet<long>();
+            }
+
             // Close + reopen only the logs that lack XML. Other open logs keep their state.
             // CloseLog is dispatched first (and clears any prior _pendingSelectionRestore entry
             // for that log name), then we populate the restore map, then OpenLog kicks off the
@@ -292,7 +324,8 @@ public sealed class EventLogEffects(
 
             foreach (var (name, ids) in selectionByLog)
             {
-                _pendingSelectionRestore[name] = ids;
+                long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
+                _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
             }
 
             foreach (var (_, name, type) in logsNeedingReload)
@@ -653,3 +686,5 @@ public sealed class EventLogEffects(
         dispatcher.Dispatch(new EventLogAction.AddEventBuffered([], false));
     }
 }
+
+internal sealed record PendingSelectionRestore(IReadOnlySet<long> SelectedIds, long? SelectedId);

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
@@ -23,6 +23,7 @@ public interface IClipboardService
 public sealed class ClipboardService : IClipboardService
 {
     private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
+    private readonly IStateSelection<EventLogState, DisplayEventModel?> _selectedEvent;
     private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
@@ -31,18 +32,21 @@ public sealed class ClipboardService : IClipboardService
     public ClipboardService(
         IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
+        IStateSelection<EventLogState, DisplayEventModel?> selectedEvent,
         ISettingsService settings,
         IEventXmlResolver xmlResolver,
         ITraceLogger traceLogger)
     {
         _eventTableColumns = eventTableColumns;
         _selectedEvents = selectedEvents;
+        _selectedEvent = selectedEvent;
         _settings = settings;
         _xmlResolver = xmlResolver;
         _traceLogger = traceLogger;
 
         _eventTableColumns.Select(s => s.Columns);
         _selectedEvents.Select(s => s.SelectedEvents);
+        _selectedEvent.Select(s => s.SelectedEvent);
     }
 
     public async Task CopySelectedEvent(CopyType? copyType = null)
@@ -169,14 +173,32 @@ public sealed class ClipboardService : IClipboardService
         // a different (or empty) list if selection changes mid-resolve, leading to copying the
         // wrong event or an IndexOutOfRangeException.
         var events = _selectedEvents.Value;
-
-        if (events.IsEmpty) { return string.Empty; }
+        var selected = _selectedEvent.Value;
 
         var resolvedType = copyType ?? _settings.CopyType;
         bool needsXml = resolvedType is CopyType.Xml or CopyType.Full;
 
+        // Single-event copy: prefer the selected (focused) row so right-click → copy
+        // targets the focused event. Fall back to the only selected event when selected
+        // is null (e.g., right-click that didn't reach the table). When selection is
+        // empty but selected is set, copy selected so the context menu still works.
+        if (events.IsEmpty)
+        {
+            if (selected is null) { return string.Empty; }
+
+            string xml = needsXml ? await _xmlResolver.GetXmlAsync(selected) : string.Empty;
+
+            return FormatEventForCopy(resolvedType, selected, xml);
+        }
+
         if (events.Count == 1)
         {
+            // Use the actual selected entry — not the focused row — so keyboard
+            // Ctrl+C copies what's selected, even when the focus cursor has
+            // moved off (e.g., Ctrl+click toggled the only selected row off
+            // but left focus on it). The context-menu/right-click flow keeps
+            // SelectedEvents in sync with the right-clicked row, so this still
+            // copies the focused row in that path.
             string xml = needsXml ? await _xmlResolver.GetXmlAsync(events[0]) : string.Empty;
 
             return FormatEventForCopy(resolvedType, events[0], xml);

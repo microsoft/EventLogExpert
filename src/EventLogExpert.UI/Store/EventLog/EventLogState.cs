@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
@@ -24,6 +24,8 @@ public sealed record EventLogState
     public IReadOnlyList<DisplayEventModel> NewEventBuffer { get; init; } = [];
 
     public bool NewEventBufferIsFull { get; init; }
+
+    public DisplayEventModel? SelectedEvent { get; init; }
 
     public ImmutableList<DisplayEventModel> SelectedEvents { get; init; } = [];
 }

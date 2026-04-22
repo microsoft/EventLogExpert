@@ -12,7 +12,6 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using System.Collections.Immutable;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -24,12 +23,11 @@ public sealed partial class DetailsPane
     private bool _hasOpened;
     private bool _isVisible;
     private bool _isXmlVisible;
-
     /// <summary>Resolved XML for the currently selected event. <c>null</c> means a fetch is in flight
     /// (show "Resolving XML..."); empty string means resolved-with-no-content (e.g. live-watcher event
     /// without a record id, or render failure); any other value is the rendered XML.</summary>
     private string? _resolvedXml;
-
+    private DisplayEventModel? _selectedEvent;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
 
@@ -37,15 +35,13 @@ public sealed partial class DetailsPane
 
     [Inject] private IEventXmlResolver EventXmlResolver { get; init; } = null!;
 
-    private string IsVisible => (SelectedEvent is not null && _isVisible).ToString().ToLower();
+    private string IsVisible => (_selectedEvent is not null && _isVisible).ToString().ToLower();
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     [Inject] private IPreferencesProvider PreferencesProvider { get; init; } = null!;
 
-    private DisplayEventModel? SelectedEvent { get; set; }
-
-    [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEventSelection { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEvent { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -64,7 +60,7 @@ public sealed partial class DetailsPane
     {
         if (disposing)
         {
-            SelectedEventSelection.SelectedValueChanged -= OnSelectedEventChanged;
+            SelectedEvent.SelectedValueChanged -= OnSelectedEventChanged;
 
             try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { }
             _xmlResolveCts?.Dispose();
@@ -97,9 +93,18 @@ public sealed partial class DetailsPane
 
     protected override void OnInitialized()
     {
-        SelectedEventSelection.Select(s => s.SelectedEvents);
+        SelectedEvent.Select(s => s.SelectedEvent);
 
-        SelectedEventSelection.SelectedValueChanged += OnSelectedEventChanged;
+        SelectedEvent.SelectedValueChanged += OnSelectedEventChanged;
+
+        // Seed from the current store value so the pane reflects an existing
+        // focus (e.g., after a restore path that completes before this
+        // component subscribes) instead of staying hidden until the next
+        // change event.
+        if (SelectedEvent.Value is not null)
+        {
+            OnSelectedEventChanged(this, SelectedEvent.Value);
+        }
 
         base.OnInitialized();
     }
@@ -142,16 +147,16 @@ public sealed partial class DetailsPane
         }
     }
 
-    private async void OnSelectedEventChanged(object? sender, ImmutableList<DisplayEventModel> selectedEvents)
+    private async void OnSelectedEventChanged(object? sender, DisplayEventModel? selectedEvent)
     {
         try
         {
-            var selectedEvent = selectedEvents.LastOrDefault();
-            SelectedEvent = selectedEvent;
+            _selectedEvent = selectedEvent;
 
             // Cancel any in-flight resolution from a prior selection so a stale fetch
             // can't overwrite the resolved XML for the now-current selection.
             try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { }
+
             _xmlResolveCts?.Dispose();
             _xmlResolveCts = null;
 
@@ -203,7 +208,7 @@ public sealed partial class DetailsPane
 
                     // Only surface the failure if we're still the current selection — otherwise
                     // a newer selection has taken over and owns _resolvedXml.
-                    if (ReferenceEquals(SelectedEvent, selectedEvent) && ReferenceEquals(_xmlResolveCts, cts))
+                    if (ReferenceEquals(_selectedEvent, selectedEvent) && ReferenceEquals(_xmlResolveCts, cts))
                     {
                         _resolvedXml = string.Empty;
                     }
@@ -212,7 +217,7 @@ public sealed partial class DetailsPane
                 }
 
                 // Selection changed while the fetch was in flight — discard the stale result.
-                if (cts.IsCancellationRequested || !ReferenceEquals(SelectedEvent, selectedEvent))
+                if (cts.IsCancellationRequested || !ReferenceEquals(_selectedEvent, selectedEvent))
                 {
                     return;
                 }

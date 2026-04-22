@@ -356,40 +356,43 @@
     }
 
     function registerKeyHandlers(table, signal) {
-        const selectAdjacentRow = function(direction) {
-            const tableRows = table.getElementsByTagName("tr");
-            const focusedRow = document.activeElement;
+        // Suppress the WebView's native arrow/Home/End/PageUp/Down scroll so
+        // Blazor's @onkeydown can drive selection without competing scroll.
+        // Capture-phase + preventDefault only (never stopPropagation) so the
+        // .NET handler still fires.
+        const navKeys = new Set([
+            "ArrowUp", "ArrowDown", "Home", "End", "PageUp", "PageDown"
+        ]);
 
-            if (focusedRow.tagName.toLowerCase() !== "tr") {
-                return;
-            }
+        const container = table.parentNode;
 
-            for (let i = 0; i < tableRows.length; i++) {
-                if (tableRows[i] === focusedRow) {
-                    const next = tableRows[i + direction];
+        if (!container) {
+            return;
+        }
 
-                    if (next) {
-                        next.focus();
-                    }
-
-                    break;
-                }
-            }
-        };
-
-        table.addEventListener("keydown",
+        container.addEventListener("keydown",
             function(e) {
-                if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    selectAdjacentRow(-1);
+                // Skip preventDefault when the table has no body rows. With an
+                // empty table there's nothing for the .NET keyboard handler
+                // to act on, so trapping these keys would only swallow the
+                // user's normal scroll/select-all gestures while focus sits
+                // on the focusable container.
+                if (!table.querySelector("tbody tr")) {
+                    return;
                 }
 
-                if (e.key === "ArrowDown") {
+                if (navKeys.has(e.key)) {
                     e.preventDefault();
-                    selectAdjacentRow(+1);
+                    return;
+                }
+
+                // Ctrl+A: prevent the WebView's native Select-All so the
+                // table's own Ctrl+A handler in HandleKeyDown owns the gesture.
+                if (e.ctrlKey && (e.key === "a" || e.key === "A")) {
+                    e.preventDefault();
                 }
             },
-            { signal });
+            { capture: true, signal });
     }
 
     window.scrollToRow = (offset) => {
@@ -409,5 +412,94 @@
             top: row.offsetHeight * offset - (table.parentNode.offsetHeight / 3),
             behavior: "smooth"
         });
+    };
+
+    // Returns the PageUp/PageDown jump size in body rows. Derived from the
+    // scroll container's clientHeight and the measured body-row height
+    // (falling back to 22px when no body row is measurable yet), then
+    // reduced by one row to preserve context above/below after the page
+    // jump (mirroring Windows Explorer / VS Code behavior). Returns at
+    // least 1 when the table/container exists, or 0 only when the table
+    // or its parent container is unavailable.
+    window.getEventTablePageSize = () => {
+        const table = document.getElementById("eventTable");
+
+        return computePageSize(table);
+    };
+
+    function computePageSize(table) {
+        if (!table || !table.parentNode) {
+            return 0;
+        }
+
+        // Sample only body rows so the header row's height (which can differ
+        // from data rows) doesn't skew the page-size calculation.
+        const row = table.querySelector("tbody tr");
+        // Fall back to a default row height (~22px) when no body row has
+        // rendered yet so the first PageDown still performs a sensible jump
+        // instead of returning 0 and forcing callers to handle an
+        // "unmeasured" case.
+        const rowHeight = row ? row.getBoundingClientRect().height : 22;
+
+        if (!rowHeight) {
+            // Measured a zero-height row (e.g., display:none); use the
+            // default row height as a safe approximation.
+            return Math.max(1, Math.floor(table.parentNode.clientHeight / 22) - 1);
+        }
+
+        // Subtract one row to leave context above/below after a page jump,
+        // mirroring Windows Explorer / VS Code behavior.
+        return Math.max(1, Math.floor(table.parentNode.clientHeight / rowHeight) - 1);
+    }
+
+    // Scrolls the row at the given index into view and focuses it. Targets
+    // rows by aria-rowindex (set by Razor as displayed-events index + 2)
+    // because Virtualize only renders rows in/near the viewport — indexing
+    // into the live `<tbody tr>` NodeList would point at the wrong row
+    // once the user has scrolled away from the top. When the row is not
+    // yet materialized, we scroll to its approximate position and retry
+    // after Virtualize has had a chance to render the new viewport slice.
+    window.focusEventTableRow = (index) => {
+        const table = document.getElementById("eventTable");
+
+        if (!table) {
+            return;
+        }
+
+        const container = table.parentNode;
+        const ariaRowIndex = index + 2;
+        const selector = `tbody tr[aria-rowindex="${ariaRowIndex}"]`;
+
+        const tryFocus = () => {
+            const row = table.querySelector(selector);
+
+            if (!row) { return false; }
+
+            // 'nearest' avoids jumping when already on screen.
+            row.scrollIntoView({ block: "nearest", behavior: "auto" });
+            row.focus({ preventScroll: true });
+
+            return true;
+        };
+
+        if (tryFocus()) { return; }
+
+        // Sample only body rows so the header row's height doesn't skew
+        // the scroll-target calculation.
+        const sampleRow = table.querySelector("tbody tr");
+        const rowHeight = sampleRow ? sampleRow.getBoundingClientRect().height : 22;
+
+        if (rowHeight) {
+            const target = rowHeight * index - container.clientHeight / 2;
+            container.scrollTo({ top: Math.max(0, target), behavior: "auto" });
+        }
+
+        if (document.activeElement !== container) {
+            container.focus({ preventScroll: true });
+        }
+
+        // Two RAFs cover Blazor's render-after-scroll cycle so the
+        // virtualized row has time to enter the DOM before we retry.
+        requestAnimationFrame(() => requestAnimationFrame(tryFocus));
     };
 })();
