@@ -42,9 +42,28 @@ public static class FilterMethods
         return group;
     }
 
-    public static bool HasFilteringChanged(EventFilter updated, EventFilter original) =>
-        !Equals(updated.DateFilter, original.DateFilter) ||
-        !updated.Filters.Equals(original.Filters);
+    public static bool HasFilteringChanged(EventFilter updated, EventFilter original)
+    {
+        if (!Equals(updated.DateFilter, original.DateFilter)) { return true; }
+
+        var updatedSignature = updated.Signature;
+        var originalSignature = original.Signature;
+
+        // Default-constructed EventFilter (rare) has an uninitialized ImmutableArray.
+        if (updatedSignature.IsDefault || originalSignature.IsDefault)
+        {
+            return updatedSignature.IsDefault != originalSignature.IsDefault;
+        }
+
+        if (updatedSignature.Length != originalSignature.Length) { return true; }
+
+        for (int index = 0; index < updatedSignature.Length; index++)
+        {
+            if (!updatedSignature[index].Equals(originalSignature[index])) { return true; }
+        }
+
+        return false;
+    }
 
     /// <summary>Returns the index of the specified item in the list, or -1 if not found.</summary>
     public static int IndexOf<T>(this IReadOnlyList<T> list, T item)

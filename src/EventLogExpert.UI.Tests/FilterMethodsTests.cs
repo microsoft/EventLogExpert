@@ -410,6 +410,20 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void HasFilteringChanged_WhenComparisonValueDiffers_ShouldReturnTrue()
+    {
+        // Arrange
+        var original = new EventFilter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+        var updated = new EventFilter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
     public void HasFilteringChanged_WhenDateFilterAdded_ShouldReturnTrue()
     {
         // Arrange
@@ -456,6 +470,26 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReturnFalse()
+    {
+        // Arrange - separately allocated FilterModels and ImmutableLists with the same Value/IsExcluded.
+        // Reproduces the bug where ImmutableList<T>.Equals (reference equality) caused this to return true.
+        var original = new EventFilter(
+            null,
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+
+        var updated = new EventFilter(
+            null,
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
     public void HasFilteringChanged_WhenFiltersAdded_ShouldReturnTrue()
     {
         // Arrange
@@ -486,6 +520,52 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void HasFilteringChanged_WhenIsExcludedDiffers_ShouldReturnTrue()
+    {
+        // Arrange
+        var original = new EventFilter(
+            null,
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, isExcluded: false)));
+
+        var updated = new EventFilter(
+            null,
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, isExcluded: true)));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReturnFalse()
+    {
+        // Arrange - color affects highlighting (driven from FilterPaneState elsewhere) but not
+        // the filtered event set, so it must NOT count as a "filtering changed" signal.
+        var redFilter = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            Color = HighlightColor.Red
+        };
+
+        var blueFilter = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            Color = HighlightColor.Blue
+        };
+
+        var original = new EventFilter(null, ImmutableList.Create(redFilter));
+        var updated = new EventFilter(null, ImmutableList.Create(blueFilter));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
     public void HasFilteringChanged_WhenSameFilters_ShouldReturnFalse()
     {
         // Arrange
@@ -498,6 +578,32 @@ public sealed class FilterMethodsTests
 
         // Assert
         Assert.False(result);
+    }
+
+    [Fact]
+    public void HasFilteringChanged_WhenSharedFilterModelMutatedInPlace_ShouldReturnTrue()
+    {
+        // Arrange - simulates the production aliasing scenario where AppliedFilter and the
+        // pane's filter list share the same FilterModel reference, and a reducer mutates it
+        // in place. The construction-time Signature snapshot must keep the comparison correct.
+        var sharedFilter = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsExcluded = false
+        };
+
+        var original = new EventFilter(null, ImmutableList.Create(sharedFilter));
+
+        // Reducer-style in-place mutation after the original snapshot is captured.
+        sharedFilter.IsExcluded = true;
+
+        var updated = new EventFilter(null, ImmutableList.Create(sharedFilter));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.True(result);
     }
 
     [Fact]
