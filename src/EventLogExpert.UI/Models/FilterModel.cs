@@ -8,7 +8,7 @@ namespace EventLogExpert.UI.Models;
 public sealed record FilterModel
 {
     [JsonIgnore]
-    public FilterId Id { get; } = FilterId.Create();
+    public FilterId Id { get; init; } = FilterId.Create();
 
     public HighlightColor Color { get; set; } = HighlightColor.None;
 
