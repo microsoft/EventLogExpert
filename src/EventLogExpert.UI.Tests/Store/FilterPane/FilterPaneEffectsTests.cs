@@ -24,10 +24,11 @@ public sealed class FilterPaneEffectsTests
         // Arrange
         var filterModel = new FilterModel
         {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsEnabled = true
         };
 
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new FilterPaneAction.AddFilter(filterModel);
 
         // Act
@@ -102,7 +103,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleApplyFilterGroup_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
         // Act
         await effects.HandleApplyFilterGroup(mockDispatcher);
@@ -115,8 +116,11 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleClearAllFilters_ShouldUpdateEventTableFilters()
     {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        // Arrange - simulate the reducer having just cleared the filters; the effect must
+        // still dispatch because the previously-applied filter differs from the empty candidate.
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
 
         // Act
         await effects.HandleClearAllFilters(mockDispatcher);
@@ -129,8 +133,10 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        // Arrange - reducer removed the filter; effect sees pane state empty but applied still has it.
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
 
         // Act
         await effects.HandleRemoveAdvancedFilter(mockDispatcher);
@@ -223,10 +229,11 @@ public sealed class FilterPaneEffectsTests
         // Arrange
         var filterModel = new FilterModel
         {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsEnabled = true
         };
 
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new FilterPaneAction.SetFilter(filterModel);
 
         // Act
@@ -409,8 +416,14 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
     {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        // Arrange - candidate must differ from applied to dispatch; supply a date in pane state.
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            filteredDateRange: new FilterDateModel
+            {
+                After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+            });
 
         // Act
         await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
@@ -424,7 +437,13 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleToggleFilterDate_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            filteredDateRange: new FilterDateModel
+            {
+                After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+            });
 
         // Act
         await effects.HandleToggleFilterDate(mockDispatcher);
@@ -438,7 +457,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleToggleFilterEnabled_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
         // Act
         await effects.HandleToggleFilterEnabled(mockDispatcher);
@@ -452,7 +471,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleToggleFilterExcluded_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
         // Act
         await effects.HandleToggleFilterExcluded(mockDispatcher);
@@ -466,7 +485,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleToggleIsEnabled_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
         // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
@@ -505,13 +524,46 @@ public sealed class FilterPaneEffectsTests
     public async Task UpdateEventTableFilters_ShouldDispatchLoadingToggleTwice()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true);
+        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
 
         // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert - Once before and once after
         mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
+    }
+
+    [Fact]
+    public async Task UpdateEventTableFilters_WhenEquivalentFiltersFromDifferentInstances_ShouldNotDispatch()
+    {
+        // Arrange - applied and candidate filters are structurally equivalent but distinct instances.
+        // The structural HasFilteringChanged guard must skip the dispatch.
+        var paneFilters = ImmutableList.Create(
+            new FilterModel
+            {
+                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+                IsEnabled = true,
+                IsExcluded = false
+            });
+
+        var appliedFilters = ImmutableList.Create(
+            new FilterModel
+            {
+                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+                IsEnabled = true,
+                IsExcluded = false
+            });
+
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            filters: paneFilters,
+            appliedFilter: new EventFilter(null, appliedFilters));
+
+        // Act
+        await effects.HandleToggleIsEnabled(mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
     [Fact]
@@ -572,11 +624,31 @@ public sealed class FilterPaneEffectsTests
             x.EventFilter.Filters[0].Comparison.Value == Constants.FilterIdEquals100));
     }
 
+    [Fact]
+    public async Task UpdateEventTableFilters_WhenFilterUnchanged_ShouldNotDispatch()
+    {
+        // Arrange - candidate equals AppliedFilter; the no-op guard must short-circuit
+        // the loading toggles, the SetFilters dispatch, and the downstream re-filter work.
+        var filters = CreateSingleEnabledFilters();
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            filters: filters,
+            appliedFilter: new EventFilter(null, filters));
+
+        // Act
+        await effects.HandleToggleIsEnabled(mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.SetFilters>());
+    }
+
     private static (FilterPaneEffects effects, IDispatcher mockDispatcher) CreateEffects(
         bool isEnabled = false,
         ImmutableList<FilterModel>? filters = null,
         FilterDateModel? filteredDateRange = null,
-        ImmutableDictionary<string, EventLogData>? activeLogs = null)
+        ImmutableDictionary<string, EventLogData>? activeLogs = null,
+        EventFilter? appliedFilter = null)
     {
         var mockFilterPaneState = Substitute.For<IState<FilterPaneState>>();
 
@@ -591,7 +663,8 @@ public sealed class FilterPaneEffectsTests
 
         mockEventLogState.Value.Returns(new EventLogState
         {
-            ActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty
+            ActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty,
+            AppliedFilter = appliedFilter ?? new EventFilter(null, [])
         });
 
         var effects = new FilterPaneEffects(mockEventLogState, mockFilterPaneState);
@@ -599,4 +672,12 @@ public sealed class FilterPaneEffectsTests
 
         return (effects, mockDispatcher);
     }
+
+    private static ImmutableList<FilterModel> CreateSingleEnabledFilters() =>
+        ImmutableList.Create(
+            new FilterModel
+            {
+                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+                IsEnabled = true
+            });
 }

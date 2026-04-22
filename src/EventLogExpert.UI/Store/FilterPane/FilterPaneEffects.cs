@@ -14,12 +14,15 @@ public sealed class FilterPaneEffects(
     IState<EventLogState> eventLogState,
     IState<FilterPaneState> filterPaneState)
 {
+    private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
+
     [EffectMethod]
     public async Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
     {
         if (!string.IsNullOrEmpty(action.FilterModel?.Comparison.Value))
         {
-            await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+            await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
         }
 
         if (action.FilterModel?.FilterType is not FilterType.Cached && action.FilterModel?.Comparison.Value is not null)
@@ -31,15 +34,15 @@ public sealed class FilterPaneEffects(
 
     [EffectMethod(typeof(FilterPaneAction.ApplyFilterGroup))]
     public async Task HandleApplyFilterGroup(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ClearAllFilters))]
     public async Task HandleClearAllFilters(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.RemoveFilter))]
     public async Task HandleRemoveAdvancedFilter(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod]
     public Task HandleSaveFilterGroup(FilterPaneAction.SaveFilterGroup action, IDispatcher dispatcher)
@@ -51,7 +54,7 @@ public sealed class FilterPaneEffects(
                     Name = action.Name,
                     Filters =
                     [
-                        .. filterPaneState.Value.Filters.Select(filter =>
+                        .. _filterPaneState.Value.Filters.Select(filter =>
                             new FilterModel
                             {
                                 Color = filter.Color,
@@ -67,7 +70,7 @@ public sealed class FilterPaneEffects(
     [EffectMethod]
     public async Task HandleSetFilter(FilterPaneAction.SetFilter action, IDispatcher dispatcher)
     {
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
         if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value) &&
             action.FilterModel.FilterType is not FilterType.Cached)
@@ -86,15 +89,15 @@ public sealed class FilterPaneEffects(
             return Task.CompletedTask;
         }
 
-        DateTime? updatedAfter = action.FilterDateModel?.After ?? filterPaneState.Value.FilteredDateRange?.After;
-        DateTime? updatedBefore = action.FilterDateModel?.Before ?? filterPaneState.Value.FilteredDateRange?.Before;
+        DateTime? updatedAfter = action.FilterDateModel?.After ?? _filterPaneState.Value.FilteredDateRange?.After;
+        DateTime? updatedBefore = action.FilterDateModel?.Before ?? _filterPaneState.Value.FilteredDateRange?.Before;
 
         long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
         if (updatedAfter is null)
         {
             long ticks =
-                (eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
+                (_eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
                         .Order()
                         .LastOrDefault() ??
                     DateTime.UtcNow)
@@ -106,7 +109,7 @@ public sealed class FilterPaneEffects(
         if (updatedBefore is null)
         {
             long ticks =
-                (eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
+                (_eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
                         .Order()
                         .FirstOrDefault() ??
                     DateTime.UtcNow)
@@ -128,43 +131,45 @@ public sealed class FilterPaneEffects(
 
     [EffectMethod(typeof(FilterPaneAction.SetFilterDateRangeSuccess))]
     public async Task HandleSetFilterDateRangeSuccess(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterDate))]
     public async Task HandleToggleFilterDate(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterEnabled))]
     public async Task HandleToggleFilterEnabled(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterExcluded))]
     public async Task HandleToggleFilterExcluded(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     [EffectMethod(typeof(FilterPaneAction.ToggleIsEnabled))]
     public async Task HandleToggleIsEnabled(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(filterPaneState.Value, dispatcher);
+        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
 
     private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
         new(filterPaneState.FilteredDateRange, filterPaneState.Filters.Where(f => f.IsEnabled).ToImmutableList());
 
-    private static async Task UpdateEventTableFiltersAsync(FilterPaneState filterPaneState, IDispatcher dispatcher)
+    private async Task UpdateEventTableFiltersAsync(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
+        var candidate = filterPaneState.IsEnabled
+            ? GetEventFilter(filterPaneState)
+            : new EventFilter(
+                filterPaneState.FilteredDateRange,
+                filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
+
+        // Skip the loading toggles, the SetFilters dispatch, and the downstream
+        // FilterActiveLogs work when the applied filter has not actually changed.
+        if (!FilterMethods.HasFilteringChanged(candidate, _eventLogState.Value.AppliedFilter))
+        {
+            return;
+        }
+
         dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
 
-        if (filterPaneState.IsEnabled)
-        {
-            await Task.Run(() => dispatcher.Dispatch(new EventLogAction.SetFilters(GetEventFilter(filterPaneState))));
-        }
-        else
-        {
-            // Only keep date and excluded filters
-            await Task.Run(() => dispatcher.Dispatch(
-                new EventLogAction.SetFilters(
-                    new EventFilter(filterPaneState.FilteredDateRange,
-                        filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList()))));
-        }
+        await Task.Run(() => dispatcher.Dispatch(new EventLogAction.SetFilters(candidate)));
 
         dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
     }
