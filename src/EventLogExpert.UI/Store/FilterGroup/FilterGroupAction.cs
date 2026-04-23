@@ -17,8 +17,6 @@ public sealed record FilterGroupAction
 
     public sealed record LoadGroupsSuccess(IEnumerable<FilterGroupModel> Groups);
 
-    public sealed record OpenMenu;
-
     public sealed record RemoveFilter(FilterGroupId ParentId, FilterId Id);
 
     public sealed record RemoveGroup(FilterGroupId Id);

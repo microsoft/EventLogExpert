@@ -11,11 +11,9 @@ public readonly record struct ReleaseNotesContent(string Title, string Markdown)
 
 public interface IUpdateService
 {
-    event Action<ReleaseNotesContent>? ReleaseNotesReady;
-
     Task CheckForUpdates(bool usePreRelease, bool manualScan);
 
-    Task GetReleaseNotes();
+    Task<ReleaseNotesContent?> GetReleaseNotes();
 }
 
 public sealed class UpdateService(
@@ -27,8 +25,6 @@ public sealed class UpdateService(
     IAlertDialogService alertDialogService) : IUpdateService
 {
     private string? _currentRawChanges;
-
-    public event Action<ReleaseNotesContent>? ReleaseNotesReady;
 
     public async Task CheckForUpdates(bool usePreRelease, bool manualScan)
     {
@@ -145,7 +141,7 @@ public sealed class UpdateService(
         }
     }
 
-    public async Task GetReleaseNotes()
+    public async Task<ReleaseNotesContent?> GetReleaseNotes()
     {
         if (string.IsNullOrWhiteSpace(_currentRawChanges))
         {
@@ -153,24 +149,12 @@ public sealed class UpdateService(
                 "Failed to get release notes for the current version",
                 "Ok");
 
-            return;
+            return null;
         }
 
         var markdown = ReleaseNotesNormalizer.Normalize(_currentRawChanges);
         var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
-        var subscribers = ReleaseNotesReady;
-
-        if (subscribers is null)
-        {
-            // No UI is wired up to render the rich modal (e.g., service used
-            // outside the Blazor host). Fall back to a plain alert so the user
-            // still sees something rather than getting silent no-op feedback.
-            await alertDialogService.ShowAlert(title, markdown, "Ok");
-
-            return;
-        }
-
-        subscribers.Invoke(new ReleaseNotesContent(title, markdown));
+        return new ReleaseNotesContent(title, markdown);
     }
 }

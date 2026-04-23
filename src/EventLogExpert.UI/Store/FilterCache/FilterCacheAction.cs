@@ -23,8 +23,6 @@ public sealed record FilterCacheAction
         ImmutableList<string> FavoriteFilters,
         ImmutableQueue<string> RecentFilters);
 
-    public sealed record OpenMenu;
-
     public sealed record RemoveFavoriteFilter(string Filter);
 
     public sealed record RemoveFavoriteFilterCompleted(

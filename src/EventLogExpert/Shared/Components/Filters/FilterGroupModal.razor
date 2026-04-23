@@ -1,37 +1,35 @@
 @using EventLogExpert.Shared.Base
 @using EventLogExpert.UI.Models
-@inherits BaseModal
+@inherits BaseModal<bool>
 
-<dialog id="filterGroupDialog" @ref="ElementReference">
-    <div class="dialog-group">
+<ModalChrome AriaLabel="Filter Groups"
+    CloseLabel="Exit"
+    Footer="FooterPreset.ImportExportClose"
+    OnClose="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnExport="OnExportAsync"
+    OnImport="OnImportAsync"
+    @ref="ChromeRef">
+    <ChildContent>
         <div class="flex-column-scroll">
             @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups.OrderBy(x => x.Key))
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    <FilterGroupSection Parent="this" Name="@name" Data="data" />
+                    <FilterGroupSection Data="data" Name="@name" Parent="this" />
                 }
                 else
                 {
                     @foreach (var group in data.FilterGroups)
                     {
-                        <FilterGroup Parent="this" Group="group" />
+                        <FilterGroup Group="group" Parent="this" />
                     }
                 }
             }
         </div>
 
-        <button class="button" @onclick="CreateGroup">
-            <i class="bi bi-plus-circle"></i> Create Group
+        <button class="button" @onclick="CreateGroup" type="button">
+            <i aria-hidden="true" class="bi bi-plus-circle"></i> Create Group
         </button>
-
-        <div class="footer-group">
-            <div>
-                <button class="button" @onclick="Import">Import</button>
-                <button class="button" @onclick="Export">Export</button>
-            </div>
-
-            <button class="button" @onclick="Close">Exit</button>
-        </div>
-    </div>
-</dialog>
+    </ChildContent>
+</ModalChrome>

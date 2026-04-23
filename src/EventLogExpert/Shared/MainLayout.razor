@@ -1,14 +1,12 @@
 ﻿@using EventLogExpert.Components
 @using EventLogExpert.Shared.Components
-@using EventLogExpert.Shared.Components.Filters
 @inherits LayoutComponentBase
 
 <div class="page" @onkeyup="HandleKeyUp" tabindex="0">
-    <SettingsModal />
-    <FilterCacheModal />
-    <FilterGroupModal />
-    <DebugLogModal />
-    <ReleaseNotesModal />
+    @* TODO: The MAUI MenuBar in MainPage.xaml lives outside the BlazorWebView, so menu accelerators
+        (File / Edit / Tools) remain interactable while a modal is open. Tracking refactor: see
+        plan-replace-mauimenu-with-blazor-menu.md in the user's Downloads folder. *@
+    <ModalHost />
 
     <TableColumnMenu />
     <ContextMenu />

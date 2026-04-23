@@ -54,8 +54,6 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
         }
     }
 
-    public event Action? Loaded;
-
     public LogLevel LogLevel
     {
         get
@@ -134,6 +132,4 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
     }
 
     public TimeZoneInfo TimeZoneInfo => TimeZoneInfo.FindSystemTimeZoneById(TimeZoneId);
-
-    public void Load() => Loaded?.Invoke();
 }

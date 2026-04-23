@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Shared.Base;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
@@ -15,15 +15,15 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class SettingsModal : IDisposable
+public sealed partial class SettingsModal : BaseModal<bool>
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
 
     private CopyType _copyType;
-    private bool _databaseRemoved = false;
+    private bool _databaseRemoved;
     private bool _isPreReleaseEnabled;
     private LogLevel _logLevel;
-    private bool _shouldReload = false;
+    private bool _shouldReload;
     private bool _showDisplayPaneOnSelectionChange;
     private Theme _theme;
     private string _timeZoneId = string.Empty;
@@ -40,11 +40,7 @@ public sealed partial class SettingsModal : IDisposable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
-
-    public void Dispose() => Settings.Loaded -= OnSettingsLoaded;
-
-    protected internal override async Task Close()
+    protected override async Task OnClosingAsync()
     {
         if (_databaseRemoved)
         {
@@ -56,15 +52,32 @@ public sealed partial class SettingsModal : IDisposable
             await ReloadOpenLogs();
             _shouldReload = false;
         }
-
-        await base.Close();
     }
 
     protected override void OnInitialized()
     {
-        Settings.Loaded += OnSettingsLoaded;
+        LoadFromSettings();
 
         base.OnInitialized();
+    }
+
+    protected override async Task OnSaveAsync()
+    {
+        Settings.CopyType = _copyType;
+        Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
+        Settings.LogLevel = _logLevel;
+        Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
+        Settings.Theme = _theme;
+        Settings.TimeZoneId = _timeZoneId;
+
+        if (_databases.Any(database => database.hasChanged))
+        {
+            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
+
+            _shouldReload = true;
+        }
+
+        await CompleteAsync(true);
     }
 
     private async Task ImportDatabase()
@@ -101,7 +114,7 @@ public sealed partial class SettingsModal : IDisposable
 
                 if (!Path.GetExtension(destination).Equals(".zip", StringComparison.OrdinalIgnoreCase)) { continue; }
 
-                await ZipFile.ExtractToDirectoryAsync(destination, FileLocationOptions.DatabasePath, overwriteFiles: true);
+                await ZipFile.ExtractToDirectoryAsync(destination, FileLocationOptions.DatabasePath, true);
                 File.Delete(destination);
             }
 
@@ -117,7 +130,7 @@ public sealed partial class SettingsModal : IDisposable
 
             await AlertDialogService.ShowAlert("Import Successful", message, "OK");
 
-            await InvokeAsync(Close);
+            await InvokeAsync(() => CompleteAsync(true));
         }
         catch (Exception ex)
         {
@@ -133,7 +146,7 @@ public sealed partial class SettingsModal : IDisposable
         await ReloadOpenLogs();
     }
 
-    private async Task Load()
+    private void LoadFromSettings()
     {
         _copyType = Settings.CopyType;
         _isPreReleaseEnabled = Settings.IsPreReleaseEnabled;
@@ -162,22 +175,6 @@ public sealed partial class SettingsModal : IDisposable
                 _databases[index] = (database, false, false);
             }
         }
-
-        StateHasChanged();
-
-        await Open();
-    }
-
-    private async void OnSettingsLoaded()
-    {
-        try
-        {
-            await InvokeAsync(Load);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to load settings modal: {e}");
-        }
     }
 
     private async Task ReloadOpenLogs()
@@ -186,7 +183,8 @@ public sealed partial class SettingsModal : IDisposable
 
         bool answer = await AlertDialogService.ShowAlert("Reload Open Logs Now?",
             "In order for these changes to take effect, all currently open logs must be reloaded. Would you like to reload all open logs now?",
-            "Yes", "No");
+            "Yes",
+            "No");
 
         if (!answer) { return; }
 
@@ -222,25 +220,6 @@ public sealed partial class SettingsModal : IDisposable
                 $"An exception occurred while removing provider databases: {ex.Message}",
                 "OK");
         }
-    }
-
-    private async Task Save()
-    {
-        Settings.CopyType = _copyType;
-        Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
-        Settings.LogLevel = _logLevel;
-        Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
-        Settings.Theme = _theme;
-        Settings.TimeZoneId = _timeZoneId;
-
-        if (_databases.Any(database => database.hasChanged))
-        {
-            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
-
-            _shouldReload = true;
-        }
-
-        await Close();
     }
 
     private void ToggleDatabase(string database)

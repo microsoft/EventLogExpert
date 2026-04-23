@@ -88,6 +88,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFilterService, FilterService>();
         builder.Services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
+        builder.Services.AddSingleton<IModalService, ModalService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
             async (title, message, cancel) => await Application.Current!.Windows[0].Page!.DisplayAlertAsync(title, message, cancel),

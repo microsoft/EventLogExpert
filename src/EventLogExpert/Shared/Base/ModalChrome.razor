@@ -1,0 +1,113 @@
+<dialog aria-label="@(string.IsNullOrEmpty(Title) ? AriaLabel : null)"
+    aria-labelledby="@(string.IsNullOrEmpty(Title) ? null : _titleId)"
+    aria-modal="true"
+    class="@DialogClass"
+    @oncancel="HandleCancelEventAsync"
+    @oncancel:preventDefault="true"
+    @onclose="HandleCloseEventAsync"
+    @ref="_dialogRef">
+    <div class="dialog-group">
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <header class="dialog-header">
+                <h2 class="dialog-title" id="@_titleId">@Title</h2>
+
+                @if (ShowCloseButton)
+                {
+                    <button aria-label="Close"
+                        class="button dialog-close"
+                        @onclick="HandleCloseButtonAsync"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-x"></i>
+                    </button>
+                }
+            </header>
+        }
+
+        <div class="dialog-body">
+            @ChildContent
+        </div>
+
+        <div class="footer-group">
+            @if (ExtraFooterContent is not null)
+            {
+                <div class="footer-extra">
+                    @ExtraFooterContent
+                </div>
+            }
+
+            @switch (Footer)
+            {
+                case FooterPreset.CloseOnly:
+                    <button autofocus
+                        class="button"
+                        @onclick="HandleCloseButtonAsync"
+                        type="button">
+                        @CloseLabel
+                    </button>
+                    break;
+
+                case FooterPreset.SaveCancel:
+                    <div class="button-group">
+                        <button class="button button-green"
+                            @onclick="HandleSaveAsync"
+                            type="button">
+                            @SaveLabel
+                        </button>
+                        <button autofocus
+                            class="button"
+                            @onclick="HandleCancelButtonAsync"
+                            type="button">
+                            @CancelLabel
+                        </button>
+                    </div>
+                    break;
+
+                case FooterPreset.ImportExportClose:
+                    <div class="button-group">
+                        <button class="button"
+                            @onclick="HandleImportAsync"
+                            type="button">
+                            @ImportLabel
+                        </button>
+                        <button class="button"
+                            @onclick="HandleExportAsync"
+                            type="button">
+                            @ExportLabel
+                        </button>
+                    </div>
+
+                    <button autofocus
+                        class="button"
+                        @onclick="HandleCloseButtonAsync"
+                        type="button">
+                        @CloseLabel
+                    </button>
+                    break;
+
+                case FooterPreset.Dismiss:
+                    <button autofocus
+                        class="button"
+                        @onclick="HandleAcceptAsync"
+                        type="button">
+                        @AcceptLabel
+                    </button>
+                    break;
+
+                case FooterPreset.AcceptCancel:
+                    <button autofocus
+                        class="button button-green"
+                        @onclick="HandleAcceptAsync"
+                        type="button">
+                        @AcceptLabel
+                    </button>
+                    <button class="button"
+                        @onclick="HandleCancelButtonAsync"
+                        type="button">
+                        @CancelLabel
+                    </button>
+                    break;
+            }
+        </div>
+    </div>
+</dialog>

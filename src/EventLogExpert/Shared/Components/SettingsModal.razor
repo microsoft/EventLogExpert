@@ -1,103 +1,107 @@
 @using EventLogExpert.Shared.Base
 @using EventLogExpert.UI
 @using Microsoft.Extensions.Logging
-@inherits BaseModal
+@inherits BaseModal<bool>
 
-<dialog id="settingsDialog" @ref="ElementReference">
-
-    <div id="settings-form">
-        <div class="flex-column-scroll">
-            <div class="flex-center-aligned-row tz-row">
-                <text>Time Zone:</text>
-                <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
-                    @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
-                    {
-                        <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
-                    }
-                </ValueSelect>
-            </div>
-
-            <div class="flex-space-between">
-                <div>Databases:</div>
-
-                <button class="button" @onclick="ImportDatabase" type="button">
-                    <i class="bi bi-plus-circle"></i> Import Database
-                </button>
-            </div>
-
+<ModalChrome AriaLabel="Settings"
+    CancelLabel="Exit"
+    Footer="FooterPreset.SaveCancel"
+    OnCancel="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnSave="OnSaveAsync"
+    @ref="ChromeRef"
+    SaveLabel="Save">
+    <ChildContent>
+        <div id="settings-form">
             <div class="flex-column-scroll">
-                @if (_databases.Any())
-                {
-                    @foreach (var database in _databases.OrderBy(x => x.name))
-                    {
-                        <div class="flex-space-between">
-                            <div>
-                                <text>@database.name</text>
+                <div class="flex-center-aligned-row tz-row">
+                    <text>Time Zone:</text>
+                    <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
+                        @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
+                        {
+                            <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </div>
 
-                                @if (!DatabaseService.LoadedDatabases.Contains(database.name))
-                                {
-                                    <button class="button button-red" type="button" @onclick="() => RemoveDatabase(database.name)">
-                                        <i class="bi bi-dash-circle"></i>
-                                    </button>
-                                }
+                <div class="flex-space-between">
+                    <div>Databases:</div>
+
+                    <button class="button" @onclick="ImportDatabase" type="button">
+                        <i aria-hidden="true" class="bi bi-plus-circle"></i> Import Database
+                    </button>
+                </div>
+
+                <div class="flex-column-scroll">
+                    @if (_databases.Any())
+                    {
+                        @foreach (var database in _databases.OrderBy(x => x.name))
+                        {
+                            <div class="flex-space-between">
+                                <div>
+                                    <text>@database.name</text>
+
+                                    @if (!DatabaseService.LoadedDatabases.Contains(database.name))
+                                    {
+                                        <button aria-label="@($"Remove database {database.name}")" class="button button-red"
+                                            @onclick="() => RemoveDatabase(database.name)"
+                                            type="button">
+                                            <i aria-hidden="true" class="bi bi-dash-circle"></i>
+                                        </button>
+                                    }
+                                </div>
+                                <BooleanSelect AriaLabel="@database.name" Value="database.isEnabled" ValueChanged="() => ToggleDatabase(database.name)" />
                             </div>
-                            <BooleanSelect AriaLabel="@database.name" Value="database.isEnabled" ValueChanged="() => ToggleDatabase(database.name)" />
-                        </div>
+                        }
                     }
-                }
-                else
-                {
-                    <p>None</p>
-                }
-            </div>
-
-            <div class="flex-center-aligned-row">
-                <text>Expand Display Pane On Selection Change:</text>
-                <BooleanSelect AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
-            </div>
-
-            <div class="flex-center-aligned-row">
-                <text>Theme:</text>
-                <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
-                    @foreach (Theme item in Enum.GetValues(typeof(Theme)))
+                    else
                     {
-                        <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
+                        <p>None</p>
                     }
-                </ValueSelect>
-            </div>
+                </div>
 
-            <div class="flex-center-aligned-row">
-                <text>Keyboard Copy Behavior:</text>
-                <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyType" CssClass="input filter-dropdown" T="CopyType">
-                    @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))
-                    {
-                        <ValueSelectItem T="CopyType" Value="item" />
-                    }
-                </ValueSelect>
-            </div>
+                <div class="flex-center-aligned-row">
+                    <text>Expand Display Pane On Selection Change:</text>
+                    <BooleanSelect AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
+                </div>
 
-            <div class="flex-center-aligned-row">
-                <text>Logging Level:</text>
-                <ValueSelect AriaLabel="Logging Level" @bind-Value="_logLevel" CssClass="input filter-dropdown" T="LogLevel">
-                    @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
-                    {
-                        <ValueSelectItem T="LogLevel" Value="item" />
-                    }
-                </ValueSelect>
+                <div class="flex-center-aligned-row">
+                    <text>Theme:</text>
+                    <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
+                        @foreach (Theme item in Enum.GetValues(typeof(Theme)))
+                        {
+                            <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Keyboard Copy Behavior:</text>
+                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyType" CssClass="input filter-dropdown" T="CopyType">
+                        @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))
+                        {
+                            <ValueSelectItem T="CopyType" Value="item" />
+                        }
+                    </ValueSelect>
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Logging Level:</text>
+                    <ValueSelect AriaLabel="Logging Level" @bind-Value="_logLevel" CssClass="input filter-dropdown" T="LogLevel">
+                        @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
+                        {
+                            <ValueSelectItem T="LogLevel" Value="item" />
+                        }
+                    </ValueSelect>
+                </div>
             </div>
         </div>
+    </ChildContent>
 
-        <div class="footer-group">
-            <div class="flex-center-aligned-row">
-                <text>Pre-release Builds:</text>
-                <BooleanSelect AriaLabel="Pre-release Builds" @bind-Value="_isPreReleaseEnabled" />
-            </div>
-
-            <div class="button-group">
-                <button class="button button-green" @onclick="Save">Save</button>
-                <button autofocus class="button" @onclick="Close" type="button">Exit</button>
-            </div>
+    <ExtraFooterContent>
+        <div class="flex-center-aligned-row">
+            <text>Pre-release Builds:</text>
+            <BooleanSelect AriaLabel="Pre-release Builds" @bind-Value="_isPreReleaseEnabled" />
         </div>
-    </div>
-
-</dialog>
+    </ExtraFooterContent>
+</ModalChrome>

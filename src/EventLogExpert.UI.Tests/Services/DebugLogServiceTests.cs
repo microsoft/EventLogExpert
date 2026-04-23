@@ -148,25 +148,6 @@ public sealed class DebugLogServiceTests : IDisposable
         Assert.Null(exception);
     }
 
-    [Fact]
-    public void DebugLogLoaded_WhenSubscribed_ShouldBeInvocable()
-    {
-        // Arrange
-        var fileLocationOptions = new FileLocationOptions(_testDirectory);
-        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
-
-        using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
-
-        var wasInvoked = false;
-        debugLogService.DebugLogLoaded += () => wasInvoked = true;
-
-        // Act
-        debugLogService.LoadDebugLog();
-
-        // Assert
-        Assert.True(wasInvoked);
-    }
-
     public void Dispose()
     {
         try
@@ -294,36 +275,22 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
-    public void LoadDebugLog_WhenNoSubscribers_ShouldNotThrow()
+    public void MinimumLevel_WhenLogLevelChangedAtRuntime_ShouldReflectNewLevel()
     {
         // Arrange
-        var fileLocationOptions = new FileLocationOptions(_testDirectory);
-        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
 
-        using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
+        using var debugLogService = new DebugLogService(
+            new FileLocationOptions(_testDirectory), mockSettingsService);
 
-        // Act & Assert - no subscribers attached
-        var exception = Record.Exception(debugLogService.LoadDebugLog);
-        Assert.Null(exception);
-    }
+        // Assert initial
+        Assert.Equal(LogLevel.Information, debugLogService.MinimumLevel);
 
-    [Fact]
-    public void LoadDebugLog_WhenSubscribed_ShouldInvokeHandler()
-    {
-        // Arrange
-        var fileLocationOptions = new FileLocationOptions(_testDirectory);
-        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        // Act - change level
+        setLogLevel(LogLevel.Warning);
 
-        using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
-
-        var actionInvoked = false;
-        debugLogService.DebugLogLoaded += () => actionInvoked = true;
-
-        // Act
-        debugLogService.LoadDebugLog();
-
-        // Assert
-        Assert.True(actionInvoked);
+        // Assert updated
+        Assert.Equal(LogLevel.Warning, debugLogService.MinimumLevel);
     }
 
     [Fact]
@@ -380,6 +347,34 @@ public sealed class DebugLogServiceTests : IDisposable
         var content = ReadLogFile();
         Assert.Contains(Constants.DebugLogFirstMessage, content);
         Assert.Contains(Constants.DebugLogSecondMessage, content);
+        Assert.Contains(Constants.DebugLogThirdMessage, content);
+    }
+
+    [Fact]
+    public void Trace_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
+    {
+        // Arrange
+        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
+
+        using var debugLogService = new DebugLogService(
+            new FileLocationOptions(_testDirectory), mockSettingsService);
+
+        // Act - write at Information (should succeed)
+        debugLogService.Info($"{Constants.DebugLogFirstMessage}");
+
+        // Change level to Warning at runtime
+        setLogLevel(LogLevel.Warning);
+
+        // Write at Information (should be filtered now)
+        debugLogService.Info($"{Constants.DebugLogSecondMessage}");
+
+        // Write at Warning (should succeed)
+        debugLogService.Warn($"{Constants.DebugLogThirdMessage}");
+
+        // Assert
+        var content = ReadLogFile();
+        Assert.Contains(Constants.DebugLogFirstMessage, content);
+        Assert.DoesNotContain(Constants.DebugLogSecondMessage, content);
         Assert.Contains(Constants.DebugLogThirdMessage, content);
     }
 
@@ -474,53 +469,6 @@ public sealed class DebugLogServiceTests : IDisposable
         var content = ReadLogFile();
         Assert.Contains("[Information]", content);
         Assert.Contains(Constants.DebugLogDefaultLevelMessage, content);
-    }
-
-    [Fact]
-    public void Trace_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
-    {
-        // Arrange
-        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
-
-        using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory), mockSettingsService);
-
-        // Act - write at Information (should succeed)
-        debugLogService.Info($"{Constants.DebugLogFirstMessage}");
-
-        // Change level to Warning at runtime
-        setLogLevel(LogLevel.Warning);
-
-        // Write at Information (should be filtered now)
-        debugLogService.Info($"{Constants.DebugLogSecondMessage}");
-
-        // Write at Warning (should succeed)
-        debugLogService.Warn($"{Constants.DebugLogThirdMessage}");
-
-        // Assert
-        var content = ReadLogFile();
-        Assert.Contains(Constants.DebugLogFirstMessage, content);
-        Assert.DoesNotContain(Constants.DebugLogSecondMessage, content);
-        Assert.Contains(Constants.DebugLogThirdMessage, content);
-    }
-
-    [Fact]
-    public void MinimumLevel_WhenLogLevelChangedAtRuntime_ShouldReflectNewLevel()
-    {
-        // Arrange
-        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
-
-        using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory), mockSettingsService);
-
-        // Assert initial
-        Assert.Equal(LogLevel.Information, debugLogService.MinimumLevel);
-
-        // Act - change level
-        setLogLevel(LogLevel.Warning);
-
-        // Assert updated
-        Assert.Equal(LogLevel.Warning, debugLogService.MinimumLevel);
     }
 
     [Fact]

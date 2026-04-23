@@ -4,8 +4,10 @@ window.openModal = (ref) => {
     }
 };
 
+window.showModal = window.openModal;
+
 window.closeModal = (ref) => {
-    if (ref != null) {
+    if (ref != null && ref.open) {
         ref.close();
     }
 };

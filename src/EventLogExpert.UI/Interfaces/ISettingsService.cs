@@ -13,8 +13,6 @@ public interface ISettingsService
 
     bool IsPreReleaseEnabled { get; set; }
 
-    event Action? Loaded;
-
     LogLevel LogLevel { get; set; }
 
     Action? LogLevelChanged { get; set; }
@@ -30,6 +28,4 @@ public interface ISettingsService
     string TimeZoneId { get; set; }
 
     TimeZoneInfo TimeZoneInfo { get; }
-
-    void Load();
 }
