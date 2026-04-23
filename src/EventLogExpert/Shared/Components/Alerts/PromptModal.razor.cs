@@ -7,15 +7,15 @@ using Microsoft.AspNetCore.Components;
 namespace EventLogExpert.Shared.Components.Alerts;
 
 /// <summary>
-/// Standalone prompt modal used by <c>ModalAlertDialogService</c> when no other modal is active.
-/// Returns the input value on Accept, or <see cref="string.Empty"/> on Cancel/Esc to match the
-/// existing <c>IAlertDialogService.DisplayPrompt</c> non-null return contract.
+///     Standalone prompt modal used by <c>ModalAlertDialogService</c> when no host modal is active. Returns the input
+///     value on Accept, or <see cref="string.Empty" /> on Cancel/Esc to match the existing
+///     <c>IAlertDialogService.DisplayPrompt</c> non-null contract.
 /// </summary>
 public sealed partial class PromptModal : ModalBase<string>
 {
     private readonly string _messageId = $"prompt-modal-message-{Guid.NewGuid():N}";
-    private bool _focusOnNextRender = true;
 
+    private bool _focusOnNextRender = true;
     private ElementReference _inputRef;
     private string _value = string.Empty;
 
@@ -35,7 +35,7 @@ public sealed partial class PromptModal : ModalBase<string>
 
             try
             {
-                await _inputRef.FocusAsync(preventScroll: true);
+                await _inputRef.FocusAsync(true);
             }
             catch
             {
@@ -54,8 +54,7 @@ public sealed partial class PromptModal : ModalBase<string>
 
     private Task HandleAcceptClickedAsync() => CompleteAsync(_value);
 
-    // Match the existing IAlertDialogService.DisplayPrompt contract which returns non-null
-    // string; existing callers check string.IsNullOrEmpty so empty-on-cancel is equivalent
-    // to MAUI's null-on-cancel for consumers.
-    private Task HandleCancelClickedAsync() => CompleteAsync(string.Empty);
+    // Match existing IAlertDialogService.DisplayPrompt contract (non-null string; callers check
+    // IsNullOrEmpty). Override so Esc/native-close returns the same value as the Cancel button.
+    protected override Task OnCancelAsync() => CompleteAsync(string.Empty);
 }

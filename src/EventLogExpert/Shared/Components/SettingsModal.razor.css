@@ -1,17 +1,9 @@
-dialog {
-    height: 60%;
+#settings-form {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
 
-    color: var(--clr-lightblue);
-    border-color: var(--clr-statusbar);
-    background-color: var(--background-dark);
-
-    & #settings-form {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-
-        height: 100%;
-    }
+    height: 100%;
 }
 
 .tz-row { margin-bottom: .5rem; }

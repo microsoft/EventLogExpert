@@ -2,7 +2,7 @@
 @inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="@AriaLabelText"
-    AcceptLabel="@(AcceptLabel ?? CancelLabel)"
+    AcceptLabel="@(string.IsNullOrEmpty(AcceptLabel) ? CancelLabel : AcceptLabel)"
     CancelLabel="@CancelLabel"
     Footer="@(string.IsNullOrEmpty(AcceptLabel) ? FooterPreset.Dismiss : FooterPreset.AcceptCancel)"
     InlineAlert="@CurrentInlineAlert"

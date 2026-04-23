@@ -1,0 +1,16 @@
+.alert-modal-message {
+    margin: 0 0 .5rem 0;
+
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.alert-modal-input {
+    width: 100%;
+    padding: .25rem .5rem;
+
+    color: var(--text-primary);
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .2rem;
+}

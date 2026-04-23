@@ -1,8 +1,0 @@
-﻿dialog {
-    height: 70%;
-    min-width: 84rem;
-
-    color: var(--clr-lightblue);
-    border-color: var(--clr-statusbar);
-    background-color: var(--background-dark);
-}

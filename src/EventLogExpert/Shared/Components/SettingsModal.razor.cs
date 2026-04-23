@@ -96,7 +96,6 @@ public sealed partial class SettingsModal : ModalBase<bool>
         {
             var result = (await FilePicker.Default.PickMultipleAsync(options)).ToArray();
 
-            // User canceled or no files selected
             if (result.Length <= 0) { return; }
 
             Directory.CreateDirectory(FileLocationOptions.DatabasePath);
