@@ -15,7 +15,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class SettingsModal : BaseModal<bool>
+public sealed partial class SettingsModal : ModalBase<bool>
 {
     private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
 

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class DebugLogModal : BaseModal<bool>
+public sealed partial class DebugLogModal : ModalBase<bool>
 {
     private readonly List<string> _data = [];
 

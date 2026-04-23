@@ -1,12 +1,14 @@
 @using EventLogExpert.Shared.Base
-@inherits BaseModal<bool>
+@inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Release Notes"
     CloseLabel="Close"
     DialogClass="release-notes-dialog"
     Footer="FooterPreset.CloseOnly"
+    InlineAlert="@CurrentInlineAlert"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
         <div class="flex-column-scroll release-notes-content">

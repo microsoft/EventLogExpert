@@ -27,9 +27,22 @@ public interface IModalService
     /// modals) are silently ignored, preventing late callbacks from completing the wrong task.</summary>
     void Complete<TResult>(long modalId, TResult? result);
 
+    /// <summary>Register the active modal as the inline-alert host so the alert dialog service can
+    /// route alerts inline. Callers must use the same <paramref name="modalId"/> they captured when
+    /// becoming active; stale ids are ignored.</summary>
+    void RegisterActiveAlertHost(long modalId, IInlineAlertHost host);
+
     /// <summary>Open a modal. If another modal is already active, its pending result is completed
     /// with <c>default</c> before the new modal becomes active. Returns a task that completes when
     /// the new modal closes.</summary>
     Task<TResult?> Show<TModal, TResult>(IDictionary<string, object?>? parameters = null)
         where TModal : Microsoft.AspNetCore.Components.IComponent;
+
+    /// <summary>Returns the currently registered inline-alert host (if any). The host is only
+    /// available between <see cref="RegisterActiveAlertHost"/> and <see cref="UnregisterActiveAlertHost"/>
+    /// (or until the active modal changes), so callers must inspect the result on every alert.</summary>
+    bool TryGetActiveAlertHost(out IInlineAlertHost? host);
+
+    /// <summary>Unregister an inline-alert host. Stale ids are ignored.</summary>
+    void UnregisterActiveAlertHost(long modalId);
 }

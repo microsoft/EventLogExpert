@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Services;
+using EventLogExpert.Shared.Components.Alerts;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
@@ -80,7 +81,9 @@ public static class MauiProgram
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
         // UI Services
-        builder.Services.AddSingleton<IMainThreadService>(new MainThreadService(MainThread.InvokeOnMainThreadAsync));
+        builder.Services.AddSingleton<IMainThreadService>(new MainThreadService(
+            MainThread.InvokeOnMainThreadAsync,
+            MainThread.InvokeOnMainThreadAsync));
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
@@ -90,11 +93,21 @@ public static class MauiProgram
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
         builder.Services.AddSingleton<IModalService, ModalService>();
 
-        builder.Services.AddSingleton<IAlertDialogService>(new AlertDialogService(
-            async (title, message, cancel) => await Application.Current!.Windows[0].Page!.DisplayAlertAsync(title, message, cancel),
-            async (title, message, accept, cancel) => await Application.Current!.Windows[0].Page!.DisplayAlertAsync(title, message, accept, cancel),
-            async (title, message) => await Application.Current!.Windows[0].Page!.DisplayPromptAsync(title, message),
-            async (title, message, value) => await Application.Current!.Windows[0].Page!.DisplayPromptAsync(title, message, initialValue: value)));
+        builder.Services.AddSingleton<IAlertDialogService>(static provider =>
+        {
+            var modalService = provider.GetRequiredService<IModalService>();
+            var mainThreadService = provider.GetRequiredService<IMainThreadService>();
+
+            return new ModalAlertDialogService(
+                modalService,
+                mainThreadService,
+                parameters => modalService.Show<AlertModal, bool>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)),
+                async parameters =>
+                {
+                    string? result = await modalService.Show<PromptModal, string>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value));
+                    return result ?? string.Empty;
+                });
+        });
 
         return builder.Build();
     }

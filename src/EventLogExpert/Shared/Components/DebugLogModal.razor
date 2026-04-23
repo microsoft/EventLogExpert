@@ -1,11 +1,13 @@
 @using EventLogExpert.Shared.Base
-@inherits BaseModal<bool>
+@inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Debug Log"
     CloseLabel="Exit"
     Footer="FooterPreset.CloseOnly"
+    InlineAlert="@CurrentInlineAlert"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
         <div aria-label="Debug log entries" aria-live="polite" class="flex-column-scroll" role="log">

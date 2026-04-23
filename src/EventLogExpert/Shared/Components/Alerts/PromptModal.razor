@@ -1,0 +1,24 @@
+@using EventLogExpert.Shared.Base
+@inherits ModalBase<string>
+
+<ModalChrome AriaLabel="@AriaLabelText"
+    AcceptLabel="OK"
+    CancelLabel="Cancel"
+    Footer="FooterPreset.AcceptCancel"
+    InlineAlert="@CurrentInlineAlert"
+    OnAccept="HandleAcceptClickedAsync"
+    OnCancel="HandleCancelClickedAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    @ref="ChromeRef"
+    Title="@Title">
+    <ChildContent>
+        <p class="alert-modal-message" id="@_messageId">@Message</p>
+        <input aria-labelledby="@_messageId"
+            class="alert-modal-input"
+            @bind="_value"
+            @bind:event="oninput"
+            @ref="_inputRef"
+            type="text" />
+    </ChildContent>
+</ModalChrome>

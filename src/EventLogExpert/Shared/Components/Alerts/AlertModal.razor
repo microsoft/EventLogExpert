@@ -1,0 +1,18 @@
+@using EventLogExpert.Shared.Base
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="@AriaLabelText"
+    AcceptLabel="@(AcceptLabel ?? CancelLabel)"
+    CancelLabel="@CancelLabel"
+    Footer="@(string.IsNullOrEmpty(AcceptLabel) ? FooterPreset.Dismiss : FooterPreset.AcceptCancel)"
+    InlineAlert="@CurrentInlineAlert"
+    OnAccept="HandleAcceptClickedAsync"
+    OnCancel="HandleCancelClickedAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    @ref="ChromeRef"
+    Title="@Title">
+    <ChildContent>
+        <p class="alert-modal-message">@Message</p>
+    </ChildContent>
+</ModalChrome>
