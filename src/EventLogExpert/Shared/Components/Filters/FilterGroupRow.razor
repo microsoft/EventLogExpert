@@ -1,5 +1,6 @@
+@using EventLogExpert.Shared.Base
 @using EventLogExpert.UI
-@inherits Base.EditableFilterRowBase
+@inherits EditableFilterRowBase
 
 <div class="filter-group-row">
     <div class="flex-space-between">
@@ -8,8 +9,10 @@
             {
                 if (!Filter.IsExcluded)
                 {
-                    <ValueSelect CssClass="input color-dropdown" DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
-                                 T="HighlightColor" @bind-Value="Filter.Color">
+                    <ValueSelect @bind-Value="Filter.Color"
+                        CssClass="input color-dropdown"
+                        DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
+                        T="HighlightColor">
                         @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                         {
                             <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
@@ -26,29 +29,32 @@
                     {
                         <label for="@Id">Expression: </label>
                     }
-                    <input class="input advanced-filter" @oninput="OnInputChanged" id="@Id"
+                    <input class="input advanced-filter" id="@Id" @oninput="OnInputChanged"
                         placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
                         type="text" value="@Filter.ComparisonText" />
                 </span>
             }
-            else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
+            else if (Value is { } savedFilter)
             {
-                <span>No Filter Specified</span>
-            }
-            else
-            {
-                @if (Value.Color != HighlightColor.None)
+                @if (string.IsNullOrWhiteSpace(savedFilter.Comparison.Value))
                 {
-                    <div class="mx-2 color-box" data-highlight="@Value.Color.ToString().ToLowerInvariant()"></div>
-                }
-
-                @if (Value.IsExcluded)
-                {
-                    <span>Exclude: @Value.Comparison.Value</span>
+                    <span>No Filter Specified</span>
                 }
                 else
                 {
-                    <span>@Value.Comparison.Value</span>                
+                    @if (savedFilter.Color != HighlightColor.None)
+                    {
+                        <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
+                    }
+
+                    @if (savedFilter.IsExcluded)
+                    {
+                        <span>Exclude: @savedFilter.Comparison.Value</span>
+                    }
+                    else
+                    {
+                        <span>@savedFilter.Comparison.Value</span>
+                    }
                 }
             }
         </div>
@@ -64,17 +70,20 @@
                     <i class="bi bi-x-circle"></i> Cancel
                 </button>
 
-                <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                    <i class="bi bi-dash-circle"></i> Remove
-                </button>
+                @if (!IsPending)
+                {
+                    <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+                }
             }
-            else
+            else if (Value is { } savedFilter)
             {
                 <button class="button" @onclick="EditFilter">
                     <i class="bi bi-funnel"></i> Edit
                 </button>
 
-                @if (Value.IsExcluded)
+                @if (savedFilter.IsExcluded)
                 {
                     <button class="button fixed-width" @onclick="ToggleFilterExclusion">
                         <i class="bi bi-plus-circle"></i> Include

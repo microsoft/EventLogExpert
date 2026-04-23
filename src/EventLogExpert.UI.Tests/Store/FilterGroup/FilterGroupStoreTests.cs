@@ -621,18 +621,30 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetFilter_WhenFilterNotFound_ShouldReturnSameState()
+    public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
-        // Arrange
+        // Arrange — pending-draft commit path: parent group exists but the filter Id is brand new
+        // (FilterGroup.OnPendingDraftSaved fires SetFilter for a draft that was never in state).
         var group = new FilterGroupModel { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var action = new FilterGroupAction.SetFilter(group.Id, new FilterModel());
+        var newFilter = new FilterModel
+        {
+            Color = HighlightColor.Yellow,
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsEditing = true // upsert must clear this
+        };
+        var action = new FilterGroupAction.SetFilter(group.Id, newFilter);
 
         // Act
         var newState = FilterGroupReducers.ReducerSetFilter(state, action);
 
         // Assert
-        Assert.Same(state, newState);
+        var resultGroup = newState.Groups.First(group => group.Id == group.Id);
+
+        Assert.Single(resultGroup.Filters);
+        Assert.Equal(newFilter.Id, resultGroup.Filters[0].Id);
+        Assert.Equal(HighlightColor.Yellow, resultGroup.Filters[0].Color);
+        Assert.False(resultGroup.Filters[0].IsEditing);
     }
 
     [Fact]

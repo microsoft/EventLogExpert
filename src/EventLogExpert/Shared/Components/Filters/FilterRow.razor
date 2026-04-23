@@ -1,5 +1,6 @@
+@using EventLogExpert.Shared.Base
 @using EventLogExpert.UI
-@inherits Base.EditableFilterRowBase
+@inherits EditableFilterRowBase
 
 <div class="flex-space-between">
     <div class="flex-align-center">
@@ -7,7 +8,11 @@
         {
             if (!Filter.IsExcluded)
             {
-                <ValueSelect AriaLabel="Highlight Color" CssClass="input color-dropdown" DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())" T="HighlightColor" @bind-Value="Filter.Color">
+                <ValueSelect AriaLabel="Highlight Color"
+                    @bind-Value="Filter.Color"
+                    CssClass="input color-dropdown"
+                    DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
+                    T="HighlightColor">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
                         <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
@@ -23,29 +28,33 @@
             {
                 <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
             }
-            <FilterCategoryEditor Data="Filter.Data" Id="@Id" CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" />
-        }
-        else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
-        {
-            <span>No Filter Specified</span>
-        }
-        else
-        {
-            @if (Value.Color != HighlightColor.None)
-            {
-                <div class="mx-2 color-box" data-highlight="@Value.Color.ToString().ToLowerInvariant()"></div>
-            }
 
-            @if (Value.IsExcluded)
+            <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="Filter.Data" Id="@Id" />
+        }
+        else if (Value is { } savedFilter)
+        {
+            @if (string.IsNullOrWhiteSpace(savedFilter.Comparison.Value))
             {
-                <span>Exclude: @Value.Comparison.Value</span>
+                <span>No Filter Specified</span>
             }
             else
             {
-                <span>@Value.Comparison.Value</span>                
+                @if (savedFilter.Color != HighlightColor.None)
+                {
+                    <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
+                }
+
+                @if (savedFilter.IsExcluded)
+                {
+                    <span>Exclude: @savedFilter.Comparison.Value</span>
+                }
+                else
+                {
+                    <span>@savedFilter.Comparison.Value</span>
+                }
             }
         }
-     </div>
+    </div>
 
     <div>
         @if (Filter is not null)
@@ -62,17 +71,20 @@
                 <i class="bi bi-x-circle"></i> Cancel
             </button>
 
-            <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                <i class="bi bi-dash-circle"></i> Remove
-            </button>
+            @if (!IsPending)
+            {
+                <button class="button button-red fixed-width" @onclick="RemoveFilter">
+                    <i class="bi bi-dash-circle"></i> Remove
+                </button>
+            }
         }
-        else
+        else if (Value is { } savedFilter)
         {
             <button class="button" @onclick="EditFilter">
                 <i class="bi bi-funnel"></i> Edit
             </button>
 
-            @if (Value.IsExcluded)
+            @if (savedFilter.IsExcluded)
             {
                 <button class="button fixed-width" @onclick="ToggleFilterExclusion">
                     <i class="bi bi-plus-circle"></i> Include
@@ -89,7 +101,7 @@
                 <i class="bi bi-dash-circle"></i> Remove
             </button>
 
-            @if (Value.IsEnabled)
+            @if (savedFilter.IsEnabled)
             {
                 <button class="button button-red fixed-width" @onclick="ToggleFilter">
                     <i class="bi bi-dash-circle"></i> Disable
@@ -110,7 +122,7 @@
     <div class="flex-column">
         @foreach (var item in Filter.SubFilters)
         {
-            <SubFilterRow @key="item.Id" Value="@item" OnRemove="RemoveSubFilter" />
+            <SubFilterRow @key="item.Id" OnRemove="RemoveSubFilter" Value="@item" />
         }
     </div>
 }
