@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Models;
@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Base;
 
-public abstract class BaseComponent<T> : ComponentBase
+public abstract class InputComponent<T> : ComponentBase
 {
     private Func<T?, string> _toStringFunc = x => x?.ToString() ?? string.Empty;
 

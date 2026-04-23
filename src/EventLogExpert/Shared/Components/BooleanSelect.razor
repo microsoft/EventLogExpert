@@ -1,5 +1,5 @@
 @using EventLogExpert.Shared.Base
-@inherits BaseComponent<bool>
+@inherits InputComponent<bool>
 
 <div aria-label="@AriaLabel" class="toggle" role="radiogroup">
     <input aria-label="@AriaLabel @DisabledString" checked="@(!Value)" id="@($"{Id}_false")" name="@Id" @onchange="UpdateValue" type="radio" value="false" />

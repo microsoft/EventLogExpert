@@ -1,12 +1,13 @@
 @using EventLogExpert.UI
+@inherits Base.EditableFilterRowBase
 
 <div class="flex-space-between">
     <div class="flex-align-center">
-        @if (_filter is not null)
+        @if (Filter is not null)
         {
-            if (!_filter.IsExcluded)
+            if (!Filter.IsExcluded)
             {
-                <ValueSelect CssClass="input color-dropdown" DataHighlight="@(_filter.Color == HighlightColor.None ? null : _filter.Color.ToString().ToLowerInvariant())" T="HighlightColor" @bind-Value="_filter.Color">
+                <ValueSelect CssClass="input color-dropdown" DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())" T="HighlightColor" @bind-Value="Filter.Color">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
                         <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
@@ -22,7 +23,7 @@
                 }
             </ValueSelect>
 
-            if (_filter.IsExcluded)
+            if (Filter.IsExcluded)
             {
                 <label aria-label="Exclude Value">Exclude Value: </label>
             }
@@ -30,7 +31,7 @@
             {
                 <label aria-label="Value">Value: </label>
             }
-            <ValueSelect CssClass="input cache-dropdown" T="string" @bind-Value="_filter.ComparisonText" IsInput>
+            <ValueSelect CssClass="input cache-dropdown" T="string" @bind-Value="Filter.ComparisonText" IsInput>
                 @if (Items.Any())
                 {
                     @foreach (var item in Items)
@@ -63,13 +64,13 @@
     </div>
 
     <div class="justify-self-right">
-        @if (_filter is not null)
+        @if (Filter is not null)
         {
             <button class="button button-green" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
             </button>
 
-            <button class="button" @onclick="CancelFilter">
+            <button class="button button-red fixed-width" @onclick="CancelFilter">
                 <i class="bi bi-x-circle"></i> Cancel
             </button>
 

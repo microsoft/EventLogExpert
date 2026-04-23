@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class BooleanSelect : BaseComponent<bool>
+public sealed partial class BooleanSelect : InputComponent<bool>
 {
     [Parameter] public string AriaLabel { get; set; } = string.Empty;
 
