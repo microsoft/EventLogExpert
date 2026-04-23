@@ -15,7 +15,6 @@ internal static class FilterUtils
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        bool isEditing = false,
         bool shouldCompareAny = false,
         FilterData? data = null,
         IEnumerable<FilterModel>? subFilters = null) =>
@@ -25,7 +24,6 @@ internal static class FilterUtils
             FilterType = filterType,
             Data = data ?? new FilterData(),
             ShouldCompareAny = shouldCompareAny,
-            IsEditing = isEditing,
             IsEnabled = isEnabled,
             IsExcluded = isExcluded,
             Comparison = new FilterComparison { Value = comparisonValue },

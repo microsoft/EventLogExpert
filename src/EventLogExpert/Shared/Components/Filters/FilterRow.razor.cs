@@ -46,7 +46,6 @@ public sealed partial class FilterRow : EditableFilterRowBase
         var newFilter = draftAsFilter with
         {
             Comparison = new FilterComparison { Value = comparisonString },
-            IsEditing = false,
             IsEnabled = true
         };
 

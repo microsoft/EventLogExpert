@@ -9,15 +9,8 @@ namespace EventLogExpert.UI.Store.FilterPane;
 public sealed class FilterPaneReducers
 {
     [ReducerMethod]
-    public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action)
-    {
-        if (action.FilterModel is null)
-        {
-            return state with { Filters = state.Filters.Add(new FilterModel { IsEditing = true }) };
-        }
-
-        return state with { Filters = state.Filters.Add(action.FilterModel) };
-    }
+    public static FilterPaneState ReduceAddFilter(FilterPaneState state, FilterPaneAction.AddFilter action) =>
+        state with { Filters = state.Filters.Add(action.FilterModel) };
 
     [ReducerMethod]
     public static FilterPaneState ReduceAddSubFilter(FilterPaneState state, FilterPaneAction.AddSubFilter action)
@@ -132,12 +125,6 @@ public sealed class FilterPaneReducers
             FilteredDateRange = state.FilteredDateRange with { IsEnabled = !state.FilteredDateRange.IsEnabled }
         };
     }
-
-    [ReducerMethod]
-    public static FilterPaneState ReduceToggleFilterEditing(
-        FilterPaneState state,
-        FilterPaneAction.ToggleFilterEditing action) =>
-        UpdateFilterById(state, action.Id, filter => filter with { IsEditing = !filter.IsEditing });
 
     [ReducerMethod]
     public static FilterPaneState ReduceToggleFilterEnabled(

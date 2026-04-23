@@ -414,11 +414,9 @@ public sealed partial class EventTable
 
         // Preserve existing semantics: first matching enabled+included filter
         // wins (even if its Color is None, which suppresses any later match).
-        // Editing filters are excluded because their fields can be mutated in
-        // place without producing a new FilterPaneState reference.
         foreach (var filter in _filters)
         {
-            if (filter is not { IsEnabled: true, IsExcluded: false, IsEditing: false }) { continue; }
+            if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
 
             if (!filter.Comparison.Expression(@event)) { continue; }
 

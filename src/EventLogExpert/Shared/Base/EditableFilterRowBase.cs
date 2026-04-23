@@ -25,8 +25,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 {
     /// <summary>
     ///     Bubbles up to the parent (FilterPane / FilterGroup) for saved rows so it can track which rows are mid-edit
-    ///     without relying on <see cref="FilterModel.IsEditing" /> in Fluxor state. Pending rows do not bubble this — the
-    ///     parent already owns the pending list.
+    ///     in component-local state. Pending rows do not bubble this — the parent already owns the pending list.
     /// </summary>
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
@@ -71,13 +70,6 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         // Saved-row branch: the exactly-one invariant in OnParametersSet guarantees Value is set.
         // Pattern-bind to a non-nullable local so the rest of the method reads without `!`.
         if (Value is not { } savedFilter) { return; }
-
-        // Legacy: a saved-but-empty placeholder (FilterModel.IsEditing set, never persisted)
-        // should be removed entirely. Dies with IsEditing in 3e.3.
-        if (string.IsNullOrEmpty(savedFilter.Comparison.Value))
-        {
-            DispatchRemoveFilter();
-        }
 
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
     }
@@ -144,12 +136,6 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
             // Pending row: the parent's draft IS the editor. Adopt once; re-renders triggered by
             // unrelated parent state changes must not wipe in-flight edits, hence the null-guard.
             Filter ??= PendingDraft;
-        }
-        else if (Value is { IsEditing: true } savedFilter && Filter is null)
-        {
-            // Legacy auto-edit path for FilterModel.IsEditing placeholders. After 3e.2 no UI path
-            // creates such placeholders, but the branch stays alive until 3e.3 retires IsEditing.
-            Filter = FilterEditorModel.FromFilterModel(savedFilter);
         }
 
         base.OnParametersSet();

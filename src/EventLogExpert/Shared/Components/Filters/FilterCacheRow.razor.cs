@@ -53,7 +53,6 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
         var newFilter = Filter.ToFilterModel() with
         {
             Comparison = new FilterComparison { Value = Filter.ComparisonText },
-            IsEditing = false,
             IsEnabled = true
         };
 

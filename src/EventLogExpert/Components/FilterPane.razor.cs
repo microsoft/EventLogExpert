@@ -133,7 +133,7 @@ public sealed partial class FilterPane : IDisposable
         int count = 0;
 
         count += FilterPaneState.Value.FilteredDateRange?.IsEnabled is true ? 1 : 0;
-        count += FilterPaneState.Value.Filters.Count(filter => filter is { IsEnabled: true, IsEditing: false });
+        count += FilterPaneState.Value.Filters.Count(filter => filter.IsEnabled);
 
         return count;
     }

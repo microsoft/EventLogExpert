@@ -14,47 +14,6 @@ namespace EventLogExpert.UI.Tests.Store.FilterGroup;
 public sealed class FilterGroupEffectsTests
 {
     [Fact]
-    public async Task HandleAddFilter_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleAddFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
-    }
-
-    [Fact]
-    public async Task HandleAddFilter_ShouldUseCurrentStateGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleAddFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 2 &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupName) &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupNameNested)));
-    }
-
-    [Fact]
     public async Task HandleAddGroup_ShouldDispatchUpdateDisplayGroups()
     {
         // Arrange
@@ -381,25 +340,6 @@ public sealed class FilterGroupEffectsTests
         // Assert
         _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
             x.Count() == 3);
-    }
-
-    [Fact]
-    public async Task HandleToggleFilter_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleToggleFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
     }
 
     [Fact]

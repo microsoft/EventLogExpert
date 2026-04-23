@@ -9,23 +9,6 @@ namespace EventLogExpert.UI.Store.FilterGroup;
 public sealed class FilterGroupReducers
 {
     [ReducerMethod]
-    public static FilterGroupState ReducerAddFilter(FilterGroupState state, FilterGroupAction.AddFilter action)
-    {
-        var group = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
-
-        if (group is null) { return state; }
-
-        var index = state.Groups.IndexOf(group);
-
-        return state with
-        {
-            Groups = state.Groups.SetItem(
-                index,
-                group with { Filters = [.. group.Filters, new FilterModel { IsEditing = true }] })
-        };
-    }
-
-    [ReducerMethod]
     public static FilterGroupState ReducerAddGroup(FilterGroupState state, FilterGroupAction.AddGroup action) =>
         state with { Groups = state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()) };
 
@@ -82,13 +65,12 @@ public sealed class FilterGroupReducers
         if (existing is null)
         {
             // Upsert: append a brand-new committed filter (e.g. from a pending draft save in
-            // FilterGroup). Force IsEditing=false to defend against stale draft state. Mirrors
-            // FilterPaneReducers.ReduceSetFilter's upsert semantics.
+            // FilterGroup). Mirrors FilterPaneReducers.ReduceSetFilter's upsert semantics.
             return state with
             {
                 Groups = state.Groups.SetItem(
                     groupIndex,
-                    parent with { Filters = [.. parent.Filters, action.Filter with { IsEditing = false }] })
+                    parent with { Filters = [.. parent.Filters, action.Filter] })
             };
         }
 
@@ -98,8 +80,7 @@ public sealed class FilterGroupReducers
         var updatedFilter = existing with
         {
             Color = action.Filter.Color,
-            Comparison = action.Filter.Comparison with { },
-            IsEditing = false
+            Comparison = action.Filter.Comparison with { }
         };
 
         return state with
@@ -131,10 +112,6 @@ public sealed class FilterGroupReducers
                 })
         };
     }
-
-    [ReducerMethod]
-    public static FilterGroupState ReducerToggleFilter(FilterGroupState state, FilterGroupAction.ToggleFilter action) =>
-        UpdateFilterInGroup(state, action.ParentId, action.Id, filter => filter with { IsEditing = !filter.IsEditing });
 
     [ReducerMethod]
     public static FilterGroupState ReducerToggleFilterExcluded(

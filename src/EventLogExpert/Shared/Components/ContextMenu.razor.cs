@@ -69,7 +69,6 @@ public sealed partial class ContextMenu
                 Value = filterValue,
                 Evaluator = FilterEvaluator.Equals
             },
-            IsEditing = false,
             IsEnabled = true,
             IsExcluded = shouldExclude
         };

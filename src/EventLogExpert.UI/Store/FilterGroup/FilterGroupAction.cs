@@ -7,8 +7,6 @@ namespace EventLogExpert.UI.Store.FilterGroup;
 
 public sealed record FilterGroupAction
 {
-    public sealed record AddFilter(FilterGroupId ParentId);
-
     public sealed record AddGroup(FilterGroupModel? FilterGroup = null);
 
     public sealed record ImportGroups(IEnumerable<FilterGroupModel> Groups);
@@ -24,8 +22,6 @@ public sealed record FilterGroupAction
     public sealed record SetFilter(FilterGroupId ParentId, FilterModel Filter);
 
     public sealed record SetGroup(FilterGroupModel FilterGroup);
-
-    public sealed record ToggleFilter(FilterGroupId ParentId, FilterId Id);
 
     public sealed record ToggleFilterExcluded(FilterGroupId ParentId, FilterId Id);
 

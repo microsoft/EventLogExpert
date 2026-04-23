@@ -10,19 +10,6 @@ namespace EventLogExpert.UI.Tests.Store.FilterGroup;
 public sealed class FilterGroupStoreTests
 {
     [Fact]
-    public void FilterGroupAction_AddFilter_ShouldStoreParentId()
-    {
-        // Arrange
-        var parentId = FilterGroupId.Create();
-
-        // Act
-        var action = new FilterGroupAction.AddFilter(parentId);
-
-        // Assert
-        Assert.Equal(parentId, action.ParentId);
-    }
-
-    [Fact]
     public void FilterGroupAction_AddGroup_WithGroup_ShouldStoreGroup()
     {
         // Arrange
@@ -133,21 +120,6 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_ToggleFilter_ShouldStoreParentIdAndFilterId()
-    {
-        // Arrange
-        var parentId = FilterGroupId.Create();
-        var filterId = FilterId.Create();
-
-        // Act
-        var action = new FilterGroupAction.ToggleFilter(parentId, filterId);
-
-        // Assert
-        Assert.Equal(parentId, action.ParentId);
-        Assert.Equal(filterId, action.Id);
-    }
-
-    [Fact]
     public void FilterGroupAction_ToggleFilterExcluded_ShouldStoreParentIdAndFilterId()
     {
         // Arrange
@@ -247,13 +219,17 @@ public sealed class FilterGroupStoreTests
         // Assert
         Assert.Single(state.Groups);
 
-        // Act - Add filter
+        // Act - Upsert filter directly into group (mirrors FilterGroup pending-draft commit path)
         var groupId = state.Groups.First().Id;
-        state = FilterGroupReducers.ReducerAddFilter(state, new FilterGroupAction.AddFilter(groupId));
+        var filter = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
+        };
+
+        state = FilterGroupReducers.ReducerSetFilter(state, new FilterGroupAction.SetFilter(groupId, filter));
 
         // Assert
         Assert.Single(state.Groups.First().Filters);
-        Assert.True(state.Groups.First().Filters[0].IsEditing);
     }
 
     [Fact]
@@ -267,27 +243,22 @@ public sealed class FilterGroupStoreTests
         state = FilterGroupReducers.ReducerAddGroup(state, new FilterGroupAction.AddGroup(group));
         var groupId = state.Groups.First().Id;
 
-        // Act - Add filter
-        state = FilterGroupReducers.ReducerAddFilter(state, new FilterGroupAction.AddFilter(groupId));
-        var filterId = state.Groups.First().Filters[0].Id;
-
-        // Act - Set filter
-        var filter = state.Groups.First().Filters[0] with
+        // Act - Upsert a brand-new filter into the group (pending-draft commit path)
+        var initialFilter = new FilterModel
         {
             Color = HighlightColor.Blue,
             Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
         };
 
-        state = FilterGroupReducers.ReducerSetFilter(state, new FilterGroupAction.SetFilter(groupId, filter));
+        state = FilterGroupReducers.ReducerSetFilter(state, new FilterGroupAction.SetFilter(groupId, initialFilter));
 
         // Assert
         Assert.Equal(HighlightColor.Blue, state.Groups.First().Filters[0].Color);
-        Assert.False(state.Groups.First().Filters[0].IsEditing);
 
-        // Act - Remove filter (note: SetFilter creates a new filter with a different ID)
-        var updatedFilterId = state.Groups.First().Filters[0].Id;
+        // Act - Remove filter
+        var filterId = state.Groups.First().Filters[0].Id;
         state = FilterGroupReducers.ReducerRemoveFilter(state,
-            new FilterGroupAction.RemoveFilter(groupId, updatedFilterId));
+            new FilterGroupAction.RemoveFilter(groupId, filterId));
 
         // Assert
         Assert.Empty(state.Groups.First().Filters);
@@ -334,7 +305,7 @@ public sealed class FilterGroupStoreTests
     public void IntegrationTest_FilterManipulation()
     {
         // Arrange
-        var filter = new FilterModel { IsEditing = true };
+        var filter = new FilterModel();
 
         var group = new FilterGroupModel
         {
@@ -364,7 +335,6 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.Equal(HighlightColor.Red, state.Groups.First().Filters[0].Color);
-        Assert.False(state.Groups.First().Filters[0].IsEditing);
     }
 
     [Fact]
@@ -396,37 +366,6 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.True(state.Groups.First(g => g.Id == firstGroupId).IsEditing);
-    }
-
-    [Fact]
-    public void ReducerAddFilter_ShouldAddNewFilterToGroup()
-    {
-        // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new FilterGroupAction.AddFilter(group.Id);
-
-        // Act
-        var newState = FilterGroupReducers.ReducerAddFilter(state, action);
-
-        // Assert
-        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.Single(updatedGroup.Filters);
-        Assert.True(updatedGroup.Filters[0].IsEditing);
-    }
-
-    [Fact]
-    public void ReducerAddFilter_WhenGroupNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new FilterGroupAction.AddFilter(FilterGroupId.Create());
-
-        // Act
-        var newState = FilterGroupReducers.ReducerAddFilter(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
     }
 
     [Fact]
@@ -591,7 +530,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetFilter_ShouldUpdateFilter()
     {
         // Arrange
-        var filter = new FilterModel { IsEditing = true };
+        var filter = new FilterModel();
 
         var group = new FilterGroupModel
         {
@@ -617,21 +556,19 @@ public sealed class FilterGroupStoreTests
         Assert.Single(updatedGroup.Filters);
         var resultFilter = updatedGroup.Filters[0];
         Assert.Equal(HighlightColor.Green, resultFilter.Color);
-        Assert.False(resultFilter.IsEditing);
     }
 
     [Fact]
     public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
         // Arrange — pending-draft commit path: parent group exists but the filter Id is brand new
-        // (FilterGroup.OnPendingDraftSaved fires SetFilter for a draft that was never in state).
+        // (FilterGroup.HandlePendingSave fires SetFilter for a draft that was never in state).
         var group = new FilterGroupModel { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var newFilter = new FilterModel
         {
             Color = HighlightColor.Yellow,
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            IsEditing = true // upsert must clear this
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
         };
         var action = new FilterGroupAction.SetFilter(group.Id, newFilter);
 
@@ -644,7 +581,6 @@ public sealed class FilterGroupStoreTests
         Assert.Single(resultGroup.Filters);
         Assert.Equal(newFilter.Id, resultGroup.Filters[0].Id);
         Assert.Equal(HighlightColor.Yellow, resultGroup.Filters[0].Color);
-        Assert.False(resultGroup.Filters[0].IsEditing);
     }
 
     [Fact]
@@ -695,58 +631,6 @@ public sealed class FilterGroupStoreTests
 
         // Act
         var newState = FilterGroupReducers.ReducerSetGroup(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
-    public void ReducerToggleFilter_ShouldToggleIsEditing()
-    {
-        // Arrange
-        var filter = new FilterModel { IsEditing = false };
-
-        var group = new FilterGroupModel
-        {
-            Name = Constants.FilterGroupName,
-            Filters = [filter]
-        };
-
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new FilterGroupAction.ToggleFilter(group.Id, filter.Id);
-
-        // Act
-        var newState = FilterGroupReducers.ReducerToggleFilter(state, action);
-
-        // Assert
-        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.True(updatedGroup.Filters[0].IsEditing);
-    }
-
-    [Fact]
-    public void ReducerToggleFilter_WhenFilterNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new FilterGroupAction.ToggleFilter(group.Id, FilterId.Create());
-
-        // Act
-        var newState = FilterGroupReducers.ReducerToggleFilter(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
-    public void ReducerToggleFilter_WhenGroupNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new FilterGroupAction.ToggleFilter(FilterGroupId.Create(), FilterId.Create());
-
-        // Act
-        var newState = FilterGroupReducers.ReducerToggleFilter(state, action);
 
         // Assert
         Assert.Same(state, newState);
