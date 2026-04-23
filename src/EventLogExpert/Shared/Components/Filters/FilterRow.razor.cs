@@ -1,91 +1,79 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.UI;
+using EventLogExpert.Shared.Base;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
-using Fluxor;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class FilterRow
+public sealed partial class FilterRow : BaseFilterRow
 {
-    [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
+    private FilterEditorModel? _filter;
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    /// <summary>Wraps <c>Value.Data.Category</c> so that a transition into a text-only category
-    /// (Description / Xml) auto-corrects an incompatible evaluator. Without this, switching from
-    /// e.g. Source (MultiSelect) to Xml would leave Evaluator=MultiSelect with no matching option
-    /// in the comparison dropdown — producing an invalid filter on save.</summary>
-    private FilterCategory CategoryBinding
-    {
-        get => Value.Data.Category;
-        set
-        {
-            Value.Data.Category = value;
-
-            if (IsTextOnlyCategory(value) && Value.Data.Evaluator == FilterEvaluator.MultiSelect)
-            {
-                Value.Data.Evaluator = FilterEvaluator.Contains;
-            }
-        }
-    }
+    protected override FilterData CurrentData => _filter?.Data ?? Value.Data;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
-
-    private List<string> FilteredItems => Items
-        .Where(x => x.Contains(Value.Data.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
-        .ToList();
-
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
-    private List<string> Items =>
-        Value.Data.Category switch
+    protected override void OnParametersSet()
+    {
+        // Auto-create a draft when the row mounts in edit mode (e.g. AddBasicFilter dispatches
+        // AddFilter with IsEditing=true). The `_filter is null` guard ensures we don't overwrite
+        // an in-flight draft when the parent re-renders due to unrelated state changes.
+        if (Value.IsEditing && _filter is null)
         {
-            FilterCategory.Id => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.Id))
-                .Distinct().Order()],
-            FilterCategory.ActivityId => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.ActivityId))
-                .Distinct().Order()],
-            FilterCategory.Level => [.. Enum.GetNames<SeverityLevel>()],
-            FilterCategory.Keywords => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.Keywords))
-                .Distinct().Order()],
-            FilterCategory.Source => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.Source))
-                .Distinct().Order()],
-            FilterCategory.TaskCategory => [.. EventLogState.Value.ActiveLogs.Values
-                .SelectMany(log => log.GetCategoryValues(FilterCategory.TaskCategory))
-                .Distinct().Order()],
-            _ => []
-        };
+            _filter = FilterEditorModel.FromFilterModel(Value);
+        }
 
-    /// <summary>Categories whose value is free-form text (no fixed enumerable set of options).
-    /// These render as a single text input and disallow MultiSelect comparison.</summary>
-    private static bool IsTextOnlyCategory(FilterCategory category) =>
-        category is FilterCategory.Description or FilterCategory.Xml;
+        base.OnParametersSet();
+    }
 
-    private void AddSubFilter() => Dispatcher.Dispatch(new FilterPaneAction.AddSubFilter(Value.Id));
+    private void AddSubFilter() => _filter?.SubFilters.Add(new FilterEditorModel());
 
-    private void EditFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
+    private void CancelFilter()
+    {
+        _filter = null;
+
+        // A new filter has no saved comparison string — Cancel removes it entirely. An existing
+        // filter just exits edit mode; the saved Value is untouched because the draft was a copy.
+        if (string.IsNullOrEmpty(Value.Comparison.Value))
+        {
+            Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+        }
+        else
+        {
+            Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
+        }
+    }
+
+    private void EditFilter()
+    {
+        _filter = FilterEditorModel.FromFilterModel(Value);
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
+    }
 
     private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
 
+    private void RemoveSubFilter(FilterId subFilterId) =>
+        _filter?.SubFilters.RemoveAll(subFilter => subFilter.Id == subFilterId);
+
     private async Task SaveFilter()
     {
-        if (!FilterService.TryParse(Value, out string comparisonString))
+        if (_filter is null) { return; }
+
+        var draftAsFilter = _filter.ToFilterModel();
+
+        if (!FilterService.TryParse(draftAsFilter, out string comparisonString))
         {
             await AlertDialogService.ShowAlert("Invalid Filter",
                 "The filter you have created is an invalid filter, please adjust and try again.",
@@ -94,14 +82,15 @@ public sealed partial class FilterRow
             return;
         }
 
-        FilterModel newModel = Value with
+        var newFilter = draftAsFilter with
         {
             Comparison = new FilterComparison { Value = comparisonString },
             IsEditing = false,
             IsEnabled = true
         };
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
+        _filter = null;
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
     }
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));

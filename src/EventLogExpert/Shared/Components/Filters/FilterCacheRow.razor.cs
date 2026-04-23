@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
@@ -16,7 +16,7 @@ public sealed partial class FilterCacheRow
 {
     private CacheType _cacheType = CacheType.Favorites;
     private string? _errorMessage;
-    private string _filterValue = string.Empty;
+    private FilterEditorModel? _filter;
 
     [Parameter] public FilterModel Value { get; set; } = null!;
 
@@ -33,9 +33,40 @@ public sealed partial class FilterCacheRow
         _ => [],
     };
 
+    protected override void OnParametersSet()
+    {
+        // Auto-create a draft when the row mounts in edit mode (e.g. AddCachedFilter dispatches
+        // AddFilter with IsEditing=true). The `_filter is null` guard ensures we don't overwrite
+        // an in-flight draft when the parent re-renders due to unrelated state changes.
+        if (Value.IsEditing && _filter is null)
+        {
+            _filter = FilterEditorModel.FromFilterModel(Value);
+        }
+
+        base.OnParametersSet();
+    }
+
+    private void CancelFilter()
+    {
+        _filter = null;
+        _errorMessage = string.Empty;
+
+        // A new filter has no saved comparison string — Cancel removes it entirely. An existing
+        // filter just exits edit mode; the saved Value is untouched because the draft was a copy.
+        if (string.IsNullOrEmpty(Value.Comparison.Value))
+        {
+            Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+        }
+        else
+        {
+            Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
+        }
+    }
+
     private void EditFilter()
     {
-        _filterValue = Value.Comparison.Value;
+        _filter = FilterEditorModel.FromFilterModel(Value);
+        _errorMessage = string.Empty;
 
         Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
     }
@@ -44,22 +75,25 @@ public sealed partial class FilterCacheRow
 
     private void SaveFilter()
     {
-        if (!FilterService.TryParseExpression(_filterValue, out var message))
+        if (_filter is null) { return; }
+
+        if (!FilterService.TryParseExpression(_filter.ComparisonText, out var message))
         {
             _errorMessage = message;
             return;
         }
 
-        _errorMessage = string.Empty;
-
-        FilterModel newModel = Value with
+        var newFilter = _filter.ToFilterModel() with
         {
-            Comparison = new FilterComparison { Value = _filterValue },
+            Comparison = new FilterComparison { Value = _filter.ComparisonText },
             IsEditing = false,
             IsEnabled = true
         };
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newModel));
+        _filter = null;
+        _errorMessage = string.Empty;
+
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
     }
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));

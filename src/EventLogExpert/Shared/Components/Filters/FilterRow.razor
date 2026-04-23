@@ -1,12 +1,13 @@
-﻿@using EventLogExpert.UI
+@using EventLogExpert.UI
+@inherits Base.BaseFilterRow
 
 <div class="flex-space-between">
     <div class="flex-align-center">
-        @if (Value.IsEditing)
+        @if (_filter is not null)
         {
-            if (!Value.IsExcluded)
+            if (!_filter.IsExcluded)
             {
-                <ValueSelect AriaLabel="Highlight Color" CssClass="input color-dropdown" DataHighlight="@(Value.Color == HighlightColor.None ? null : Value.Color.ToString().ToLowerInvariant())" T="HighlightColor" @bind-Value="Value.Color">
+                <ValueSelect AriaLabel="Highlight Color" CssClass="input color-dropdown" DataHighlight="@(_filter.Color == HighlightColor.None ? null : _filter.Color.ToString().ToLowerInvariant())" T="HighlightColor" @bind-Value="_filter.Color">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
                         <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
@@ -14,7 +15,7 @@
                 </ValueSelect>
             }
 
-            if (Value.IsExcluded)
+            if (_filter.IsExcluded)
             {
                 <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
             }
@@ -30,10 +31,10 @@
             </ValueSelect>
 
             <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
-            <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
+            <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="_filter.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
                 @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
                 {
-                    @if (IsTextOnlyCategory(Value.Data.Category) && item == FilterEvaluator.MultiSelect)
+                    @if (IsTextOnlyCategory(_filter.Data.Category) && item == FilterEvaluator.MultiSelect)
                     {
                         continue;
                     }
@@ -43,13 +44,13 @@
 
             <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
             <div>
-                @if (IsTextOnlyCategory(Value.Data.Category))
+                @if (IsTextOnlyCategory(_filter.Data.Category))
                 {
-                    <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
+                    <TextInput CssClass="input filter-description" @bind-Value="@_filter.Data.Value" />
                 }
-                else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
+                else if (_filter.Data.Evaluator == FilterEvaluator.MultiSelect)
                 {
-                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
+                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="_filter.Data.Values" IsMultiSelect
                         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
                         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in Items)
@@ -60,7 +61,7 @@
                 }
                 else
                 {
-                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
+                    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="_filter.Data.Value" IsInput>
                     <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
                         @foreach (var item in FilteredItems)
                         {
@@ -93,7 +94,7 @@
      </div>
 
     <div>
-        @if (Value.IsEditing)
+        @if (_filter is not null)
         {
             <button class="button" @onclick="AddSubFilter">
                 <i class="bi bi-plus-circle"></i> Add Sub Filter
@@ -101,6 +102,10 @@
 
             <button class="button button-green" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
+            </button>
+
+            <button class="button" @onclick="CancelFilter">
+                <i class="bi bi-x-circle"></i> Cancel
             </button>
 
             <button class="button button-red fixed-width" @onclick="RemoveFilter">
@@ -146,12 +151,12 @@
     </div>
 </div>
 
-@if (Value.SubFilters.Count > 0 && Value.IsEditing)
+@if (_filter is not null && _filter.SubFilters.Count > 0)
 {
     <div class="flex-column">
-        @foreach (var item in Value.SubFilters)
+        @foreach (var item in _filter.SubFilters)
         {
-            <SubFilterRow ParentId="Value.Id" Value="@item" />
+            <SubFilterRow @key="item.Id" Value="@item" OnRemove="RemoveSubFilter" />
         }
     </div>
 }

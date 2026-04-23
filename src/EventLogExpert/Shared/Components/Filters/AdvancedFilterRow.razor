@@ -2,12 +2,12 @@
 
 <div class="flex-space-between">
     <div class="flex-align-center">
-        @if (Value.IsEditing)
+        @if (_filter is not null)
         {
-            @if (!Value.IsExcluded)
+            @if (!_filter.IsExcluded)
             {
-                <ValueSelect CssClass="input color-dropdown" DataHighlight="@(Value.Color == HighlightColor.None ? null : Value.Color.ToString().ToLowerInvariant())"
-                    T="HighlightColor" @bind-Value="Value.Color">
+                <ValueSelect CssClass="input color-dropdown" DataHighlight="@(_filter.Color == HighlightColor.None ? null : _filter.Color.ToString().ToLowerInvariant())"
+                    T="HighlightColor" @bind-Value="_filter.Color">
                     @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
                     {
                         <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
@@ -16,7 +16,7 @@
             }
 
             <span>
-                @if (Value.IsExcluded)
+                @if (_filter.IsExcluded)
                 {
                     <label aria-label="Exclude Expression" for="@Id">Exclude Expression: </label>
                 }
@@ -26,7 +26,7 @@
                 }
                 <input class="input advanced-filter" @oninput="OnInputChanged" id="@Id"
                     placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-                    type="text" value="@Value.Comparison.Value" />
+                    type="text" value="@_filter.ComparisonText" />
             </span>
         }
         else if (string.IsNullOrWhiteSpace(Value.Comparison.Value))
@@ -52,10 +52,14 @@
     </div>
 
     <div>
-        @if (Value.IsEditing)
+        @if (_filter is not null)
         {
             <button class="button button-green" @onclick="SaveFilter">
                 <i class="bi bi-check-circle"></i> Save
+            </button>
+
+            <button class="button" @onclick="CancelFilter">
+                <i class="bi bi-x-circle"></i> Cancel
             </button>
 
             <button class="button button-red fixed-width" @onclick="RemoveFilter">
