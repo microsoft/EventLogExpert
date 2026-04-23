@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Shared.Base;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
@@ -14,7 +14,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class FilterGroupModal
+public sealed partial class FilterGroupModal : BaseModal<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -22,19 +22,7 @@ public sealed partial class FilterGroupModal
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
-
-    protected override void OnInitialized()
-    {
-        SubscribeToAction<FilterGroupAction.OpenMenu>(OnOpenMenu);
-
-        base.OnInitialized();
-    }
-
-    private void CreateGroup() =>
-        Dispatcher.Dispatch(new FilterGroupAction.AddGroup(new FilterGroupModel { IsEditing = true }));
-
-    private async Task Export()
+    protected override async Task OnExportAsync()
     {
         FileSavePicker picker = new()
         {
@@ -73,7 +61,7 @@ public sealed partial class FilterGroupModal
         }
     }
 
-    private async Task Import()
+    protected override async Task OnImportAsync()
     {
         PickOptions options = new()
         {
@@ -103,15 +91,6 @@ public sealed partial class FilterGroupModal
         }
     }
 
-    private async void OnOpenMenu(FilterGroupAction.OpenMenu action)
-    {
-        try
-        {
-            await InvokeAsync(Open);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to open filter group modal: {e}");
-        }
-    }
+    private void CreateGroup() =>
+        Dispatcher.Dispatch(new FilterGroupAction.AddGroup(new FilterGroupModel { IsEditing = true }));
 }

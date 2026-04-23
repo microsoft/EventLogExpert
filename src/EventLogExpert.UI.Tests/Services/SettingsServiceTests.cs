@@ -241,35 +241,6 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void Load_WhenCalled_ShouldInvokeLoadedEvent()
-    {
-        // Arrange
-        var settingsService = CreateSettingsService();
-
-        var eventInvoked = false;
-        settingsService.Loaded += () => eventInvoked = true;
-
-        // Act
-        settingsService.Load();
-
-        // Assert
-        Assert.True(eventInvoked);
-    }
-
-    [Fact]
-    public void Load_WhenNoSubscribers_ShouldNotThrow()
-    {
-        // Arrange
-        var settingsService = CreateSettingsService();
-
-        // Act - no subscribers attached
-        var exception = Record.Exception(settingsService.Load);
-
-        // Assert
-        Assert.Null(exception);
-    }
-
-    [Fact]
     public void LogLevel_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange

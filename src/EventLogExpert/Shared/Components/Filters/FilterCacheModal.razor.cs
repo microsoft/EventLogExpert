@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Shared.Base;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
@@ -16,7 +16,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class FilterCacheModal
+public sealed partial class FilterCacheModal : BaseModal<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
@@ -24,33 +24,7 @@ public sealed partial class FilterCacheModal
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
-    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
-
-    protected override void OnInitialized()
-    {
-        SubscribeToAction<FilterCacheAction.OpenMenu>(OnOpenMenu);
-
-        base.OnInitialized();
-    }
-
-    private void AddFavorite(string filter) =>
-        Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
-
-    private async Task AddFilter(string filter)
-    {
-        Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    Comparison = new FilterComparison { Value = filter },
-                    FilterType = FilterType.Cached,
-                    IsEnabled = true
-                }));
-
-        await Close();
-    }
-
-    private async Task ExportFavorites()
+    protected override async Task OnExportAsync()
     {
         FileSavePicker picker = new()
         {
@@ -89,7 +63,7 @@ public sealed partial class FilterCacheModal
         }
     }
 
-    private async Task ImportFavorites()
+    protected override async Task OnImportAsync()
     {
         PickOptions options = new()
         {
@@ -122,16 +96,20 @@ public sealed partial class FilterCacheModal
         }
     }
 
-    private async void OnOpenMenu(FilterCacheAction.OpenMenu action)
+    private void AddFavorite(string filter) => Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
+
+    private async Task AddFilter(string filter)
     {
-        try
-        {
-            await InvokeAsync(Open);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to open filter cache modal: {e}");
-        }
+        Dispatcher.Dispatch(
+            new FilterPaneAction.AddFilter(
+                new FilterModel
+                {
+                    Comparison = new FilterComparison { Value = filter },
+                    FilterType = FilterType.Cached,
+                    IsEnabled = true
+                }));
+
+        await CloseAsync();
     }
 
     private void RemoveFavorite(string filter) =>

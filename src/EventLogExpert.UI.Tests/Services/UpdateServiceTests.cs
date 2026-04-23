@@ -368,27 +368,24 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
-    public async Task GetReleaseNotes_NoCurrentChanges_ShouldShowFailureAlert()
+    public async Task GetReleaseNotes_NoCurrentChanges_ShouldShowFailureAlertAndReturnNull()
     {
         // Arrange
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
 
         var updateService = CreateUpdateService(alertDialogService: mockAlertDialogService);
 
-        ReleaseNotesContent? captured = null;
-        updateService.ReleaseNotesReady += content => captured = content;
-
         // Act
-        await updateService.GetReleaseNotes();
+        var result = await updateService.GetReleaseNotes();
 
         // Assert
         await mockAlertDialogService.Received(1)
             .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "Ok");
-        Assert.Null(captured);
+        Assert.Null(result);
     }
 
     [Fact]
-    public async Task GetReleaseNotes_WithCurrentChanges_ShouldRaiseReleaseNotesReadyEvent()
+    public async Task GetReleaseNotes_WithCurrentChanges_ShouldReturnContent()
     {
         // Arrange
         var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
@@ -404,53 +401,20 @@ public sealed class UpdateServiceTests
             mockCurrentVersionProvider,
             gitHubService: mockGitHubService,
             alertDialogService: mockAlertDialogService);
-
-        ReleaseNotesContent? captured = null;
-        updateService.ReleaseNotesReady += content => captured = content;
 
         // Act
         await updateService.CheckForUpdates(false, false);
-        await updateService.GetReleaseNotes();
+        var result = await updateService.GetReleaseNotes();
 
         // Assert
-        Assert.NotNull(captured);
-        Assert.Contains("Release notes", captured!.Value.Title);
-        Assert.Contains(Constants.GitHubLatestVersion[1..], captured!.Value.Title);
-        Assert.Contains("Updated Azure yml to .NET 8", captured!.Value.Markdown);
-        Assert.DoesNotContain("66b7d6883807a5c518ffcd59f92e07e528a5636a", captured!.Value.Markdown);
+        Assert.NotNull(result);
+        Assert.Contains("Release notes", result.Value.Title);
+        Assert.Contains(Constants.GitHubLatestVersion[1..], result.Value.Title);
+        Assert.Contains("Updated Azure yml to .NET 8", result.Value.Markdown);
+        Assert.DoesNotContain("66b7d6883807a5c518ffcd59f92e07e528a5636a", result.Value.Markdown);
 
         await mockAlertDialogService.DidNotReceive()
             .ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
-    }
-
-    [Fact]
-    public async Task GetReleaseNotes_WithCurrentChangesButNoSubscriber_ShouldFallBackToAlert()
-    {
-        // Arrange
-        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
-        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.GitHubLatestVersion[1..]));
-        mockCurrentVersionProvider.IsDevBuild.Returns(false);
-
-        var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
-
-        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
-
-        var updateService = CreateUpdateService(
-            mockCurrentVersionProvider,
-            gitHubService: mockGitHubService,
-            alertDialogService: mockAlertDialogService);
-
-        // Act — note: no subscriber attached to ReleaseNotesReady.
-        await updateService.CheckForUpdates(false, false);
-        await updateService.GetReleaseNotes();
-
-        // Assert — without a UI subscriber the service must surface notes via the alert dialog
-        // so the user is never left with silent no-op feedback.
-        await mockAlertDialogService.Received(1).ShowAlert(
-            Arg.Is<string>(title => title.Contains("Release notes")),
-            Arg.Is<string>(body => body.Contains("Updated Azure yml to .NET 8")),
-            "Ok");
     }
 
     private static UpdateService CreateUpdateService(

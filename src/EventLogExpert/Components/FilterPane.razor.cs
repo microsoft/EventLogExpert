@@ -1,11 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Shared.Components.Filters;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -27,6 +28,8 @@ public sealed partial class FilterPane : IDisposable
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
+
+    [Inject] private IModalService ModalService { get; init; } = null!;
 
     private bool HasFilters => IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false;
 
@@ -74,7 +77,7 @@ public sealed partial class FilterPane : IDisposable
         _isFilterListVisible = true;
     }
 
-    private void AddCachedFilter() => Dispatcher.Dispatch(new FilterCacheAction.OpenMenu());
+    private async Task AddCachedFilter() => await ModalService.Show<FilterCacheModal, bool>();
 
     private void AddDateFilter()
     {

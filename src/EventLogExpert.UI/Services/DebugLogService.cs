@@ -33,8 +33,6 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         AppDomain.CurrentDomain.UnhandledException += OnUnhandledException;
     }
 
-    public event Action? DebugLogLoaded;
-
     public LogLevel MinimumLevel => _cachedLogLevel;
 
     public Task ClearAsync()
@@ -126,8 +124,6 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
             }
         }
     }
-
-    public void LoadDebugLog() => DebugLogLoaded?.Invoke();
 
     public void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler)
     {

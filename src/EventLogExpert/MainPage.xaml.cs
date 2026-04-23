@@ -6,6 +6,8 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Services;
+using EventLogExpert.Shared.Components;
+using EventLogExpert.Shared.Components.Filters;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -41,6 +43,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private readonly IAlertDialogService _dialogService;
     private readonly IFileLogger _fileLogger;
     private readonly IDispatcher _fluxorDispatcher;
+    private readonly IModalService _modalService;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
     private readonly IUpdateService _updateService;
@@ -63,7 +66,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger,
-        IFileLogger fileLogger)
+        IFileLogger fileLogger,
+        IModalService modalService)
     {
         InitializeComponent();
         PopulateOtherLogsMenu();
@@ -74,6 +78,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _databaseService = databaseService;
         _fileLogger = fileLogger;
         _fluxorDispatcher = fluxorDispatcher;
+        _modalService = modalService;
         _settings = settings;
         _dialogService = dialogService;
         _traceLogger = traceLogger;
@@ -448,7 +453,17 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _fluxorDispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
     }
 
-    private void OpenSettingsModal_Clicked(object sender, EventArgs e) => _settings.Load();
+    private async void OpenSettingsModal_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await _modalService.Show<SettingsModal, bool>();
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to open settings modal: {ex}");
+        }
+    }
 
     private void PopulateOtherLogsMenu()
     {
@@ -480,7 +495,22 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private async void ReleaseNotes_Clicked(object sender, EventArgs e) => await _updateService.GetReleaseNotes();
+    private async void ReleaseNotes_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            var content = await _updateService.GetReleaseNotes();
+
+            if (content is null) { return; }
+
+            await _modalService.Show<ReleaseNotesModal, bool>(
+                new Dictionary<string, object?> { ["Content"] = content.Value });
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to display release notes: {ex}");
+        }
+    }
 
     private async void SaveAllFilters_Clicked(object sender, EventArgs e)
     {
@@ -538,11 +568,39 @@ public sealed partial class MainPage : ContentPage, IDisposable
         }
     }
 
-    private void ViewFilterGroups_Clicked(object? sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new FilterGroupAction.OpenMenu());
+    private async void ViewFilterGroups_Clicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            await _modalService.Show<FilterGroupModal, bool>();
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to open filter groups modal: {ex}");
+        }
+    }
 
-    private void ViewLogs_Clicked(object? sender, EventArgs e) => _fileLogger.LoadDebugLog();
+    private async void ViewLogs_Clicked(object? sender, EventArgs e)
+    {
+        try
+        {
+            await _modalService.Show<DebugLogModal, bool>();
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to open debug log modal: {ex}");
+        }
+    }
 
-    private void ViewRecentFilters_Clicked(object sender, EventArgs e) =>
-        _fluxorDispatcher.Dispatch(new FilterCacheAction.OpenMenu());
+    private async void ViewRecentFilters_Clicked(object sender, EventArgs e)
+    {
+        try
+        {
+            await _modalService.Show<FilterCacheModal, bool>();
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"Failed to open recent filters modal: {ex}");
+        }
+    }
 }

@@ -37,7 +37,8 @@ public sealed partial class App : Application
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger,
-        IFileLogger fileLogger)
+        IFileLogger fileLogger,
+        IModalService modalService)
     {
         InitializeComponent();
 
@@ -63,7 +64,8 @@ public sealed partial class App : Application
             appTitleService,
             fileLocationOptions,
             traceLogger,
-            fileLogger);
+            fileLogger,
+            modalService);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)

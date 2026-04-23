@@ -1,0 +1,6 @@
+@if (Service.ActiveModalType is not null)
+{
+    <DynamicComponent @key="Service.ActiveModalId"
+        Parameters="Service.ActiveModalParameters"
+        Type="Service.ActiveModalType" />
+}
