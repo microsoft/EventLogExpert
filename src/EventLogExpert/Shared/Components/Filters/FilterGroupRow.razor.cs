@@ -108,7 +108,6 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
         var newFilter = Filter.ToFilterModel() with
         {
             Comparison = new FilterComparison { Value = Filter.ComparisonText },
-            IsEditing = false,
             IsEnabled = true
         };
 

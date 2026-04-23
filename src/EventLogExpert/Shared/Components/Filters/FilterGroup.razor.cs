@@ -210,16 +210,10 @@ public sealed partial class FilterGroup
     {
         // Block save while any row is mid-edit. Existing-filter edits are tracked locally via
         // _editingFilters (populated by OnRowEditingChanged bubbled up from FilterGroupRow).
-        // New-filter rows now live in _pendingDrafts (this component owns them; they never hit
-        // Fluxor state until the user hits Save on the row). The legacy filter.IsEditing branch
-        // remains for backwards compatibility until 3e.3 drops the field entirely.
+        // New-filter rows live in _pendingDrafts (this component owns them; they never hit
+        // Fluxor state until the user hits Save on the row).
         if (_editingFilters.Count > 0) { return; }
         if (_pendingDrafts.Count > 0) { return; }
-
-        foreach (var filter in Group.Filters)
-        {
-            if (filter.IsEditing) { return; }
-        }
 
         Dispatcher.Dispatch(new FilterGroupAction.SetGroup(Group));
     }

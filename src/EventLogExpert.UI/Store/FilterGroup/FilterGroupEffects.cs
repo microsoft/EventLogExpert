@@ -10,14 +10,6 @@ public sealed class FilterGroupEffects(
     IState<FilterGroupState> filterGroupState,
     IPreferencesProvider preferencesProvider)
 {
-    [EffectMethod(typeof(FilterGroupAction.AddFilter))]
-    public Task HandleAddFilter(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
-        return Task.CompletedTask;
-    }
-
     [EffectMethod(typeof(FilterGroupAction.AddGroup))]
     public Task HandleAddGroup(IDispatcher dispatcher)
     {
@@ -81,14 +73,6 @@ public sealed class FilterGroupEffects(
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
 
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(FilterGroupAction.ToggleFilter))]
-    public Task HandleToggleFilter(IDispatcher dispatcher)
-    {
         dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
 
         return Task.CompletedTask;

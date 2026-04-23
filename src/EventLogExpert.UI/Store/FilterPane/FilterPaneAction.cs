@@ -7,7 +7,7 @@ namespace EventLogExpert.UI.Store.FilterPane;
 
 public sealed record FilterPaneAction
 {
-    public sealed record AddFilter(FilterModel? FilterModel = null);
+    public sealed record AddFilter(FilterModel FilterModel);
 
     public sealed record AddSubFilter(FilterId ParentId);
 
@@ -26,8 +26,6 @@ public sealed record FilterPaneAction
     public sealed record SetFilterDateRange(FilterDateModel? FilterDateModel);
 
     public sealed record SetFilterDateRangeSuccess(FilterDateModel? FilterDateModel);
-
-    public sealed record ToggleFilterEditing(FilterId Id);
 
     public sealed record ToggleFilterEnabled(FilterId Id);
 

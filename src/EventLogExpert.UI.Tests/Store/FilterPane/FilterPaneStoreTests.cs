@@ -63,14 +63,6 @@ public sealed class FilterPaneActionTests
     }
 
     [Fact]
-    public void AddFilterAction_WithNullFilter_ShouldCreateAction()
-    {
-        var action = new FilterPaneAction.AddFilter();
-
-        Assert.Null(action.FilterModel);
-    }
-
-    [Fact]
     public void AddSubFilterAction_ShouldCreateAction()
     {
         var parentId = FilterId.Create();
@@ -160,15 +152,6 @@ public sealed class FilterPaneActionTests
     }
 
     [Fact]
-    public void ToggleFilterEditingAction_ShouldCreateAction()
-    {
-        var filterId = FilterId.Create();
-        var action = new FilterPaneAction.ToggleFilterEditing(filterId);
-
-        Assert.Equal(filterId, action.Id);
-    }
-
-    [Fact]
     public void ToggleFilterEnabledAction_ShouldCreateAction()
     {
         var filterId = FilterId.Create();
@@ -209,7 +192,8 @@ public sealed class FilterPaneReducerTests
     public void ReduceAddFilter_ShouldNotModifyOriginalState()
     {
         var state = new FilterPaneState();
-        var action = new FilterPaneAction.AddFilter();
+        var filter = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
+        var action = new FilterPaneAction.AddFilter(filter);
 
         FilterPaneReducers.ReduceAddFilter(state, action);
 
@@ -227,18 +211,6 @@ public sealed class FilterPaneReducerTests
 
         Assert.Single(result.Filters);
         Assert.Equal(filter, result.Filters[0]);
-    }
-
-    [Fact]
-    public void ReduceAddFilter_WithNullFilter_ShouldAddNewEditingFilter()
-    {
-        var state = new FilterPaneState();
-        var action = new FilterPaneAction.AddFilter();
-
-        var result = FilterPaneReducers.ReduceAddFilter(state, action);
-
-        Assert.Single(result.Filters);
-        Assert.True(result.Filters[0].IsEditing);
     }
 
     [Fact]
@@ -592,30 +564,6 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceToggleFilterEditing_ShouldToggleIsEditing()
-    {
-        var filter = new FilterModel { IsEditing = false };
-        var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterEditing(filter.Id);
-
-        var result = FilterPaneReducers.ReduceToggleFilterEditing(state, action);
-
-        Assert.True(result.Filters[0].IsEditing);
-    }
-
-    [Fact]
-    public void ReduceToggleFilterEditing_WithInvalidId_ShouldNotModifyFilters()
-    {
-        var filter = new FilterModel { IsEditing = false };
-        var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterEditing(FilterId.Create());
-
-        var result = FilterPaneReducers.ReduceToggleFilterEditing(state, action);
-
-        Assert.False(result.Filters[0].IsEditing);
-    }
-
-    [Fact]
     public void ReduceToggleFilterEnabled_ShouldToggleIsEnabled()
     {
         var filter = new FilterModel { IsEnabled = false };
@@ -761,28 +709,6 @@ public sealed class FilterPaneIntegrationTests
             new FilterPaneAction.SetFilterDateRangeSuccess(null));
 
         Assert.Null(state.FilteredDateRange);
-    }
-
-    [Fact]
-    public void FilterEditing_ShouldToggleIndependently()
-    {
-        var filter1 = new FilterModel { IsEditing = false };
-        var filter2 = new FilterModel { IsEditing = false };
-        var state = new FilterPaneState { Filters = [filter1, filter2] };
-
-        state = FilterPaneReducers.ReduceToggleFilterEditing(
-            state,
-            new FilterPaneAction.ToggleFilterEditing(filter1.Id));
-
-        Assert.True(state.Filters[0].IsEditing);
-        Assert.False(state.Filters[1].IsEditing);
-
-        state = FilterPaneReducers.ReduceToggleFilterEditing(
-            state,
-            new FilterPaneAction.ToggleFilterEditing(filter1.Id));
-
-        Assert.False(state.Filters[0].IsEditing);
-        Assert.False(state.Filters[1].IsEditing);
     }
 
     [Fact]

@@ -107,7 +107,6 @@ public sealed partial class AdvancedFilterRow : EditableFilterRowBase, IDisposab
 
         var newFilter = Filter.ToFilterModel() with
         {
-            IsEditing = false,
             IsEnabled = true
         };
 

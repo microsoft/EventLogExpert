@@ -33,9 +33,6 @@ public sealed record FilterModel
     public bool ShouldCompareAny { get; set; }
 
     [JsonIgnore]
-    public bool IsEditing { get; init; }
-
-    [JsonIgnore]
     public bool IsEnabled { get; init; }
 
     public bool IsExcluded { get; init; }

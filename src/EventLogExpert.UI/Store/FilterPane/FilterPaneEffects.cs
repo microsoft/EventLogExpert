@@ -20,12 +20,13 @@ public sealed class FilterPaneEffects(
     [EffectMethod]
     public async Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
     {
-        if (!string.IsNullOrEmpty(action.FilterModel?.Comparison.Value))
+        if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
         {
             await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
         }
 
-        if (action.FilterModel?.FilterType is not FilterType.Cached && action.FilterModel?.Comparison.Value is not null)
+        if (action.FilterModel.FilterType is not FilterType.Cached &&
+            !string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
         {
             dispatcher.Dispatch(
                 new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
