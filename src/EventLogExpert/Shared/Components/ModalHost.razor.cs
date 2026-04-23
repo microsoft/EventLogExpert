@@ -18,5 +18,5 @@ public sealed partial class ModalHost : ComponentBase, IDisposable
         base.OnInitialized();
     }
 
-    private void OnStateChanged() => InvokeAsync(StateHasChanged);
+    private void OnStateChanged() => _ = InvokeAsync(StateHasChanged);
 }

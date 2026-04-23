@@ -35,6 +35,13 @@ public sealed class UpdateService(
         {
             traceLogger.Debug($"{nameof(CheckForUpdates)} {nameof(versionProvider.IsDevBuild)}: {versionProvider.IsDevBuild}. Skipping update check.");
 
+            if (manualScan)
+            {
+                await alertDialogService.ShowAlert("Update Check Unavailable",
+                    "Update checks are disabled for development builds.",
+                    "OK");
+            }
+
             return;
         }
 
@@ -78,7 +85,7 @@ public sealed class UpdateService(
                 {
                     await alertDialogService.ShowAlert("No Updates Available",
                         "You are currently running the latest version.",
-                        "Ok");
+                        "OK");
                 }
 
                 return;
@@ -95,7 +102,7 @@ public sealed class UpdateService(
             
             await alertDialogService.ShowAlert("Update Failure",
                 $"Failed to retrieve latest releases:\r\n{ex.Message}",
-                "Ok");
+                "OK");
 
             return;
         }
@@ -133,7 +140,7 @@ public sealed class UpdateService(
         {
             await alertDialogService.ShowAlert("Update Failure",
                 $"Update failed to install:\r\n{ex.Message}",
-                "Ok");
+                "OK");
         }
         finally
         {
@@ -147,7 +154,7 @@ public sealed class UpdateService(
         {
             await alertDialogService.ShowAlert("Release Notes Failure",
                 "Failed to get release notes for the current version",
-                "Ok");
+                "OK");
 
             return null;
         }

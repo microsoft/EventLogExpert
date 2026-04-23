@@ -1,0 +1,121 @@
+/* Shared chrome for all modal dialogs. Size is parameterized via CSS custom properties set by
+   the ModalChrome component (--modal-height, --modal-min-width, --modal-max-width) so each
+   consumer modal can override without re-theming. */
+
+dialog {
+    /* :modal default is `fit-content`. Overriding to `auto` would make the dialog stretch to
+       the viewport because the UA stylesheet sets `inset-block-start/end: 0` on :modal. */
+    height: var(--modal-height, fit-content);
+    min-width: var(--modal-min-width, auto);
+    max-width: var(--modal-max-width, none);
+
+    color: var(--clr-lightblue);
+    border-color: var(--clr-statusbar);
+    background-color: var(--background-dark);
+}
+
+/* Establish a containing block for the absolutely-positioned inline-alert overlay only when the
+   dialog is non-modal. The UA `dialog:modal` rule sets `position: fixed`, which already creates
+   a containing block; an author rule of `position: relative` on the bare `dialog` selector wins
+   over the UA rule (author origin beats UA origin) and would break default modal positioning. */
+dialog:not(:modal) {
+    position: relative;
+}
+
+.dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: .5rem;
+    padding-bottom: .5rem;
+    border-bottom: 1px solid var(--clr-statusbar);
+}
+
+.dialog-title {
+    margin: 0;
+
+    font-size: 1.1rem;
+    color: var(--clr-lightblue);
+}
+
+.dialog-close {
+    padding: 0 .5rem;
+
+    line-height: 1;
+    font-size: 1.2rem;
+}
+
+.dialog-body {
+    /* Flex column so ChildContent siblings (e.g., a `.flex-column-scroll` list followed by a
+       Create button) lay out the way they did pre-refactor when content sat directly inside
+       `.dialog-group`. The body itself does not scroll — child elements opt in via
+       `.flex-column-scroll` or their own `overflow`. */
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+/* Inline alert overlay — centered modal-in-modal. The overlay div covers the dialog surface
+   with a semi-transparent backdrop; the alert card is positioned above it in the center.
+   Host dialog content is marked `inert` by the parent component so the overlay is also the
+   interactive root while active. */
+.inline-alert-overlay {
+    position: absolute;
+    inset: 0;
+
+    background-color: rgb(0 0 0 / 55%);
+}
+
+.inline-alert {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+
+    display: flex;
+    flex-direction: column;
+    gap: .75rem;
+    min-width: 20rem;
+    max-width: min(36rem, 90%);
+    padding: 1rem 1.25rem;
+
+    color: var(--clr-lightblue);
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .25rem;
+    box-shadow: 0 .5rem 1.5rem rgb(0 0 0 / 60%);
+}
+
+.inline-alert-title {
+    margin: 0;
+
+    font-size: 1.05rem;
+    color: var(--clr-lightblue);
+}
+
+.inline-alert-message {
+    margin: 0;
+
+    line-height: 1.4;
+    white-space: pre-wrap;
+}
+
+.inline-alert-input {
+    width: 100%;
+    padding: .25rem .5rem;
+
+    color: var(--text-primary);
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-statusbar);
+    border-radius: .2rem;
+}
+
+.inline-alert-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+
+    margin-top: .25rem;
+}

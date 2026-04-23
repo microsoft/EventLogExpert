@@ -82,8 +82,8 @@ public static class MauiProgram
 
         // UI Services
         builder.Services.AddSingleton<IMainThreadService>(new MainThreadService(
-            MainThread.InvokeOnMainThreadAsync,
-            MainThread.InvokeOnMainThreadAsync));
+            mainThreadInvoker: action => MainThread.InvokeOnMainThreadAsync(action),
+            mainThreadAsyncInvoker: taskFactory => MainThread.InvokeOnMainThreadAsync(taskFactory)));
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();

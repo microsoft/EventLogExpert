@@ -11,11 +11,15 @@ public sealed partial class ReleaseNotesModal : ModalBase<bool>
 {
     private string _html = string.Empty;
 
+    [EditorRequired]
     [Parameter] public ReleaseNotesContent Content { get; set; }
 
     protected override void OnParametersSet()
     {
-        _html = ReleaseNotesMarkdownRenderer.RenderToHtml(Content.Title, Content.Markdown);
+        // ReleaseNotesContent is a struct; defend against a missing parameter (default(struct))
+        // even though [EditorRequired] surfaces the omission as a build warning.
+        _html = ReleaseNotesMarkdownRenderer.RenderToHtml(Content.Title ?? string.Empty, Content.Markdown ?? string.Empty);
+
         base.OnParametersSet();
     }
 }

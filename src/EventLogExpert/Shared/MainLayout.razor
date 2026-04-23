@@ -4,8 +4,8 @@
 
 <div class="page" @onkeyup="HandleKeyUp" tabindex="0">
     @* TODO: The MAUI MenuBar in MainPage.xaml lives outside the BlazorWebView, so menu accelerators
-        (File / Edit / Tools) remain interactable while a modal is open. Tracking refactor: see
-        plan-replace-mauimenu-with-blazor-menu.md in the user's Downloads folder. *@
+        (File / Edit / Tools) remain interactable while a modal is open. A future refactor should
+        replace the MAUI MenuBar with a Blazor-rendered menu so it participates in modal inert/focus. *@
     <ModalHost />
 
     <TableColumnMenu />

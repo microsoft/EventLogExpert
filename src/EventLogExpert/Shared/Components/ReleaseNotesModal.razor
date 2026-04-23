@@ -3,9 +3,11 @@
 
 <ModalChrome AriaLabel="Release Notes"
     CloseLabel="Close"
-    DialogClass="release-notes-dialog"
     Footer="FooterPreset.CloseOnly"
+    Height="70%"
     InlineAlert="@CurrentInlineAlert"
+    MaxWidth="70rem"
+    MinWidth="50rem"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"

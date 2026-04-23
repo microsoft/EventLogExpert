@@ -1,11 +1,14 @@
-<dialog aria-label="@(string.IsNullOrEmpty(Title) ? AriaLabel : null)"
+<dialog aria-label="@(string.IsNullOrEmpty(Title) ? (string.IsNullOrEmpty(AriaLabel) ? "Dialog" : AriaLabel) : null)"
     aria-labelledby="@(string.IsNullOrEmpty(Title) ? null : _titleId)"
     aria-modal="true"
     class="@DialogClass"
     @oncancel="HandleCancelEventAsync"
     @oncancel:preventDefault="true"
     @onclose="HandleCloseEventAsync"
-    @ref="_dialogRef">
+    @onkeydown:stopPropagation="true"
+    @onkeyup:stopPropagation="true"
+    @ref="_dialogRef"
+    style="@DialogInlineStyle">
     <div class="dialog-group">
         @if (!string.IsNullOrEmpty(Title))
         {
@@ -14,7 +17,7 @@
 
                 @if (ShowCloseButton)
                 {
-                    <button aria-label="Close"
+                    <button aria-label="@(string.IsNullOrEmpty(CloseButtonAriaLabel) ? "Close" : CloseButtonAriaLabel)"
                         class="button dialog-close"
                         disabled="@HasInlineAlert"
                         @onclick="HandleCloseButtonAsync"
@@ -23,52 +26,6 @@
                     </button>
                 }
             </header>
-        }
-
-        @if (HasInlineAlert)
-        {
-            <section aria-describedby="@_inlineAlertMessageId"
-                aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
-                aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? "Alert" : null)"
-                class="inline-alert"
-                role="alertdialog">
-                @if (!string.IsNullOrEmpty(InlineAlert.Title))
-                {
-                    <h3 class="inline-alert-title" id="@_inlineAlertTitleId">@InlineAlert.Title</h3>
-                }
-
-                <p class="inline-alert-message" id="@_inlineAlertMessageId">@InlineAlert.Message</p>
-
-                @if (InlineAlert.IsPrompt)
-                {
-                    <input aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
-                        class="inline-alert-input"
-                        @bind="_inlineAlertPromptValue"
-                        @bind:event="oninput"
-                        @ref="_inlineAlertInputRef"
-                        type="text" />
-                }
-
-                <div class="inline-alert-buttons">
-                    @if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
-                    {
-                        <button autofocus="@(!InlineAlert.IsPrompt)"
-                            class="button button-green"
-                            @onclick="HandleInlineAlertAcceptAsync"
-                            @ref="_inlineAlertAcceptButtonRef"
-                            type="button">
-                            @InlineAlert.AcceptLabel
-                        </button>
-                    }
-                    <button autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
-                        class="button"
-                        @onclick="HandleInlineAlertCancelAsync"
-                        @ref="_inlineAlertCancelButtonRef"
-                        type="button">
-                        @InlineAlert.CancelLabel
-                    </button>
-                </div>
-            </section>
         }
 
         <div class="dialog-body" inert="@HasInlineAlert">
@@ -166,4 +123,53 @@
             }
         </div>
     </div>
+
+    @if (HasInlineAlert)
+    {
+        <div aria-hidden="true" class="inline-alert-overlay"></div>
+
+        <section aria-describedby="@_inlineAlertMessageId"
+            aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
+            aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? "Alert" : null)"
+            aria-modal="true"
+            class="inline-alert"
+            role="alertdialog">
+            @if (!string.IsNullOrEmpty(InlineAlert.Title))
+            {
+                <h3 class="inline-alert-title" id="@_inlineAlertTitleId">@InlineAlert.Title</h3>
+            }
+
+            <p class="inline-alert-message" id="@_inlineAlertMessageId">@InlineAlert.Message</p>
+
+            @if (InlineAlert.IsPrompt)
+            {
+                <input aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
+                    class="inline-alert-input"
+                    @bind="_inlineAlertPromptValue"
+                    @bind:event="oninput"
+                    @ref="_inlineAlertInputRef"
+                    type="text" />
+            }
+
+            <div class="inline-alert-buttons">
+                @if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
+                {
+                    <button autofocus="@(!InlineAlert.IsPrompt)"
+                        class="button button-green"
+                        @onclick="HandleInlineAlertAcceptAsync"
+                        @ref="_inlineAlertAcceptButtonRef"
+                        type="button">
+                        @InlineAlert.AcceptLabel
+                    </button>
+                }
+                <button autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
+                    class="button"
+                    @onclick="HandleInlineAlertCancelAsync"
+                    @ref="_inlineAlertCancelButtonRef"
+                    type="button">
+                    @InlineAlert.CancelLabel
+                </button>
+            </div>
+        </section>
+    }
 </dialog>

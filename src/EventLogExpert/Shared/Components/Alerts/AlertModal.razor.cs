@@ -7,10 +7,8 @@ using Microsoft.AspNetCore.Components;
 namespace EventLogExpert.Shared.Components.Alerts;
 
 /// <summary>
-/// Standalone alert modal used by <c>ModalAlertDialogService</c> when no other modal is active.
-/// When <see cref="AcceptLabel"/> is <c>null</c>, renders a single dismiss button (labeled with
-/// <see cref="CancelLabel"/>) matching <c>IAlertDialogService.ShowAlert(title, message, cancel)</c>.
-/// Otherwise renders Accept/Cancel buttons matching the two-button overload.
+///     Standalone alert modal used by <c>ModalAlertDialogService</c> when no host modal is active. Dismiss-only when
+///     <see cref="AcceptLabel" /> is null; otherwise renders Accept/Cancel.
 /// </summary>
 public sealed partial class AlertModal : ModalBase<bool>
 {
@@ -24,7 +22,9 @@ public sealed partial class AlertModal : ModalBase<bool>
 
     private string AriaLabelText => string.IsNullOrEmpty(Title) ? "Alert" : Title;
 
-    private Task HandleAcceptClickedAsync() => CompleteAsync(true);
+    // In dismiss-only mode the single button represents a dismissal, so complete with false to
+    // match Cancel/Esc and keep all dismissal routes equivalent.
+    private Task HandleAcceptClickedAsync() => CompleteAsync(!string.IsNullOrEmpty(AcceptLabel));
 
     private Task HandleCancelClickedAsync() => CompleteAsync(false);
 }

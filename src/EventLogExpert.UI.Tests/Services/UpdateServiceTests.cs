@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -70,11 +70,11 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Deployment failed")), "Ok");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Deployment failed")), "OK");
     }
 
     [Fact]
-    public async Task CheckForUpdates_DevBuild_ShouldSkipUpdateCheck()
+    public async Task CheckForUpdates_DevBuildAutoScan_ShouldSkipSilently()
     {
         // Arrange
         var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
@@ -82,19 +82,48 @@ public sealed class UpdateServiceTests
 
         var mockGitHubService = Substitute.For<IGitHubService>();
         var mockDeploymentService = Substitute.For<IDeploymentService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
             gitHubService: mockGitHubService,
-            deploymentService: mockDeploymentService);
+            deploymentService: mockDeploymentService,
+            alertDialogService: mockAlertDialogService);
 
         // Act
-        await updateService.CheckForUpdates(false, false);
+        await updateService.CheckForUpdates(false, manualScan: false);
 
         // Assert
         await mockGitHubService.DidNotReceive().GetReleases();
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>());
+        await mockAlertDialogService.DidNotReceive().ShowAlert(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_DevBuildManualScan_ShouldShowAlert()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.IsDevBuild.Returns(true);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService,
+            alertDialogService: mockAlertDialogService);
+
+        // Act
+        await updateService.CheckForUpdates(false, manualScan: true);
+
+        // Assert
+        await mockGitHubService.DidNotReceive().GetReleases();
+        await mockAlertDialogService.Received(1).ShowAlert(
+            "Update Check Unavailable",
+            "Update checks are disabled for development builds.",
+            "OK");
     }
 
     [Fact]
@@ -124,7 +153,7 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Network error")), "Ok");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("Network error")), "OK");
 
         mockDeploymentService.DidNotReceive().RestartNowAndUpdate(Arg.Any<string>());
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>());
@@ -215,7 +244,7 @@ public sealed class UpdateServiceTests
         mockDeploymentService.DidNotReceive().UpdateOnNextRestart(Arg.Any<string>());
 
         await mockAlertDialogService.Received(1)
-            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("No releases available")), "Ok");
+            .ShowAlert("Update Failure", Arg.Is<string>(s => s.Contains("No releases available")), "OK");
     }
 
     [Fact]
@@ -380,7 +409,7 @@ public sealed class UpdateServiceTests
 
         // Assert
         await mockAlertDialogService.Received(1)
-            .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "Ok");
+            .ShowAlert(Arg.Is<string>(s => s.Contains("Release Notes")), Arg.Is<string>(s => s.Contains("Failed to get release notes")), "OK");
         Assert.Null(result);
     }
 

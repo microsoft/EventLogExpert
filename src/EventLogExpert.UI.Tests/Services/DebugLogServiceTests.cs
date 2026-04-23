@@ -190,7 +190,8 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act - Start enumeration and delete the file while the reader holds a handle
-        await using var enumerator = debugLogService.LoadAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
+        await using var enumerator =
+            debugLogService.LoadAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         // Read first line to ensure the file is open
         Assert.True(await enumerator.MoveNextAsync());
@@ -281,7 +282,8 @@ public sealed class DebugLogServiceTests : IDisposable
         var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
 
         using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory), mockSettingsService);
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
 
         // Assert initial
         Assert.Equal(LogLevel.Information, debugLogService.MinimumLevel);
@@ -357,7 +359,8 @@ public sealed class DebugLogServiceTests : IDisposable
         var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Information);
 
         using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory), mockSettingsService);
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
 
         // Act - write at Information (should succeed)
         debugLogService.Info($"{Constants.DebugLogFirstMessage}");
@@ -478,7 +481,8 @@ public sealed class DebugLogServiceTests : IDisposable
         var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
 
         using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory), mockSettingsService);
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
 
         // Act - write at Debug (should succeed)
         debugLogService.Debug($"debug message before change");
@@ -509,11 +513,9 @@ public sealed class DebugLogServiceTests : IDisposable
         return mockSettingsService;
     }
 
-    /// <summary>
-    ///     Creates a mock settings service that supports dynamic log level changes
-    ///     by wiring up the LogLevelChanged callback.
-    /// </summary>
-    private static (ISettingsService service, Action<LogLevel> setLogLevel) CreateMockSettingsServiceWithDynamicLogLevel(LogLevel initialLevel)
+    // Mock settings service that supports dynamic log level changes via LogLevelChanged.
+    private static (ISettingsService service, Action<LogLevel> setLogLevel)
+        CreateMockSettingsServiceWithDynamicLogLevel(LogLevel initialLevel)
     {
         var currentLevel = initialLevel;
         var mockSettingsService = Substitute.For<ISettingsService>();
