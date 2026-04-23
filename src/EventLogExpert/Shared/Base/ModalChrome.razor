@@ -9,13 +9,14 @@
     <div class="dialog-group">
         @if (!string.IsNullOrEmpty(Title))
         {
-            <header class="dialog-header">
+            <header class="dialog-header" inert="@HasInlineAlert">
                 <h2 class="dialog-title" id="@_titleId">@Title</h2>
 
                 @if (ShowCloseButton)
                 {
                     <button aria-label="Close"
                         class="button dialog-close"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleCloseButtonAsync"
                         type="button">
                         <i aria-hidden="true" class="bi bi-x"></i>
@@ -24,11 +25,57 @@
             </header>
         }
 
-        <div class="dialog-body">
+        @if (HasInlineAlert)
+        {
+            <section aria-describedby="@_inlineAlertMessageId"
+                aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
+                aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? "Alert" : null)"
+                class="inline-alert"
+                role="alertdialog">
+                @if (!string.IsNullOrEmpty(InlineAlert.Title))
+                {
+                    <h3 class="inline-alert-title" id="@_inlineAlertTitleId">@InlineAlert.Title</h3>
+                }
+
+                <p class="inline-alert-message" id="@_inlineAlertMessageId">@InlineAlert.Message</p>
+
+                @if (InlineAlert.IsPrompt)
+                {
+                    <input aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
+                        class="inline-alert-input"
+                        @bind="_inlineAlertPromptValue"
+                        @bind:event="oninput"
+                        @ref="_inlineAlertInputRef"
+                        type="text" />
+                }
+
+                <div class="inline-alert-buttons">
+                    @if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
+                    {
+                        <button autofocus="@(!InlineAlert.IsPrompt)"
+                            class="button button-green"
+                            @onclick="HandleInlineAlertAcceptAsync"
+                            @ref="_inlineAlertAcceptButtonRef"
+                            type="button">
+                            @InlineAlert.AcceptLabel
+                        </button>
+                    }
+                    <button autofocus="@(string.IsNullOrEmpty(InlineAlert.AcceptLabel))"
+                        class="button"
+                        @onclick="HandleInlineAlertCancelAsync"
+                        @ref="_inlineAlertCancelButtonRef"
+                        type="button">
+                        @InlineAlert.CancelLabel
+                    </button>
+                </div>
+            </section>
+        }
+
+        <div class="dialog-body" inert="@HasInlineAlert">
             @ChildContent
         </div>
 
-        <div class="footer-group">
+        <div class="footer-group" inert="@HasInlineAlert">
             @if (ExtraFooterContent is not null)
             {
                 <div class="footer-extra">
@@ -41,6 +88,7 @@
                 case FooterPreset.CloseOnly:
                     <button autofocus
                         class="button"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleCloseButtonAsync"
                         type="button">
                         @CloseLabel
@@ -50,12 +98,14 @@
                 case FooterPreset.SaveCancel:
                     <div class="button-group">
                         <button class="button button-green"
+                            disabled="@HasInlineAlert"
                             @onclick="HandleSaveAsync"
                             type="button">
                             @SaveLabel
                         </button>
                         <button autofocus
                             class="button"
+                            disabled="@HasInlineAlert"
                             @onclick="HandleCancelButtonAsync"
                             type="button">
                             @CancelLabel
@@ -66,11 +116,13 @@
                 case FooterPreset.ImportExportClose:
                     <div class="button-group">
                         <button class="button"
+                            disabled="@HasInlineAlert"
                             @onclick="HandleImportAsync"
                             type="button">
                             @ImportLabel
                         </button>
                         <button class="button"
+                            disabled="@HasInlineAlert"
                             @onclick="HandleExportAsync"
                             type="button">
                             @ExportLabel
@@ -79,6 +131,7 @@
 
                     <button autofocus
                         class="button"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleCloseButtonAsync"
                         type="button">
                         @CloseLabel
@@ -88,6 +141,7 @@
                 case FooterPreset.Dismiss:
                     <button autofocus
                         class="button"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleAcceptAsync"
                         type="button">
                         @AcceptLabel
@@ -97,11 +151,13 @@
                 case FooterPreset.AcceptCancel:
                     <button autofocus
                         class="button button-green"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleAcceptAsync"
                         type="button">
                         @AcceptLabel
                     </button>
                     <button class="button"
+                        disabled="@HasInlineAlert"
                         @onclick="HandleCancelButtonAsync"
                         type="button">
                         @CancelLabel

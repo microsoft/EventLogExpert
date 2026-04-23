@@ -16,7 +16,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class FilterCacheModal : BaseModal<bool>
+public sealed partial class FilterCacheModal : ModalBase<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 

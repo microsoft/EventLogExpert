@@ -1,13 +1,15 @@
 @using EventLogExpert.Shared.Base
 @using EventLogExpert.UI
 @using Microsoft.Extensions.Logging
-@inherits BaseModal<bool>
+@inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Settings"
     CancelLabel="Exit"
     Footer="FooterPreset.SaveCancel"
+    InlineAlert="@CurrentInlineAlert"
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     OnSave="OnSaveAsync"
     @ref="ChromeRef"
     SaveLabel="Save">

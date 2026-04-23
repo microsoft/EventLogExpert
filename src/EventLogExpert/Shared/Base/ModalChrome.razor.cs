@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -8,7 +9,7 @@ namespace EventLogExpert.Shared.Base;
 
 /// <summary>
 /// Compositional wrapper component that renders the shared <c>&lt;dialog&gt;</c> chrome (header,
-/// body, footer, close button) for a modal. Owned by parent <see cref="BaseModal{TResult}"/>
+/// body, footer, close button) for a modal. Owned by parent <see cref="ModalBase{TResult}"/>
 /// instances which bind it via <c>@ref</c>.
 /// </summary>
 /// <remarks>
@@ -22,17 +23,24 @@ namespace EventLogExpert.Shared.Base;
 /// <item>Native <c>&lt;dialog&gt;.showModal()</c> provides focus trap, Esc-to-close, and focus
 /// restoration on close.</item>
 /// <item>Esc and other native cancel routes are intercepted via <c>@oncancel</c> so the parent
-/// modal can run its <see cref="BaseModal{TResult}.HandleDialogClosedByUserAsync"/> path and
+/// modal can run its <see cref="ModalBase{TResult}.HandleDialogClosedByUserAsync"/> path and
 /// complete the awaiting task. We <c>preventDefault</c> on <c>cancel</c> and explicitly close
 /// from C# to keep ordering deterministic.</item>
 /// </list>
 /// </remarks>
 public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 {
+    private readonly string _inlineAlertMessageId = $"modal-inline-alert-message-{Guid.NewGuid():N}";
+    private readonly string _inlineAlertTitleId = $"modal-inline-alert-title-{Guid.NewGuid():N}";
     private readonly string _titleId = $"modal-title-{Guid.NewGuid():N}";
 
     private ElementReference _dialogRef;
+    private ElementReference _inlineAlertAcceptButtonRef;
+    private ElementReference _inlineAlertCancelButtonRef;
+    private ElementReference _inlineAlertInputRef;
+    private string _inlineAlertPromptValue = string.Empty;
     private bool _isClosed;
+    private InlineAlertRequest? _previouslyRenderedInlineAlert;
 
     [Parameter] public string AcceptLabel { get; set; } = "OK";
 
@@ -56,6 +64,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public string ImportLabel { get; set; } = "Import";
 
+    /// <summary>Active inline-alert request to render as a banner above the modal body. When set,
+    /// the chrome's footer and body are rendered as <c>inert</c> + buttons disabled, and Esc
+    /// dismisses the alert (cancel) instead of the host modal.</summary>
+    [Parameter] public InlineAlertRequest? InlineAlert { get; set; }
+
     [Parameter] public EventCallback OnAccept { get; set; }
 
     [Parameter] public EventCallback OnCancel { get; set; }
@@ -63,13 +76,18 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     [Parameter] public EventCallback OnClose { get; set; }
 
     /// <summary>Invoked when the dialog is closed by the user (Esc or native close), as opposed to
-    /// a footer button click. Parent <see cref="BaseModal{TResult}"/> wires this to its
-    /// <see cref="BaseModal{TResult}.HandleDialogClosedByUserAsync"/>.</summary>
+    /// a footer button click. Parent <see cref="ModalBase{TResult}"/> wires this to its
+    /// <see cref="ModalBase{TResult}.HandleDialogClosedByUserAsync"/>.</summary>
     [Parameter] public EventCallback OnDialogClosedByUser { get; set; }
 
     [Parameter] public EventCallback OnExport { get; set; }
 
     [Parameter] public EventCallback OnImport { get; set; }
+
+    /// <summary>Invoked when the user resolves the active <see cref="InlineAlert" /> by clicking
+    /// the accept or cancel button or pressing Esc. Parent <see cref="ModalBase{TResult}"/> wires
+    /// this to its <see cref="ModalBase{TResult}.HandleInlineAlertResolvedAsync" />.</summary>
+    [Parameter] public EventCallback<InlineAlertResult> OnInlineAlertResolved { get; set; }
 
     [Parameter] public EventCallback OnSave { get; set; }
 
@@ -78,6 +96,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     [Parameter] public bool ShowCloseButton { get; set; }
 
     [Parameter] public string? Title { get; set; }
+
+    private bool HasInlineAlert => InlineAlert is not null;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -121,6 +141,39 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
             }
         }
 
+        // When an inline alert appears, move focus into it. We compare references against the
+        // last-rendered alert to avoid re-focusing on every parent re-render.
+        if (!ReferenceEquals(_previouslyRenderedInlineAlert, InlineAlert))
+        {
+            _previouslyRenderedInlineAlert = InlineAlert;
+
+            if (InlineAlert is not null)
+            {
+                _inlineAlertPromptValue = InlineAlert.IsPrompt ? InlineAlert.PromptInitialValue ?? string.Empty : string.Empty;
+
+                try
+                {
+                    if (InlineAlert.IsPrompt)
+                    {
+                        await _inlineAlertInputRef.FocusAsync(preventScroll: true);
+                    }
+                    else if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
+                    {
+                        await _inlineAlertAcceptButtonRef.FocusAsync(preventScroll: true);
+                    }
+                    else
+                    {
+                        await _inlineAlertCancelButtonRef.FocusAsync(preventScroll: true);
+                    }
+                }
+                catch
+                {
+                    // Best-effort: if the element is no longer in the DOM (alert was canceled
+                    // during the same render cycle) ignore the focus failure.
+                }
+            }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -138,6 +191,14 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         // already closed (e.g., disposal race).
         if (_isClosed) { return; }
 
+        // While an inline alert is active, Esc dismisses the alert (cancel) instead of the host
+        // modal. This matches the user's expectation that the alert "intercepts" interaction.
+        if (HasInlineAlert)
+        {
+            await HandleInlineAlertCancelAsync();
+            return;
+        }
+
         await OnDialogClosedByUser.InvokeAsync();
     }
 
@@ -154,6 +215,17 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private Task HandleExportAsync() => OnExport.InvokeAsync();
 
     private Task HandleImportAsync() => OnImport.InvokeAsync();
+
+    private async Task HandleInlineAlertAcceptAsync()
+    {
+        if (InlineAlert is null) { return; }
+
+        string? promptValue = InlineAlert.IsPrompt ? _inlineAlertPromptValue : null;
+        await OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(true, promptValue));
+    }
+
+    private Task HandleInlineAlertCancelAsync() =>
+        OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, null));
 
     private Task HandleSaveAsync() => OnSave.InvokeAsync();
 }

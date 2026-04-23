@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class ReleaseNotesModal : BaseModal<bool>
+public sealed partial class ReleaseNotesModal : ModalBase<bool>
 {
     private string _html = string.Empty;
 

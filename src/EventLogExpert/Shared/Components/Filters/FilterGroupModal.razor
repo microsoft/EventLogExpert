@@ -1,14 +1,16 @@
 @using EventLogExpert.Shared.Base
 @using EventLogExpert.UI.Models
-@inherits BaseModal<bool>
+@inherits ModalBase<bool>
 
 <ModalChrome AriaLabel="Filter Groups"
     CloseLabel="Exit"
     Footer="FooterPreset.ImportExportClose"
+    InlineAlert="@CurrentInlineAlert"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnExport="OnExportAsync"
     OnImport="OnImportAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
         <div class="flex-column-scroll">

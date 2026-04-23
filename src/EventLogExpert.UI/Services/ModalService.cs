@@ -8,7 +8,8 @@ namespace EventLogExpert.UI.Services;
 public sealed class ModalService : IModalService
 {
     private readonly Lock _stateLock = new();
-
+    private IInlineAlertHost? _activeAlertHost;
+    private long _activeAlertHostId;
     private object? _activeTcs;
     private Action? _cancelActiveDelegate;
     private long _idCounter;
@@ -60,6 +61,21 @@ public sealed class ModalService : IModalService
         if (stateChanged) { StateChanged?.Invoke(); }
     }
 
+    public void RegisterActiveAlertHost(long modalId, IInlineAlertHost host)
+    {
+        ArgumentNullException.ThrowIfNull(host);
+
+        lock (_stateLock)
+        {
+            // Only the currently active modal can register. Late registrations from a stale modal
+            // would route alerts to a torn-down host.
+            if (modalId != ActiveModalId) { return; }
+
+            _activeAlertHost = host;
+            _activeAlertHostId = modalId;
+        }
+    }
+
     public Task<TResult?> Show<TModal, TResult>(IDictionary<string, object?>? parameters = null)
         where TModal : IComponent
     {
@@ -76,10 +92,35 @@ public sealed class ModalService : IModalService
             ActiveModalParameters = parameters;
             _activeTcs = tcs;
             _cancelActiveDelegate = () => tcs.TrySetResult(default);
+
+            // Clear any host registration left over from the previous active modal. The new modal
+            // will re-register itself in OnInitialized.
+            _activeAlertHost = null;
+            _activeAlertHostId = 0;
         }
 
         StateChanged?.Invoke();
         return tcs.Task;
+    }
+
+    public bool TryGetActiveAlertHost(out IInlineAlertHost? host)
+    {
+        lock (_stateLock)
+        {
+            host = _activeAlertHost;
+            return host is not null;
+        }
+    }
+
+    public void UnregisterActiveAlertHost(long modalId)
+    {
+        lock (_stateLock)
+        {
+            if (modalId != _activeAlertHostId) { return; }
+
+            _activeAlertHost = null;
+            _activeAlertHostId = 0;
+        }
     }
 
     private void ClearStateLocked()
@@ -88,5 +129,7 @@ public sealed class ModalService : IModalService
         ActiveModalParameters = null;
         _activeTcs = null;
         _cancelActiveDelegate = null;
+        _activeAlertHost = null;
+        _activeAlertHostId = 0;
     }
 }
