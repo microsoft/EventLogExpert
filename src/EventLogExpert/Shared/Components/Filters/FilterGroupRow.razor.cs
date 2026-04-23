@@ -24,13 +24,17 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
         _debounceCts?.Dispose();
     }
 
-    protected override void DispatchRemoveFilter() =>
-        Dispatcher.Dispatch(new FilterGroupAction.RemoveFilter(ParentId, Value.Id));
+    protected override void DispatchRemoveFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        Dispatcher.Dispatch(new FilterGroupAction.RemoveFilter(ParentId, savedFilter.Id));
+    }
 
     /// <summary>
-    /// Cancel pending validation and clear the error banner before the base mutates the draft or
-    /// bubbles the editing-state change. Disposing the CTS prevents a stale debounce continuation
-    /// from racing with the new edit session.
+    ///     Cancel pending validation and clear the error banner before the base mutates the draft or bubbles the
+    ///     editing-state change. Disposing the CTS prevents a stale debounce continuation from racing with the new edit
+    ///     session.
     /// </summary>
     protected override void OnEditSessionResetting()
     {
@@ -57,37 +61,38 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
         var sessionToken = _debounceCts.Token;
 
         _ = Task.Run(async () =>
-        {
-            try
             {
-                await Task.Delay(250, sessionToken).ConfigureAwait(false);
-            }
-            catch (TaskCanceledException)
-            {
-                return;
-            }
-
-            // The session token guards against stale callbacks writing into a draft that was
-            // discarded (Cancel) or replaced (new edit session) before the debounce elapsed.
-            if (sessionToken.IsCancellationRequested || Filter is null) { return; }
-
-            var isValid = FilterService.TryParseExpression(rawText, out var message);
-
-            try
-            {
-                await InvokeAsync(() =>
+                try
                 {
-                    if (sessionToken.IsCancellationRequested || Filter is null) { return; }
+                    await Task.Delay(250, sessionToken).ConfigureAwait(false);
+                }
+                catch (TaskCanceledException)
+                {
+                    return;
+                }
 
-                    _errorMessage = isValid ? string.Empty : message;
-                    StateHasChanged();
-                }).ConfigureAwait(false);
-            }
-            catch (ObjectDisposedException)
-            {
-                // Component disposed mid-debounce; safe to ignore.
-            }
-        }, sessionToken);
+                // The session token guards against stale callbacks writing into a draft that was
+                // discarded (Cancel) or replaced (new edit session) before the debounce elapsed.
+                if (sessionToken.IsCancellationRequested || Filter is null) { return; }
+
+                var isValid = FilterService.TryParseExpression(rawText, out var message);
+
+                try
+                {
+                    await InvokeAsync(() =>
+                    {
+                        if (sessionToken.IsCancellationRequested || Filter is null) { return; }
+
+                        _errorMessage = isValid ? string.Empty : message;
+                        StateHasChanged();
+                    }).ConfigureAwait(false);
+                }
+                catch (ObjectDisposedException)
+                {
+                    // Component disposed mid-debounce; safe to ignore.
+                }
+            },
+            sessionToken);
     }
 
     private async Task SaveFilter()
@@ -113,10 +118,20 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
         _debounceCts?.Dispose();
         _debounceCts = null;
 
+        if (IsPending)
+        {
+            await CommitPendingAsync(newFilter);
+            return;
+        }
+
         Dispatcher.Dispatch(new FilterGroupAction.SetFilter(ParentId, newFilter));
-        await BubbleSavedAsync();
+        await NotifyEditingEndedAsync();
     }
 
-    private void ToggleFilterExclusion() =>
-        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilterExcluded(ParentId, Value.Id));
+    private void ToggleFilterExclusion()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilterExcluded(ParentId, savedFilter.Id));
+    }
 }

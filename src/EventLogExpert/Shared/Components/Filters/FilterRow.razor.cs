@@ -16,8 +16,12 @@ public sealed partial class FilterRow : EditableFilterRowBase
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
-    protected override void DispatchRemoveFilter() =>
-        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+    protected override void DispatchRemoveFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(savedFilter.Id));
+    }
 
     private void AddSubFilter() => Filter?.SubFilters.Add(new FilterEditorModel());
 
@@ -47,12 +51,29 @@ public sealed partial class FilterRow : EditableFilterRowBase
         };
 
         Filter = null;
+
+        if (IsPending)
+        {
+            await CommitPendingAsync(newFilter);
+
+            return;
+        }
+
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
-        await BubbleSavedAsync();
+        await NotifyEditingEndedAsync();
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
+    private void ToggleFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
 
-    private void ToggleFilterExclusion() =>
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(savedFilter.Id));
+    }
+
+    private void ToggleFilterExclusion()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(savedFilter.Id));
+    }
 }

@@ -76,16 +76,26 @@ public sealed class FilterGroupReducers
 
         if (parent is null) { return state; }
 
-        var filter = parent.Filters.FirstOrDefault(x => x.Id == action.Filter.Id);
-
-        if (filter is null) { return state; }
-
         var groupIndex = state.Groups.IndexOf(parent);
+        var existing = parent.Filters.FirstOrDefault(x => x.Id == action.Filter.Id);
+
+        if (existing is null)
+        {
+            // Upsert: append a brand-new committed filter (e.g. from a pending draft save in
+            // FilterGroup). Force IsEditing=false to defend against stale draft state. Mirrors
+            // FilterPaneReducers.ReduceSetFilter's upsert semantics.
+            return state with
+            {
+                Groups = state.Groups.SetItem(
+                    groupIndex,
+                    parent with { Filters = [.. parent.Filters, action.Filter with { IsEditing = false }] })
+            };
+        }
 
         // Preserve all fields not explicitly overridden by the action (IsExcluded, IsEnabled,
         // Data, SubFilters, etc.). Previously a partial new FilterModel was constructed which
         // silently dropped those fields.
-        var updatedFilter = filter with
+        var updatedFilter = existing with
         {
             Color = action.Filter.Color,
             Comparison = action.Filter.Comparison with { },
@@ -96,7 +106,7 @@ public sealed class FilterGroupReducers
         {
             Groups = state.Groups.SetItem(
                 groupIndex,
-                parent with { Filters = ReplaceFilterById(parent.Filters, filter.Id, updatedFilter) })
+                parent with { Filters = ReplaceFilterById(parent.Filters, existing.Id, updatedFilter) })
         };
     }
 

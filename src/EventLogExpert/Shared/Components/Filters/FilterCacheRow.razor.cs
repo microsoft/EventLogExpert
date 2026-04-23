@@ -28,8 +28,11 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
         _ => [],
     };
 
-    protected override void DispatchRemoveFilter() =>
-        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+    protected override void DispatchRemoveFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
+        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(savedFilter.Id));
+    }
 
     /// <summary>
     /// Clear the validation banner before the base mutates the draft or bubbles the
@@ -57,12 +60,25 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
         Filter = null;
         _errorMessage = string.Empty;
 
+        if (IsPending)
+        {
+            await CommitPendingAsync(newFilter);
+            return;
+        }
+
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
-        await BubbleSavedAsync();
+        await NotifyEditingEndedAsync();
     }
 
-    private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));
+    private void ToggleFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(savedFilter.Id));
+    }
 
-    private void ToggleFilterExclusion() =>
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(Value.Id));
+    private void ToggleFilterExclusion()
+    {
+        if (Value is not { } savedFilter) { return; }
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(savedFilter.Id));
+    }
 }
