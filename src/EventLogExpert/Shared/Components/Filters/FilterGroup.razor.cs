@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
@@ -16,6 +17,8 @@ namespace EventLogExpert.Shared.Components.Filters;
 public sealed partial class FilterGroup
 {
     private readonly HashSet<FilterId> _editingFilters = [];
+    private readonly List<FilterEditorModel> _pendingDrafts = [];
+    private FilterGroupId? _trackedGroupId;
 
     [Parameter] public FilterGroupModel Group { get; set; } = null!;
 
@@ -27,6 +30,29 @@ public sealed partial class FilterGroup
 
     protected override void OnParametersSet()
     {
+        // Group identity swap: FilterGroupModal renders FilterGroup instances without an @key
+        // and the underlying list is sorted by name, so a rename or import can repoint the same
+        // component instance at a different group. Drop all per-row state to avoid leaking
+        // editing flags or pending drafts across groups.
+        if (_trackedGroupId is not null && _trackedGroupId != Group.Id)
+        {
+            _editingFilters.Clear();
+            _pendingDrafts.Clear();
+        }
+
+        _trackedGroupId = Group.Id;
+
+        // When the group collapses (Cancel, Save via SetGroup reducer, Rename, Import) the
+        // FilterGroupRow children unmount without notifying us, so any in-flight per-row edit
+        // state must be dropped here. Otherwise SaveGroup would silently block forever the next
+        // time the group is reopened. Pending drafts are dropped for the same reason — collapse
+        // means "abandon unsaved work", consistent with the legacy IsEditing-placeholder flow.
+        if (!Group.IsEditing)
+        {
+            _editingFilters.Clear();
+            _pendingDrafts.Clear();
+        }
+
         // Prune _editingFilters of any IDs no longer present in Group.Filters so external
         // mutations (ImportGroup replacing the entire filter list, RemoveFilter dispatched
         // from elsewhere, etc.) cannot leave permanent stale entries that would block SaveGroup.
@@ -39,15 +65,16 @@ public sealed partial class FilterGroup
         base.OnParametersSet();
     }
 
-    private void AddFilter() => Dispatcher.Dispatch(new FilterGroupAction.AddFilter(Group.Id));
-
-    private void CancelGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
+    private void AddFilter() =>
+        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
 
     private async Task ApplyFilters()
     {
         Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(Group));
         await Parent.CloseAsync();
     }
+
+    private void CancelGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
 
     private void CopyGroup()
     {
@@ -95,6 +122,17 @@ public sealed partial class FilterGroup
                 $"An exception occurred while exporting saved groups: {ex.Message}",
                 "OK");
         }
+    }
+
+    private void HandlePendingDiscard(FilterEditorModel draft) => _pendingDrafts.Remove(draft);
+
+    private void HandlePendingSave(FilterEditorModel draft, FilterModel filter)
+    {
+        _pendingDrafts.Remove(draft);
+
+        // SetFilter is upsert (replace-by-Id, append-if-missing) — same defense against a
+        // double-click race that the FilterPane pending-draft handler relies on.
+        Dispatcher.Dispatch(new FilterGroupAction.SetFilter(Group.Id, filter));
     }
 
     private async Task ImportGroup()
@@ -170,11 +208,13 @@ public sealed partial class FilterGroup
 
     private void SaveGroup()
     {
-        // Block save while any row is mid-edit. New-filter rows are still tracked via
-        // FilterModel.IsEditing in state (until 3e.2 lifts that into a pane-local draft).
-        // Existing-filter edits are tracked locally via _editingFilters, populated by the
-        // OnRowEditingChanged callback bubbled up from FilterGroupRow.
+        // Block save while any row is mid-edit. Existing-filter edits are tracked locally via
+        // _editingFilters (populated by OnRowEditingChanged bubbled up from FilterGroupRow).
+        // New-filter rows now live in _pendingDrafts (this component owns them; they never hit
+        // Fluxor state until the user hits Save on the row). The legacy filter.IsEditing branch
+        // remains for backwards compatibility until 3e.3 drops the field entirely.
         if (_editingFilters.Count > 0) { return; }
+        if (_pendingDrafts.Count > 0) { return; }
 
         foreach (var filter in Group.Filters)
         {

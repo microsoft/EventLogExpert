@@ -83,6 +83,15 @@
 
     @if (Group.IsEditing)
     {
+        @foreach (var draft in _pendingDrafts)
+        {
+            <FilterGroupRow @key="draft.Id"
+                ParentId="Group.Id"
+                PendingDraft="draft"
+                OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                OnPendingDiscard="() => HandlePendingDiscard(draft)" />
+        }
+
         <button class="button" @onclick="AddFilter" type="button">
             <i class="bi bi-plus-circle"></i> Add Filter
         </button>
