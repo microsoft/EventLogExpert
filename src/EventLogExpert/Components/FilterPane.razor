@@ -59,11 +59,13 @@
         {
             <EditForm class="flex-row" id="filter-form" Model="_model">
                 <span>
-                    After: <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"
+                    After:
+                    <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"
                         disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
                 <span>
-                    Before: <InputDate aria-label="Before" @bind-Value="_model.Before" class="input filter-datetime"
+                    Before:
+                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="input filter-datetime"
                         disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
 
@@ -117,6 +119,34 @@
                     break;
                 case FilterType.Cached:
                     <FilterCacheRow @key="item.Id" Value="item" />
+
+                    break;
+            }
+        }
+
+        @foreach (var draft in _pendingDrafts)
+        {
+            switch (draft.FilterType)
+            {
+                case FilterType.Basic:
+                    <FilterRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
+
+                    break;
+                case FilterType.Advanced:
+                    <AdvancedFilterRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
+
+                    break;
+                case FilterType.Cached:
+                    <FilterCacheRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
 
                     break;
             }
