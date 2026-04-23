@@ -18,6 +18,7 @@ namespace EventLogExpert.Components;
 public sealed partial class FilterPane : IDisposable
 {
     private readonly FilterDateModel _model = new();
+    private readonly List<FilterEditorModel> _pendingDrafts = [];
 
     private bool _canEditDate;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
@@ -31,7 +32,8 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IModalService ModalService { get; init; } = null!;
 
-    private bool HasFilters => IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false;
+    private bool HasFilters =>
+        IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
     private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
 
@@ -43,8 +45,16 @@ public sealed partial class FilterPane : IDisposable
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<FilterPaneAction.ClearAllFilters>(action => { _canEditDate = false; });
-        SubscribeToAction<FilterPaneAction.SetFilterDateRangeSuccess>(action => { UpdateFilterDate(action.FilterDateModel); });
+        SubscribeToAction<FilterPaneAction.ClearAllFilters>(action =>
+        {
+            _canEditDate = false;
+            _pendingDrafts.Clear();
+        });
+
+        SubscribeToAction<FilterPaneAction.SetFilterDateRangeSuccess>(action =>
+        {
+            UpdateFilterDate(action.FilterDateModel);
+        });
 
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
 
@@ -53,27 +63,13 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddAdvancedFilter()
     {
-        Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    FilterType = FilterType.Advanced,
-                    IsEditing = true
-                }));
-
+        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    FilterType = FilterType.Basic,
-                    IsEditing = true
-                }));
-
+        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Basic });
         _isFilterListVisible = true;
     }
 
@@ -104,7 +100,7 @@ public sealed partial class FilterPane : IDisposable
             .ConvertTimeZone(_currentTimeZone);
 
         // Round up to the nearest hour for the latest event
-        _model.Before = new DateTime(((mostRecentEventTicks + ticksPerHour - 1) / ticksPerHour) * ticksPerHour, DateTimeKind.Utc)
+        _model.Before = new DateTime((mostRecentEventTicks + ticksPerHour - 1) / ticksPerHour * ticksPerHour, DateTimeKind.Utc)
             .ConvertTimeZone(_currentTimeZone);
 
         _isFilterListVisible = true;
@@ -113,15 +109,7 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddExclusion()
     {
-        Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    FilterType = FilterType.Basic,
-                    IsEditing = true,
-                    IsExcluded = true
-                }));
-
+        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Basic, IsExcluded = true });
         _isFilterListVisible = true;
     }
 
@@ -156,6 +144,20 @@ public sealed partial class FilterPane : IDisposable
         {
             ToggleMenu();
         }
+    }
+
+    private void HandlePendingDiscard(FilterEditorModel draft) => _pendingDrafts.Remove(draft);
+
+    /// <summary>
+    ///     Invoked by a pending row when the user saves a valid draft. Removes the draft from the local list and
+    ///     dispatches <see cref="FilterPaneAction.SetFilter" /> (upsert) atomically so state and local pending list never both
+    ///     hold the same filter Id within a render frame. SetFilter is preferred over AddFilter for duplicate-Id safety in the
+    ///     unlikely event Save fires twice (e.g., double-click race).
+    /// </summary>
+    private void HandlePendingSave(FilterEditorModel draft, FilterModel filter)
+    {
+        _pendingDrafts.Remove(draft);
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }
 
     private void RemoveDateFilter()
