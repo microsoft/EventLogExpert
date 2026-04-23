@@ -7,13 +7,9 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class SubFilterRow : BaseFilterRow
+public sealed partial class SubFilterRow : FilterRowBase<FilterEditorModel>
 {
-    [Parameter] public FilterEditorModel Value { get; set; } = null!;
-
     [Parameter] public EventCallback<FilterId> OnRemove { get; set; }
-
-    protected override FilterData CurrentData => Value.Data;
 
     private async Task RemoveSubFilter() => await OnRemove.InvokeAsync(Value.Id);
 }

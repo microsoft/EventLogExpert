@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
@@ -8,7 +8,7 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
-public sealed partial class ValueSelect<T> : BaseComponent<T>, IAsyncDisposable
+public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 {
     private readonly string _itemId = $"select_{Guid.NewGuid().ToString()[..8]}";
     private readonly List<ValueSelectItem<T>> _items = [];

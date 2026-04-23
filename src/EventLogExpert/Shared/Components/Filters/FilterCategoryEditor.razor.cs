@@ -8,36 +8,49 @@ using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Shared.Base;
+namespace EventLogExpert.Shared.Components.Filters;
 
-public abstract class BaseFilterRow : ComponentBase
+/// <summary>
+/// Renders the category dropdown + evaluator dropdown + value input (text / multi-select /
+/// single-select) used by both <see cref="FilterRow"/> (via its draft) and <see cref="SubFilterRow"/>.
+/// The <see cref="Data"/> parameter is held by reference so child <c>@bind-Value</c>s mutate the
+/// parent draft directly.
+/// </summary>
+public sealed partial class FilterCategoryEditor : ComponentBase
 {
+    [Parameter, EditorRequired] public FilterData Data { get; set; } = null!;
+
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    protected FilterCategory CategoryBinding
+    /// <summary>
+    /// Optional id of an external element that labels the category dropdown (e.g. the
+    /// "Filter On:" / "Exclude On:" label on <see cref="FilterRow"/>). When null, the dropdown
+    /// uses its own "Category" aria-label instead.
+    /// </summary>
+    [Parameter] public string? CategoryAriaLabelledBy { get; set; }
+
+    [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+
+    private FilterCategory CategoryBinding
     {
-        get => CurrentData.Category;
+        get => Data.Category;
         set
         {
-            CurrentData.Category = value;
+            Data.Category = value;
 
-            if (IsTextOnlyCategory(value) && CurrentData.Evaluator == FilterEvaluator.MultiSelect)
+            if (IsTextOnlyCategory(value) && Data.Evaluator == FilterEvaluator.MultiSelect)
             {
-                CurrentData.Evaluator = FilterEvaluator.Contains;
+                Data.Evaluator = FilterEvaluator.Contains;
             }
         }
     }
 
-    protected abstract FilterData CurrentData { get; }
-
-    [Inject] protected IState<EventLogState> EventLogState { get; init; } = null!;
-
-    protected List<string> FilteredItems => Items
-        .Where(item => item.Contains(CurrentData.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
+    private List<string> FilteredItems => Items
+        .Where(item => item.Contains(Data.Value ?? string.Empty, StringComparison.CurrentCultureIgnoreCase))
         .ToList();
 
-    protected List<string> Items =>
-        CurrentData.Category switch
+    private List<string> Items =>
+        Data.Category switch
         {
             FilterCategory.Id => [.. EventLogState.Value.ActiveLogs.Values
                 .SelectMany(log => log.GetCategoryValues(FilterCategory.Id))
@@ -58,6 +71,6 @@ public abstract class BaseFilterRow : ComponentBase
             _ => []
         };
 
-    protected static bool IsTextOnlyCategory(FilterCategory category) =>
+    private static bool IsTextOnlyCategory(FilterCategory category) =>
         category is FilterCategory.Description or FilterCategory.Xml;
 }

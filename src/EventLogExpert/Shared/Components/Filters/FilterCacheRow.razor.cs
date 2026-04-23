@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Shared.Base;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -8,19 +9,13 @@ using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class FilterCacheRow
+public sealed partial class FilterCacheRow : EditableFilterRowBase
 {
     private CacheType _cacheType = CacheType.Favorites;
     private string? _errorMessage;
-    private FilterEditorModel? _filter;
-
-    [Parameter] public FilterModel Value { get; set; } = null!;
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
@@ -33,67 +28,37 @@ public sealed partial class FilterCacheRow
         _ => [],
     };
 
-    protected override void OnParametersSet()
+    protected override void DispatchRemoveFilter() =>
+        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
+
+    /// <summary>
+    /// Clear the validation banner before the base mutates the draft or bubbles the
+    /// editing-state change.
+    /// </summary>
+    protected override void OnEditSessionResetting() => _errorMessage = string.Empty;
+
+    private async Task SaveFilter()
     {
-        // Auto-create a draft when the row mounts in edit mode (e.g. AddCachedFilter dispatches
-        // AddFilter with IsEditing=true). The `_filter is null` guard ensures we don't overwrite
-        // an in-flight draft when the parent re-renders due to unrelated state changes.
-        if (Value.IsEditing && _filter is null)
-        {
-            _filter = FilterEditorModel.FromFilterModel(Value);
-        }
+        if (Filter is null) { return; }
 
-        base.OnParametersSet();
-    }
-
-    private void CancelFilter()
-    {
-        _filter = null;
-        _errorMessage = string.Empty;
-
-        // A new filter has no saved comparison string — Cancel removes it entirely. An existing
-        // filter just exits edit mode; the saved Value is untouched because the draft was a copy.
-        if (string.IsNullOrEmpty(Value.Comparison.Value))
-        {
-            Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
-        }
-        else
-        {
-            Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
-        }
-    }
-
-    private void EditFilter()
-    {
-        _filter = FilterEditorModel.FromFilterModel(Value);
-        _errorMessage = string.Empty;
-
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEditing(Value.Id));
-    }
-
-    private void RemoveFilter() => Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(Value.Id));
-
-    private void SaveFilter()
-    {
-        if (_filter is null) { return; }
-
-        if (!FilterService.TryParseExpression(_filter.ComparisonText, out var message))
+        if (!FilterService.TryParseExpression(Filter.ComparisonText, out var message))
         {
             _errorMessage = message;
             return;
         }
 
-        var newFilter = _filter.ToFilterModel() with
+        var newFilter = Filter.ToFilterModel() with
         {
-            Comparison = new FilterComparison { Value = _filter.ComparisonText },
+            Comparison = new FilterComparison { Value = Filter.ComparisonText },
             IsEditing = false,
             IsEnabled = true
         };
 
-        _filter = null;
+        Filter = null;
         _errorMessage = string.Empty;
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
+        await BubbleSavedAsync();
     }
 
     private void ToggleFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(Value.Id));

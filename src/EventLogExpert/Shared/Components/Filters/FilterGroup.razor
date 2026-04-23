@@ -1,11 +1,10 @@
 @using EventLogExpert.UI
-
 <div class="mb-1">
     <div class="flex-space-between">
         <div class="flex-space-between">
             <div>@Group.DisplayName</div>
 
-            <button aria-label="Rename @Group.DisplayName" class="button" type="button" @onclick="RenameGroup">
+            <button aria-label="Rename @Group.DisplayName" class="button" @onclick="RenameGroup" type="button">
                 <i class="bi bi-pencil-square"></i>
             </button>
         </div>
@@ -13,15 +12,19 @@
         @if (Group.IsEditing)
         {
             <div>
-                <button class="button button-green" type="button" @onclick="SaveGroup">
+                <button class="button button-green" @onclick="SaveGroup" type="button">
                     <i class="bi bi-check-circle"></i> Save
                 </button>
 
-                <button class="button" type="button" @onclick="ImportGroup">
+                <button class="button" @onclick="ImportGroup" type="button">
                     <i class="bi bi-download"></i> Import
                 </button>
 
-                <button class="button button-red" type="button" @onclick="RemoveGroup">
+                <button class="button button-red fixed-width" @onclick="CancelGroup" type="button">
+                    <i class="bi bi-x-circle"></i> Cancel
+                </button>
+
+                <button class="button button-red fixed-width" @onclick="RemoveGroup" type="button">
                     <i class="bi bi-dash-circle"></i> Remove
                 </button>
             </div>
@@ -29,23 +32,23 @@
         else
         {
             <div>
-                <button class="button button-green" type="button" @onclick="ApplyFilters">
+                <button class="button button-green" @onclick="ApplyFilters" type="button">
                     <i class="bi bi-plus-circle"></i> Apply Filters
                 </button>
 
-                <button class="button" type="button" @onclick="CopyGroup">
+                <button class="button" @onclick="CopyGroup" type="button">
                     <i class="bi bi-clipboard2-plus"></i> Copy
                 </button>
 
-                <button class="button" type="button" @onclick="ExportGroup">
+                <button class="button" @onclick="ExportGroup" type="button">
                     <i class="bi bi-upload"></i> Export
                 </button>
 
-                <button class="button" type="button" @onclick="ToggleGroup">
+                <button class="button" @onclick="ToggleGroup" type="button">
                     <i class="bi bi-funnel"></i> Edit
                 </button>
-                
-                <button class="button button-red" type="button" @onclick="RemoveGroup">
+
+                <button class="button button-red" @onclick="RemoveGroup" type="button">
                     <i class="bi bi-dash-circle"></i> Remove
                 </button>
             </div>
@@ -56,7 +59,10 @@
     {
         @if (Group.IsEditing)
         {
-            <FilterGroupRow @key="filter.Id" ParentId="Group.Id" Value="filter" />
+            <FilterGroupRow @key="filter.Id"
+                OnEditingChanged="OnRowEditingChanged"
+                ParentId="Group.Id"
+                Value="filter" />
         }
         else
         {
@@ -69,7 +75,7 @@
                 }
                 else
                 {
-                    <span>@filter.Comparison.Value</span>                
+                    <span>@filter.Comparison.Value</span>
                 }
             </div>
         }
@@ -77,7 +83,7 @@
 
     @if (Group.IsEditing)
     {
-        <button class="button" type="button" @onclick="AddFilter">
+        <button class="button" @onclick="AddFilter" type="button">
             <i class="bi bi-plus-circle"></i> Add Filter
         </button>
     }

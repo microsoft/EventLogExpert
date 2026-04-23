@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Models;
@@ -15,6 +15,8 @@ namespace EventLogExpert.Shared.Components.Filters;
 
 public sealed partial class FilterGroup
 {
+    private readonly HashSet<FilterId> _editingFilters = [];
+
     [Parameter] public FilterGroupModel Group { get; set; } = null!;
 
     [Parameter] public FilterGroupModal Parent { get; set; } = null!;
@@ -23,7 +25,23 @@ public sealed partial class FilterGroup
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    protected override void OnParametersSet()
+    {
+        // Prune _editingFilters of any IDs no longer present in Group.Filters so external
+        // mutations (ImportGroup replacing the entire filter list, RemoveFilter dispatched
+        // from elsewhere, etc.) cannot leave permanent stale entries that would block SaveGroup.
+        if (_editingFilters.Count > 0)
+        {
+            var currentIds = Group.Filters.Select(filter => filter.Id).ToHashSet();
+            _editingFilters.RemoveWhere(id => !currentIds.Contains(id));
+        }
+
+        base.OnParametersSet();
+    }
+
     private void AddFilter() => Dispatcher.Dispatch(new FilterGroupAction.AddFilter(Group.Id));
+
+    private void CancelGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
 
     private async Task ApplyFilters()
     {
@@ -115,6 +133,18 @@ public sealed partial class FilterGroup
         }
     }
 
+    private void OnRowEditingChanged((FilterId Id, bool IsEditing) change)
+    {
+        if (change.IsEditing)
+        {
+            _editingFilters.Add(change.Id);
+        }
+        else
+        {
+            _editingFilters.Remove(change.Id);
+        }
+    }
+
     private void RemoveGroup() => Dispatcher.Dispatch(new FilterGroupAction.RemoveGroup(Group.Id));
 
     private async Task RenameGroup()
@@ -140,6 +170,12 @@ public sealed partial class FilterGroup
 
     private void SaveGroup()
     {
+        // Block save while any row is mid-edit. New-filter rows are still tracked via
+        // FilterModel.IsEditing in state (until 3e.2 lifts that into a pane-local draft).
+        // Existing-filter edits are tracked locally via _editingFilters, populated by the
+        // OnRowEditingChanged callback bubbled up from FilterGroupRow.
+        if (_editingFilters.Count > 0) { return; }
+
         foreach (var filter in Group.Filters)
         {
             if (filter.IsEditing) { return; }

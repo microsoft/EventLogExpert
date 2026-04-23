@@ -1,56 +1,11 @@
-﻿@using EventLogExpert.UI
-@inherits Base.BaseFilterRow
+@using EventLogExpert.Shared.Base
+@inherits FilterRowBase<FilterEditorModel>
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
-        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" />
+        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" DisabledString="AND" EnabledString="OR" IsSingleColor="true" />
 
-        <ValueSelect AriaLabel="Category" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="CategoryBinding" ToStringFunc="x => x.ToFullString()">
-            @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
-            {
-                <ValueSelectItem T="FilterCategory" Value="item" />
-            }
-        </ValueSelect>
-
-        <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
-        <ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Value.Data.Evaluator" ToStringFunc="x => x.ToFullString()">
-            @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
-            {
-                @if (IsTextOnlyCategory(Value.Data.Category) && item == FilterEvaluator.MultiSelect)
-                {
-                    continue;
-                }
-                <ValueSelectItem T="FilterEvaluator" Value="item" />
-            }
-        </ValueSelect>
-
-        <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
-        @if (IsTextOnlyCategory(Value.Data.Category))
-        {
-            <TextInput CssClass="input filter-description" @bind-Value="@Value.Data.Value" />
-        }
-        else if (Value.Data.Evaluator == FilterEvaluator.MultiSelect)
-        {
-            <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Value.Data.Values" IsMultiSelect
-                ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
-                <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
-                @foreach (var item in Items)
-                {
-                    <ValueSelectItem T="string" Value="item" />
-                }
-            </ValueSelect>
-        }
-        else
-        {
-            <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Value.Data.Value" IsInput>
-                <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
-                @foreach (var item in FilteredItems)
-                {
-                    <ValueSelectItem T="string" Value="item" />
-                }
-            </ValueSelect>
-        }
-
+        <FilterCategoryEditor Data="Value.Data" Id="@Id" />
     </div>
 
     <button class="button button-red fixed-width" @onclick="RemoveSubFilter">

@@ -1,6 +1,6 @@
 @typeparam T
 @using EventLogExpert.Shared.Base
-@inherits BaseComponent<T>
+@inherits InputComponent<T>
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @onkeydown:preventDefault="_preventDefault" @ref="_selectComponent">
     <input aria-activedescendant="@HighlightedItem?.ItemId" aria-controls="@_itemId"
