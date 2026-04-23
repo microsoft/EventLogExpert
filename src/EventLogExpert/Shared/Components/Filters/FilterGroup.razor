@@ -56,7 +56,7 @@
     {
         @if (Group.IsEditing)
         {
-            <FilterGroupRow ParentId="Group.Id" Value="filter" />
+            <FilterGroupRow @key="filter.Id" ParentId="Group.Id" Value="filter" />
         }
         else
         {
