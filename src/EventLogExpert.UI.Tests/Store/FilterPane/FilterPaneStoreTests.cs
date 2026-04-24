@@ -63,15 +63,6 @@ public sealed class FilterPaneActionTests
     }
 
     [Fact]
-    public void AddSubFilterAction_ShouldCreateAction()
-    {
-        var parentId = FilterId.Create();
-        var action = new FilterPaneAction.AddSubFilter(parentId);
-
-        Assert.Equal(parentId, action.ParentId);
-    }
-
-    [Fact]
     public void ApplyFilterGroupAction_ShouldCreateAction()
     {
         var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
@@ -95,17 +86,6 @@ public sealed class FilterPaneActionTests
         var action = new FilterPaneAction.RemoveFilter(filterId);
 
         Assert.Equal(filterId, action.Id);
-    }
-
-    [Fact]
-    public void RemoveSubFilterAction_ShouldCreateAction()
-    {
-        var parentId = FilterId.Create();
-        var subFilterId = FilterId.Create();
-        var action = new FilterPaneAction.RemoveSubFilter(parentId, subFilterId);
-
-        Assert.Equal(parentId, action.ParentId);
-        Assert.Equal(subFilterId, action.SubFilterId);
     }
 
     [Fact]
@@ -214,34 +194,9 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceAddSubFilter_WithInvalidParent_ShouldReturnOriginalState()
-    {
-        var state = new FilterPaneState { Filters = [new FilterModel()] };
-        var action = new FilterPaneAction.AddSubFilter(FilterId.Create());
-
-        var result = FilterPaneReducers.ReduceAddSubFilter(state, action);
-
-        Assert.Equal(state, result);
-    }
-
-    [Fact]
-    public void ReduceAddSubFilter_WithValidParent_ShouldAddSubFilter()
-    {
-        var parentFilter = new FilterModel();
-        var state = new FilterPaneState { Filters = [parentFilter] };
-        var action = new FilterPaneAction.AddSubFilter(parentFilter.Id);
-
-        var result = FilterPaneReducers.ReduceAddSubFilter(state, action);
-
-        Assert.Single(result.Filters);
-        Assert.Single(result.Filters[0].SubFilters);
-    }
-
-    [Fact]
     public void ReduceApplyFilterGroup_ShouldPreserveIsExcludedOnAppliedFilters()
     {
-        // Regression: previously the IsExcluded flag from grouped filters was dropped when
-        // copying them into the pane.
+        // Regression: IsExcluded was previously dropped when copying grouped filters into the pane.
         var state = new FilterPaneState();
 
         var filterGroup = new FilterGroupModel
@@ -327,8 +282,7 @@ public sealed class FilterPaneReducerTests
     [Fact]
     public void ReduceApplyFilterGroup_WithSameComparisonButDifferentExclusion_ShouldKeepBoth()
     {
-        // Dedupe key is (Comparison.Value, IsExcluded) so an "Id == 100" include and an
-        // "Id == 100" exclude are treated as semantically different filters.
+        // Dedupe key includes IsExcluded so include and exclude of the same expression are distinct.
         var existingInclude = new FilterModel
         {
             Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
@@ -397,31 +351,6 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceRemoveSubFilter_WithInvalidParent_ShouldReturnOriginalState()
-    {
-        var state = new FilterPaneState { Filters = [new FilterModel()] };
-        var action = new FilterPaneAction.RemoveSubFilter(FilterId.Create(), FilterId.Create());
-
-        var result = FilterPaneReducers.ReduceRemoveSubFilter(state, action);
-
-        Assert.Equal(state, result);
-    }
-
-    [Fact]
-    public void ReduceRemoveSubFilter_WithValidParentAndSubFilter_ShouldRemoveSubFilter()
-    {
-        var subFilter = new FilterModel();
-        var parentFilter = new FilterModel { SubFilters = [subFilter] };
-        var state = new FilterPaneState { Filters = [parentFilter] };
-        var action = new FilterPaneAction.RemoveSubFilter(parentFilter.Id, subFilter.Id);
-
-        var result = FilterPaneReducers.ReduceRemoveSubFilter(state, action);
-
-        Assert.Single(result.Filters);
-        Assert.Empty(result.Filters[0].SubFilters);
-    }
-
-    [Fact]
     public void ReduceSetFilter_ShouldReplaceFilter()
     {
         var originalFilter = new FilterModel
@@ -465,8 +394,7 @@ public sealed class FilterPaneReducerTests
     [Fact]
     public void ReduceSetFilter_WhenIdFound_ShouldReplaceInPlaceWithoutReordering()
     {
-        // Guards against the previous Where(...).Concat([new]) implementation which reordered
-        // the list by appending the replacement at the end.
+        // Regression: previous Where(...).Concat([new]) implementation reordered the list.
         var first = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
         var middle = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals200 } };
         var last = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterLevelEqualsError } };
@@ -491,8 +419,7 @@ public sealed class FilterPaneReducerTests
     [Fact]
     public void ReduceSetFilter_WhenIdNotFound_ShouldAppend()
     {
-        // Characterizes the upsert contract: ContextMenu and other callers dispatch SetFilter
-        // with a brand-new Id and rely on the reducer appending it.
+        // Upsert contract: ContextMenu and other callers dispatch SetFilter with a new Id.
         var existing = new FilterModel { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
         var state = new FilterPaneState { Filters = [existing] };
 
@@ -791,31 +718,6 @@ public sealed class FilterPaneIntegrationTests
         Assert.Single(state.Filters);
         Assert.Equal(Constants.FilterIdEquals200, state.Filters[0].Comparison.Value);
         Assert.False(state.Filters[0].IsEnabled);
-    }
-
-    [Fact]
-    public void SubFilterManagement_ShouldHandleNestedFilters()
-    {
-        var state = new FilterPaneState();
-
-        var parentFilter = new FilterModel
-            { Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 } };
-
-        state = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(parentFilter));
-
-        state = FilterPaneReducers.ReduceAddSubFilter(
-            state,
-            new FilterPaneAction.AddSubFilter(parentFilter.Id));
-
-        Assert.Single(state.Filters[0].SubFilters);
-
-        var subFilterId = state.Filters[0].SubFilters[0].Id;
-
-        state = FilterPaneReducers.ReduceRemoveSubFilter(
-            state,
-            new FilterPaneAction.RemoveSubFilter(parentFilter.Id, subFilterId));
-
-        Assert.Empty(state.Filters[0].SubFilters);
     }
 
     [Fact]

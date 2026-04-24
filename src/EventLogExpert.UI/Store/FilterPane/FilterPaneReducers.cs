@@ -13,31 +13,13 @@ public sealed class FilterPaneReducers
         state with { Filters = state.Filters.Add(action.FilterModel) };
 
     [ReducerMethod]
-    public static FilterPaneState ReduceAddSubFilter(FilterPaneState state, FilterPaneAction.AddSubFilter action)
-    {
-        var parent = state.Filters.FirstOrDefault(filter => filter.Id == action.ParentId);
-
-        if (parent is null) { return state; }
-
-        var index = state.Filters.IndexOf(parent);
-
-        return state with
-        {
-            Filters = state.Filters.SetItem(
-                index,
-                parent with { SubFilters = parent.SubFilters.Add(new FilterModel()) })
-        };
-    }
-
-    [ReducerMethod]
     public static FilterPaneState ReduceApplyFilterGroup(
         FilterPaneState state,
         FilterPaneAction.ApplyFilterGroup action)
     {
         if (!action.FilterGroup.Filters.Any()) { return state; }
 
-        // Dedupe on (Comparison.Value, IsExcluded) so an "Id == 100" include and an "Id == 100" exclude
-        // are treated as semantically different filters and both can land in the pane.
+        // Dedupe key includes IsExcluded so include/exclude pairs of the same expression both land.
         HashSet<(string Value, bool IsExcluded)> existingKeys =
             [.. state.Filters.Select(filter => (filter.Comparison.Value, filter.IsExcluded))];
 
@@ -73,30 +55,9 @@ public sealed class FilterPaneReducers
     }
 
     [ReducerMethod]
-    public static FilterPaneState ReduceRemoveSubFilter(FilterPaneState state, FilterPaneAction.RemoveSubFilter action)
-    {
-        var parent = state.Filters.FirstOrDefault(filter => filter.Id == action.ParentId);
-
-        if (parent is null) { return state; }
-
-        var updatedSubFilters = parent.SubFilters.RemoveAll(filter => filter.Id == action.SubFilterId);
-
-        // ImmutableList<T>.RemoveAll returns the same instance when nothing matched.
-        if (ReferenceEquals(updatedSubFilters, parent.SubFilters)) { return state; }
-
-        var index = state.Filters.IndexOf(parent);
-
-        return state with
-        {
-            Filters = state.Filters.SetItem(index, parent with { SubFilters = updatedSubFilters })
-        };
-    }
-
-    [ReducerMethod]
     public static FilterPaneState ReduceSetFilter(FilterPaneState state, FilterPaneAction.SetFilter action)
     {
-        // Upsert: replace by Id if present (preserving position), append if not. ContextMenu and
-        // the FilterRow save path both rely on the append branch.
+        // Upsert: replace-by-Id (preserving position) or append.
         var existing = state.Filters.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
 
         if (existing is null)

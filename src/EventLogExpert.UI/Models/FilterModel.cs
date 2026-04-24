@@ -11,12 +11,7 @@ public sealed record FilterModel
     [JsonIgnore]
     public FilterId Id { get; init; } = FilterId.Create();
 
-    // NOTE: Color and ShouldCompareAny remain mutable until Step 3c migrates Razor components
-    // (FilterRow / SubFilterRow / AdvancedFilterRow / FilterCacheRow / FilterGroupRow) to bind
-    // FilterEditorModel instead of FilterModel directly. Razor @bind-Value requires a settable
-    // property on the binding target, so flipping these to init now would break compilation of
-    // the existing components.
-    public HighlightColor Color { get; set; } = HighlightColor.None;
+    public HighlightColor Color { get; init; } = HighlightColor.None;
 
     public FilterComparison Comparison { get; init; } = new();
 
@@ -30,7 +25,7 @@ public sealed record FilterModel
     public ImmutableList<FilterModel> SubFilters { get; init; } = [];
 
     [JsonIgnore]
-    public bool ShouldCompareAny { get; set; }
+    public bool ShouldCompareAny { get; init; }
 
     [JsonIgnore]
     public bool IsEnabled { get; init; }

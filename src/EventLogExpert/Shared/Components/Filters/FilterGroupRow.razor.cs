@@ -31,11 +31,7 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
         Dispatcher.Dispatch(new FilterGroupAction.RemoveFilter(ParentId, savedFilter.Id));
     }
 
-    /// <summary>
-    ///     Cancel pending validation and clear the error banner before the base mutates the draft or bubbles the
-    ///     editing-state change. Disposing the CTS prevents a stale debounce continuation from racing with the new edit
-    ///     session.
-    /// </summary>
+    /// <summary>Cancels the debounce and clears the error banner before the base mutates the draft.</summary>
     protected override void OnEditSessionResetting()
     {
         _errorMessage = string.Empty;
@@ -50,8 +46,7 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
 
         var rawText = e.Value as string ?? string.Empty;
 
-        // Persist raw text into the draft synchronously so invalid/partial input survives
-        // re-renders. Validation runs separately on the debounce timer.
+        // Persist raw text immediately; validation runs on debounce.
         Filter.ComparisonText = rawText;
 
         _debounceCts?.Cancel();
@@ -71,8 +66,7 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase, IDisposable
                     return;
                 }
 
-                // The session token guards against stale callbacks writing into a draft that was
-                // discarded (Cancel) or replaced (new edit session) before the debounce elapsed.
+                // Guard against a stale callback writing into a discarded/replaced draft.
                 if (sessionToken.IsCancellationRequested || Filter is null) { return; }
 
                 var isValid = FilterService.TryParseExpression(rawText, out var message);

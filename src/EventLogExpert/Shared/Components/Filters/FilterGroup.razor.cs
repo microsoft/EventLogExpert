@@ -18,6 +18,7 @@ public sealed partial class FilterGroup
 {
     private readonly HashSet<FilterId> _editingFilters = [];
     private readonly List<FilterEditorModel> _pendingDrafts = [];
+
     private FilterGroupId? _trackedGroupId;
 
     [Parameter] public FilterGroupModel Group { get; set; } = null!;
@@ -30,10 +31,7 @@ public sealed partial class FilterGroup
 
     protected override void OnParametersSet()
     {
-        // Group identity swap: FilterGroupModal renders FilterGroup instances without an @key
-        // and the underlying list is sorted by name, so a rename or import can repoint the same
-        // component instance at a different group. Drop all per-row state to avoid leaking
-        // editing flags or pending drafts across groups.
+        // Group identity swap: FilterGroupModal reuses component instances when the sorted list reorders.
         if (_trackedGroupId is not null && _trackedGroupId != Group.Id)
         {
             _editingFilters.Clear();
@@ -42,20 +40,14 @@ public sealed partial class FilterGroup
 
         _trackedGroupId = Group.Id;
 
-        // When the group collapses (Cancel, Save via SetGroup reducer, Rename, Import) the
-        // FilterGroupRow children unmount without notifying us, so any in-flight per-row edit
-        // state must be dropped here. Otherwise SaveGroup would silently block forever the next
-        // time the group is reopened. Pending drafts are dropped for the same reason — collapse
-        // means "abandon unsaved work", consistent with the legacy IsEditing-placeholder flow.
+        // Group collapse unmounts row children silently; drop per-row state so SaveGroup isn't blocked next reopen.
         if (!Group.IsEditing)
         {
             _editingFilters.Clear();
             _pendingDrafts.Clear();
         }
 
-        // Prune _editingFilters of any IDs no longer present in Group.Filters so external
-        // mutations (ImportGroup replacing the entire filter list, RemoveFilter dispatched
-        // from elsewhere, etc.) cannot leave permanent stale entries that would block SaveGroup.
+        // Drop any tracked IDs that were removed externally (Import/RemoveFilter) so they can't block SaveGroup forever.
         if (_editingFilters.Count > 0)
         {
             var currentIds = Group.Filters.Select(filter => filter.Id).ToHashSet();
@@ -65,8 +57,7 @@ public sealed partial class FilterGroup
         base.OnParametersSet();
     }
 
-    private void AddFilter() =>
-        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
+    private void AddFilter() => _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
 
     private async Task ApplyFilters()
     {
@@ -130,8 +121,6 @@ public sealed partial class FilterGroup
     {
         _pendingDrafts.Remove(draft);
 
-        // SetFilter is upsert (replace-by-Id, append-if-missing) — same defense against a
-        // double-click race that the FilterPane pending-draft handler relies on.
         Dispatcher.Dispatch(new FilterGroupAction.SetFilter(Group.Id, filter));
     }
 
@@ -187,7 +176,8 @@ public sealed partial class FilterGroup
 
     private async Task RenameGroup()
     {
-        var newName = await AlertDialogService.DisplayPrompt("Group Name", "What would you like to name this group?", Group.Name);
+        var newName =
+            await AlertDialogService.DisplayPrompt("Group Name", "What would you like to name this group?", Group.Name);
 
         if (string.IsNullOrEmpty(newName))
         {
@@ -208,11 +198,9 @@ public sealed partial class FilterGroup
 
     private void SaveGroup()
     {
-        // Block save while any row is mid-edit. Existing-filter edits are tracked locally via
-        // _editingFilters (populated by OnRowEditingChanged bubbled up from FilterGroupRow).
-        // New-filter rows live in _pendingDrafts (this component owns them; they never hit
-        // Fluxor state until the user hits Save on the row).
+        // Block save while any saved row is mid-edit or any new-filter draft is unsaved.
         if (_editingFilters.Count > 0) { return; }
+
         if (_pendingDrafts.Count > 0) { return; }
 
         Dispatcher.Dispatch(new FilterGroupAction.SetGroup(Group));

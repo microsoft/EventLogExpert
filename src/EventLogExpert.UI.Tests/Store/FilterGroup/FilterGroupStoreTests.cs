@@ -219,7 +219,7 @@ public sealed class FilterGroupStoreTests
         // Assert
         Assert.Single(state.Groups);
 
-        // Act - Upsert filter directly into group (mirrors FilterGroup pending-draft commit path)
+        // Act - Upsert filter into group (pending-draft commit path)
         var groupId = state.Groups.First().Id;
         var filter = new FilterModel
         {
@@ -243,7 +243,7 @@ public sealed class FilterGroupStoreTests
         state = FilterGroupReducers.ReducerAddGroup(state, new FilterGroupAction.AddGroup(group));
         var groupId = state.Groups.First().Id;
 
-        // Act - Upsert a brand-new filter into the group (pending-draft commit path)
+        // Act - Upsert a new filter into the group (pending-draft commit path)
         var initialFilter = new FilterModel
         {
             Color = HighlightColor.Blue,
@@ -561,8 +561,7 @@ public sealed class FilterGroupStoreTests
     [Fact]
     public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
-        // Arrange — pending-draft commit path: parent group exists but the filter Id is brand new
-        // (FilterGroup.HandlePendingSave fires SetFilter for a draft that was never in state).
+        // Pending-draft commit path: SetFilter for an Id that was never in state.
         var group = new FilterGroupModel { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var newFilter = new FilterModel

@@ -116,8 +116,7 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleClearAllFilters_ShouldUpdateEventTableFilters()
     {
-        // Arrange - simulate the reducer having just cleared the filters; the effect must
-        // still dispatch because the previously-applied filter differs from the empty candidate.
+        // Effect must dispatch even when pane state is empty if applied still has filters.
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
@@ -133,7 +132,7 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
-        // Arrange - reducer removed the filter; effect sees pane state empty but applied still has it.
+        // Pane state empty, applied still has the removed filter.
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
@@ -416,7 +415,7 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
     {
-        // Arrange - candidate must differ from applied to dispatch; supply a date in pane state.
+        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,
             filteredDateRange: new FilterDateModel
@@ -511,8 +510,7 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenEquivalentFiltersFromDifferentInstances_ShouldNotDispatch()
     {
-        // Arrange - applied and candidate filters are structurally equivalent but distinct instances.
-        // The structural HasFilteringChanged guard must skip the dispatch.
+        // Structurally equivalent but distinct instances; HasFilteringChanged must short-circuit.
         var paneFilters = ImmutableList.Create(
             new FilterModel
             {
@@ -602,8 +600,7 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenFilterUnchanged_ShouldNotDispatch()
     {
-        // Arrange - candidate equals AppliedFilter; the no-op guard must short-circuit
-        // the loading toggles, the SetFilters dispatch, and the downstream re-filter work.
+        // No-op guard must skip both loading toggles and the SetFilters dispatch.
         var filters = CreateSingleEnabledFilters();
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,

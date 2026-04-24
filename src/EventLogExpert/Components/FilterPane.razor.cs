@@ -148,12 +148,6 @@ public sealed partial class FilterPane : IDisposable
 
     private void HandlePendingDiscard(FilterEditorModel draft) => _pendingDrafts.Remove(draft);
 
-    /// <summary>
-    ///     Invoked by a pending row when the user saves a valid draft. Removes the draft from the local list and
-    ///     dispatches <see cref="FilterPaneAction.SetFilter" /> (upsert) atomically so state and local pending list never both
-    ///     hold the same filter Id within a render frame. SetFilter is preferred over AddFilter for duplicate-Id safety in the
-    ///     unlikely event Save fires twice (e.g., double-click race).
-    /// </summary>
     private void HandlePendingSave(FilterEditorModel draft, FilterModel filter)
     {
         _pendingDrafts.Remove(draft);

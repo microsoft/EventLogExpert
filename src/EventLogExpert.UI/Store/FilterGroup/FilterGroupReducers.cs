@@ -19,7 +19,8 @@ public sealed class FilterGroupReducers
     [ReducerMethod]
     public static FilterGroupState ReducerLoadGroupsSuccess(
         FilterGroupState state,
-        FilterGroupAction.LoadGroupsSuccess action) => state with { Groups = [.. action.Groups] };
+        FilterGroupAction.LoadGroupsSuccess action) =>
+        state with { Groups = [.. action.Groups] };
 
     [ReducerMethod]
     public static FilterGroupState ReducerRemoveFilter(FilterGroupState state, FilterGroupAction.RemoveFilter action)
@@ -64,8 +65,7 @@ public sealed class FilterGroupReducers
 
         if (existing is null)
         {
-            // Upsert: append a brand-new committed filter (e.g. from a pending draft save in
-            // FilterGroup). Mirrors FilterPaneReducers.ReduceSetFilter's upsert semantics.
+            // Upsert append (pending-draft commit path).
             return state with
             {
                 Groups = state.Groups.SetItem(
@@ -74,9 +74,7 @@ public sealed class FilterGroupReducers
             };
         }
 
-        // Preserve all fields not explicitly overridden by the action (IsExcluded, IsEnabled,
-        // Data, SubFilters, etc.). Previously a partial new FilterModel was constructed which
-        // silently dropped those fields.
+        // `with` preserves IsExcluded/IsEnabled/Data/SubFilters; only Color and Comparison are overridden.
         var updatedFilter = existing with
         {
             Color = action.Filter.Color,
@@ -117,7 +115,10 @@ public sealed class FilterGroupReducers
     public static FilterGroupState ReducerToggleFilterExcluded(
         FilterGroupState state,
         FilterGroupAction.ToggleFilterExcluded action) =>
-        UpdateFilterInGroup(state, action.ParentId, action.Id, filter => filter with { IsExcluded = !filter.IsExcluded });
+        UpdateFilterInGroup(state,
+            action.ParentId,
+            action.Id,
+            filter => filter with { IsExcluded = !filter.IsExcluded });
 
     [ReducerMethod]
     public static FilterGroupState ReducerToggleGroup(FilterGroupState state, FilterGroupAction.ToggleGroup action)
@@ -135,7 +136,8 @@ public sealed class FilterGroupReducers
     }
 
     [ReducerMethod]
-    public static FilterGroupState ReducerUpdateDisplayGroups(FilterGroupState state,
+    public static FilterGroupState ReducerUpdateDisplayGroups(
+        FilterGroupState state,
         FilterGroupAction.UpdateDisplayGroups action)
     {
         Dictionary<string, FilterGroupData> displayGroups = [];
@@ -155,8 +157,6 @@ public sealed class FilterGroupReducers
         FilterId id,
         FilterModel replacement)
     {
-        // Order-preserving replacement. FilterGroupModel.Filters is IReadOnlyList (not ImmutableList)
-        // so we materialize to an array; allocation is O(n) which is fine for the small group sizes used.
         var result = new FilterModel[filters.Count];
 
         for (var index = 0; index < filters.Count; index++)
