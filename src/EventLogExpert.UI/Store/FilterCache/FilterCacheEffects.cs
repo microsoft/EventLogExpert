@@ -49,13 +49,15 @@ public sealed class FilterCacheEffects(IPreferencesProvider preferencesProvider,
     [EffectMethod]
     public Task HandleImportFavorites(FilterCacheAction.ImportFavorites action, IDispatcher dispatcher)
     {
+        HashSet<string> currentFilters = new(state.Value.FavoriteFilters, StringComparer.OrdinalIgnoreCase);
         List<string> newFilters = [.. state.Value.FavoriteFilters];
 
-        foreach (var filter in
-            action.Filters.Where(filter =>
-                !newFilters.Any(x => string.Equals(filter, x, StringComparison.OrdinalIgnoreCase))))
+        foreach (var filter in action.Filters)
         {
-            newFilters.Add(filter);
+            if (currentFilters.Add(filter))
+            {
+                newFilters.Add(filter);
+            }
         }
 
         preferencesProvider.FavoriteFiltersPreference = newFilters;

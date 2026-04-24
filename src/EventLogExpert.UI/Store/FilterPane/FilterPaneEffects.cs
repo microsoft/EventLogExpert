@@ -108,6 +108,9 @@ public sealed class FilterPaneEffects(
 
         long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
+        // TODO: This computes intersection bounds (latest oldest / earliest newest) across active logs,
+        // not the global envelope. Same logic is duplicated in FilterPane.razor.cs:AddDateFilter.
+        // Lock down intent with tests across both call sites and resolve intersection-vs-envelope.
         if (updatedAfter is null)
         {
             long ticks =

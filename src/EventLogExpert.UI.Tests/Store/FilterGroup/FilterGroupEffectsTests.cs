@@ -14,26 +14,6 @@ namespace EventLogExpert.UI.Tests.Store.FilterGroup;
 public sealed class FilterGroupEffectsTests
 {
     [Fact]
-    public async Task HandleAddGroup_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleAddGroup(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1 &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupName)));
-    }
-
-    [Fact]
     public async Task HandleAddGroup_ShouldPersistToPreferences()
     {
         // Arrange
@@ -69,26 +49,6 @@ public sealed class FilterGroupEffectsTests
     }
 
     [Fact]
-    public async Task HandleImportGroups_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleImportGroups(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 2));
-    }
-
-    [Fact]
     public async Task HandleImportGroups_ShouldPersistToPreferences()
     {
         // Arrange
@@ -104,38 +64,12 @@ public sealed class FilterGroupEffectsTests
         await effects.HandleImportGroups(mockDispatcher);
 
         // Assert
-        var _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
             x.Count() == 2);
     }
 
     [Fact]
-    public async Task HandleLoadGroups_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var savedGroups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.SavedFiltersPreference.Returns(savedGroups);
-
-        var mockState = Substitute.For<IState<FilterGroupState>>();
-        mockState.Value.Returns(new FilterGroupState());
-
-        var effects = new FilterGroupEffects(mockState, mockPreferencesProvider);
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
-        // Act
-        await effects.HandleLoadGroups(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
-    }
-
-    [Fact]
-    public async Task HandleLoadGroups_ShouldLoadFromPreferences()
+    public async Task HandleLoadGroups_ShouldDispatchLoadGroupsSuccess()
     {
         // Arrange
         var savedGroups = new List<FilterGroupModel>
@@ -164,7 +98,7 @@ public sealed class FilterGroupEffectsTests
     }
 
     [Fact]
-    public async Task HandleLoadGroups_WhenPreferencesEmpty_ShouldLoadEmptyList()
+    public async Task HandleLoadGroups_WhenPreferencesEmpty_ShouldDispatchEmptyList()
     {
         // Arrange
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
@@ -185,67 +119,6 @@ public sealed class FilterGroupEffectsTests
     }
 
     [Fact]
-    public async Task HandleRemoveFilter_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleRemoveFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
-    }
-
-    [Fact]
-    public async Task HandleRemoveFilter_WithMultipleGroups_ShouldDispatchAllGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleRemoveFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 2 &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupName) &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupNameNested)));
-    }
-
-    [Fact]
-    public async Task HandleRemoveGroup_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleRemoveGroup(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 2));
-    }
-
-    [Fact]
     public async Task HandleRemoveGroup_ShouldPersistToPreferences()
     {
         // Arrange
@@ -262,44 +135,6 @@ public sealed class FilterGroupEffectsTests
         // Assert
         _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
             x.Count() == 1);
-    }
-
-    [Fact]
-    public async Task HandleSetFilter_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleSetFilter(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
-    }
-
-    [Fact]
-    public async Task HandleSetGroup_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleSetGroup(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
     }
 
     [Fact]
@@ -340,44 +175,6 @@ public sealed class FilterGroupEffectsTests
         // Assert
         _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
             x.Count() == 3);
-    }
-
-    [Fact]
-    public async Task HandleToggleFilterExcluded_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleToggleFilterExcluded(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
-    }
-
-    [Fact]
-    public async Task HandleToggleGroup_ShouldDispatchUpdateDisplayGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName }
-        };
-
-        var (effects, mockDispatcher, _) = CreateEffects(groups);
-
-        // Act
-        await effects.HandleToggleGroup(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.UpdateDisplayGroups>(x =>
-            x.Groups.Count() == 1));
     }
 
     private static (FilterGroupEffects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)

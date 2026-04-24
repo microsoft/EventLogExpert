@@ -81,6 +81,9 @@ public sealed partial class FilterPane : IDisposable
 
         long ticksPerHour = TimeSpan.FromHours(1).Ticks;
 
+        // TODO: This computes intersection bounds (latest oldest / earliest newest) across active logs,
+        // not the global envelope. Same logic is duplicated in FilterPaneEffects.HandleSetFilterDateRange.
+        // Lock down intent with tests across both call sites and resolve intersection-vs-envelope.
         long oldestEventTicks =
             (EventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
                     .Order()

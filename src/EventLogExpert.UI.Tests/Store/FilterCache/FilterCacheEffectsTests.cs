@@ -309,6 +309,34 @@ public sealed class FilterCacheEffectsTests
     }
 
     [Fact]
+    public async Task HandleImportFavorites_WhenImportContainsCaseInsensitiveDuplicates_ShouldDedupe()
+    {
+        // Arrange
+        var existingFavorites = ImmutableList<string>.Empty;
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
+            existingFavorites);
+
+        var filtersToImport = new List<string>
+        {
+            "Id == 100",
+            "ID == 100",
+            Constants.FilterLevelEqualsError
+        };
+
+        var action = new FilterCacheAction.ImportFavorites(filtersToImport);
+
+        // Act
+        await effects.HandleImportFavorites(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterCacheAction.AddFavoriteFilterCompleted>(a =>
+            a.Filters.Count == 2 &&
+            a.Filters.Contains("Id == 100") &&
+            a.Filters.Contains(Constants.FilterLevelEqualsError)));
+    }
+
+    [Fact]
     public async Task HandleLoadFilters_ShouldLoadBothFavoritesAndRecent()
     {
         // Arrange
