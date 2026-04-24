@@ -35,8 +35,8 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received().Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received().Dispatch(Arg.Any<EventLogAction.SetFilters>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.SetIsLoading>());
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
     [Fact]
@@ -109,7 +109,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleApplyFilterGroup(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -125,7 +124,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleClearAllFilters(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -141,7 +139,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleRemoveAdvancedFilter(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -239,7 +236,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -428,7 +424,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -448,7 +443,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleToggleFilterDate(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -462,7 +456,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleToggleFilterEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -476,7 +469,6 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleToggleFilterExcluded(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 
@@ -490,21 +482,7 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
-    }
-
-    [Fact]
-    public async Task UpdateEventTableFilters_ShouldDispatchLoadingToggleTwice()
-    {
-        // Arrange
-        var (effects, mockDispatcher) = CreateEffects(true, CreateSingleEnabledFilters());
-
-        // Act
-        await effects.HandleToggleIsEnabled(mockDispatcher);
-
-        // Assert - Once before and once after
-        mockDispatcher.Received(2).Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
     }
 
     [Fact]
@@ -611,7 +589,7 @@ public sealed class FilterPaneEffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.ToggleIsLoading>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.SetIsLoading>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventLogAction.SetFilters>());
     }
 

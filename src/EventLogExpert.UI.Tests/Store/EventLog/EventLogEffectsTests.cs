@@ -8,6 +8,7 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -404,6 +405,136 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleSetFilters_FilterBranch_ShouldDispatchSetIsLoadingTrueThenFalse()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [filter]));
+
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        Received.InOrder(() =>
+        {
+            mockDispatcher.Dispatch(Arg.Is<FilterPaneAction.SetIsLoading>(a => a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+            mockDispatcher.Dispatch(Arg.Is<FilterPaneAction.SetIsLoading>(a => !a.IsLoading));
+        });
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_FilterBranch_WhenFilterServiceThrows_ShouldStillClearLoading()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        mockFilterService
+            .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>()))
+            .Do(_ => throw new InvalidOperationException("boom"));
+
+        var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [filter]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => effects.HandleSetFilters(action, mockDispatcher));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetIsLoading>(a => a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetIsLoading>(a => !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_FilterBranch_WhenSupersededByNewerFilter_ShouldDropStaleResults()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var staleResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [logData.Id] = new List<DisplayEventModel> { EventUtils.CreateTestEvent(999) }
+        };
+
+        var freshResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [logData.Id] = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) }
+        };
+
+        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
+        var freshFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+
+        var staleFilter = new EventFilter(null, [staleFilterModel]);
+        var freshFilter = new EventFilter(null, [freshFilterModel]);
+
+        mockFilterService
+            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo =>
+            {
+                var filter = callInfo.Arg<EventFilter>();
+
+                if (filter.Filters.Count > 0 && filter.Filters[0].Comparison.Value == Constants.FilterIdEquals999)
+                {
+                    staleStarted.TrySetResult(true);
+                    staleGate.Task.GetAwaiter().GetResult();
+                    return staleResult;
+                }
+
+                return freshResult;
+            });
+
+        // Start the stale filter and wait until it is parked inside FilterActiveLogs.
+        var staleTask = effects.HandleSetFilters(new EventLogAction.SetFilters(staleFilter), mockDispatcher);
+        await staleStarted.Task;
+
+        // While the stale filter is still parked, run the fresh filter to completion. This
+        // bumps _filterGeneration so the stale run will be detected as superseded.
+        await effects.HandleSetFilters(new EventLogAction.SetFilters(freshFilter), mockDispatcher);
+
+        // Release the stale filter — its post-await checks should now fail the generation guard.
+        staleGate.SetResult(true);
+        await staleTask;
+
+        // Fresh result reached the table; stale result was dropped.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.UpdateDisplayedEvents>(
+            a => a.ActiveLogs[logData.Id][0].Id == 100));
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<EventTableAction.UpdateDisplayedEvents>(
+            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
+
+        // SetIsLoading(false) was dispatched by the fresh run; the stale run's finally was
+        // suppressed by the generation guard, so we should see exactly one false-dispatch.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetIsLoading>(a => !a.IsLoading));
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_ReloadBranch_ShouldNotDispatchSetIsLoading()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [xmlFilter]));
+
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        Assert.True(action.EventFilter.RequiresXml);
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterPaneAction.SetIsLoading>());
+    }
+
+    [Fact]
     public async Task HandleSetFilters_ShouldFilterAndDispatchUpdate()
     {
         // Arrange
@@ -442,12 +573,7 @@ public sealed class EventLogEffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var nonXmlFilter = new FilterModel
-        {
-            IsEnabled = true,
-            Comparison = new FilterComparison { Value = "Id == 100" }
-        };
-
+        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
         var eventFilter = new EventFilter(null, [nonXmlFilter]);
         var action = new EventLogAction.SetFilters(eventFilter);
 
@@ -504,12 +630,7 @@ public sealed class EventLogEffectsTests
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
-        var xmlFilter = new FilterModel
-        {
-            IsEnabled = true,
-            Comparison = new FilterComparison { Value = "Xml.Contains(\"foo\")" }
-        };
-
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
         var eventFilter = new EventFilter(null, [xmlFilter]);
 
         // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
@@ -537,12 +658,7 @@ public sealed class EventLogEffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var xmlFilter = new FilterModel
-        {
-            IsEnabled = true,
-            Comparison = new FilterComparison { Value = "Xml.Contains(\"foo\")" }
-        };
-
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
         var eventFilter = new EventFilter(null, [xmlFilter]);
         var action = new EventLogAction.SetFilters(eventFilter);
 

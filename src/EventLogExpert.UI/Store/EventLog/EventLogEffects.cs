@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -54,6 +55,7 @@ public sealed class EventLogEffects(
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
 
     private long _cancelGeneration;
+    private long _filterGeneration;
     private CancellationTokenSource _globalCts = new();
 
     [EffectMethod]
@@ -273,7 +275,7 @@ public sealed class EventLogEffects(
     }
 
     [EffectMethod]
-    public Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
+    public async Task HandleSetFilters(EventLogAction.SetFilters action, IDispatcher dispatcher)
     {
         bool newRequiresXml = action.EventFilter.RequiresXml;
 
@@ -333,14 +335,33 @@ public sealed class EventLogEffects(
                 dispatcher.Dispatch(new EventLogAction.OpenLog(name, type));
             }
 
-            return Task.CompletedTask;
+            return;
         }
 
-        var filteredActiveLogs = _filterService.FilterActiveLogs(_eventLogState.Value.ActiveLogs.Values, action.EventFilter);
+        // Generation guard: when filter changes arrive in quick succession, only the latest
+        // run may publish results or clear the loading flag; superseded runs silently exit.
+        long generation = Interlocked.Increment(ref _filterGeneration);
+        var activeLogsSnapshot = _eventLogState.Value.ActiveLogs.Values.ToList();
 
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+        dispatcher.Dispatch(new FilterPaneAction.SetIsLoading(true));
 
-        return Task.CompletedTask;
+        try
+        {
+            var filteredActiveLogs = await Task.Run(
+                () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.EventFilter));
+
+            if (Interlocked.Read(ref _filterGeneration) == generation)
+            {
+                dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+            }
+        }
+        finally
+        {
+            if (Interlocked.Read(ref _filterGeneration) == generation)
+            {
+                dispatcher.Dispatch(new FilterPaneAction.SetIsLoading(false));
+            }
+        }
     }
 
     /// <summary>Adds new events to the currently opened log</summary>

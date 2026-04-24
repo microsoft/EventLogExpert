@@ -23,6 +23,8 @@ public sealed record FilterPaneAction
 
     public sealed record SetFilterDateRangeSuccess(FilterDateModel? FilterDateModel);
 
+    public sealed record SetIsLoading(bool IsLoading);
+
     public sealed record ToggleFilterEnabled(FilterId Id);
 
     public sealed record ToggleFilterExcluded(FilterId Id);
@@ -30,6 +32,4 @@ public sealed record FilterPaneAction
     public sealed record ToggleFilterDate;
 
     public sealed record ToggleIsEnabled;
-
-    public sealed record ToggleIsLoading;
 }

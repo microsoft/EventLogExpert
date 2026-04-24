@@ -103,9 +103,9 @@ public sealed class FilterPaneReducers
     public static FilterPaneState ReduceToggleIsEnabled(FilterPaneState state) =>
         state with { IsEnabled = !state.IsEnabled };
 
-    [ReducerMethod(typeof(FilterPaneAction.ToggleIsLoading))]
-    public static FilterPaneState ReduceToggleIsLoading(FilterPaneState state) =>
-        state with { IsLoading = !state.IsLoading };
+    [ReducerMethod]
+    public static FilterPaneState ReduceSetIsLoading(FilterPaneState state, FilterPaneAction.SetIsLoading action) =>
+        state.IsLoading == action.IsLoading ? state : state with { IsLoading = action.IsLoading };
 
     private static FilterPaneState UpdateFilterById(
         FilterPaneState state,
