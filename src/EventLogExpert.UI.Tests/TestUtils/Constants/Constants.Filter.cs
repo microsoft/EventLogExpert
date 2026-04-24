@@ -8,6 +8,7 @@ public sealed partial class Constants
     // Filter expression strings
     public const string FilterIdEquals100 = "Id == 100";
     public const string FilterIdEquals200 = "Id == 200";
+    public const string FilterIdEquals999 = "Id == 999";
     public const string FilterIdNotEquals100 = "Id != 100";
     public const string FilterIdGreaterThan100 = "Id > 100";
     public const string FilterIdEquals100Or200 = "Id == 100 || Id == 200";

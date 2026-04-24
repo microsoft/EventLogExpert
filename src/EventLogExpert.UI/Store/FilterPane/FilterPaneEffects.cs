@@ -18,11 +18,11 @@ public sealed class FilterPaneEffects(
     private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
 
     [EffectMethod]
-    public async Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
+    public Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
     {
         if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
         {
-            await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+            UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
         }
 
         if (action.FilterModel.FilterType is not FilterType.Cached &&
@@ -31,19 +31,30 @@ public sealed class FilterPaneEffects(
             dispatcher.Dispatch(
                 new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
+
+        return Task.CompletedTask;
     }
 
     [EffectMethod(typeof(FilterPaneAction.ApplyFilterGroup))]
-    public async Task HandleApplyFilterGroup(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleApplyFilterGroup(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.ClearAllFilters))]
-    public async Task HandleClearAllFilters(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleClearAllFilters(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.RemoveFilter))]
-    public async Task HandleRemoveAdvancedFilter(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleRemoveAdvancedFilter(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+        return Task.CompletedTask;
+    }
 
     [EffectMethod]
     public Task HandleSaveFilterGroup(FilterPaneAction.SaveFilterGroup action, IDispatcher dispatcher)
@@ -69,15 +80,17 @@ public sealed class FilterPaneEffects(
     }
 
     [EffectMethod]
-    public async Task HandleSetFilter(FilterPaneAction.SetFilter action, IDispatcher dispatcher)
+    public Task HandleSetFilter(FilterPaneAction.SetFilter action, IDispatcher dispatcher)
     {
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
 
         if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value) &&
             action.FilterModel.FilterType is not FilterType.Cached)
         {
             dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
         }
+
+        return Task.CompletedTask;
     }
 
     [EffectMethod]
@@ -131,29 +144,49 @@ public sealed class FilterPaneEffects(
     }
 
     [EffectMethod(typeof(FilterPaneAction.SetFilterDateRangeSuccess))]
-    public async Task HandleSetFilterDateRangeSuccess(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleSetFilterDateRangeSuccess(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterDate))]
-    public async Task HandleToggleFilterDate(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleToggleFilterDate(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterEnabled))]
-    public async Task HandleToggleFilterEnabled(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleToggleFilterEnabled(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleFilterExcluded))]
-    public async Task HandleToggleFilterExcluded(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleToggleFilterExcluded(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
 
     [EffectMethod(typeof(FilterPaneAction.ToggleIsEnabled))]
-    public async Task HandleToggleIsEnabled(IDispatcher dispatcher) =>
-        await UpdateEventTableFiltersAsync(_filterPaneState.Value, dispatcher);
+    public Task HandleToggleIsEnabled(IDispatcher dispatcher)
+    {
+        UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
+
+        return Task.CompletedTask;
+    }
 
     private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
         new(filterPaneState.FilteredDateRange, filterPaneState.Filters.Where(f => f.IsEnabled).ToImmutableList());
 
-    private async Task UpdateEventTableFiltersAsync(FilterPaneState filterPaneState, IDispatcher dispatcher)
+    private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
         var candidate = filterPaneState.IsEnabled
             ? GetEventFilter(filterPaneState)
@@ -161,16 +194,11 @@ public sealed class FilterPaneEffects(
                 filterPaneState.FilteredDateRange,
                 filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
 
-        // No-op when the applied filter is unchanged.
         if (!FilterMethods.HasFilteringChanged(candidate, _eventLogState.Value.AppliedFilter))
         {
             return;
         }
 
-        dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
-
-        await Task.Run(() => dispatcher.Dispatch(new EventLogAction.SetFilters(candidate)));
-
-        dispatcher.Dispatch(new FilterPaneAction.ToggleIsLoading());
+        dispatcher.Dispatch(new EventLogAction.SetFilters(candidate));
     }
 }

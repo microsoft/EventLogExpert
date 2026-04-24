@@ -124,6 +124,15 @@ public sealed class FilterPaneActionTests
     }
 
     [Fact]
+    public void SetIsLoadingAction_ShouldCreateAction()
+    {
+        var action = new FilterPaneAction.SetIsLoading(true);
+
+        Assert.NotNull(action);
+        Assert.True(action.IsLoading);
+    }
+
+    [Fact]
     public void ToggleFilterDateAction_ShouldCreateAction()
     {
         var action = new FilterPaneAction.ToggleFilterDate();
@@ -153,14 +162,6 @@ public sealed class FilterPaneActionTests
     public void ToggleIsEnabledAction_ShouldCreateAction()
     {
         var action = new FilterPaneAction.ToggleIsEnabled();
-
-        Assert.NotNull(action);
-    }
-
-    [Fact]
-    public void ToggleIsLoadingAction_ShouldCreateAction()
-    {
-        var action = new FilterPaneAction.ToggleIsLoading();
 
         Assert.NotNull(action);
     }
@@ -468,6 +469,26 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
+    public void ReduceSetIsLoading_ShouldSetValue()
+    {
+        var state = new FilterPaneState { IsLoading = false };
+
+        var result = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
+
+        Assert.True(result.IsLoading);
+    }
+
+    [Fact]
+    public void ReduceSetIsLoading_WhenValueUnchanged_ShouldReturnSameState()
+    {
+        var state = new FilterPaneState { IsLoading = true };
+
+        var result = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
+
+        Assert.Same(state, result);
+    }
+
+    [Fact]
     public void ReduceToggleFilterDate_WithDateRange_ShouldToggleIsEnabled()
     {
         var state = new FilterPaneState
@@ -546,16 +567,6 @@ public sealed class FilterPaneReducerTests
         var result = FilterPaneReducers.ReduceToggleIsEnabled(state);
 
         Assert.True(result.IsEnabled);
-    }
-
-    [Fact]
-    public void ReduceToggleIsLoading_ShouldToggleValue()
-    {
-        var state = new FilterPaneState { IsLoading = false };
-
-        var result = FilterPaneReducers.ReduceToggleIsLoading(state);
-
-        Assert.True(result.IsLoading);
     }
 }
 
@@ -733,7 +744,7 @@ public sealed class FilterPaneIntegrationTests
         Assert.True(state.IsEnabled);
         Assert.False(state.IsLoading);
 
-        state = FilterPaneReducers.ReduceToggleIsLoading(state);
+        state = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
         Assert.True(state.IsEnabled);
         Assert.True(state.IsLoading);
     }
