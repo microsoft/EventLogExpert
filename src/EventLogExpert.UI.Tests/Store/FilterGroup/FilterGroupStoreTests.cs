@@ -148,19 +148,6 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_UpdateDisplayGroups_ShouldStoreGroups()
-    {
-        // Arrange
-        var groups = new List<FilterGroupModel> { new() { Name = Constants.FilterGroupName } };
-
-        // Act
-        var action = new FilterGroupAction.UpdateDisplayGroups(groups);
-
-        // Assert
-        Assert.Single(action.Groups);
-    }
-
-    [Fact]
     public void FilterGroupId_Create_ShouldGenerateUniqueIds()
     {
         // Arrange & Act
@@ -283,15 +270,10 @@ public sealed class FilterGroupStoreTests
             new() { Name = "TestSection\\AnotherGroup" }
         };
 
-        // Act - Load groups
+        // Act - Load groups (DisplayGroups is now built atomically inside the reducer)
         state = FilterGroupReducers.ReducerLoadGroupsSuccess(
             state,
             new FilterGroupAction.LoadGroupsSuccess(groups));
-
-        // Act - Update display groups
-        state = FilterGroupReducers.ReducerUpdateDisplayGroups(
-            state,
-            new FilterGroupAction.UpdateDisplayGroups(state.Groups));
 
         // Assert
         Assert.NotEmpty(state.DisplayGroups);
@@ -369,6 +351,23 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
+    public void ReducerAddGroup_ShouldRebuildDisplayGroupsAtomically()
+    {
+        // Arrange
+        var state = new FilterGroupState();
+        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var action = new FilterGroupAction.AddGroup(group);
+
+        // Act
+        var newState = FilterGroupReducers.ReducerAddGroup(state, action);
+
+        // Assert
+        Assert.Single(newState.Groups);
+        Assert.NotEmpty(newState.DisplayGroups);
+        Assert.True(newState.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
+    }
+
+    [Fact]
     public void ReducerAddGroup_WithGroup_ShouldAddSpecifiedGroup()
     {
         // Arrange
@@ -421,6 +420,28 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
+    public void ReducerLoadGroupsSuccess_ShouldCreateDisplayHierarchy()
+    {
+        // Arrange
+        var state = new FilterGroupState();
+
+        var groups = new List<FilterGroupModel>
+        {
+            new() { Name = Constants.FilterGroupName },
+            new() { Name = Constants.FilterGroupNameNested }
+        };
+
+        var action = new FilterGroupAction.LoadGroupsSuccess(groups);
+
+        // Act
+        var newState = FilterGroupReducers.ReducerLoadGroupsSuccess(state, action);
+
+        // Assert
+        Assert.NotEmpty(newState.DisplayGroups);
+        Assert.True(newState.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
+    }
+
+    [Fact]
     public void ReducerLoadGroupsSuccess_ShouldReplaceAllGroups()
     {
         // Arrange
@@ -441,6 +462,20 @@ public sealed class FilterGroupStoreTests
         // Assert
         Assert.Equal(2, newState.Groups.Count);
         Assert.DoesNotContain(newState.Groups, g => g.Name == "Old\\Group");
+    }
+
+    [Fact]
+    public void ReducerLoadGroupsSuccess_WithEmptyGroups_ShouldHaveEmptyDisplay()
+    {
+        // Arrange
+        var state = new FilterGroupState();
+        var action = new FilterGroupAction.LoadGroupsSuccess([]);
+
+        // Act
+        var newState = FilterGroupReducers.ReducerLoadGroupsSuccess(state, action);
+
+        // Assert
+        Assert.Empty(newState.DisplayGroups);
     }
 
     [Fact]
@@ -493,6 +528,23 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReducerRemoveGroup_ShouldRebuildDisplayGroupsAtomically()
+    {
+        // Arrange
+        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var state = FilterGroupReducers.ReducerAddGroup(
+            new FilterGroupState(),
+            new FilterGroupAction.AddGroup(group));
+
+        // Act
+        var newState = FilterGroupReducers.ReducerRemoveGroup(state, new FilterGroupAction.RemoveGroup(group.Id));
+
+        // Assert
+        Assert.Empty(newState.Groups);
+        Assert.Empty(newState.DisplayGroups);
     }
 
     [Fact]
@@ -715,41 +767,5 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.Same(state, newState);
-    }
-
-    [Fact]
-    public void ReducerUpdateDisplayGroups_ShouldCreateDisplayHierarchy()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-
-        var groups = new List<FilterGroupModel>
-        {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
-        };
-
-        var action = new FilterGroupAction.UpdateDisplayGroups(groups);
-
-        // Act
-        var newState = FilterGroupReducers.ReducerUpdateDisplayGroups(state, action);
-
-        // Assert
-        Assert.NotEmpty(newState.DisplayGroups);
-        Assert.True(newState.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
-    }
-
-    [Fact]
-    public void ReducerUpdateDisplayGroups_WithEmptyGroups_ShouldHaveEmptyDisplay()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new FilterGroupAction.UpdateDisplayGroups([]);
-
-        // Act
-        var newState = FilterGroupReducers.ReducerUpdateDisplayGroups(state, action);
-
-        // Assert
-        Assert.Empty(newState.DisplayGroups);
     }
 }

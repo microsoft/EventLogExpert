@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Models;
 using Fluxor;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Store.FilterGroup;
 
@@ -10,17 +11,17 @@ public sealed class FilterGroupReducers
 {
     [ReducerMethod]
     public static FilterGroupState ReducerAddGroup(FilterGroupState state, FilterGroupAction.AddGroup action) =>
-        state with { Groups = state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()) };
+        WithGroups(state, state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()));
 
     [ReducerMethod]
     public static FilterGroupState ReducerImportGroups(FilterGroupState state, FilterGroupAction.ImportGroups action) =>
-        state with { Groups = state.Groups.AddRange(action.Groups) };
+        WithGroups(state, state.Groups.AddRange(action.Groups));
 
     [ReducerMethod]
     public static FilterGroupState ReducerLoadGroupsSuccess(
         FilterGroupState state,
         FilterGroupAction.LoadGroupsSuccess action) =>
-        state with { Groups = [.. action.Groups] };
+        WithGroups(state, [.. action.Groups]);
 
     [ReducerMethod]
     public static FilterGroupState ReducerRemoveFilter(FilterGroupState state, FilterGroupAction.RemoveFilter action)
@@ -35,12 +36,11 @@ public sealed class FilterGroupReducers
 
         var groupIndex = state.Groups.IndexOf(parent);
 
-        return state with
-        {
-            Groups = state.Groups.SetItem(
+        return WithGroups(
+            state,
+            state.Groups.SetItem(
                 groupIndex,
-                parent with { Filters = [.. parent.Filters.Where(x => x.Id != action.Id)] })
-        };
+                parent with { Filters = [.. parent.Filters.Where(x => x.Id != action.Id)] }));
     }
 
     [ReducerMethod]
@@ -50,7 +50,7 @@ public sealed class FilterGroupReducers
 
         if (group is null) { return state; }
 
-        return state with { Groups = state.Groups.Remove(group) };
+        return WithGroups(state, state.Groups.Remove(group));
     }
 
     [ReducerMethod]
@@ -66,12 +66,11 @@ public sealed class FilterGroupReducers
         if (existing is null)
         {
             // Upsert append (pending-draft commit path).
-            return state with
-            {
-                Groups = state.Groups.SetItem(
+            return WithGroups(
+                state,
+                state.Groups.SetItem(
                     groupIndex,
-                    parent with { Filters = [.. parent.Filters, action.Filter] })
-            };
+                    parent with { Filters = [.. parent.Filters, action.Filter] }));
         }
 
         // `with` preserves IsExcluded/IsEnabled/Data/SubFilters; only Color and Comparison are overridden.
@@ -81,12 +80,11 @@ public sealed class FilterGroupReducers
             Comparison = action.Filter.Comparison with { }
         };
 
-        return state with
-        {
-            Groups = state.Groups.SetItem(
+        return WithGroups(
+            state,
+            state.Groups.SetItem(
                 groupIndex,
-                parent with { Filters = ReplaceFilterById(parent.Filters, existing.Id, updatedFilter) })
-        };
+                parent with { Filters = ReplaceFilterById(parent.Filters, existing.Id, updatedFilter) }));
     }
 
     [ReducerMethod]
@@ -98,17 +96,16 @@ public sealed class FilterGroupReducers
 
         var index = state.Groups.IndexOf(group);
 
-        return state with
-        {
-            Groups = state.Groups.SetItem(
+        return WithGroups(
+            state,
+            state.Groups.SetItem(
                 index,
                 group with
                 {
                     Name = action.FilterGroup.Name,
                     Filters = action.FilterGroup.Filters,
                     IsEditing = false
-                })
-        };
+                }));
     }
 
     [ReducerMethod]
@@ -129,27 +126,24 @@ public sealed class FilterGroupReducers
 
         var index = state.Groups.IndexOf(group);
 
-        return state with
-        {
-            Groups = state.Groups.SetItem(index, group with { IsEditing = !group.IsEditing })
-        };
+        return WithGroups(
+            state,
+            state.Groups.SetItem(index, group with { IsEditing = !group.IsEditing }));
     }
 
-    [ReducerMethod]
-    public static FilterGroupState ReducerUpdateDisplayGroups(
-        FilterGroupState state,
-        FilterGroupAction.UpdateDisplayGroups action)
+    private static IReadOnlyDictionary<string, FilterGroupData> BuildDisplayGroups(
+        IEnumerable<FilterGroupModel> groups)
     {
         Dictionary<string, FilterGroupData> displayGroups = [];
 
-        foreach (var group in action.Groups)
+        foreach (var group in groups)
         {
             var folders = group.Name.Split('\\');
 
             displayGroups.AddFilterGroup(folders, group);
         }
 
-        return state with { DisplayGroups = displayGroups.AsReadOnly() };
+        return displayGroups.AsReadOnly();
     }
 
     private static IReadOnlyList<FilterModel> ReplaceFilterById(
@@ -183,11 +177,13 @@ public sealed class FilterGroupReducers
 
         var groupIndex = state.Groups.IndexOf(parent);
 
-        return state with
-        {
-            Groups = state.Groups.SetItem(
+        return WithGroups(
+            state,
+            state.Groups.SetItem(
                 groupIndex,
-                parent with { Filters = ReplaceFilterById(parent.Filters, filterId, transform(filter)) })
-        };
+                parent with { Filters = ReplaceFilterById(parent.Filters, filterId, transform(filter)) }));
     }
+
+    private static FilterGroupState WithGroups(FilterGroupState state, ImmutableList<FilterGroupModel> newGroups) =>
+        state with { Groups = newGroups, DisplayGroups = BuildDisplayGroups(newGroups) };
 }

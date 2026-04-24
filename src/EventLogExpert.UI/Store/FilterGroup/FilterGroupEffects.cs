@@ -15,8 +15,6 @@ public sealed class FilterGroupEffects(
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
 
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
         return Task.CompletedTask;
     }
 
@@ -24,8 +22,6 @@ public sealed class FilterGroupEffects(
     public Task HandleImportGroups(IDispatcher dispatcher)
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
-
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
 
         return Task.CompletedTask;
     }
@@ -37,16 +33,6 @@ public sealed class FilterGroupEffects(
 
         dispatcher.Dispatch(new FilterGroupAction.LoadGroupsSuccess(loadedFilters));
 
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(loadedFilters));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(FilterGroupAction.RemoveFilter))]
-    public Task HandleRemoveFilter(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
         return Task.CompletedTask;
     }
 
@@ -55,16 +41,6 @@ public sealed class FilterGroupEffects(
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
 
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(FilterGroupAction.SetFilter))]
-    public Task HandleSetFilter(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
         return Task.CompletedTask;
     }
 
@@ -72,24 +48,6 @@ public sealed class FilterGroupEffects(
     public Task HandleSetGroup(IDispatcher dispatcher)
     {
         preferencesProvider.SavedFiltersPreference = filterGroupState.Value.Groups;
-
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(FilterGroupAction.ToggleFilterExcluded))]
-    public Task HandleToggleFilterExcluded(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(FilterGroupAction.ToggleGroup))]
-    public Task HandleToggleGroup(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new FilterGroupAction.UpdateDisplayGroups(filterGroupState.Value.Groups));
 
         return Task.CompletedTask;
     }
