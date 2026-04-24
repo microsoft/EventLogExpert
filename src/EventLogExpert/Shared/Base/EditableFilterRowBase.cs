@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
@@ -31,13 +32,18 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 
     [Inject] protected IDispatcher Dispatcher { get; init; } = null!;
 
+    protected string ErrorMessage { get; set; } = string.Empty;
+
     protected FilterEditorModel? Filter { get; set; }
+
+    [Inject] protected IFilterService FilterService { get; init; } = null!;
 
     protected bool IsPending => PendingDraft is not null;
 
     protected async Task CancelFilter()
     {
         OnEditSessionResetting();
+
         Filter = null;
 
         if (IsPending)
@@ -53,8 +59,17 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 
     protected Task CommitPendingAsync(FilterModel filter) => OnPendingSave.InvokeAsync(filter);
 
-    /// <summary>Subclasses dispatch the appropriate remove action. Saved rows only.</summary>
+    /// <summary>Subclasses dispatch the appropriate remove-filter action. Saved rows only.</summary>
     protected abstract void DispatchRemoveFilter();
+
+    /// <summary>Subclasses dispatch the appropriate set-filter action (FilterPane, FilterGroup, etc.).</summary>
+    protected abstract void DispatchSetFilter(FilterModel filter);
+
+    /// <summary>Subclasses that expose an enable/disable toggle override this. Default is no-op.</summary>
+    protected virtual void DispatchToggleEnabled(FilterId id) { }
+
+    /// <summary>Subclasses dispatch toggle-exclusion. Saved rows only.</summary>
+    protected abstract void DispatchToggleExclusion(FilterId id);
 
     protected async Task EditFilter()
     {
@@ -71,8 +86,17 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     protected Task NotifyEditingEndedAsync() =>
         Value is { } savedFilter ? OnEditingChanged.InvokeAsync((savedFilter.Id, false)) : Task.CompletedTask;
 
-    /// <summary>Hook for subclasses to clear transient UI state (validation, debounce CTS) before the draft changes.</summary>
-    protected virtual void OnEditSessionResetting() { }
+    /// <summary>Hook for subclasses to clear transient UI state before the draft changes. Base clears the error banner.</summary>
+    protected virtual void OnEditSessionResetting() => ErrorMessage = string.Empty;
+
+    /// <summary>Persist raw input into the draft and clear any stale error banner.</summary>
+    protected void OnInputChanged(ChangeEventArgs eventArgs)
+    {
+        if (Filter is null) { return; }
+
+        Filter.ComparisonText = eventArgs.Value as string ?? string.Empty;
+        ErrorMessage = string.Empty;
+    }
 
     protected override void OnParametersSet()
     {
@@ -112,5 +136,66 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         DispatchRemoveFilter();
 
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
+    }
+
+    protected async Task SaveFilter()
+    {
+        if (Filter is null) { return; }
+
+        var newFilter = await TrySaveAsync(Filter);
+
+        if (newFilter is null) { return; }
+
+        Filter = null;
+        ErrorMessage = string.Empty;
+
+        if (IsPending)
+        {
+            await CommitPendingAsync(newFilter);
+            return;
+        }
+
+        DispatchSetFilter(newFilter);
+        await NotifyEditingEndedAsync();
+    }
+
+    protected void ToggleFilter()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        DispatchToggleEnabled(savedFilter.Id);
+    }
+
+    protected void ToggleFilterExclusion()
+    {
+        if (Value is not { } savedFilter) { return; }
+
+        DispatchToggleExclusion(savedFilter.Id);
+    }
+
+    /// <summary>
+    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch. Returning
+    ///     <see langword="null" /> aborts the save (subclass is responsible for surfacing the error). The default
+    ///     implementation enforces non-empty text and parses via <see cref="IFilterService.TryParseExpression" />.
+    /// </summary>
+    protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
+    {
+        if (string.IsNullOrWhiteSpace(draft.ComparisonText))
+        {
+            ErrorMessage = "Cannot save an empty filter";
+
+            return ValueTask.FromResult<FilterModel?>(null);
+        }
+
+        if (!FilterService.TryParseExpression(draft.ComparisonText, out var error))
+        {
+            ErrorMessage = error;
+
+            return ValueTask.FromResult<FilterModel?>(null);
+        }
+
+        FilterModel result = draft.ToFilterModel() with { IsEnabled = true };
+
+        return ValueTask.FromResult<FilterModel?>(result);
     }
 }

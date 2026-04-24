@@ -1,0 +1,136 @@
+@using EventLogExpert.UI
+@if (!string.IsNullOrEmpty(OuterCssClass))
+{
+    <div class="@OuterCssClass">
+        @RenderRowContent()
+
+        @if (UseInlineErrorRow)
+        {
+            <div class="error-row" hidden="@(string.IsNullOrWhiteSpace(ErrorMessage))">@ErrorMessage</div>
+        }
+    </div>
+}
+else
+{
+    @RenderRowContent()
+}
+
+@if (!UseInlineErrorRow)
+{
+    <div hidden="@(string.IsNullOrWhiteSpace(ErrorMessage))">
+        <span class="advanced-filter-error">@ErrorMessage</span>
+    </div>
+}
+
+@code {
+    private RenderFragment RenderRowContent() =>
+        @<div class="flex-space-between">
+            <div class="flex-align-center">
+                @if (Filter is not null)
+                {
+                    if (!Filter.IsExcluded)
+                    {
+                        <ValueSelect AriaLabel="Highlight Color"
+                            @bind-Value="Filter.Color"
+                            CssClass="input color-dropdown"
+                            DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
+                            T="HighlightColor">
+                            @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
+                            {
+                                <ValueSelectItem CssClass="color-dropdown-item"
+                                    DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())"
+                                    T="HighlightColor"
+                                    Value="item" />
+                            }
+                        </ValueSelect>
+                    }
+
+                    @EditingContent
+                }
+                else if (Value is { } savedFilter)
+                {
+                    if (string.IsNullOrWhiteSpace(savedFilter.Comparison.Value))
+                    {
+                        <span>No Filter Specified</span>
+                    }
+                    else
+                    {
+                        if (savedFilter.Color != HighlightColor.None)
+                        {
+                            <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
+                        }
+
+                        if (savedFilter.IsExcluded)
+                        {
+                            <span>Exclude: @savedFilter.Comparison.Value</span>
+                        }
+                        else
+                        {
+                            <span>@savedFilter.Comparison.Value</span>
+                        }
+                    }
+                }
+            </div>
+
+            <div class="@RightCssClass">
+                @if (Filter is not null)
+                {
+                    @ExtraEditingButtons
+
+                    <button class="button button-green" @onclick="OnSave">
+                        <i class="bi bi-check-circle"></i> Save
+                    </button>
+
+                    <button class="button button-red fixed-width" @onclick="OnCancel">
+                        <i class="bi bi-x-circle"></i> Cancel
+                    </button>
+
+                    @if (!IsPending)
+                    {
+                        <button class="button button-red fixed-width" @onclick="OnRemove">
+                            <i class="bi bi-dash-circle"></i> Remove
+                        </button>
+                    }
+                }
+                else if (Value is { } savedFilter)
+                {
+                    <button class="button" @onclick="OnEdit">
+                        <i class="bi bi-funnel"></i> Edit
+                    </button>
+
+                    @if (savedFilter.IsExcluded)
+                    {
+                        <button class="button fixed-width" @onclick="OnToggleExclusion">
+                            <i class="bi bi-plus-circle"></i> Include
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="button fixed-width" @onclick="OnToggleExclusion">
+                            <i class="bi bi-dash-circle"></i> Exclude
+                        </button>
+                    }
+
+                    <button class="button button-red fixed-width" @onclick="OnRemove">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+
+                    @if (ShowToggleEnabled)
+                    {
+                        if (savedFilter.IsEnabled)
+                        {
+                            <button class="button button-red fixed-width" @onclick="OnToggleEnabled">
+                                <i class="bi bi-dash-circle"></i> Disable
+                            </button>
+                        }
+                        else
+                        {
+                            <button class="button button-green fixed-width" @onclick="OnToggleEnabled">
+                                <i class="bi bi-plus-circle"></i> Enable
+                            </button>
+                        }
+                    }
+                }
+            </div>
+        </div>;
+}

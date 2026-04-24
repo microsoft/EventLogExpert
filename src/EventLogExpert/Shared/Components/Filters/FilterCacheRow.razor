@@ -2,130 +2,48 @@
 @using EventLogExpert.UI
 @inherits EditableFilterRowBase
 
-<div class="flex-space-between">
-    <div class="flex-align-center">
-        @if (Filter is not null)
-        {
-            if (!Filter.IsExcluded)
+<FilterRowChrome ErrorMessage="@ErrorMessage"
+    Filter="Filter"
+    IsPending="IsPending"
+    OnCancel="CancelFilter"
+    OnEdit="EditFilter"
+    OnRemove="RemoveFilter"
+    OnSave="SaveFilter"
+    OnToggleEnabled="ToggleFilter"
+    OnToggleExclusion="ToggleFilterExclusion"
+    RightCssClass="justify-self-right"
+    Value="Value">
+    <EditingContent>
+        <label aria-label="Cache Type">Cache Type: </label>
+
+        <ValueSelect @bind-Value="_cacheType" CssClass="input filter-dropdown" T="CacheType" ToStringFunc="x => x.ToFullString()">
+            @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
             {
-                <ValueSelect @bind-Value="Filter.Color"
-                    CssClass="input color-dropdown"
-                    DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
-                    T="HighlightColor">
-                    @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
-                    {
-                        <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
-                    }
-                </ValueSelect>
+                <ValueSelectItem T="CacheType" Value="item" />
             }
+        </ValueSelect>
 
-            <label aria-label="Cache Type">Cache Type: </label>
+        @if (Filter!.IsExcluded)
+        {
+            <label aria-label="Exclude Value">Exclude Value: </label>
+        }
+        else
+        {
+            <label aria-label="Value">Value: </label>
+        }
 
-            <ValueSelect @bind-Value="_cacheType" CssClass="input filter-dropdown" T="CacheType" ToStringFunc="x => x.ToFullString()">
-                @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
+        <ValueSelect @bind-Value="Filter!.ComparisonText" CssClass="input cache-dropdown" IsInput T="string">
+            @if (Items.Any())
+            {
+                @foreach (var item in Items)
                 {
-                    <ValueSelectItem T="CacheType" Value="item" />
+                    <ValueSelectItem T="string" Value="item" />
                 }
-            </ValueSelect>
-
-            if (Filter.IsExcluded)
-            {
-                <label aria-label="Exclude Value">Exclude Value: </label>
             }
             else
             {
-                <label aria-label="Value">Value: </label>
+                <ValueSelectItem IsDisabled T="string" />
             }
-
-            <ValueSelect @bind-Value="Filter.ComparisonText" CssClass="input cache-dropdown" IsInput T="string">
-                @if (Items.Any())
-                {
-                    @foreach (var item in Items)
-                    {
-                        <ValueSelectItem T="string" Value="item" />
-                    }
-                }
-                else
-                {
-                    <ValueSelectItem IsDisabled T="string" />
-                }
-            </ValueSelect>
-        }
-        else if (Value is { } savedFilter)
-        {
-            @if (savedFilter.Color != HighlightColor.None)
-            {
-                <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
-            }
-
-            @if (savedFilter.IsExcluded)
-            {
-                <span>Exclude: @savedFilter.Comparison.Value</span>
-            }
-            else
-            {
-                <span>@savedFilter.Comparison.Value</span>
-            }
-        }
-    </div>
-
-    <div class="justify-self-right">
-        @if (Filter is not null)
-        {
-            <button class="button button-green" @onclick="SaveFilter">
-                <i class="bi bi-check-circle"></i> Save
-            </button>
-
-            <button class="button button-red fixed-width" @onclick="CancelFilter">
-                <i class="bi bi-x-circle"></i> Cancel
-            </button>
-
-            @if (!IsPending)
-            {
-                <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                    <i class="bi bi-dash-circle"></i> Remove
-                </button>
-            }
-        }
-        else if (Value is { } savedFilter)
-        {
-            <button class="button" @onclick="EditFilter">
-                <i class="bi bi-funnel"></i> Edit
-            </button>
-
-            @if (savedFilter.IsExcluded)
-            {
-                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
-                    <i class="bi bi-plus-circle"></i> Include
-                </button>
-            }
-            else
-            {
-                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
-                    <i class="bi bi-dash-circle"></i> Exclude
-                </button>
-            }
-
-            <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                <i class="bi bi-dash-circle"></i> Remove
-            </button>
-
-            @if (savedFilter.IsEnabled)
-            {
-                <button class="button button-red fixed-width" @onclick="ToggleFilter">
-                    <i class="bi bi-dash-circle"></i> Disable
-                </button>
-            }
-            else
-            {
-                <button class="button button-green fixed-width" @onclick="ToggleFilter">
-                    <i class="bi bi-plus-circle"></i> Enable
-                </button>
-            }
-        }
-    </div>
-</div>
-
-<div hidden="@(string.IsNullOrWhiteSpace(_errorMessage))">
-    <span class="advanced-filter-error">@_errorMessage</span>
-</div>
+        </ValueSelect>
+    </EditingContent>
+</FilterRowChrome>

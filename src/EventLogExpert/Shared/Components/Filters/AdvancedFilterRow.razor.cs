@@ -2,25 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterPane;
-using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class AdvancedFilterRow : EditableFilterRowBase, IDisposable
+public sealed partial class AdvancedFilterRow : EditableFilterRowBase
 {
-    private CancellationTokenSource? _debounceCts;
-    private string _errorMessage = string.Empty;
-
-    [Inject] private IFilterService FilterService { get; init; } = null!;
-
-    public void Dispose()
-    {
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-    }
-
     protected override void DispatchRemoveFilter()
     {
         if (Value is not { } savedFilter) { return; }
@@ -28,108 +16,12 @@ public sealed partial class AdvancedFilterRow : EditableFilterRowBase, IDisposab
         Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(savedFilter.Id));
     }
 
-    /// <summary>Cancels the debounce and clears the error banner before the base mutates the draft.</summary>
-    protected override void OnEditSessionResetting()
-    {
-        _errorMessage = string.Empty;
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = null;
-    }
+    protected override void DispatchSetFilter(FilterModel filter) =>
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
 
-    private void OnInputChanged(ChangeEventArgs eventArgs)
-    {
-        if (Filter is null) { return; }
+    protected override void DispatchToggleEnabled(FilterId id) =>
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(id));
 
-        var rawText = eventArgs.Value as string ?? string.Empty;
-
-        // Persist raw text immediately; validation runs on debounce.
-        Filter.ComparisonText = rawText;
-
-        _debounceCts?.Cancel();
-        _debounceCts?.Dispose();
-        _debounceCts = new CancellationTokenSource();
-
-        var sessionToken = _debounceCts.Token;
-
-        _ = Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(250, sessionToken).ConfigureAwait(false);
-                }
-                catch (TaskCanceledException)
-                {
-                    return;
-                }
-
-                // Guard against a stale callback writing into a discarded/replaced draft.
-                if (sessionToken.IsCancellationRequested || Filter is null) { return; }
-
-                var isValid = FilterService.TryParseExpression(rawText, out var message);
-
-                try
-                {
-                    await InvokeAsync(() =>
-                    {
-                        if (sessionToken.IsCancellationRequested || Filter is null) { return; }
-
-                        _errorMessage = isValid ? string.Empty : message;
-                        StateHasChanged();
-                    }).ConfigureAwait(false);
-                }
-                catch (ObjectDisposedException)
-                {
-                    // Component disposed mid-debounce; safe to ignore.
-                }
-            },
-            sessionToken);
-    }
-
-    private async Task SaveFilter()
-    {
-        if (Filter is null) { return; }
-
-        if (!string.IsNullOrEmpty(_errorMessage)) { return; }
-
-        if (string.IsNullOrWhiteSpace(Filter.ComparisonText))
-        {
-            _errorMessage = "Cannot save an empty filter";
-
-            return;
-        }
-
-        var newFilter = Filter.ToFilterModel() with
-        {
-            IsEnabled = true
-        };
-
-        Filter = null;
-        _errorMessage = string.Empty;
-        _debounceCts?.Cancel();
-
-        if (IsPending)
-        {
-            await CommitPendingAsync(newFilter);
-            return;
-        }
-
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
-
-        await NotifyEditingEndedAsync();
-    }
-
-    private void ToggleFilter()
-    {
-        if (Value is not { } savedFilter) { return; }
-
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(savedFilter.Id));
-    }
-
-    private void ToggleFilterExclusion()
-    {
-        if (Value is not { } savedFilter) { return; }
-
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(savedFilter.Id));
-    }
+    protected override void DispatchToggleExclusion(FilterId id) =>
+        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(id));
 }
