@@ -13,6 +13,8 @@ public sealed record EventTableAction
 
     public sealed record AppendTableEvents(EventLogId LogId, IReadOnlyList<DisplayEventModel> Events);
 
+    public sealed record AppendTableEventsBatch(IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> EventsByLog);
+
     public sealed record CloseAll;
 
     public sealed record CloseLog(EventLogId LogId);

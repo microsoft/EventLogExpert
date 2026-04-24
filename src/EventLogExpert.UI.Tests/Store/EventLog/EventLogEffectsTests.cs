@@ -68,6 +68,32 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleAddEvent_WhenContinuouslyUpdateTrue_AndEventFilteredOut_ShouldNotDispatchAppend()
+    {
+        // Arrange
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(true, activeLogs);
+
+        // Mock the filter to drop everything (simulate "no events match the active filter").
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
+            .Returns(new List<DisplayEventModel>());
+
+        var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var action = new EventLogAction.AddEvent(newEvent);
+
+        // Act
+        await effects.HandleAddEvent(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.AddEventSuccess>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.AppendTableEvents>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+    }
+
+    [Fact]
     public async Task HandleAddEvent_WhenContinuouslyUpdateTrue_ShouldDispatchSuccessAndUpdate()
     {
         // Arrange
@@ -86,7 +112,9 @@ public sealed class EventLogEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.AddEventSuccess>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.AppendTableEvents>(a =>
+            a.LogId == logData.Id && a.Events.Count == 1 && a.Events[0] == newEvent));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
     }
 
     [Fact]
@@ -292,11 +320,84 @@ public sealed class EventLogEffectsTests
         await effects.HandleLoadNewEvents(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.AppendTableEventsBatch>(a =>
+            a.EventsByLog.Count == 1 &&
+            a.EventsByLog.ContainsKey(logData.Id) &&
+            a.EventsByLog[logData.Id].Count == 2));
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.AddEventSuccess>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.AddEventBuffered>(a =>
             a.UpdatedBuffer.Count == 0 && a.IsFull == false));
+    }
+
+    [Fact]
+    public async Task HandleLoadNewEvents_WhenAllEventsFiltered_ShouldNotDispatchAppendBatch()
+    {
+        // Arrange
+        var bufferedEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
+        };
+
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs, newEventBuffer: bufferedEvents);
+
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
+            .Returns(new List<DisplayEventModel>());
+
+        // Act
+        await effects.HandleLoadNewEvents(mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.AddEventSuccess>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.AppendTableEventsBatch>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.AddEventBuffered>(a =>
+            a.UpdatedBuffer.Count == 0 && a.IsFull == false));
+    }
+
+    [Fact]
+    public async Task HandleLoadNewEvents_WhenBufferSpansMultipleLogs_ShouldGroupIntoSingleBatch()
+    {
+        // Arrange
+        // EventUtils.CreateTestEvent always sets OwningLog="TestLog"; override via `with` to span 2 logs.
+        var bufferedEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100) with { OwningLog = Constants.LogNameApplication },
+            EventUtils.CreateTestEvent(200) with { OwningLog = Constants.LogNameTestLog },
+            EventUtils.CreateTestEvent(300) with { OwningLog = Constants.LogNameApplication }
+        };
+
+        var applicationLog = new EventLogData(Constants.LogNameApplication, PathType.LogName, []);
+        var testLog = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameApplication, applicationLog)
+            .Add(Constants.LogNameTestLog, testLog);
+
+        var (effects, mockDispatcher) = CreateEffects(
+            activeLogs: activeLogs,
+            newEventBuffer: bufferedEvents);
+
+        // Capture the dispatched batch for inspection.
+        EventTableAction.AppendTableEventsBatch? captured = null;
+
+        mockDispatcher
+            .When(dispatcher => dispatcher.Dispatch(Arg.Any<EventTableAction.AppendTableEventsBatch>()))
+            .Do(call => captured = (EventTableAction.AppendTableEventsBatch)call.Args()[0]);
+
+        // Act
+        await effects.HandleLoadNewEvents(mockDispatcher);
+
+        // Assert: a single batched append covering both logs.
+        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.AppendTableEventsBatch>());
+        Assert.NotNull(captured);
+        Assert.Equal(2, captured!.EventsByLog.Count);
+        Assert.Equal(2, captured.EventsByLog[applicationLog.Id].Count);
+        Assert.Single(captured.EventsByLog[testLog.Id]);
     }
 
     [Fact]
@@ -399,9 +500,10 @@ public sealed class EventLogEffectsTests
         // Act
         await effects.HandleSetContinuouslyUpdate(action, mockDispatcher);
 
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+        // Assert: ProcessNewEventBuffer now dispatches a batched append (no UpdateDisplayedEvents).
+        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.AppendTableEventsBatch>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.AddEventSuccess>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
     }
 
     [Fact]

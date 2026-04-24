@@ -20,6 +20,14 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider, 
         return Task.CompletedTask;
     }
 
+    [EffectMethod(typeof(EventTableAction.AppendTableEventsBatch))]
+    public static Task HandleAppendTableEventsBatch(IDispatcher dispatcher)
+    {
+        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
+
+        return Task.CompletedTask;
+    }
+
     [EffectMethod(typeof(EventTableAction.UpdateDisplayedEvents))]
     public static Task HandleUpdateDisplayedEvents(IDispatcher dispatcher)
     {
