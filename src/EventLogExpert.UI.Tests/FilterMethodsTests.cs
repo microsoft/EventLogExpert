@@ -109,7 +109,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
+        var filter = CreateFilter(Constants.FilterIdEquals100, true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -124,7 +124,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
+        var filter = CreateFilter(Constants.FilterIdEquals100, true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -168,7 +168,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
         var includeFilter = CreateFilter(Constants.FilterIdEquals100);
-        var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError, isExcluded: true);
+        var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError, true);
         var filters = new List<FilterModel> { includeFilter, excludeFilter };
 
         // Act
@@ -235,7 +235,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100, isExcluded: true);
+        var filter = CreateFilter(Constants.FilterIdEquals100, true);
         var filters = new List<FilterModel> { filter };
 
         // Act
@@ -392,6 +392,30 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void HasFilteringChanged_UsesConstructionTimeSnapshot()
+    {
+        // Contract guard: HasFilteringChanged must compare a construction-time snapshot, not
+        // the live FilterModel graph (whose Comparison.Value and FilterData are still settable).
+        var sharedFilter = new FilterModel
+        {
+            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
+            IsExcluded = false
+        };
+
+        var original = new EventFilter(null, ImmutableList.Create(sharedFilter));
+
+        sharedFilter.Comparison.Value = Constants.FilterIdEquals200;
+
+        var updated = new EventFilter(null, ImmutableList.Create(sharedFilter));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
     public void HasFilteringChanged_WhenBothEmpty_ShouldReturnFalse()
     {
         // Arrange
@@ -521,11 +545,11 @@ public sealed class FilterMethodsTests
         // Arrange
         var original = new EventFilter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, isExcluded: false)));
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, false)));
 
         var updated = new EventFilter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, isExcluded: true)));
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, true)));
 
         // Act
         var result = FilterMethods.HasFilteringChanged(updated, original);
@@ -537,8 +561,7 @@ public sealed class FilterMethodsTests
     [Fact]
     public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReturnFalse()
     {
-        // Arrange - color affects highlighting (driven from FilterPaneState elsewhere) but not
-        // the filtered event set, so it must NOT count as a "filtering changed" signal.
+        // Color affects highlighting, not the filtered event set.
         var redFilter = new FilterModel
         {
             Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
@@ -574,35 +597,6 @@ public sealed class FilterMethodsTests
 
         // Assert
         Assert.False(result);
-    }
-
-    [Fact]
-    public void HasFilteringChanged_WhenSharedFilterModelMutatedInPlace_ShouldReturnTrue()
-    {
-        // Arrange - simulates the production aliasing scenario where AppliedFilter and the
-        // pane's filter list share the same FilterModel reference, and a UI binding mutates
-        // the inner FilterComparison.Value in place. The construction-time Signature snapshot
-        // must keep the comparison correct. (FilterModel.IsExcluded is now init-only, but
-        // FilterComparison.Value still has a settable property bound from Razor components,
-        // so the aliasing path persists until Step 3c migrates components to FilterEditorModel.)
-        var sharedFilter = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            IsExcluded = false
-        };
-
-        var original = new EventFilter(null, ImmutableList.Create(sharedFilter));
-
-        // Aliased mutation through the still-mutable inner FilterComparison.Value setter.
-        sharedFilter.Comparison.Value = Constants.FilterIdEquals200;
-
-        var updated = new EventFilter(null, ImmutableList.Create(sharedFilter));
-
-        // Act
-        var result = FilterMethods.HasFilteringChanged(updated, original);
-
-        // Assert
-        Assert.True(result);
     }
 
     [Fact]
@@ -1107,9 +1101,9 @@ public sealed class FilterMethodsTests
         // Arrange
         var events = new List<DisplayEventModel>
         {
-            EventUtils.CreateTestEvent(id: 100, recordId: 1),
-            EventUtils.CreateTestEvent(id: 100, recordId: 3),
-            EventUtils.CreateTestEvent(id: 100, recordId: 2)
+            EventUtils.CreateTestEvent(100, recordId: 1),
+            EventUtils.CreateTestEvent(100, recordId: 3),
+            EventUtils.CreateTestEvent(100, recordId: 2)
         };
 
         // Act

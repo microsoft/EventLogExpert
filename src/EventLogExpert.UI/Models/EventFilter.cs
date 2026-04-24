@@ -5,11 +5,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Models;
 
-/// <summary>
-/// Snapshot of the properties of a <see cref="FilterModel"/> that affect the filtered event set.
-/// Captured at <see cref="EventFilter"/> construction so subsequent in-place mutation of the
-/// underlying <see cref="FilterModel"/> (by reducers) cannot invalidate equality comparisons.
-/// </summary>
+/// <summary>Snapshot of <see cref="FilterModel" /> fields that affect the filtered event set.</summary>
 public readonly record struct FilterSignatureEntry(string Value, bool IsExcluded);
 
 public readonly record struct EventFilter
@@ -25,18 +21,10 @@ public readonly record struct EventFilter
 
     public ImmutableList<FilterModel> Filters { get; }
 
-    /// <summary>
-    /// Construction-time snapshot of the filter set used for equality comparisons by
-    /// <c>FilterMethods.HasFilteringChanged</c>. Immune to subsequent in-place mutation
-    /// of the source <see cref="FilterModel"/> instances.
-    /// </summary>
+    /// <summary>Construction-time snapshot used by <see cref="FilterMethods.HasFilteringChanged" />.</summary>
     public ImmutableArray<FilterSignatureEntry> Signature { get; }
 
-    /// <summary>
-    /// Returns <c>true</c> when any active filter (or sub-filter) references
-    /// <see cref="Eventing.Models.DisplayEventModel.Xml"/>. Used to decide whether
-    /// logs must be opened with pre-rendered XML.
-    /// </summary>
+    /// <summary>True when any filter or sub-filter references <see cref="Eventing.Models.DisplayEventModel.Xml" />.</summary>
     public bool RequiresXml
     {
         get

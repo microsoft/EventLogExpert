@@ -9,15 +9,11 @@ public sealed record FilterPaneAction
 {
     public sealed record AddFilter(FilterModel FilterModel);
 
-    public sealed record AddSubFilter(FilterId ParentId);
-
     public sealed record ApplyFilterGroup(FilterGroupModel FilterGroup);
 
     public sealed record ClearAllFilters;
 
     public sealed record RemoveFilter(FilterId Id);
-
-    public sealed record RemoveSubFilter(FilterId ParentId, FilterId SubFilterId);
 
     public sealed record SaveFilterGroup(string Name);
 

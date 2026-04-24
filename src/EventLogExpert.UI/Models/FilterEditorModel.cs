@@ -25,10 +25,7 @@ public sealed class FilterEditorModel
 
     public List<FilterEditorModel> SubFilters { get; set; } = [];
 
-    /// <summary>
-    /// Creates a draft editor populated from a saved filter. Deep-copies <see cref="Data"/> and
-    /// recursively converts <see cref="SubFilters"/> so edits to the draft never reach state.
-    /// </summary>
+    /// <summary>Creates a deep-copied draft editor from a saved filter.</summary>
     public static FilterEditorModel FromFilterModel(FilterModel filter) =>
         new()
         {
@@ -44,8 +41,8 @@ public sealed class FilterEditorModel
         };
 
     /// <summary>
-    /// Materializes an immutable <see cref="FilterModel"/> from the current draft state, compiling
-    /// the comparison expression. Throws if <see cref="ComparisonText"/> is not parseable.
+    ///     Materializes an immutable <see cref="FilterModel" /> from the draft. Throws if <see cref="ComparisonText" />
+    ///     is not parseable.
     /// </summary>
     public FilterModel ToFilterModel() =>
         new()
@@ -65,7 +62,7 @@ public sealed class FilterEditorModel
 
     private static FilterData CloneFilterData(FilterData source)
     {
-        // Category setter clears Value/Values — assign Category first, then restore Value/Values.
+        // Category setter clears Value/Values; assign it first.
         var clone = new FilterData
         {
             Category = source.Category,

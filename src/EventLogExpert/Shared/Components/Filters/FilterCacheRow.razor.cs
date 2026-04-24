@@ -21,23 +21,22 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
-    private List<string> Items => _cacheType switch
-    {
-        CacheType.Favorites => [.. FilterCacheState.Value.FavoriteFilters],
-        CacheType.Recent => [.. FilterCacheState.Value.RecentFilters],
-        _ => [],
-    };
+    private List<string> Items =>
+        _cacheType switch
+        {
+            CacheType.Favorites => [.. FilterCacheState.Value.FavoriteFilters],
+            CacheType.Recent => [.. FilterCacheState.Value.RecentFilters],
+            _ => [],
+        };
 
     protected override void DispatchRemoveFilter()
     {
         if (Value is not { } savedFilter) { return; }
+
         Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(savedFilter.Id));
     }
 
-    /// <summary>
-    /// Clear the validation banner before the base mutates the draft or bubbles the
-    /// editing-state change.
-    /// </summary>
+    /// <summary>Clears the validation banner before the base mutates the draft.</summary>
     protected override void OnEditSessionResetting() => _errorMessage = string.Empty;
 
     private async Task SaveFilter()
@@ -66,18 +65,21 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
         }
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(newFilter));
+
         await NotifyEditingEndedAsync();
     }
 
     private void ToggleFilter()
     {
         if (Value is not { } savedFilter) { return; }
+
         Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(savedFilter.Id));
     }
 
     private void ToggleFilterExclusion()
     {
         if (Value is not { } savedFilter) { return; }
+
         Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(savedFilter.Id));
     }
 }

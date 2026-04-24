@@ -417,8 +417,7 @@ public sealed class FilterServiceTests
         var filterService = CreateFilterService();
         var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
 
-        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
-        subFilter.ShouldCompareAny = true;
+        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error") with { ShouldCompareAny = true };
         filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
 
         // Act
@@ -436,8 +435,7 @@ public sealed class FilterServiceTests
         var filterService = CreateFilterService();
         var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
 
-        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
-        subFilter.ShouldCompareAny = false;
+        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error") with { ShouldCompareAny = false };
         filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
 
         // Act

@@ -161,8 +161,7 @@ public sealed class FilterPaneEffects(
                 filterPaneState.FilteredDateRange,
                 filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
 
-        // Skip the loading toggles, the SetFilters dispatch, and the downstream
-        // FilterActiveLogs work when the applied filter has not actually changed.
+        // No-op when the applied filter is unchanged.
         if (!FilterMethods.HasFilteringChanged(candidate, _eventLogState.Value.AppliedFilter))
         {
             return;
