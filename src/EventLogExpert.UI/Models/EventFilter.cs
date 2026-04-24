@@ -15,6 +15,7 @@ public readonly record struct EventFilter
         DateFilter = dateFilter;
         Filters = filters;
         Signature = ComputeSignature(Filters);
+        RequiresXml = ComputeRequiresXml(Filters);
     }
 
     public FilterDateModel? DateFilter { get; }
@@ -25,26 +26,25 @@ public readonly record struct EventFilter
     public ImmutableArray<FilterSignatureEntry> Signature { get; }
 
     /// <summary>True when any filter or sub-filter references <see cref="Eventing.Models.DisplayEventModel.Xml" />.</summary>
-    public bool RequiresXml
+    public bool RequiresXml { get; }
+
+    private static bool ComputeRequiresXml(ImmutableList<FilterModel> filters)
     {
-        get
+        if (filters.IsEmpty) { return false; }
+
+        foreach (var filter in filters)
         {
-            if (Filters is null) { return false; }
+            if (filter.Comparison.RequiresXml) { return true; }
 
-            foreach (var filter in Filters)
+            if (filter.SubFilters.Count == 0) { continue; }
+
+            foreach (var sub in filter.SubFilters)
             {
-                if (filter.Comparison.RequiresXml) { return true; }
-
-                if (filter.SubFilters.Count == 0) { continue; }
-
-                foreach (var sub in filter.SubFilters)
-                {
-                    if (sub.Comparison.RequiresXml) { return true; }
-                }
+                if (sub.Comparison.RequiresXml) { return true; }
             }
-
-            return false;
         }
+
+        return false;
     }
 
     private static ImmutableArray<FilterSignatureEntry> ComputeSignature(ImmutableList<FilterModel> filters)
