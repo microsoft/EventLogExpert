@@ -37,6 +37,46 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
+    public void FilterActiveLogs_WhenMultipleLargeLogs_ShouldMatchSequentialResult()
+    {
+        // Arrange — two logs whose combined size exceeds the outer-parallel threshold (10k);
+        // verifies the parallel path returns the same per-log results as the sequential path.
+        var filterService = CreateFilterService();
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var cutoff = baseTime.AddMinutes(3_000);
+
+        var dateFilter = new FilterDateModel { After = cutoff, Before = baseTime.AddMinutes(20_000), IsEnabled = true };
+        var eventFilter = new EventFilter(dateFilter, []);
+
+        var log1Events = Enumerable.Range(0, 6_000)
+            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .ToList();
+
+        var log2Events = Enumerable.Range(0, 6_000)
+            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .ToList();
+
+        var logData = new List<EventLogData>
+        {
+            new("Log1", PathType.LogName, log1Events),
+            new("Log2", PathType.LogName, log2Events)
+        };
+
+        var expectedLog1 = log1Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
+        var expectedLog2 = log2Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
+
+        // Act
+        var result = filterService.FilterActiveLogs(logData, eventFilter);
+
+        // Assert
+        Assert.Equal(2, result.Count);
+        Assert.Equal(expectedLog1.Count, result[logData[0].Id].Count);
+        Assert.Equal(expectedLog2.Count, result[logData[1].Id].Count);
+        Assert.Equal(expectedLog1.Select(e => e.RecordId), result[logData[0].Id].Select(e => e.RecordId));
+        Assert.Equal(expectedLog2.Select(e => e.RecordId), result[logData[1].Id].Select(e => e.RecordId));
+    }
+
+    [Fact]
     public void FilterActiveLogs_WhenMultipleLogs_ShouldFilterEachLog()
     {
         // Arrange
@@ -67,6 +107,32 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void FilterActiveLogs_WhenMultipleLogsButFilteringDisabled_ShouldReturnAllEventsPerLog()
+    {
+        // Arrange — IsFilteringEnabled short-circuit must stay engaged even with many logs to
+        // avoid spinning up parallel work for a no-op filter.
+        var filterService = CreateFilterService();
+
+        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+
+        var logData = new List<EventLogData>
+        {
+            new("Log1", PathType.LogName, log1Events),
+            new("Log2", PathType.LogName, log2Events)
+        };
+
+        var eventFilter = new EventFilter(null, []);
+
+        // Act
+        var result = filterService.FilterActiveLogs(logData, eventFilter);
+
+        // Assert
+        Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
+        Assert.Equal(log2Events.Count, result[logData[1].Id].Count);
     }
 
     [Fact]
