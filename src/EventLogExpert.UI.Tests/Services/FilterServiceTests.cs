@@ -388,7 +388,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(result);
-        Assert.Contains("test'value", comparison); // Quotes should be replaced with single quotes
+        Assert.Contains("test\\\"value", comparison);
     }
 
     [Fact]
@@ -459,6 +459,38 @@ public sealed class FilterServiceTests
         // Assert
         Assert.True(result);
         Assert.Contains("UserId != null", comparison);
+    }
+
+    [Theory]
+    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, "He said \"hi\".")]
+    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, @"path\to\file")]
+    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, "line one\r\nline two")]
+    [InlineData(FilterCategory.Description, FilterEvaluator.Equals, "She wrote: \"yes\\no\".")]
+    [InlineData(FilterCategory.Source, FilterEvaluator.Equals, "Source\"With\"Quotes")]
+    public void TryParse_WhenValueHasSpecialCharacters_GeneratesParsableExpressionThatRoundTrips(
+        FilterCategory category,
+        FilterEvaluator evaluator,
+        string rawValue)
+    {
+        var filterService = CreateFilterService();
+        var filterModel = CreateFilterModel(category, evaluator, rawValue);
+
+        var result = filterService.TryParse(filterModel, out var comparison);
+
+        Assert.True(result);
+
+        // Round-trip through the actual Dynamic LINQ parser by assigning to FilterComparison.
+        // If the escape syntax is wrong, the setter will throw a ParseException.
+        var parsed = new FilterComparison { Value = comparison };
+
+        var matchingEvent = category switch
+        {
+            FilterCategory.Description => EventUtils.CreateTestEvent(description: rawValue),
+            FilterCategory.Source => EventUtils.CreateTestEvent(source: rawValue),
+            _ => throw new ArgumentOutOfRangeException(nameof(category))
+        };
+
+        Assert.True(parsed.Expression(matchingEvent));
     }
 
     [Theory]
