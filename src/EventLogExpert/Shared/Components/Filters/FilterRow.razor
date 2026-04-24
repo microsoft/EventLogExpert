@@ -1,121 +1,34 @@
 @using EventLogExpert.Shared.Base
-@using EventLogExpert.UI
 @inherits EditableFilterRowBase
 
-<div class="flex-space-between">
-    <div class="flex-align-center">
-        @if (Filter is not null)
+<FilterRowChrome ErrorMessage="@ErrorMessage"
+    Filter="Filter"
+    IsPending="IsPending"
+    OnCancel="CancelFilter"
+    OnEdit="EditFilter"
+    OnRemove="RemoveFilter"
+    OnSave="SaveFilter"
+    OnToggleEnabled="ToggleFilter"
+    OnToggleExclusion="ToggleFilterExclusion"
+    Value="Value">
+    <EditingContent>
+        @if (Filter!.IsExcluded)
         {
-            if (!Filter.IsExcluded)
-            {
-                <ValueSelect AriaLabel="Highlight Color"
-                    @bind-Value="Filter.Color"
-                    CssClass="input color-dropdown"
-                    DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
-                    T="HighlightColor">
-                    @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
-                    {
-                        <ValueSelectItem CssClass="color-dropdown-item" DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())" T="HighlightColor" Value="item" />
-                    }
-                </ValueSelect>
-            }
-
-            if (Filter.IsExcluded)
-            {
-                <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
-            }
-            else
-            {
-                <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
-            }
-
-            <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="Filter.Data" Id="@Id" />
+            <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
         }
-        else if (Value is { } savedFilter)
+        else
         {
-            @if (string.IsNullOrWhiteSpace(savedFilter.Comparison.Value))
-            {
-                <span>No Filter Specified</span>
-            }
-            else
-            {
-                @if (savedFilter.Color != HighlightColor.None)
-                {
-                    <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
-                }
-
-                @if (savedFilter.IsExcluded)
-                {
-                    <span>Exclude: @savedFilter.Comparison.Value</span>
-                }
-                else
-                {
-                    <span>@savedFilter.Comparison.Value</span>
-                }
-            }
+            <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
         }
-    </div>
 
-    <div>
-        @if (Filter is not null)
-        {
-            <button class="button" @onclick="AddSubFilter">
-                <i class="bi bi-plus-circle"></i> Add Sub Filter
-            </button>
-
-            <button class="button button-green" @onclick="SaveFilter">
-                <i class="bi bi-check-circle"></i> Save
-            </button>
-
-            <button class="button button-red fixed-width" @onclick="CancelFilter">
-                <i class="bi bi-x-circle"></i> Cancel
-            </button>
-
-            @if (!IsPending)
-            {
-                <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                    <i class="bi bi-dash-circle"></i> Remove
-                </button>
-            }
-        }
-        else if (Value is { } savedFilter)
-        {
-            <button class="button" @onclick="EditFilter">
-                <i class="bi bi-funnel"></i> Edit
-            </button>
-
-            @if (savedFilter.IsExcluded)
-            {
-                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
-                    <i class="bi bi-plus-circle"></i> Include
-                </button>
-            }
-            else
-            {
-                <button class="button fixed-width" @onclick="ToggleFilterExclusion">
-                    <i class="bi bi-dash-circle"></i> Exclude
-                </button>
-            }
-
-            <button class="button button-red fixed-width" @onclick="RemoveFilter">
-                <i class="bi bi-dash-circle"></i> Remove
-            </button>
-
-            @if (savedFilter.IsEnabled)
-            {
-                <button class="button button-red fixed-width" @onclick="ToggleFilter">
-                    <i class="bi bi-dash-circle"></i> Disable
-                </button>
-            }
-            else
-            {
-                <button class="button button-green fixed-width" @onclick="ToggleFilter">
-                    <i class="bi bi-plus-circle"></i> Enable
-                </button>
-            }
-        }
-    </div>
-</div>
+        <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="Filter!.Data" Id="@Id" />
+    </EditingContent>
+    <ExtraEditingButtons>
+        <button class="button" @onclick="AddSubFilter">
+            <i class="bi bi-plus-circle"></i> Add Sub Filter
+        </button>
+    </ExtraEditingButtons>
+</FilterRowChrome>
 
 @if (Filter is not null && Filter.SubFilters.Count > 0)
 {
