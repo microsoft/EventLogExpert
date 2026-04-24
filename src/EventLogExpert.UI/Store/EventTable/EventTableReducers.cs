@@ -71,6 +71,40 @@ public sealed class EventTableReducers
         };
     }
 
+    [ReducerMethod]
+    public static EventTableState ReduceAppendTableEventsBatch(
+        EventTableState state,
+        EventTableAction.AppendTableEventsBatch action)
+    {
+        if (action.EventsByLog.Count == 0) { return state; }
+
+        var updatedTables = new List<EventTableModel>(state.EventTables.Count);
+        var changed = false;
+
+        foreach (var table in state.EventTables)
+        {
+            if (!action.EventsByLog.TryGetValue(table.Id, out var newEvents) || newEvents.Count == 0)
+            {
+                updatedTables.Add(table);
+
+                continue;
+            }
+
+            var merged = FilterMethods.MergeSorted(
+                table.DisplayedEvents,
+                newEvents,
+                state.OrderBy,
+                state.IsDescending);
+
+            updatedTables.Add(table with { DisplayedEvents = merged });
+            changed = true;
+        }
+
+        if (!changed) { return state; }
+
+        return state with { EventTables = [.. updatedTables] };
+    }
+
     [ReducerMethod(typeof(EventTableAction.CloseAll))]
     public static EventTableState ReduceCloseAll(EventTableState state) =>
         state with { EventTables = [], ActiveEventLogId = null };

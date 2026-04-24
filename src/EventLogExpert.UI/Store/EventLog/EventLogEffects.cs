@@ -71,10 +71,19 @@ public sealed class EventLogEffects(
                 _eventLogState.Value.ActiveLogs,
                 [action.NewEvent]);
 
-            var filteredActiveLogs = _filterService.FilterActiveLogs(activeLogs.Values, _eventLogState.Value.AppliedFilter);
-
             dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
-            dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+
+            // Filter just the new event and append to the table; previous displayed
+            // events are unchanged so a full re-filter is unnecessary.
+            var filteredNew = _filterService.GetFilteredEvents(
+                [action.NewEvent],
+                _eventLogState.Value.AppliedFilter);
+
+            if (filteredNew.Count > 0 &&
+                activeLogs.TryGetValue(action.NewEvent.OwningLog, out var owningLog))
+            {
+                dispatcher.Dispatch(new EventTableAction.AppendTableEvents(owningLog.Id, filteredNew));
+            }
         }
         else
         {
@@ -700,10 +709,41 @@ public sealed class EventLogEffects(
     {
         var activeLogs = DistributeEventsToManyLogs(state.ActiveLogs, state.NewEventBuffer);
 
-        var filteredActiveLogs = _filterService.FilterActiveLogs(activeLogs.Values, state.AppliedFilter);
-
-        dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
         dispatcher.Dispatch(new EventLogAction.AddEventSuccess(activeLogs));
+
+        // Group the buffered events by owning log id, filter each group, and dispatch
+        // a single batched append so the combined-view reducer only fires once.
+        var batched = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>();
+        var grouped = new Dictionary<EventLogId, List<DisplayEventModel>>();
+
+        foreach (var bufferedEvent in state.NewEventBuffer)
+        {
+            if (!activeLogs.TryGetValue(bufferedEvent.OwningLog, out var owningLog)) { continue; }
+
+            if (!grouped.TryGetValue(owningLog.Id, out var list))
+            {
+                list = [];
+                grouped[owningLog.Id] = list;
+            }
+
+            list.Add(bufferedEvent);
+        }
+
+        foreach (var (logId, events) in grouped)
+        {
+            var filtered = _filterService.GetFilteredEvents(events, state.AppliedFilter);
+
+            if (filtered.Count > 0)
+            {
+                batched[logId] = filtered;
+            }
+        }
+
+        if (batched.Count > 0)
+        {
+            dispatcher.Dispatch(new EventTableAction.AppendTableEventsBatch(batched));
+        }
+
         dispatcher.Dispatch(new EventLogAction.AddEventBuffered([], false));
     }
 }
