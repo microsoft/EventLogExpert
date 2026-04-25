@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -85,74 +86,31 @@ public sealed class FilterService : IFilterService
 
     public bool TryParse(FilterModel filterModel, out string comparison)
     {
+        ArgumentNullException.ThrowIfNull(filterModel);
+
+        return TryParse(BuildBasicSource(filterModel), out comparison);
+    }
+
+    public bool TryParse(BasicFilterSource source, out string comparison)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
         comparison = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(filterModel.Data.Value) &&
-            filterModel.Data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
-
-        if (filterModel.Data.Values.Count <= 0 &&
-            filterModel.Data.Evaluator == FilterEvaluator.MultiSelect) { return false; }
-
-        StringBuilder stringBuilder = new();
-
-        if (filterModel.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            filterModel.Data.Category is FilterCategory.Keywords)
+        if (!TryFormatCriteria(source.Main, joinPrefix: null, out var mainText))
         {
-            stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
+            return false;
         }
 
-        switch (filterModel.Data.Evaluator)
+        StringBuilder stringBuilder = new(mainText);
+
+        foreach (var subClause in source.SubClauses)
         {
-            case FilterEvaluator.Equals:
-            case FilterEvaluator.NotEqual:
-                if (filterModel.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(filterModel.Data.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(filterModel.Data.Value)}\"");
-                }
+            var joinPrefix = subClause.JoinWithAny ? " || " : " && ";
 
-                break;
-            case FilterEvaluator.Contains:
-            case FilterEvaluator.NotContains:
-                if (filterModel.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(filterModel.Data.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(filterModel.Data.Value)}\", StringComparison.OrdinalIgnoreCase)");
-                }
-
-                break;
-            case FilterEvaluator.MultiSelect:
-                if (filterModel.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", filterModel.Data.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", filterModel.Data.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
-                }
-
-                break;
-            default: return false;
-        }
-
-        if (filterModel.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
-        {
-            stringBuilder.Append(GetComparisonString(filterModel.Data.Category, filterModel.Data.Evaluator));
-        }
-
-        if (filterModel.SubFilters.Count > 0)
-        {
-            foreach (var subFilter in filterModel.SubFilters)
+            if (TryFormatCriteria(subClause.Criteria, joinPrefix, out var subText))
             {
-                string? subFilterComparison = GetSubFilterComparisonString(subFilter);
-
-                if (subFilterComparison != null) { stringBuilder.AppendLine(subFilterComparison); }
+                stringBuilder.AppendLine(subText);
             }
         }
 
@@ -180,6 +138,19 @@ public sealed class FilterService : IFilterService
 
             return false;
         }
+    }
+
+    private static BasicFilterSource BuildBasicSource(FilterModel filterModel)
+    {
+        var main = ToCriteria(filterModel.Data);
+
+        var subClauses = filterModel.SubFilters.Count == 0
+            ? ImmutableList<BasicSubClause>.Empty
+            : filterModel.SubFilters
+                .Select(subFilter => new BasicSubClause(ToCriteria(subFilter.Data), subFilter.ShouldCompareAny))
+                .ToImmutableList();
+
+        return new BasicFilterSource(main, subClauses);
     }
 
     private static string EscapeStringLiteral(string? value)
@@ -251,70 +222,6 @@ public sealed class FilterService : IFilterService
             _ => string.Empty
         };
 
-    private static string? GetSubFilterComparisonString(FilterModel subFilter)
-    {
-        if (string.IsNullOrWhiteSpace(subFilter.Data.Value) &&
-            subFilter.Data.Evaluator != FilterEvaluator.MultiSelect) { return null; }
-
-        if (subFilter.Data.Values.Count <= 0 &&
-            subFilter.Data.Evaluator == FilterEvaluator.MultiSelect) { return null; }
-
-        StringBuilder stringBuilder = new(subFilter.ShouldCompareAny ? " || " : " && ");
-
-        if (subFilter.Data.Evaluator != FilterEvaluator.MultiSelect ||
-            subFilter.Data.Category is FilterCategory.Keywords)
-        {
-            stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
-        }
-
-        switch (subFilter.Data.Evaluator)
-        {
-            case FilterEvaluator.Equals:
-            case FilterEvaluator.NotEqual:
-                if (subFilter.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(subFilter.Data.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(subFilter.Data.Value)}\"");
-                }
-
-                break;
-            case FilterEvaluator.Contains:
-            case FilterEvaluator.NotContains:
-                if (subFilter.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(subFilter.Data.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(subFilter.Data.Value)}\", StringComparison.OrdinalIgnoreCase)");
-                }
-
-                break;
-            case FilterEvaluator.MultiSelect:
-                if (subFilter.Data.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", subFilter.Data.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", subFilter.Data.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
-                }
-
-                break;
-            default: return null;
-        }
-
-        if (subFilter.Data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
-        {
-            stringBuilder.Append(GetComparisonString(subFilter.Data.Category, subFilter.Data.Evaluator));
-        }
-
-        return stringBuilder.ToString();
-    }
-
     private static bool ShouldParallelizeAcrossLogs(IReadOnlyList<EventLogData> logs)
     {
         long totalEvents = 0;
@@ -336,6 +243,94 @@ public sealed class FilterService : IFilterService
         }
 
         return false;
+    }
+
+    private static BasicFilterCriteria ToCriteria(FilterData data) =>
+        new()
+        {
+            Category = data.Category,
+            Evaluator = data.Evaluator,
+            Value = data.Value,
+            Values = data.Values.ToImmutableList()
+        };
+
+    /// <summary>
+    ///     Formats a single Basic criterion into the runtime comparison fragment.
+    ///     Performs all guards before writing any output so a skipped sub-clause leaves
+    ///     no orphaned join operator in the caller's <see cref="StringBuilder" />.
+    /// </summary>
+    /// <param name="criteria">The criterion to format.</param>
+    /// <param name="joinPrefix">
+    ///     Optional " || " or " && " prepended for sub-clauses; <c>null</c> for the main clause.
+    /// </param>
+    /// <param name="formatted">The formatted fragment when successful; otherwise empty.</param>
+    /// <returns><c>true</c> when the criterion produced output; <c>false</c> when guards rejected it.</returns>
+    private static bool TryFormatCriteria(BasicFilterCriteria criteria, string? joinPrefix, out string formatted)
+    {
+        formatted = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(criteria.Value) &&
+            criteria.Evaluator != FilterEvaluator.MultiSelect) { return false; }
+
+        if (criteria.Values.Count <= 0 &&
+            criteria.Evaluator == FilterEvaluator.MultiSelect) { return false; }
+
+        StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
+
+        if (criteria.Evaluator != FilterEvaluator.MultiSelect ||
+            criteria.Category is FilterCategory.Keywords)
+        {
+            stringBuilder.Append(GetComparisonString(criteria.Category, criteria.Evaluator));
+        }
+
+        switch (criteria.Evaluator)
+        {
+            case FilterEvaluator.Equals:
+            case FilterEvaluator.NotEqual:
+                if (criteria.Category is FilterCategory.Keywords)
+                {
+                    stringBuilder.Append($"\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"\"{EscapeStringLiteral(criteria.Value)}\"");
+                }
+
+                break;
+            case FilterEvaluator.Contains:
+            case FilterEvaluator.NotContains:
+                if (criteria.Category is FilterCategory.Keywords)
+                {
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                }
+                else
+                {
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase)");
+                }
+
+                break;
+            case FilterEvaluator.MultiSelect:
+                if (criteria.Category is FilterCategory.Keywords)
+                {
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", criteria.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
+                }
+                else
+                {
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", criteria.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
+                }
+
+                break;
+            default: return false;
+        }
+
+        if (criteria is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
+        {
+            stringBuilder.Append(GetComparisonString(criteria.Category, criteria.Evaluator));
+        }
+
+        formatted = stringBuilder.ToString();
+
+        return true;
     }
 
     private Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>> BuildSequentialResult(

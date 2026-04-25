@@ -559,6 +559,192 @@ public sealed class FilterServiceTests
         Assert.True(parsed.Expression(matchingEvent));
     }
 
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenMainInvalid_ShouldReturnFalseEvenWithValidSubClauses()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: true)
+            ]);
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.False(result);
+        Assert.Empty(comparison);
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenMainOnly_ShouldMatchFilterModelOutput()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            []);
+
+        var equivalentModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
+
+        // Act
+        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
+
+        // Assert
+        Assert.True(sourceResult);
+        Assert.True(modelResult);
+        Assert.Equal("Id == \"100\"", sourceComparison);
+        Assert.Equal(modelComparison, sourceComparison);
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenMultiSelectKeywords_ShouldMatchFilterModelOutput()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria
+            {
+                Category = FilterCategory.Keywords,
+                Evaluator = FilterEvaluator.MultiSelect,
+                Values = ["Audit Success", "Audit Failure"]
+            },
+            []);
+
+        var equivalentModel = new FilterModel
+        {
+            Data =
+            {
+                Category = FilterCategory.Keywords,
+                Evaluator = FilterEvaluator.MultiSelect,
+                Values = ["Audit Success", "Audit Failure"]
+            }
+        };
+
+        // Act
+        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
+
+        // Assert
+        Assert.True(sourceResult);
+        Assert.True(modelResult);
+        Assert.Equal(modelComparison, sourceComparison);
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenMultiSelectNonKeywords_ShouldMatchFilterModelOutput()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria
+            {
+                Category = FilterCategory.Level,
+                Evaluator = FilterEvaluator.MultiSelect,
+                Values = ["Error", "Warning"]
+            },
+            []);
+
+        var equivalentModel = new FilterModel
+        {
+            Data =
+            {
+                Category = FilterCategory.Level,
+                Evaluator = FilterEvaluator.MultiSelect,
+                Values = ["Error", "Warning"]
+            }
+        };
+
+        // Act
+        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
+
+        // Assert
+        Assert.True(sourceResult);
+        Assert.True(modelResult);
+        Assert.Equal(modelComparison, sourceComparison);
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenSourceIsNull_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((BasicFilterSource)null!, out _));
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenSubClauseInvalid_ShouldSkipWithoutOrphanedJoinOperator()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
+                    JoinWithAny: true),
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
+                    JoinWithAny: false)
+            ]);
+
+        var expected = "Id == \"100\" && Source == \"Kernel\"" + Environment.NewLine;
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(expected, comparison);
+        Assert.DoesNotContain(" || ", comparison);
+    }
+
+    [Fact]
+    public void TryParse_WithBasicFilterSource_WhenSubClausesPresent_ShouldUseExactJoinAndNewlineOrdering()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: true),
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
+                    JoinWithAny: false)
+            ]);
+
+        var expected =
+            "Id == \"100\" || Level == \"Error\"" + Environment.NewLine +
+            " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)" + Environment.NewLine;
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.True(result);
+        Assert.Equal(expected, comparison);
+    }
+
+    [Fact]
+    public void TryParse_WithFilterModel_WhenFilterModelIsNull_ShouldThrowArgumentNullException()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act & Assert
+        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((FilterModel)null!, out _));
+    }
+
     [Theory]
     [InlineData("Id == 100")]
     [InlineData("Level == \"Error\"")]

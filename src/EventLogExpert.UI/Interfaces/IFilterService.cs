@@ -18,5 +18,7 @@ public interface IFilterService
 
     bool TryParse(FilterModel filterModel, out string comparison);
 
+    bool TryParse(BasicFilterSource source, out string comparison);
+
     bool TryParseExpression(string? expression, out string error);
 }
