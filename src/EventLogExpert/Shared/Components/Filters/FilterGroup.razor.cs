@@ -72,8 +72,8 @@ public sealed partial class FilterGroup
         if (Group.Filters.Count <= 0) { return; }
 
         var text = Group.Filters.Count > 1 ?
-            string.Join(" || ", Group.Filters.Select(filter => $"({filter.Comparison.Value})")) :
-            Group.Filters[0].Comparison.Value;
+            string.Join(" || ", Group.Filters.Select(filter => $"({filter.ComparisonText})")) :
+            Group.Filters[0].ComparisonText;
 
         _ = Clipboard.SetTextAsync(text);
     }

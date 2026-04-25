@@ -73,11 +73,15 @@ public sealed class FilterGroupReducers
                     parent with { Filters = [.. parent.Filters, action.Filter] }));
         }
 
-        // `with` preserves IsExcluded/IsEnabled/Data/SubFilters; only Color and Comparison are overridden.
+        // Replace the filter in-place. `with` preserves IsExcluded/IsEnabled. Color, ComparisonText,
+        // Compiled, BasicSource, and FilterType are overridden from the incoming action.
         var updatedFilter = existing with
         {
             Color = action.Filter.Color,
-            Comparison = action.Filter.Comparison with { }
+            ComparisonText = action.Filter.ComparisonText,
+            Compiled = action.Filter.Compiled,
+            BasicSource = action.Filter.BasicSource,
+            FilterType = action.Filter.FilterType
         };
 
         return WithGroups(

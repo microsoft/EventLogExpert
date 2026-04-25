@@ -84,13 +84,6 @@ public sealed class FilterService : IFilterService
             .AsReadOnly();
     }
 
-    public bool TryParse(FilterModel filterModel, out string comparison)
-    {
-        ArgumentNullException.ThrowIfNull(filterModel);
-
-        return TryParse(BuildBasicSource(filterModel), out comparison);
-    }
-
     public bool TryParse(BasicFilterSource source, out string comparison)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -138,19 +131,6 @@ public sealed class FilterService : IFilterService
 
             return false;
         }
-    }
-
-    private static BasicFilterSource BuildBasicSource(FilterModel filterModel)
-    {
-        var main = ToCriteria(filterModel.Data);
-
-        var subClauses = filterModel.SubFilters.Count == 0
-            ? ImmutableList<BasicSubClause>.Empty
-            : filterModel.SubFilters
-                .Select(subFilter => new BasicSubClause(ToCriteria(subFilter.Data), subFilter.ShouldCompareAny))
-                .ToImmutableList();
-
-        return new BasicFilterSource(main, subClauses);
     }
 
     private static string EscapeStringLiteral(string? value)
@@ -244,15 +224,6 @@ public sealed class FilterService : IFilterService
 
         return false;
     }
-
-    private static BasicFilterCriteria ToCriteria(FilterData data) =>
-        new()
-        {
-            Category = data.Category,
-            Evaluator = data.Evaluator,
-            Value = data.Value,
-            Values = data.Values.ToImmutableList()
-        };
 
     /// <summary>
     ///     Formats a single Basic criterion into the runtime comparison fragment.

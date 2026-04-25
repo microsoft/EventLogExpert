@@ -3,8 +3,6 @@
 
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
-// // Copyright (c) Microsoft Corporation.
-// // Licensed under the MIT License.
 
 namespace EventLogExpert.UI.Interfaces;
 
@@ -15,8 +13,6 @@ public interface IFilterService
         EventFilter eventFilter);
 
     IReadOnlyList<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter);
-
-    bool TryParse(FilterModel filterModel, out string comparison);
 
     bool TryParse(BasicFilterSource source, out string comparison);
 

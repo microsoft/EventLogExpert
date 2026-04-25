@@ -61,21 +61,25 @@ public sealed partial class ContextMenu
             _ => string.Empty,
         };
 
-        FilterModel filter = new()
-        {
-            Data = new FilterData
+        var basicSource = new BasicFilterSource(
+            new BasicFilterCriteria
             {
                 Category = filterType,
-                Value = filterValue,
-                Evaluator = FilterEvaluator.Equals
+                Evaluator = FilterEvaluator.Equals,
+                Value = filterValue
             },
-            IsEnabled = true,
-            IsExcluded = shouldExclude
-        };
+            []);
 
-        if (!FilterService.TryParse(filter, out var comparisonString)) { return; }
+        if (!FilterService.TryParse(basicSource, out var comparisonString)) { return; }
 
-        filter.Comparison.Value = comparisonString;
+        var filter = FilterModel.TryCreate(
+            comparisonString,
+            FilterType.Basic,
+            basicSource,
+            isExcluded: shouldExclude,
+            isEnabled: true);
+
+        if (filter is null) { return; }
 
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }

@@ -7,6 +7,7 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Services;
 
@@ -255,10 +256,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Xml, FilterEvaluator.Contains, "test");
+        var source = CreateBasicSource(FilterCategory.Xml, FilterEvaluator.Contains, "test");
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -282,10 +283,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(category, evaluator, value);
+        var source = CreateBasicSource(category, evaluator, value);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -297,10 +298,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, null);
+        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.Equals, null);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -312,11 +313,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.MultiSelect, null);
-        filterModel.Data.Values.Clear();
+        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.MultiSelect, null);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -335,10 +335,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(category, evaluator, value);
+        var source = CreateBasicSource(category, evaluator, value);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -350,10 +350,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Contains, "10");
+        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.Contains, "10");
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -365,10 +365,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Keywords, FilterEvaluator.Equals, "Audit Success");
+        var source = CreateBasicSource(FilterCategory.Keywords, FilterEvaluator.Equals, "Audit Success");
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -381,11 +381,14 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Level, FilterEvaluator.MultiSelect, null);
-        filterModel.Data.Values.AddRange(["Error", "Warning"]);
+        var source = CreateBasicSource(
+            FilterCategory.Level,
+            FilterEvaluator.MultiSelect,
+            value: null,
+            values: ["Error", "Warning"]);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -411,10 +414,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(category, evaluator, value);
+        var source = CreateBasicSource(category, evaluator, value);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -432,10 +435,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(category, evaluator, value);
+        var source = CreateBasicSource(category, evaluator, value);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -447,10 +450,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Description, FilterEvaluator.Contains, "test\"value");
+        var source = CreateBasicSource(FilterCategory.Description, FilterEvaluator.Contains, "test\"value");
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -462,13 +465,16 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
-
-        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error");
-        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: false)
+            ]);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -481,13 +487,16 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
-
-        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error") with { ShouldCompareAny = true };
-        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: true)
+            ]);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -499,13 +508,16 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
-
-        var subFilter = CreateFilterModel(FilterCategory.Level, FilterEvaluator.Equals, "Error") with { ShouldCompareAny = false };
-        filterModel = filterModel with { SubFilters = filterModel.SubFilters.Add(subFilter) };
+        var source = new BasicFilterSource(
+            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new BasicSubClause(
+                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: false)
+            ]);
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -517,10 +529,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(FilterCategory.UserId, FilterEvaluator.Equals, "S-1-5-21");
+        var source = CreateBasicSource(FilterCategory.UserId, FilterEvaluator.Equals, "S-1-5-21");
 
         // Act
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -539,15 +551,15 @@ public sealed class FilterServiceTests
         string rawValue)
     {
         var filterService = CreateFilterService();
-        var filterModel = CreateFilterModel(category, evaluator, rawValue);
+        var source = CreateBasicSource(category, evaluator, rawValue);
 
-        var result = filterService.TryParse(filterModel, out var comparison);
+        var result = filterService.TryParse(source, out var comparison);
 
         Assert.True(result);
 
-        // Round-trip through the actual Dynamic LINQ parser by assigning to FilterComparison.
-        // If the escape syntax is wrong, the setter will throw a ParseException.
-        var parsed = new FilterComparison { Value = comparison };
+        // Round-trip through the actual Dynamic LINQ parser by compiling the produced expression.
+        // If the escape syntax is wrong, TryCompile will return false.
+        Assert.True(FilterCompiler.TryCompile(comparison, out var compiled, out _));
 
         var matchingEvent = category switch
         {
@@ -556,7 +568,7 @@ public sealed class FilterServiceTests
             _ => throw new ArgumentOutOfRangeException(nameof(category))
         };
 
-        Assert.True(parsed.Expression(matchingEvent));
+        Assert.True(compiled!.Predicate(matchingEvent));
     }
 
     [Fact]
@@ -589,21 +601,15 @@ public sealed class FilterServiceTests
             new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             []);
 
-        var equivalentModel = CreateFilterModel(FilterCategory.Id, FilterEvaluator.Equals, "100");
-
-        // Act
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
-        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
 
         // Assert
         Assert.True(sourceResult);
-        Assert.True(modelResult);
         Assert.Equal("Id == \"100\"", sourceComparison);
-        Assert.Equal(modelComparison, sourceComparison);
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMultiSelectKeywords_ShouldMatchFilterModelOutput()
+    public void TryParse_WithBasicFilterSource_WhenMultiSelectKeywords_ShouldEmitAnyContainsExpression()
     {
         // Arrange
         var filterService = CreateFilterService();
@@ -616,28 +622,18 @@ public sealed class FilterServiceTests
             },
             []);
 
-        var equivalentModel = new FilterModel
-        {
-            Data =
-            {
-                Category = FilterCategory.Keywords,
-                Evaluator = FilterEvaluator.MultiSelect,
-                Values = ["Audit Success", "Audit Failure"]
-            }
-        };
-
         // Act
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
-        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
 
         // Assert
         Assert.True(sourceResult);
-        Assert.True(modelResult);
-        Assert.Equal(modelComparison, sourceComparison);
+        Assert.Equal(
+            "Keywords.Any(e => (new[] {\"Audit Success\", \"Audit Failure\"}).Contains(e))",
+            sourceComparison);
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMultiSelectNonKeywords_ShouldMatchFilterModelOutput()
+    public void TryParse_WithBasicFilterSource_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
     {
         // Arrange
         var filterService = CreateFilterService();
@@ -650,24 +646,14 @@ public sealed class FilterServiceTests
             },
             []);
 
-        var equivalentModel = new FilterModel
-        {
-            Data =
-            {
-                Category = FilterCategory.Level,
-                Evaluator = FilterEvaluator.MultiSelect,
-                Values = ["Error", "Warning"]
-            }
-        };
-
         // Act
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
-        var modelResult = filterService.TryParse(equivalentModel, out var modelComparison);
 
         // Assert
         Assert.True(sourceResult);
-        Assert.True(modelResult);
-        Assert.Equal(modelComparison, sourceComparison);
+        Assert.Equal(
+            "(new[] {\"Error\", \"Warning\"}).Contains(Level.ToString())",
+            sourceComparison);
     }
 
     [Fact]
@@ -733,16 +719,6 @@ public sealed class FilterServiceTests
         // Assert
         Assert.True(result);
         Assert.Equal(expected, comparison);
-    }
-
-    [Fact]
-    public void TryParse_WithFilterModel_WhenFilterModelIsNull_ShouldThrowArgumentNullException()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((FilterModel)null!, out _));
     }
 
     [Theory]
@@ -833,8 +809,20 @@ public sealed class FilterServiceTests
         Assert.Empty(error);
     }
 
-    private static FilterModel CreateFilterModel(FilterCategory category, FilterEvaluator evaluator, string? value) =>
-        new() { Data = { Category = category, Evaluator = evaluator, Value = value } };
+    private static BasicFilterSource CreateBasicSource(
+        FilterCategory category,
+        FilterEvaluator evaluator,
+        string? value,
+        IEnumerable<string>? values = null) =>
+        new(
+            new BasicFilterCriteria
+            {
+                Category = category,
+                Evaluator = evaluator,
+                Value = value,
+                Values = values?.ToImmutableList() ?? []
+            },
+            []);
 
     private static FilterService CreateFilterService() => new();
 }

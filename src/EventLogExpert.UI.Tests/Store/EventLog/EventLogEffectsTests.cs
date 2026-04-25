@@ -585,7 +585,7 @@ public sealed class EventLogEffectsTests
             {
                 var filter = callInfo.Arg<EventFilter>();
 
-                if (filter.Filters.Count > 0 && filter.Filters[0].Comparison.Value == Constants.FilterIdEquals999)
+                if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == Constants.FilterIdEquals999)
                 {
                     staleStarted.TrySetResult(true);
                     staleGate.Task.GetAwaiter().GetResult();

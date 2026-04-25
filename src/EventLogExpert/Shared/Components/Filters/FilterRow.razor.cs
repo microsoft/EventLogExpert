@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterPane;
@@ -32,15 +33,20 @@ public sealed partial class FilterRow : EditableFilterRowBase
     /// <summary>Structured filter: validate via TryParse and surface failures via the alert dialog (no inline banner).</summary>
     protected override async ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
     {
-        if (FilterService.TryParse(draft.ToBasicSource(), out string comparisonString))
-        {
-            draft.ComparisonText = comparisonString;
+        var basicSource = draft.ToBasicSource();
 
-            return draft.ToFilterModel() with
-            {
-                Comparison = new FilterComparison { Value = comparisonString },
-                IsEnabled = true
-            };
+        if (FilterService.TryParse(basicSource, out string comparisonString))
+        {
+            var model = FilterModel.TryCreate(
+                comparisonString,
+                FilterType.Basic,
+                basicSource,
+                draft.Color,
+                draft.IsExcluded,
+                isEnabled: true,
+                draft.Id);
+
+            if (model is not null) { return model; }
         }
 
         await AlertDialogService.ShowAlert("Invalid Filter",

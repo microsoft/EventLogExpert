@@ -49,7 +49,7 @@ else
                 }
                 else if (Value is { } savedFilter)
                 {
-                    if (string.IsNullOrWhiteSpace(savedFilter.Comparison.Value))
+                    if (string.IsNullOrWhiteSpace(savedFilter.ComparisonText))
                     {
                         <span>No Filter Specified</span>
                     }
@@ -62,11 +62,11 @@ else
 
                         if (savedFilter.IsExcluded)
                         {
-                            <span>Exclude: @savedFilter.Comparison.Value</span>
+                            <span>Exclude: @savedFilter.ComparisonText</span>
                         }
                         else
                         {
-                            <span>@savedFilter.Comparison.Value</span>
+                            <span>@savedFilter.ComparisonText</span>
                         }
                     }
                 }

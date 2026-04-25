@@ -21,21 +21,18 @@ public sealed class FilterPaneReducers
 
         // Dedupe key includes IsExcluded so include/exclude pairs of the same expression both land.
         HashSet<(string Value, bool IsExcluded)> existingKeys =
-            [.. state.Filters.Select(filter => (filter.Comparison.Value, filter.IsExcluded))];
+            [.. state.Filters.Select(filter => (filter.ComparisonText, filter.IsExcluded))];
 
         List<FilterModel> additions = [];
 
         foreach (var filter in action.FilterGroup.Filters)
         {
-            if (!existingKeys.Add((filter.Comparison.Value, filter.IsExcluded))) { continue; }
+            if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
 
-            additions.Add(new FilterModel
-            {
-                Color = filter.Color,
-                Comparison = filter.Comparison with { },
-                IsEnabled = true,
-                IsExcluded = filter.IsExcluded
-            });
+            // Apply the group filter as-is, only flipping IsEnabled on. Color, ComparisonText,
+            // Compiled, BasicSource, FilterType, and IsExcluded are preserved verbatim so a Basic
+            // filter saved in a group is still re-editable as Basic.
+            additions.Add(filter with { Id = FilterId.Create(), IsEnabled = true });
         }
 
         return additions.Count == 0 ? state : state with { Filters = state.Filters.AddRange(additions) };

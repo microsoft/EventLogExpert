@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Models;
-using System.Collections.Immutable;
 using static EventLogExpert.UI.Tests.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -15,20 +14,10 @@ internal static class FilterUtils
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        bool shouldCompareAny = false,
-        FilterData? data = null,
-        IEnumerable<FilterModel>? subFilters = null) =>
-        new()
-        {
-            Color = color,
-            FilterType = filterType,
-            Data = data ?? new FilterData(),
-            ShouldCompareAny = shouldCompareAny,
-            IsEnabled = isEnabled,
-            IsExcluded = isExcluded,
-            Comparison = new FilterComparison { Value = comparisonValue },
-            SubFilters = subFilters?.ToImmutableList() ?? []
-        };
+        BasicFilterSource? basicSource = null,
+        FilterId? id = null) =>
+        FilterModel.TryCreate(comparisonValue, filterType, basicSource, color, isExcluded, isEnabled, id) ??
+        throw new InvalidOperationException($"Test filter expression failed to compile: '{comparisonValue}'");
 
     internal static FilterEditorModel CreateTestFilterEditor(
         FilterId? id = null,

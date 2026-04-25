@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
+using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.UI.Tests.Store.FilterGroup;
@@ -96,7 +97,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var parentId = FilterGroupId.Create();
-        var filter = new FilterModel();
+        var filter = FilterUtils.CreateTestFilter();
 
         // Act
         var action = new FilterGroupAction.SetFilter(parentId, filter);
@@ -208,10 +209,7 @@ public sealed class FilterGroupStoreTests
 
         // Act - Upsert filter into group (pending-draft commit path)
         var groupId = state.Groups.First().Id;
-        var filter = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
-        };
+        var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
 
         state = FilterGroupReducers.ReducerSetFilter(state, new FilterGroupAction.SetFilter(groupId, filter));
 
@@ -231,11 +229,7 @@ public sealed class FilterGroupStoreTests
         var groupId = state.Groups.First().Id;
 
         // Act - Upsert a new filter into the group (pending-draft commit path)
-        var initialFilter = new FilterModel
-        {
-            Color = HighlightColor.Blue,
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
-        };
+        var initialFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Blue);
 
         state = FilterGroupReducers.ReducerSetFilter(state, new FilterGroupAction.SetFilter(groupId, initialFilter));
 
@@ -287,7 +281,7 @@ public sealed class FilterGroupStoreTests
     public void IntegrationTest_FilterManipulation()
     {
         // Arrange
-        var filter = new FilterModel();
+        var filter = FilterUtils.CreateTestFilter();
 
         var group = new FilterGroupModel
         {
@@ -482,7 +476,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveFilter_ShouldRemoveFilterFromGroup()
     {
         // Arrange
-        var filter = new FilterModel();
+        var filter = FilterUtils.CreateTestFilter();
 
         var group = new FilterGroupModel
         {
@@ -582,7 +576,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetFilter_ShouldUpdateFilter()
     {
         // Arrange
-        var filter = new FilterModel();
+        var filter = FilterUtils.CreateTestFilter();
 
         var group = new FilterGroupModel
         {
@@ -592,11 +586,10 @@ public sealed class FilterGroupStoreTests
 
         var state = new FilterGroupState { Groups = [group] };
 
-        var updatedFilter = filter with
-        {
-            Color = HighlightColor.Green,
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
-        };
+        var updatedFilter = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            color: HighlightColor.Green,
+            id: filter.Id);
 
         var action = new FilterGroupAction.SetFilter(group.Id, updatedFilter);
 
@@ -616,11 +609,7 @@ public sealed class FilterGroupStoreTests
         // Pending-draft commit path: SetFilter for an Id that was never in state.
         var group = new FilterGroupModel { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var newFilter = new FilterModel
-        {
-            Color = HighlightColor.Yellow,
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 }
-        };
+        var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Yellow);
         var action = new FilterGroupAction.SetFilter(group.Id, newFilter);
 
         // Act
@@ -639,7 +628,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new FilterGroupAction.SetFilter(FilterGroupId.Create(), new FilterModel());
+        var action = new FilterGroupAction.SetFilter(FilterGroupId.Create(), FilterUtils.CreateTestFilter());
 
         // Act
         var newState = FilterGroupReducers.ReducerSetFilter(state, action);
@@ -658,7 +647,7 @@ public sealed class FilterGroupStoreTests
         var updatedGroup = group with
         {
             Name = Constants.FilterGroupName,
-            Filters = [new FilterModel()]
+            Filters = [FilterUtils.CreateTestFilter()]
         };
 
         var action = new FilterGroupAction.SetGroup(updatedGroup);
@@ -691,7 +680,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleFilterExcluded_ShouldToggleIsExcluded()
     {
         // Arrange
-        var filter = new FilterModel { IsExcluded = false };
+        var filter = FilterUtils.CreateTestFilter(isExcluded: false);
 
         var group = new FilterGroupModel
         {

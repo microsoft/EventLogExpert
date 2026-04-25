@@ -100,14 +100,11 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 
     private async Task AddFilter(string filter)
     {
-        Dispatcher.Dispatch(
-            new FilterPaneAction.AddFilter(
-                new FilterModel
-                {
-                    Comparison = new FilterComparison { Value = filter },
-                    FilterType = FilterType.Cached,
-                    IsEnabled = true
-                }));
+        var model = FilterModel.TryCreate(filter, FilterType.Cached, isEnabled: true);
+
+        if (model is null) { return; }
+
+        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(model));
 
         await CloseAsync();
     }
