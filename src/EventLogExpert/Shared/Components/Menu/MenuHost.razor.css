@@ -1,0 +1,22 @@
+.menu-host-overlay {
+    position: fixed;
+    /* Leave the menu-bar strip (--menu-bar-height) uncovered so clicks/hovers on other
+       File/Edit/View items reach the buttons directly. The buttons handle the "switch
+       active menu" behavior themselves; if we covered them here, every cross-bar
+       interaction would close the open menu first and require a second click to open
+       the next one. */
+    left: 0;
+    right: 0;
+    top: var(--menu-bar-height);
+    bottom: 0;
+    z-index: 100;
+    background: transparent;
+    outline: none;
+}
+
+.menu-host-popup {
+    position: fixed;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+}

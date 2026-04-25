@@ -1,0 +1,97 @@
+@if (Items is not null)
+{
+    <ul aria-orientation="vertical"
+        class="menu-list"
+        @onkeydown="HandleListKeyDown"
+        @onkeydown:preventDefault="@_preventDefaultKeyDown"
+        @onkeydown:stopPropagation="true"
+        role="menu">
+        @for (int index = 0; index < Items.Count; index++)
+        {
+            var item = Items[index];
+            var capturedIndex = index;
+
+            @if (item.IsSeparator)
+            {
+                <li class="menu-separator" role="separator"></li>
+            }
+            else
+            {
+                bool hasChildren = item.Children is not null || item.ChildrenLoader is not null;
+                bool isOpen = ReferenceEquals(_openItem, item);
+                bool isFocused = capturedIndex == _focusedIndex;
+                string itemClass = "menu-item";
+
+                if (!item.IsEnabled) { itemClass += " disabled"; }
+
+                if (hasChildren) { itemClass += " has-submenu"; }
+
+                if (isOpen) { itemClass += " open"; }
+
+                if (item.IsDanger) { itemClass += " danger"; }
+
+                <li aria-checked="@(item.IsChecked is null ? null : (item.IsChecked.Value ? "true" : "false"))"
+                    aria-disabled="@(!item.IsEnabled ? "true" : null)"
+                    aria-expanded="@(hasChildren ? isOpen.ToString().ToLowerInvariant() : null)"
+                    aria-haspopup="@(hasChildren ? "menu" : null)"
+                    class="@itemClass"
+                    @key="capturedIndex"
+                    @onclick="async () => await OnItemActivate(item, capturedIndex)"
+                    @onclick:stopPropagation
+                    @onmouseenter="() => OnItemHover(item, capturedIndex)"
+                    @ref="_itemElements[capturedIndex]"
+                    role="@(item.IsChecked is null ? "menuitem" : "menuitemcheckbox")"
+                    tabindex="@(isFocused && item.IsEnabled ? 0 : -1)">
+
+                    <span class="menu-check">
+                        @if (item.IsChecked is true)
+                        {
+                            <i class="bi bi-check-lg"></i>
+                        }
+                    </span>
+
+                    <span class="menu-label">@item.Label</span>
+
+                    @if (hasChildren)
+                    {
+                        <i aria-hidden="true" class="bi bi-caret-right-fill menu-arrow"></i>
+                    }
+                    else if (!string.IsNullOrEmpty(item.Shortcut))
+                    {
+                        <span class="menu-shortcut">@item.Shortcut</span>
+                    }
+
+                    @if (hasChildren && isOpen)
+                    {
+                        <div class="submenu" @onclick:stopPropagation>
+                            @if (_resolvedChildren is null)
+                            {
+                                <ul aria-label="Loading"
+                                    aria-orientation="vertical"
+                                    class="menu-list"
+                                    role="menu">
+                                    <li aria-disabled="true"
+                                        class="menu-item disabled"
+                                        role="menuitem"
+                                        tabindex="-1">
+                                        <span class="menu-check"></span>
+                                        <span class="menu-label">Loading…</span>
+                                    </li>
+                                </ul>
+                            }
+                            else
+                            {
+                                <MenuRenderer IsSubmenu="true"
+                                    Items="@_resolvedChildren"
+                                    OnActivated="OnChildActivated"
+                                    OnCloseSubmenu="OnSubmenuRequestedClose"
+                                    OnNavigateBar="OnNavigateBar"
+                                    SuppressInitialFocus="@(!_openSubmenuFocusesFirstChild)" />
+                            }
+                        </div>
+                    }
+                </li>
+            }
+        }
+    </ul>
+}

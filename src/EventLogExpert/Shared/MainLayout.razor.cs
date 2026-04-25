@@ -1,35 +1,39 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared;
 
-public sealed partial class MainLayout : IDisposable
+public sealed partial class MainLayout : IAsyncDisposable
 {
     [Inject] private IAppTitleService AppTitleService { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
-
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private KeyboardShortcutService KeyboardShortcutService { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     [Inject] private IUpdateService UpdateService { get; init; } = null!;
 
-    public void Dispose() => Settings.ThemeChanged -= OnThemeChanged;
+    public async ValueTask DisposeAsync()
+    {
+        Settings.ThemeChanged -= OnThemeChanged;
+
+        await KeyboardShortcutService.UnregisterAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
             await ApplyThemeAsync();
+            await KeyboardShortcutService.EnsureRegisteredAsync(JSRuntime);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -45,21 +49,8 @@ public sealed partial class MainLayout : IDisposable
         await base.OnInitializedAsync();
     }
 
-    private async Task ApplyThemeAsync()
-    {
+    private async Task ApplyThemeAsync() =>
         await JSRuntime.InvokeVoidAsync("setTheme", Settings.Theme.ToString().ToLowerInvariant());
-    }
-
-    private void HandleKeyUp(KeyboardEventArgs args)
-    {
-        // https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_key_values
-        switch (args)
-        {
-            case { CtrlKey: true, Code: "KeyH" }:
-                Dispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
-                break;
-        }
-    }
 
     private void OnThemeChanged() => _ = InvokeAsync(ApplyThemeAsync);
 }

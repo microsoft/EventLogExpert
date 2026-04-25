@@ -22,10 +22,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     [Parameter] public string? AriaLabelledBy { get; set; }
 
-    [Parameter] public string? DataHighlight { get; set; }
-
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
+
+    [Parameter] public string? DataHighlight { get; set; }
 
     public ValueSelectItem<T>? HighlightedItem
     {

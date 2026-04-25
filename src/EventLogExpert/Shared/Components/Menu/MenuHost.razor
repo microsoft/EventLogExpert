@@ -1,0 +1,21 @@
+@if (MenuService.ActiveItems is not null)
+{
+    <div class="menu-host-overlay"
+        @onclick="HandleOverlayClick"
+        @oncontextmenu="HandleOverlayClick"
+        @oncontextmenu:preventDefault="true">
+        <div aria-label="Menu"
+            class="menu-host-popup"
+            @onclick:stopPropagation
+            @onkeydown="HandleKeyDown"
+            role="presentation"
+            style="@PositionStyle"
+            tabindex="-1">
+            <MenuRenderer Items="MenuService.ActiveItems"
+                @key="MenuService.ActiveMenuId"
+                InitialFocusIndex="@(MenuService.ActiveFocusFirst ? 0 : -1)"
+                OnActivated="HandleActivated"
+                OnNavigateBar="HandleNavigateBar" />
+        </div>
+    </div>
+}

@@ -97,10 +97,17 @@ public sealed class EventLogReducers
 
     [ReducerMethod]
     public static EventLogState ReduceOpenLog(EventLogState state, EventLogAction.OpenLog action) =>
-        state with
-        {
-            ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.PathType))
-        };
+        // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
+        // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
+        // TODO: HandleOpenLog effect still runs for every dispatched OpenLog action, so a duplicate dispatch can
+        // start a second background load for the same EventLogData.Id and overwrite _logCts[id]. The reducer no-op
+        // prevents the throw but the effect-level dedup is a separate hardening worth tackling next.
+        state.ActiveLogs.ContainsKey(action.LogName)
+            ? state
+            : state with
+            {
+                ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.PathType))
+            };
 
     [ReducerMethod]
     public static EventLogState ReduceSelectEvent(EventLogState state, EventLogAction.SelectEvent action)
