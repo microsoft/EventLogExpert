@@ -46,6 +46,8 @@ public sealed partial class PromptModal : ModalBase<string>
         await base.OnAfterRenderAsync(firstRender);
     }
 
+    protected override Task OnCancelAsync() => CompleteAsync(string.Empty);
+
     protected override void OnInitialized()
     {
         _value = InitialValue;
@@ -53,8 +55,4 @@ public sealed partial class PromptModal : ModalBase<string>
     }
 
     private Task HandleAcceptClickedAsync() => CompleteAsync(_value);
-
-    // Match existing IAlertDialogService.DisplayPrompt contract (non-null string; callers check
-    // IsNullOrEmpty). Override so Esc/native-close returns the same value as the Cancel button.
-    protected override Task OnCancelAsync() => CompleteAsync(string.Empty);
 }

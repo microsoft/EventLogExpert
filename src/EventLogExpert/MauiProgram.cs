@@ -92,6 +92,11 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
         builder.Services.AddSingleton<IModalService, ModalService>();
+        builder.Services.AddSingleton<IMenuService, MenuService>();
+        builder.Services.AddSingleton<MauiMenuActionService>();
+        builder.Services.AddSingleton<IMenuActionService>(static provider =>
+            provider.GetRequiredService<MauiMenuActionService>());
+        builder.Services.AddSingleton<KeyboardShortcutService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {

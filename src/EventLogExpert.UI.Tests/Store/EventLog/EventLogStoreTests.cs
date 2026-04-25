@@ -734,6 +734,28 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceOpenLog_WhenLogAlreadyActive_ShouldReturnSameStateInstance()
+    {
+        // Arrange — duplicate OpenLog dispatches must be a no-op so re-opening an already
+        // active log (drag/drop, command line, recent menu) cannot replace its EventLogData
+        // (which would invalidate ongoing loads and reset the user's events).
+        var state = new EventLogState();
+        state = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+
+        var existingLogData = state.ActiveLogs[Constants.LogNameTestLog];
+
+        // Act — dispatch the same OpenLog a second time.
+        var newState = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+
+        // Assert — same state reference, same EventLogData reference (no replacement).
+        Assert.Same(state, newState);
+        Assert.Same(existingLogData, newState.ActiveLogs[Constants.LogNameTestLog]);
+        Assert.Single(newState.ActiveLogs);
+    }
+
+    [Fact]
     public void ReduceOpenLog_WithFilePath_ShouldSetCorrectPathType()
     {
         // Arrange

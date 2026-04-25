@@ -1,81 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:local="clr-namespace:EventLogExpert"
-             xmlns:ui="clr-namespace:EventLogExpert.UI;assembly=EventLogExpert.UI"
              x:Class="EventLogExpert.MainPage"
              BackgroundColor="{DynamicResource PageBackgroundColor}">
-
-    <ContentPage.MenuBarItems>
-        <MenuBarItem Text="File">
-            <MenuFlyoutSubItem Text="Open">
-                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked">
-                    <MenuFlyoutItem.KeyboardAccelerators>
-                        <KeyboardAccelerator Modifiers="Ctrl" Key="O" />
-                    </MenuFlyoutItem.KeyboardAccelerators>
-                </MenuFlyoutItem>
-                <MenuFlyoutItem Text="Folder" Clicked="OpenFolder_Clicked" />
-                <MenuFlyoutSubItem Text="Live Event Log" >
-                    <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" />
-                    <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" />
-                    <MenuFlyoutItem Text="Security" Clicked="OpenLiveLog_Clicked" />
-                    <MenuFlyoutSubItem Text="Other Logs" x:Name="OpenOtherLogsFlyoutSubitem" />
-                </MenuFlyoutSubItem>
-            </MenuFlyoutSubItem>
-            <MenuFlyoutSubItem Text="Add Another Log To This View">
-                <MenuFlyoutItem Text="File" Clicked="OpenFile_Clicked" CommandParameter="{StaticResource True}" />
-                <MenuFlyoutItem Text="Folder" Clicked="OpenFolder_Clicked" CommandParameter="{StaticResource True}" />
-                <MenuFlyoutSubItem Text="Live Event Log" >
-                    <MenuFlyoutItem Text="Application" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
-                    <MenuFlyoutItem Text="System" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
-                    <MenuFlyoutItem Text="Security" Clicked="OpenLiveLog_Clicked" CommandParameter="{StaticResource True}" />
-                    <MenuFlyoutSubItem Text="Other Logs" x:Name="AddOtherLogsFlyoutSubitem" CommandParameter="{StaticResource True}" />
-                </MenuFlyoutSubItem>
-            </MenuFlyoutSubItem>
-            <MenuFlyoutItem Text="Close All Open Logs" Clicked="CloseAll_Clicked" />
-            <MenuFlyoutItem Text="Exit" Clicked="Exit_Clicked" />
-        </MenuBarItem>
-        <MenuBarItem Text="Edit">
-            <MenuFlyoutItem Text="Copy Selected" x:Name="CopySelected"
-                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Default}" />
-            <MenuFlyoutItem Text="Copy Selected (Simple)" x:Name="CopySelectedSimple"
-                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Simple}" />
-            <MenuFlyoutItem Text="Copy Selected (XML)" x:Name="CopySelectedXml"
-                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Xml}" />
-            <MenuFlyoutItem Text="Copy Selected (Full)" x:Name="CopySelectedFull"
-                            Clicked="CopySelected_Clicked" CommandParameter="{x:Static ui:CopyType.Full}" />
-            <MenuFlyoutItem Text="Save All Filters" Clicked="SaveAllFilters_Clicked" />
-            <MenuFlyoutItem Text="Clear All Filters" Clicked="ClearAllFilters_Clicked" />
-        </MenuBarItem>
-        <MenuBarItem Text="View">
-            <MenuFlyoutItem Text="Show All Events" Clicked="ShowAllEvents_Clicked" x:Name="ShowAllEventsMenuItem">
-                <MenuFlyoutItem.KeyboardAccelerators>
-                    <KeyboardAccelerator Modifiers="Ctrl" Key="H" />
-                </MenuFlyoutItem.KeyboardAccelerators>
-            </MenuFlyoutItem>
-            <MenuFlyoutItem Text="Load New Events" Clicked="LoadNewEvents_Clicked" />
-            <MenuFlyoutItem Text="Continuously Update" Clicked="ContinuouslyUpdate_Clicked" x:Name="ContinuouslyUpdateMenuItem" />
-            <MenuFlyoutItem Text="Show Cached Filters" Clicked="ViewRecentFilters_Clicked" />
-            <MenuFlyoutItem Text="Show Filter Groups" Clicked="ViewFilterGroups_Clicked" />
-        </MenuBarItem>
-        <MenuBarItem Text="Tools">
-            <MenuFlyoutItem Text="Settings" Clicked="OpenSettingsModal_Clicked" />
-            <!-- Option to export providers? -->
-        </MenuBarItem>
-        <MenuBarItem Text="Help">
-            <MenuFlyoutItem Text="Docs" Clicked="Docs_Clicked" />
-            <MenuFlyoutItem Text="Submit an Issue" Clicked="SubmitAnIssue_Clicked" />
-            <MenuFlyoutItem Text="Check for Updates" Clicked="CheckForUpdates_Clicked" />
-            <MenuFlyoutItem Text="Release Notes" Clicked="ReleaseNotes_Clicked" />
-            <MenuFlyoutItem Text="View Logs" Clicked="ViewLogs_Clicked" />
-        </MenuBarItem>
-    </ContentPage.MenuBarItems>
 
     <Grid>
         <Grid.GestureRecognizers>
             <DropGestureRecognizer AllowDrop="True" Drop="DropGestureRecognizer_OnDrop" DragOver="DropGestureRecognizer_OnDragOver" />
         </Grid.GestureRecognizers>
-        
+
         <BlazorWebView x:Name="MainWebView" HostPage="wwwroot/index.html" BlazorWebViewInitialized="MainWebView_BlazorWebViewInitialized">
             <BlazorWebView.RootComponents>
                 <RootComponent Selector="#app" ComponentType="{x:Type local:Main}" />

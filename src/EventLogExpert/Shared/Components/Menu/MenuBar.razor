@@ -1,0 +1,27 @@
+@inherits FluxorComponent
+
+<nav aria-label="Main menu" aria-orientation="horizontal" class="menu-bar" role="menubar">
+    @for (int index = 0; index < _bars.Count; index++)
+    {
+        var bar = _bars[index];
+        var capturedIndex = index;
+        bool isActive = IsActive(bar);
+        bool isFocused = capturedIndex == _focusedBarIndex;
+
+        <button aria-expanded="@isActive.ToString().ToLowerInvariant()"
+            aria-haspopup="menu"
+            class="@($"menu-bar-item{(isActive ? " active" : string.Empty)}")"
+            @key="bar.Label"
+            @onclick="async _ => await OnBarClick(bar, capturedIndex)"
+            @onclick:stopPropagation
+            @onkeydown="async args => await OnBarKeyDown(args, capturedIndex)"
+            @onmouseenter="async _ => await OnBarHover(bar, capturedIndex)"
+            @ref="_barElements[capturedIndex]"
+            role="menuitem"
+            tabindex="@(isFocused ? 0 : -1)"
+            type="button">
+            @bar.Label
+        </button>
+    }
+</nav>
+

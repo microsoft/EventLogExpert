@@ -7,6 +7,7 @@ using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
@@ -72,7 +73,11 @@ public sealed partial class EventTable
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
+    [Inject] private IFilterService FilterService { get; init; } = null!;
+
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IMenuService MenuService { get; init; } = null!;
 
     [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEvent { get; init; } = null!;
 
@@ -281,6 +286,42 @@ public sealed partial class EventTable
         }
 
         return null;
+    }
+
+    private void ApplySelectedFilter(DisplayEventModel selectedEvent, FilterCategory category, bool exclude)
+    {
+        string filterValue = category switch
+        {
+            FilterCategory.Id => selectedEvent.Id.ToString(),
+            FilterCategory.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
+            FilterCategory.Level => selectedEvent.Level,
+            FilterCategory.Keywords => selectedEvent.KeywordsDisplayName,
+            FilterCategory.Source => selectedEvent.Source,
+            FilterCategory.TaskCategory => selectedEvent.TaskCategory,
+            _ => string.Empty,
+        };
+
+        var basicFilter = new BasicFilter(
+            new FilterData
+            {
+                Category = category,
+                Value = filterValue,
+                Evaluator = FilterEvaluator.Equals,
+            },
+            []);
+
+        if (!FilterService.TryParse(basicFilter, out var comparisonString)) { return; }
+
+        var filter = FilterModel.TryCreate(
+            comparisonString,
+            FilterType.Basic,
+            basicFilter,
+            isExcluded: exclude,
+            isEnabled: true);
+
+        if (filter is null) { return; }
+
+        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }
 
     private IReadOnlyList<DisplayEventModel> BuildRange(
@@ -556,11 +597,21 @@ public sealed partial class EventTable
         await JSRuntime.InvokeVoidAsync("initializeTableEvents", _dotNetRef);
     }
 
-    private async Task InvokeContextMenu(MouseEventArgs args) =>
-        await JSRuntime.InvokeVoidAsync("invokeContextMenu", args.ClientX, args.ClientY);
+    private void InvokeContextMenu(MouseEventArgs args)
+    {
+        // Snapshot the currently selected event into the closures so a subsequent selection change
+        // (e.g. user clicks elsewhere while the menu is open) doesn't retarget the action. Note:
+        // selection follows the right-click in EventTable, so SelectedEvent.Value matches the row
+        // under the pointer at invocation time.
+        var clicked = SelectedEvent.Value;
 
-    private async Task InvokeTableColumnMenu(MouseEventArgs args) =>
-        await JSRuntime.InvokeVoidAsync("invokeTableColumnMenu", args.ClientX, args.ClientY);
+        if (clicked is null) { return; }
+
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowContextMenuItems(clicked));
+    }
+
+    private void InvokeTableColumnMenu(MouseEventArgs args) =>
+        MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
 
     private bool IsSelectionOutOfSortOrder(IReadOnlyList<DisplayEventModel> selection)
     {
@@ -782,6 +833,79 @@ public sealed partial class EventTable
 
                 return;
         }
+    }
+
+    private IReadOnlyList<MenuItem> ShowColumnMenuItems()
+    {
+        var state = EventTableState.Value;
+        var items = new List<MenuItem>();
+
+        foreach (var (column, isVisible) in state.Columns)
+        {
+            var capturedColumn = column;
+            items.Add(MenuItem.Item(
+                column.ToFullString(),
+                () => Dispatcher.Dispatch(new EventTableAction.ToggleColumn(capturedColumn)),
+                isChecked: isVisible));
+        }
+
+        items.Add(MenuItem.Separator());
+
+        var orderItems = new List<MenuItem>();
+        foreach (var (column, _) in state.Columns)
+        {
+            var capturedColumn = column;
+            orderItems.Add(MenuItem.Item(
+                column.ToFullString(),
+                () => Dispatcher.Dispatch(new EventTableAction.SetOrderBy(capturedColumn)),
+                isChecked: state.OrderBy.Equals(capturedColumn)));
+        }
+
+        items.Add(MenuItem.SubMenu("Order By", orderItems));
+        items.Add(MenuItem.Separator());
+        items.Add(MenuItem.Item(
+            "Reset Column Defaults",
+            () => Dispatcher.Dispatch(new EventTableAction.ResetColumnDefaults())));
+
+        return items;
+    }
+
+    private IReadOnlyList<MenuItem> ShowContextMenuItems(DisplayEventModel selectedEvent)
+    {
+        return
+        [
+            MenuItem.Item("Copy Selected", () => ClipboardService.CopySelectedEvent(CopyType.Default)),
+            MenuItem.Item("Copy Selected (Simple)", () => ClipboardService.CopySelectedEvent(CopyType.Simple)),
+            MenuItem.Item("Copy Selected (XML)", () => ClipboardService.CopySelectedEvent(CopyType.Xml)),
+            MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(CopyType.Full)),
+            MenuItem.Separator(),
+            MenuItem.Item("Exclude Events Before", () =>
+                Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(
+                    new FilterDateModel { Before = selectedEvent.TimeCreated }))),
+            MenuItem.Item("Exclude Events After", () =>
+                Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(
+                    new FilterDateModel { After = selectedEvent.TimeCreated }))),
+            MenuItem.Separator(),
+            MenuItem.SubMenu("Include", ShowFilterCategoryItems(selectedEvent, exclude: false)),
+            MenuItem.SubMenu("Exclude", ShowFilterCategoryItems(selectedEvent, exclude: true)),
+        ];
+    }
+
+    private IReadOnlyList<MenuItem> ShowFilterCategoryItems(DisplayEventModel selectedEvent, bool exclude)
+    {
+        var items = new List<MenuItem>();
+
+        foreach (FilterCategory category in Enum.GetValues<FilterCategory>())
+        {
+            if (category is FilterCategory.Description or FilterCategory.Xml) { continue; }
+
+            var capturedCategory = category;
+            items.Add(MenuItem.Item(
+                category.ToFullString(),
+                () => ApplySelectedFilter(selectedEvent, capturedCategory, exclude)));
+        }
+
+        return items;
     }
 
     private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());

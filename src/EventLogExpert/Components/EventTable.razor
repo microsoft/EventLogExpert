@@ -6,7 +6,7 @@
 
 <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
     <table aria-label="Event Log Table" aria-multiselectable="true" aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)" id="eventTable" role="grid">
-        <thead @oncontextmenu="InvokeTableColumnMenu">
+        <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         <tr role="row">
             @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
             {
@@ -36,7 +36,7 @@
             <th aria-colindex="@(_enabledColumns.Length + 1)" class="description" role="columnheader">Description</th>
         </tr>
         </thead>
-        <tbody @oncontextmenu="InvokeContextMenu">
+        <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         @if (_currentTable is not null)
         {
             <Virtualize Context="evt" Items="@((_currentTable.DisplayedEvents as ICollection<DisplayEventModel>) ?? [])">

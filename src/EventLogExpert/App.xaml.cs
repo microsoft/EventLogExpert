@@ -10,10 +10,15 @@ using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
+using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
+using Application = Microsoft.Maui.Controls.Application;
+using Color = Windows.UI.Color;
 using IDispatcher = Fluxor.IDispatcher;
+using Window = Microsoft.Maui.Controls.Window;
 
 namespace EventLogExpert;
 
@@ -26,26 +31,17 @@ public sealed partial class App : Application
         IDispatcher fluxorDispatcher,
         IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
-        IStateSelection<EventLogState, bool> continuouslyUpdate,
-        IStateSelection<FilterPaneState, bool> filterPaneIsEnabled,
         IDatabaseService databaseService,
         ISettingsService settings,
-        IAlertDialogService dialogService,
-        IClipboardService clipboardService,
-        IUpdateService updateService,
-        ICurrentVersionProvider currentVersionProvider,
         IAppTitleService appTitleService,
         FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger,
-        IFileLogger fileLogger,
-        IModalService modalService)
+        MauiMenuActionService menuActionService)
     {
         InitializeComponent();
 
         _settings = settings;
 
-        // Apply native (XAML) theme before constructing MainPage so the initial
-        // MenuFlyout / native control tree is created under the correct theme.
         ApplyNativeTheme(_settings.Theme);
         _settings.ThemeChanged += OnThemeChanged;
 
@@ -53,19 +49,12 @@ public sealed partial class App : Application
             fluxorDispatcher,
             databaseCollectionProvider,
             activeLogs,
-            continuouslyUpdate,
-            filterPaneIsEnabled,
             databaseService,
             settings,
-            dialogService,
-            clipboardService,
-            updateService,
-            currentVersionProvider,
             appTitleService,
             fileLocationOptions,
             traceLogger,
-            fileLogger,
-            modalService);
+            menuActionService);
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
@@ -73,7 +62,7 @@ public sealed partial class App : Application
         var window = new Window
         {
             Title = "EventLogExpert",
-            Page = new NavigationPage(_mainPage)
+            Page = _mainPage
         };
 
         // Ultrawide monitors create a window that is way too wide
@@ -82,13 +71,51 @@ public sealed partial class App : Application
             window.Width = 2000;
         }
 
-        // The WinUI MenuBar (rendered for ContentPage.MenuBarItems) is a
-        // native control whose theme is driven by the WinUI window root's
-        // FrameworkElement.RequestedTheme - MAUI's UserAppTheme alone does
-        // not propagate to it. Apply once the platform handler is attached.
+        // The custom Blazor menu bar (MenuBar/MenuHost) replaces the native WinUI MenuBar that
+        // ContentPage.MenuBarItems used to render, so we no longer need to wire FrameworkElement
+        // RequestedTheme through the platform handler. The forced-dark title bar styling below
+        // is still applied here once the WinUI window handler is attached.
         window.HandlerChanged += (_, _) => ApplyPlatformWindowTheme();
 
         return window;
+    }
+
+    private static void ForceDarkTitleBar(Microsoft.UI.Xaml.Window winUiWindow)
+    {
+        try
+        {
+            var titleBar = winUiWindow.AppWindow?.TitleBar;
+
+            if (titleBar is null) { return; }
+
+            if (!AppWindowTitleBar.IsCustomizationSupported()) { return; }
+
+            var background = Color.FromArgb(0xFF, 0x22, 0x22, 0x22);
+            var foreground = Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
+            var inactiveBackground = Color.FromArgb(0xFF, 0x2D, 0x2D, 0x2D);
+            var inactiveForeground = Color.FromArgb(0xFF, 0x99, 0x99, 0x99);
+            var hoverBackground = Color.FromArgb(0xFF, 0x35, 0x35, 0x35);
+            var pressedBackground = Color.FromArgb(0xFF, 0x44, 0x44, 0x44);
+
+            titleBar.BackgroundColor = background;
+            titleBar.ForegroundColor = foreground;
+            titleBar.InactiveBackgroundColor = inactiveBackground;
+            titleBar.InactiveForegroundColor = inactiveForeground;
+
+            titleBar.ButtonBackgroundColor = background;
+            titleBar.ButtonForegroundColor = foreground;
+            titleBar.ButtonHoverBackgroundColor = hoverBackground;
+            titleBar.ButtonHoverForegroundColor = foreground;
+            titleBar.ButtonPressedBackgroundColor = pressedBackground;
+            titleBar.ButtonPressedForegroundColor = foreground;
+            titleBar.ButtonInactiveBackgroundColor = inactiveBackground;
+            titleBar.ButtonInactiveForegroundColor = inactiveForeground;
+        }
+        catch (COMException)
+        {
+            // Window has been closed/disposed between the event firing and
+            // here. Safe to ignore.
+        }
     }
 
     private void ApplyNativeTheme(Theme theme)
@@ -102,11 +129,6 @@ public sealed partial class App : Application
 
         ApplyPlatformWindowTheme();
     }
-
-    private void OnThemeChanged() =>
-        // ThemeChanged may be raised from non-UI threads (Blazor JSInterop /
-        // Fluxor effects). UserAppTheme must be set on the MAUI UI thread.
-        MainThread.BeginInvokeOnMainThread(() => ApplyNativeTheme(_settings.Theme));
 
     private void ApplyPlatformWindowTheme()
     {
@@ -123,50 +145,17 @@ public sealed partial class App : Application
                 continue;
             }
 
-            if (winUiWindow.Content is Microsoft.UI.Xaml.FrameworkElement root)
+            if (winUiWindow.Content is FrameworkElement root)
             {
-                root.RequestedTheme = Microsoft.UI.Xaml.ElementTheme.Dark;
+                root.RequestedTheme = ElementTheme.Dark;
             }
 
             ForceDarkTitleBar(winUiWindow);
         }
     }
 
-    private static void ForceDarkTitleBar(Microsoft.UI.Xaml.Window winUiWindow)
-    {
-        try
-        {
-            var titleBar = winUiWindow.AppWindow?.TitleBar;
-
-            if (titleBar is null) { return; }
-
-            if (!Microsoft.UI.Windowing.AppWindowTitleBar.IsCustomizationSupported()) { return; }
-
-            var background = global::Windows.UI.Color.FromArgb(0xFF, 0x22, 0x22, 0x22);
-            var foreground = global::Windows.UI.Color.FromArgb(0xFF, 0xFF, 0xFF, 0xFF);
-            var inactiveBackground = global::Windows.UI.Color.FromArgb(0xFF, 0x2D, 0x2D, 0x2D);
-            var inactiveForeground = global::Windows.UI.Color.FromArgb(0xFF, 0x99, 0x99, 0x99);
-            var hoverBackground = global::Windows.UI.Color.FromArgb(0xFF, 0x35, 0x35, 0x35);
-            var pressedBackground = global::Windows.UI.Color.FromArgb(0xFF, 0x44, 0x44, 0x44);
-
-            titleBar.BackgroundColor = background;
-            titleBar.ForegroundColor = foreground;
-            titleBar.InactiveBackgroundColor = inactiveBackground;
-            titleBar.InactiveForegroundColor = inactiveForeground;
-
-            titleBar.ButtonBackgroundColor = background;
-            titleBar.ButtonForegroundColor = foreground;
-            titleBar.ButtonHoverBackgroundColor = hoverBackground;
-            titleBar.ButtonHoverForegroundColor = foreground;
-            titleBar.ButtonPressedBackgroundColor = pressedBackground;
-            titleBar.ButtonPressedForegroundColor = foreground;
-            titleBar.ButtonInactiveBackgroundColor = inactiveBackground;
-            titleBar.ButtonInactiveForegroundColor = inactiveForeground;
-        }
-        catch (System.Runtime.InteropServices.COMException)
-        {
-            // Window has been closed/disposed between the event firing and
-            // here. Safe to ignore.
-        }
-    }
+    private void OnThemeChanged() =>
+        // ThemeChanged may be raised from non-UI threads (Blazor JSInterop /
+        // Fluxor effects). UserAppTheme must be set on the MAUI UI thread.
+        MainThread.BeginInvokeOnMainThread(() => ApplyNativeTheme(_settings.Theme));
 }

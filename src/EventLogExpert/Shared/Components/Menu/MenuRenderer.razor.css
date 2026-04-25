@@ -1,0 +1,83 @@
+.menu-list {
+    list-style: none;
+    margin: 0;
+    padding: 4px 0;
+    min-width: 12em;
+    color: var(--text-primary);
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-lightblue);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    user-select: none;
+}
+
+.menu-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px 4px 6px;
+    cursor: default;
+    outline: none;
+
+    &:hover:not(.disabled),
+    &.open:not(.disabled) {
+        background-color: var(--background-darkgray);
+    }
+
+    &:focus-visible:not(.disabled) {
+        background-color: var(--background-darkgray);
+        outline: 2px solid var(--clr-lightblue);
+        outline-offset: -2px;
+    }
+
+    &.disabled {
+        color: var(--text-secondary);
+        opacity: 0.6;
+    }
+
+    &.danger {
+        color: var(--clr-red);
+    }
+}
+
+.menu-check {
+    display: inline-flex;
+    justify-content: center;
+    width: 1.1em;
+    flex: 0 0 auto;
+    color: var(--clr-lightblue);
+}
+
+.menu-label {
+    flex: 1 1 auto;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.menu-shortcut {
+    flex: 0 0 auto;
+    margin-left: 16px;
+    color: var(--text-secondary);
+    font-size: 0.9em;
+}
+
+.menu-arrow {
+    flex: 0 0 auto;
+    margin-left: 12px;
+    font-size: 0.75em;
+}
+
+.menu-separator {
+    height: 1px;
+    margin: 4px 6px;
+    background-color: var(--clr-lightblue);
+    opacity: 0.4;
+}
+
+.submenu {
+    position: absolute;
+    top: -5px;
+    left: 100%;
+    z-index: 1;
+}

@@ -8,6 +8,14 @@ namespace EventLogExpert;
 
 internal static class ExtensionMethods
 {
+    internal static string ToFullString(this Enum value)
+    {
+        var memberAttribute = value.GetType().GetField(value.ToString())?
+            .GetCustomAttribute(typeof(EnumMemberAttribute)) as EnumMemberAttribute;
+
+        return memberAttribute?.Value ?? value.ToString();
+    }
+
     extension(DateTime time)
     {
         internal DateTime ConvertTimeZone(TimeZoneInfo? destinationTime) =>
@@ -15,13 +23,5 @@ internal static class ExtensionMethods
 
         internal DateTime ConvertTimeZoneToUtc(TimeZoneInfo? destinationTime) =>
             destinationTime is null ? time : TimeZoneInfo.ConvertTimeToUtc(time, destinationTime);
-    }
-
-    internal static string ToFullString(this Enum value)
-    {
-        var memberAttribute = value.GetType().GetField(value.ToString())?
-            .GetCustomAttribute(typeof(EnumMemberAttribute)) as EnumMemberAttribute;
-
-        return memberAttribute?.Value ?? value.ToString();
     }
 }

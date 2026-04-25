@@ -19,8 +19,6 @@ public sealed partial class FilterGroupSection
 
     private string MenuState => _menuState.ToString().ToLower();
 
-    private void ToggleMenu() => _menuState = !_menuState;
-
     private void HandleKeyDown(KeyboardEventArgs e)
     {
         if (e.Key is "Enter" or " ")
@@ -28,4 +26,6 @@ public sealed partial class FilterGroupSection
             ToggleMenu();
         }
     }
+
+    private void ToggleMenu() => _menuState = !_menuState;
 }

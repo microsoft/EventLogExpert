@@ -1,0 +1,33 @@
+.menu-bar {
+    display: flex;
+    align-items: stretch;
+    height: var(--menu-bar-height);
+    background-color: var(--clr-statusbar);
+    user-select: none;
+    flex: 0 0 auto;
+}
+
+.menu-bar-item {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    background: transparent;
+    color: var(--text-on-statusbar);
+    border: 0;
+    font-size: 0.9rem;
+    cursor: default;
+    outline: none;
+
+    &:hover,
+    &.active {
+        background-color: rgba(255, 255, 255, 0.18);
+        color: var(--text-on-statusbar);
+    }
+
+    &:focus-visible {
+        background-color: rgba(255, 255, 255, 0.18);
+        color: var(--text-on-statusbar);
+        outline: 2px solid var(--clr-lightblue);
+        outline-offset: -2px;
+    }
+}
