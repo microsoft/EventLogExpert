@@ -1,6 +1,7 @@
 ﻿.toggle {
-    display: flex;
+    display: inline-flex;
     margin-left: 5px;
+    width: fit-content;
 }
 
 .toggle input {
@@ -20,29 +21,34 @@
     text-align: center;
     user-select: none;
     padding: 4px 8px;
-    margin-right: -1px;
-    border: 1px solid rgba(0, 0, 0, 0.2);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px rgba(255, 255, 255, 0.1);
-    transition: all 0.1s ease-in-out;
+    border-top: 1px solid rgba(0, 0, 0, 0.2);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
+    border-left: 1px solid rgba(0, 0, 0, 0.2);
+    transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
     min-width: 4rem;
+    box-sizing: border-box;
 }
 
-.toggle label:first-of-type { border-radius: 4px 0 0 4px; }
-
-.toggle label:last-of-type { border-radius: 0 4px 4px 0; }
+.toggle label:last-of-type {
+    border-right: 1px solid rgba(0, 0, 0, 0.2);
+}
 
 .toggle input:checked + label {
-    box-shadow: none;
-    color: var(--clr-black);
-
-    &[data-single-color="true"] {
-        background-color: var(--clr-lightblue);
-        color: var(--accent-on-fill);
-    }
+    background-color: var(--clr-lightblue);
+    color: var(--accent-on-fill);
 }
 
-.toggle input:checked + label:first-of-type { background-color: var(--clr-red); }
+.toggle input:checked + label[data-use-status-colors="true"]:first-of-type {
+    background-color: var(--clr-red);
+    color: var(--clr-white);
+}
 
-.toggle input:checked + label:last-of-type { background-color: var(--clr-green); }
+.toggle input:checked + label[data-use-status-colors="true"]:last-of-type {
+    background-color: var(--clr-green);
+    color: var(--clr-white);
+}
 
-.toggle input:focus + label { border: 1px solid var(--clr-statusbar); }
+.toggle input:focus-visible + label {
+    outline: 2px solid var(--clr-statusbar);
+    outline-offset: -2px;
+}

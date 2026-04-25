@@ -2,7 +2,7 @@
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
-        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" IsSingleColor="true" />
+        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" EnabledString="OR" DisabledString="AND" />
 
         <ValueSelect AriaLabel="Category" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="CategoryBinding" ToStringFunc="x => x.ToFullString()">
             @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
