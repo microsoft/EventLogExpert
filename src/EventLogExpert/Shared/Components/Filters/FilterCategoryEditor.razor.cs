@@ -21,7 +21,7 @@ public sealed partial class FilterCategoryEditor : ComponentBase
     /// <summary>Optional id of the external label for the category dropdown; falls back to a built-in aria-label.</summary>
     [Parameter] public string? CategoryAriaLabelledBy { get; set; }
 
-    [Parameter][EditorRequired] public FilterData Data { get; set; } = null!;
+    [Parameter][EditorRequired] public BasicFilterCriteriaDraft Data { get; set; } = null!;
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
@@ -30,7 +30,7 @@ public sealed partial class FilterCategoryEditor : ComponentBase
         get => Data.Category;
         set
         {
-            Data.Category = value;
+            Data.ChangeCategory(value);
 
             if (IsTextOnlyCategory(value) && Data.Evaluator == FilterEvaluator.MultiSelect)
             {
