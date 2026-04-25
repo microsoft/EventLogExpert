@@ -59,9 +59,8 @@ public sealed class FilterPaneEffects(
     [EffectMethod]
     public Task HandleSaveFilterGroup(FilterPaneAction.SaveFilterGroup action, IDispatcher dispatcher)
     {
-        // Saved-group filters are projected fresh: new Id (so re-applying the group inserts cleanly into
-        // the pane's de-dup) and IsEnabled defaults to false so the user opts in by toggling. All other
-        // identity (color/text/compiled/source/type/excluded) is preserved verbatim via record copy.
+        // New Id so re-applying the group inserts cleanly into the pane's de-dup; IsEnabled cleared
+        // so the user opts in by toggling. All other identity is preserved verbatim via record copy.
         dispatcher.Dispatch(
             new FilterGroupAction.AddGroup(
                 new FilterGroupModel

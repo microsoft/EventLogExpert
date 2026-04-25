@@ -29,9 +29,8 @@ public sealed class FilterPaneReducers
         {
             if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
 
-            // Apply the group filter as-is, only flipping IsEnabled on. Color, ComparisonText,
-            // Compiled, BasicSource, FilterType, and IsExcluded are preserved verbatim so a Basic
-            // filter saved in a group is still re-editable as Basic.
+            // Preserve the group filter as-is; only flip IsEnabled on so a Basic filter saved in a
+            // group is still re-editable as Basic.
             additions.Add(filter with { Id = FilterId.Create(), IsEnabled = true });
         }
 

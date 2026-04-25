@@ -17,20 +17,18 @@ public sealed class FilterEditorModel
 
     public bool IsExcluded { get; set; }
 
-    /// <summary>The main Basic-filter clause being edited.</summary>
     public BasicFilterCriteriaDraft Main { get; set; } = new();
 
     /// <summary>
-    ///     Flat list of additional sub-clauses joined to the main clause via
-    ///     <see cref="BasicSubClauseDraft.JoinWithAny" /> (OR when true, AND when false).
+    ///     Sub-clauses are joined to <see cref="Main" /> via <see cref="BasicSubClauseDraft.JoinWithAny" />
+    ///     (OR when true, AND when false).
     /// </summary>
     public List<BasicSubClauseDraft> SubClauses { get; set; } = [];
 
     /// <summary>
-    ///     Creates a draft editor from a saved filter. When the saved filter retains its Basic
-    ///     <see cref="FilterModel.BasicSource" />, the editor is hydrated from it so Basic re-edit reopens with the original
-    ///     main + sub-clause structure. Otherwise (Advanced / Cached, or legacy persisted Basic filters that pre-date
-    ///     BasicSource) the editor opens with empty Basic fields and the user sees just the comparison text.
+    ///     Hydrates Basic structure from <see cref="FilterModel.BasicSource" /> when present so Basic re-edit
+    ///     reopens with the original main + sub-clauses; otherwise opens empty Basic fields with just
+    ///     <see cref="FilterModel.ComparisonText" /> populated.
     /// </summary>
     public static FilterEditorModel FromFilterModel(FilterModel filter)
     {
@@ -53,7 +51,6 @@ public sealed class FilterEditorModel
         };
     }
 
-    /// <summary>Materializes the immutable Basic source for parse / compile.</summary>
     public BasicFilterSource ToBasicSource() =>
         new(Main.ToCriteria(), [.. SubClauses.Select(subClause => subClause.ToSubClause())]);
 
