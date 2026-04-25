@@ -17,19 +17,16 @@ namespace EventLogExpert.Shared.Base;
 /// </summary>
 public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 {
-    /// <summary>Bubbled to the parent so it can track which saved rows are mid-edit.</summary>
+    /// <summary>Notifies the parent which saved rows are mid-edit.</summary>
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
 
-    /// <summary>Pending-row cancel: parent removes the draft from its pending list (no dispatch).</summary>
+    /// <summary>Pending-row cancel: parent removes the draft (no dispatch).</summary>
     [Parameter] public EventCallback OnPendingDiscard { get; set; }
 
     /// <summary>Pending-row save: parent must remove the draft and dispatch the upsert atomically.</summary>
     [Parameter] public EventCallback<FilterModel> OnPendingSave { get; set; }
 
-    /// <summary>
-    ///     Parent-owned draft for a never-saved filter; mutually exclusive with
-    ///     <see cref="FilterRowBase{TValue}.Value" />.
-    /// </summary>
+    /// <summary>Mutually exclusive with <see cref="FilterRowBase{TValue}.Value" />.</summary>
     [Parameter] public FilterEditorModel? PendingDraft { get; set; }
 
     [Inject] protected IDispatcher Dispatcher { get; init; } = null!;
@@ -61,16 +58,16 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 
     protected Task CommitPendingAsync(FilterModel filter) => OnPendingSave.InvokeAsync(filter);
 
-    /// <summary>Subclasses dispatch the appropriate remove-filter action. Saved rows only.</summary>
+    /// <summary>Saved rows only.</summary>
     protected abstract void DispatchRemoveFilter();
 
-    /// <summary>Subclasses dispatch the appropriate set-filter action (FilterPane, FilterGroup, etc.).</summary>
+    /// <summary>Dispatches the appropriate set-filter action (FilterPane, FilterGroup, etc.).</summary>
     protected abstract void DispatchSetFilter(FilterModel filter);
 
-    /// <summary>Subclasses that expose an enable/disable toggle override this. Default is no-op.</summary>
+    /// <summary>Default is no-op; subclasses with an enable/disable toggle override.</summary>
     protected virtual void DispatchToggleEnabled(FilterId id) { }
 
-    /// <summary>Subclasses dispatch toggle-exclusion. Saved rows only.</summary>
+    /// <summary>Saved rows only.</summary>
     protected abstract void DispatchToggleExclusion(FilterId id);
 
     protected async Task EditFilter()
@@ -88,10 +85,9 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     protected Task NotifyEditingEndedAsync() =>
         Value is { } savedFilter ? OnEditingChanged.InvokeAsync((savedFilter.Id, false)) : Task.CompletedTask;
 
-    /// <summary>Hook for subclasses to clear transient UI state before the draft changes. Base clears the error banner.</summary>
+    /// <summary>Subclass hook to clear transient UI state before the draft changes. Base clears the error banner.</summary>
     protected virtual void OnEditSessionResetting() => ErrorMessage = string.Empty;
 
-    /// <summary>Persist raw input into the draft and clear any stale error banner.</summary>
     protected void OnInputChanged(ChangeEventArgs eventArgs)
     {
         if (Filter is null) { return; }
@@ -178,10 +174,9 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     }
 
     /// <summary>
-    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch. Returning
-    ///     <see langword="null" /> aborts the save (subclass is responsible for surfacing the error). The default
-    ///     implementation enforces non-empty text and compiles via <see cref="FilterCompiler.TryCompile" /> (the same compiler
-    ///     used at filter-evaluation time).
+    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch.
+    ///     Returning <see langword="null" /> aborts the save (subclass surfaces the error). Default
+    ///     enforces non-empty text and compiles via <see cref="FilterCompiler.TryCompile" />.
     /// </summary>
     protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
     {

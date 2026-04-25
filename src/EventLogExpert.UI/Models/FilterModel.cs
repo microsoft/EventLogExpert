@@ -7,17 +7,14 @@ using System.Text.Json.Serialization;
 namespace EventLogExpert.UI.Models;
 
 /// <summary>
-///     Immutable saved filter. Carries the source <see cref="ComparisonText" /> together with the pre-compiled
+///     Immutable saved filter. Carries <see cref="ComparisonText" /> together with the pre-compiled
 ///     <see cref="Compiled" /> predicate so consumers never have to recompile to evaluate. Basic filters additionally
-///     retain the structured <see cref="BasicSource" /> for round-trip re-edit.
+///     retain <see cref="BasicSource" /> for round-trip re-edit.
 /// </summary>
 [JsonConverter(typeof(FilterModelJsonConverter))]
 public sealed record FilterModel
 {
-    /// <summary>
-    ///     The empty filter — no expression, no compiled artifact. Use as a placeholder where a default-valued
-    ///     <see cref="FilterModel" /> is required.
-    /// </summary>
+    /// <summary>Placeholder where a default-valued <see cref="FilterModel" /> is required.</summary>
     public static readonly FilterModel Empty = new() { ComparisonText = string.Empty, Compiled = null };
 
     [JsonIgnore]
@@ -36,8 +33,8 @@ public sealed record FilterModel
     public required CompiledFilter? Compiled { get; init; }
 
     /// <summary>
-    ///     Structured source for Basic filters; persisted so re-edit can re-open the Basic editor with the original main
-    ///     + sub-clause structure intact. <c>null</c> for Advanced and Cached filters.
+    ///     Structured source for Basic filters; persisted so re-edit reopens the original main + sub-clause structure.
+    ///     <c>null</c> for Advanced and Cached filters.
     /// </summary>
     public BasicFilterSource? BasicSource { get; init; }
 
@@ -50,8 +47,7 @@ public sealed record FilterModel
 
     /// <summary>
     ///     Compiles <paramref name="comparisonText" /> and returns a populated <see cref="FilterModel" />, or <c>null</c>
-    ///     if the expression fails to parse. Use this from any code path that needs to construct a runnable filter from a
-    ///     freshly-typed expression.
+    ///     if the expression fails to parse.
     /// </summary>
     public static FilterModel? TryCreate(
         string comparisonText,

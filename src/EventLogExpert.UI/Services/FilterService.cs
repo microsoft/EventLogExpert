@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using System.Collections.Immutable;
 using System.Linq.Dynamic.Core;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -22,8 +21,8 @@ public sealed class FilterService : IFilterService
     {
         var logs = logData as IReadOnlyList<EventLogData> ?? [.. logData];
 
-        // Single log, no filters, or trivial total work -> sequential per-log (inner PLINQ still
-        // engages for >=10k events on a single large log, preserving the fast path).
+        // Single log, no filters, or trivial total work: sequential per-log (inner PLINQ still
+        // engages for >=10k events on a single large log).
         if (logs.Count <= 1 ||
             !FilterMethods.IsFilteringEnabled(eventFilter) ||
             !ShouldParallelizeAcrossLogs(logs))
@@ -32,7 +31,7 @@ public sealed class FilterService : IFilterService
         }
 
         // Multi-log heavy work: parallelize across logs, sequential within each log to avoid
-        // oversubscribing the thread pool with nested PLINQ.
+        // oversubscribing the thread pool.
         var results = new IReadOnlyList<DisplayEventModel>[logs.Count];
 
         try
@@ -70,8 +69,7 @@ public sealed class FilterService : IFilterService
             return events as IReadOnlyList<DisplayEventModel> ?? [.. events];
         }
 
-        // For small collections, PLINQ's thread scheduling overhead exceeds the
-        // parallelism benefit. Use sequential filtering below the threshold.
+        // PLINQ scheduling overhead exceeds the benefit below this threshold.
         if (events is IReadOnlyCollection<DisplayEventModel> { Count: < 10_000 } collection)
         {
             return FilterEventsSequential(collection, eventFilter);
@@ -90,7 +88,7 @@ public sealed class FilterService : IFilterService
 
         comparison = string.Empty;
 
-        if (!TryFormatCriteria(source.Main, joinPrefix: null, out var mainText))
+        if (!TryFormatCriteria(source.Main, null, out var mainText))
         {
             return false;
         }
@@ -226,16 +224,13 @@ public sealed class FilterService : IFilterService
     }
 
     /// <summary>
-    ///     Formats a single Basic criterion into the runtime comparison fragment.
-    ///     Performs all guards before writing any output so a skipped sub-clause leaves
-    ///     no orphaned join operator in the caller's <see cref="StringBuilder" />.
+    ///     Formats a single Basic criterion into the runtime comparison fragment. Performs all guards before writing any
+    ///     output so a skipped sub-clause leaves no orphaned join operator in the caller's <see cref="StringBuilder" />.
     /// </summary>
-    /// <param name="criteria">The criterion to format.</param>
     /// <param name="joinPrefix">
-    ///     Optional " || " or " && " prepended for sub-clauses; <c>null</c> for the main clause.
+    ///     <c>" || "</c> or <c>" &amp;&amp; "</c> prepended for sub-clauses; <c>null</c> for the main
+    ///     clause.
     /// </param>
-    /// <param name="formatted">The formatted fragment when successful; otherwise empty.</param>
-    /// <returns><c>true</c> when the criterion produced output; <c>false</c> when guards rejected it.</returns>
     private static bool TryFormatCriteria(BasicFilterCriteria criteria, string? joinPrefix, out string formatted)
     {
         formatted = string.Empty;
