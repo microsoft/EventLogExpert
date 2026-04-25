@@ -34,14 +34,7 @@ public readonly record struct EventFilter
 
         foreach (var filter in filters)
         {
-            if (filter.Comparison.RequiresXml) { return true; }
-
-            if (filter.SubFilters.Count == 0) { continue; }
-
-            foreach (var sub in filter.SubFilters)
-            {
-                if (sub.Comparison.RequiresXml) { return true; }
-            }
+            if (filter.Compiled?.RequiresXml == true) { return true; }
         }
 
         return false;
@@ -55,7 +48,7 @@ public readonly record struct EventFilter
 
         foreach (var filter in filters)
         {
-            builder.Add(new FilterSignatureEntry(filter.Comparison.Value, filter.IsExcluded));
+            builder.Add(new FilterSignatureEntry(filter.ComparisonText, filter.IsExcluded));
         }
 
         return builder.MoveToImmutable();

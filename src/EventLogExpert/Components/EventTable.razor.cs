@@ -418,7 +418,7 @@ public sealed partial class EventTable
         {
             if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
 
-            if (!filter.Comparison.Expression(@event)) { continue; }
+            if (filter.Compiled is null || !filter.Compiled.Predicate(@event)) { continue; }
 
             // Skip filters whose Color is outside the defined HighlightColor
             // range (e.g., from corrupted persisted state) so they don't

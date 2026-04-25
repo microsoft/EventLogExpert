@@ -1,8 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Services;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -109,9 +111,11 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
 
         if (Value is not null && PendingDraft is not null)
         {
-            throw new InvalidOperationException(
-                $"{nameof(EditableFilterRowBase)} cannot have both {nameof(Value)} and " +
-                $"{nameof(PendingDraft)} set; choose one.");
+            // Pending → saved transition: the parent reused the same key (FilterId is preserved on save),
+            // so Blazor rebinds Value but Blazor does NOT clear PendingDraft from the previous render.
+            // Treat the saved value as authoritative and drop the stale draft reference.
+            PendingDraft = null;
+            Filter = null;
         }
 
         if (IsPending)
@@ -176,7 +180,8 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     /// <summary>
     ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch. Returning
     ///     <see langword="null" /> aborts the save (subclass is responsible for surfacing the error). The default
-    ///     implementation enforces non-empty text and parses via <see cref="IFilterService.TryParseExpression" />.
+    ///     implementation enforces non-empty text and compiles via <see cref="FilterCompiler.TryCompile" /> (the same compiler
+    ///     used at filter-evaluation time).
     /// </summary>
     protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
     {
@@ -187,14 +192,24 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
             return ValueTask.FromResult<FilterModel?>(null);
         }
 
-        if (!FilterService.TryParseExpression(draft.ComparisonText, out var error))
+        if (!FilterCompiler.TryCompile(draft.ComparisonText, out var compiled, out var error))
         {
             ErrorMessage = error;
 
             return ValueTask.FromResult<FilterModel?>(null);
         }
 
-        FilterModel result = draft.ToFilterModel() with { IsEnabled = true };
+        var result = new FilterModel
+        {
+            Id = draft.Id,
+            Color = draft.Color,
+            ComparisonText = draft.ComparisonText,
+            Compiled = compiled,
+            BasicSource = draft.FilterType == FilterType.Basic ? draft.ToBasicSource() : null,
+            FilterType = draft.FilterType,
+            IsEnabled = true,
+            IsExcluded = draft.IsExcluded
+        };
 
         return ValueTask.FromResult<FilterModel?>(result);
     }

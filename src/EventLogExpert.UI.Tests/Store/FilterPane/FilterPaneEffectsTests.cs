@@ -22,11 +22,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleAddFilter_WhenComparisonValueExists_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            IsEnabled = true
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new FilterPaneAction.AddFilter(filterModel);
@@ -42,10 +38,12 @@ public sealed class FilterPaneEffectsTests
     [Fact]
     public async Task HandleAddFilter_WhenComparisonValueIsNull_ShouldNotUpdateEventTableFilters()
     {
-        // Arrange
+        // Arrange — empty comparison cannot compile, so the placeholder filter has no Compiled artifact
+        // and the effect must skip dispatching SetFilters.
         var filterModel = new FilterModel
         {
-            Comparison = new FilterComparison() // Default constructor leaves Value as null
+            ComparisonText = string.Empty,
+            Compiled = null
         };
 
         var (effects, mockDispatcher) = CreateEffects();
@@ -62,11 +60,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleAddFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            FilterType = FilterType.Cached
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new FilterPaneAction.AddFilter(filterModel);
@@ -82,11 +76,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleAddFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            FilterType = FilterType.Advanced
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new FilterPaneAction.AddFilter(filterModel);
@@ -147,12 +137,10 @@ public sealed class FilterPaneEffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                Color = HighlightColor.Red,
-                IsExcluded = true
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                color: HighlightColor.Red,
+                isExcluded: true));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
         var action = new FilterPaneAction.SaveFilterGroup(Constants.FilterGroupName);
@@ -164,7 +152,7 @@ public sealed class FilterPaneEffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.AddGroup>(x =>
             x.FilterGroup!.Filters[0].Color == HighlightColor.Red &&
             x.FilterGroup.Filters[0].IsExcluded == true &&
-            x.FilterGroup.Filters[0].Comparison.Value == Constants.FilterIdEquals100));
+            x.FilterGroup.Filters[0].ComparisonText == Constants.FilterIdEquals100));
     }
 
     [Fact]
@@ -172,12 +160,10 @@ public sealed class FilterPaneEffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                Color = HighlightColor.Blue,
-                IsExcluded = false
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                color: HighlightColor.Blue,
+                isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
         var action = new FilterPaneAction.SaveFilterGroup(Constants.FilterGroupName);
@@ -197,16 +183,8 @@ public sealed class FilterPaneEffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                Color = HighlightColor.Blue
-            },
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterLevelEqualsError },
-                Color = HighlightColor.Red
-            });
+            FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Blue),
+            FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError, color: HighlightColor.Red));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
         var action = new FilterPaneAction.SaveFilterGroup(Constants.FilterGroupName);
@@ -223,11 +201,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            IsEnabled = true
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new FilterPaneAction.SetFilter(filterModel);
@@ -243,11 +217,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleSetFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            FilterType = FilterType.Cached
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new FilterPaneAction.SetFilter(filterModel);
@@ -263,11 +233,7 @@ public sealed class FilterPaneEffectsTests
     public async Task HandleSetFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            FilterType = FilterType.Advanced
-        };
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new FilterPaneAction.SetFilter(filterModel);
@@ -490,20 +456,16 @@ public sealed class FilterPaneEffectsTests
     {
         // Structurally equivalent but distinct instances; HasFilteringChanged must short-circuit.
         var paneFilters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                IsEnabled = true,
-                IsExcluded = false
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                isEnabled: true,
+                isExcluded: false));
 
         var appliedFilters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                IsEnabled = true,
-                IsExcluded = false
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                isEnabled: true,
+                isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,
@@ -522,18 +484,14 @@ public sealed class FilterPaneEffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                IsEnabled = true,
-                IsExcluded = false
-            },
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterLevelEqualsError },
-                IsEnabled = true,
-                IsExcluded = true
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                isEnabled: true,
+                isExcluded: false),
+            FilterUtils.CreateTestFilter(
+                Constants.FilterLevelEqualsError,
+                isEnabled: true,
+                isExcluded: true));
 
         var (effects, mockDispatcher) = CreateEffects(false, filters);
 
@@ -551,18 +509,14 @@ public sealed class FilterPaneEffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                IsEnabled = true,
-                IsExcluded = false
-            },
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterLevelEqualsError },
-                IsEnabled = false,
-                IsExcluded = false
-            });
+            FilterUtils.CreateTestFilter(
+                Constants.FilterIdEquals100,
+                isEnabled: true,
+                isExcluded: false),
+            FilterUtils.CreateTestFilter(
+                Constants.FilterLevelEqualsError,
+                isEnabled: false,
+                isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(true, filters);
 
@@ -572,7 +526,7 @@ public sealed class FilterPaneEffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.SetFilters>(x =>
             x.EventFilter.Filters.Count == 1 &&
-            x.EventFilter.Filters[0].Comparison.Value == Constants.FilterIdEquals100));
+            x.EventFilter.Filters[0].ComparisonText == Constants.FilterIdEquals100));
     }
 
     [Fact]
@@ -625,9 +579,5 @@ public sealed class FilterPaneEffectsTests
 
     private static ImmutableList<FilterModel> CreateSingleEnabledFilters() =>
         ImmutableList.Create(
-            new FilterModel
-            {
-                Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-                IsEnabled = true
-            });
+            FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true));
 }

@@ -392,30 +392,6 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_UsesConstructionTimeSnapshot()
-    {
-        // Contract guard: HasFilteringChanged must compare a construction-time snapshot, not
-        // the live FilterModel graph (whose Comparison.Value and FilterData are still settable).
-        var sharedFilter = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            IsExcluded = false
-        };
-
-        var original = new EventFilter(null, ImmutableList.Create(sharedFilter));
-
-        sharedFilter.Comparison.Value = Constants.FilterIdEquals200;
-
-        var updated = new EventFilter(null, ImmutableList.Create(sharedFilter));
-
-        // Act
-        var result = FilterMethods.HasFilteringChanged(updated, original);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
     public void HasFilteringChanged_WhenBothEmpty_ShouldReturnFalse()
     {
         // Arrange
@@ -427,6 +403,24 @@ public sealed class FilterMethodsTests
 
         // Assert
         Assert.False(result);
+    }
+
+    [Fact]
+    public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReturnTrue()
+    {
+        // FilterModel is now immutable, so structural change is the only signal HasFilteringChanged
+        // needs to detect. (Pre-immutability this test guarded against in-place Comparison mutation.)
+        var first = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
+        var second = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
+
+        var original = new EventFilter(null, ImmutableList.Create(first));
+        var updated = new EventFilter(null, ImmutableList.Create(second));
+
+        // Act
+        var result = FilterMethods.HasFilteringChanged(updated, original);
+
+        // Assert
+        Assert.True(result);
     }
 
     [Fact]
@@ -562,17 +556,8 @@ public sealed class FilterMethodsTests
     public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReturnFalse()
     {
         // Color affects highlighting, not the filtered event set.
-        var redFilter = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            Color = HighlightColor.Red
-        };
-
-        var blueFilter = new FilterModel
-        {
-            Comparison = new FilterComparison { Value = Constants.FilterIdEquals100 },
-            Color = HighlightColor.Blue
-        };
+        var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Red);
+        var blueFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Blue);
 
         var original = new EventFilter(null, ImmutableList.Create(redFilter));
         var updated = new EventFilter(null, ImmutableList.Create(blueFilter));
@@ -1115,12 +1100,6 @@ public sealed class FilterMethodsTests
         Assert.Equal(1L, result[2].RecordId);
     }
 
-    private static FilterModel CreateFilter(string expression, bool isExcluded = false)
-    {
-        return new FilterModel
-        {
-            Comparison = new FilterComparison { Value = expression },
-            IsExcluded = isExcluded
-        };
-    }
+    private static FilterModel CreateFilter(string expression, bool isExcluded = false) =>
+        FilterUtils.CreateTestFilter(comparisonValue: expression, isExcluded: isExcluded);
 }

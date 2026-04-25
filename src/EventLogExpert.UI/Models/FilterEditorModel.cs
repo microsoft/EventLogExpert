@@ -1,8 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using System.Collections.Immutable;
-
 namespace EventLogExpert.UI.Models;
 
 public sealed class FilterEditorModel
@@ -24,91 +22,45 @@ public sealed class FilterEditorModel
 
     /// <summary>
     ///     Flat list of additional sub-clauses joined to the main clause via
-    ///     <see cref="BasicSubClauseDraft.JoinWithAny" /> (OR when true, AND when false). Production never produces nested
-    ///     grandchildren; legacy deeper trees are intentionally flattened away on import.
+    ///     <see cref="BasicSubClauseDraft.JoinWithAny" /> (OR when true, AND when false).
     /// </summary>
     public List<BasicSubClauseDraft> SubClauses { get; set; } = [];
 
-    /// <summary>Creates a draft editor from a saved filter.</summary>
-    /// <remarks>
-    ///     Lossy bridge: only the top level of <paramref name="filter" />.SubFilters is preserved (mapped to
-    ///     <see cref="SubClauses" />). Grandchildren and per-sub-filter Color/IsEnabled/IsExcluded are discarded — production
-    ///     never produces them.
-    /// </remarks>
-    public static FilterEditorModel FromFilterModel(FilterModel filter) =>
-        new()
+    /// <summary>
+    ///     Creates a draft editor from a saved filter. When the saved filter retains its Basic
+    ///     <see cref="FilterModel.BasicSource" />, the editor is hydrated from it so Basic re-edit reopens with the original
+    ///     main + sub-clause structure. Otherwise (Advanced / Cached, or legacy persisted Basic filters that pre-date
+    ///     BasicSource) the editor opens with empty Basic fields and the user sees just the comparison text.
+    /// </summary>
+    public static FilterEditorModel FromFilterModel(FilterModel filter)
+    {
+        var basicSource = filter.FilterType == FilterType.Basic ? filter.BasicSource : null;
+
+        return new FilterEditorModel
         {
             Id = filter.Id,
             Color = filter.Color,
-            ComparisonText = filter.Comparison.Value,
+            ComparisonText = filter.ComparisonText,
             FilterType = filter.FilterType,
             IsEnabled = filter.IsEnabled,
             IsExcluded = filter.IsExcluded,
-            Main = DraftFromFilterData(filter.Data),
-            SubClauses = [.. filter.SubFilters.Select(SubClauseDraftFromFilterModel)]
+            Main = basicSource is null
+                ? new BasicFilterCriteriaDraft()
+                : BasicFilterCriteriaDraft.FromCriteria(basicSource.Main),
+            SubClauses = basicSource is null
+                ? []
+                : [.. basicSource.SubClauses.Select(SubClauseDraftFromSubClause)]
         };
+    }
 
     /// <summary>Materializes the immutable Basic source for parse / compile.</summary>
     public BasicFilterSource ToBasicSource() =>
         new(Main.ToCriteria(), [.. SubClauses.Select(subClause => subClause.ToSubClause())]);
 
-    /// <summary>
-    ///     Materializes a saved <see cref="FilterModel" /> in the legacy shape so downstream consumers (reducers,
-    ///     persistence, re-edit) can continue to round-trip the draft. Will be removed in 13d when callers migrate to
-    ///     <see cref="ToBasicSource" /> + <c>FilterModel</c>'s new shape.
-    /// </summary>
-    public FilterModel ToFilterModel() =>
+    private static BasicSubClauseDraft SubClauseDraftFromSubClause(BasicSubClause subClause) =>
         new()
         {
-            Id = Id,
-            Color = Color,
-            FilterType = FilterType,
-            IsEnabled = IsEnabled,
-            IsExcluded = IsExcluded,
-            Data = FilterDataFromDraft(Main),
-            SubFilters = [.. SubClauses.Select(SubFilterFromSubClauseDraft)],
-            Comparison = string.IsNullOrEmpty(ComparisonText)
-                ? new FilterComparison()
-                : new FilterComparison { Value = ComparisonText }
-        };
-
-    private static BasicFilterCriteriaDraft DraftFromFilterData(FilterData data) =>
-        new()
-        {
-            Category = data.Category,
-            Evaluator = data.Evaluator,
-            Value = data.Value,
-            Values = [.. data.Values]
-        };
-
-    private static FilterData FilterDataFromDraft(BasicFilterCriteriaDraft draft)
-    {
-        // FilterData.Category setter clears Value/Values, so populate Category before Value/Values.
-        var data = new FilterData
-        {
-            Category = draft.Category,
-            Evaluator = draft.Evaluator,
-            Value = draft.Value,
-            Values = [.. draft.Values]
-        };
-
-        return data;
-    }
-
-    private static BasicSubClauseDraft SubClauseDraftFromFilterModel(FilterModel subFilter) =>
-        new()
-        {
-            Id = subFilter.Id,
-            Criteria = DraftFromFilterData(subFilter.Data),
-            JoinWithAny = subFilter.ShouldCompareAny
-        };
-
-    private static FilterModel SubFilterFromSubClauseDraft(BasicSubClauseDraft subClause) =>
-        new()
-        {
-            Id = subClause.Id,
-            Data = FilterDataFromDraft(subClause.Criteria),
-            ShouldCompareAny = subClause.JoinWithAny,
-            SubFilters = ImmutableList<FilterModel>.Empty
+            Criteria = BasicFilterCriteriaDraft.FromCriteria(subClause.Criteria),
+            JoinWithAny = subClause.JoinWithAny
         };
 }

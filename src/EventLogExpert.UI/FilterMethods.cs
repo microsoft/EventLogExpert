@@ -175,11 +175,13 @@ public static class FilterMethods
 
             foreach (var filter in filters)
             {
-                if (filter.IsExcluded && filter.Comparison.Expression(@event)) { return false; }
+                if (filter.Compiled is null) { continue; }
+
+                if (filter.IsExcluded && filter.Compiled.Predicate(@event)) { return false; }
 
                 if (!filter.IsExcluded) { isEmpty = false; }
 
-                if (!filter.IsExcluded && filter.Comparison.Expression(@event)) { isFiltered = true; }
+                if (!filter.IsExcluded && filter.Compiled.Predicate(@event)) { isFiltered = true; }
             }
 
             return isEmpty || isFiltered;

@@ -20,16 +20,16 @@ public sealed class FilterPaneEffects(
     [EffectMethod]
     public Task HandleAddFilter(FilterPaneAction.AddFilter action, IDispatcher dispatcher)
     {
-        if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
+        if (!string.IsNullOrEmpty(action.FilterModel.ComparisonText))
         {
             UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
         }
 
         if (action.FilterModel.FilterType is not FilterType.Cached &&
-            !string.IsNullOrEmpty(action.FilterModel.Comparison.Value))
+            !string.IsNullOrEmpty(action.FilterModel.ComparisonText))
         {
             dispatcher.Dispatch(
-                new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
+                new FilterCacheAction.AddRecentFilter(action.FilterModel.ComparisonText));
         }
 
         return Task.CompletedTask;
@@ -59,6 +59,9 @@ public sealed class FilterPaneEffects(
     [EffectMethod]
     public Task HandleSaveFilterGroup(FilterPaneAction.SaveFilterGroup action, IDispatcher dispatcher)
     {
+        // Saved-group filters are projected fresh: new Id (so re-applying the group inserts cleanly into
+        // the pane's de-dup) and IsEnabled defaults to false so the user opts in by toggling. All other
+        // identity (color/text/compiled/source/type/excluded) is preserved verbatim via record copy.
         dispatcher.Dispatch(
             new FilterGroupAction.AddGroup(
                 new FilterGroupModel
@@ -67,12 +70,7 @@ public sealed class FilterPaneEffects(
                     Filters =
                     [
                         .. _filterPaneState.Value.Filters.Select(filter =>
-                            new FilterModel
-                            {
-                                Color = filter.Color,
-                                Comparison = filter.Comparison with { },
-                                IsExcluded = filter.IsExcluded
-                            })
+                            filter with { Id = FilterId.Create(), IsEnabled = false })
                     ]
                 }));
 
@@ -84,10 +82,10 @@ public sealed class FilterPaneEffects(
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
 
-        if (!string.IsNullOrEmpty(action.FilterModel.Comparison.Value) &&
+        if (!string.IsNullOrEmpty(action.FilterModel.ComparisonText) &&
             action.FilterModel.FilterType is not FilterType.Cached)
         {
-            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.Comparison.Value));
+            dispatcher.Dispatch(new FilterCacheAction.AddRecentFilter(action.FilterModel.ComparisonText));
         }
 
         return Task.CompletedTask;
