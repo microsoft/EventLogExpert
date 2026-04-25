@@ -7,7 +7,6 @@ namespace EventLogExpert.UI.Models;
 
 /// <summary>
 ///     Immutable representation of a single Basic-filter criterion (one row of the editor).
-///     Replaces <see cref="FilterData" /> for the new filter shape.
 /// </summary>
 public sealed record BasicFilterCriteria
 {

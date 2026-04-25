@@ -11,8 +11,7 @@ namespace EventLogExpert.UI.Services;
 
 /// <summary>
 ///     Single source of truth for compiling a Dynamic LINQ expression string into a
-///     <see cref="CompiledFilter" />. Replaces the dual configurations previously used by
-///     <c>FilterComparison.Value</c> and <c>FilterService.TryParseExpression</c>.
+///     <see cref="CompiledFilter" />.
 /// </summary>
 public static class FilterCompiler
 {
