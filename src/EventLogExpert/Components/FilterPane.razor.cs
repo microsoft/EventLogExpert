@@ -18,7 +18,7 @@ namespace EventLogExpert.Components;
 public sealed partial class FilterPane : IDisposable
 {
     private readonly FilterDateModel _model = new();
-    private readonly List<FilterEditorModel> _pendingDrafts = [];
+    private readonly List<FilterDraftModel> _pendingDrafts = [];
 
     private bool _canEditDate;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
@@ -63,13 +63,13 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddAdvancedFilter()
     {
-        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
+        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Advanced });
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Basic });
+        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Basic });
         _isFilterListVisible = true;
     }
 
@@ -92,7 +92,7 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddExclusion()
     {
-        _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Basic, IsExcluded = true });
+        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Basic, IsExcluded = true });
         _isFilterListVisible = true;
     }
 
@@ -129,9 +129,9 @@ public sealed partial class FilterPane : IDisposable
         }
     }
 
-    private void HandlePendingDiscard(FilterEditorModel draft) => _pendingDrafts.Remove(draft);
+    private void HandlePendingDiscard(FilterDraftModel draft) => _pendingDrafts.Remove(draft);
 
-    private void HandlePendingSave(FilterEditorModel draft, FilterModel filter)
+    private void HandlePendingSave(FilterDraftModel draft, FilterModel filter)
     {
         _pendingDrafts.Remove(draft);
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));

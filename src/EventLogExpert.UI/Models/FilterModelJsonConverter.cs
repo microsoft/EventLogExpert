@@ -11,7 +11,7 @@ namespace EventLogExpert.UI.Models;
 /// <summary>
 ///     Reads and writes <see cref="FilterModel" /> JSON. Accepts both the legacy persisted shape (
 ///     <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b }</c>) and the new shape (
-///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "FilterType": "Advanced", "BasicSource": ... }</c>).
+///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "FilterType": "Advanced", "BasicFilter": ... }</c>).
 ///     Always writes the new shape.
 ///     <para>
 ///         When a persisted <c>ComparisonText</c> fails to compile, the loaded filter retains the text and
@@ -33,7 +33,7 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
         string? legacyComparisonValue = null;
         bool isExcluded = false;
         FilterType filterType = FilterType.Advanced;
-        BasicFilterSource? basicSource = null;
+        BasicFilter? basicFilter = null;
         bool filterTypeSeen = false;
 
         while (reader.Read())
@@ -45,7 +45,11 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
                 throw new JsonException($"Expected PropertyName, got {reader.TokenType}.");
             }
 
-            string propertyName = reader.GetString()!;
+            if (reader.GetString() is not { } propertyName)
+            {
+                throw new JsonException("Expected non-null PropertyName.");
+            }
+
             reader.Read();
 
             switch (propertyName)
@@ -66,10 +70,10 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
                     filterType = ReadFilterType(ref reader);
                     filterTypeSeen = true;
                     break;
-                case "BasicSource":
-                    basicSource = reader.TokenType == JsonTokenType.Null
+                case "BasicFilter":
+                    basicFilter = reader.TokenType == JsonTokenType.Null
                         ? null
-                        : JsonSerializer.Deserialize<BasicFilterSource>(ref reader, options);
+                        : JsonSerializer.Deserialize<BasicFilter>(ref reader, options);
 
                     break;
                 default:
@@ -86,10 +90,10 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
             filterType = FilterType.Advanced;
         }
 
-        if (filterType == FilterType.Basic && basicSource is null)
+        if (filterType == FilterType.Basic && basicFilter is null)
         {
             Trace.TraceWarning(
-                "FilterModelJsonConverter: persisted Basic filter has no BasicSource; degrading to Advanced. Text='{0}'",
+                "FilterModelJsonConverter: persisted Basic filter has no BasicFilter; degrading to Advanced. Text='{0}'",
                 text);
 
             filterType = FilterType.Advanced;
@@ -97,8 +101,8 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
 
         if (filterType != FilterType.Basic)
         {
-            // BasicSource is only meaningful for Basic filters; drop any stale value.
-            basicSource = null;
+            // BasicFilter is only meaningful for Basic filters; drop any stale value.
+            basicFilter = null;
         }
 
         CompiledFilter? compiled = null;
@@ -119,7 +123,7 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
             Color = color,
             ComparisonText = text,
             Compiled = compiled,
-            BasicSource = basicSource,
+            BasicFilter = basicFilter,
             FilterType = filterType,
             IsEnabled = !compileFailed && compiled is not null,
             IsExcluded = isExcluded
@@ -134,10 +138,10 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
         writer.WriteBoolean("IsExcluded", value.IsExcluded);
         writer.WriteString("FilterType", value.FilterType.ToString());
 
-        if (value.FilterType == FilterType.Basic && value.BasicSource is not null)
+        if (value.FilterType == FilterType.Basic && value.BasicFilter is not null)
         {
-            writer.WritePropertyName("BasicSource");
-            JsonSerializer.Serialize(writer, value.BasicSource, options);
+            writer.WritePropertyName("BasicFilter");
+            JsonSerializer.Serialize(writer, value.BasicFilter, options);
         }
 
         writer.WriteEndObject();
@@ -174,19 +178,22 @@ public sealed class FilterModelJsonConverter : JsonConverter<FilterModel>
         {
             if (reader.TokenType == JsonTokenType.EndObject) { break; }
 
-            if (reader.TokenType == JsonTokenType.PropertyName)
-            {
-                string name = reader.GetString()!;
-                reader.Read();
+            if (reader.TokenType != JsonTokenType.PropertyName) { continue; }
 
-                if (name == "Value")
-                {
-                    value = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
-                }
-                else
-                {
-                    reader.Skip();
-                }
+            if (reader.GetString() is not { } name)
+            {
+                throw new JsonException("Expected non-null PropertyName.");
+            }
+
+            reader.Read();
+
+            if (name == "Value")
+            {
+                value = reader.TokenType == JsonTokenType.Null ? null : reader.GetString();
+            }
+            else
+            {
+                reader.Skip();
             }
         }
 

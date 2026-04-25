@@ -82,24 +82,24 @@ public sealed class FilterService : IFilterService
             .AsReadOnly();
     }
 
-    public bool TryParse(BasicFilterSource source, out string comparison)
+    public bool TryParse(BasicFilter basicFilter, out string comparison)
     {
-        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(basicFilter);
 
         comparison = string.Empty;
 
-        if (!TryFormatCriteria(source.Main, null, out var mainText))
+        if (!TryFormatData(basicFilter.Comparison, null, out var comparisonText))
         {
             return false;
         }
 
-        StringBuilder stringBuilder = new(mainText);
+        StringBuilder stringBuilder = new(comparisonText);
 
-        foreach (var subClause in source.SubClauses)
+        foreach (var subFilter in basicFilter.SubFilters)
         {
-            var joinPrefix = subClause.JoinWithAny ? " || " : " && ";
+            var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
 
-            if (TryFormatCriteria(subClause.Criteria, joinPrefix, out var subText))
+            if (TryFormatData(subFilter.Data, joinPrefix, out var subText))
             {
                 stringBuilder.AppendLine(subText);
             }
@@ -223,75 +223,67 @@ public sealed class FilterService : IFilterService
         return false;
     }
 
-    /// <summary>
-    ///     Formats a single Basic criterion into the runtime comparison fragment. Performs all guards before writing any
-    ///     output so a skipped sub-clause leaves no orphaned join operator in the caller's <see cref="StringBuilder" />.
-    /// </summary>
-    /// <param name="joinPrefix">
-    ///     <c>" || "</c> or <c>" &amp;&amp; "</c> prepended for sub-clauses; <c>null</c> for the main
-    ///     clause.
-    /// </param>
-    private static bool TryFormatCriteria(BasicFilterCriteria criteria, string? joinPrefix, out string formatted)
+    private static bool TryFormatData(FilterData data, string? joinPrefix, out string formatted)
     {
         formatted = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(criteria.Value) &&
-            criteria.Evaluator != FilterEvaluator.MultiSelect) { return false; }
+        if (string.IsNullOrWhiteSpace(data.Value) &&
+            data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
 
-        if (criteria.Values.Count <= 0 &&
-            criteria.Evaluator == FilterEvaluator.MultiSelect) { return false; }
+        if (data.Values.Count <= 0 &&
+            data.Evaluator == FilterEvaluator.MultiSelect) { return false; }
 
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
 
-        if (criteria.Evaluator != FilterEvaluator.MultiSelect ||
-            criteria.Category is FilterCategory.Keywords)
+        if (data.Evaluator != FilterEvaluator.MultiSelect ||
+            data.Category is FilterCategory.Keywords)
         {
-            stringBuilder.Append(GetComparisonString(criteria.Category, criteria.Evaluator));
+            stringBuilder.Append(GetComparisonString(data.Category, data.Evaluator));
         }
 
-        switch (criteria.Evaluator)
+        switch (data.Evaluator)
         {
             case FilterEvaluator.Equals:
             case FilterEvaluator.NotEqual:
-                if (criteria.Category is FilterCategory.Keywords)
+                if (data.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(criteria.Value)}\"");
+                    stringBuilder.Append($"\"{EscapeStringLiteral(data.Value)}\"");
                 }
 
                 break;
             case FilterEvaluator.Contains:
             case FilterEvaluator.NotContains:
-                if (criteria.Category is FilterCategory.Keywords)
+                if (data.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(criteria.Value)}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
             case FilterEvaluator.MultiSelect:
-                if (criteria.Category is FilterCategory.Keywords)
+                if (data.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", criteria.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", data.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", criteria.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", data.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
                 }
 
                 break;
             default: return false;
         }
 
-        if (criteria is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
+        if (data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
         {
-            stringBuilder.Append(GetComparisonString(criteria.Category, criteria.Evaluator));
+            stringBuilder.Append(GetComparisonString(data.Category, data.Evaluator));
         }
 
         formatted = stringBuilder.ToString();

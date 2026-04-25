@@ -53,7 +53,7 @@ public sealed partial class ContextMenu
         string filterValue = filterType switch
         {
             FilterCategory.Id => selectedEvent.Id.ToString(),
-            FilterCategory.ActivityId => selectedEvent.ActivityId.ToString()!,
+            FilterCategory.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
             FilterCategory.Level => selectedEvent.Level,
             FilterCategory.Keywords => selectedEvent.KeywordsDisplayName,
             FilterCategory.Source => selectedEvent.Source,
@@ -61,8 +61,8 @@ public sealed partial class ContextMenu
             _ => string.Empty,
         };
 
-        var basicSource = new BasicFilterSource(
-            new BasicFilterCriteria
+        var basicFilter = new BasicFilter(
+            new FilterData
             {
                 Category = filterType,
                 Evaluator = FilterEvaluator.Equals,
@@ -70,12 +70,12 @@ public sealed partial class ContextMenu
             },
             []);
 
-        if (!FilterService.TryParse(basicSource, out var comparisonString)) { return; }
+        if (!FilterService.TryParse(basicFilter, out var comparisonString)) { return; }
 
         var filter = FilterModel.TryCreate(
             comparisonString,
             FilterType.Basic,
-            basicSource,
+            basicFilter,
             isExcluded: shouldExclude,
             isEnabled: true);
 

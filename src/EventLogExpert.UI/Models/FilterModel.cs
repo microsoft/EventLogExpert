@@ -9,7 +9,7 @@ namespace EventLogExpert.UI.Models;
 /// <summary>
 ///     Immutable saved filter. Carries <see cref="ComparisonText" /> together with the pre-compiled
 ///     <see cref="Compiled" /> predicate so consumers never have to recompile to evaluate. Basic filters additionally
-///     retain <see cref="BasicSource" /> for round-trip re-edit.
+///     retain <see cref="BasicFilter" /> for round-trip re-edit.
 /// </summary>
 [JsonConverter(typeof(FilterModelJsonConverter))]
 public sealed record FilterModel
@@ -33,10 +33,10 @@ public sealed record FilterModel
     public required CompiledFilter? Compiled { get; init; }
 
     /// <summary>
-    ///     Structured source for Basic filters; persisted so re-edit reopens the original main + sub-clause structure.
-    ///     <c>null</c> for Advanced and Cached filters.
+    ///     Structured form of Basic filters; persisted so re-edit reopens the original comparison + sub-filter
+    ///     structure. <c>null</c> for Advanced and Cached filters.
     /// </summary>
-    public BasicFilterSource? BasicSource { get; init; }
+    public BasicFilter? BasicFilter { get; init; }
 
     public FilterType FilterType { get; init; } = FilterType.Advanced;
 
@@ -52,7 +52,7 @@ public sealed record FilterModel
     public static FilterModel? TryCreate(
         string comparisonText,
         FilterType filterType = FilterType.Advanced,
-        BasicFilterSource? basicSource = null,
+        BasicFilter? basicFilter = null,
         HighlightColor color = HighlightColor.None,
         bool isExcluded = false,
         bool isEnabled = false,
@@ -66,7 +66,7 @@ public sealed record FilterModel
             Color = color,
             ComparisonText = comparisonText,
             Compiled = compiled,
-            BasicSource = basicSource,
+            BasicFilter = basicFilter,
             FilterType = filterType,
             IsEnabled = isEnabled,
             IsExcluded = isExcluded

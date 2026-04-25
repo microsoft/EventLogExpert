@@ -6,21 +6,21 @@ using EventLogExpert.UI.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.UI.Tests.Models;
 
-public sealed class BasicFilterCriteriaTests
+public sealed class FilterDataTests
 {
     [Fact]
     public void Default_ShouldHaveEmptyValuesAndNullValue()
     {
-        var criteria = new BasicFilterCriteria();
+        var data = new FilterData();
 
-        Assert.Null(criteria.Value);
-        Assert.Empty(criteria.Values);
+        Assert.Null(data.Value);
+        Assert.Empty(data.Values);
     }
 
     [Fact]
     public void WithCategory_ShouldNotMutateOriginal()
     {
-        var original = new BasicFilterCriteria
+        var original = new FilterData
         {
             Category = FilterCategory.Source,
             Value = Constants.FilterValue100,
@@ -37,7 +37,7 @@ public sealed class BasicFilterCriteriaTests
     [Fact]
     public void WithCategory_WhenCalled_ShouldReturnNewInstanceWithClearedValueAndValues()
     {
-        var original = new BasicFilterCriteria
+        var original = new FilterData
         {
             Category = FilterCategory.Source,
             Evaluator = FilterEvaluator.Contains,

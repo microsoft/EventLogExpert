@@ -11,17 +11,15 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-/// <summary>Category + evaluator + value input shared by <see cref="FilterRow" /> and <see cref="SubFilterRow" />.</summary>
 public sealed partial class FilterCategoryEditor : ComponentBase
 {
+    private List<string> _filteredItemsCache = [];
     private ImmutableArray<string> _filteredItemsSource = ImmutableArray<string>.Empty;
     private string? _filteredItemsValue;
-    private List<string> _filteredItemsCache = [];
 
-    /// <summary>Optional id of the external label for the category dropdown; falls back to a built-in aria-label.</summary>
     [Parameter] public string? CategoryAriaLabelledBy { get; set; }
 
-    [Parameter][EditorRequired] public BasicFilterCriteriaDraft Data { get; set; } = null!;
+    [Parameter][EditorRequired] public FilterDataDraft Data { get; set; } = null!;
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 

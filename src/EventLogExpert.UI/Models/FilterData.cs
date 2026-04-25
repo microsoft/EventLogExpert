@@ -8,7 +8,7 @@ namespace EventLogExpert.UI.Models;
 /// <summary>
 ///     Immutable representation of a single Basic-filter criterion (one row of the editor).
 /// </summary>
-public sealed record BasicFilterCriteria
+public sealed record FilterData
 {
     public FilterCategory Category { get; init; }
 
@@ -22,6 +22,6 @@ public sealed record BasicFilterCriteria
     ///     Returns a copy with the new <paramref name="category" /> and Value/Values cleared,
     ///     since the available value space changes when the category changes.
     /// </summary>
-    public BasicFilterCriteria WithCategory(FilterCategory category) =>
+    public FilterData WithCategory(FilterCategory category) =>
         this with { Category = category, Value = null, Values = [] };
 }

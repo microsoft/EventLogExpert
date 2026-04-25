@@ -14,18 +14,21 @@
     UseInlineErrorRow="true"
     Value="Value">
     <EditingContent>
-        <span>
-            @if (Filter!.IsExcluded)
-            {
-                <label for="@Id">Exclude Expression: </label>
-            }
-            else
-            {
-                <label for="@Id">Expression: </label>
-            }
-            <input class="input advanced-filter" id="@Id" @oninput="OnInputChanged"
-                placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
-                type="text" value="@Filter!.ComparisonText" />
-        </span>
+        @if (Filter is { } filter)
+        {
+            <span>
+                @if (filter.IsExcluded)
+                {
+                    <label for="@Id">Exclude Expression: </label>
+                }
+                else
+                {
+                    <label for="@Id">Expression: </label>
+                }
+                <input class="input advanced-filter" id="@Id" @oninput="OnInputChanged"
+                    placeholder="(Id == 1000 || Id == 1001) && Description.Contains('Fault')"
+                    type="text" value="@filter.ComparisonText" />
+            </span>
+        }
     </EditingContent>
 </FilterRowChrome>

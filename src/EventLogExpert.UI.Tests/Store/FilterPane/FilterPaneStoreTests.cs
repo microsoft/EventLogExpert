@@ -196,12 +196,12 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceApplyFilterGroup_PreservesBasicSourceAndFilterType()
+    public void ReduceApplyFilterGroup_PreservesBasicFilterAndFilterType()
     {
-        // Saved-to-group "re-edit as Basic" path: applying a Basic group filter must keep BasicSource
+        // Saved-to-group "re-edit as Basic" path: applying a Basic group filter must keep BasicFilter
         // and FilterType so the row reopens as Basic, not collapsed to Advanced.
-        var basicSource = new BasicFilterSource(
-            new BasicFilterCriteria
+        var basicFilter = new BasicFilter(
+            new FilterData
             {
                 Category = FilterCategory.Id,
                 Evaluator = FilterEvaluator.Equals,
@@ -218,7 +218,7 @@ public sealed class FilterPaneReducerTests
                 FilterUtils.CreateTestFilter(
                     Constants.FilterIdEquals100,
                     filterType: FilterType.Basic,
-                    basicSource: basicSource)
+                    basicFilter: basicFilter)
             ]
         };
 
@@ -228,7 +228,7 @@ public sealed class FilterPaneReducerTests
 
         Assert.Single(result.Filters);
         Assert.Equal(FilterType.Basic, result.Filters[0].FilterType);
-        Assert.Equal(basicSource, result.Filters[0].BasicSource);
+        Assert.Equal(basicFilter, result.Filters[0].BasicFilter);
         Assert.True(result.Filters[0].IsEnabled);
     }
 
@@ -509,7 +509,8 @@ public sealed class FilterPaneReducerTests
 
         var result = FilterPaneReducers.ReduceToggleFilterDate(state);
 
-        Assert.True(result.FilteredDateRange!.IsEnabled);
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.True(result.FilteredDateRange.IsEnabled);
     }
 
     [Fact]
@@ -648,10 +649,11 @@ public sealed class FilterPaneIntegrationTests
             new FilterPaneAction.SetFilterDateRangeSuccess(dateModel));
 
         Assert.NotNull(state.FilteredDateRange);
-        Assert.True(state.FilteredDateRange!.IsEnabled);
+        Assert.True(state.FilteredDateRange.IsEnabled);
 
         state = FilterPaneReducers.ReduceToggleFilterDate(state);
-        Assert.False(state.FilteredDateRange!.IsEnabled);
+        Assert.NotNull(state.FilteredDateRange);
+        Assert.False(state.FilteredDateRange.IsEnabled);
 
         state = FilterPaneReducers.ReduceSetFilterDateRangeSuccess(
             state,

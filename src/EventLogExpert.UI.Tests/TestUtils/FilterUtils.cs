@@ -14,28 +14,28 @@ internal static class FilterUtils
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        BasicFilterSource? basicSource = null,
+        BasicFilter? basicFilter = null,
         FilterId? id = null) =>
-        FilterModel.TryCreate(comparisonValue, filterType, basicSource, color, isExcluded, isEnabled, id) ??
+        FilterModel.TryCreate(comparisonValue, filterType, basicFilter, color, isExcluded, isEnabled, id) ??
         throw new InvalidOperationException($"Test filter expression failed to compile: '{comparisonValue}'");
 
-    internal static FilterEditorModel CreateTestFilterEditor(
+    internal static FilterDraftModel CreateTestFilterDraft(
         FilterId? id = null,
         string comparisonText = FilterIdEquals100,
         FilterType filterType = FilterType.Advanced,
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        BasicFilterCriteriaDraft? main = null,
-        IEnumerable<BasicSubClauseDraft>? subClauses = null) =>
+        FilterDataDraft? comparison = null,
+        IEnumerable<SubFilterDraft>? subFilters = null) =>
         new()
         {
             Id = id ?? FilterId.Create(),
             Color = color,
             ComparisonText = comparisonText,
             FilterType = filterType,
-            Main = main ?? new BasicFilterCriteriaDraft(),
-            SubClauses = subClauses?.ToList() ?? [],
+            Comparison = comparison ?? new FilterDataDraft(),
+            SubFilters = subFilters?.ToList() ?? [],
             IsEnabled = isEnabled,
             IsExcluded = isExcluded
         };
