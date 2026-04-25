@@ -247,55 +247,98 @@ public sealed class FilterPaneEffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldCalculateFromEvents()
+    public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldUseEnvelopeFromActiveLogs()
     {
         // Arrange
-        var testDate = new DateTime(2024, 1, 1, 12, 30, 45, DateTimeKind.Utc);
+        var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
+        var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
+        var unrelatedBefore = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Utc);
 
         var events = new List<DisplayEventModel>
         {
-            EventUtils.CreateTestEvent(timeCreated: testDate)
+            EventUtils.CreateTestEvent(timeCreated: newest),
+            EventUtils.CreateTestEvent(timeCreated: oldest)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
-        var action = new FilterPaneAction.SetFilterDateRange(new FilterDateModel { Before = testDate });
+        var action = new FilterPaneAction.SetFilterDateRange(new FilterDateModel { Before = unrelatedBefore });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
+        var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After != null &&
-            x.FilterDateModel.After.Value.Hour == 12));
+            x.FilterDateModel!.After == expectedAfter &&
+            x.FilterDateModel.Before == unrelatedBefore));
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldCalculateFromEvents()
+    public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldUseEnvelopeFromActiveLogs()
     {
         // Arrange
-        var testDate = new DateTime(2024, 1, 1, 12, 30, 45, DateTimeKind.Utc);
+        var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
+        var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
+        var unrelatedAfter = new DateTime(2023, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
         var events = new List<DisplayEventModel>
         {
-            EventUtils.CreateTestEvent(timeCreated: testDate)
+            EventUtils.CreateTestEvent(timeCreated: newest),
+            EventUtils.CreateTestEvent(timeCreated: oldest)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
-        var action = new FilterPaneAction.SetFilterDateRange(new FilterDateModel { After = testDate });
+        var action = new FilterPaneAction.SetFilterDateRange(new FilterDateModel { After = unrelatedAfter });
+
+        // Act
+        await effects.HandleSetFilterDateRange(action, mockDispatcher);
+
+        // Assert
+        var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
+            x.FilterDateModel!.After == unrelatedAfter &&
+            x.FilterDateModel.Before == expectedBefore));
+    }
+
+    [Fact]
+    public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeEnvelope()
+    {
+        // Logs A and B don't overlap; envelope must span both, and intersection (the previous bug)
+        // would have inverted After/Before.
+        var logAOldest = new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc);
+        var logANewest = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc);
+        var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
+        var logBNewest = new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc);
+
+        var logA = new EventLogData(
+            "LogA",
+            PathType.LogName,
+            [EventUtils.CreateTestEvent(timeCreated: logANewest), EventUtils.CreateTestEvent(timeCreated: logAOldest)]);
+        var logB = new EventLogData(
+            "LogB",
+            PathType.LogName,
+            [EventUtils.CreateTestEvent(timeCreated: logBNewest), EventUtils.CreateTestEvent(timeCreated: logBOldest)]);
+
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add("LogA", logA)
+            .Add("LogB", logB);
+
+        var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
+        var action = new FilterPaneAction.SetFilterDateRange(new FilterDateModel());
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.Before != null &&
-            x.FilterDateModel.Before.Value.Hour == 13));
+            x.FilterDateModel!.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
+            x.FilterDateModel.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
     }
 
     [Fact]

@@ -79,32 +79,12 @@ public sealed partial class FilterPane : IDisposable
     {
         _currentTimeZone = Settings.TimeZoneInfo;
 
-        long ticksPerHour = TimeSpan.FromHours(1).Ticks;
+        var (after, before) = DateRangeDefaults.ComputeFromActiveLogs(
+            EventLogState.Value.ActiveLogs.Values,
+            DateTime.UtcNow);
 
-        // TODO: This computes intersection bounds (latest oldest / earliest newest) across active logs,
-        // not the global envelope. Same logic is duplicated in FilterPaneEffects.HandleSetFilterDateRange.
-        // Lock down intent with tests across both call sites and resolve intersection-vs-envelope.
-        long oldestEventTicks =
-            (EventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
-                    .Order()
-                    .LastOrDefault() ??
-                DateTime.UtcNow)
-            .Ticks;
-
-        long mostRecentEventTicks =
-            (EventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
-                    .Order()
-                    .FirstOrDefault() ??
-                DateTime.UtcNow)
-            .Ticks;
-
-        // Round down to the nearest hour for the earliest event
-        _model.After = new DateTime(oldestEventTicks / ticksPerHour * ticksPerHour, DateTimeKind.Utc)
-            .ConvertTimeZone(_currentTimeZone);
-
-        // Round up to the nearest hour for the latest event
-        _model.Before = new DateTime((mostRecentEventTicks + ticksPerHour - 1) / ticksPerHour * ticksPerHour, DateTimeKind.Utc)
-            .ConvertTimeZone(_currentTimeZone);
+        _model.After = after.ConvertTimeZone(_currentTimeZone);
+        _model.Before = before.ConvertTimeZone(_currentTimeZone);
 
         _isFilterListVisible = true;
         _canEditDate = true;
