@@ -16,7 +16,7 @@ public sealed partial class BooleanSelect : BaseComponent<bool>
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [Parameter] public bool IsSingleColor { get; set; }
+    [Parameter] public bool UseStatusColors { get; set; }
 
     private async Task UpdateValue(ChangeEventArgs args)
     {
