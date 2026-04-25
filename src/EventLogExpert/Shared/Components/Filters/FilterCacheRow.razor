@@ -14,36 +14,39 @@
     RightCssClass="justify-self-right"
     Value="Value">
     <EditingContent>
-        <label aria-label="Cache Type">Cache Type: </label>
-
-        <ValueSelect @bind-Value="_cacheType" CssClass="input filter-dropdown" T="CacheType" ToStringFunc="x => x.ToFullString()">
-            @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
-            {
-                <ValueSelectItem T="CacheType" Value="item" />
-            }
-        </ValueSelect>
-
-        @if (Filter!.IsExcluded)
+        @if (Filter is { } filter)
         {
-            <label aria-label="Exclude Value">Exclude Value: </label>
-        }
-        else
-        {
-            <label aria-label="Value">Value: </label>
-        }
+            <label aria-label="Cache Type">Cache Type: </label>
 
-        <ValueSelect @bind-Value="Filter!.ComparisonText" CssClass="input cache-dropdown" IsInput T="string">
-            @if (Items.Any())
-            {
-                @foreach (var item in Items)
+            <ValueSelect @bind-Value="_cacheType" CssClass="input filter-dropdown" T="CacheType" ToStringFunc="x => x.ToFullString()">
+                @foreach (CacheType item in Enum.GetValues(typeof(CacheType)))
                 {
-                    <ValueSelectItem T="string" Value="item" />
+                    <ValueSelectItem T="CacheType" Value="item" />
                 }
+            </ValueSelect>
+
+            @if (filter.IsExcluded)
+            {
+                <label aria-label="Exclude Value">Exclude Value: </label>
             }
             else
             {
-                <ValueSelectItem IsDisabled T="string" />
+                <label aria-label="Value">Value: </label>
             }
-        </ValueSelect>
+
+            <ValueSelect @bind-Value="filter.ComparisonText" CssClass="input cache-dropdown" IsInput T="string">
+                @if (Items.Any())
+                {
+                    @foreach (var item in Items)
+                    {
+                        <ValueSelectItem T="string" Value="item" />
+                    }
+                }
+                else
+                {
+                    <ValueSelectItem IsDisabled T="string" />
+                }
+            </ValueSelect>
+        }
     </EditingContent>
 </FilterRowChrome>

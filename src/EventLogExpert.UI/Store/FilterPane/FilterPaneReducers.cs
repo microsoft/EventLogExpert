@@ -29,9 +29,10 @@ public sealed class FilterPaneReducers
         {
             if (!existingKeys.Add((filter.ComparisonText, filter.IsExcluded))) { continue; }
 
-            // Preserve the group filter as-is; only flip IsEnabled on so a Basic filter saved in a
-            // group is still re-editable as Basic.
-            additions.Add(filter with { Id = FilterId.Create(), IsEnabled = true });
+            // Preserve the group filter as-is, but only enable when Compiled is non-null. A saved group
+            // filter loaded with an invalid expression has Compiled == null and must stay disabled, otherwise
+            // it appears active in the UI but is silently skipped by filtering/highlighting.
+            additions.Add(filter with { Id = FilterId.Create(), IsEnabled = filter.Compiled is not null });
         }
 
         return additions.Count == 0 ? state : state with { Filters = state.Filters.AddRange(additions) };

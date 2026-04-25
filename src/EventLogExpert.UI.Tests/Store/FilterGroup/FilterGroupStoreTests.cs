@@ -616,7 +616,7 @@ public sealed class FilterGroupStoreTests
         var newState = FilterGroupReducers.ReducerSetFilter(state, action);
 
         // Assert
-        var resultGroup = newState.Groups.First(group => group.Id == group.Id);
+        var resultGroup = newState.Groups.First(g => g.Id == group.Id);
 
         Assert.Single(resultGroup.Filters);
         Assert.Equal(newFilter.Id, resultGroup.Filters[0].Id);

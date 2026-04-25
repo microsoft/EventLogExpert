@@ -14,7 +14,7 @@ public interface IFilterService
 
     IReadOnlyList<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter);
 
-    bool TryParse(BasicFilterSource source, out string comparison);
+    bool TryParse(BasicFilter basicFilter, out string comparison);
 
     bool TryParseExpression(string? expression, out string error);
 }

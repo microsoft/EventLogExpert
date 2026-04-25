@@ -102,7 +102,14 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
     {
         var model = FilterModel.TryCreate(filter, FilterType.Cached, isEnabled: true);
 
-        if (model is null) { return; }
+        if (model is null)
+        {
+            await AlertDialogService.ShowAlert("Invalid Filter",
+                $"The selected cached filter could not be parsed and will not be added:{Environment.NewLine}{Environment.NewLine}{filter}",
+                "OK");
+
+            return;
+        }
 
         Dispatcher.Dispatch(new FilterPaneAction.AddFilter(model));
 

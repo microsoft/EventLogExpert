@@ -5,12 +5,12 @@ using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Tests.Models;
 
-public sealed class BasicFilterCriteriaDraftTests
+public sealed class FilterDataDraftTests
 {
     [Fact]
     public void ChangeCategory_ClearsValueAndValues()
     {
-        var draft = new BasicFilterCriteriaDraft
+        var draft = new FilterDataDraft
         {
             Category = FilterCategory.Id,
             Value = "100",
@@ -28,7 +28,7 @@ public sealed class BasicFilterCriteriaDraftTests
     {
         // Evaluator coercion is the UI's responsibility (FilterCategoryEditor.CategoryBinding),
         // not the draft's — keeping it on the draft would entangle non-overlapping concerns.
-        var draft = new BasicFilterCriteriaDraft
+        var draft = new FilterDataDraft
         {
             Category = FilterCategory.Id,
             Evaluator = FilterEvaluator.MultiSelect
@@ -42,7 +42,7 @@ public sealed class BasicFilterCriteriaDraftTests
     [Fact]
     public void ChangeCategory_SetsNewCategory()
     {
-        var draft = new BasicFilterCriteriaDraft { Category = FilterCategory.Id };
+        var draft = new FilterDataDraft { Category = FilterCategory.Id };
 
         draft.ChangeCategory(FilterCategory.Source);
 
@@ -50,26 +50,26 @@ public sealed class BasicFilterCriteriaDraftTests
     }
 
     [Fact]
-    public void FromCriteria_DoesNotShareValuesListWithDraft()
+    public void FromData_DoesNotShareValuesListWithDraft()
     {
-        var criteria = new BasicFilterCriteria
+        var data = new FilterData
         {
             Category = FilterCategory.Level,
             Values = ["Error"]
         };
 
-        var draft = BasicFilterCriteriaDraft.FromCriteria(criteria);
+        var draft = FilterDataDraft.FromData(data);
 
         draft.Values.Add("Warning");
 
-        Assert.Single(criteria.Values);
-        Assert.Equal("Error", criteria.Values[0]);
+        Assert.Single(data.Values);
+        Assert.Equal("Error", data.Values[0]);
     }
 
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        var original = new BasicFilterCriteria
+        var original = new FilterData
         {
             Category = FilterCategory.Level,
             Evaluator = FilterEvaluator.MultiSelect,
@@ -77,7 +77,7 @@ public sealed class BasicFilterCriteriaDraftTests
             Values = ["Error", "Warning"]
         };
 
-        var roundTripped = BasicFilterCriteriaDraft.FromCriteria(original).ToCriteria();
+        var roundTripped = FilterDataDraft.FromData(original).ToData();
 
         Assert.Equal(original.Category, roundTripped.Category);
         Assert.Equal(original.Evaluator, roundTripped.Evaluator);
@@ -86,19 +86,19 @@ public sealed class BasicFilterCriteriaDraftTests
     }
 
     [Fact]
-    public void ToCriteria_DoesNotShareValuesListWithDraft()
+    public void ToData_DoesNotShareValuesListWithDraft()
     {
-        var draft = new BasicFilterCriteriaDraft
+        var draft = new FilterDataDraft
         {
             Category = FilterCategory.Level,
             Values = ["Error"]
         };
 
-        var criteria = draft.ToCriteria();
+        var data = draft.ToData();
 
         draft.Values.Add("Warning");
 
-        Assert.Single(criteria.Values);
-        Assert.Equal("Error", criteria.Values[0]);
+        Assert.Single(data.Values);
+        Assert.Equal("Error", data.Values[0]);
     }
 }

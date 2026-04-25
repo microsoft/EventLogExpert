@@ -150,7 +150,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.AddGroup>(x =>
-            x.FilterGroup!.Filters[0].Color == HighlightColor.Red &&
+            x.FilterGroup != null &&
+            x.FilterGroup.Filters[0].Color == HighlightColor.Red &&
             x.FilterGroup.Filters[0].IsExcluded == true &&
             x.FilterGroup.Filters[0].ComparisonText == Constants.FilterIdEquals100));
     }
@@ -194,7 +195,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterGroupAction.AddGroup>(x =>
-            x.FilterGroup!.Filters.Count == 2));
+            x.FilterGroup != null &&
+            x.FilterGroup.Filters.Count == 2));
     }
 
     [Fact]
@@ -272,7 +274,8 @@ public sealed class FilterPaneEffectsTests
         // Assert
         var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == expectedAfter &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == expectedAfter &&
             x.FilterDateModel.Before == unrelatedBefore));
     }
 
@@ -302,7 +305,8 @@ public sealed class FilterPaneEffectsTests
         // Assert
         var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == unrelatedAfter &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == unrelatedAfter &&
             x.FilterDateModel.Before == expectedBefore));
     }
 
@@ -337,7 +341,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
             x.FilterDateModel.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
     }
 
@@ -356,7 +361,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == after &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == after &&
             x.FilterDateModel.Before == before));
     }
 
@@ -377,7 +383,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == existingAfter &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == existingAfter &&
             x.FilterDateModel.Before == newBefore));
     }
 
@@ -398,7 +405,8 @@ public sealed class FilterPaneEffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<FilterPaneAction.SetFilterDateRangeSuccess>(x =>
-            x.FilterDateModel!.After == newAfter &&
+            x.FilterDateModel != null &&
+            x.FilterDateModel.After == newAfter &&
             x.FilterDateModel.Before == existingBefore));
     }
 

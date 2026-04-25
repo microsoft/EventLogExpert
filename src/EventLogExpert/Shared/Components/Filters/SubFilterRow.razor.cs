@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Shared.Components.Filters;
 
-public sealed partial class SubFilterRow : FilterRowBase<BasicSubClauseDraft>
+public sealed partial class SubFilterRow : FilterRowBase<SubFilterDraft>
 {
     [Parameter] public EventCallback<FilterId> OnRemove { get; set; }
 

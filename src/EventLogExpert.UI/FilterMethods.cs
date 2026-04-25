@@ -46,20 +46,20 @@ public static class FilterMethods
     {
         if (!Equals(updated.DateFilter, original.DateFilter)) { return true; }
 
-        var updatedSignature = updated.Signature;
-        var originalSignature = original.Signature;
+        var updatedSnapshots = updated.Snapshots;
+        var originalSnapshots = original.Snapshots;
 
         // Default-constructed EventFilter (rare) has an uninitialized ImmutableArray.
-        if (updatedSignature.IsDefault || originalSignature.IsDefault)
+        if (updatedSnapshots.IsDefault || originalSnapshots.IsDefault)
         {
-            return updatedSignature.IsDefault != originalSignature.IsDefault;
+            return updatedSnapshots.IsDefault != originalSnapshots.IsDefault;
         }
 
-        if (updatedSignature.Length != originalSignature.Length) { return true; }
+        if (updatedSnapshots.Length != originalSnapshots.Length) { return true; }
 
-        for (int index = 0; index < updatedSignature.Length; index++)
+        for (int index = 0; index < updatedSnapshots.Length; index++)
         {
-            if (!updatedSignature[index].Equals(originalSignature[index])) { return true; }
+            if (!updatedSnapshots[index].Equals(originalSnapshots[index])) { return true; }
         }
 
         return false;

@@ -31,19 +31,19 @@ public sealed partial class FilterRow : EditableFilterRowBase
         Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(id));
 
     /// <summary>Structured filter: validate via TryParse and surface failures via the alert dialog (no inline banner).</summary>
-    protected override async ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
+    protected override async ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
     {
-        var basicSource = draft.ToBasicSource();
+        var basicFilter = draft.ToBasicFilter();
 
-        if (FilterService.TryParse(basicSource, out string comparisonString))
+        if (FilterService.TryParse(basicFilter, out string comparisonString))
         {
             var model = FilterModel.TryCreate(
                 comparisonString,
                 FilterType.Basic,
-                basicSource,
+                basicFilter,
                 draft.Color,
                 draft.IsExcluded,
-                isEnabled: true,
+                true,
                 draft.Id);
 
             if (model is not null) { return model; }
@@ -56,8 +56,8 @@ public sealed partial class FilterRow : EditableFilterRowBase
         return null;
     }
 
-    private void AddSubFilter() => Filter?.SubClauses.Add(new BasicSubClauseDraft());
+    private void AddSubFilter() => Filter?.SubFilters.Add(new SubFilterDraft());
 
     private void RemoveSubFilter(FilterId subFilterId) =>
-        Filter?.SubClauses.RemoveAll(subClause => subClause.Id == subFilterId);
+        Filter?.SubFilters.RemoveAll(subFilter => subFilter.Id == subFilterId);
 }

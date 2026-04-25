@@ -17,7 +17,7 @@ namespace EventLogExpert.Shared.Components.Filters;
 public sealed partial class FilterGroup
 {
     private readonly HashSet<FilterId> _editingFilters = [];
-    private readonly List<FilterEditorModel> _pendingDrafts = [];
+    private readonly List<FilterDraftModel> _pendingDrafts = [];
 
     private FilterGroupId? _trackedGroupId;
 
@@ -57,7 +57,7 @@ public sealed partial class FilterGroup
         base.OnParametersSet();
     }
 
-    private void AddFilter() => _pendingDrafts.Add(new FilterEditorModel { FilterType = FilterType.Advanced });
+    private void AddFilter() => _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Advanced });
 
     private async Task ApplyFilters()
     {
@@ -115,9 +115,9 @@ public sealed partial class FilterGroup
         }
     }
 
-    private void HandlePendingDiscard(FilterEditorModel draft) => _pendingDrafts.Remove(draft);
+    private void HandlePendingDiscard(FilterDraftModel draft) => _pendingDrafts.Remove(draft);
 
-    private void HandlePendingSave(FilterEditorModel draft, FilterModel filter)
+    private void HandlePendingSave(FilterDraftModel draft, FilterModel filter)
     {
         _pendingDrafts.Remove(draft);
 

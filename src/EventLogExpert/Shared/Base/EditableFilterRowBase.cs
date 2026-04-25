@@ -12,7 +12,7 @@ namespace EventLogExpert.Shared.Base;
 
 /// <summary>
 ///     Base for filter rows that bind either to a saved <see cref="FilterModel" /> (via
-///     <see cref="FilterRowBase{TValue}.Value" />) or to a parent-owned <see cref="FilterEditorModel" /> draft (via
+///     <see cref="FilterRowBase{TValue}.Value" />) or to a parent-owned <see cref="FilterDraftModel" /> draft (via
 ///     <see cref="PendingDraft" />). Exactly one must be set.
 /// </summary>
 public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
@@ -27,17 +27,17 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     [Parameter] public EventCallback<FilterModel> OnPendingSave { get; set; }
 
     /// <summary>Mutually exclusive with <see cref="FilterRowBase{TValue}.Value" />.</summary>
-    [Parameter] public FilterEditorModel? PendingDraft { get; set; }
+    [Parameter] public FilterDraftModel? PendingDraft { get; set; }
 
     [Inject] protected IDispatcher Dispatcher { get; init; } = null!;
 
     protected string ErrorMessage { get; set; } = string.Empty;
 
-    protected FilterEditorModel? Filter { get; set; }
+    protected FilterDraftModel? Filter { get; set; }
 
     [Inject] protected IFilterService FilterService { get; init; } = null!;
 
-    protected bool IsPending => PendingDraft is not null;
+    protected bool IsPending => Value is null && PendingDraft is not null;
 
     protected async Task CancelFilter()
     {
@@ -77,7 +77,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         if (Value is not { } savedFilter) { return; }
 
         OnEditSessionResetting();
-        Filter = FilterEditorModel.FromFilterModel(savedFilter);
+        Filter = FilterDraftModel.FromFilterModel(savedFilter);
 
         await OnEditingChanged.InvokeAsync((savedFilter.Id, true));
     }
@@ -108,9 +108,8 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         if (Value is not null && PendingDraft is not null)
         {
             // Pending → saved transition: the parent reused the same key (FilterId is preserved on save),
-            // so Blazor rebinds Value but Blazor does NOT clear PendingDraft from the previous render.
-            // Treat the saved value as authoritative and drop the stale draft reference.
-            PendingDraft = null;
+            // so Blazor rebinds Value but does NOT clear the prior PendingDraft parameter. Drop the local
+            // draft state; IsPending now evaluates false because Value is set, so PendingDraft is ignored.
             Filter = null;
         }
 
@@ -178,7 +177,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     ///     Returning <see langword="null" /> aborts the save (subclass surfaces the error). Default
     ///     enforces non-empty text and compiles via <see cref="FilterCompiler.TryCompile" />.
     /// </summary>
-    protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
+    protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
     {
         if (string.IsNullOrWhiteSpace(draft.ComparisonText))
         {
@@ -200,7 +199,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
             Color = draft.Color,
             ComparisonText = draft.ComparisonText,
             Compiled = compiled,
-            BasicSource = draft.FilterType == FilterType.Basic ? draft.ToBasicSource() : null,
+            BasicFilter = draft.FilterType == FilterType.Basic ? draft.ToBasicFilter() : null,
             FilterType = draft.FilterType,
             IsEnabled = true,
             IsExcluded = draft.IsExcluded

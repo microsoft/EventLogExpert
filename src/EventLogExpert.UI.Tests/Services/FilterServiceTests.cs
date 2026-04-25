@@ -256,7 +256,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Xml, FilterEvaluator.Contains, "test");
+        var source = CreateBasicFilter(FilterCategory.Xml, FilterEvaluator.Contains, "test");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -283,7 +283,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(category, evaluator, value);
+        var source = CreateBasicFilter(category, evaluator, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -298,7 +298,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.Equals, null);
+        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.Equals, null);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -313,7 +313,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.MultiSelect, null);
+        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.MultiSelect, null);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -335,7 +335,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(category, evaluator, value);
+        var source = CreateBasicFilter(category, evaluator, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -350,7 +350,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Id, FilterEvaluator.Contains, "10");
+        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.Contains, "10");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -365,7 +365,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Keywords, FilterEvaluator.Equals, "Audit Success");
+        var source = CreateBasicFilter(FilterCategory.Keywords, FilterEvaluator.Equals, "Audit Success");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -381,7 +381,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(
+        var source = CreateBasicFilter(
             FilterCategory.Level,
             FilterEvaluator.MultiSelect,
             value: null,
@@ -414,7 +414,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(category, evaluator, value);
+        var source = CreateBasicFilter(category, evaluator, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -435,7 +435,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(category, evaluator, value);
+        var source = CreateBasicFilter(category, evaluator, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -450,7 +450,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.Description, FilterEvaluator.Contains, "test\"value");
+        var source = CreateBasicFilter(FilterCategory.Description, FilterEvaluator.Contains, "test\"value");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -465,11 +465,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: false)
             ]);
 
@@ -487,11 +487,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true)
             ]);
 
@@ -508,11 +508,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: false)
             ]);
 
@@ -529,7 +529,7 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(FilterCategory.UserId, FilterEvaluator.Equals, "S-1-5-21");
+        var source = CreateBasicFilter(FilterCategory.UserId, FilterEvaluator.Equals, "S-1-5-21");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -551,7 +551,7 @@ public sealed class FilterServiceTests
         string rawValue)
     {
         var filterService = CreateFilterService();
-        var source = CreateBasicSource(category, evaluator, rawValue);
+        var source = CreateBasicFilter(category, evaluator, rawValue);
 
         var result = filterService.TryParse(source, out var comparison);
 
@@ -568,19 +568,20 @@ public sealed class FilterServiceTests
             _ => throw new ArgumentOutOfRangeException(nameof(category))
         };
 
-        Assert.True(compiled!.Predicate(matchingEvent));
+        Assert.NotNull(compiled);
+        Assert.True(compiled.Predicate(matchingEvent));
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMainInvalid_ShouldReturnFalseEvenWithValidSubClauses()
+    public void TryParse_WithBasicFilter_WhenMainInvalid_ShouldReturnFalseEvenWithValidSubFilters()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true)
             ]);
 
@@ -593,12 +594,12 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMainOnly_ShouldMatchFilterModelOutput()
+    public void TryParse_WithBasicFilter_WhenMainOnly_ShouldMatchFilterModelOutput()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             []);
 
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
@@ -609,12 +610,12 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMultiSelectKeywords_ShouldEmitAnyContainsExpression()
+    public void TryParse_WithBasicFilter_WhenMultiSelectKeywords_ShouldEmitAnyContainsExpression()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria
+        var source = new BasicFilter(
+            new FilterData
             {
                 Category = FilterCategory.Keywords,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -633,12 +634,12 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
+    public void TryParse_WithBasicFilter_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria
+        var source = new BasicFilter(
+            new FilterData
             {
                 Category = FilterCategory.Level,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -657,28 +658,28 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenSourceIsNull_ShouldThrowArgumentNullException()
+    public void TryParse_WithBasicFilter_WhenSourceIsNull_ShouldThrowArgumentNullException()
     {
         // Arrange
         var filterService = CreateFilterService();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((BasicFilterSource)null!, out _));
+        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((BasicFilter)null!, out _));
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenSubClauseInvalid_ShouldSkipWithoutOrphanedJoinOperator()
+    public void TryParse_WithBasicFilter_WhenSubFilterInvalid_ShouldSkipWithoutOrphanedJoinOperator()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
                     JoinWithAny: true),
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
                     JoinWithAny: false)
             ]);
 
@@ -694,18 +695,18 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilterSource_WhenSubClausesPresent_ShouldUseExactJoinAndNewlineOrdering()
+    public void TryParse_WithBasicFilter_WhenSubFiltersPresent_ShouldUseExactJoinAndNewlineOrdering()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = new BasicFilterSource(
-            new BasicFilterCriteria { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true),
-                new BasicSubClause(
-                    new BasicFilterCriteria { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
                     JoinWithAny: false)
             ]);
 
@@ -809,13 +810,13 @@ public sealed class FilterServiceTests
         Assert.Empty(error);
     }
 
-    private static BasicFilterSource CreateBasicSource(
+    private static BasicFilter CreateBasicFilter(
         FilterCategory category,
         FilterEvaluator evaluator,
         string? value,
         IEnumerable<string>? values = null) =>
         new(
-            new BasicFilterCriteria
+            new FilterData
             {
                 Category = category,
                 Evaluator = evaluator,

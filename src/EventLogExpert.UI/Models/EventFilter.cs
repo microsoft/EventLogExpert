@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Models;
 
 /// <summary>Snapshot of <see cref="FilterModel" /> fields that affect the filtered event set.</summary>
-public readonly record struct FilterSignatureEntry(string Value, bool IsExcluded);
+public readonly record struct FilterSnapshot(string Value, bool IsExcluded);
 
 public readonly record struct EventFilter
 {
@@ -14,7 +14,7 @@ public readonly record struct EventFilter
     {
         DateFilter = dateFilter;
         Filters = filters;
-        Signature = ComputeSignature(Filters);
+        Snapshots = ComputeSnapshots(Filters);
         RequiresXml = ComputeRequiresXml(Filters);
     }
 
@@ -23,7 +23,7 @@ public readonly record struct EventFilter
     public ImmutableList<FilterModel> Filters { get; }
 
     /// <summary>Construction-time snapshot used by <see cref="FilterMethods.HasFilteringChanged" />.</summary>
-    public ImmutableArray<FilterSignatureEntry> Signature { get; }
+    public ImmutableArray<FilterSnapshot> Snapshots { get; }
 
     /// <summary>True when any filter or sub-filter references <see cref="Eventing.Models.DisplayEventModel.Xml" />.</summary>
     public bool RequiresXml { get; }
@@ -40,15 +40,15 @@ public readonly record struct EventFilter
         return false;
     }
 
-    private static ImmutableArray<FilterSignatureEntry> ComputeSignature(ImmutableList<FilterModel> filters)
+    private static ImmutableArray<FilterSnapshot> ComputeSnapshots(ImmutableList<FilterModel> filters)
     {
-        if (filters.Count == 0) { return ImmutableArray<FilterSignatureEntry>.Empty; }
+        if (filters.Count == 0) { return ImmutableArray<FilterSnapshot>.Empty; }
 
-        var builder = ImmutableArray.CreateBuilder<FilterSignatureEntry>(filters.Count);
+        var builder = ImmutableArray.CreateBuilder<FilterSnapshot>(filters.Count);
 
         foreach (var filter in filters)
         {
-            builder.Add(new FilterSignatureEntry(filter.ComparisonText, filter.IsExcluded));
+            builder.Add(new FilterSnapshot(filter.ComparisonText, filter.IsExcluded));
         }
 
         return builder.MoveToImmutable();

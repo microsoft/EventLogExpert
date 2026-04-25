@@ -20,7 +20,7 @@ public sealed partial class FilterRowChrome : ComponentBase
 
     [Parameter] public RenderFragment? ExtraEditingButtons { get; set; }
 
-    [Parameter] public FilterEditorModel? Filter { get; set; }
+    [Parameter] public FilterDraftModel? Filter { get; set; }
 
     [Parameter] public bool IsPending { get; set; }
 
