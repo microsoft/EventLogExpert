@@ -21,7 +21,7 @@
             <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
         }
 
-        <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="Filter!.Data" Id="@Id" />
+        <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="Filter!.Main" Id="@Id" />
     </EditingContent>
     <ExtraEditingButtons>
         <button class="button" @onclick="AddSubFilter">
@@ -30,10 +30,10 @@
     </ExtraEditingButtons>
 </FilterRowChrome>
 
-@if (Filter is not null && Filter.SubFilters.Count > 0)
+@if (Filter is not null && Filter.SubClauses.Count > 0)
 {
     <div class="flex-column">
-        @foreach (var item in Filter.SubFilters)
+        @foreach (var item in Filter.SubClauses)
         {
             <SubFilterRow @key="item.Id" OnRemove="RemoveSubFilter" Value="@item" />
         }

@@ -10,7 +10,7 @@ namespace EventLogExpert.UI.Tests.Models;
 public sealed class FilterEditorModelTests
 {
     [Fact]
-    public void FromFilterModel_DeepCopiesData()
+    public void FromFilterModel_DeepCopiesMainCriteria()
     {
         var original = FilterUtils.CreateTestFilter(
             data: new FilterData
@@ -24,11 +24,53 @@ public sealed class FilterEditorModelTests
         var editor = FilterEditorModel.FromFilterModel(original);
 
         // Mutating the editor copy must not affect the original.
-        editor.Data.Value = Constants.FilterValue500;
-        editor.Data.Values.Clear();
+        editor.Main.Value = Constants.FilterValue500;
+        editor.Main.Values.Clear();
 
         Assert.Equal(Constants.FilterValue100, original.Data.Value);
         Assert.Equal(2, original.Data.Values.Count);
+    }
+
+    [Fact]
+    public void FromFilterModel_DiscardsLegacyGrandchildSubFilters()
+    {
+        // 13c intentionally flattens deeper trees: production never produces them.
+        var grandchild = FilterUtils.CreateTestFilter();
+        var child = FilterUtils.CreateTestFilter(subFilters: [grandchild]);
+        var parent = FilterUtils.CreateTestFilter(subFilters: [child]);
+
+        var editor = FilterEditorModel.FromFilterModel(parent);
+
+        Assert.Single(editor.SubClauses);
+        // Grandchildren are not represented anywhere on the editor model.
+    }
+
+    [Fact]
+    public void FromFilterModel_FlattensTopLevelSubFiltersIntoSubClauses()
+    {
+        var subA = FilterUtils.CreateTestFilter(
+            comparisonValue: Constants.FilterIdEquals100,
+            shouldCompareAny: true,
+            data: new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" });
+
+        var subB = FilterUtils.CreateTestFilter(
+            comparisonValue: Constants.FilterIdEquals200,
+            shouldCompareAny: false,
+            data: new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" });
+
+        var parent = FilterUtils.CreateTestFilter(subFilters: [subA, subB]);
+
+        var editor = FilterEditorModel.FromFilterModel(parent);
+
+        Assert.Equal(2, editor.SubClauses.Count);
+        Assert.Equal(subA.Id, editor.SubClauses[0].Id);
+        Assert.Equal(subB.Id, editor.SubClauses[1].Id);
+        Assert.True(editor.SubClauses[0].JoinWithAny);
+        Assert.False(editor.SubClauses[1].JoinWithAny);
+        Assert.Equal(FilterCategory.Level, editor.SubClauses[0].Criteria.Category);
+        Assert.Equal("Error", editor.SubClauses[0].Criteria.Value);
+        Assert.Equal(FilterCategory.Source, editor.SubClauses[1].Criteria.Category);
+        Assert.Equal("Kernel", editor.SubClauses[1].Criteria.Value);
     }
 
     [Fact]
@@ -47,7 +89,6 @@ public sealed class FilterEditorModelTests
         var original = FilterUtils.CreateTestFilter(
             color: HighlightColor.Blue,
             filterType: FilterType.Basic,
-            shouldCompareAny: true,
             isEnabled: true,
             isExcluded: true);
 
@@ -55,47 +96,26 @@ public sealed class FilterEditorModelTests
 
         Assert.Equal(HighlightColor.Blue, editor.Color);
         Assert.Equal(FilterType.Basic, editor.FilterType);
-        Assert.True(editor.ShouldCompareAny);
         Assert.True(editor.IsEnabled);
         Assert.True(editor.IsExcluded);
         Assert.Equal(Constants.FilterIdEquals100, editor.ComparisonText);
     }
 
     [Fact]
-    public void FromFilterModel_RecursivelyConvertsSubFilters()
+    public void RoundTrip_PreservesScalarsAndFlatSubClauses()
     {
-        var grandchild = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdGreaterThan100);
-        var child1 = FilterUtils.CreateTestFilter(
+        var subA = FilterUtils.CreateTestFilter(
             comparisonValue: Constants.FilterIdEquals100,
-            isExcluded: true,
-            subFilters: [grandchild]);
-        var child2 = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals200);
-        var parent = FilterUtils.CreateTestFilter(subFilters: [child1, child2]);
-
-        var editor = FilterEditorModel.FromFilterModel(parent);
-
-        Assert.Equal(2, editor.SubFilters.Count);
-        Assert.Equal(child1.Id, editor.SubFilters[0].Id);
-        Assert.Equal(child2.Id, editor.SubFilters[1].Id);
-        Assert.True(editor.SubFilters[0].IsExcluded);
-        Assert.Single(editor.SubFilters[0].SubFilters);
-        Assert.Equal(grandchild.Id, editor.SubFilters[0].SubFilters[0].Id);
-    }
-
-    [Fact]
-    public void RoundTrip_PreservesDeepTreeIdentityAndOrder()
-    {
-        var grandchildA = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals100);
-        var grandchildB = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals200);
-        var child = FilterUtils.CreateTestFilter(
-            comparisonValue: Constants.FilterIdGreaterThan100,
-            isExcluded: true,
-            subFilters: [grandchildA, grandchildB]);
+            shouldCompareAny: true,
+            data: new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" });
+        var subB = FilterUtils.CreateTestFilter(
+            comparisonValue: Constants.FilterIdEquals200,
+            shouldCompareAny: false,
+            data: new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" });
         var original = FilterUtils.CreateTestFilter(
             comparisonValue: Constants.FilterIdEquals100AndLevelError,
             color: HighlightColor.Green,
             filterType: FilterType.Basic,
-            shouldCompareAny: true,
             isEnabled: true,
             data: new FilterData
             {
@@ -103,14 +123,13 @@ public sealed class FilterEditorModelTests
                 Evaluator = FilterEvaluator.Equals,
                 Value = Constants.FilterValue100
             },
-            subFilters: [child]);
+            subFilters: [subA, subB]);
 
         var roundTripped = FilterEditorModel.FromFilterModel(original).ToFilterModel();
 
         Assert.Equal(original.Id, roundTripped.Id);
         Assert.Equal(original.Color, roundTripped.Color);
         Assert.Equal(original.FilterType, roundTripped.FilterType);
-        Assert.Equal(original.ShouldCompareAny, roundTripped.ShouldCompareAny);
         Assert.Equal(original.IsEnabled, roundTripped.IsEnabled);
         Assert.Equal(original.IsExcluded, roundTripped.IsExcluded);
         Assert.Equal(original.Comparison.Value, roundTripped.Comparison.Value);
@@ -118,19 +137,73 @@ public sealed class FilterEditorModelTests
         Assert.Equal(original.Data.Evaluator, roundTripped.Data.Evaluator);
         Assert.Equal(original.Data.Value, roundTripped.Data.Value);
 
-        Assert.Single(roundTripped.SubFilters);
-        Assert.Equal(child.Id, roundTripped.SubFilters[0].Id);
-        Assert.True(roundTripped.SubFilters[0].IsExcluded);
-        Assert.Equal(2, roundTripped.SubFilters[0].SubFilters.Count);
-        Assert.Equal(grandchildA.Id, roundTripped.SubFilters[0].SubFilters[0].Id);
-        Assert.Equal(grandchildB.Id, roundTripped.SubFilters[0].SubFilters[1].Id);
+        Assert.Equal(2, roundTripped.SubFilters.Count);
+        Assert.Equal(subA.Id, roundTripped.SubFilters[0].Id);
+        Assert.Equal(subB.Id, roundTripped.SubFilters[1].Id);
+        Assert.True(roundTripped.SubFilters[0].ShouldCompareAny);
+        Assert.False(roundTripped.SubFilters[1].ShouldCompareAny);
+        Assert.Equal(FilterCategory.Level, roundTripped.SubFilters[0].Data.Category);
+        Assert.Equal("Error", roundTripped.SubFilters[0].Data.Value);
     }
 
     [Fact]
-    public void ToFilterModel_DeepCopiesData_SoSubsequentEditorMutationDoesNotAffectModel()
+    public void ToBasicSource_DoesNotShareValuesListWithEditor()
     {
         var editor = FilterUtils.CreateTestFilterEditor(
-            data: new FilterData
+            main: new BasicFilterCriteriaDraft
+            {
+                Category = FilterCategory.Level,
+                Evaluator = FilterEvaluator.MultiSelect,
+                Values = ["Error"]
+            });
+
+        var source = editor.ToBasicSource();
+
+        editor.Main.Values.Add("Warning");
+
+        Assert.Single(source.Main.Values);
+        Assert.Equal("Error", source.Main.Values[0]);
+    }
+
+    [Fact]
+    public void ToBasicSource_ProducesImmutableSourceMatchingEditorState()
+    {
+        var editor = FilterUtils.CreateTestFilterEditor(
+            main: new BasicFilterCriteriaDraft
+            {
+                Category = FilterCategory.Id,
+                Evaluator = FilterEvaluator.Equals,
+                Value = Constants.FilterValue100
+            },
+            subClauses:
+            [
+                new BasicSubClauseDraft
+                {
+                    Criteria = new BasicFilterCriteriaDraft
+                    {
+                        Category = FilterCategory.Level,
+                        Evaluator = FilterEvaluator.Equals,
+                        Value = "Error"
+                    },
+                    JoinWithAny = true
+                }
+            ]);
+
+        var source = editor.ToBasicSource();
+
+        Assert.Equal(FilterCategory.Id, source.Main.Category);
+        Assert.Equal(Constants.FilterValue100, source.Main.Value);
+        Assert.Single(source.SubClauses);
+        Assert.True(source.SubClauses[0].JoinWithAny);
+        Assert.Equal(FilterCategory.Level, source.SubClauses[0].Criteria.Category);
+        Assert.Equal("Error", source.SubClauses[0].Criteria.Value);
+    }
+
+    [Fact]
+    public void ToFilterModel_DeepCopiesMain_SoSubsequentEditorMutationDoesNotAffectModel()
+    {
+        var editor = FilterUtils.CreateTestFilterEditor(
+            main: new BasicFilterCriteriaDraft
             {
                 Category = FilterCategory.Id,
                 Value = Constants.FilterValue100,
@@ -139,11 +212,42 @@ public sealed class FilterEditorModelTests
 
         var model = editor.ToFilterModel();
 
-        editor.Data.Value = Constants.FilterValue500;
-        editor.Data.Values.Add(Constants.FilterValue1000);
+        editor.Main.Value = Constants.FilterValue500;
+        editor.Main.Values.Add(Constants.FilterValue1000);
 
         Assert.Equal(Constants.FilterValue100, model.Data.Value);
         Assert.Single(model.Data.Values);
+    }
+
+    [Fact]
+    public void ToFilterModel_MaterializesSubClausesAsDegenerateSubFilters()
+    {
+        var subClauseId = FilterId.Create();
+        var editor = FilterUtils.CreateTestFilterEditor(
+            comparisonText: string.Empty,
+            subClauses:
+            [
+                new BasicSubClauseDraft
+                {
+                    Id = subClauseId,
+                    Criteria = new BasicFilterCriteriaDraft
+                    {
+                        Category = FilterCategory.Level,
+                        Evaluator = FilterEvaluator.Equals,
+                        Value = "Error"
+                    },
+                    JoinWithAny = true
+                }
+            ]);
+
+        var model = editor.ToFilterModel();
+
+        Assert.Single(model.SubFilters);
+        Assert.Equal(subClauseId, model.SubFilters[0].Id);
+        Assert.True(model.SubFilters[0].ShouldCompareAny);
+        Assert.Equal(FilterCategory.Level, model.SubFilters[0].Data.Category);
+        Assert.Equal("Error", model.SubFilters[0].Data.Value);
+        Assert.Empty(model.SubFilters[0].SubFilters);
     }
 
     [Fact]
@@ -155,10 +259,9 @@ public sealed class FilterEditorModelTests
             comparisonText: Constants.FilterIdEquals200,
             color: HighlightColor.Red,
             filterType: FilterType.Basic,
-            shouldCompareAny: true,
             isEnabled: true,
             isExcluded: true,
-            data: new FilterData
+            main: new BasicFilterCriteriaDraft
             {
                 Category = FilterCategory.Source,
                 Evaluator = FilterEvaluator.Contains,
@@ -171,38 +274,11 @@ public sealed class FilterEditorModelTests
         Assert.Equal(HighlightColor.Red, model.Color);
         Assert.Equal(Constants.FilterIdEquals200, model.Comparison.Value);
         Assert.Equal(FilterType.Basic, model.FilterType);
-        Assert.True(model.ShouldCompareAny);
         Assert.True(model.IsEnabled);
         Assert.True(model.IsExcluded);
         Assert.Equal(FilterCategory.Source, model.Data.Category);
         Assert.Equal(FilterEvaluator.Contains, model.Data.Evaluator);
         Assert.Equal(Constants.EventSourceTestSource, model.Data.Value);
-    }
-
-    [Fact]
-    public void ToFilterModel_RecursivelyConvertsSubFilters()
-    {
-        var childId = FilterId.Create();
-        var grandchildId = FilterId.Create();
-        var editor = FilterUtils.CreateTestFilterEditor(
-            comparisonText: string.Empty,
-            subFilters:
-            [
-                FilterUtils.CreateTestFilterEditor(
-                    id: childId,
-                    comparisonText: Constants.FilterIdEquals100,
-                    subFilters:
-                    [
-                        FilterUtils.CreateTestFilterEditor(id: grandchildId, comparisonText: Constants.FilterIdEquals200)
-                    ])
-            ]);
-
-        var model = editor.ToFilterModel();
-
-        Assert.Single(model.SubFilters);
-        Assert.Equal(childId, model.SubFilters[0].Id);
-        Assert.Single(model.SubFilters[0].SubFilters);
-        Assert.Equal(grandchildId, model.SubFilters[0].SubFilters[0].Id);
     }
 
     [Fact]

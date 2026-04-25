@@ -1,11 +1,11 @@
 @using EventLogExpert.Shared.Base
-@inherits FilterRowBase<FilterEditorModel>
+@inherits FilterRowBase<BasicSubClauseDraft>
 
 <div class="flex-center-aligned-row px-4">
     <div class="flex-align-center">
-        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.ShouldCompareAny" DisabledString="AND" EnabledString="OR" IsSingleColor="true" />
+        <BooleanSelect AriaLabel="Should Compare" @bind-Value="Value.JoinWithAny" DisabledString="AND" EnabledString="OR" IsSingleColor="true" />
 
-        <FilterCategoryEditor Data="Value.Data" Id="@Id" />
+        <FilterCategoryEditor Data="Value.Criteria" Id="@Id" />
     </div>
 
     <button class="button button-red fixed-width" @onclick="RemoveSubFilter">

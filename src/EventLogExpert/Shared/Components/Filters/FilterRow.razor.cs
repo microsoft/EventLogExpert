@@ -32,11 +32,11 @@ public sealed partial class FilterRow : EditableFilterRowBase
     /// <summary>Structured filter: validate via TryParse and surface failures via the alert dialog (no inline banner).</summary>
     protected override async ValueTask<FilterModel?> TrySaveAsync(FilterEditorModel draft)
     {
-        var draftAsFilter = draft.ToFilterModel();
-
-        if (FilterService.TryParse(draftAsFilter, out string comparisonString))
+        if (FilterService.TryParse(draft.ToBasicSource(), out string comparisonString))
         {
-            return draftAsFilter with
+            draft.ComparisonText = comparisonString;
+
+            return draft.ToFilterModel() with
             {
                 Comparison = new FilterComparison { Value = comparisonString },
                 IsEnabled = true
@@ -50,8 +50,8 @@ public sealed partial class FilterRow : EditableFilterRowBase
         return null;
     }
 
-    private void AddSubFilter() => Filter?.SubFilters.Add(new FilterEditorModel());
+    private void AddSubFilter() => Filter?.SubClauses.Add(new BasicSubClauseDraft());
 
     private void RemoveSubFilter(FilterId subFilterId) =>
-        Filter?.SubFilters.RemoveAll(subFilter => subFilter.Id == subFilterId);
+        Filter?.SubClauses.RemoveAll(subClause => subClause.Id == subFilterId);
 }

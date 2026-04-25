@@ -37,18 +37,16 @@ internal static class FilterUtils
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        bool shouldCompareAny = false,
-        FilterData? data = null,
-        IEnumerable<FilterEditorModel>? subFilters = null) =>
+        BasicFilterCriteriaDraft? main = null,
+        IEnumerable<BasicSubClauseDraft>? subClauses = null) =>
         new()
         {
             Id = id ?? FilterId.Create(),
             Color = color,
             ComparisonText = comparisonText,
             FilterType = filterType,
-            Data = data ?? new FilterData(),
-            SubFilters = subFilters?.ToList() ?? [],
-            ShouldCompareAny = shouldCompareAny,
+            Main = main ?? new BasicFilterCriteriaDraft(),
+            SubClauses = subClauses?.ToList() ?? [],
             IsEnabled = isEnabled,
             IsExcluded = isExcluded
         };
