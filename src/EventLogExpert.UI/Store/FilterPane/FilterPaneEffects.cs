@@ -104,33 +104,14 @@ public sealed class FilterPaneEffects(
         DateTime? updatedAfter = action.FilterDateModel?.After ?? _filterPaneState.Value.FilteredDateRange?.After;
         DateTime? updatedBefore = action.FilterDateModel?.Before ?? _filterPaneState.Value.FilteredDateRange?.Before;
 
-        long ticksPerHour = TimeSpan.FromHours(1).Ticks;
-
-        // TODO: This computes intersection bounds (latest oldest / earliest newest) across active logs,
-        // not the global envelope. Same logic is duplicated in FilterPane.razor.cs:AddDateFilter.
-        // Lock down intent with tests across both call sites and resolve intersection-vs-envelope.
-        if (updatedAfter is null)
+        if (updatedAfter is null || updatedBefore is null)
         {
-            long ticks =
-                (_eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.LastOrDefault()?.TimeCreated)
-                        .Order()
-                        .LastOrDefault() ??
-                    DateTime.UtcNow)
-                .Ticks;
+            var (after, before) = DateRangeDefaults.ComputeFromActiveLogs(
+                _eventLogState.Value.ActiveLogs.Values,
+                DateTime.UtcNow);
 
-            updatedAfter = new DateTime(ticks / ticksPerHour * ticksPerHour, DateTimeKind.Utc);
-        }
-
-        if (updatedBefore is null)
-        {
-            long ticks =
-                (_eventLogState.Value.ActiveLogs.Values.Select(log => log.Events.FirstOrDefault()?.TimeCreated)
-                        .Order()
-                        .FirstOrDefault() ??
-                    DateTime.UtcNow)
-                .Ticks;
-
-            updatedBefore = new DateTime((ticks + ticksPerHour - 1) / ticksPerHour * ticksPerHour, DateTimeKind.Utc);
+            updatedAfter ??= after;
+            updatedBefore ??= before;
         }
 
         dispatcher.Dispatch(
