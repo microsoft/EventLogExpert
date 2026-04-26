@@ -3,6 +3,8 @@
         <ImplicitUsings>enable</ImplicitUsings>  
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!-- CsWinRT1030 fires for List<T> of any public type because IT could theoretically cross the WinRT ABI in AOT/trimmed scenarios. We never marshal these collections across the ABI, so the warning is benign. -->
+        <NoWarn>$(NoWarn);CsWinRT1030</NoWarn>
     </PropertyGroup>
 
     <Choose>

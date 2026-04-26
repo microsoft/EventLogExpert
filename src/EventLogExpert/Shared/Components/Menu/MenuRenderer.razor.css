@@ -5,8 +5,6 @@
     min-width: 12em;
     color: var(--text-primary);
     background-color: var(--background-dark);
-    border: 1px solid var(--clr-lightblue);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     user-select: none;
 }
 
@@ -76,8 +74,29 @@
 }
 
 .submenu {
-    position: absolute;
-    top: -5px;
-    left: 100%;
-    z-index: 1;
+    position: fixed;
+    max-width: 70vw;
+    max-height: 70vh;
+    overflow: auto;
+    z-index: 101;
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-lightblue);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    /* Hidden until positionMenuSubmenu adds menu-submenu-positioned. opacity (not visibility)
+       keeps the first item focusable during the brief pre-positioning window. */
+    opacity: 0;
+    pointer-events: none;
+
+    /* Hide the scrollbar while keeping wheel/keyboard scrolling for long lists. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    &.menu-submenu-positioned {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }

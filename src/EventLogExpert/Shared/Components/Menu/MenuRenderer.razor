@@ -3,7 +3,7 @@
     <ul aria-orientation="vertical"
         class="menu-list"
         @onkeydown="HandleListKeyDown"
-        @onkeydown:preventDefault="@_preventDefaultKeyDown"
+        @onkeydown:preventDefault="@PreventDefaultKeyDown"
         @onkeydown:stopPropagation="true"
         role="menu">
         @for (int index = 0; index < Items.Count; index++)
@@ -63,7 +63,7 @@
 
                     @if (hasChildren && isOpen)
                     {
-                        <div class="submenu" @onclick:stopPropagation>
+                        <div class="submenu" @ref="_submenuElement" @onclick:stopPropagation>
                             @if (_resolvedChildren is null)
                             {
                                 <ul aria-label="Loading"

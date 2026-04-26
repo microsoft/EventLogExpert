@@ -3,14 +3,17 @@
 
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components.Menu;
 
 public sealed partial class MenuRenderer
 {
-    // Type-ahead matches reset after this idle window. Mirrors common menu type-ahead behavior
-    // (e.g. Win32 menubar, WAI-ARIA Authoring Practices) so users can either type a single letter
-    // to step through matches or quickly type a longer prefix.
+    // Constant rather than method-level call because Blazor's @onkeydown:preventDefault must
+    // resolve at render time. Tab is handled in HandleListKeyDown so it can close the menu first.
+    private const bool PreventDefaultKeyDown = true;
+
+    // Type-ahead matches reset after this idle window (WAI-ARIA Authoring Practices guidance).
     private static readonly TimeSpan s_typeAheadResetWindow = TimeSpan.FromMilliseconds(500);
 
     private int _focusedIndex = -1;
@@ -18,15 +21,10 @@ public sealed partial class MenuRenderer
     private ElementReference[] _itemElements = [];
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;
-
-    // Always preventDefault on the menu list so arrow keys / Space don't scroll the page and Tab
-    // doesn't escape past the focus-restore plumbing. We model this as a constant rather than a
-    // method-level call because Blazor's `@onkeydown:preventDefault` directive must resolve at
-    // render time. Tab is handled explicitly in HandleListKeyDown to close the menu first.
-    private bool _preventDefaultKeyDown = true;
     private IReadOnlyList<MenuItem>? _previousItems;
     private bool _previousSuppressInitialFocus;
     private IReadOnlyList<MenuItem>? _resolvedChildren;
+    private ElementReference _submenuElement;
     private string _typeAheadBuffer = string.Empty;
     private DateTimeOffset _typeAheadLastInputAt = DateTimeOffset.MinValue;
 
@@ -61,6 +59,8 @@ public sealed partial class MenuRenderer
     /// </summary>
     [Parameter] public bool SuppressInitialFocus { get; set; }
 
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
     /// <summary>Programmatically focus the first/last item; called by hosts after the popup is in the DOM.</summary>
     public Task FocusInitialAsync(bool focusFirst)
     {
@@ -90,6 +90,12 @@ public sealed partial class MenuRenderer
             await TryFocusCurrentAsync();
         }
 
+        if (_openItem is not null && _resolvedChildren is not null)
+        {
+            try { await JSRuntime.InvokeVoidAsync("positionMenuSubmenu", _submenuElement); }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
+        }
+
         await base.OnAfterRenderAsync(firstRender);
     }
 
@@ -106,11 +112,8 @@ public sealed partial class MenuRenderer
             }
             else if (SuppressInitialFocus)
             {
-                // Hover-opened submenu: leave _focusedIndex at -1 so no item is marked focused.
-                // Keyboard focus stays on the parent menu item, and the parent list handles
-                // ArrowUp/Down/Home/End for sibling navigation. The user explicitly steps into
-                // this submenu by pressing Enter, Space, or ArrowRight on the parent item, which
-                // re-opens the submenu via OpenSubmenu without SuppressInitialFocus.
+                // Hover-opened submenu: keep focus on the parent until the user explicitly enters
+                // via Enter/Space/ArrowRight (which re-opens without SuppressInitialFocus).
                 _focusedIndex = -1;
             }
             else
@@ -122,11 +125,8 @@ public sealed partial class MenuRenderer
         }
         else if (_previousSuppressInitialFocus && !SuppressInitialFocus && _focusedIndex < 0 && Items is not null)
         {
-            // SuppressInitialFocus flipped from true -> false while Items stayed the same reference
-            // (e.g., a hover-opened submenu the user explicitly enters via Enter/Space/ArrowRight,
-            // which re-renders this child with SuppressInitialFocus=false but the same Items list).
-            // Pick the first enabled item and schedule focus so keyboard focus actually moves into
-            // the submenu instead of staying stuck on the parent.
+            // SuppressInitialFocus flipped false while Items stayed the same reference — user
+            // stepped into a hover-opened submenu, so move focus into it.
             _focusedIndex = InitialFocusIndex == 0
                 ? FindEnabledIndex(0, +1)
                 : FindEnabledIndex(Items.Count - 1, -1);
@@ -155,8 +155,7 @@ public sealed partial class MenuRenderer
 
     private async Task HandleArrowLeftAsync()
     {
-        // In a submenu: ArrowLeft collapses back to the parent. In a top-level menu it asks the
-        // menubar to switch to the previous bar entry.
+        // Submenu: collapse to parent. Top-level menu: ask the menubar to switch entries.
         if (IsSubmenu) { await OnCloseSubmenu.InvokeAsync(); }
         else { await OnNavigateBar.InvokeAsync(-1); }
     }
@@ -173,8 +172,8 @@ public sealed partial class MenuRenderer
             return;
         }
 
-        // Leaf item in a top-level menu: ArrowRight moves to the next menubar entry. Submenus
-        // intentionally do nothing so users can keep navigating up/down without losing place.
+        // Top-level leaf: ArrowRight advances the menubar. Submenus stay put so users don't lose
+        // their place while navigating.
         if (!IsSubmenu) { await OnNavigateBar.InvokeAsync(+1); }
     }
 
@@ -204,9 +203,7 @@ public sealed partial class MenuRenderer
                 return;
             case "Enter":
             case " ":
-                // Suppress auto-repeat for activation keys so holding Enter/Space doesn't
-                // re-fire the action repeatedly. Navigation keys above intentionally allow
-                // repeat so users can hold ArrowDown/Up/Home/End to traverse long menus.
+                // Block auto-repeat on activation keys; navigation keys above intentionally allow it.
                 if (args.Repeat) { return; }
                 if (_focusedIndex >= 0) { await OnItemActivate(Items[_focusedIndex], _focusedIndex); }
 
@@ -217,18 +214,14 @@ public sealed partial class MenuRenderer
 
                 return;
             case "Tab":
-                // WAI-ARIA: Tab/Shift+Tab closes the entire menu (not just the current submenu).
-                // preventDefault on the <ul> blocks the browser's tab traversal so OnActivated's
-                // focus-restore lands on the opener button first; from there the user presses Tab
-                // again to advance normally. Bubble OnActivated upward through every nested
-                // renderer so a single Tab consistently exits the whole menu chain.
+                // WAI-ARIA: Tab/Shift+Tab closes the entire menu. preventDefault on the <ul>
+                // blocks browser tab traversal so focus-restore lands on the opener first.
                 await OnActivated.InvokeAsync();
 
                 return;
         }
 
-        // Type-ahead: any single printable character. KeyboardEventArgs.Key contains the typed
-        // character (respects keyboard layout), unlike Code which is physical-key based.
+        // Type-ahead: any single printable character. KeyboardEventArgs.Key respects keyboard layout.
         if (args.Key.Length == 1 && !char.IsControl(args.Key, 0))
         {
             HandleTypeAhead(args.Key);
@@ -249,9 +242,8 @@ public sealed partial class MenuRenderer
         _typeAheadLastInputAt = now;
         _typeAheadBuffer += typedKey;
 
-        // Treat a buffer of all-the-same-character as cycling so repeated taps of the same letter
-        // step through matches (e.g. pressing 'S' twice moves Save -> System), matching common
-        // menu behavior. Otherwise multi-character buffers do exact prefix matching.
+        // A buffer of all-the-same-character cycles through matches (e.g., 'S' twice: Save -> System).
+        // Multi-character buffers do exact prefix matching.
         bool repeatedSameChar = true;
 
         for (int charIndex = 1; charIndex < _typeAheadBuffer.Length; charIndex++)
@@ -267,8 +259,7 @@ public sealed partial class MenuRenderer
         bool isCycling = _typeAheadBuffer.Length == 1 || repeatedSameChar;
         string matchPrefix = isCycling ? _typeAheadBuffer[..1] : _typeAheadBuffer;
 
-        // Cycling matches starting after the focused item; multi-letter buffer matches by prefix
-        // from the start of the list so users can disambiguate quickly.
+        // Cycling matches start after the focused item; multi-letter buffers match from the start.
         int startIndex = isCycling
             ? (_focusedIndex < 0 ? 0 : (_focusedIndex + 1) % Items.Count)
             : 0;
@@ -296,7 +287,6 @@ public sealed partial class MenuRenderer
             ? (direction > 0 ? -1 : Items.Count)
             : _focusedIndex;
 
-        // Wrap when scanning past either end so Down/Up cycle through enabled items only.
         for (int step = 0; step < Items.Count; step++)
         {
             start = ((start + direction) % Items.Count + Items.Count) % Items.Count;
@@ -329,8 +319,6 @@ public sealed partial class MenuRenderer
     {
         if (!item.IsEnabled) { return; }
 
-        // Keep the focused item in sync with click-driven activation so subsequent keyboard
-        // navigation starts from the user's pointer position.
         _focusedIndex = index;
 
         if (item.Children is not null || item.ChildrenLoader is not null)
@@ -341,8 +329,7 @@ public sealed partial class MenuRenderer
 
         if (item.OnClickAsync is not null)
         {
-            // Surface the activation to the host BEFORE invoking the action so the popup tears down
-            // before any modal the action might open — otherwise the menu would briefly overlap.
+            // Surface activation BEFORE invoking so the popup tears down before any modal opens.
             await OnActivated.InvokeAsync();
             await item.OnClickAsync();
         }
@@ -358,9 +345,8 @@ public sealed partial class MenuRenderer
 
         if (item.Children is null && item.ChildrenLoader is null)
         {
-            // Hovering a leaf collapses any open sibling submenu — matches native menu behavior.
-            // Move DOM focus to the hovered item so roving tabindex and the focus ring stay in
-            // sync with _focusedIndex (otherwise focus can remain on an item now tabindex=-1).
+            // Hovering a leaf collapses any open sibling submenu and moves focus to the leaf
+            // so roving tabindex stays in sync with _focusedIndex.
             if (_openItem is null && _focusedIndex == index) { return; }
 
             _openItem = null;
@@ -432,13 +418,6 @@ public sealed partial class MenuRenderer
         {
             StateHasChanged();
         }
-
-        // Submenus are autonomous renderers; they pick up InitialFocusIndex from their own
-        // OnParametersSet so we don't need to chase the inner ElementReference here.
-        if (!focusFirstChild)
-        {
-            // Hover-open: keep focus on the parent item so arrow keys still target the parent menu.
-        }
     }
 
     private async Task TryFocusCurrentAsync()
@@ -447,11 +426,15 @@ public sealed partial class MenuRenderer
 
         try
         {
+            // preventScroll keeps the page steady; scrollMenuItemIntoView scrolls within the menu panel.
             await _itemElements[_focusedIndex].FocusAsync(true);
+
+            try { await JSRuntime.InvokeVoidAsync("scrollMenuItemIntoView", _itemElements[_focusedIndex]); }
+            catch (Exception ex) when (ex is JSDisconnectedException or TaskCanceledException) { }
         }
         catch
         {
-            // Element may have been replaced or detached between render frames — best effort only.
+            // Element may have been replaced or detached between render frames.
         }
     }
 }
