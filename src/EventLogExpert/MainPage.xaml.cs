@@ -28,11 +28,16 @@ namespace EventLogExpert;
 public sealed partial class MainPage : ContentPage, IDisposable
 {
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogs;
+    private readonly IAppTitleService _appTitleService;
+    private readonly IDatabaseCollectionProvider _databaseCollectionProvider;
+    private readonly IDatabaseService _databaseService;
+    private readonly FileLocationOptions _fileLocationOptions;
     private readonly MauiMenuActionService _menuActionService;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
 
     private CoreWebView2? _coreWebView;
+    private bool _disposed;
 
     public MainPage(
         IDispatcher fluxorDispatcher,
@@ -48,23 +53,18 @@ public sealed partial class MainPage : ContentPage, IDisposable
         InitializeComponent();
 
         _activeLogs = activeLogs;
+        _appTitleService = appTitleService;
+        _databaseCollectionProvider = databaseCollectionProvider;
+        _databaseService = databaseService;
+        _fileLocationOptions = fileLocationOptions;
         _settings = settings;
         _traceLogger = traceLogger;
         _menuActionService = menuActionService;
 
         _activeLogs.Select(state => state.ActiveLogs);
 
-        _activeLogs.SelectedValueChanged += (_, updatedActiveLogs) =>
-            MainThread.InvokeOnMainThreadAsync(() =>
-                appTitleService.SetLogName(
-                    updatedActiveLogs.Count <= 0
-                        ? null
-                        : string.Join(" | ", updatedActiveLogs.Values.Select(log => log.Name))));
-
-        databaseService.LoadedDatabasesChanged += (_, loadedProviders) =>
-            databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
-                Path.Join(fileLocationOptions.DatabasePath, path)));
-
+        _activeLogs.SelectedValueChanged += OnActiveLogsChanged;
+        _databaseService.LoadedDatabasesChanged += OnLoadedDatabasesChanged;
         _settings.ThemeChanged += OnThemeChanged;
 
         fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
@@ -74,7 +74,13 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _ = ProcessCommandLine();
     }
 
-    public void Dispose() => _settings.ThemeChanged -= OnThemeChanged;
+    public void Dispose()
+    {
+        _disposed = true;
+        _activeLogs.SelectedValueChanged -= OnActiveLogsChanged;
+        _databaseService.LoadedDatabasesChanged -= OnLoadedDatabasesChanged;
+        _settings.ThemeChanged -= OnThemeChanged;
+    }
 
     private void ApplyWebViewTheme(Theme theme)
     {
@@ -166,6 +172,29 @@ public sealed partial class MainPage : ContentPage, IDisposable
             : $"document.documentElement.setAttribute('data-theme','{themeAttr}');";
 
         _ = _coreWebView.AddScriptToExecuteOnDocumentCreatedAsync(script);
+    }
+
+    private void OnActiveLogsChanged(object? sender, ImmutableDictionary<string, EventLogData> updatedActiveLogs)
+    {
+        if (_disposed) { return; }
+
+        MainThread.InvokeOnMainThreadAsync(() =>
+        {
+            if (_disposed) { return; }
+
+            _appTitleService.SetLogName(
+                updatedActiveLogs.Count <= 0
+                    ? null
+                    : string.Join(" | ", updatedActiveLogs.Values.Select(log => log.Name)));
+        });
+    }
+
+    private void OnLoadedDatabasesChanged(object? sender, IEnumerable<string> loadedProviders)
+    {
+        if (_disposed) { return; }
+
+        _databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
+            Path.Join(_fileLocationOptions.DatabasePath, path)));
     }
 
     private void OnThemeChanged() =>

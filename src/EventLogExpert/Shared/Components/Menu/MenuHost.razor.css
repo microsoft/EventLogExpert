@@ -16,7 +16,26 @@
 
 .menu-host-popup {
     position: fixed;
-    max-width: 90vw;
-    max-height: 90vh;
-    overflow: auto;
+    max-width: 70vw;
+    max-height: 70vh;
+    overflow-y: auto;
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-lightblue);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    /* Hidden until clampMenuPopup adds menu-popup-positioned. opacity (not visibility)
+       keeps the first item focusable during the brief pre-positioning window. */
+    opacity: 0;
+    pointer-events: none;
+
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+}
+
+.menu-host-popup.menu-popup-positioned {
+    opacity: 1;
+    pointer-events: auto;
 }

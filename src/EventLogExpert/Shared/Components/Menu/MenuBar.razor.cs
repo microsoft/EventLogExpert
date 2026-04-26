@@ -3,7 +3,6 @@
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -19,6 +18,7 @@ public sealed partial class MenuBar : IDisposable
     private readonly List<TopLevel> _bars = [];
     private ElementReference[] _barElements = [];
     private int _focusedBarIndex;
+    private long _openRequestId;
 
     [Inject] private IMenuActionService Actions { get; init; } = null!;
 
@@ -38,6 +38,8 @@ public sealed partial class MenuBar : IDisposable
 
     public void Dispose()
     {
+        InvalidatePendingOpen();
+
         Settings.CopyTypeChanged -= OnSettingsChanged;
         MenuService.StateChanged -= OnMenuServiceStateChanged;
         MenuService.NavigateBarRequested -= OnNavigateBarRequested;
@@ -119,31 +121,32 @@ public sealed partial class MenuBar : IDisposable
 
     private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool addLog)
     {
-        // Mirrors the legacy CreateFlyoutMenu: split on '-' or '/', nest into submenus by folder.
         var rootChildren = new List<MenuItem>();
         var folderMap = new Dictionary<string, List<MenuItem>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var logName in logNames)
         {
-            var folders = logName.Split('-', '/');
-            var leafLabel = folders[^1];
+            var path = LogNameMethods.GetMenuPath(logName);
+
+            if (path.Count == 0) { continue; }
+
+            var leafLabel = path[^1];
             var leaf = MenuItem.Item(leafLabel, () => Actions.OpenLiveLogAsync(logName, addLog));
 
-            if (folders.Length == 1)
+            if (path.Count == 1)
             {
                 rootChildren.Add(leaf);
+
                 continue;
             }
 
-            // Walk the folder path, creating missing layers on the fly. Use StringBuilder so
-            // building keys for deep folder hierarchies doesn't allocate a fresh string for every
-            // segment of every log name.
+            // NUL keys folderMap entries so segments containing '-' or '/' can't collide.
             var children = rootChildren;
             var pathBuilder = new StringBuilder();
 
-            for (int folderIndex = 0; folderIndex < folders.Length - 1; folderIndex++)
+            for (int folderIndex = 0; folderIndex < path.Count - 1; folderIndex++)
             {
-                pathBuilder.Append(folders[folderIndex]).Append('/');
+                pathBuilder.Append(path[folderIndex]).Append('\0');
                 var pathSoFar = pathBuilder.ToString();
 
                 if (folderMap.TryGetValue(pathSoFar, out var existingChildren))
@@ -154,7 +157,7 @@ public sealed partial class MenuBar : IDisposable
 
                 var newChildren = new List<MenuItem>();
                 folderMap[pathSoFar] = newChildren;
-                children.Add(MenuItem.SubMenu(folders[folderIndex], newChildren));
+                children.Add(MenuItem.SubMenu(path[folderIndex], newChildren));
                 children = newChildren;
             }
 
@@ -177,8 +180,7 @@ public sealed partial class MenuBar : IDisposable
 
     private IReadOnlyList<MenuItem> BuildView()
     {
-        // Snapshot state at open time. Per the rubber-duck refinement, we don't push live updates
-        // into an open menu — the next open will reflect any change.
+        // Snapshot state at open time. Live updates aren't pushed into an open menu — the next open will reflect any change.
         bool isFilterEnabled = FilterPaneIsEnabled.Value;
         bool isContinuouslyUpdating = ContinuouslyUpdate.Value;
 
@@ -197,6 +199,8 @@ public sealed partial class MenuBar : IDisposable
             MenuItem.Item("Show Filter Groups", () => Actions.ShowFilterGroupsAsync()),
         ];
     }
+
+    private void InvalidatePendingOpen() => Interlocked.Increment(ref _openRequestId);
 
     private bool IsActive(TopLevel bar) =>
         ActiveBar is not null && ReferenceEquals(ActiveBar, bar) && MenuService.ActiveItems is not null;
@@ -217,12 +221,9 @@ public sealed partial class MenuBar : IDisposable
         _focusedBarIndex = index;
 
         // If a menu is already open, switch to the new bar's menu so arrow keys feel continuous.
-        // Otherwise just move focus on the bar.
         if (openIfMenuActive && MenuService.ActiveItems is not null)
         {
-            // Preserve the original opener captured when the first menubar dropdown opened so
-            // closing restores focus to the menubar rather than a transient menu item from the
-            // previous bar's popup.
+            // Preserve the original opener so closing restores focus to the menubar.
             await OpenBarAsync(_bars[index], index, captureOpener: false);
 
             return;
@@ -248,12 +249,9 @@ public sealed partial class MenuBar : IDisposable
 
     private async Task OnBarHover(TopLevel bar, int index)
     {
-        // Only switch on hover when another menu is already open — matches Win32 menu-bar behavior.
+        // Only switch on hover when another menu is already open — matches Win32 menubar behavior.
         if (MenuService.ActiveItems is null || ReferenceEquals(ActiveBar, bar)) { return; }
 
-        // Preserve the original opener captured when the first menubar dropdown opened so closing
-        // restores focus to a stable menubar trigger rather than a transient menu item from the
-        // previously open popup that is about to be torn down.
         await OpenBarAsync(bar, index, captureOpener: false);
     }
 
@@ -276,14 +274,12 @@ public sealed partial class MenuBar : IDisposable
                 await MoveBarFocusTo(_bars.Count - 1, true);
                 return;
             case "ArrowDown":
-                // Open and focus first item. Enter/Space are intentionally not handled here so the
-                // browser's native button activation fires the click handler exactly once — handling
-                // them on keydown AND letting the click bubble would toggle the menu shut.
+                // Enter/Space are intentionally not handled here so the browser's native button
+                // click fires once — handling them on keydown would toggle the menu shut.
                 await OpenBarAsync(_bars[index], index, true);
                 return;
             case "ArrowUp":
-                // WAI-ARIA menubar pattern: ArrowUp opens the menu and focuses the LAST item so
-                // users can quickly reach items at the bottom of long menus.
+                // WAI-ARIA menubar: ArrowUp opens and focuses the last item.
                 await OpenBarAsync(_bars[index], index, false);
                 return;
             case "Escape":
@@ -295,9 +291,13 @@ public sealed partial class MenuBar : IDisposable
 
     private void OnMenuServiceStateChanged()
     {
-        if (MenuService.ActiveItems is null && ActiveBar is not null)
+        if (MenuService.ActiveItems is null)
         {
-            ActiveBar = null;
+            // Invalidate any in-flight OpenBarAsync so a stale continuation can't reopen
+            // the menu after it was closed (overlay click, item activation, Escape, etc.).
+            InvalidatePendingOpen();
+
+            if (ActiveBar is not null) { ActiveBar = null; }
         }
 
         _ = InvokeAsync(StateHasChanged);
@@ -310,11 +310,16 @@ public sealed partial class MenuBar : IDisposable
 
     private async Task OpenBarAsync(TopLevel bar, int index, bool focusFirst = true, bool captureOpener = true)
     {
-        // Anchor the dropdown to the bottom-left of the trigger button so all File/Edit/View/...
-        // dropdowns line up with their menu-bar item rather than wherever the cursor was.
+        // Tag this open request so out-of-order JS interop completions from rapid hover/keyboard
+        // navigation (or a close that happens mid-await) don't activate the wrong bar.
+        var requestId = Interlocked.Increment(ref _openRequestId);
+
+        // Anchor the dropdown to the bottom-left of the trigger button.
         var rect = await JSRuntime.InvokeAsync<MenuBarItemRect>(
             "getMenuElementRect",
             _barElements[index]);
+
+        if (requestId != Volatile.Read(ref _openRequestId)) { return; }
 
         ActiveBar = bar;
         _focusedBarIndex = index;

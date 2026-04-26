@@ -1,6 +1,7 @@
 ﻿#details-pane {
     display: flex;
     flex-direction: column;
+    flex: 0 0 auto;
     position: relative;
 
     margin: 0 5px;

@@ -6,6 +6,7 @@
         @oncontextmenu:preventDefault="true">
         <div aria-label="Menu"
             class="menu-host-popup"
+            @ref="_popupElement"
             @onclick:stopPropagation
             @onkeydown="HandleKeyDown"
             role="presentation"

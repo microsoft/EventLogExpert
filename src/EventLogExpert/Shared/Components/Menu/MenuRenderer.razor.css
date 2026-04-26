@@ -1,12 +1,10 @@
 .menu-list {
     list-style: none;
     margin: 0;
-    padding: 4px 0;
-    min-width: 12em;
+    padding: 2px 0;
+    min-width: 10em;
     color: var(--text-primary);
     background-color: var(--background-dark);
-    border: 1px solid var(--clr-lightblue);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
     user-select: none;
 }
 
@@ -14,8 +12,8 @@
     position: relative;
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 4px 12px 4px 6px;
+    gap: 6px;
+    padding: 2px 8px;
     cursor: default;
     outline: none;
 
@@ -41,11 +39,10 @@
 }
 
 .menu-check {
-    display: inline-flex;
-    justify-content: center;
-    width: 1.1em;
     flex: 0 0 auto;
+    margin-left: 12px;
     color: var(--clr-lightblue);
+    font-size: 0.9em;
 }
 
 .menu-label {
@@ -57,7 +54,7 @@
 
 .menu-shortcut {
     flex: 0 0 auto;
-    margin-left: 16px;
+    margin-left: 12px;
     color: var(--text-secondary);
     font-size: 0.9em;
 }
@@ -70,14 +67,35 @@
 
 .menu-separator {
     height: 1px;
-    margin: 4px 6px;
+    margin: 2px 6px;
     background-color: var(--clr-lightblue);
     opacity: 0.4;
 }
 
 .submenu {
-    position: absolute;
-    top: -5px;
-    left: 100%;
-    z-index: 1;
+    position: fixed;
+    max-width: 70vw;
+    max-height: 70vh;
+    overflow: auto;
+    z-index: 101;
+    background-color: var(--background-dark);
+    border: 1px solid var(--clr-lightblue);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    /* Hidden until positionMenuSubmenu adds menu-submenu-positioned. opacity (not visibility)
+       keeps the first item focusable during the brief pre-positioning window. */
+    opacity: 0;
+    pointer-events: none;
+
+    /* Hide the scrollbar while keeping wheel/keyboard scrolling for long lists. */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    &.menu-submenu-positioned {
+        opacity: 1;
+        pointer-events: auto;
+    }
 }
