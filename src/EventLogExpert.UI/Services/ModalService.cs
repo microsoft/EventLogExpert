@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Interfaces;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Services;

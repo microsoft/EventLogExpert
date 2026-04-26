@@ -1,4 +1,5 @@
 ﻿#tab-pane {
+    flex: 0 0 auto;
     margin: 0 5px;
     height: 33px;
     overflow: hidden;

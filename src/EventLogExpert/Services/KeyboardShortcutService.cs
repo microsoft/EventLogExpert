@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Services;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Services;

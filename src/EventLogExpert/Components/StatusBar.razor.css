@@ -1,4 +1,5 @@
 ﻿.status-bar {
+    flex: 0 0 auto;
     background-color: var(--clr-statusbar);
     color: var(--clr-white);
     padding-left: 5px;
