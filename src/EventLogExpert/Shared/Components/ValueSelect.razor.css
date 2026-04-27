@@ -1,0 +1,19 @@
+.dropdown-input {
+    display: inline-block;
+    margin: 0 0.5rem;
+
+    & > .input { margin: 0; }
+}
+
+.dropdown-list {
+    display: none;
+    user-select: none;
+    border: 1px solid var(--clr-lightblue);
+    background-color: var(--background-dark);
+    z-index: var(--z-dropdown);
+    max-height: 240px;
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    &[data-toggle] { display: block; }
+}

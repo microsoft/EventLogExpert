@@ -1,0 +1,32 @@
+[role="option"] {
+    text-align: left;
+    margin: 0;
+    padding: 0 5px;
+    display: block;
+    clear: both;
+    color: var(--text-primary);
+
+    &:hover,
+    &[highlighted] { background-color: var(--background-darkgray); }
+
+    &[aria-selected="true"] {
+        color: var(--accent-on-fill);
+        background-color: var(--clr-lightblue);
+    }
+}
+
+/* Color swatch variant. The shared dimensions live in app.css alongside
+   .color-box / .input.color-dropdown. State styling stays here so it can win
+   the specificity contest against the generic item hover/selected rules
+   above without needing !important. */
+[role="option"].color-dropdown-item {
+    border: none;
+    background-color: var(--hl-bg, var(--background-dark));
+
+    &:hover,
+    &[highlighted],
+    &[aria-selected="true"] {
+        background-color: var(--hl-bg, var(--background-dark));
+        filter: brightness(0.9);
+    }
+}

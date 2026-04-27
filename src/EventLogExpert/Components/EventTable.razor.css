@@ -83,3 +83,20 @@ tr {
 th.dragging {
     opacity: 0.5;
 }
+
+/* event_table.js dynamically injects these resize handles into header cells,
+   so the JS-created elements never get a scoped attribute. ::deep on the
+   ancestor lets the rule target unscoped descendants. */
+table ::deep div.table-divider {
+    height: 22px;
+    width: 8px;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: var(--z-base);
+
+    &:hover { cursor: e-resize !important; }
+}

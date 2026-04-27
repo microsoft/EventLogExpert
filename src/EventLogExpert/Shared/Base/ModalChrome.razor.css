@@ -22,6 +22,14 @@ dialog:not(:modal) {
     position: relative;
 }
 
+.dialog-group {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+
+    height: 100%;
+}
+
 .dialog-header {
     display: flex;
     align-items: center;
