@@ -19,7 +19,7 @@
     cursor: pointer;
     position: relative;
     top: 2px;
-    transition: all 0.1s ease-in-out;
+    transition: background-color 0.1s ease-in-out, padding 0.1s ease-in-out, border-top 0.1s ease-in-out;
 
     width: 30ch;
     text-align: center;
