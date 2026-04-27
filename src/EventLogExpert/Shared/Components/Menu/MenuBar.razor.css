@@ -20,12 +20,12 @@
 
     &:hover,
     &.active {
-        background-color: rgba(255, 255, 255, 0.18);
+        background-color: var(--menu-hover-overlay);
         color: var(--text-on-statusbar);
     }
 
     &:focus-visible {
-        background-color: rgba(255, 255, 255, 0.18);
+        background-color: var(--menu-hover-overlay);
         color: var(--text-on-statusbar);
         outline: 2px solid var(--clr-lightblue);
         outline-offset: -2px;

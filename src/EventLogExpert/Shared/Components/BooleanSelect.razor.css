@@ -21,16 +21,16 @@
     text-align: center;
     user-select: none;
     padding: 4px 8px;
-    border-top: 1px solid rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid rgba(0, 0, 0, 0.2);
-    border-left: 1px solid rgba(0, 0, 0, 0.2);
+    border-top: 1px solid var(--border-divider);
+    border-bottom: 1px solid var(--border-divider);
+    border-left: 1px solid var(--border-divider);
     transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out;
     min-width: 4rem;
     box-sizing: border-box;
 }
 
 .toggle label:last-of-type {
-    border-right: 1px solid rgba(0, 0, 0, 0.2);
+    border-right: 1px solid var(--border-divider);
 }
 
 .toggle input:checked + label {
