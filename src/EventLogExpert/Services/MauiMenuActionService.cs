@@ -57,7 +57,7 @@ public sealed class MauiMenuActionService(
             return;
         }
 
-        await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, true);
+        await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, userInitiated: true);
     }
 
     public void ClearAllFilters() => _dispatcher.Dispatch(new FilterPaneAction.ClearAllFilters());

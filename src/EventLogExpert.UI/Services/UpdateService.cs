@@ -11,7 +11,7 @@ public readonly record struct ReleaseNotesContent(string Title, string Markdown)
 
 public interface IUpdateService
 {
-    Task CheckForUpdates(bool usePreRelease, bool manualScan);
+    Task CheckForUpdates(bool usePreRelease, bool userInitiated = false);
 
     Task<ReleaseNotesContent?> GetReleaseNotes();
 }
@@ -26,16 +26,16 @@ public sealed class UpdateService(
 {
     private string? _currentRawChanges;
 
-    public async Task CheckForUpdates(bool usePreRelease, bool manualScan)
+    public async Task CheckForUpdates(bool usePreRelease, bool userInitiated = false)
     {
         traceLogger.Debug($"{nameof(CheckForUpdates)} was called. {nameof(usePreRelease)} is {usePreRelease}. " +
-            $"{nameof(manualScan)} is {manualScan}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
+            $"{nameof(userInitiated)} is {userInitiated}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
 
         if (versionProvider.IsDevBuild)
         {
             traceLogger.Debug($"{nameof(CheckForUpdates)} {nameof(versionProvider.IsDevBuild)}: {versionProvider.IsDevBuild}. Skipping update check.");
 
-            if (manualScan)
+            if (userInitiated)
             {
                 await alertDialogService.ShowAlert("Update Check Unavailable",
                     "Update checks are disabled for development builds.",
@@ -81,7 +81,7 @@ public sealed class UpdateService(
                     appTitleService.SetIsPrerelease(true);
                 }
 
-                if (manualScan)
+                if (userInitiated)
                 {
                     await alertDialogService.ShowAlert("No Updates Available",
                         "You are currently running the latest version.",
@@ -99,15 +99,20 @@ public sealed class UpdateService(
         catch (Exception ex)
         {
             traceLogger.Error($"{nameof(CheckForUpdates)} failed while retrieving releases: {ex.Message}.");
-            
-            await alertDialogService.ShowAlert("Update Failure",
-                $"Failed to retrieve latest releases:\r\n{ex.Message}",
-                "OK");
+
+            if (userInitiated)
+            {
+                await alertDialogService.ShowAlert("Update Failure",
+                    $"Failed to retrieve latest releases:\r\n{ex.Message}",
+                    "OK");
+            }
 
             return;
         }
 
         traceLogger.Debug($"{nameof(CheckForUpdates)} Found latest release {latest.Value.Version}. IsPreRelease: {latest.Value.IsPreRelease}");
+
+        bool shouldReboot = false;
 
         try
         {
@@ -120,7 +125,7 @@ public sealed class UpdateService(
                 return;
             }
 
-            bool shouldReboot = await alertDialogService.ShowAlert(
+            shouldReboot = await alertDialogService.ShowAlert(
                 "Update Available",
                 "A new version has been detected, would you like to install and reload the application?",
                 "Yes", "No");
@@ -129,18 +134,23 @@ public sealed class UpdateService(
 
             if (shouldReboot)
             {
-                deploymentService.RestartNowAndUpdate(downloadPath);
+                deploymentService.RestartNowAndUpdate(downloadPath, userInitiated: true);
             }
             else
             {
-                deploymentService.UpdateOnNextRestart(downloadPath);
+                deploymentService.UpdateOnNextRestart(downloadPath, userInitiated);
             }
         }
         catch (Exception ex)
         {
-            await alertDialogService.ShowAlert("Update Failure",
-                $"Update failed to install:\r\n{ex.Message}",
-                "OK");
+            traceLogger.Error($"{nameof(CheckForUpdates)} failed while installing update: {ex}");
+
+            if (userInitiated || shouldReboot)
+            {
+                await alertDialogService.ShowAlert("Update Failure",
+                    $"Update failed to install:\r\n{ex.Message}",
+                    "OK");
+            }
         }
         finally
         {

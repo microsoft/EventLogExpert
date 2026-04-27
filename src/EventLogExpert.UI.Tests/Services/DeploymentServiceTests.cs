@@ -37,7 +37,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
 
         // Assert
         mockApplicationRestartService.Received(1).RegisterApplicationRestart();
@@ -66,7 +66,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
 
         // Assert
         mockApplicationRestartService.Received(1).RegisterApplicationRestart();
@@ -103,7 +103,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
 
         // Assert
         mockTraceLogger.Received(2).Debug(Arg.Any<DebugLogHandler>());
@@ -134,6 +134,8 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
@@ -141,11 +143,11 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateCompleted(status);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
+        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         mockAppTitleService.Received(1).SetProgressString(null);
     }
 
@@ -172,6 +174,8 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
@@ -179,11 +183,11 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateCompleted(AsyncStatus.Completed);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
+        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         mockAppTitleService.Received(1).SetProgressString(Constants.RelaunchMessage);
     }
 
@@ -212,6 +216,8 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
@@ -220,15 +226,62 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateCompleted(AsyncStatus.Error, testException);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
+        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
             Arg.Is<string>(msg => msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);
+
+        mockAppTitleService.Received(1).SetProgressString(null);
+    }
+
+    [Fact]
+    public async Task RestartNowAndUpdate_WhenDeploymentFailsAutoScan_ShouldNotShowAlertButClearProgress()
+    {
+        // Arrange
+        var testException = new Exception("Test deployment error");
+        var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
+        var mockPackageDeploymentService = Substitute.For<IPackageDeploymentService>();
+
+        mockPackageDeploymentService
+            .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>())
+            .Returns(mockDeploymentOperation);
+
+        var mockApplicationRestartService = Substitute.For<IApplicationRestartService>();
+        mockApplicationRestartService.RegisterApplicationRestart().Returns(true);
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        var mockMainThreadService = Substitute.For<IMainThreadService>();
+
+        mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
+        {
+            callInfo.Arg<Action>().Invoke();
+            return Task.CompletedTask;
+        });
+
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
+        var deploymentService = CreateDeploymentService(
+            appTitleService: mockAppTitleService,
+            mainThreadService: mockMainThreadService,
+            alertDialogService: mockAlertDialogService,
+            applicationRestartService: mockApplicationRestartService,
+            packageDeploymentService: mockPackageDeploymentService);
+
+        // Act
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, userInitiated: false);
+        mockDeploymentOperation.SimulateCompleted(AsyncStatus.Error, testException);
+
+        // Assert
+        await mockAlertDialogService.DidNotReceive().ShowAlert(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>());
 
         mockAppTitleService.Received(1).SetProgressString(null);
     }
@@ -256,6 +309,8 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
@@ -263,7 +318,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.RestartNowAndUpdate(Constants.DownloadPath);
+        deploymentService.RestartNowAndUpdate(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateProgress(50);
 
         // Assert
@@ -285,7 +340,7 @@ public sealed class DeploymentServiceTests
         var deploymentService = CreateDeploymentService(packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
 
         // Assert
         // NSubstitute's Received() doesn't reliably return configured values for IAsyncOperationWithProgress
@@ -316,7 +371,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
 
         // Assert
         mockApplicationRestartService.DidNotReceive().RegisterApplicationRestart();
@@ -340,7 +395,7 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
 
         // Assert
         mockTraceLogger.Received(1).Debug(Arg.Any<DebugLogHandler>());
@@ -366,17 +421,19 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateCompleted(AsyncStatus.Completed);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
+        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         mockAppTitleService.Received(1).SetProgressString(Constants.RelaunchMessage);
     }
 
@@ -402,6 +459,8 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
@@ -409,15 +468,58 @@ public sealed class DeploymentServiceTests
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateCompleted(AsyncStatus.Error, testException);
 
         // Assert
-        await mockMainThreadService.Received(1).InvokeOnMainThread(Arg.Any<Action>());
+        await mockMainThreadService.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
         await mockAlertDialogService.Received(1).ShowAlert(
             Constants.UpdateFailureTitle,
             Arg.Is<string>(msg => msg.Contains(testException.ToString())),
             Constants.UpdateFailureOk);
+
+        mockAppTitleService.Received(1).SetProgressString(null);
+    }
+
+    [Fact]
+    public async Task UpdateOnNextRestart_WhenDeploymentFailsAutoScan_ShouldNotShowAlertButClearProgress()
+    {
+        // Arrange
+        var testException = new Exception("Test deployment error");
+        var mockDeploymentOperation = new DeploymentUtils.MockDeploymentOperation();
+        var mockPackageDeploymentService = Substitute.For<IPackageDeploymentService>();
+
+        mockPackageDeploymentService
+            .AddPackageAsync(Arg.Any<Uri>(), Arg.Any<PackageDeploymentOptions>())
+            .Returns(mockDeploymentOperation);
+
+        var mockAppTitleService = Substitute.For<IAppTitleService>();
+        var mockAlertDialogService = Substitute.For<IAlertDialogService>();
+        var mockMainThreadService = Substitute.For<IMainThreadService>();
+
+        mockMainThreadService.InvokeOnMainThread(Arg.Any<Action>()).Returns(callInfo =>
+        {
+            callInfo.Arg<Action>().Invoke();
+            return Task.CompletedTask;
+        });
+
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
+        var deploymentService = CreateDeploymentService(
+            appTitleService: mockAppTitleService,
+            mainThreadService: mockMainThreadService,
+            alertDialogService: mockAlertDialogService,
+            packageDeploymentService: mockPackageDeploymentService);
+
+        // Act
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, userInitiated: false);
+        mockDeploymentOperation.SimulateCompleted(AsyncStatus.Error, testException);
+
+        // Assert
+        await mockAlertDialogService.DidNotReceive().ShowAlert(
+            Arg.Any<string>(),
+            Arg.Any<string>(),
+            Arg.Any<string>());
 
         mockAppTitleService.Received(1).SetProgressString(null);
     }
@@ -442,13 +544,15 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateProgress(25);
         mockDeploymentOperation.SimulateProgress(50);
         mockDeploymentOperation.SimulateProgress(100);
@@ -480,13 +584,15 @@ public sealed class DeploymentServiceTests
             return Task.CompletedTask;
         });
 
+        mockMainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>()).Returns(callInfo => callInfo.Arg<Func<Task>>()());
+
         var deploymentService = CreateDeploymentService(
             appTitleService: mockAppTitleService,
             mainThreadService: mockMainThreadService,
             packageDeploymentService: mockPackageDeploymentService);
 
         // Act
-        deploymentService.UpdateOnNextRestart(Constants.DownloadPath);
+        deploymentService.UpdateOnNextRestart(Constants.DownloadPath, true);
         mockDeploymentOperation.SimulateProgress(25);
 
         // Assert

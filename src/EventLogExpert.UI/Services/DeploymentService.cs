@@ -25,7 +25,7 @@ public class DeploymentService(
     private readonly IPackageDeploymentService _packageDeploymentService = packageDeploymentService;
     private readonly ITraceLogger _traceLogger = traceLogger;
 
-    public void RestartNowAndUpdate(string downloadPath)
+    public void RestartNowAndUpdate(string downloadPath, bool userInitiated = false)
     {
         _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_applicationRestartService.RegisterApplicationRestart)}.");
 
@@ -39,10 +39,10 @@ public class DeploymentService(
             new Uri(downloadPath),
             new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, ForceTargetAppShutdown: true));
 
-        SetCallbacks(deployment);
+        SetCallbacks(deployment, userInitiated);
     }
 
-    public void UpdateOnNextRestart(string downloadPath)
+    public void UpdateOnNextRestart(string downloadPath, bool userInitiated = false)
     {
         _traceLogger.Debug($"{MethodBase.GetCurrentMethod()} Calling {nameof(_packageDeploymentService.AddPackageAsync)}.");
 
@@ -50,10 +50,10 @@ public class DeploymentService(
             new Uri(downloadPath),
             new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
 
-        SetCallbacks(deployment);
+        SetCallbacks(deployment, userInitiated);
     }
 
-    private void SetCallbacks(IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment)
+    private void SetCallbacks(IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> deployment, bool userInitiated)
     {
         deployment.Progress = (result, progress) =>
         {
@@ -62,14 +62,17 @@ public class DeploymentService(
 
         deployment.Completed = (result, progress) =>
         {
-            _mainThreadService.InvokeOnMainThread(() =>
+            var completionTask = _mainThreadService.InvokeOnMainThreadAsync(async () =>
             {
                 switch (result.Status)
                 {
                     case AsyncStatus.Error :
-                        _alertDialogService.ShowAlert("Update Failure",
-                            $"Update failed to install:\r\n{result.ErrorCode}",
-                            "Ok");
+                        if (userInitiated)
+                        {
+                            await _alertDialogService.ShowAlert("Update Failure",
+                                $"Update failed to install:\r\n{result.ErrorCode}",
+                                "Ok");
+                        }
 
                         _appTitleService.SetProgressString(null);
                         break;
@@ -83,6 +86,10 @@ public class DeploymentService(
                         break;
                 }
             });
+
+            completionTask.ContinueWith(
+                t => _traceLogger.Error($"{nameof(DeploymentService)} deployment completion handler failed: {t.Exception}"),
+                TaskContinuationOptions.OnlyOnFaulted);
         };
     }
 }

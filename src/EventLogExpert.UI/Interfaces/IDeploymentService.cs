@@ -5,7 +5,7 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IDeploymentService
 {
-    void RestartNowAndUpdate(string downloadPath);
+    void RestartNowAndUpdate(string downloadPath, bool userInitiated = false);
 
-    void UpdateOnNextRestart(string downloadPath);
+    void UpdateOnNextRestart(string downloadPath, bool userInitiated = false);
 }
