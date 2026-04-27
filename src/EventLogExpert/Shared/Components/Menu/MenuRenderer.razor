@@ -64,7 +64,8 @@
                         <div class="submenu" @ref="_submenuElement" @onclick:stopPropagation>
                             @if (_resolvedChildren is null)
                             {
-                                <ul aria-label="Loading"
+                                <ul aria-busy="true"
+                                    aria-label="Loading"
                                     aria-orientation="vertical"
                                     class="menu-list"
                                     role="menu">

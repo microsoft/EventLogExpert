@@ -56,6 +56,9 @@ tr {
 .table-row.selected {
     background-color: var(--clr-lightblue);
     color: var(--accent-on-fill);
+    /* Non-color cue so users with color-vision differences (or in forced-colors
+       mode) can still tell which row is selected. */
+    box-shadow: inset 3px 0 0 var(--clr-statusbar);
 
     & span.error { color: var(--accent-on-fill); }
 
