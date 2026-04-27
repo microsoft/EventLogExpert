@@ -1,7 +1,7 @@
 ﻿@using EventLogExpert.UI
 @inherits FluxorComponent
 
-<div class="status-bar">
+<div aria-atomic="true" aria-live="polite" class="status-bar" role="status">
     @foreach (var loadingProgress in _statusBarState.EventsLoading)
     {
         <span>Loading: @loadingProgress.Value.Item1</span>

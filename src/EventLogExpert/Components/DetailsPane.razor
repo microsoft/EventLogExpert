@@ -1,10 +1,16 @@
 @inherits FluxorComponent
 
-<div data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" class="details-pane">
+<div class="details-pane" data-toggle="@IsVisible" hidden="@(_selectedEvent is null)">
     <div class="details-resizer"></div>
 
-    <div aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")" class="flex-space-between" id="details-header"
-        @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
+    <div aria-expanded="@_isVisible.ToString().ToLower()"
+        aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")"
+        class="flex-space-between"
+        id="details-header"
+        @onclick="ToggleMenu"
+        @onkeydown="HandleKeyDown"
+        role="button"
+        tabindex="0">
         <div>Details</div>
 
         <span class="menu-toggle" data-rotate="@IsVisible">
@@ -33,7 +39,13 @@
 
         <hr />
 
-        <div aria-label="@(_isXmlVisible ? "XML Expanded" : "XML Collapsed")" class="details-row-xml" @onclick="ToggleXml" @onkeydown="HandleKeyDownXml" tabindex="0">
+        <div aria-expanded="@_isXmlVisible.ToString().ToLower()"
+            aria-label="@(_isXmlVisible ? "XML Expanded" : "XML Collapsed")"
+            class="details-row-xml"
+            @onclick="ToggleXml"
+            @onkeydown="HandleKeyDownXml"
+            role="button"
+            tabindex="0">
             <div>XML</div>
             <div class="justify-self-center">
                 <button class="button" @onclick="CopyEvent">Copy Event</button>

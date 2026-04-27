@@ -5,7 +5,11 @@
 <SplitLogTabPane />
 
 <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
-    <table aria-label="Event Log Table" aria-multiselectable="true" aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)" id="eventTable" role="grid">
+    <table aria-label="Event Log Table"
+        aria-multiselectable="true"
+        aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)"
+        id="eventTable"
+        role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         <tr role="row">
             @for (int columnIndex = 0; columnIndex < _enabledColumns.Length; columnIndex++)
@@ -14,8 +18,13 @@
                 _headerName = columnHeader.ToFullString();
                 var width = GetColumnWidth(columnHeader);
 
-                <th @key="columnHeader" aria-colindex="@(columnIndex + 1)" aria-sort="@(_eventTableState.OrderBy == columnHeader ? (_eventTableState.IsDescending ? "descending" : "ascending") : "none")"
-                    class="@columnHeader.ToString().ToLowerInvariant()" data-column="@columnHeader" role="columnheader" style="width: @(width)px">
+                <th aria-colindex="@(columnIndex + 1)"
+                    aria-sort="@(_eventTableState.OrderBy == columnHeader ? _eventTableState.IsDescending ? "descending" : "ascending" : "none")"
+                    class="@columnHeader.ToString().ToLowerInvariant()"
+                    data-column="@columnHeader"
+                    @key="columnHeader"
+                    role="columnheader"
+                    style="width: @(width)px">
                     @if (columnHeader == ColumnName.DateAndTime)
                     {
                         <text>@GetDateColumnHeader()</text>
@@ -39,16 +48,22 @@
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         @if (_currentTable is not null)
         {
-            <Virtualize Context="evt" Items="@((_currentTable.DisplayedEvents as ICollection<DisplayEventModel>) ?? [])">
-                    <tr aria-rowindex="@GetRowIndex(evt)" aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
-                        class="@GetCss(evt)" data-highlight="@GetHighlight(evt)" @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")" @onmousedown="args => SelectEvent(args, evt)" role="row" tabindex="0">
+            <Virtualize Context="evt" Items="@(_currentTable.DisplayedEvents as ICollection<DisplayEventModel> ?? [])">
+                <tr aria-rowindex="@GetRowIndex(evt)"
+                    aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
+                    class="@GetCss(evt)"
+                    data-highlight="@GetHighlight(evt)"
+                    @key="@($"{evt.OwningLog}_{evt.RecordId}_{evt.TimeCreated:O}")"
+                    @onmousedown="args => SelectEvent(args, evt)"
+                    role="row"
+                    tabindex="0">
                     @for (int i = 0; i < _enabledColumns.Length; i++)
                     {
                         <td aria-colindex="@(i + 1)" role="gridcell">
                             @switch (_enabledColumns[i])
                             {
                                 case ColumnName.Level:
-                                    <text><span class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
+                                    <text><span aria-hidden="true" class="@GetLevelClass(evt.Level)"></span> @evt.Level</text>
                                     break;
                                 case ColumnName.DateAndTime:
                                     @evt.TimeCreated.ConvertTimeZone(_timeZoneSettings)
