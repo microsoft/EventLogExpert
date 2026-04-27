@@ -26,6 +26,14 @@ public sealed class ReleaseNotesMarkdownRendererTests
     }
 
     [Fact]
+    public void RenderToHtml_AsteriskBoldInsideUnderscoreItalic_NestsCorrectly()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_some **bold** text_");
+
+        Assert.Contains("<em>some <strong>bold</strong> text</em>", html);
+    }
+
+    [Fact]
     public void RenderToHtml_BlankLineBetweenBullets_StartsNewList()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("- a\n\n- b");
@@ -154,6 +162,16 @@ public sealed class ReleaseNotesMarkdownRendererTests
     }
 
     [Fact]
+    public void RenderToHtml_IntrawordUnderscoreInsideText_NotItalicized()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("uses my_field and your_field together");
+
+        Assert.DoesNotContain("<em>", html);
+        Assert.Contains("my_field", html);
+        Assert.Contains("your_field", html);
+    }
+
+    [Fact]
     public void RenderToHtml_Italic_RendersEm()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("paragraph with *italic* word");
@@ -264,6 +282,15 @@ public sealed class ReleaseNotesMarkdownRendererTests
     }
 
     [Fact]
+    public void RenderToHtml_SnakeCaseIdentifier_NotItalicized()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("see snake_case_var for details");
+
+        Assert.DoesNotContain("<em>", html);
+        Assert.Contains("snake_case_var", html);
+    }
+
+    [Fact]
     public void RenderToHtml_TitleIsHtmlEscaped()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("<script>alert(1)</script>", string.Empty);
@@ -281,12 +308,72 @@ public sealed class ReleaseNotesMarkdownRendererTests
     }
 
     [Fact]
+    public void RenderToHtml_UnderscoreAdjacentToNonAsciiLetter_NotItalicized()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("café_au_lait is a drink");
+
+        Assert.DoesNotContain("<em>", html);
+        Assert.Contains("_au_lait", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnderscoreBold_RendersStrong()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__bold text__");
+
+        Assert.Contains("<strong>bold text</strong>", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnderscoreBoldMixedWithAsteriskItalic_BothRender()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__bold__ and *italic*");
+
+        Assert.Contains("<strong>bold</strong>", html);
+        Assert.Contains("<em>italic</em>", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnderscoreItalic_RendersEm()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("paragraph with _italic_ word");
+
+        Assert.Contains("<em>italic</em>", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnderscoreItalicAtStartOfLine_RendersEm()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_All changes since the last stable release._");
+
+        Assert.Contains("<em>All changes since the last stable release.</em>", html);
+    }
+
+    [Fact]
     public void RenderToHtml_UnmatchedBoldMarkers_LeftAsLiteral()
     {
         var html = ReleaseNotesMarkdownRenderer.RenderToHtml("**unclosed bold");
 
         Assert.DoesNotContain("<strong>", html);
         Assert.Contains("**unclosed bold", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnmatchedUnderscoreBoldMarker_LeftAsLiteral()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__unclosed bold");
+
+        Assert.DoesNotContain("<strong>", html);
+        Assert.Contains("__unclosed bold", html);
+    }
+
+    [Fact]
+    public void RenderToHtml_UnmatchedUnderscoreItalicMarker_LeftAsLiteral()
+    {
+        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_unclosed italic");
+
+        Assert.DoesNotContain("<em>", html);
+        Assert.Contains("_unclosed italic", html);
     }
 
     [Fact]
