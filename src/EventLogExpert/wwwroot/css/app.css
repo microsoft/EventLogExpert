@@ -40,6 +40,25 @@
        --hl-fg-dark  = always-dark text suitable for use on light tints.
        Components that opt in via [data-highlight] inherit --hl-bg / --hl-fg
        and apply them in a single rule rather than per-color CSS classes. */
+
+    /* Muted/secondary text (disabled menu items, shortcut hints, etc.). */
+    --text-secondary: var(--clr-lightgray);
+
+    /* Surface chrome tokens. Used for shared menu / popover shadows and
+       semi-transparent overlays so light theme can re-tune them. */
+    --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.35);
+    --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.6);
+    --overlay-dim: rgba(0, 0, 0, 0.55);
+    --border-divider: rgba(255, 255, 255, 0.18);
+    --menu-hover-overlay: rgba(255, 255, 255, 0.18);
+
+    /* Z-index layers. Keep all stacking decisions in one place so
+       components compose predictably. */
+    --z-base: 1;
+    --z-dropdown: 10;
+    --z-error-ui: 50;
+    --z-menu-overlay: 100;
+    --z-submenu: 101;
 }
 
 /* -----------------------------------------------------------------------------
@@ -107,6 +126,13 @@
     --clr-on-light-highlight: #1A1A1A;
     --text-primary: var(--clr-lightblue);
     --text-on-statusbar: var(--clr-white);
+
+    --text-secondary: #555;
+    --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.18);
+    --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.25);
+    --overlay-dim: rgba(0, 0, 0, 0.35);
+    --border-divider: rgba(0, 0, 0, 0.2);
+    --menu-hover-overlay: rgba(0, 0, 0, 0.12);
 }
 
 @media (prefers-color-scheme: light) {
@@ -128,8 +154,17 @@
         --clr-on-light-highlight: #1A1A1A;
         --text-primary: var(--clr-lightblue);
         --text-on-statusbar: var(--clr-white);
+
+        --text-secondary: #555;
+        --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.18);
+        --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.25);
+        --overlay-dim: rgba(0, 0, 0, 0.35);
+        --border-divider: rgba(0, 0, 0, 0.2);
+        --menu-hover-overlay: rgba(0, 0, 0, 0.12);
     }
 }
+
+*, *::before, *::after { box-sizing: border-box; }
 
 ::-webkit-scrollbar {
     width: 6px;
@@ -195,15 +230,7 @@ a,
 
 .advanced-filter-error { margin-left: 70px; }
 
-/*.valid.modified:not([type=checkbox]) {
-    outline: 1px solid #26b050;
-}
-
-.invalid {
-    outline: 1px solid red;
-}*/
-
-.validation-message { color: red; }
+.validation-message { color: var(--clr-red); }
 
 #blazor-error-ui {
     background: lightyellow;
@@ -214,7 +241,7 @@ a,
     padding: 0.6rem 1.25rem 0.7rem 1.25rem;
     position: fixed;
     width: 100%;
-    z-index: 1000;
+    z-index: var(--z-error-ui);
 }
 
 #blazor-error-ui .dismiss {
@@ -374,7 +401,7 @@ div.table-divider {
     position: absolute;
     top: 0;
     right: 0;
-    z-index: 1;
+    z-index: var(--z-base);
 }
 
     /* col-resize is currently bugged in WebView2 */
@@ -397,7 +424,7 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     user-select: none;
     border: 1px solid var(--clr-lightblue);
     background-color: var(--background-dark);
-    z-index: 10;
+    z-index: var(--z-dropdown);
     max-height: 240px;
     overflow-y: auto;
     overflow-x: hidden;
@@ -444,25 +471,3 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
 
     &[aria-selected="true"] { filter: brightness(0.9); }
 }
-
-@media (forced-colors: active) {
-    :root {
-        forced-color-adjust: none;
-    }
-}
-
-/*@supports (-webkit-touch-callout: none) {
-    .status-bar-safe-area {
-        display: flex;
-        position: sticky;
-        top: 0;
-        height: env(safe-area-inset-top);
-        background-color: #f7f7f7;
-        width: 100%;
-        z-index: 1;
-    }
-
-	.flex-column, .navbar-brand {
-		padding-left: env(safe-area-inset-left);
-	}
-}*/

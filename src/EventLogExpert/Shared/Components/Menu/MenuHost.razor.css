@@ -9,7 +9,7 @@
     right: 0;
     top: var(--menu-bar-height);
     bottom: 0;
-    z-index: 100;
+    z-index: var(--z-menu-overlay);
     background: transparent;
     outline: none;
 }
@@ -21,7 +21,7 @@
     overflow-y: auto;
     background-color: var(--background-dark);
     border: 1px solid var(--clr-lightblue);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    box-shadow: var(--shadow-menu);
     /* Hidden until clampMenuPopup adds menu-popup-positioned. opacity (not visibility)
        keeps the first item focusable during the brief pre-positioning window. */
     opacity: 0;

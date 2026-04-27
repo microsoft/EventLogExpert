@@ -60,9 +60,3 @@ span {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
-
-.spinner-border {
-    font-size: 0.85em;
-    height: 0.95em;
-    width: 0.95em;
-}
