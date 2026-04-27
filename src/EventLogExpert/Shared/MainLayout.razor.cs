@@ -43,7 +43,7 @@ public sealed partial class MainLayout : IAsyncDisposable
     {
         Settings.ThemeChanged += OnThemeChanged;
 
-        await UpdateService.CheckForUpdates(Settings.IsPreReleaseEnabled, false);
+        await UpdateService.CheckForUpdates(Settings.IsPreReleaseEnabled);
         AppTitleService.SetLogName(null);
 
         await base.OnInitializedAsync();
