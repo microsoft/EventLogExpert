@@ -1,0 +1,10 @@
+.divider {
+    width: 95%;
+    align-self: center;
+    border-top: 3px solid var(--clr-lightblue);
+}
+
+i.bi.bi-star,
+i.bi.bi-star-fill {
+    color: var(--clr-yellow);
+}

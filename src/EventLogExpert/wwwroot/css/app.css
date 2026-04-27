@@ -2,64 +2,74 @@
 @import url("https://cdn.jsdelivr.net/npm/bootstrap-icons@1.9.1/font/bootstrap-icons.css");
 
 :root {
-    --clr-lightblue: #9CDCFE;
-    --clr-lightgray: #A4B9C0;
+    /* Browsers use color-scheme to (a) hint native control rendering and
+       (b) drive the light-dark() function below. data-theme overrides on
+       <html> further restrict this to a single scheme. */
+    color-scheme: light dark;
+
+    /* Invariant palette - same in both themes. */
     --clr-white: #FFF;
     --clr-black: #000;
-    --clr-red: #EF523B;
-    --clr-green: #5AC358;
-    --clr-yellow: #F8C84B;
 
-    --clr-placeholder: #A3A1A1;
+    /* Theme-aware palette. light-dark(lightValue, darkValue) resolves based on
+       the element's used color-scheme. */
+    --clr-lightblue:    light-dark(#155A9E, #9CDCFE);
+    --clr-lightgray:    light-dark(#4A4A4A, #A4B9C0);
+    --clr-red:          light-dark(#C0392B, #EF523B);
+    --clr-green:        light-dark(#1E7E34, #5AC358);
+    --clr-yellow:       light-dark(#8A6D00, #F8C84B);
+    --clr-placeholder:  light-dark(#6B6B6B, #A3A1A1);
+    --clr-statusbar:    light-dark(#2E50C0, #3C64E7);
 
-    --clr-statusbar: #3C64E7;
+    --background-dark:     light-dark(#E0E0E0, #222222);
+    --background-darkgray: light-dark(#CECECE, #353535);
 
     /* Shared menu metrics. The menu bar height drives the MenuHost overlay offset so
        the bar strip stays clickable while a menu is open. */
     --menu-bar-height: 28px;
 
-    --background-dark: #222222;
-    --background-darkgray: #353535;
-
-    /* Semantic tokens. Values may differ in light mode. */
+    /* Semantic tokens. */
     /* Text color shown on top of an accent fill (e.g. selected rows / menu items
        whose background is var(--clr-lightblue)). */
-    --accent-on-fill: var(--background-darkgray);
+    --accent-on-fill: light-dark(var(--clr-white), var(--background-darkgray));
     /* Always-dark text suitable for use on light highlight tints
        (--highlight-light* colors). */
-    --clr-on-light-highlight: var(--background-darkgray);
+    --clr-on-light-highlight: light-dark(#1A1A1A, var(--background-darkgray));
     /* Default body text color. Component CSS should reference this rather than
        hardcoding white/black. */
     --text-primary: var(--clr-lightblue);
     /* Inverted text for badges / scrollbar thumbs that always appear on the
        statusbar (blue) background. */
     --text-on-statusbar: var(--clr-white);
-
-    /* Foreground tokens used by highlight palette below.
-       --hl-fg-light = white text suitable for use on saturated/dark fills.
-       --hl-fg-dark  = always-dark text suitable for use on light tints.
-       Components that opt in via [data-highlight] inherit --hl-bg / --hl-fg
-       and apply them in a single rule rather than per-color CSS classes. */
-
     /* Muted/secondary text (disabled menu items, shortcut hints, etc.). */
-    --text-secondary: var(--clr-lightgray);
+    --text-secondary: light-dark(#555, var(--clr-lightgray));
 
-    /* Surface chrome tokens. Used for shared menu / popover shadows and
-       semi-transparent overlays so light theme can re-tune them. */
-    --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.35);
-    --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.6);
-    --overlay-dim: rgba(0, 0, 0, 0.55);
-    --border-divider: rgba(255, 255, 255, 0.18);
-    --menu-hover-overlay: rgba(255, 255, 255, 0.18);
+    /* Surface chrome tokens. Shadow color components are extracted so the
+       light/dark variant can swap while the geometry stays in one place. */
+    --shadow-menu-color:  light-dark(rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.35));
+    --shadow-modal-color: light-dark(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.6));
+    --shadow-menu:  0 2px 6px var(--shadow-menu-color);
+    --shadow-modal: 0 .5rem 1.5rem var(--shadow-modal-color);
+
+    --overlay-dim:         light-dark(rgba(0, 0, 0, 0.35),     rgba(0, 0, 0, 0.55));
+    --border-divider:      light-dark(rgba(0, 0, 0, 0.2),      rgba(255, 255, 255, 0.18));
+    --menu-hover-overlay:  light-dark(rgba(0, 0, 0, 0.12),     rgba(255, 255, 255, 0.18));
 
     /* Z-index layers. Keep all stacking decisions in one place so
-       components compose predictably. */
+       components compose predictably. Spaced by 20 to leave room for new
+       layers without renumbering existing ones. */
     --z-base: 1;
-    --z-dropdown: 10;
-    --z-error-ui: 50;
-    --z-menu-overlay: 100;
-    --z-submenu: 101;
+    --z-dropdown: 20;
+    --z-error-ui: 40;
+    --z-menu-overlay: 60;
+    --z-submenu: 80;
 }
+
+/* Explicit user choice overrides the OS preference. Setting color-scheme to a
+   single value forces every light-dark() call below to that branch. */
+:root[data-theme="light"] { color-scheme: light; }
+
+:root[data-theme="dark"]  { color-scheme: dark; }
 
 /* -----------------------------------------------------------------------------
    Highlight palette.
@@ -94,75 +104,6 @@
 [data-highlight="lightpink"]    { --hl-bg: #FF74A1; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="pink"]         { --hl-bg: #E2074C; --hl-fg: var(--clr-white); }
 [data-highlight="darkpink"]     { --hl-bg: #960131; --hl-fg: var(--clr-white); }
-
-/* -----------------------------------------------------------------------------
-   Light theme palette.
-   Applied when:
-     - User explicitly selects Light (data-theme="light"), OR
-     - User leaves Theme = System (no data-theme attribute) AND OS reports
-       prefers-color-scheme: light.
-   Intentionally NOT applied when data-theme="dark" so an explicit Dark choice
-   wins over the OS preference.
-
-   All foreground/background pairs target WCAG AA contrast (>= 4.5:1) for
-   normal text. Highlight palette is unchanged; --clr-on-light-highlight
-   ensures the dark-on-light-tint text remains readable.
-   -------------------------------------------------------------------------- */
-:root[data-theme="light"] {
-    --clr-lightblue: #155A9E;       /* primary accent - on white ~6.0:1 */
-    --clr-lightgray: #4A4A4A;
-    --clr-red: #C0392B;             /* on white ~5.0:1 */
-    --clr-green: #1E7E34;           /* on white ~5.0:1 */
-    --clr-yellow: #8A6D00;          /* dark olive - true yellow fails AA */
-
-    --clr-placeholder: #6B6B6B;     /* on white ~5.7:1 */
-
-    --clr-statusbar: #2E50C0;       /* white text on it ~6.7:1 */
-
-    --background-dark: #F5F5F5;     /* primary surface - softer than pure white */
-    --background-darkgray: #E4E4E4; /* alt rows / headers / hover */
-
-    --accent-on-fill: var(--clr-white);
-    --clr-on-light-highlight: #1A1A1A;
-    --text-primary: var(--clr-lightblue);
-    --text-on-statusbar: var(--clr-white);
-
-    --text-secondary: #555;
-    --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.18);
-    --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.25);
-    --overlay-dim: rgba(0, 0, 0, 0.35);
-    --border-divider: rgba(0, 0, 0, 0.2);
-    --menu-hover-overlay: rgba(0, 0, 0, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-    :root:not([data-theme="dark"]):not([data-theme="light"]) {
-        --clr-lightblue: #155A9E;
-        --clr-lightgray: #4A4A4A;
-        --clr-red: #C0392B;
-        --clr-green: #1E7E34;
-        --clr-yellow: #8A6D00;
-
-        --clr-placeholder: #6B6B6B;
-
-        --clr-statusbar: #2E50C0;
-
-        --background-dark: #F5F5F5;
-        --background-darkgray: #E4E4E4;
-
-        --accent-on-fill: var(--clr-white);
-        --clr-on-light-highlight: #1A1A1A;
-        --text-primary: var(--clr-lightblue);
-        --text-on-statusbar: var(--clr-white);
-
-        --text-secondary: #555;
-        --shadow-menu: 0 2px 6px rgba(0, 0, 0, 0.18);
-        --shadow-modal: 0 .5rem 1.5rem rgba(0, 0, 0, 0.25);
-        --overlay-dim: rgba(0, 0, 0, 0.35);
-        --border-divider: rgba(0, 0, 0, 0.2);
-        --menu-hover-overlay: rgba(0, 0, 0, 0.12);
-    }
-}
 
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -221,42 +162,12 @@ html, body {
 
     .footer-group.align-right { justify-content: flex-end; }
 
-a,
-.btn-link {
-    color: #0071c1;
-}
-
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
-}
+a { color: var(--clr-lightblue); }
 
 .spinner-border {
     font-size: 0.85em;
     height: 0.95em;
     width: 0.95em;
-}
-
-.content { padding-top: 1.1rem; }
-
-.advanced-filter-error { margin-left: 70px; }
-
-/* Visually-hidden until focused. Lets keyboard users jump past the menu bar
-   straight to the main content area. */
-.skip-link {
-    position: absolute;
-    top: -40px;
-    left: 0;
-    padding: 6px 12px;
-    background-color: var(--clr-statusbar);
-    color: var(--text-on-statusbar);
-    z-index: var(--z-error-ui);
-    text-decoration: none;
-}
-
-.skip-link:focus {
-    top: 0;
 }
 
 .validation-message { color: var(--clr-red); }
@@ -287,8 +198,6 @@ a,
 }
 
 .blazor-error-boundary::after { content: "An error has occurred." }
-
-.status-bar-safe-area { display: none; }
 
 .text-align-center { text-align: center; }
 
@@ -328,20 +237,6 @@ a,
 }
 
 .indent { margin-left: 1rem; }
-
-.dialog-group {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-
-    height: 100%;
-}
-
-.divider {
-    width: 95%;
-    align-self: center;
-    border-top: 3px solid var(--clr-lightblue);
-}
 
 .input {
     background: none;
@@ -395,88 +290,21 @@ input[type="text"].input { padding: 0; }
     .menu-toggle[data-rotate="true"] { transform: rotate(-180deg); }
 
 .button {
-    color: var(--clr-lightblue);
-    border: var(--clr-lightblue);
+    --btn-color: var(--clr-lightblue);
+    color: var(--btn-color);
+    border: none;
     background: none;
 
     &:hover { filter: brightness(0.9); }
 }
 
-.button.button-red {
-    color: var(--clr-red);
-    border: var(--clr-red);
-}
+.button.button-red    { --btn-color: var(--clr-red); }
 
-.button.button-green {
-    color: var(--clr-green);
-    border: var(--clr-green);
-}
+.button.button-green  { --btn-color: var(--clr-green); }
 
-.button.button-yellow {
-    color: var(--clr-yellow);
-    border: var(--clr-yellow);
-}
+.button.button-yellow { --btn-color: var(--clr-yellow); }
 
 .button.fixed-width { width: 11ch; }
-
-div.table-divider {
-    height: 22px;
-    width: 8px;
-    margin: 0;
-    padding: 0;
-    user-select: none;
-    position: absolute;
-    top: 0;
-    right: 0;
-    z-index: var(--z-base);
-}
-
-    /* col-resize is currently bugged in WebView2 */
-    /* https://github.com/dotnet/maui/issues/9960 */
-    div.table-divider:hover { cursor: e-resize !important; }
-
-i.bi.bi-star { color: var(--clr-yellow); }
-
-i.bi.bi-star-fill { color: var(--clr-yellow); }
-
-.dropdown-input {
-    display: inline-block;
-    margin: 0 0.5rem;
-
-    & > .input { margin: 0; }
-}
-
-.dropdown-list {
-    display: none;
-    user-select: none;
-    border: 1px solid var(--clr-lightblue);
-    background-color: var(--background-dark);
-    z-index: var(--z-dropdown);
-    max-height: 240px;
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    &[data-toggle] { display: block; }
-
-    & > div {
-        text-align: left;
-        margin: 0;
-        padding: 0 5px;
-
-        display:block;
-        clear: both;
-
-        color: var(--text-primary);
-
-        &:hover,
-        &[highlighted] { background-color: var(--background-darkgray); }
-
-        &[aria-selected="true"] {
-            color: var(--accent-on-fill);
-            background-color: var(--clr-lightblue);
-        }
-    }
-}
 
 .input.color-dropdown,
 .color-dropdown-item,
@@ -488,13 +316,5 @@ i.bi.bi-star-fill { color: var(--clr-yellow); }
     border-bottom: 0;
     border: 1px solid var(--clr-lightblue);
     text-indent: 100%;
-    background-color: var(--hl-bg, var(--background-dark)) !important;
-}
-
-.color-dropdown-item {
-    border: none;
-
-    &:hover { filter: brightness(0.9); }
-
-    &[aria-selected="true"] { filter: brightness(0.9); }
+    background-color: var(--hl-bg, var(--background-dark));
 }

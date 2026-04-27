@@ -1,0 +1,14 @@
+/* Visually-hidden until focused. Lets keyboard users jump past the menu bar
+   straight to the main content area. */
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 0;
+    padding: 6px 12px;
+    background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
+    z-index: var(--z-error-ui);
+    text-decoration: none;
+
+    &:focus { top: 0; }
+}
