@@ -1,7 +1,7 @@
 @inherits FluxorComponent
 
-<div data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" id="details-pane">
-    <div id="details-resizer"></div>
+<div data-toggle="@IsVisible" hidden="@(_selectedEvent is null)" class="details-pane">
+    <div class="details-resizer"></div>
 
     <div aria-label="@(_isVisible ? "Details Expanded" : "Details Collapsed")" class="flex-space-between" id="details-header"
         @onclick="ToggleMenu" @onkeydown="HandleKeyDown" tabindex="0">
