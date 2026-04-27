@@ -1,25 +1,25 @@
-﻿#details-pane {
+﻿.details-pane {
     display: flex;
     flex-direction: column;
     flex: 0 0 auto;
     position: relative;
 
     margin: 0 5px;
-    height: 30%;
+    height: var(--details-pane-height, 30%);
     min-height: 20%;
     overflow: hidden;
 
     border-top: solid var(--background-darkgray);
 
     &[data-toggle="false"] {
-        height: auto !important;
-        min-height: 0 !important;
+        height: auto;
+        min-height: 0;
 
         & > :not(#details-header) { display: none; }
     }
 }
 
-#details-resizer {
+.details-resizer {
     height: 10px;
     width: 100%;
     margin: 0;

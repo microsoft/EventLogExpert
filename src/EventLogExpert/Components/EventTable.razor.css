@@ -51,26 +51,28 @@ tr {
 
 .warning { color: var(--clr-yellow); }
 
-.selected {
-    background-color: var(--clr-lightblue) !important;
-    color: var(--accent-on-fill) !important;
-
-    & span.error { color: var(--accent-on-fill) !important; }
-
-    & span.warning { color: var(--accent-on-fill) !important; }
-}
-
 .table-row { cursor: pointer; }
 
+.table-row.selected {
+    background-color: var(--clr-lightblue);
+    color: var(--accent-on-fill);
+
+    & span.error { color: var(--accent-on-fill); }
+
+    & span.warning { color: var(--accent-on-fill); }
+}
+
 /* Single rule applies any highlight color via the [data-highlight] palette
-   defined in app.css. Bg/fg pair guarantees WCAG-compliant contrast. */
+   defined in app.css. Bg/fg pair guarantees WCAG-compliant contrast.
+   Specificity (.table-row[data-highlight] = 0,2,0) beats
+   tr:nth-child(odd) (0,1,1) without needing !important. */
 .table-row[data-highlight] {
-    background-color: var(--hl-bg) !important;
-    color: var(--hl-fg) !important;
+    background-color: var(--hl-bg);
+    color: var(--hl-fg);
 
-    & span.error { color: var(--hl-fg) !important; }
+    & span.error { color: var(--hl-fg); }
 
-    & span.warning { color: var(--hl-fg) !important; }
+    & span.warning { color: var(--hl-fg); }
 }
 
 .description { width: 100%; }

@@ -1,6 +1,6 @@
 @inherits FluxorComponent
 
-<div id="tab-pane" hidden="@(EventTableState.Value.EventTables.Count <= 1)">
+<div class="split-log-tab-pane" hidden="@(EventTableState.Value.EventTables.Count <= 1)">
     <div class="tab-row">
         @foreach (var table in _sortedTabs)
         {

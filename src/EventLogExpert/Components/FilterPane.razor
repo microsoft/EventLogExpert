@@ -57,7 +57,7 @@
     <div class="filter-group" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
-            <EditForm class="flex-row" id="filter-form" Model="_model">
+            <EditForm class="flex-row filter-form" Model="_model">
                 <span>
                     After:
                     <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"

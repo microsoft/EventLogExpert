@@ -1,5 +1,5 @@
 ﻿window.registerTabPaneEvents = () => {
-    const tabPane = document.getElementById("tab-pane");
+    const tabPane = document.querySelector(".split-log-tab-pane");
 
     if (!tabPane) { return; }
 

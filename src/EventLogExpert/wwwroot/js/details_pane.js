@@ -23,19 +23,21 @@
     window.enableDetailsPaneResizer = (dotNetRef, savedHeight) => {
         window.disposeDetailsPaneResizer();
 
-        const detailsPane = document.getElementById("details-pane");
-        const resizer = document.getElementById("details-resizer");
+        const detailsPane = document.querySelector(".details-pane");
+        const resizer = detailsPane?.querySelector(".details-resizer");
 
         if (detailsPane == null || resizer == null) {
             return;
         }
 
         // Apply persisted height (if any) before user interaction. CSS supplies
-        // the default height when no saved value exists. Clamp so a height saved
-        // on a larger window can't overwhelm a smaller viewport on next launch.
+        // the default height via var(--details-pane-height, 30%) when no saved
+        // value exists. Setting a custom property (rather than inline height)
+        // lets the [data-toggle="false"] collapsed-state CSS rule win without
+        // needing !important.
         if (savedHeight && savedHeight > 0) {
             const maxHeight = Math.max(60, Math.floor(window.innerHeight * 0.8));
-            detailsPane.style.height = `${Math.min(savedHeight, maxHeight)}px`;
+            detailsPane.style.setProperty("--details-pane-height", `${Math.min(savedHeight, maxHeight)}px`);
         }
 
         detailsPaneState.dotNetRef = dotNetRef;
@@ -53,7 +55,7 @@
             // and being un-grabbable). CSS min-height still applies on top.
             const newHeight = Math.max(30, h - distance);
 
-            detailsPane.style.height = `${newHeight}px`;
+            detailsPane.style.setProperty("--details-pane-height", `${newHeight}px`);
         };
 
         const mouseUpHandler = function() {
