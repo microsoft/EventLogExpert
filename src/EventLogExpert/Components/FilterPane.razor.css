@@ -20,7 +20,7 @@
     overflow: auto;
 
     border-bottom: solid var(--background-darkgray);
-    transition: all 1s;
+    transition: max-height 1s, padding 1s, border 1s;
 }
 
 .filter-group[data-toggle="false"] {

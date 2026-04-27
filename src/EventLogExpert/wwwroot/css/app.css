@@ -166,6 +166,20 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
+:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
 ::-webkit-scrollbar {
     width: 6px;
     background: var(--background-darkgray);
@@ -206,8 +220,6 @@ html, body {
 }
 
     .footer-group.align-right { justify-content: flex-end; }
-
-h1:focus { outline: none; }
 
 a,
 .btn-link {
@@ -369,8 +381,6 @@ input[type="text"].input { padding: 0; }
     color: var(--clr-lightblue);
     border: var(--clr-lightblue);
     background: none;
-
-    &:focus { border: none; }
 
     &:hover { filter: brightness(0.9); }
 }

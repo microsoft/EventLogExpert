@@ -3,16 +3,21 @@
 @using EventLogExpert.Shared.Components.Menu
 @inherits LayoutComponentBase
 
-<div class="page" tabindex="0">
+<div class="page">
     <ModalHost />
     <MenuHost />
 
-    <MenuBar />
+    <nav aria-label="Main menu">
+        <MenuBar />
+    </nav>
 
-    <div class="page-content">
+    <main class="page-content">
         <FilterPane />
         <EventTable />
         <DetailsPane />
+    </main>
+
+    <footer>
         <StatusBar />
-    </div>
+    </footer>
 </div>
