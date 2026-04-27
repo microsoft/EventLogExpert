@@ -162,9 +162,11 @@ public static partial class ReleaseNotesMarkdownRenderer
         var withLinkTextOnly = LinkRegex().Replace(withCodePlaceholders, match => match.Groups[1].Value);
 
         var withBold = BoldRegex().Replace(withLinkTextOnly, "<strong>$1</strong>");
-        var withItalic = ItalicRegex().Replace(withBold, "<em>$1</em>");
+        var withUnderscoreBold = UnderscoreBoldRegex().Replace(withBold, "<strong>$1</strong>");
+        var withItalic = ItalicRegex().Replace(withUnderscoreBold, "<em>$1</em>");
+        var withUnderscoreItalic = UnderscoreItalicRegex().Replace(withItalic, "<em>$1</em>");
 
-        var restored = CodePlaceholderRegex().Replace(withItalic, match =>
+        var restored = CodePlaceholderRegex().Replace(withUnderscoreItalic, match =>
         {
             var index = int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
             return index >= 0 && index < codeSpans.Count ? codeSpans[index] : match.Value;
@@ -172,4 +174,10 @@ public static partial class ReleaseNotesMarkdownRenderer
 
         return restored;
     }
+
+    [GeneratedRegex(@"(?<![\p{L}\p{N}\p{M}_])__([^\n]+?)__(?![\p{L}\p{N}\p{M}_])")]
+    private static partial Regex UnderscoreBoldRegex();
+
+    [GeneratedRegex(@"(?<![\p{L}\p{N}\p{M}_])_([^_\n]+?)_(?![\p{L}\p{N}\p{M}_])")]
+    private static partial Regex UnderscoreItalicRegex();
 }
