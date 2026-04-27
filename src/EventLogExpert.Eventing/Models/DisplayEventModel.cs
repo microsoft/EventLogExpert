@@ -20,7 +20,7 @@ public sealed record DisplayEventModel(
 
     public IReadOnlyList<string> Keywords { get; init; } = [];
 
-    public string KeywordsDisplayName { get; init; } = string.Empty;
+    public string KeywordsDisplayName => Keywords.Count == 0 ? string.Empty : string.Join(", ", Keywords);
 
     public string Level { get; init; } = string.Empty;
 

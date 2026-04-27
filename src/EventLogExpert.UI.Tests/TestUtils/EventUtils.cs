@@ -21,7 +21,7 @@ internal static class EventUtils
         Guid? activityId = null,
         int? processId = null,
         int? threadId = null,
-        string keywordsDisplayName = "") =>
+        IReadOnlyList<string>? keywords = null) =>
         new("TestLog", PathType.LogName)
         {
             Id = id,
@@ -36,6 +36,6 @@ internal static class EventUtils
             ActivityId = activityId,
             ProcessId = processId,
             ThreadId = threadId,
-            KeywordsDisplayName = keywordsDisplayName
+            Keywords = keywords ?? []
         };
 }

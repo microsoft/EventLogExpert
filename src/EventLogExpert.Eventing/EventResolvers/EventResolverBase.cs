@@ -332,7 +332,6 @@ public partial class EventResolverBase : IDisposable
             Description = ResolveDescription(eventRecord, descriptionDetails, modernEvent, supplemental),
             Id = eventRecord.Id,
             Keywords = keywords,
-            KeywordsDisplayName = string.Join(", ", keywords),
             Level = Severity.GetString(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,

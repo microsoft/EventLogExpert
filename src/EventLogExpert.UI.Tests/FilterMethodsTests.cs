@@ -910,9 +910,9 @@ public sealed class FilterMethodsTests
         // Arrange
         var events = new List<DisplayEventModel>
         {
-            EventUtils.CreateTestEvent(keywordsDisplayName: "Zebra"),
-            EventUtils.CreateTestEvent(keywordsDisplayName: "Apple"),
-            EventUtils.CreateTestEvent(keywordsDisplayName: "Mango")
+            EventUtils.CreateTestEvent(keywords: ["Zebra"]),
+            EventUtils.CreateTestEvent(keywords: ["Apple"]),
+            EventUtils.CreateTestEvent(keywords: ["Mango"])
         };
 
         // Act
