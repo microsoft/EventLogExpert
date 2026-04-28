@@ -80,92 +80,108 @@ public sealed class ClipboardService : IClipboardService
 
     private string FormatEventForCopy(CopyType copyType, DisplayEventModel @event, string xml)
     {
+        if (copyType == CopyType.Xml)
+        {
+            return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
+        }
+
+        StringBuilder builder = new();
+
+        AppendFormattedEvent(builder, copyType, @event, xml);
+
+        return builder.ToString();
+    }
+
+    private void AppendFormattedEvent(
+        StringBuilder builder,
+        CopyType copyType,
+        DisplayEventModel @event,
+        string xml)
+    {
         switch (copyType)
         {
             case CopyType.Default:
-                StringBuilder defaultEvent = new();
-
                 foreach ((ColumnName column, _) in _eventTableColumns.Value.Where(x => x.Value))
                 {
                     switch (column)
                     {
                         case ColumnName.Level:
-                            defaultEvent.Append($"\"{@event.Level}\" ");
+                            builder.Append($"\"{@event.Level}\" ");
                             break;
                         case ColumnName.DateAndTime:
-                            defaultEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
+                            builder.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
                             break;
                         case ColumnName.ActivityId:
-                            defaultEvent.Append($"\"{@event.ActivityId}\" ");
+                            builder.Append($"\"{@event.ActivityId}\" ");
                             break;
                         case ColumnName.Log:
-                            defaultEvent.Append($"\"{@event.OwningLog.Split("\\").Last()}\" ");
+                            builder.Append($"\"{GetLogShortName(@event.OwningLog)}\" ");
                             break;
                         case ColumnName.ComputerName:
-                            defaultEvent.Append($"\"{@event.ComputerName}\" ");
+                            builder.Append($"\"{@event.ComputerName}\" ");
                             break;
                         case ColumnName.Source:
-                            defaultEvent.Append($"\"{@event.Source}\" ");
+                            builder.Append($"\"{@event.Source}\" ");
                             break;
                         case ColumnName.EventId:
-                            defaultEvent.Append($"\"{@event.Id}\" ");
+                            builder.Append($"\"{@event.Id}\" ");
                             break;
                         case ColumnName.TaskCategory:
-                            defaultEvent.Append($"\"{@event.TaskCategory}\" ");
+                            builder.Append($"\"{@event.TaskCategory}\" ");
                             break;
                         case ColumnName.Keywords:
-                            defaultEvent.Append($"\"{@event.KeywordsDisplayName}\" ");
+                            builder.Append($"\"{@event.KeywordsDisplayName}\" ");
                             break;
                         case ColumnName.ProcessId:
-                            defaultEvent.Append($"\"{@event.ProcessId}\" ");
+                            builder.Append($"\"{@event.ProcessId}\" ");
                             break;
                         case ColumnName.ThreadId:
-                            defaultEvent.Append($"\"{@event.ThreadId}\" ");
+                            builder.Append($"\"{@event.ThreadId}\" ");
                             break;
                         case ColumnName.User:
-                            defaultEvent.Append($"\"{@event.UserId}\" ");
+                            builder.Append($"\"{@event.UserId}\" ");
                             break;
                     }
                 }
 
-                return defaultEvent.Append($"\"{@event.Description}\"").ToString();
+                builder.Append($"\"{@event.Description}\"");
+                break;
             case CopyType.Simple:
-                StringBuilder simpleEvent = new();
-
-                simpleEvent.Append($"\"{@event.Level}\" ");
-                simpleEvent.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
-                simpleEvent.Append($"\"{@event.Source}\" ");
-                simpleEvent.Append($"\"{@event.Id}\" ");
-                simpleEvent.Append($"\"{@event.Description}\"");
-
-                return simpleEvent.ToString();
+                builder.Append($"\"{@event.Level}\" ");
+                builder.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
+                builder.Append($"\"{@event.Source}\" ");
+                builder.Append($"\"{@event.Id}\" ");
+                builder.Append($"\"{@event.Description}\"");
+                break;
             case CopyType.Xml:
-                return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
+                if (!string.IsNullOrEmpty(xml)) { builder.Append(FormatXmlForCopy(xml)); }
+                break;
             case CopyType.Full:
             default:
-                StringBuilder fullEvent = new();
-
-                fullEvent.AppendLine($"Log Name: {@event.LogName}");
-                fullEvent.AppendLine($"Source: {@event.Source}");
-                fullEvent.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}");
-                fullEvent.AppendLine($"Event ID: {@event.Id}");
-                fullEvent.AppendLine($"Task Category: {@event.TaskCategory}");
-                fullEvent.AppendLine($"Level: {@event.Level}");
-                fullEvent.AppendLine($"Keywords: {@event.KeywordsDisplayName}");
-                fullEvent.AppendLine($"User: {@event.UserId}");
-                fullEvent.AppendLine($"Computer: {@event.ComputerName}");
-                fullEvent.AppendLine("Description:");
-                fullEvent.AppendLine(@event.Description);
-                fullEvent.AppendLine("Event Xml:");
+                builder.AppendLine($"Log Name: {@event.LogName}");
+                builder.AppendLine($"Source: {@event.Source}");
+                builder.AppendLine($"Date: {@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}");
+                builder.AppendLine($"Event ID: {@event.Id}");
+                builder.AppendLine($"Task Category: {@event.TaskCategory}");
+                builder.AppendLine($"Level: {@event.Level}");
+                builder.AppendLine($"Keywords: {@event.KeywordsDisplayName}");
+                builder.AppendLine($"User: {@event.UserId}");
+                builder.AppendLine($"Computer: {@event.ComputerName}");
+                builder.AppendLine("Description:");
+                builder.AppendLine(@event.Description);
+                builder.AppendLine("Event Xml:");
 
                 if (!string.IsNullOrEmpty(xml))
                 {
-                    fullEvent.AppendLine(FormatXmlForCopy(xml));
+                    builder.AppendLine(FormatXmlForCopy(xml));
                 }
 
-                return fullEvent.ToString();
+                break;
         }
     }
+
+    private static string GetLogShortName(string owningLog) =>
+        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
 
     private async Task<string> GetFormattedEvent(CopyType? copyType)
     {
@@ -233,7 +249,8 @@ public sealed class ClipboardService : IClipboardService
         {
             string xml = needsXml ? xmlByIndex[i] : string.Empty;
 
-            stringToCopy.AppendLine(FormatEventForCopy(resolvedType, events[i], xml));
+            AppendFormattedEvent(stringToCopy, resolvedType, events[i], xml);
+            stringToCopy.AppendLine();
         }
 
         return stringToCopy.ToString();
