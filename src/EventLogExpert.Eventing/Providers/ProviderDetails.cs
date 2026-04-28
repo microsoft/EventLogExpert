@@ -45,6 +45,16 @@ public class ProviderDetails
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
 
+    /// <summary>True when no provider metadata of any kind is loaded (legacy or modern).
+    /// Used by resolvers to distinguish "provider not found" from "provider known but no matching message".</summary>
+    public bool IsEmpty =>
+        Events.Count == 0 &&
+        Messages.Count == 0 &&
+        Keywords.Count == 0 &&
+        Opcodes.Count == 0 &&
+        Tasks.Count == 0 &&
+        !Parameters.Any();
+
     /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     internal IReadOnlyList<EventModel> GetEventsById(long id)
     {

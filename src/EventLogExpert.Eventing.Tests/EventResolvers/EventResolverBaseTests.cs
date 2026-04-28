@@ -1652,6 +1652,42 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithProviderHavingOnlyKeywordsTasksOpcodes_ShouldReturnNoMatchingMessage()
+    {
+        // Arrange - modern providers can register Keywords/Tasks/Opcodes without any
+        // Events or Messages. The provider exists, so we should report "no matching message"
+        // rather than "no matching provider".
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string> { { unchecked((long)0x8000000000000000UL), "ClassicKeyword" } },
+            Opcodes = new Dictionary<int, string> { { 1, "Start" } },
+            Tasks = new Dictionary<int, string> { { 1, "InitTask" } }
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching message", displayEvent.Description);
+        Assert.DoesNotContain("No matching provider", displayEvent.Description);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithProviderKeywords_ShouldResolveKeywords()
     {
         // Arrange

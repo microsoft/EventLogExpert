@@ -14,7 +14,7 @@ namespace EventLogExpert.Eventing.EventResolvers;
 public partial class EventResolverBase : IDisposable
 {
     private const string DefaultFailedDescription = "Failed to resolve description, see XML for more details.";
-    private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details";
+    private const string DefaultNoMatchingDescription = "No matching message found with loaded providers, see XML for more details.";
     private const string DefaultNoProviderDescription = "No matching provider available, see XML for more details.";
 
     /// <summary>
@@ -1125,7 +1125,7 @@ public partial class EventResolverBase : IDisposable
             return FormatDescription(properties, null, details.Parameters);
         }
 
-        if (details.Events.Count == 0 && details.Messages.Count == 0 && !details.Parameters.Any())
+        if (details.IsEmpty)
         {
             Logger?.Debug($"{nameof(ResolveDescription)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
