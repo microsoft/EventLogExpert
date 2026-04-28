@@ -3,7 +3,6 @@
 
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.IO.Compression;
-using System.Text;
 using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
@@ -14,12 +13,11 @@ public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => 
 {
     public static byte[] ConvertToCompressedJson(T value)
     {
-        var json = JsonSerializer.Serialize(value);
-        var buffer = Encoding.UTF8.GetBytes(json);
         using MemoryStream memoryStream = new();
-        using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize))
+
+        using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize, leaveOpen: true))
         {
-            gZipStream.Write(buffer, 0, buffer.Length);
+            JsonSerializer.Serialize(gZipStream, value);
         }
 
         return memoryStream.ToArray();
@@ -29,15 +27,8 @@ public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => 
     {
         using MemoryStream memoryStream = new(value);
         using GZipStream gZipStream = new(memoryStream, CompressionMode.Decompress);
-        using StreamReader streamReader = new(gZipStream);
 
-        return JsonSerializer.Deserialize<T>(streamReader.ReadToEnd())
+        return JsonSerializer.Deserialize<T>(gZipStream)
             ?? throw new JsonException($"Failed to deserialize compressed JSON to type {typeof(T).Name}. The deserialized value was null.");
-    }
-
-    private static T ConvertFromJson(string value)
-    {
-        return JsonSerializer.Deserialize<T>(value)
-            ?? throw new JsonException($"Failed to deserialize JSON to type {typeof(T).Name}. The deserialized value was null.");
     }
 }
