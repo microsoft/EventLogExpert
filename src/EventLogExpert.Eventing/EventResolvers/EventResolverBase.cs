@@ -77,46 +77,55 @@ public partial class EventResolverBase : IDisposable
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
 
-        var keywords = GetKeywordsFromBitmask(eventRecord);
-
         // Resolve the modern event once and reuse for both description and task name
         ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details);
         var modernEvent = details is not null ? GetModernEvent(eventRecord, details) : null;
 
-        // If the primary provider couldn't match this event, try a supplemental source.
-        // This handles cases where MTA/DB has partial coverage for a provider.
-        // Only load supplemental when primary has neither modern events nor legacy messages,
-        // to avoid unnecessary local provider loading when primary data is sufficient.
         var descriptionDetails = details;
         ProviderDetails? supplemental = null;
 
-        if (modernEvent is not null ||
-            details is null ||
-            details.GetMessagesByShortId(eventRecord.Id).Count != 0)
+        // Primary is decisive when modernEvent matched or there's a single unambiguous legacy
+        // message. In that case skip supplemental loading entirely.
+        if (modernEvent is not null || details is null)
         {
-            return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
+            return CreateEventModel(eventRecord, modernEvent, details, descriptionDetails, supplemental, null);
         }
 
+        var primaryLegacyCount = details.GetMessagesByShortId(eventRecord.Id).Count;
+
+        if (primaryLegacyCount == 1)
+        {
+            return CreateEventModel(eventRecord, modernEvent, details, descriptionDetails, supplemental, null);
+        }
+
+        // Primary is non-decisive: either has no match (count == 0) or has multiple ambiguous
+        // legacy messages (count > 1). Load supplemental so it's available to description,
+        // task, and keyword resolution consistently. ResolveDescription will use supplemental
+        // as a disambiguation fallback in the count > 1 case.
         supplemental = TryGetSupplementalDetails(eventRecord);
 
-        if (supplemental is null)
+        EventModel? supplementalModernEvent = supplemental is not null
+            ? GetModernEvent(eventRecord, supplemental)
+            : null;
+
+        if (supplemental is not null && primaryLegacyCount == 0)
         {
-            return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
+            // Primary has no match at all — promote supplemental as the description source
+            // when it matches. For count > 1, leave primary as the description source so its
+            // disambiguation runs first; supplemental becomes a tiebreaker inside ResolveDescription.
+            if (supplementalModernEvent is not null)
+            {
+                modernEvent = supplementalModernEvent;
+                descriptionDetails = supplemental;
+            }
+            else if (supplemental.GetMessagesByShortId(eventRecord.Id).Count > 0)
+            {
+                // Supplemental has legacy messages for this EventId
+                descriptionDetails = supplemental;
+            }
         }
 
-        modernEvent = GetModernEvent(eventRecord, supplemental);
-
-        if (modernEvent is not null)
-        {
-            descriptionDetails = supplemental;
-        }
-        else if (supplemental.GetMessagesByShortId(eventRecord.Id).Count > 0)
-        {
-            // Supplemental has legacy messages for this EventId
-            descriptionDetails = supplemental;
-        }
-
-        return CreateEventModel(eventRecord, keywords, modernEvent, descriptionDetails, supplemental);
+        return CreateEventModel(eventRecord, modernEvent, details, descriptionDetails, supplemental, supplementalModernEvent);
     }
 
     protected virtual void Dispose(bool disposing)
@@ -320,23 +329,24 @@ public partial class EventResolverBase : IDisposable
 
     private DisplayEventModel CreateEventModel(
         EventRecord eventRecord,
-        List<string> keywords,
         EventModel? modernEvent,
+        ProviderDetails? details,
         ProviderDetails? descriptionDetails,
-        ProviderDetails? supplemental) =>
+        ProviderDetails? supplemental,
+        EventModel? supplementalModernEvent) =>
         new(eventRecord.PathName, eventRecord.PathType)
         {
             ActivityId = eventRecord.ActivityId,
             ComputerName = _cache?.GetOrAddValue(eventRecord.ComputerName) ?? eventRecord.ComputerName,
-            Description = ResolveDescription(eventRecord, descriptionDetails, modernEvent, supplemental),
+            Description = ResolveDescription(eventRecord, details, descriptionDetails, modernEvent, supplemental, supplementalModernEvent),
             Id = eventRecord.Id,
-            Keywords = keywords,
+            Keywords = GetKeywordsFromBitmask(eventRecord, details, supplemental),
             Level = Severity.GetString(eventRecord.Level),
             LogName = _cache?.GetOrAddValue(eventRecord.LogName) ?? eventRecord.LogName,
             ProcessId = eventRecord.ProcessId,
             RecordId = eventRecord.RecordId,
             Source = _cache?.GetOrAddValue(eventRecord.ProviderName) ?? eventRecord.ProviderName,
-            TaskCategory = ResolveTaskName(eventRecord, descriptionDetails, modernEvent),
+            TaskCategory = ResolveTaskName(eventRecord, details, modernEvent, supplemental, supplementalModernEvent),
             ThreadId = eventRecord.ThreadId,
             TimeCreated = eventRecord.TimeCreated,
             UserId = eventRecord.UserId,
@@ -663,7 +673,7 @@ public partial class EventResolverBase : IDisposable
         return formattedValues;
     }
 
-    private List<string> GetKeywordsFromBitmask(EventRecord eventRecord)
+    private List<string> GetKeywordsFromBitmask(EventRecord eventRecord, ProviderDetails? details, ProviderDetails? supplemental)
     {
         if (eventRecord.Keywords is null or 0) { return []; }
 
@@ -683,23 +693,37 @@ public partial class EventResolverBase : IDisposable
             }
         }
 
-        if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
-        {
-            return returnValue;
-        }
-
         // Provider-defined keywords use bits 0–47; bits 48–63 are reserved
         // for Microsoft-defined standard keywords handled above.
         var providerBits = keywordsValue & 0x0000_FFFF_FFFF_FFFFL;
 
         if (providerBits == 0) { return returnValue; }
 
-        foreach (var (bit, name) in details.Keywords)
-        {
-            if ((providerBits & bit) != bit) { continue; }
+        long matchedBits = 0;
 
-            var keyword = name.TrimEnd('\0');
-            returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+        if (details is not null)
+        {
+            foreach (var (bit, name) in details.Keywords)
+            {
+                if ((providerBits & bit) != bit) { continue; }
+
+                matchedBits |= bit;
+                var keyword = name.TrimEnd('\0');
+                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+            }
+        }
+
+        // Fill remaining set bits from supplemental. Primary wins on conflicts.
+        if (supplemental is not null && !ReferenceEquals(supplemental, details))
+        {
+            foreach (var (bit, name) in supplemental.Keywords)
+            {
+                if ((providerBits & bit) != bit) { continue; }
+                if ((matchedBits & bit) == bit) { continue; }
+
+                var keyword = name.TrimEnd('\0');
+                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+            }
         }
 
         return returnValue;
@@ -910,20 +934,30 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Returns the best available parameter collection for FormatDescription.
-    ///     Only loads supplemental parameters when the primary provider lacks them,
-    ///     which occurs for MTA/DB providers that don't load parameter DLLs.
+    ///     Picks the parameter table for %%n substitutions, biased toward whichever provider
+    ///     supplied the description text. When <paramref name="descriptionFromSupplemental"/>
+    ///     is true, prefer supplemental's parameters and fall back to primary; otherwise prefer
+    ///     primary and fall back to supplemental (lazily loading it when not yet available).
     /// </summary>
-    private IEnumerable<MessageModel> GetParametersWithFallback(
-        ProviderDetails details,
+    private IEnumerable<MessageModel> GetParametersForDescription(
+        ProviderDetails? primary,
+        ProviderDetails? supplementalDetails,
+        bool descriptionFromSupplemental,
         ref ProviderDetails? supplemental,
         EventRecord eventRecord)
     {
-        if (details.Parameters.Any()) { return details.Parameters; }
+        if (descriptionFromSupplemental && supplementalDetails is not null)
+        {
+            if (supplementalDetails.Parameters.Any()) { return supplementalDetails.Parameters; }
+
+            return primary?.Parameters ?? supplementalDetails.Parameters;
+        }
+
+        if (primary is not null && primary.Parameters.Any()) { return primary.Parameters; }
 
         supplemental ??= TryGetSupplementalDetails(eventRecord);
 
-        return supplemental?.Parameters ?? details.Parameters;
+        return supplemental?.Parameters ?? primary?.Parameters ?? [];
     }
 
     /// <summary>
@@ -1019,9 +1053,11 @@ public partial class EventResolverBase : IDisposable
     /// <summary>Resolve event descriptions from an event record.</summary>
     private string ResolveDescription(
         EventRecord eventRecord,
+        ProviderDetails? primaryDetails,
         ProviderDetails? details,
         EventModel? modernEvent,
-        ProviderDetails? supplemental)
+        ProviderDetails? supplemental,
+        EventModel? supplementalModernEvent)
     {
         if (details is null)
         {
@@ -1032,12 +1068,14 @@ public partial class EventResolverBase : IDisposable
 
         var properties = GetFormattedProperties(modernEvent?.Template, eventRecord.Properties);
 
+        var descriptionFromSupplemental = supplemental is not null && ReferenceEquals(details, supplemental);
+
         if (!string.IsNullOrEmpty(modernEvent?.Description))
         {
             Logger?.Debug($"{nameof(ResolveDescription)}: Using modern event description - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, modernEvent!.Description,
-                GetParametersWithFallback(details, ref supplemental, eventRecord));
+                GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         // Legacy provider message lookup
@@ -1048,71 +1086,51 @@ public partial class EventResolverBase : IDisposable
             Logger?.Debug($"{nameof(ResolveDescription)}: Using legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
 
             return FormatDescription(properties, legacyMessages[0].Text,
-                GetParametersWithFallback(details, ref supplemental, eventRecord));
+                GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
         }
 
         if (legacyMessages.Count > 1)
         {
-            // Disambiguate by LogLink, matching the pattern used in ResolveTaskName
-            MessageModel? bestMatch = null;
-
-            foreach (var m in legacyMessages)
-            {
-                if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
-                {
-                    bestMatch = m;
-
-                    break;
-                }
-            }
-
-            // If LogLink didn't disambiguate, try severity-based matching.
-            // MC RawId bits 31-30 encode severity: 00=Success, 01=Informational, 10=Warning, 11=Error
-            // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose
-            if (bestMatch is null && eventRecord.Level is not null)
-            {
-                int targetSeverity = eventRecord.Level switch
-                {
-                    1 or 2 => 3,    // Critical/Error → severity 11 (Error)
-                    3 => 2,         // Warning → severity 10 (Warning)
-                    4 or 5 => 1,    // Information/Verbose → severity 01 (Informational)
-                    _ => 0          // LogAlways → severity 00 (Success)
-                };
-
-                MessageModel? severityCandidate = null;
-
-                foreach (var m in legacyMessages)
-                {
-                    int messageSeverity = (int)((m.RawId >> 30) & 0x3);
-
-                    if (messageSeverity != targetSeverity) { continue; }
-
-                    if (severityCandidate is not null)
-                    {
-                        // Multiple matches with same severity — still ambiguous
-                        severityCandidate = null;
-
-                        break;
-                    }
-
-                    severityCandidate = m;
-                }
-
-                bestMatch = severityCandidate;
-
-                if (bestMatch is not null)
-                {
-                    Logger?.Debug($"{nameof(ResolveDescription)}: Disambiguated legacy message by severity - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Level={eventRecord.Level}, Severity={(bestMatch.RawId >> 30) & 0x3}");
-                }
-            }
+            var bestMatch = TryDisambiguateLegacyMessage(eventRecord, legacyMessages);
 
             if (bestMatch is not null)
             {
+                Logger?.Debug($"{nameof(ResolveDescription)}: Disambiguated legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Level={eventRecord.Level}");
+
                 return FormatDescription(properties, bestMatch.Text,
-                    GetParametersWithFallback(details, ref supplemental, eventRecord));
+                    GetParametersForDescription(primaryDetails, supplemental, descriptionFromSupplemental, ref supplemental, eventRecord));
             }
 
             Logger?.Debug($"{nameof(ResolveDescription)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
+
+            // Last-resort: ambiguous primary may be resolvable via supplemental. ResolveEvent
+            // pre-loads supplemental and its modern event for count > 1, so both are already
+            // set here when supplemental is available.
+            if (supplemental is not null && !ReferenceEquals(supplemental, details))
+            {
+                if (!string.IsNullOrEmpty(supplementalModernEvent?.Description))
+                {
+                    Logger?.Debug($"{nameof(ResolveDescription)}: Disambiguated via supplemental modern event - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
+
+                    var supplementalProperties = GetFormattedProperties(supplementalModernEvent!.Template, eventRecord.Properties);
+
+                    // Description came from supplemental, so resolve %%n parameter substitutions
+                    // against supplemental's parameter table first.
+                    return FormatDescription(supplementalProperties, supplementalModernEvent.Description,
+                        GetParametersForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                }
+
+                var supplementalLegacy = supplemental.GetMessagesByShortId(eventRecord.Id);
+                var supplementalBest = TryDisambiguateLegacyMessage(eventRecord, supplementalLegacy);
+
+                if (supplementalBest is not null)
+                {
+                    Logger?.Debug($"{nameof(ResolveDescription)}: Disambiguated via supplemental legacy message - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
+
+                    return FormatDescription(properties, supplementalBest.Text,
+                        GetParametersForDescription(primaryDetails, supplemental, true, ref supplemental, eventRecord));
+                }
+            }
         }
 
         // Some events store the entire description in a single property when no template exists.
@@ -1125,7 +1143,7 @@ public partial class EventResolverBase : IDisposable
             return FormatDescription(properties, null, details.Parameters);
         }
 
-        if (details.IsEmpty)
+        if (details.IsEmpty && (supplemental is null || supplemental.IsEmpty))
         {
             Logger?.Debug($"{nameof(ResolveDescription)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
@@ -1137,18 +1155,77 @@ public partial class EventResolverBase : IDisposable
         return DefaultNoMatchingDescription;
     }
 
-    /// <summary>Resolve event task names from an event record.</summary>
-    private string ResolveTaskName(EventRecord eventRecord, ProviderDetails? details, EventModel? modernEvent)
+    /// <summary>
+    ///     Disambiguate multiple legacy messages for the same event ID. Returns null when
+    ///     the set is empty or remains ambiguous after both LogLink and severity matching.
+    /// </summary>
+    private MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
     {
-        if (details is null)
+        if (legacyMessages.Count == 0) { return null; }
+        if (legacyMessages.Count == 1) { return legacyMessages[0]; }
+
+        // LogLink match
+        foreach (var m in legacyMessages)
         {
-            return string.Empty;
+            if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
+            {
+                return m;
+            }
         }
 
-        if (modernEvent?.Task is not null && details.Tasks.TryGetValue(modernEvent.Task, out var taskName))
+        // Severity-based match. MC RawId bits 31-30 encode severity:
+        // 00=Success, 01=Informational, 10=Warning, 11=Error.
+        // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose.
+        if (eventRecord.Level is null) { return null; }
+
+        int targetSeverity = eventRecord.Level switch
         {
-            taskName = taskName.TrimEnd('\0');
-            return _cache?.GetOrAddValue(taskName) ?? taskName;
+            1 or 2 => 3,
+            3 => 2,
+            4 or 5 => 1,
+            _ => 0
+        };
+
+        MessageModel? severityCandidate = null;
+
+        foreach (var m in legacyMessages)
+        {
+            int messageSeverity = (int)((m.RawId >> 30) & 0x3);
+
+            if (messageSeverity != targetSeverity) { continue; }
+
+            if (severityCandidate is not null)
+            {
+                // Multiple matches with same severity — still ambiguous
+                return null;
+            }
+
+            severityCandidate = m;
+        }
+
+        return severityCandidate;
+    }
+
+    private string ResolveTaskName(
+        EventRecord eventRecord,
+        ProviderDetails? details,
+        EventModel? modernEvent,
+        ProviderDetails? supplemental,
+        EventModel? supplementalModernEvent)
+    {
+        if (TryResolveTaskNameFromDetails(eventRecord, details, modernEvent, out var taskName))
+        {
+            return CacheTaskName(taskName);
+        }
+
+        if (supplemental is not null &&
+            !ReferenceEquals(supplemental, details) &&
+            TryResolveTaskNameFromDetails(eventRecord, supplemental, supplementalModernEvent, out taskName))
+        {
+            // The primary modernEvent (if any) was already tried above against primary's tables.
+            // Use the pre-computed supplementalModernEvent so its EventModel.Task can drive
+            // supplemental's Tasks lookup.
+            return CacheTaskName(taskName);
         }
 
         if (!eventRecord.Task.HasValue)
@@ -1156,12 +1233,37 @@ public partial class EventResolverBase : IDisposable
             return string.Empty;
         }
 
-        details.Tasks.TryGetValue(eventRecord.Task.Value, out taskName);
+        return CacheTaskName(eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})");
+    }
 
-        if (taskName is not null)
+    private bool TryResolveTaskNameFromDetails(
+        EventRecord eventRecord,
+        ProviderDetails? details,
+        EventModel? modernEvent,
+        out string taskName)
+    {
+        taskName = string.Empty;
+
+        if (details is null)
         {
-            taskName = taskName.TrimEnd('\0');
-            return _cache?.GetOrAddValue(taskName) ?? taskName;
+            return false;
+        }
+
+        if (modernEvent?.Task is not null && details.Tasks.TryGetValue(modernEvent.Task, out var name))
+        {
+            taskName = name;
+            return true;
+        }
+
+        if (!eventRecord.Task.HasValue)
+        {
+            return false;
+        }
+
+        if (details.Tasks.TryGetValue(eventRecord.Task.Value, out name))
+        {
+            taskName = name;
+            return true;
         }
 
         var messagesByShortId = details.GetMessagesByShortId(eventRecord.Task.Value);
@@ -1188,12 +1290,15 @@ public partial class EventResolverBase : IDisposable
 
                 potentialTaskNames.ForEach(t => Logger?.Debug($"    {t.LogLink} {t.Text}"));
             }
-        }
-        else
-        {
-            taskName = eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})";
+
+            return true;
         }
 
+        return false;
+    }
+
+    private string CacheTaskName(string taskName)
+    {
         taskName = taskName.TrimEnd('\0');
 
         return _cache?.GetOrAddValue(taskName) ?? taskName;

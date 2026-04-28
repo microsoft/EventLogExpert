@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.Eventing.Tests.TestUtils.Constants;
 
-public sealed class Constants
+public sealed partial class Constants
 {
     public const string ApplicationLogName = "Application";
     public const string SystemLogName = "System";

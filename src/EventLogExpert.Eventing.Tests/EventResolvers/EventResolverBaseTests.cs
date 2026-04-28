@@ -115,6 +115,271 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithAmbiguousPrimaryAndSupplementalDescription_ShouldUseSupplementalParameters()
+    {
+        // Arrange - regression: when the description is selected from supplemental, %%n
+        // parameter substitutions must resolve against supplemental's parameter table, not
+        // the primary's. Primary has populated parameters that would otherwise short-circuit
+        // the lookup and produce the wrong substitution.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 800, RawId = 0x40000800, Text = Constants.PrimaryShortA, LogLink = null },
+                new MessageModel { ShortId = 800, RawId = 0x40000800, Text = Constants.PrimaryShortB, LogLink = null }
+            ],
+            Parameters =
+            [
+                new MessageModel { ShortId = 1, RawId = 1, Text = Constants.PrimaryParameterValue, LogLink = null }
+            ],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 800,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = Constants.ResolvedParameterTemplate,
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters =
+            [
+                new MessageModel { ShortId = 1, RawId = 1, Text = Constants.SupplementalParameterValue, LogLink = null }
+            ],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 800,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains(Constants.SupplementalParameterValue, displayEvent.Description);
+        Assert.DoesNotContain(Constants.PrimaryParameterValue, displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithAmbiguousPrimaryAndSupplementalModernEventTask_ShouldUseModernEventTaskForLookup()
+    {
+        // Arrange - regression: when primary has ambiguous legacy and supplemental has a modern
+        // event whose Task differs from EventRecord.Task, ResolveTaskName must look up the
+        // supplemental Tasks table using the supplemental EventModel.Task (not just eventRecord.Task).
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 700, RawId = 0x40000700, Text = Constants.PrimaryShortA, LogLink = null },
+                new MessageModel { ShortId = 700, RawId = 0x40000700, Text = Constants.PrimaryShortB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 700,
+                    Version = 0,
+                    Task = 42,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern description",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string> { { 42, Constants.ModernEventTask } }
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 700,
+            Version = 0,
+            // EventRecord.Task is null - the only way TaskCategory can resolve is via the
+            // supplemental modern event's Task = 42 mapping to Constants.ModernEventTask.
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(Constants.ModernEventTask, displayEvent.TaskCategory);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithAmbiguousPrimaryLegacyAndSupplemental_ShouldAlsoUseSupplementalForKeywordsAndTask()
+    {
+        // Arrange - regression for the cross-issue case: when primary has ambiguous legacy
+        // messages AND supplemental is loaded for the description fallback, supplemental's
+        // task and keyword metadata must also be visible to ResolveTaskName / GetKeywordsFromBitmask.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 600, RawId = 0x40000600, Text = Constants.PrimaryMessageA, LogLink = null },
+                new MessageModel { ShortId = 600, RawId = 0x40000600, Text = Constants.PrimaryMessageB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 600,
+                    Version = 0,
+                    Task = 9,
+                    LogName = Constants.ApplicationLogName,
+                    Description = Constants.SupplementalDescription,
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string> { { 0x4, Constants.SupplementalKeyword } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string> { { 9, Constants.SupplementalTask } }
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 600,
+            Version = 0,
+            Task = 9,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Keywords = 0x4
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains(Constants.SupplementalDescription, displayEvent.Description);
+        Assert.Equal(Constants.SupplementalTask, displayEvent.TaskCategory);
+        Assert.Contains(Constants.SupplementalKeyword, displayEvent.Keywords);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithAmbiguousPrimaryLegacyAndSupplementalMatch_ShouldUseSupplementalDescription()
+    {
+        // Arrange - primary has 2 legacy messages for the same event ID with no LogLink
+        // and identical severity (so disambiguation fails). Supplemental has a matching
+        // modern event. Should fall back to supplemental's description.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageA, LogLink = null },
+                new MessageModel { ShortId = 500, RawId = 0x40000500, Text = Constants.PrimaryMessageB, LogLink = null }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 500,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental modern: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 500,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["resolved"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Supplemental modern: resolved", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithBasicEventRecord_ShouldReturnDisplayEventModel()
     {
         // Arrange
@@ -241,6 +506,218 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("TestValue", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndNonMatchingSupplemental_ShouldReturnNoMatchingMessage()
+    {
+        // Arrange - primary provider returned an empty ProviderDetails (provider not installed
+        // on this machine) but a supplemental source has metadata for the provider, just no
+        // match for THIS event ID. We should report "no matching message" since a provider
+        // IS available, not "no matching provider".
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 100,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Some unrelated event: %1",
+                    Keywords = [],
+                    Template = "<template><data name=\"Val\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>"
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching message", displayEvent.Description);
+        Assert.DoesNotContain("No matching provider", displayEvent.Description);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndNoSupplemental_ShouldReturnNoProviderDescription()
+    {
+        // Arrange - guard test: empty primary AND no supplemental should still return
+        // DefaultNoProviderDescription. Multi-property event so single-property fallback
+        // does not apply.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplemental: null);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching provider", displayEvent.Description);
+        Assert.DoesNotContain("No matching message", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndSupplementalModernDescription_ShouldUsePrimaryParametersFallback()
+    {
+        // Arrange - regression: when descriptionDetails is promoted to supplemental
+        // (count==0 path) and supplemental's description has %%n substitutions but supplemental
+        // has NO parameters, the substitution must fall back to the primary parameter table.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters =
+            [
+                new MessageModel { ShortId = 1, RawId = 1, Text = Constants.PrimaryFallbackParameter, LogLink = null }
+            ],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 900,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = Constants.ResolvedParameterTemplate,
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 900,
+            Version = 0,
+            Level = 4,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains(Constants.PrimaryFallbackParameter, displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyPrimaryAndSupplementalTask_ShouldUseSupplementalTaskName()
+    {
+        // Arrange - primary is empty; supplemental has matching event AND task name.
+        // Task category should come from supplemental.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 100,
+                    Version = 0,
+                    Task = 7,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Event 100",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string> { { 7, Constants.SupplementalTask } }
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 100,
+            Task = 7,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(Constants.SupplementalTask, displayEvent.TaskCategory);
     }
 
     [Fact]
@@ -1610,6 +2087,62 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithPrimaryAndSupplementalTask_ShouldPreferPrimaryTaskName()
+    {
+        // Arrange - both primary and supplemental define the task. Primary wins.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 100,
+                    Version = 0,
+                    Task = 7,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Primary event",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string> { { 7, Constants.PrimaryTask } }
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string> { { 7, Constants.SupplementalTask } }
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 100,
+            Task = 7,
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(Constants.PrimaryTask, displayEvent.TaskCategory);
+    }
+
+    [Fact]
     public void ResolveEvent_WithPropertyIndexOutOfRange_ShouldResolveAvailableProperties()
     {
         // Arrange - template references %3 but only 2 properties exist
@@ -1822,6 +2355,68 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal("This is the description from property", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithSplitKeywordsBetweenPrimaryAndSupplemental_ShouldMergeWithPrimaryWins()
+    {
+        // Arrange - event has keyword bits 0x1 and 0x2 set. Primary defines name for 0x1,
+        // supplemental defines a different name for 0x1 AND a name for 0x2. Result should
+        // include primary's name for 0x1 and supplemental's name for 0x2.
+        var primaryDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string> { { 0x1, Constants.PrimaryKeyword } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var supplementalDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 200,
+                    Version = 0,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Supplemental event",
+                    Keywords = [],
+                    Template = Constants.EmptyTemplate
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>
+            {
+                { 0x1, Constants.SupplementalKeywordShouldLose },
+                { 0x2, Constants.SupplementalKeyword2 }
+            },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new SupplementalTestResolver([primaryDetails], supplementalDetails);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 200,
+            Keywords = 0x3
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains(Constants.PrimaryKeyword, displayEvent.Keywords);
+        Assert.Contains(Constants.SupplementalKeyword2, displayEvent.Keywords);
+        Assert.DoesNotContain(Constants.SupplementalKeywordShouldLose, displayEvent.Keywords);
     }
 
     [Fact]
