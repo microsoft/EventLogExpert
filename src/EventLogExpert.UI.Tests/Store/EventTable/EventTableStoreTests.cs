@@ -513,7 +513,8 @@ public sealed class EventTableStoreTests
         // Act
         var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
 
-        // Assert - default sort is by RecordId descending (IsDescending defaults to true)
+        // Assert - sort is by DateAndTime descending; ties on TimeCreated fall through
+        // to the RecordId tiebreaker, which preserves descending RecordId order here.
         var displayedEvents = newState.EventTables.First(t => t.Id == logData.Id).DisplayedEvents;
         Assert.Equal(4, displayedEvents.Count);
 
@@ -849,6 +850,39 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceSetOrderBy_WhenToggledOff_ShouldSortPerLogListsByEffectiveComparator()
+    {
+        // After the user clicks the active column header to deselect it (OrderBy reset to null),
+        // per-log lists must remain sorted by the same comparator the combined merge will use
+        // (DateAndTime). Otherwise a subsequent ReduceUpdateCombinedEvents merges RecordId-sorted
+        // inputs under a DateAndTime comparator and produces silently incorrect output.
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState { OrderBy = ColumnName.Level, IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameTestLog, PathType.LogName) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
+            new(Constants.LogNameTestLog, PathType.LogName) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData.Id, events));
+
+        // Act — user deselects the active column
+        var toggledState = EventTableReducers.ReduceSetOrderBy(state, new EventTableAction.SetOrderBy(ColumnName.Level));
+
+        // Assert — toggle-off forces descending; the order distinguishes a DateAndTime sort
+        // (events ordered +40s then +20s) from the buggy RecordId sort (which would order
+        // RecordId=2 (+20s) before RecordId=1 (+40s)).
+        Assert.Null(toggledState.OrderBy);
+        Assert.True(toggledState.IsDescending);
+        var sortedEvents = toggledState.EventTables.First(table => table.Id == logData.Id).DisplayedEvents;
+        Assert.Equal(baseTime.AddSeconds(40), sortedEvents[0].TimeCreated);
+        Assert.Equal(baseTime.AddSeconds(20), sortedEvents[1].TimeCreated);
+    }
+
+    [Fact]
     public void ReduceSetOrderBy_WithNewColumn_ShouldUpdateOrderBy()
     {
         // Arrange
@@ -924,6 +958,37 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceToggleSorting_WhenOrderByIsNull_ShouldPreserveNullOrderBy()
+    {
+        // ToggleSorting only flips IsDescending. When the user has previously deselected the
+        // active column (OrderBy is null), toggling sort direction must preserve that null so
+        // the UI does not silently re-light a column header. Sort still uses the effective
+        // (DateAndTime) comparator inside SortDisplayEvents.
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var state = new EventTableState { OrderBy = null, IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
+
+        var events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameTestLog, PathType.LogName) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
+            new(Constants.LogNameTestLog, PathType.LogName) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData.Id, events));
+
+        // Act
+        var toggledState = EventTableReducers.ReduceToggleSorting(state);
+
+        // Assert
+        Assert.Null(toggledState.OrderBy);
+        Assert.True(toggledState.IsDescending);
+        var sortedEvents = toggledState.EventTables.First(table => table.Id == logData.Id).DisplayedEvents;
+        Assert.Equal(baseTime.AddSeconds(40), sortedEvents[0].TimeCreated);
+        Assert.Equal(baseTime.AddSeconds(20), sortedEvents[1].TimeCreated);
+    }
+
+    [Fact]
     public void ReduceUpdateCombinedEvents_WhenAllTablesAreLoading_ShouldReturnSameState()
     {
         // Arrange
@@ -941,6 +1006,82 @@ public sealed class EventTableStoreTests
     }
 
     [Fact]
+    public void ReduceUpdateCombinedEvents_WhenDescendingOrderRequested_ShouldMergeInDescendingOrder()
+    {
+        // Arrange — two logs, descending sort
+        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var state = new EventTableState { IsDescending = true };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
+
+        var eventsLog1 = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 11, RecordId = 3 }
+        };
+
+        var eventsLog2 = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 20, RecordId = 2 },
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 21, RecordId = 4 }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, eventsLog1));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, eventsLog2));
+
+        // Act
+        var newState = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        // Assert — combined view in descending RecordId order
+        var combinedTable = newState.EventTables.First(table => table.IsCombined);
+        Assert.Equal(4, combinedTable.DisplayedEvents.Count);
+        Assert.Equal(4L, combinedTable.DisplayedEvents[0].RecordId);
+        Assert.Equal(3L, combinedTable.DisplayedEvents[1].RecordId);
+        Assert.Equal(2L, combinedTable.DisplayedEvents[2].RecordId);
+        Assert.Equal(1L, combinedTable.DisplayedEvents[3].RecordId);
+    }
+
+    [Fact]
+    public void ReduceUpdateCombinedEvents_WhenMultipleTablesPopulated_ShouldMergeInSortedOrder()
+    {
+        // Arrange — two logs with interleaved RecordIds, ascending RecordId order
+        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var state = new EventTableState { IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
+
+        var eventsLog1 = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 11, RecordId = 3 }
+        };
+
+        var eventsLog2 = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 20, RecordId = 2 },
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 21, RecordId = 4 }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, eventsLog1));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, eventsLog2));
+
+        // Act
+        var newState = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        // Assert — combined view must interleave both logs in RecordId order
+        var combinedTable = newState.EventTables.First(table => table.IsCombined);
+        Assert.Equal(4, combinedTable.DisplayedEvents.Count);
+        Assert.Equal(1L, combinedTable.DisplayedEvents[0].RecordId);
+        Assert.Equal(2L, combinedTable.DisplayedEvents[1].RecordId);
+        Assert.Equal(3L, combinedTable.DisplayedEvents[2].RecordId);
+        Assert.Equal(4L, combinedTable.DisplayedEvents[3].RecordId);
+        Assert.Equal(Constants.LogNameLog1, combinedTable.DisplayedEvents[0].OwningLog);
+        Assert.Equal(Constants.LogNameLog2, combinedTable.DisplayedEvents[1].OwningLog);
+    }
+
+    [Fact]
     public void ReduceUpdateCombinedEvents_WhenOneTable_ShouldReturnSameState()
     {
         // Arrange
@@ -953,6 +1094,134 @@ public sealed class EventTableStoreTests
 
         // Assert
         Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReduceUpdateCombinedEvents_WhenRecordIdsCollideAcrossLogs_ShouldDetectContentChangeViaOwningLog()
+    {
+        // Arrange — two logs with disjoint RecordIds initially, ascending RecordId order
+        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var state = new EventTableState { IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
+
+        var initialLog1Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 10, RecordId = 1 },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 11, RecordId = 3 }
+        };
+
+        var initialLog2Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 20, RecordId = 2 },
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 21, RecordId = 4 }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, initialLog1Events));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, initialLog2Events));
+        state = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        // Swap which log owns which RecordIds — keeps the combined RecordId sequence [1,2,3,4]
+        // identical, but flips the OwningLog at each position. The pre-fix equality check (RecordId-only)
+        // would falsely short-circuit; the (OwningLog, RecordId) check correctly detects the change.
+        var swappedLog1Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 12, RecordId = 2 },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 13, RecordId = 4 }
+        };
+
+        var swappedLog2Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 22, RecordId = 1 },
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 23, RecordId = 3 }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, swappedLog1Events));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, swappedLog2Events));
+
+        // Act
+        var newState = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        // Assert — combined view reflects the swapped ownership at each position
+        var combinedTable = newState.EventTables.First(table => table.IsCombined);
+        Assert.Equal(4, combinedTable.DisplayedEvents.Count);
+        Assert.Equal(Constants.LogNameLog2, combinedTable.DisplayedEvents[0].OwningLog);
+        Assert.Equal(Constants.LogNameLog1, combinedTable.DisplayedEvents[1].OwningLog);
+        Assert.Equal(Constants.LogNameLog2, combinedTable.DisplayedEvents[2].OwningLog);
+        Assert.Equal(Constants.LogNameLog1, combinedTable.DisplayedEvents[3].OwningLog);
+    }
+
+    [Fact]
+    public void ReduceUpdateCombinedEvents_WhenSomeTablesAreEmpty_ShouldMergeOnlyNonEmptyTables()
+    {
+        // Arrange — one log populated, one log empty (but not loading), ascending RecordId order
+        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var state = new EventTableState { IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
+
+        var eventsLog1 = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 10, RecordId = 5 },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 11, RecordId = 7 }
+        };
+
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, eventsLog1));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, []));
+
+        // Act
+        var newState = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        // Assert — combined view contains only the populated log's events
+        var combinedTable = newState.EventTables.First(table => table.IsCombined);
+        Assert.Equal(2, combinedTable.DisplayedEvents.Count);
+        Assert.Equal(5L, combinedTable.DisplayedEvents[0].RecordId);
+        Assert.Equal(7L, combinedTable.DisplayedEvents[1].RecordId);
+    }
+
+    [Fact]
+    public void ReduceUpdateCombinedEvents_WhenTimeCreatedDivergesFromRecordId_ShouldMergeByTimeCreated()
+    {
+        // Per-log lists are stored sorted by the same comparator the combined merge uses
+        // (DateAndTime when OrderBy is null). This test pins that contract by giving each log
+        // ascending RecordIds whose TimeCreated values descend, so a RecordId-based merge would
+        // emit events out of chronological order. The combined view must come out time-ordered.
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        var log1Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
+            new(Constants.LogNameLog1, PathType.LogName) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
+        };
+
+        var log2Events = new List<DisplayEventModel>
+        {
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 20, RecordId = 1, TimeCreated = baseTime.AddSeconds(30) },
+            new(Constants.LogNameLog2, PathType.LogName) { Id = 21, RecordId = 2, TimeCreated = baseTime.AddSeconds(10) }
+        };
+
+        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var state = new EventTableState { IsDescending = false };
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
+        state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, log1Events));
+        state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, log2Events));
+
+        var newState = EventTableReducers.ReduceUpdateCombinedEvents(state);
+
+        var combinedTable = newState.EventTables.First(table => table.IsCombined);
+        var actualTimes = combinedTable.DisplayedEvents.Select(e => e.TimeCreated).ToList();
+        var expectedTimes = new List<DateTime>
+        {
+            baseTime.AddSeconds(10),
+            baseTime.AddSeconds(20),
+            baseTime.AddSeconds(30),
+            baseTime.AddSeconds(40)
+        };
+        Assert.Equal(expectedTimes, actualTimes);
     }
 
     [Fact]
