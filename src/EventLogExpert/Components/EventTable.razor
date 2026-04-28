@@ -72,7 +72,7 @@
                                     @evt.ActivityId
                                     break;
                                 case ColumnName.Log:
-                                    @evt.OwningLog.Split("\\").Last()
+                                    @GetLogShortName(evt.OwningLog)
                                     break;
                                 case ColumnName.ComputerName:
                                     @evt.ComputerName

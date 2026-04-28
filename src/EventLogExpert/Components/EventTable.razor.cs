@@ -261,6 +261,9 @@ public sealed partial class EventTable
             _ => string.Empty,
         };
 
+    private static string GetLogShortName(string owningLog) =>
+        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
+
     private static DisplayEventModel? ResolveByKey(
         IReadOnlyList<DisplayEventModel> displayedEvents,
         DisplayEventModel? candidate)
