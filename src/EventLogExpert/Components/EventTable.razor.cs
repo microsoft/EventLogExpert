@@ -724,23 +724,30 @@ public sealed partial class EventTable
 
         if (target is null) { return; }
 
+        var displayedEvents = _currentTable?.DisplayedEvents;
+
+        if (displayedEvents is null) { return; }
+
         // Match on OwningLog (the per-source identifier — file path for
         // exported logs, channel name for live logs) in addition to LogName
         // and RecordId so we don't scroll to a value-equal row from a
         // different open log when multiple sources share the same channel
-        // name and overlapping record-id ranges.
-        var entry = _currentTable?.DisplayedEvents.FirstOrDefault(x =>
-            string.Equals(x.OwningLog, target.OwningLog, StringComparison.Ordinal) &&
-            string.Equals(x.LogName, target.LogName, StringComparison.Ordinal) &&
-            x.RecordId == target.RecordId);
-
-        if (entry is null) { return; }
-
-        var index = _currentTable?.DisplayedEvents.IndexOf(entry);
-
-        if (index >= 0)
+        // name and overlapping record-id ranges. Single pass over the list
+        // returns both the row and its index without re-scanning via IndexOf.
+        for (var index = 0; index < displayedEvents.Count; index++)
         {
+            var candidate = displayedEvents[index];
+
+            if (candidate.RecordId != target.RecordId ||
+                !string.Equals(candidate.OwningLog, target.OwningLog, StringComparison.Ordinal) ||
+                !string.Equals(candidate.LogName, target.LogName, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
             await JSRuntime.InvokeVoidAsync("scrollToRow", index);
+
+            return;
         }
     }
 
