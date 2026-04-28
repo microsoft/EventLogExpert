@@ -390,10 +390,12 @@ public partial class EventResolverBase : IDisposable
         {
             // If there is only one property then this is what certain EventRecords look like
             // when the entire description is a string literal, and there is no provider DLL needed.
-            // Found a few providers that have their properties wrapped with \r\n for some reason
+            // Found a few providers that have their properties wrapped with \r\n for some reason.
+            // Multi-property fall-through is a defensive backstop (e.g. a legacy message row with
+            // empty Text); DefaultFailedDescription is reserved for actual formatting exceptions.
             returnDescription = properties.Count == 1 ?
                 properties[0].TrimEnd('\0', '\r', '\n') :
-                DefaultFailedDescription;
+                DefaultNoMatchingDescription;
 
             return _cache?.GetOrAddDescription(returnDescription) ?? returnDescription;
         }
@@ -1113,12 +1115,21 @@ public partial class EventResolverBase : IDisposable
             Logger?.Debug($"{nameof(ResolveDescription)}: Multiple legacy messages found, could not disambiguate - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, MessageCount={legacyMessages.Count}");
         }
 
-        // Some events store the description in the event properties
-        if (properties.Count > 0)
+        // Some events store the entire description in a single property when no template exists.
+        // Only the single-property case is meaningful here; multi-property events without a template
+        // cannot be rendered into a description and would just emit a misleading constant.
+        if (properties.Count == 1)
         {
-            Logger?.Debug($"{nameof(ResolveDescription)}: Using property-based description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, PropertyCount={properties.Count}");
+            Logger?.Debug($"{nameof(ResolveDescription)}: Using single-property description fallback - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}");
 
             return FormatDescription(properties, null, details.Parameters);
+        }
+
+        if (details.Events.Count == 0 && details.Messages.Count == 0 && !details.Parameters.Any())
+        {
+            Logger?.Debug($"{nameof(ResolveDescription)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
+
+            return DefaultNoProviderDescription;
         }
 
         Logger?.Debug($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");

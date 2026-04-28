@@ -244,6 +244,73 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithEmptyProviderDetailsAndMultipleProperties_ShouldReturnNoProviderDescription()
+    {
+        // Arrange - reproduces the AppXDeploymentServer/Operational scenario where
+        // EventMessageProvider returns an empty-but-non-null ProviderDetails because
+        // no ETW publisher and no legacy registry source exist for the provider name.
+        // The event has multiple properties so the single-property dump path does not apply.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2562,
+            Properties = ["MSIXDeployment", "windows.applicationData", "DeleteMachineFolder", "Removed folder X"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching provider", displayEvent.Description);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyProviderDetailsAndSingleProperty_ShouldDumpProperty()
+    {
+        // Arrange - even when no provider metadata exists, a single-property event should still
+        // surface that property as the description (some providers emit a self-contained string).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000,
+            Properties = ["The entire description is this single string."]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("The entire description is this single string.", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithFormattingCharacters_ShouldCleanupDescription()
     {
         // Arrange
@@ -1501,6 +1568,44 @@ public sealed class EventResolverBaseTests
         Assert.NotNull(displayEvent);
         Assert.Contains("TestUser", displayEvent.Description);
         Assert.DoesNotContain("%0", displayEvent.Description);
+        Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithPopulatedProviderButUnknownEventAndMultipleProperties_ShouldReturnNoMatchingMessage()
+    {
+        // Arrange - provider has metadata for some other event, but not this one. We have
+        // multiple properties, so the single-property dump does not apply. The result should
+        // be "no matching message" (we know the provider, just not this specific event).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel { ProviderName = Constants.TestProviderName, ShortId = 1234, Text = "Some other event" }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 9999,
+            Properties = ["a", "b", "c"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching message", displayEvent.Description);
+        Assert.DoesNotContain("No matching provider", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
     }
 
