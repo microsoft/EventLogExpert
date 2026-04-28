@@ -17,7 +17,7 @@ public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => 
 
         using (GZipStream gZipStream = new(memoryStream, CompressionLevel.SmallestSize, leaveOpen: true))
         {
-            JsonSerializer.Serialize(gZipStream, value);
+            JsonSerializer.Serialize(gZipStream, value, ProviderJsonSerializerOptions.Default);
         }
 
         return memoryStream.ToArray();
@@ -28,7 +28,7 @@ public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => 
         using MemoryStream memoryStream = new(value);
         using GZipStream gZipStream = new(memoryStream, CompressionMode.Decompress);
 
-        return JsonSerializer.Deserialize<T>(gZipStream)
+        return JsonSerializer.Deserialize<T>(gZipStream, ProviderJsonSerializerOptions.Default)
             ?? throw new JsonException($"Failed to deserialize compressed JSON to type {typeof(T).Name}. The deserialized value was null.");
     }
 }

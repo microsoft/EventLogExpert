@@ -132,12 +132,12 @@ public sealed class EventProviderDbContext : DbContext
                         var p = new ProviderDetails
                         {
                             ProviderName = providerName,
-                            Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"]) ?? new List<MessageModel>(),
+                            Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"], ProviderJsonSerializerOptions.Default) ?? new List<MessageModel>(),
                             Parameters = TryReadParametersJson(detailsReader, providerName),
-                            Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"]) ?? new List<EventModel>(),
-                            Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
-                            Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
-                            Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"]) ?? new Dictionary<int, string>()
+                            Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"], ProviderJsonSerializerOptions.Default) ?? new List<EventModel>(),
+                            Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<long, string>(),
+                            Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<int, string>(),
+                            Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<int, string>()
                         };
                         allProviderDetails.Add(p);
                     }
@@ -249,7 +249,7 @@ public sealed class EventProviderDbContext : DbContext
 
                 try
                 {
-                    return JsonSerializer.Deserialize<List<MessageModel>>(s) ?? [];
+                    return JsonSerializer.Deserialize<List<MessageModel>>(s, ProviderJsonSerializerOptions.Default) ?? [];
                 }
                 catch (JsonException ex)
                 {
