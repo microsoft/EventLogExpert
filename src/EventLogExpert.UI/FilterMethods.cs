@@ -123,10 +123,54 @@ public static class FilterMethods
         return isDescending ? (a, b) => comparer(b, a) : comparer;
     }
 
-    /// <summary>
-    /// Merges an already-sorted existing list with a new batch by sorting only the batch
-    /// and performing a linear merge. O(n + k log k) where n is existing count and k is batch count.
-    /// </summary>
+    internal static IReadOnlyList<DisplayEventModel> MergeSorted(
+        IReadOnlyList<IReadOnlyList<DisplayEventModel>> sortedLists,
+        ColumnName orderBy,
+        bool isDescending)
+    {
+        switch (sortedLists.Count)
+        {
+            case 0: return [];
+            case 1: return sortedLists[0];
+        }
+
+        int totalCount = 0;
+
+        foreach (var list in sortedLists) { totalCount += list.Count; }
+
+        if (totalCount == 0) { return []; }
+
+        var comparer = GetComparer(orderBy, isDescending);
+        var result = new List<DisplayEventModel>(totalCount);
+        var heap = new PriorityQueue<int, DisplayEventModel>(
+            sortedLists.Count,
+            Comparer<DisplayEventModel>.Create(comparer));
+        var positions = new int[sortedLists.Count];
+
+        for (int listIndex = 0; listIndex < sortedLists.Count; listIndex++)
+        {
+            if (sortedLists[listIndex].Count <= 0) { continue; }
+
+            heap.Enqueue(listIndex, sortedLists[listIndex][0]);
+            positions[listIndex] = 1;
+        }
+
+        while (heap.TryDequeue(out int sourceListIndex, out DisplayEventModel? currentEvent))
+        {
+            result.Add(currentEvent);
+
+            int nextPosition = positions[sourceListIndex];
+
+            if (nextPosition >= sortedLists[sourceListIndex].Count) { continue; }
+
+            heap.Enqueue(sourceListIndex, sortedLists[sourceListIndex][nextPosition]);
+            positions[sourceListIndex] = nextPosition + 1;
+        }
+
+        return result.AsReadOnly();
+    }
+
+
     internal static IReadOnlyList<DisplayEventModel> MergeSorted(
         IReadOnlyList<DisplayEventModel> existing,
         IReadOnlyList<DisplayEventModel> batch,

@@ -59,7 +59,7 @@ public sealed class EventTableReducers
         var merged = FilterMethods.MergeSorted(
             table.DisplayedEvents,
             action.Events,
-            state.OrderBy,
+            GetEffectiveOrderBy(state.OrderBy),
             state.IsDescending);
 
         return state with
@@ -93,7 +93,7 @@ public sealed class EventTableReducers
             var merged = FilterMethods.MergeSorted(
                 table.DisplayedEvents,
                 newEvents,
-                state.OrderBy,
+                GetEffectiveOrderBy(state.OrderBy),
                 state.IsDescending);
 
             updatedTables.Add(table with { DisplayedEvents = merged });
@@ -131,7 +131,7 @@ public sealed class EventTableReducers
                     IsCombined = true,
                     DisplayedEvents = GetCombinedEvents(
                         updatedTables.Select(log => log.DisplayedEvents),
-                        state.OrderBy ?? ColumnName.DateAndTime,
+                        GetEffectiveOrderBy(state.OrderBy),
                         state.IsDescending)
                 };
 
@@ -231,12 +231,12 @@ public sealed class EventTableReducers
             state.EventTables
                 .Where(table => !table.IsCombined)
                 .Select(table => table.DisplayedEvents),
-            state.OrderBy ?? ColumnName.DateAndTime,
+            GetEffectiveOrderBy(state.OrderBy),
             state.IsDescending);
 
         if (combinedEvents.Count == existingCombinedTable.DisplayedEvents.Count &&
-            combinedEvents.Select(e => e.RecordId)
-                .SequenceEqual(existingCombinedTable.DisplayedEvents.Select(e => e.RecordId)))
+            combinedEvents.Select(e => (e.OwningLog, e.RecordId))
+                .SequenceEqual(existingCombinedTable.DisplayedEvents.Select(e => (e.OwningLog, e.RecordId))))
         {
             return state;
         }
@@ -274,7 +274,7 @@ public sealed class EventTableReducers
 
             updatedTables.Add(table with
             {
-                DisplayedEvents = currentActiveLog.SortEvents(state.OrderBy, state.IsDescending)
+                DisplayedEvents = currentActiveLog.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending)
             });
         }
 
@@ -292,39 +292,34 @@ public sealed class EventTableReducers
         {
             EventTables = state.EventTables.Replace(table, table with
             {
-                DisplayedEvents = action.Events.SortEvents(state.OrderBy, state.IsDescending),
+                DisplayedEvents = action.Events.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending),
                 IsLoading = false
             })
         };
     }
 
     private static IReadOnlyList<DisplayEventModel> GetCombinedEvents(
-        IEnumerable<IEnumerable<DisplayEventModel>> eventLists,
-        ColumnName? orderBy = null,
-        bool isDescending = false)
-    {
-        List<DisplayEventModel> combinedEvents = [];
+        IEnumerable<IReadOnlyList<DisplayEventModel>> sortedEventLists,
+        ColumnName orderBy,
+        bool isDescending) =>
+        FilterMethods.MergeSorted([.. sortedEventLists], orderBy, isDescending);
 
-        foreach (var eventList in eventLists)
-        {
-            combinedEvents.AddRange(eventList);
-        }
-
-        // Sort in-place instead of creating a new list
-        combinedEvents.Sort(FilterMethods.GetComparer(orderBy, isDescending));
-
-        return combinedEvents.AsReadOnly();
-    }
+    // The k-way merge in GetCombinedEvents requires every per-log list to have been sorted with
+    // the same comparator. Funnel all per-log sort and combined-merge call sites through this
+    // helper so the effective default (DateAndTime) is applied consistently in both directions.
+    private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) =>
+        orderBy ?? ColumnName.DateAndTime;
 
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)
     {
         List<EventTableModel> updatedTables = [];
+        var effectiveOrderBy = GetEffectiveOrderBy(orderBy);
 
         updatedTables.AddRange(
             state.EventTables.Select(
                 logData => logData with
                 {
-                    DisplayedEvents = logData.DisplayedEvents.SortEvents(orderBy, isDescending)
+                    DisplayedEvents = logData.DisplayedEvents.SortEvents(effectiveOrderBy, isDescending)
                 }));
 
         return state with
