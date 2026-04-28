@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
+using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
 
@@ -188,6 +189,7 @@ internal enum SeekFlags
 internal static partial class EventMethods
 {
     private const string EventLogApi = "wevtapi.dll";
+    private const int MaxStackAllocChars = 4096;
 
     internal static object? ConvertVariant(EvtVariant variant)
     {
@@ -514,30 +516,41 @@ internal static partial class EventMethods
             }
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed];
+        int charCount = bufferUsed;
+        char[]? rented = null;
+        Span<char> buffer = charCount <= MaxStackAllocChars
+            ? stackalloc char[charCount]
+            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
 
-        success = EvtFormatMessage(
-            publisherMetadataHandle,
-            EvtHandle.Zero,
-            messageId,
-            0,
-            IntPtr.Zero,
-            EvtFormatMessageFlags.Id,
-            bufferUsed,
-            buffer,
-            out bufferUsed);
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!success &&
-            error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
-            error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
-            error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
+        try
         {
-            ThrowEventLogException(error);
-        }
+            success = EvtFormatMessage(
+                publisherMetadataHandle,
+                EvtHandle.Zero,
+                messageId,
+                0,
+                IntPtr.Zero,
+                EvtFormatMessageFlags.Id,
+                bufferUsed,
+                buffer,
+                out bufferUsed);
 
-        return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer[..(bufferUsed - 1)]);
+            error = Marshal.GetLastWin32Error();
+
+            if (!success &&
+                error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
+                error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
+                error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
+            {
+                ThrowEventLogException(error);
+            }
+
+            return bufferUsed - 1 <= 0 ? string.Empty : new string(buffer[..(bufferUsed - 1)]);
+        }
+        finally
+        {
+            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
+        }
     }
 
     internal static object GetObjectArrayProperty(
@@ -553,38 +566,49 @@ internal static partial class EventMethods
             ThrowEventLogException(error);
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed];
+        int charCount = bufferUsed;
+        char[]? rented = null;
+        Span<char> buffer = charCount <= MaxStackAllocChars
+            ? stackalloc char[charCount]
+            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
 
-        unsafe
+        try
         {
-            fixed (char* bufferPtr = buffer)
+            unsafe
             {
-                success = EvtGetObjectArrayProperty(array,
-                    propertyId,
-                    index,
-                    0,
-                    bufferUsed,
-                    (IntPtr)bufferPtr,
-                    out bufferUsed);
+                fixed (char* bufferPtr = buffer)
+                {
+                    success = EvtGetObjectArrayProperty(array,
+                        propertyId,
+                        index,
+                        0,
+                        bufferUsed,
+                        (IntPtr)bufferPtr,
+                        out bufferUsed);
+                }
+            }
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            unsafe
+            {
+                fixed (char* bufferPtr = buffer)
+                {
+                    var variant = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr);
+
+                    return ConvertVariant(variant) ??
+                        throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
+                }
             }
         }
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!success)
+        finally
         {
-            ThrowEventLogException(error);
-        }
-
-        unsafe
-        {
-            fixed (char* bufferPtr = buffer)
-            {
-                var variant = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr);
-
-                return ConvertVariant(variant) ??
-                    throw new InvalidDataException($"Invalid Object Array for Property: {propertyId}");
-            }
+            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
         }
     }
 
@@ -619,36 +643,47 @@ internal static partial class EventMethods
             ThrowEventLogException(error);
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
+        int charCount = bufferUsed / sizeof(char);
+        char[]? rented = null;
+        Span<char> buffer = charCount <= MaxStackAllocChars
+            ? stackalloc char[charCount]
+            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
 
-        unsafe
+        try
         {
-            fixed (char* bufferPtr = buffer)
+            unsafe
             {
-                success = EvtRender(
-                    EventLogSession.GlobalSession.SystemRenderContext,
-                    eventHandle,
-                    EvtRenderFlags.EventValues,
-                    bufferUsed,
-                    (IntPtr)bufferPtr,
-                    out bufferUsed,
-                    out propertyCount);
+                fixed (char* bufferPtr = buffer)
+                {
+                    success = EvtRender(
+                        EventLogSession.GlobalSession.SystemRenderContext,
+                        eventHandle,
+                        EvtRenderFlags.EventValues,
+                        bufferUsed,
+                        (IntPtr)bufferPtr,
+                        out bufferUsed,
+                        out propertyCount);
+                }
+            }
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            unsafe
+            {
+                fixed (char* bufferPtr = buffer)
+                {
+                    return GetEventRecord((IntPtr)bufferPtr, propertyCount);
+                }
             }
         }
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!success)
+        finally
         {
-            ThrowEventLogException(error);
-        }
-
-        unsafe
-        {
-            fixed (char* bufferPtr = buffer)
-            {
-                return GetEventRecord((IntPtr)bufferPtr, propertyCount);
-            }
+            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
         }
     }
 
@@ -670,48 +705,59 @@ internal static partial class EventMethods
             ThrowEventLogException(error);
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
+        int charCount = bufferUsed / sizeof(char);
+        char[]? rented = null;
+        Span<char> buffer = charCount <= MaxStackAllocChars
+            ? stackalloc char[charCount]
+            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
 
-        unsafe
-        {
-            fixed (char* bufferPtr = buffer)
-            {
-                success = EvtRender(
-                    EventLogSession.GlobalSession.UserRenderContext,
-                    eventHandle,
-                    EvtRenderFlags.EventValues,
-                    bufferUsed,
-                    (IntPtr)bufferPtr,
-                    out bufferUsed,
-                    out propertyCount);
-            }
-        }
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!success)
-        {
-            ThrowEventLogException(error);
-        }
-
-        if (propertyCount <= 0) { return []; }
-
-        var properties = new object[propertyCount];
-
-        for (int i = 0; i < propertyCount; i++)
+        try
         {
             unsafe
             {
                 fixed (char* bufferPtr = buffer)
                 {
-                    var property = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr + (i * Marshal.SizeOf<EvtVariant>()));
-
-                    properties[i] = ConvertVariant(property) ?? throw new InvalidDataException();
+                    success = EvtRender(
+                        EventLogSession.GlobalSession.UserRenderContext,
+                        eventHandle,
+                        EvtRenderFlags.EventValues,
+                        bufferUsed,
+                        (IntPtr)bufferPtr,
+                        out bufferUsed,
+                        out propertyCount);
                 }
             }
-        }
 
-        return properties;
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            if (propertyCount <= 0) { return []; }
+
+            var properties = new object[propertyCount];
+
+            for (int i = 0; i < propertyCount; i++)
+            {
+                unsafe
+                {
+                    fixed (char* bufferPtr = buffer)
+                    {
+                        var property = Marshal.PtrToStructure<EvtVariant>((IntPtr)bufferPtr + (i * Marshal.SizeOf<EvtVariant>()));
+
+                        properties[i] = ConvertVariant(property) ?? throw new InvalidDataException();
+                    }
+                }
+            }
+
+            return properties;
+        }
+        finally
+        {
+            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
+        }
     }
 
     internal static string? RenderEventXml(EvtHandle eventHandle)
@@ -732,31 +778,42 @@ internal static partial class EventMethods
             ThrowEventLogException(error);
         }
 
-        Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
+        int charCount = bufferUsed / sizeof(char);
+        char[]? rented = null;
+        Span<char> buffer = charCount <= MaxStackAllocChars
+            ? stackalloc char[charCount]
+            : (rented = ArrayPool<char>.Shared.Rent(charCount)).AsSpan(0, charCount);
 
-        unsafe
+        try
         {
-            fixed (char* bufferPtr = buffer)
+            unsafe
             {
-                success = EvtRender(
-                    EvtHandle.Zero,
-                    eventHandle,
-                    EvtRenderFlags.EventXml,
-                    bufferUsed,
-                    (IntPtr)bufferPtr,
-                    out bufferUsed,
-                    out int _);
+                fixed (char* bufferPtr = buffer)
+                {
+                    success = EvtRender(
+                        EvtHandle.Zero,
+                        eventHandle,
+                        EvtRenderFlags.EventXml,
+                        bufferUsed,
+                        (IntPtr)bufferPtr,
+                        out bufferUsed,
+                        out int _);
+                }
             }
+
+            error = Marshal.GetLastWin32Error();
+
+            if (!success)
+            {
+                ThrowEventLogException(error);
+            }
+
+            return bufferUsed - 1 <= 0 ? null : new string(buffer[..((bufferUsed - 1) / sizeof(char))]);
         }
-
-        error = Marshal.GetLastWin32Error();
-
-        if (!success)
+        finally
         {
-            ThrowEventLogException(error);
+            if (rented is not null) { ArrayPool<char>.Shared.Return(rented, clearArray: true); }
         }
-
-        return bufferUsed - 1 <= 0 ? null : new string(buffer[..((bufferUsed - 1) / sizeof(char))]);
     }
 
     internal static void ThrowEventLogException(int error)
