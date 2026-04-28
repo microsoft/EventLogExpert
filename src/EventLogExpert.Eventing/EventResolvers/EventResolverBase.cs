@@ -47,7 +47,6 @@ public partial class EventResolverBase : IDisposable
 
     protected readonly ConcurrentDictionary<string, ProviderDetails?> ProviderDetails =
         new(StringComparer.OrdinalIgnoreCase);
-    protected readonly Lock ProviderDetailsLock = new();
 
     private readonly IEventResolverCache? _cache;
     private readonly ConcurrentDictionary<string, string[]> _formattedPropertiesCache = [];
