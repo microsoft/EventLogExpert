@@ -665,14 +665,20 @@ public partial class EventResolverBase : IDisposable
     {
         if (eventRecord.Keywords is null or 0) { return []; }
 
+        var keywordsValue = eventRecord.Keywords.Value;
         List<string> returnValue = [];
 
-        foreach (var k in s_standardKeywords.Keys)
+        // Standard (Microsoft-defined) keywords live in bits 48–55. Skip the entire
+        // standard-keyword scan when the event has no bits in that range.
+        if ((keywordsValue & 0x00FF_0000_0000_0000L) != 0)
         {
-            if ((eventRecord.Keywords.Value & k) != k) { continue; }
+            foreach (var (bit, name) in s_standardKeywords)
+            {
+                if ((keywordsValue & bit) != bit) { continue; }
 
-            var keyword = s_standardKeywords[k].TrimEnd('\0');
-            returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+                var keyword = name.TrimEnd('\0');
+                returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
+            }
         }
 
         if (!ProviderDetails.TryGetValue(eventRecord.ProviderName, out var details) || details is null)
@@ -682,18 +688,18 @@ public partial class EventResolverBase : IDisposable
 
         // Provider-defined keywords use bits 0–47; bits 48–63 are reserved
         // for Microsoft-defined standard keywords handled above.
-        var providerBits = eventRecord.Keywords.Value & 0x0000_FFFF_FFFF_FFFFL;
+        var providerBits = keywordsValue & 0x0000_FFFF_FFFF_FFFFL;
 
         if (providerBits == 0) { return returnValue; }
-        
-        foreach (var k in details.Keywords.Keys)
-        {
-            if ((providerBits & k) != k) { continue; }
 
-            var keyword = details.Keywords[k].TrimEnd('\0');
+        foreach (var (bit, name) in details.Keywords)
+        {
+            if ((providerBits & bit) != bit) { continue; }
+
+            var keyword = name.TrimEnd('\0');
             returnValue.Add(_cache?.GetOrAddValue(keyword) ?? keyword);
         }
-        
+
         return returnValue;
     }
 
