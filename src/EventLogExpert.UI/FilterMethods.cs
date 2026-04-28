@@ -8,6 +8,49 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
+    private static readonly Comparison<DisplayEventModel> s_ascByLevel =
+        (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByDateAndTime =
+        (a, b) => WithTieBreaker(a.TimeCreated.CompareTo(b.TimeCreated), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByActivityId =
+        (a, b) => WithTieBreaker(Nullable.Compare(a.ActivityId, b.ActivityId), a, b);
+
+    private static readonly Comparison<DisplayEventModel> s_ascByLog =
+        (a, b) => WithTieBreaker(string.Compare(a.LogName, b.LogName, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByComputerName =
+        (a, b) => WithTieBreaker(string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal), a, b);
+
+    private static readonly Comparison<DisplayEventModel> s_ascBySource =
+        (a, b) => WithTieBreaker(string.Compare(a.Source, b.Source, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByEventId =
+        (a, b) => WithTieBreaker(a.Id.CompareTo(b.Id), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByTaskCategory =
+        (a, b) => WithTieBreaker(string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByKeywords =
+        (a, b) => WithTieBreaker(string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByProcessId =
+        (a, b) => WithTieBreaker(Nullable.Compare(a.ProcessId, b.ProcessId), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByThreadId =
+        (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByUser =
+        (a, b) => WithTieBreaker(string.Compare(a.UserId?.Value, b.UserId?.Value, StringComparison.Ordinal), a, b);
+    private static readonly Comparison<DisplayEventModel> s_ascByDefault =
+        (a, b) => FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
+
+    private static readonly Comparison<DisplayEventModel> s_descByActivityId = (a, b) => s_ascByActivityId(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByComputerName = (a, b) => s_ascByComputerName(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByDateAndTime = (a, b) => s_ascByDateAndTime(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByDefault = (a, b) => s_ascByDefault(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByEventId = (a, b) => s_ascByEventId(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByKeywords = (a, b) => s_ascByKeywords(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByLevel = (a, b) => s_ascByLevel(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByLog = (a, b) => s_ascByLog(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByProcessId = (a, b) => s_ascByProcessId(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descBySource = (a, b) => s_ascBySource(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByTaskCategory = (a, b) => s_ascByTaskCategory(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
+    private static readonly Comparison<DisplayEventModel> s_descByUser = (a, b) => s_ascByUser(b, a);
+
     public static Dictionary<string, FilterGroupData> AddFilterGroup(
         this Dictionary<string, FilterGroupData> group,
         string[] groupNames,
@@ -95,33 +138,40 @@ public static class FilterMethods
         return sorted.AsReadOnly();
     }
 
-    internal static Comparison<DisplayEventModel> GetComparer(ColumnName? orderBy, bool isDescending)
-    {
-        // To reverse sort direction we swap operands (a,b)
-        Comparison<DisplayEventModel> comparer = orderBy switch
-        {
-            ColumnName.Level => (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b),
-            ColumnName.DateAndTime => (a, b) => WithTieBreaker(a.TimeCreated.CompareTo(b.TimeCreated), a, b),
-            ColumnName.ActivityId => (a, b) => WithTieBreaker(Nullable.Compare(a.ActivityId, b.ActivityId), a, b),
-            ColumnName.Log => (a, b) => WithTieBreaker(string.Compare(a.LogName, b.LogName, StringComparison.Ordinal), a, b),
-            ColumnName.ComputerName => (a, b) => WithTieBreaker(string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal), a, b),
-            ColumnName.Source => (a, b) => WithTieBreaker(string.Compare(a.Source, b.Source, StringComparison.Ordinal), a, b),
-            ColumnName.EventId => (a, b) => WithTieBreaker(a.Id.CompareTo(b.Id), a, b),
-            ColumnName.TaskCategory => (a, b) => WithTieBreaker(string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal), a, b),
-            ColumnName.Keywords => (a, b) => WithTieBreaker(string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal), a, b),
-            ColumnName.ProcessId => (a, b) => WithTieBreaker(Nullable.Compare(a.ProcessId, b.ProcessId), a, b),
-            ColumnName.ThreadId => (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b),
-            ColumnName.User => (a, b) =>
+    internal static Comparison<DisplayEventModel> GetComparer(ColumnName? orderBy, bool isDescending) =>
+        isDescending
+            ? orderBy switch
             {
-                var aStr = a.UserId?.Value;
-                var bStr = b.UserId?.Value;
-                return WithTieBreaker(string.Compare(aStr, bStr, StringComparison.Ordinal), a, b);
-            },
-            _ => (a, b) => FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b)
-        };
-
-        return isDescending ? (a, b) => comparer(b, a) : comparer;
-    }
+                ColumnName.Level => s_descByLevel,
+                ColumnName.DateAndTime => s_descByDateAndTime,
+                ColumnName.ActivityId => s_descByActivityId,
+                ColumnName.Log => s_descByLog,
+                ColumnName.ComputerName => s_descByComputerName,
+                ColumnName.Source => s_descBySource,
+                ColumnName.EventId => s_descByEventId,
+                ColumnName.TaskCategory => s_descByTaskCategory,
+                ColumnName.Keywords => s_descByKeywords,
+                ColumnName.ProcessId => s_descByProcessId,
+                ColumnName.ThreadId => s_descByThreadId,
+                ColumnName.User => s_descByUser,
+                _ => s_descByDefault
+            }
+            : orderBy switch
+            {
+                ColumnName.Level => s_ascByLevel,
+                ColumnName.DateAndTime => s_ascByDateAndTime,
+                ColumnName.ActivityId => s_ascByActivityId,
+                ColumnName.Log => s_ascByLog,
+                ColumnName.ComputerName => s_ascByComputerName,
+                ColumnName.Source => s_ascBySource,
+                ColumnName.EventId => s_ascByEventId,
+                ColumnName.TaskCategory => s_ascByTaskCategory,
+                ColumnName.Keywords => s_ascByKeywords,
+                ColumnName.ProcessId => s_ascByProcessId,
+                ColumnName.ThreadId => s_ascByThreadId,
+                ColumnName.User => s_ascByUser,
+                _ => s_ascByDefault
+            };
 
     internal static IReadOnlyList<DisplayEventModel> MergeSorted(
         IReadOnlyList<IReadOnlyList<DisplayEventModel>> sortedLists,
@@ -169,7 +219,6 @@ public static class FilterMethods
 
         return result.AsReadOnly();
     }
-
 
     internal static IReadOnlyList<DisplayEventModel> MergeSorted(
         IReadOnlyList<DisplayEventModel> existing,
