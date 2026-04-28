@@ -9,6 +9,10 @@ namespace EventLogExpert.Eventing.Helpers;
 
 internal struct LogHandlerCore
 {
+    [ThreadStatic] private static StringBuilder? s_pooledBuilder;
+
+    private const int MaxPooledCapacity = 4096;
+
     private StringBuilder? _builder;
 
     internal bool IsEnabled;
@@ -17,7 +21,16 @@ internal struct LogHandlerCore
     {
         IsEnabled = isEnabled = level >= logger.MinimumLevel;
 
-        if (isEnabled)
+        if (!isEnabled) { return; }
+
+        var pooled = s_pooledBuilder;
+
+        if (pooled is not null)
+        {
+            s_pooledBuilder = null;
+            _builder = pooled;
+        }
+        else
         {
             _builder = new StringBuilder(literalLength + (formattedCount * 8));
         }
@@ -27,12 +40,24 @@ internal struct LogHandlerCore
 
     internal void AppendFormatted<T>(T value) => _builder!.Append(value);
 
-    internal void AppendFormatted<T>(T value, string? format) => _builder!.AppendFormat($"{{0:{format}}}", value);
+    internal void AppendFormatted(string? value) => _builder!.Append(value);
 
-    internal void AppendFormatted<T>(T value, int alignment) => _builder!.AppendFormat($"{{0,{alignment}}}", value);
+    internal void AppendFormatted(int value) => _builder!.Append(value);
 
-    internal void AppendFormatted<T>(T value, int alignment, string? format) =>
-        _builder!.AppendFormat($"{{0,{alignment}:{format}}}", value);
+    internal void AppendFormatted(long value) => _builder!.Append(value);
+
+    internal void AppendFormatted(double value) => _builder!.Append(value);
+
+    internal void AppendFormatted<T>(T value, string? format)
+    {
+        if (format is null) { _builder!.Append(value); return; }
+        if (value is IFormattable formattable) { _builder!.Append(formattable.ToString(format, null)); return; }
+        _builder!.Append(value);
+    }
+
+    internal void AppendFormatted<T>(T value, int alignment) => AppendAligned(value, alignment, null);
+
+    internal void AppendFormatted<T>(T value, int alignment, string? format) => AppendAligned(value, alignment, format);
 
     internal void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
 
@@ -46,9 +71,29 @@ internal struct LogHandlerCore
         if (_builder is null) { return string.Empty; }
 
         string result = _builder.ToString();
-        _builder.Clear();
+        var consumed = _builder;
+        _builder = null;
+        consumed.Clear();
+        if (consumed.Capacity <= MaxPooledCapacity) { s_pooledBuilder = consumed; }
 
         return result;
+    }
+
+    private void AppendAligned<T>(T value, int alignment, string? format)
+    {
+        string formatted = value switch
+        {
+            null => string.Empty,
+            IFormattable f when format is not null => f.ToString(format, null) ?? string.Empty,
+            _ => value.ToString() ?? string.Empty
+        };
+
+        int width = alignment == int.MinValue ? int.MaxValue : Math.Abs(alignment);
+        int padding = width - formatted.Length;
+        if (padding <= 0) { _builder!.Append(formatted); return; }
+
+        if (alignment >= 0) { _builder!.Append(' ', padding).Append(formatted); }
+        else { _builder!.Append(formatted).Append(' ', padding); }
     }
 }
 
@@ -65,6 +110,14 @@ public struct TraceLogHandler
     public void AppendLiteral(string s) => _core.AppendLiteral(s);
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
 
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
@@ -97,6 +150,14 @@ public struct DebugLogHandler
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
 
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
+
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
     public void AppendFormatted<T>(T value, int alignment) => _core.AppendFormatted(value, alignment);
@@ -127,6 +188,14 @@ public struct InfoLogHandler
     public void AppendLiteral(string s) => _core.AppendLiteral(s);
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
 
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
@@ -159,6 +228,14 @@ public struct WarnLogHandler
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
 
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
+
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
     public void AppendFormatted<T>(T value, int alignment) => _core.AppendFormatted(value, alignment);
@@ -190,6 +267,14 @@ public struct ErrorLogHandler
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
 
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
+
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
     public void AppendFormatted<T>(T value, int alignment) => _core.AppendFormatted(value, alignment);
@@ -220,6 +305,14 @@ public struct CriticalLogHandler
     public void AppendLiteral(string s) => _core.AppendLiteral(s);
 
     public void AppendFormatted<T>(T value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(string? value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(int value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(long value) => _core.AppendFormatted(value);
+
+    public void AppendFormatted(double value) => _core.AppendFormatted(value);
 
     public void AppendFormatted<T>(T value, string? format) => _core.AppendFormatted(value, format);
 
