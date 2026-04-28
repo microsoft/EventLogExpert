@@ -22,6 +22,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
 {
     private readonly Lock _databaseAccessLock = new();
     private readonly ConcurrentDictionary<string, bool> _providerFromNonLocal = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, Lazy<bool>> _resolutionGates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails = new(StringComparer.OrdinalIgnoreCase);
 
     private ImmutableArray<EventProviderDbContext> _dbContexts = [];
@@ -51,27 +52,38 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
     {
         ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventResolver));
 
+        var providerName = eventRecord.ProviderName;
+
         // Fast path: ConcurrentDictionary is thread-safe for reads
-        if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+        if (ProviderDetails.ContainsKey(providerName)) { return; }
 
-        using (ProviderDetailsLock.EnterScope())
+        // Per-provider single-flight: same provider name from N threads coalesces onto one Lazy;
+        // different providers resolve in parallel. Replaces the old global ProviderDetailsLock
+        // that serialized every first-touch across all providers.
+        var gate = _resolutionGates.GetOrAdd(
+            providerName,
+            static (name, self) => new Lazy<bool>(
+                () => self.ResolveProviderUnderGate(name),
+                LazyThreadSafetyMode.ExecutionAndPublication),
+            this);
+
+        try
         {
-            if (ProviderDetails.ContainsKey(eventRecord.ProviderName)) { return; }
+            _ = gate.Value;
+        }
+        catch
+        {
+            // Don't poison the provider for the resolver's lifetime — clear the gate so a later
+            // call can retry. Use compare-remove so we don't yank a newer gate created mid-retry.
+            RemoveGateIfSame(providerName, gate);
+            throw;
+        }
 
-            // 1. Try MTA locale metadata files (primary source for exported logs)
-            if (_metadataPaths.Length > 0 && TryResolveFromMta(eventRecord))
-            {
-                return;
-            }
-
-            // 2. Try provider databases
-            if (_dbContexts.Length > 0 && TryResolveFromDatabase(eventRecord))
-            {
-                return;
-            }
-
-            // 3. Fall back to local providers
-            ResolveFromLocalProvider(eventRecord);
+        // Successful resolution is now cached in ProviderDetails; the gate is no longer needed.
+        // Remove it to keep _resolutionGates as a pure in-flight coordination structure.
+        if (gate.IsValueCreated)
+        {
+            RemoveGateIfSame(providerName, gate);
         }
     }
 
@@ -226,14 +238,44 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         }
     }
 
-    private void ResolveFromLocalProvider(EventRecord eventRecord)
-    {
-        var details = new EventMessageProvider(eventRecord.ProviderName, Logger).LoadProviderDetails();
+    private void RemoveGateIfSame(string providerName, Lazy<bool> gate) =>
+        ((ICollection<KeyValuePair<string, Lazy<bool>>>)_resolutionGates)
+            .Remove(new KeyValuePair<string, Lazy<bool>>(providerName, gate));
 
-        ProviderDetails.TryAdd(eventRecord.ProviderName, details);
+    private void ResolveFromLocalProvider(string providerName)
+    {
+        var details = new EventMessageProvider(providerName, Logger).LoadProviderDetails();
+
+        ProviderDetails.TryAdd(providerName, details);
     }
 
-    private bool TryResolveFromDatabase(EventRecord eventRecord)
+    private bool ResolveProviderUnderGate(string providerName)
+    {
+        if (ProviderDetails.ContainsKey(providerName)) { return true; }
+
+        // Snapshot fields once so the resolution chain sees a consistent view even if
+        // SetMetadataPaths/LoadDatabases reassigns the immutable arrays mid-flight.
+        var metadataPaths = _metadataPaths;
+        var dbContexts = _dbContexts;
+
+        // 1. Try MTA locale metadata files (primary source for exported logs)
+        if (metadataPaths.Length > 0 && TryResolveFromMta(providerName, metadataPaths))
+        {
+            return true;
+        }
+
+        // 2. Try provider databases
+        if (dbContexts.Length > 0 && TryResolveFromDatabase(providerName))
+        {
+            return true;
+        }
+
+        // 3. Fall back to local providers
+        ResolveFromLocalProvider(providerName);
+        return true;
+    }
+
+    private bool TryResolveFromDatabase(string providerName)
     {
         using (_databaseAccessLock.EnterScope())
         {
@@ -243,13 +285,13 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             {
                 var details = dbContext.ProviderDetails.FirstOrDefault(p =>
                     EF.Functions.Collate(p.ProviderName, "NOCASE") ==
-                    EF.Functions.Collate(eventRecord.ProviderName, "NOCASE"));
+                    EF.Functions.Collate(providerName, "NOCASE"));
 
                 if (details is null) { continue; }
 
-                Logger?.Debug($"Resolved {eventRecord.ProviderName} from database {dbContext.Name}.");
-                ProviderDetails.TryAdd(eventRecord.ProviderName, details);
-                _providerFromNonLocal.TryAdd(eventRecord.ProviderName, true);
+                Logger?.Debug($"Resolved {providerName} from database {dbContext.Name}.");
+                ProviderDetails.TryAdd(providerName, details);
+                _providerFromNonLocal.TryAdd(providerName, true);
 
                 return true;
             }
@@ -258,12 +300,12 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         return false;
     }
 
-    private bool TryResolveFromMta(EventRecord eventRecord)
+    private bool TryResolveFromMta(string providerName, ImmutableArray<string> metadataPaths)
     {
         var details = new EventMessageProvider(
-            eventRecord.ProviderName,
+            providerName,
             null,
-            _metadataPaths,
+            metadataPaths,
             Logger).LoadProviderDetails();
 
         if (details.Events.Count == 0 && details.Keywords.Count == 0 && details.Messages.Count == 0)
@@ -271,8 +313,8 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             return false;
         }
 
-        ProviderDetails.TryAdd(eventRecord.ProviderName, details);
-        _providerFromNonLocal.TryAdd(eventRecord.ProviderName, true);
+        ProviderDetails.TryAdd(providerName, details);
+        _providerFromNonLocal.TryAdd(providerName, true);
 
         return true;
     }

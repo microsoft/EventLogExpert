@@ -12,16 +12,18 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
     private readonly string? _computerName = computerName;
     private readonly ITraceLogger? _logger = logger;
 
-    /// <summary>sounds Returns the file paths for the message files for this provider.</summary>
+    /// <summary>Returns the file paths for the message files for this provider.</summary>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
         _logger?.Debug($"GetLegacyProviderFiles called for provider {providerName} on computer {_computerName}");
 
-        var hklm = string.IsNullOrEmpty(_computerName)
-            ? Registry.LocalMachine
+        // Open an owned base key (do NOT use Registry.LocalMachine — that's a shared static).
+        // This makes concurrent calls across instances safe to dispose independently.
+        using var hklm = string.IsNullOrEmpty(_computerName)
+            ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
             : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
 
-        var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
+        using var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
             throw new OpenEventLogRegistryKeyFailedException(_computerName ?? string.Empty);
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
@@ -32,8 +34,8 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
                 continue;
             }
 
-            var logSubKey = eventLogKey.OpenSubKey(logSubKeyName);
-            var providerSubKey = logSubKey?.OpenSubKey(providerName);
+            using var logSubKey = eventLogKey.OpenSubKey(logSubKeyName);
+            using var providerSubKey = logSubKey?.OpenSubKey(providerName);
 
             if (providerSubKey?.GetValue("EventMessageFile") is not string eventMessageFilePath)
             {
@@ -64,14 +66,9 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
                 files = messageFiles;
             }
 
-            // Now we have all our paths, but they are not expanded yet, so expand them
-            files = GetExpandedFilePaths(files).ToList();
-
-            hklm.Close();
-            return files;
+            // Materialize before the using-scopes close the registry handles
+            return GetExpandedFilePaths(files).ToList();
         }
-
-        hklm.Close();
 
         return [];
     }
@@ -114,14 +111,13 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
     private string? GetSystemRoot()
     {
-        var hklm = string.IsNullOrEmpty(_computerName)
-            ? Registry.LocalMachine
+        using var hklm = string.IsNullOrEmpty(_computerName)
+            ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
             : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
 
-        var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
-        var systemRoot = currentVersion?.GetValue("SystemRoot") as string;
+        using var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
 
-        return systemRoot;
+        return currentVersion?.GetValue("SystemRoot") as string;
     }
 
     private class ExpandFilePathsFailedException(string msg) : Exception(msg) {}
