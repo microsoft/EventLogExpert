@@ -20,6 +20,8 @@ public sealed record EventRecord
 
     public long? Keywords { get; set; }
 
+    public ushort? Qualifiers { get; set; }
+
     public byte? Level { get; set; }
 
     public string LogName { get; set; } = string.Empty;

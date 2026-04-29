@@ -881,6 +881,9 @@ internal static partial class EventMethods
                 case (int)EvtSystemPropertyId.EventId:
                     properties.Id = (ushort)variant!;
                     break;
+                case (int)EvtSystemPropertyId.Qualifiers:
+                    properties.Qualifiers = (ushort?)variant;
+                    break;
                 case (int)EvtSystemPropertyId.Keywords:
                     properties.Keywords = (long?)(ulong?)variant;
                     break;
