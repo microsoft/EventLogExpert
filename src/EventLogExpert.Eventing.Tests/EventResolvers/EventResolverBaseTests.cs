@@ -461,6 +461,94 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithClassicEventIdMatchingWin32ErrorCode_ShouldNotPrependSystemMessage()
+    {
+        // Arrange - regression guard: classic events whose low 16-bit EventId happens to
+        // collide with a Win32 error code (e.g. EventId 2 == ERROR_FILE_NOT_FOUND) must
+        // NOT have that error text injected as the description. The system-message
+        // fallback is intentionally restricted to EventId 0 to avoid such false matches.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2,
+            Keywords = unchecked((long)0x80000000000000UL),
+            Properties = ["payload-a", "payload-b"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        // Compare against the locale's system-message text for error 2 so the test
+        // catches false matches on non-English Windows too.
+        var win32ErrorTwoMessage = NativeMethods.FormatSystemMessage(2);
+        if (!string.IsNullOrWhiteSpace(win32ErrorTwoMessage))
+        {
+            Assert.DoesNotContain(win32ErrorTwoMessage, displayEvent.Description);
+        }
+        // Property tail is still rendered
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("payload-a", displayEvent.Description);
+        Assert.Contains("payload-b", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithClassicEventIdZeroAndNoProviderMetadata_ShouldPrependSystemMessage()
+    {
+        // Arrange - reproduces the AsusUpdateCheck scenario: classic-keyword event with
+        // EventId 0 and no provider metadata at all. mmc shows the Win32 system message
+        // for ERROR_SUCCESS ("The operation completed successfully.") followed by the
+        // EventData payload. We replicate that.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 0,
+            Keywords = unchecked((long)0x80000000000000UL),
+            Properties = ["AsusUpdateCheck", "CServiceControl in OnStop"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        // Compare against the locale's system-message text rather than a hard-coded English
+        // string so the test passes on non-English Windows.
+        var expectedSystemMessage = NativeMethods.FormatSystemMessage(0);
+        Assert.False(string.IsNullOrWhiteSpace(expectedSystemMessage), "FormatSystemMessage(0) must return text on Windows.");
+        Assert.StartsWith(expectedSystemMessage!, displayEvent.Description);
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("AsusUpdateCheck", displayEvent.Description);
+        Assert.Contains("CServiceControl in OnStop", displayEvent.Description);
+        Assert.DoesNotContain("No matching provider", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithDataElementsMissingOutType_ShouldResolveDescription()
     {
         // Arrange - template has 3 data elements, only first has outType
@@ -568,11 +656,11 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithEmptyPrimaryAndNoSupplemental_ShouldReturnNoProviderDescription()
+    public void ResolveEvent_WithEmptyPrimaryAndNoSupplemental_ShouldReturnEventDataTail()
     {
-        // Arrange - guard test: empty primary AND no supplemental should still return
-        // DefaultNoProviderDescription. Multi-property event so single-property fallback
-        // does not apply.
+        // Arrange - empty primary AND no supplemental should fall through to the
+        // no-metadata fallback. With multiple properties present, that surfaces them
+        // under the "included with the event" header (mmc-style payload dump).
         var primaryDetails = new ProviderDetails
         {
             ProviderName = Constants.TestProviderName,
@@ -598,7 +686,10 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Contains("No matching provider", displayEvent.Description);
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("a", displayEvent.Description);
+        Assert.Contains("b", displayEvent.Description);
+        Assert.Contains("c", displayEvent.Description);
         Assert.DoesNotContain("No matching message", displayEvent.Description);
     }
 
@@ -721,12 +812,14 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
-    public void ResolveEvent_WithEmptyProviderDetailsAndMultipleProperties_ShouldReturnNoProviderDescription()
+    public void ResolveEvent_WithEmptyProviderDetailsAndMultipleProperties_ShouldReturnEventDataTail()
     {
         // Arrange - reproduces the AppXDeploymentServer/Operational scenario where
         // EventMessageProvider returns an empty-but-non-null ProviderDetails because
         // no ETW publisher and no legacy registry source exist for the provider name.
-        // The event has multiple properties so the single-property dump path does not apply.
+        // The event has multiple properties so the no-metadata fallback should surface
+        // the EventData payload using mmc's "included with the event" wording. EventId
+        // 2562 is intentionally NOT a Win32 error code, so no system message is prepended.
         var providerDetails = new ProviderDetails
         {
             ProviderName = Constants.TestProviderName,
@@ -743,6 +836,7 @@ public sealed class EventResolverBaseTests
         {
             ProviderName = Constants.TestProviderName,
             Id = 2562,
+            Keywords = unchecked((long)0x80000000000000UL),
             Properties = ["MSIXDeployment", "windows.applicationData", "DeleteMachineFolder", "Removed folder X"]
         };
 
@@ -751,8 +845,49 @@ public sealed class EventResolverBaseTests
 
         // Assert
         Assert.NotNull(displayEvent);
-        Assert.Contains("No matching provider", displayEvent.Description);
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("MSIXDeployment", displayEvent.Description);
+        Assert.Contains("windows.applicationData", displayEvent.Description);
+        Assert.Contains("DeleteMachineFolder", displayEvent.Description);
+        Assert.Contains("Removed folder X", displayEvent.Description);
+        Assert.DoesNotContain("No matching provider", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+        // EventId 2562 must NOT false-match a Win32 error code via the system message table
+        Assert.DoesNotContain("The operation completed successfully", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithEmptyProviderDetailsAndNoProperties_ShouldReturnDefaultDescription()
+    {
+        // Arrange - no metadata, no EventData payload, no classic+Id0 system message hint
+        // → fall back to the original "No matching provider" placeholder so the user knows
+        // there is nothing further to display.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 2,
+            Keywords = unchecked((long)0x80000000000000UL),
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("No matching provider", displayEvent.Description);
     }
 
     [Fact]
@@ -1616,6 +1751,48 @@ public sealed class EventResolverBaseTests
         Assert.Contains("Admin", displayEvent.Description);
         Assert.Contains("Login", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNonClassicEventIdZeroAndNoProviderMetadata_ShouldNotPrependSystemMessage()
+    {
+        // Arrange - regression guard: only classic-keyword events get the Win32
+        // system-message prepend. Modern (manifest) events with EventId 0 should fall
+        // through to the property tail without injecting the system message for ERROR_SUCCESS.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 0,
+            Keywords = null,
+            Properties = ["payload-a", "payload-b"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        // Compare against the locale's system-message text for ERROR_SUCCESS so the
+        // negative assertion catches an incorrect prepend on non-English Windows too.
+        var win32SuccessMessage = NativeMethods.FormatSystemMessage(0);
+        if (!string.IsNullOrWhiteSpace(win32SuccessMessage))
+        {
+            Assert.DoesNotContain(win32SuccessMessage, displayEvent.Description);
+        }
+        Assert.Contains("The following information was included with the event:", displayEvent.Description);
+        Assert.Contains("payload-a", displayEvent.Description);
     }
 
     [Fact]

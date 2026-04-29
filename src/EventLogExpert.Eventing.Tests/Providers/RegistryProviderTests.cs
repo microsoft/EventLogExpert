@@ -86,38 +86,6 @@ public sealed class RegistryProviderTests
         Assert.NotNull(result);
     }
 
-    /// <summary>
-    /// Tests that when a provider has multiple message files (including CategoryMessageFile),
-    /// they are all returned. This test is environment-dependent and will pass vacuously
-    /// if no providers with multiple message files exist on the system.
-    /// </summary>
-    [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenMultipleMessageFilesExist_ShouldReturnAll()
-    {
-        // Arrange
-        var provider = new RegistryProvider();
-        var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
-
-        // Act - Find a provider with multiple message files
-        foreach (var providerName in commonProviders)
-        {
-            var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
-
-            // Assert - If we found multiple files, verify the collection is valid
-            if (result.Count > 1)
-            {
-                Assert.NotEmpty(result);
-                Assert.All(result, file => Assert.False(string.IsNullOrWhiteSpace(file)));
-                return; // Test passed with actual validation
-            }
-        }
-
-        // No providers with multiple message files found on this system.
-        // This is environment-dependent - the test passes vacuously but logs the condition.
-        // To make this test meaningful, run on a system with providers that have
-        // both EventMessageFile and CategoryMessageFile registry entries.
-    }
-
     [Theory]
     [InlineData(Constants.ApplicationLogName)]
     [InlineData(Constants.SystemLogName)]
@@ -195,6 +163,38 @@ public sealed class RegistryProviderTests
         }
     }
 
+    /// <summary>
+    /// Tests that when a provider has multiple message files (including CategoryMessageFile),
+    /// they are all returned. This test is environment-dependent and will pass vacuously
+    /// if no providers with multiple message files exist on the system.
+    /// </summary>
+    [Fact]
+    public void GetMessageFilesForLegacyProvider_WhenMultipleMessageFilesExist_ShouldReturnAll()
+    {
+        // Arrange
+        var provider = new RegistryProvider();
+        var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
+
+        // Act - Find a provider with multiple message files
+        foreach (var providerName in commonProviders)
+        {
+            var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
+
+            // Assert - If we found multiple files, verify the collection is valid
+            if (result.Count > 1)
+            {
+                Assert.NotEmpty(result);
+                Assert.All(result, file => Assert.False(string.IsNullOrWhiteSpace(file)));
+                return; // Test passed with actual validation
+            }
+        }
+
+        // No providers with multiple message files found on this system.
+        // This is environment-dependent - the test passes vacuously but logs the condition.
+        // To make this test meaningful, run on a system with providers that have
+        // both EventMessageFile and CategoryMessageFile registry entries.
+    }
+
     [Fact]
     public async Task GetMessageFilesForLegacyProvider_WhenMultipleProviders_ShouldHandleConcurrentAccess()
     {
@@ -232,6 +232,22 @@ public sealed class RegistryProviderTests
         // This test verifies the semicolon splitting logic works
         // Even if we only get one file, the test passes as it shows the method works
         Assert.NotNull(result);
+    }
+
+    [Fact]
+    public void GetMessageFilesForLegacyProvider_WhenNoSubkeyFound_ShouldLogTerminalMessage()
+    {
+        // Arrange
+        var providerName = "DefinitelyMissingProvider_" + Guid.NewGuid();
+        var mockLogger = Substitute.For<ITraceLogger>();
+        var provider = new RegistryProvider(mockLogger);
+
+        // Act
+        _ = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
+
+        // Assert
+        mockLogger.Received().Debug(
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No legacy EventMessageFile found for provider") && h.ToString().Contains(providerName)));
     }
 
     [Fact]

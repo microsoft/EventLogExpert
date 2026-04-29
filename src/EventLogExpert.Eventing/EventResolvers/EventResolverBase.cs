@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Providers;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.EventResolvers;
@@ -147,6 +148,21 @@ public partial class EventResolverBase : IDisposable
     /// </summary>
     protected virtual ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => null;
 
+    private static string? BuildEventDataTail(List<string> properties)
+    {
+        if (properties.Count == 0) { return null; }
+
+        StringBuilder builder = new();
+        builder.Append("The following information was included with the event:\r\n");
+
+        foreach (var property in properties)
+        {
+            builder.Append("\r\n").Append(property);
+        }
+
+        return builder.ToString();
+    }
+
     private static void CleanupFormatting(ReadOnlySpan<char> unformattedString, ref Span<char> buffer, out int bufferIndex)
     {
         bufferIndex = 0;
@@ -230,8 +246,96 @@ public partial class EventResolverBase : IDisposable
         source = buffer = newBuffer;
     }
 
+    /// <summary>
+    ///     Disambiguate multiple legacy messages for the same event ID. Returns null when
+    ///     the set is empty or remains ambiguous after both LogLink and severity matching.
+    /// </summary>
+    private static MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
+    {
+        if (legacyMessages.Count == 0) { return null; }
+
+        if (legacyMessages.Count == 1) { return legacyMessages[0]; }
+
+        // LogLink match
+        foreach (var m in legacyMessages)
+        {
+            if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
+            {
+                return m;
+            }
+        }
+
+        // Severity-based match. MC RawId bits 31-30 encode severity:
+        // 00=Success, 01=Informational, 10=Warning, 11=Error.
+        // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose.
+        if (eventRecord.Level is null) { return null; }
+
+        int targetSeverity = eventRecord.Level switch
+        {
+            1 or 2 => 3,
+            3 => 2,
+            4 or 5 => 1,
+            _ => 0
+        };
+
+        MessageModel? severityCandidate = null;
+
+        foreach (var m in legacyMessages)
+        {
+            int messageSeverity = (int)((m.RawId >> 30) & 0x3);
+
+            if (messageSeverity != targetSeverity) { continue; }
+
+            if (severityCandidate is not null)
+            {
+                // Multiple matches with same severity — still ambiguous
+                return null;
+            }
+
+            severityCandidate = m;
+        }
+
+        return severityCandidate;
+    }
+
     [GeneratedRegex("%+[0-9]+")]
     private static partial Regex WildcardWithNumberRegex();
+
+    private string BuildNoMetadataFallbackDescription(EventRecord eventRecord, List<string> properties)
+    {
+        const long classicKeywordBit = 0x0080000000000000L;
+        bool isClassic = ((eventRecord.Keywords ?? 0) & classicKeywordBit) != 0;
+
+        string? systemMessage = null;
+
+        if (isClassic && eventRecord.Id == 0)
+        {
+            // EventId 0 with the Classic keyword bit is what mmc renders as the Win32
+            // ERROR_SUCCESS text ("The operation completed successfully."). The Win32
+            // ERROR_SUCCESS code happens to be 0 too, but we are deliberately requesting
+            // the ERROR_SUCCESS message — not treating the EventId as a Win32 error code.
+            const uint Win32ErrorSuccess = 0;
+            systemMessage = NativeMethods.FormatSystemMessage(Win32ErrorSuccess);
+        }
+
+        string? propertyTail = BuildEventDataTail(properties);
+
+        string fallback = string.IsNullOrWhiteSpace(systemMessage) switch
+        {
+            false when propertyTail is not null => $"{systemMessage}\r\n\r\n{propertyTail}",
+            false => systemMessage!,
+            _ => propertyTail ?? DefaultNoProviderDescription
+        };
+
+        return _cache?.GetOrAddDescription(fallback) ?? fallback;
+    }
+
+    private string CacheTaskName(string taskName)
+    {
+        taskName = taskName.TrimEnd('\0');
+
+        return _cache?.GetOrAddValue(taskName) ?? taskName;
+    }
 
     /// <summary>
     ///     Counts the number of "visible" template properties by excluding length-prefixed
@@ -1145,65 +1249,14 @@ public partial class EventResolverBase : IDisposable
 
         if (details.IsEmpty && (supplemental is null || supplemental.IsEmpty))
         {
-            Logger?.Debug($"{nameof(ResolveDescription)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
+            Logger?.Debug($"{nameof(ResolveDescription)}: No provider metadata available - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}, Keywords=0x{eventRecord.Keywords ?? 0:X16}");
 
-            return DefaultNoProviderDescription;
+            return BuildNoMetadataFallbackDescription(eventRecord, properties);
         }
 
         Logger?.Debug($"{nameof(ResolveDescription)}: No matching description found - Provider={eventRecord.ProviderName}, EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}, RecordId={eventRecord.RecordId}");
 
         return DefaultNoMatchingDescription;
-    }
-
-    /// <summary>
-    ///     Disambiguate multiple legacy messages for the same event ID. Returns null when
-    ///     the set is empty or remains ambiguous after both LogLink and severity matching.
-    /// </summary>
-    private MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
-    {
-        if (legacyMessages.Count == 0) { return null; }
-        if (legacyMessages.Count == 1) { return legacyMessages[0]; }
-
-        // LogLink match
-        foreach (var m in legacyMessages)
-        {
-            if (m.LogLink is not null && LogNamesMatch(m.LogLink, eventRecord.LogName))
-            {
-                return m;
-            }
-        }
-
-        // Severity-based match. MC RawId bits 31-30 encode severity:
-        // 00=Success, 01=Informational, 10=Warning, 11=Error.
-        // ETW levels: 0=LogAlways, 1=Critical, 2=Error, 3=Warning, 4=Information, 5=Verbose.
-        if (eventRecord.Level is null) { return null; }
-
-        int targetSeverity = eventRecord.Level switch
-        {
-            1 or 2 => 3,
-            3 => 2,
-            4 or 5 => 1,
-            _ => 0
-        };
-
-        MessageModel? severityCandidate = null;
-
-        foreach (var m in legacyMessages)
-        {
-            int messageSeverity = (int)((m.RawId >> 30) & 0x3);
-
-            if (messageSeverity != targetSeverity) { continue; }
-
-            if (severityCandidate is not null)
-            {
-                // Multiple matches with same severity — still ambiguous
-                return null;
-            }
-
-            severityCandidate = m;
-        }
-
-        return severityCandidate;
     }
 
     private string ResolveTaskName(
@@ -1228,12 +1281,9 @@ public partial class EventResolverBase : IDisposable
             return CacheTaskName(taskName);
         }
 
-        if (!eventRecord.Task.HasValue)
-        {
-            return string.Empty;
-        }
-
-        return CacheTaskName(eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})");
+        return !eventRecord.Task.HasValue ?
+            string.Empty :
+            CacheTaskName(eventRecord.Task == 0 ? "None" : $"({eventRecord.Task})");
     }
 
     private bool TryResolveTaskNameFromDetails(
@@ -1295,12 +1345,5 @@ public partial class EventResolverBase : IDisposable
         }
 
         return false;
-    }
-
-    private string CacheTaskName(string taskName)
-    {
-        taskName = taskName.TrimEnd('\0');
-
-        return _cache?.GetOrAddValue(taskName) ?? taskName;
     }
 }

@@ -25,11 +25,11 @@ public class RegistryProvider(ITraceLogger? logger = null)
         // This makes concurrent calls across instances safe to dispose independently.
         using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
 
-        const string eventLogKeyPath = @"SYSTEM\CurrentControlSet\Services\EventLog";
+        const string EventLogKeyPath = @"SYSTEM\CurrentControlSet\Services\EventLog";
 
-        using var eventLogKey = hklm.OpenSubKey(eventLogKeyPath) ??
+        using var eventLogKey = hklm.OpenSubKey(EventLogKeyPath) ??
             throw new OpenEventLogRegistryKeyFailedException(
-                $@"Failed to open HKEY_LOCAL_MACHINE\{eventLogKeyPath}.");
+                $@"Failed to open HKEY_LOCAL_MACHINE\{EventLogKeyPath}.");
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
@@ -42,16 +42,24 @@ public class RegistryProvider(ITraceLogger? logger = null)
             using var logSubKey = eventLogKey.OpenSubKey(logSubKeyName);
             using var providerSubKey = logSubKey?.OpenSubKey(providerName);
 
-            if (providerSubKey?.GetValue("EventMessageFile") is not string eventMessageFilePath)
+            if (providerSubKey is null)
             {
                 continue;
             }
 
-            var categoryMessageFilePath = providerSubKey?.GetValue("CategoryMessageFile") as string;
-            var parameterMessageFilePath = providerSubKey?.GetValue("ParameterMessageFile") as string;
+            if (providerSubKey.GetValue("EventMessageFile") is not string eventMessageFilePath)
+            {
+                _logger?.Debug(
+                    $"Legacy provider registry subkey found without EventMessageFile - Provider={providerName}, SubKey={providerSubKey.Name}");
+
+                continue;
+            }
+
+            var categoryMessageFilePath = providerSubKey.GetValue("CategoryMessageFile") as string;
+            var parameterMessageFilePath = providerSubKey.GetValue("ParameterMessageFile") as string;
 
             _logger?.Debug(
-                $"Found message file for legacy provider {providerName} in subkey {providerSubKey!.Name}. EventMessageFile={eventMessageFilePath}, CategoryMessageFile={categoryMessageFilePath ?? "<null>"}, ParameterMessageFile={parameterMessageFilePath ?? "<null>"}.");
+                $"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}. EventMessageFile={eventMessageFilePath}, CategoryMessageFile={categoryMessageFilePath ?? "<null>"}, ParameterMessageFile={parameterMessageFilePath ?? "<null>"}.");
 
             // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
             // and trying to load that causes an access violation.
@@ -78,6 +86,8 @@ public class RegistryProvider(ITraceLogger? logger = null)
             // Materialize before the using-scopes close the registry handles
             return files.Select(Environment.ExpandEnvironmentVariables).ToList();
         }
+
+        _logger?.Debug($"No legacy EventMessageFile found for provider {providerName}");
 
         return [];
     }

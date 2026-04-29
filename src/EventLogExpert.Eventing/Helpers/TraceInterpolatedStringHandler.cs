@@ -9,7 +9,7 @@ namespace EventLogExpert.Eventing.Helpers;
 
 internal struct LogHandlerCore
 {
-    [ThreadStatic] private static StringBuilder? s_pooledBuilder;
+    [ThreadStatic] private static StringBuilder? t_pooledBuilder;
 
     private const int MaxPooledCapacity = 4096;
 
@@ -23,11 +23,11 @@ internal struct LogHandlerCore
 
         if (!isEnabled) { return; }
 
-        var pooled = s_pooledBuilder;
+        var pooled = t_pooledBuilder;
 
         if (pooled is not null)
         {
-            s_pooledBuilder = null;
+            t_pooledBuilder = null;
             _builder = pooled;
         }
         else
@@ -74,7 +74,7 @@ internal struct LogHandlerCore
         var consumed = _builder;
         _builder = null;
         consumed.Clear();
-        if (consumed.Capacity <= MaxPooledCapacity) { s_pooledBuilder = consumed; }
+        if (consumed.Capacity <= MaxPooledCapacity) { t_pooledBuilder = consumed; }
 
         return result;
     }
