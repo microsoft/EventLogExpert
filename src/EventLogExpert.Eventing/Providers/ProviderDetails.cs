@@ -2,31 +2,16 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EventLogExpert.Eventing.Providers;
 
 public class ProviderDetails
 {
     private IReadOnlyList<EventModel> _events = [];
-    private IReadOnlyList<MessageModel> _messages = [];
     private Dictionary<long, List<EventModel>>? _eventsByIdLookup;
+    private IReadOnlyList<MessageModel> _messages = [];
     private Dictionary<int, List<MessageModel>>? _messagesByShortIdLookup;
-
-    public string ProviderName { get; set; } = string.Empty;
-
-    /// <summary>Messages from legacy provider</summary>
-    public IReadOnlyList<MessageModel> Messages
-    {
-        get => _messages;
-        set
-        {
-            _messages = value;
-            _messagesByShortIdLookup = null;
-        }
-    }
-
-    /// <summary>Parameter strings from legacy provider</summary>
-    public IEnumerable<MessageModel> Parameters { get; set; } = [];
 
     /// <summary>Events and related items from modern provider</summary>
     public IReadOnlyList<EventModel> Events
@@ -39,12 +24,6 @@ public class ProviderDetails
         }
     }
 
-    public IDictionary<long, string> Keywords { get; set; } = new Dictionary<long, string>();
-
-    public IDictionary<int, string> Opcodes { get; set; } = new Dictionary<int, string>();
-
-    public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
-
     /// <summary>True when no provider metadata of any kind is loaded (legacy or modern).
     /// Used by resolvers to distinguish "provider not found" from "provider known but no matching message".</summary>
     public bool IsEmpty =>
@@ -54,6 +33,38 @@ public class ProviderDetails
         Opcodes.Count == 0 &&
         Tasks.Count == 0 &&
         !Parameters.Any();
+
+    public IDictionary<long, string> Keywords { get; set; } = new Dictionary<long, string>();
+
+    /// <summary>Messages from legacy provider</summary>
+    public IReadOnlyList<MessageModel> Messages
+    {
+        get => _messages;
+        set
+        {
+            _messages = value;
+            _messagesByShortIdLookup = null;
+        }
+    }
+
+    public IDictionary<int, string> Opcodes { get; set; } = new Dictionary<int, string>();
+
+    /// <summary>Parameter strings from legacy provider</summary>
+    public IEnumerable<MessageModel> Parameters { get; set; } = [];
+
+    public string ProviderName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// When the provider name on the event was actually a channel path that the resolver
+    /// followed back to its owning publisher, this records the publisher name that the
+    /// metadata/messages were ultimately loaded from. Null when no channel-owner fallback
+    /// was used. Diagnostic only — does not participate in any cache key or equality check,
+    /// and is excluded from the EF Core schema so existing provider databases are unaffected.
+    /// </summary>
+    [NotMapped]
+    public string? ResolvedFromOwningPublisher { get; set; } // TODO: Should probably be mapped in the DB upgrade
+
+    public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
 
     /// <summary>Gets events matching the given Id using a pre-built lookup dictionary.</summary>
     internal IReadOnlyList<EventModel> GetEventsById(long id)

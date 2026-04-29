@@ -320,12 +320,19 @@ public partial class EventResolverBase : IDisposable
 
         string? propertyTail = BuildEventDataTail(properties);
 
-        string fallback = string.IsNullOrWhiteSpace(systemMessage) switch
+        // The propertyTail varies per event (timestamps, paths, IDs, etc.) — caching it
+        // would grow the description cache unboundedly. Only cache the low-cardinality
+        // canned strings (DefaultNoProviderDescription, systemMessage).
+        if (propertyTail is not null)
         {
-            false when propertyTail is not null => $"{systemMessage}\r\n\r\n{propertyTail}",
-            false => systemMessage!,
-            _ => propertyTail ?? DefaultNoProviderDescription
-        };
+            return string.IsNullOrWhiteSpace(systemMessage)
+                ? propertyTail
+                : $"{systemMessage}\r\n\r\n{propertyTail}";
+        }
+
+        string fallback = string.IsNullOrWhiteSpace(systemMessage)
+            ? DefaultNoProviderDescription
+            : systemMessage!;
 
         return _cache?.GetOrAddDescription(fallback) ?? fallback;
     }

@@ -2,10 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Tests.Providers;
 
@@ -265,6 +268,24 @@ public sealed class EventMessageProviderTests
     }
 
     [Fact]
+    public void LoadProviderDetails_WhenChannelOwningPublisherUnknown_ShouldReturnEmptyDetailsWithoutFallback()
+    {
+        // A made-up provider name that is neither a registered publisher nor a registered channel.
+        // The owning-publisher probe must return false and the resolver must end up with an empty
+        // ProviderDetails instead of recursing or throwing.
+        const string MadeUpName = "NonExistent-Publisher-And-Channel/Bogus";
+
+        EventMessageProvider provider = new(MadeUpName);
+
+        var details = provider.LoadProviderDetails();
+
+        Assert.NotNull(details);
+        Assert.True(details.IsEmpty);
+        Assert.Null(details.ResolvedFromOwningPublisher);
+        Assert.Equal(MadeUpName, details.ProviderName);
+    }
+
+    [Fact]
     public void LoadProviderDetails_WhenProviderHasNoData_ShouldReturnEmptyCollections()
     {
         // Arrange
@@ -280,6 +301,26 @@ public sealed class EventMessageProviderTests
     }
 
     [Fact]
+    public void LoadProviderDetails_WhenProviderNameIsActuallyAChannelPath_ShouldFallBackToOwningPublisher()
+    {
+        // Some events arrive with a channel path in the ProviderName slot rather than the real
+        // publisher name (the AppXDeploymentServer/Operational case). We expect the fallback to
+        // resolve via EvtChannelConfigOwningPublisher and load the real publisher's metadata.
+        Assert.SkipUnless(
+            TryFindChannelWithDistinctOwningPublisher(out var channelName, out var owningPublisher),
+            "Test requires a registered channel whose owning publisher differs from the channel path itself.");
+
+        EventMessageProvider provider = new(channelName!);
+
+        var details = provider.LoadProviderDetails();
+
+        Assert.NotNull(details);
+        Assert.False(details.IsEmpty,
+            $"Expected channel-owner fallback to populate metadata for channel '{channelName}' (owner '{owningPublisher}').");
+        Assert.Equal(owningPublisher, details.ResolvedFromOwningPublisher);
+    }
+
+    [Fact]
     public void LoadProviderDetails_WhenProviderNotFound_ShouldReturnDetailsWithProviderName()
     {
         // Arrange
@@ -291,6 +332,48 @@ public sealed class EventMessageProviderTests
         // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
+    }
+
+    private static bool TryFindChannelWithDistinctOwningPublisher(out string? channelName, out string? owningPublisher)
+    {
+        foreach (var candidate in EventLogSession.GlobalSession.GetLogNames())
+        {
+            // Only modern channels carry an OwningPublisher distinct from the channel path itself.
+            if (!candidate.Contains('/'))
+            {
+                continue;
+            }
+
+            using var channelConfig = EventMethods.EvtOpenChannelConfig(
+                EventLogSession.GlobalSession.Handle,
+                candidate,
+                0);
+
+            if (channelConfig.IsInvalid)
+            {
+                continue;
+            }
+
+            if (!TryReadOwningPublisher(channelConfig, out var publisher) || string.IsNullOrEmpty(publisher))
+            {
+                continue;
+            }
+
+            if (string.Equals(publisher, candidate, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            channelName = candidate;
+            owningPublisher = publisher;
+
+            return true;
+        }
+
+        channelName = null;
+        owningPublisher = null;
+
+        return false;
     }
 
     private static bool TryFindMuiSatellite(string systemDirectory, string binaryName, out string? satellitePath)
@@ -331,5 +414,52 @@ public sealed class EventMessageProviderTests
         satellitePath = null;
 
         return false;
+    }
+
+    private static bool TryReadOwningPublisher(EvtHandle channelConfig, out string? publisher)
+    {
+        publisher = null;
+
+        bool success = EventMethods.EvtGetChannelConfigProperty(
+            channelConfig,
+            EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
+            0,
+            0,
+            IntPtr.Zero,
+            out int bufferSize);
+
+        int error = Marshal.GetLastWin32Error();
+
+        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        {
+            return false;
+        }
+
+        IntPtr buffer = Marshal.AllocHGlobal(bufferSize);
+
+        try
+        {
+            success = EventMethods.EvtGetChannelConfigProperty(
+                channelConfig,
+                EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
+                0,
+                bufferSize,
+                buffer,
+                out _);
+
+            if (!success)
+            {
+                return false;
+            }
+
+            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            publisher = EventMethods.ConvertVariant(variant) as string;
+
+            return !string.IsNullOrEmpty(publisher);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(buffer);
+        }
     }
 }

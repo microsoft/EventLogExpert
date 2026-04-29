@@ -18,9 +18,9 @@ public sealed class EventMessageProvider(
     ITraceLogger? logger = null)
 {
     private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
+    private readonly ITraceLogger? _logger = logger;
 
     private readonly IReadOnlyList<string>? _metadataPaths = metadataPaths;
-    private readonly ITraceLogger? _logger = logger;
     private readonly string _providerName = providerName;
 
     private RegistryProvider? _registryProvider;
@@ -120,6 +120,8 @@ public sealed class EventMessageProvider(
 
         return messages;
     }
+
+    public ProviderDetails LoadProviderDetails() => LoadProviderDetailsCore(visited: null);
 
     /// <summary>
     ///     Loads a message-resource module using flags that honor MUI satellite resolution, with
@@ -230,52 +232,6 @@ public sealed class EventMessageProvider(
         return LibraryHandle.Zero;
     }
 
-    public ProviderDetails LoadProviderDetails()
-    {
-        var providerMetadata = ProviderMetadata.Create(_providerName, _metadataPaths, _logger);
-
-        ProviderDetails provider = providerMetadata is not null
-            ? LoadMessagesFromModernProvider(providerMetadata)
-            : new ProviderDetails { ProviderName = _providerName };
-
-        // When metadataPaths are provided, this is an MTA-only resolution path.
-        // Skip registry and DLL lookups entirely.
-        if (_metadataPaths is { Count: > 0 })
-        {
-            return provider;
-        }
-
-        _registryProvider ??= new RegistryProvider(_logger);
-
-        var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
-
-        if (legacyProviderFiles.Any())
-        {
-            provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
-        }
-        else
-        {
-            if (string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
-            {
-                _logger?.Debug($"No message files found for provider {_providerName}. Returning null.");
-            }
-            else
-            {
-                _logger?.Debug(
-                    $"No message files found for provider {_providerName}. Using message file from modern provider.");
-
-                provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
-            }
-        }
-
-        if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath))
-        {
-            provider.Parameters = LoadMessagesFromDlls([providerMetadata.ParameterFilePath]);
-        }
-
-        return provider;
-    }
-
     /// <summary>
     ///     Loads the messages for a legacy provider from the files specified in the registry. This information is stored
     ///     at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
@@ -370,5 +326,207 @@ public sealed class EventMessageProvider(
         _logger?.Debug($"Returning {provider.Events.Count} events for provider {_providerName}");
 
         return provider;
+    }
+
+    private ProviderDetails LoadProviderDetailsCore(HashSet<string>? visited)
+    {
+        var providerMetadata = ProviderMetadata.Create(_providerName, _metadataPaths, _logger);
+
+        ProviderDetails provider = providerMetadata is not null
+            ? LoadMessagesFromModernProvider(providerMetadata)
+            : new ProviderDetails { ProviderName = _providerName };
+
+        // When metadataPaths are provided, this is an MTA-only resolution path.
+        // Skip registry and DLL lookups entirely.
+        if (_metadataPaths is { Count: > 0 })
+        {
+            return provider;
+        }
+
+        _registryProvider ??= new RegistryProvider(_logger);
+
+        var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
+
+        if (legacyProviderFiles.Any())
+        {
+            provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
+        }
+        else
+        {
+            if (string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
+            {
+                _logger?.Debug($"No message files found for provider {_providerName}. Returning empty provider details.");
+            }
+            else
+            {
+                _logger?.Debug(
+                    $"No message files found for provider {_providerName}. Using message file from modern provider.");
+
+                provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath))
+        {
+            provider.Parameters = LoadMessagesFromDlls([providerMetadata.ParameterFilePath]);
+        }
+
+        if (provider.IsEmpty)
+        {
+            TryFallbackToOwningPublisher(provider, visited);
+        }
+
+        return provider;
+    }
+
+    /// <summary>
+    ///     Final fallback when neither modern publisher metadata nor a legacy registry entry exists
+    ///     for the configured provider name. Some events (notably modern channel-named providers
+    ///     like "Microsoft-Windows-AppXDeploymentServer/Operational") carry a channel path in the
+    ///     ProviderName slot; the real publisher must be looked up through the channel config's
+    ///     OwningPublisher property and resolved separately. Produces no result on failure.
+    /// </summary>
+    private void TryFallbackToOwningPublisher(ProviderDetails target, HashSet<string>? visited)
+    {
+        // Bound the fallback in case channel/publisher misconfiguration creates a chain.
+        const int MaxOwningPublisherHops = 4;
+
+        visited ??= new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        if (visited.Count >= MaxOwningPublisherHops)
+        {
+            _logger?.Debug(
+                $"{nameof(TryFallbackToOwningPublisher)}: depth cap ({MaxOwningPublisherHops}) reached resolving {_providerName}; giving up.");
+
+            return;
+        }
+
+        if (!visited.Add(_providerName))
+        {
+            _logger?.Debug(
+                $"{nameof(TryFallbackToOwningPublisher)}: skipping - already attempted {_providerName} in this resolution chain.");
+
+            return;
+        }
+
+        if (!TryGetChannelOwningPublisher(_providerName, out var owningPublisher) || owningPublisher is null)
+        {
+            return;
+        }
+
+        if (string.Equals(owningPublisher, _providerName, StringComparison.OrdinalIgnoreCase))
+        {
+            // Channel owns itself - nothing else to try.
+            return;
+        }
+
+        _logger?.Debug(
+            $"{nameof(TryFallbackToOwningPublisher)}: {_providerName} resolved to owning publisher {owningPublisher}; loading details from there.");
+
+        var ownerDetails = new EventMessageProvider(owningPublisher, _metadataPaths, _logger)
+            .LoadProviderDetailsCore(visited);
+
+        if (ownerDetails.IsEmpty)
+        {
+            return;
+        }
+
+        target.Events = ownerDetails.Events;
+        target.Messages = ownerDetails.Messages;
+        target.Parameters = ownerDetails.Parameters;
+        target.Keywords = ownerDetails.Keywords;
+        target.Opcodes = ownerDetails.Opcodes;
+        target.Tasks = ownerDetails.Tasks;
+        target.ResolvedFromOwningPublisher = owningPublisher;
+    }
+
+    private bool TryGetChannelOwningPublisher(string channelName, out string? publisher)
+    {
+        publisher = null;
+
+        using var channelConfig = EventMethods.EvtOpenChannelConfig(
+            EventLogSession.GlobalSession.Handle,
+            channelName,
+            0);
+
+        if (channelConfig.IsInvalid)
+        {
+            int openError = Marshal.GetLastWin32Error();
+
+            _logger?.Debug(
+                $"{nameof(TryGetChannelOwningPublisher)}: EvtOpenChannelConfig failed for {channelName}. Error: {openError} ({NativeMethods.FormatSystemMessage((uint)openError) ?? "unknown"})");
+
+            return false;
+        }
+
+        IntPtr buffer = IntPtr.Zero;
+
+        try
+        {
+            bool success = EventMethods.EvtGetChannelConfigProperty(
+                channelConfig,
+                EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
+                0,
+                0,
+                IntPtr.Zero,
+                out int bufferSize);
+
+            int sizeError = Marshal.GetLastWin32Error();
+
+            if (!success && sizeError != Interop.ERROR_INSUFFICIENT_BUFFER)
+            {
+                _logger?.Debug(
+                    $"{nameof(TryGetChannelOwningPublisher)}: size probe failed for {channelName}. Error: {sizeError}");
+
+                return false;
+            }
+
+            buffer = Marshal.AllocHGlobal(bufferSize);
+
+            success = EventMethods.EvtGetChannelConfigProperty(
+                channelConfig,
+                EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
+                0,
+                bufferSize,
+                buffer,
+                out _);
+
+            if (!success)
+            {
+                int readError = Marshal.GetLastWin32Error();
+
+                _logger?.Debug(
+                    $"{nameof(TryGetChannelOwningPublisher)}: read failed for {channelName}. Error: {readError}");
+
+                return false;
+            }
+
+            var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
+            var value = EventMethods.ConvertVariant(variant) as string;
+
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            publisher = value;
+            return true;
+        }
+        catch (Exception ex) when (ex is not OutOfMemoryException
+                                       and not StackOverflowException
+                                       and not AccessViolationException)
+        {
+            _logger?.Debug(
+                $"{nameof(TryGetChannelOwningPublisher)}: unexpected failure for {channelName}.\n{ex}");
+
+            return false;
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero)
+            {
+                Marshal.FreeHGlobal(buffer);
+            }
+        }
     }
 }

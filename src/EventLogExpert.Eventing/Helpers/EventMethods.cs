@@ -140,6 +140,14 @@ internal enum EvtSystemPropertyId
     Version
 }
 
+internal enum EvtChannelConfigPropertyId
+{
+    EvtChannelConfigEnabled = 0,
+    EvtChannelConfigIsolation = 1,
+    EvtChannelConfigType = 2,
+    EvtChannelConfigOwningPublisher = 3,
+}
+
 internal enum EvtVariantType
 {
     Null,
@@ -335,6 +343,17 @@ internal static partial class EventMethods
         Span<char> buffer,
         out int bufferUsed);
 
+    /// <summary>Gets the specified channel configuration property</summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static partial bool EvtGetChannelConfigProperty(
+        EvtHandle channelConfig,
+        EvtChannelConfigPropertyId propertyId,
+        int flags,
+        int propertyValueBufferSize,
+        IntPtr propertyValueBuffer,
+        out int propertyValueBufferUsed);
+
     /// <summary>Gets the specified event metadata property</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -416,6 +435,13 @@ internal static partial class EventMethods
         int publisherIdBufferSize,
         Span<char> publisherIdBuffer,
         out int publisherIdBufferUsed);
+
+    /// <summary>Gets a handle that you use to read or write configuration information for the specified channel</summary>
+    [LibraryImport(EventLogApi, SetLastError = true)]
+    internal static partial EvtHandle EvtOpenChannelConfig(
+        EvtHandle session,
+        [MarshalAs(UnmanagedType.LPWStr)] string channelPath,
+        int flags);
 
     /// <summary>Gets a handle that you use to enumerate the list of channels that are registered on the computer</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
