@@ -3,28 +3,33 @@
 
 using EventLogExpert.Eventing.Helpers;
 using Microsoft.Win32;
-using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.Providers;
 
-public partial class RegistryProvider(string? computerName, ITraceLogger? logger = null)
+public class RegistryProvider(ITraceLogger? logger = null)
 {
-    private readonly string? _computerName = computerName;
     private readonly ITraceLogger? _logger = logger;
 
-    /// <summary>Returns the file paths for the message files for this provider.</summary>
+    /// <summary>Returns the file paths for the message files for this provider on the local machine.</summary>
+    /// <remarks>
+    ///     EventLogExpert is a local-only tool. Remote-machine resolution is intentionally not
+    ///     supported because the modern provider metadata path (used as a fallback when no legacy
+    ///     registry entry exists) is local-only, and silently mixing local and remote sources
+    ///     produced wrong message text. Callers must already be operating in a local context.
+    /// </remarks>
     public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
     {
-        _logger?.Debug($"GetLegacyProviderFiles called for provider {providerName} on computer {_computerName}");
+        _logger?.Debug($"{nameof(GetMessageFilesForLegacyProvider)} called for provider {providerName}");
 
         // Open an owned base key (do NOT use Registry.LocalMachine — that's a shared static).
         // This makes concurrent calls across instances safe to dispose independently.
-        using var hklm = string.IsNullOrEmpty(_computerName)
-            ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
-            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
+        using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
 
-        using var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog") ??
-            throw new OpenEventLogRegistryKeyFailedException(_computerName ?? string.Empty);
+        const string eventLogKeyPath = @"SYSTEM\CurrentControlSet\Services\EventLog";
+
+        using var eventLogKey = hklm.OpenSubKey(eventLogKeyPath) ??
+            throw new OpenEventLogRegistryKeyFailedException(
+                $@"Failed to open HKEY_LOCAL_MACHINE\{eventLogKeyPath}.");
 
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
@@ -42,7 +47,11 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
                 continue;
             }
 
-            _logger?.Debug($"Found message file for legacy provider {providerName} in subkey {providerSubKey.Name}");
+            var categoryMessageFilePath = providerSubKey?.GetValue("CategoryMessageFile") as string;
+            var parameterMessageFilePath = providerSubKey?.GetValue("ParameterMessageFile") as string;
+
+            _logger?.Debug(
+                $"Found message file for legacy provider {providerName} in subkey {providerSubKey!.Name}. EventMessageFile={eventMessageFilePath}, CategoryMessageFile={categoryMessageFilePath ?? "<null>"}, ParameterMessageFile={parameterMessageFilePath ?? "<null>"}.");
 
             // Filter by extension. The FltMgr provider puts a .sys file in the EventMessageFile value,
             // and trying to load that causes an access violation.
@@ -55,7 +64,7 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
 
             IEnumerable<string> files;
 
-            if (providerSubKey.GetValue("CategoryMessageFile") is string categoryMessageFilePath)
+            if (categoryMessageFilePath is not null)
             {
                 var fileList = new List<string> { categoryMessageFilePath };
                 fileList.AddRange(messageFiles.Where(f => f != categoryMessageFilePath));
@@ -67,60 +76,11 @@ public partial class RegistryProvider(string? computerName, ITraceLogger? logger
             }
 
             // Materialize before the using-scopes close the registry handles
-            return GetExpandedFilePaths(files).ToList();
+            return files.Select(Environment.ExpandEnvironmentVariables).ToList();
         }
 
         return [];
     }
-
-    [GeneratedRegex("^[A-Z]:")]
-    private static partial Regex ConvertRootPath();
-
-    private IEnumerable<string> GetExpandedFilePaths(IEnumerable<string> paths)
-    {
-        if (string.IsNullOrEmpty(_computerName))
-        {
-            // For local computer, do it the easy way
-            return paths.Select(Environment.ExpandEnvironmentVariables);
-        }
-
-        // For remote computer, get SystemRoot from the registry
-        // TODO: Support variables other than SystemRoot?
-        var systemRoot = GetSystemRoot() ??
-            throw new ExpandFilePathsFailedException(
-                $"Could not get SystemRoot from remote registry: {_computerName}");
-
-        paths = paths.Select(p =>
-        {
-            // Expand the variable
-            var newPath = p.ReplaceCaseInsensitiveFind("%SystemRoot%", systemRoot);
-
-            // Now replace any drive root references with \\computername\drive$
-            var match = ConvertRootPath().Match(newPath);
-
-            if (match.Success)
-            {
-                newPath = $@"\\{_computerName}\{match.Value[0]}${newPath[2..]}";
-            }
-
-            return newPath;
-        });
-
-        return paths;
-    }
-
-    private string? GetSystemRoot()
-    {
-        using var hklm = string.IsNullOrEmpty(_computerName)
-            ? RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
-            : RegistryKey.OpenRemoteBaseKey(RegistryHive.LocalMachine, _computerName);
-
-        using var currentVersion = hklm.OpenSubKey(@"Software\Microsoft\Windows NT\CurrentVersion");
-
-        return currentVersion?.GetValue("SystemRoot") as string;
-    }
-
-    private class ExpandFilePathsFailedException(string msg) : Exception(msg) {}
 
     private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg) {}
 }

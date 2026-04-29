@@ -8,24 +8,22 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Providers;
 
-/// <summary>Represents an event provider from a particular machine.</summary>
+/// <summary>
+///     Represents an event provider on the local machine. EventLogExpert is a local-only tool;
+///     remote-machine resolution is intentionally not supported.
+/// </summary>
 public sealed class EventMessageProvider(
     string providerName,
-    string? computerName,
     IReadOnlyList<string>? metadataPaths = null,
     ITraceLogger? logger = null)
 {
     private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
 
-    private readonly string? _computerName = computerName;
     private readonly IReadOnlyList<string>? _metadataPaths = metadataPaths;
     private readonly ITraceLogger? _logger = logger;
     private readonly string _providerName = providerName;
 
     private RegistryProvider? _registryProvider;
-
-    public EventMessageProvider(string providerName, ITraceLogger? logger = null)
-        : this(providerName, null, null, logger) { }
 
     public static List<MessageModel> GetMessages(
         IEnumerable<string> legacyProviderFiles,
@@ -57,7 +55,24 @@ public sealed class EventMessageProvider(
             }
 
             var msgTable = NativeMethods.LoadResource(hModule, msgTableInfo);
+            int loadResourceError = Marshal.GetLastWin32Error();
+
+            if (msgTable == IntPtr.Zero)
+            {
+                logger?.Debug(
+                    $"LoadResource returned NULL for message table in file:\n{file}\nError: {loadResourceError} ({NativeMethods.FormatSystemMessage((uint)loadResourceError) ?? "unknown"}).");
+
+                continue;
+            }
+
             var memTable = NativeMethods.LockResource(msgTable);
+
+            if (memTable == IntPtr.Zero)
+            {
+                logger?.Debug($"LockResource returned NULL for message table in file:\n{file}");
+
+                continue;
+            }
 
             var numberOfBlocks = Marshal.ReadInt32(memTable);
             var blockPtr = IntPtr.Add(memTable, 4);
@@ -149,16 +164,21 @@ public sealed class EventMessageProvider(
 
         hModule.Dispose();
 
-        logger?.Debug(
-            $"LoadLibraryEx failed for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Falling back to LOAD_LIBRARY_AS_DATAFILE with leaf filename.");
+        var primaryFailureMessage =
+            $"LoadLibraryEx failed for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}).";
 
-        // Legacy fallback: LOAD_LIBRARY_AS_DATAFILE with the leaf filename only. Restrict this to
-        // inputs that are not rooted at all — for any rooted input (fully qualified, drive-relative
-        // like "C:foo.dll", or root-relative like "\Windows\foo.dll"), falling back to a bare leaf
-        // name on the default DLL search order could load a different same-named binary and produce
-        // wrong message text.
-        if (Path.IsPathRooted(file))
+        // Legacy fallback: re-attempt the load using the leaf filename only, resolved under the
+        // trusted system directory. Restrict this to inputs that are already pure leaf filenames
+        // (no directory information of any kind). Both rooted inputs (e.g., "C:\foo.dll",
+        // "C:foo.dll", "\Windows\foo.dll") and unrooted inputs that include a subdirectory
+        // (e.g., "subdir\foo.dll") would have their directory portion stripped here and the bare
+        // leaf name resolved against the default DLL search order, which could load a different
+        // same-named binary and produce wrong message text. Path.IsPathRooted alone does NOT
+        // catch the "subdir\foo.dll" case, so compare against Path.GetFileName instead.
+        if (!string.Equals(file, Path.GetFileName(file), StringComparison.Ordinal))
         {
+            logger?.Debug($"{primaryFailureMessage} Skipping leaf-name fallback because the input contains directory information.");
+
             return LibraryHandle.Zero;
         }
 
@@ -166,20 +186,38 @@ public sealed class EventMessageProvider(
 
         if (string.IsNullOrEmpty(leafName))
         {
+            logger?.Debug($"{primaryFailureMessage} Skipping leaf-name fallback because no leaf filename could be extracted.");
+
             return LibraryHandle.Zero;
         }
 
-        hModule = NativeMethods.LoadLibraryExW(
-            leafName,
-            IntPtr.Zero,
-            LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+        // Constrain leaf-name resolution to the trusted system directory. Letting LoadLibraryEx
+        // resolve a bare leaf name through the default DLL search order would search the
+        // application directory first, which is a DLL planting / hijacking risk and could load
+        // a same-named binary with bogus message text. Historically this fallback existed for
+        // legacy registry values that named system binaries by leaf only (e.g., "wevtsvc.dll");
+        // pinning resolution to %SystemRoot%\System32 preserves that behavior safely.
+        var systemPath = Path.Combine(Environment.SystemDirectory, leafName);
+
+        if (!File.Exists(systemPath))
+        {
+            logger?.Debug(
+                $"{primaryFailureMessage} Skipping leaf-name fallback because '{leafName}' does not exist under {Environment.SystemDirectory}.");
+
+            return LibraryHandle.Zero;
+        }
+
+        logger?.Debug(
+            $"{primaryFailureMessage} Falling back to leaf-name resolution against the system directory: {systemPath}.");
+
+        hModule = NativeMethods.LoadLibraryExW(systemPath, IntPtr.Zero, muiAwareFlags);
 
         error = Marshal.GetLastWin32Error();
 
         if (!hModule.IsInvalid)
         {
             logger?.Debug(
-                $"LoadLibraryEx succeeded for {leafName} (leaf-name fallback) with flags LOAD_LIBRARY_AS_DATAFILE.");
+                $"LoadLibraryEx succeeded for {systemPath} (leaf-name fallback) with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE.");
 
             return hModule;
         }
@@ -187,7 +225,7 @@ public sealed class EventMessageProvider(
         hModule.Dispose();
 
         logger?.Debug(
-            $"LoadLibraryEx failed for {leafName} (leaf-name fallback) with flags LOAD_LIBRARY_AS_DATAFILE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Original requested file was: {file}.");
+            $"LoadLibraryEx failed for {systemPath} (leaf-name fallback) with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Original requested file was: {file}.");
 
         return LibraryHandle.Zero;
     }
@@ -207,7 +245,7 @@ public sealed class EventMessageProvider(
             return provider;
         }
 
-        _registryProvider ??= new RegistryProvider(_computerName, _logger);
+        _registryProvider ??= new RegistryProvider(_logger);
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 

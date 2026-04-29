@@ -5,25 +5,12 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
+using System.Globalization;
 
 namespace EventLogExpert.Eventing.Tests.Providers;
 
 public sealed class EventMessageProviderTests
 {
-    [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData(Constants.LocalComputer)]
-    [InlineData(Constants.RemoteComputer)]
-    public void Constructor_WhenDifferentComputerNames_ShouldCreateInstances(string? computerName)
-    {
-        // Arrange & Act
-        EventMessageProvider provider = new(Constants.TestProviderName, computerName);
-
-        // Assert
-        Assert.NotNull(provider);
-    }
-
     [Theory]
     [InlineData(Constants.TestProviderName)]
     [InlineData(Constants.TestProviderLongName)]
@@ -39,16 +26,17 @@ public sealed class EventMessageProviderTests
     [Fact]
     public void GetMessages_WhenBinaryUsesMuiSatellite_ShouldLoadMessagesFromMuiFile()
     {
-        // wevtsvc.dll on Windows keeps its message table in en-US\wevtsvc.dll.mui rather
+        // wevtsvc.dll on Windows keeps its message table in <locale>\wevtsvc.dll.mui rather
         // than in the binary itself. The previous load path used LOAD_LIBRARY_AS_DATAFILE
         // with only the leaf filename and therefore failed with ERROR_RESOURCE_TYPE_NOT_FOUND
         // (1813) for binaries like this — including the WMIRegistrationService.exe scenario
         // that motivated this fix. The MUI-aware load path should resolve them.
-        const string muiBinary = @"C:\Windows\System32\wevtsvc.dll";
+        var systemDirectory = Environment.SystemDirectory;
+        var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
         Assert.SkipUnless(
-            File.Exists(muiBinary) && File.Exists(@"C:\Windows\System32\en-US\wevtsvc.dll.mui"),
-            "Test requires wevtsvc.dll and its en-US MUI satellite to be present.");
+            File.Exists(muiBinary) && TryFindMuiSatellite(systemDirectory, "wevtsvc.dll", out _),
+            "Test requires wevtsvc.dll and a matching .mui satellite in the loader's MUI fallback chain (current UI culture or en-US).");
 
         // Act
         var messages = EventMessageProvider.GetMessages([muiBinary], Constants.TestProviderName);
@@ -57,16 +45,6 @@ public sealed class EventMessageProviderTests
         Assert.NotNull(messages);
         Assert.NotEmpty(messages);
         Assert.All(messages, m => Assert.Equal(Constants.TestProviderName, m.ProviderName));
-    }
-
-    [Fact]
-    public void Constructor_WhenProviderNameAndComputerNameProvided_ShouldCreateInstance()
-    {
-        // Arrange & Act
-        EventMessageProvider provider = new(Constants.TestProviderName, Constants.LocalComputer);
-
-        // Assert
-        Assert.NotNull(provider);
     }
 
     [Fact]
@@ -82,10 +60,15 @@ public sealed class EventMessageProviderTests
         // Assert
         Assert.NotNull(messages);
 
-        // Each missing file produces two LoadLibraryEx failure logs (MUI-aware attempt and
-        // leaf-name fallback). Two files therefore produce four such logs total.
-        mockLogger.Received(4)
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("LoadLibraryEx failed")));
+        // Each input that fails the primary MUI-aware load produces a debug log that begins with
+        // "LoadLibraryEx failed for {file}". Asserting per-input presence (with the filename in
+        // the message) is robust to future changes in the number of fallback attempts or extra
+        // diagnostic lines per input — only the primary-attempt failure log is contractually
+        // guaranteed to fire once per input here.
+        mockLogger.Received(duplicateFiles.Length)
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("LoadLibraryEx failed") &&
+                h.ToString().Contains(Constants.NonExistentDll)));
     }
 
     [Fact]
@@ -183,10 +166,15 @@ public sealed class EventMessageProviderTests
         // Act
         EventMessageProvider.GetMessages(invalidFiles, Constants.TestProviderName, mockLogger);
 
-        // Assert: each missing file produces two LoadLibraryEx failure logs (MUI-aware attempt
-        // and leaf-name fallback), so two files produce four logs total.
-        mockLogger.Received(4)
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("LoadLibraryEx failed")));
+        // Assert: each input that fails the primary MUI-aware load produces a debug log that
+        // begins with "LoadLibraryEx failed for {file}". Asserting per-input presence (with the
+        // filename in the message) is robust to future changes in the number of fallback attempts
+        // or extra diagnostic lines per input — only the primary-attempt failure log is
+        // contractually guaranteed to fire once per input here.
+        mockLogger.Received(invalidFiles.Length)
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("LoadLibraryEx failed") &&
+                h.ToString().Contains(Constants.NonExistentDll)));
     }
 
     [Fact]
@@ -303,5 +291,45 @@ public sealed class EventMessageProviderTests
         // Assert
         Assert.NotNull(details);
         Assert.Equal(Constants.TestProviderName, details.ProviderName);
+    }
+
+    private static bool TryFindMuiSatellite(string systemDirectory, string binaryName, out string? satellitePath)
+    {
+        var muiFileName = binaryName + ".mui";
+
+        // Only probe locales the Win32 MUI loader will actually consult: the current UI culture,
+        // its parents, and "en-US" as the well-known system fallback that ships with every Windows
+        // SKU. A satellite present in some other locale subfolder would pass a broad existence
+        // check but the loader would never select it, so the test could still fail after skipping.
+        // The loop terminates naturally when culture.Name becomes empty (the invariant culture).
+        var probeOrder = new List<string>();
+
+        for (var culture = CultureInfo.CurrentUICulture; !string.IsNullOrEmpty(culture.Name); culture = culture.Parent)
+        {
+            if (!probeOrder.Contains(culture.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                probeOrder.Add(culture.Name);
+            }
+        }
+
+        if (!probeOrder.Contains("en-US", StringComparer.OrdinalIgnoreCase))
+        {
+            probeOrder.Add("en-US");
+        }
+
+        foreach (var cultureName in probeOrder)
+        {
+            var candidate = Path.Combine(systemDirectory, cultureName, muiFileName);
+
+            if (!File.Exists(candidate)) { continue; }
+
+            satellitePath = candidate;
+
+            return true;
+        }
+
+        satellitePath = null;
+
+        return false;
     }
 }

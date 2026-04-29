@@ -185,7 +185,7 @@ internal static class MtaProviderSource
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
             if (seen is not null && seen.Contains(providerName)) { continue; }
 
-            var details = new EventMessageProvider(providerName, null, mtaFiles, logger).LoadProviderDetails();
+            var details = new EventMessageProvider(providerName, mtaFiles, logger).LoadProviderDetails();
 
             if (IsEmpty(details))
             {

@@ -173,7 +173,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             {
                 Logger?.Debug($"Loading supplemental local provider for {name}");
 
-                return new EventMessageProvider(name, Logger).LoadProviderDetails();
+                return new EventMessageProvider(name, logger: Logger).LoadProviderDetails();
             });
     }
 
@@ -244,7 +244,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
 
     private void ResolveFromLocalProvider(string providerName)
     {
-        var details = new EventMessageProvider(providerName, Logger).LoadProviderDetails();
+        var details = new EventMessageProvider(providerName, logger: Logger).LoadProviderDetails();
 
         ProviderDetails.TryAdd(providerName, details);
     }
@@ -304,7 +304,6 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
     {
         var details = new EventMessageProvider(
             providerName,
-            null,
             metadataPaths,
             Logger).LoadProviderDetails();
 

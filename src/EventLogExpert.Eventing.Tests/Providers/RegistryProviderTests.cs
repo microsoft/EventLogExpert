@@ -11,26 +11,10 @@ namespace EventLogExpert.Eventing.Tests.Providers;
 public sealed class RegistryProviderTests
 {
     [Fact]
-    public void Constructor_WhenCalledWithComputerName_ShouldNotThrow()
-    {
-        // Act & Assert
-        var provider = new RegistryProvider(Constants.Localhost);
-        Assert.NotNull(provider);
-    }
-
-    [Fact]
-    public void Constructor_WhenCalledWithNullComputerName_ShouldNotThrow()
-    {
-        // Act & Assert
-        var provider = new RegistryProvider(null);
-        Assert.NotNull(provider);
-    }
-
-    [Fact]
     public void Constructor_WhenCalledWithNullLogger_ShouldNotThrow()
     {
         // Act & Assert
-        var provider = new RegistryProvider(Constants.Localhost);
+        var provider = new RegistryProvider();
         Assert.NotNull(provider);
     }
 
@@ -38,8 +22,8 @@ public sealed class RegistryProviderTests
     public void Constructor_WhenCreatedMultipleTimes_ShouldCreateDifferentInstances()
     {
         // Arrange & Act
-        var provider1 = new RegistryProvider(null);
-        var provider2 = new RegistryProvider(null);
+        var provider1 = new RegistryProvider();
+        var provider2 = new RegistryProvider();
 
         // Assert
         Assert.NotNull(provider1);
@@ -51,7 +35,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var allResults = new List<string>();
@@ -74,40 +58,26 @@ public sealed class RegistryProviderTests
     }
 
     [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenCalledWithEmptyComputerName_ShouldUseLocalMachine()
-    {
-        // Arrange
-        var provider = new RegistryProvider(string.Empty);
-
-        // Act
-        var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName);
-
-        // Assert
-        Assert.NotNull(result);
-        // Should not throw, treats empty string as local machine
-    }
-
-    [Fact]
     public void GetMessageFilesForLegacyProvider_WhenCalledWithLogger_ShouldLogTrace()
     {
         // Arrange
         var providerName = "TestProvider_" + Guid.NewGuid();
         var mockLogger = Substitute.For<ITraceLogger>();
-        var provider = new RegistryProvider(null, mockLogger);
+        var provider = new RegistryProvider(mockLogger);
 
         // Act
         _ = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
         // Assert
         mockLogger.Received(1).Debug(
-            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("GetLegacyProviderFiles called") && h.ToString().Contains(providerName)));
+            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("GetMessageFilesForLegacyProvider called") && h.ToString().Contains(providerName)));
     }
 
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenCalledWithoutLogger_ShouldNotThrow()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName);
@@ -125,7 +95,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenMultipleMessageFilesExist_ShouldReturnAll()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
         var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
 
         // Act - Find a provider with multiple message files
@@ -154,7 +124,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenCommonLogNames_ShouldNotThrow(string providerName)
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(providerName);
@@ -167,7 +137,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenCommonWindowsProvider_ShouldReturnFiles()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName).ToList();
@@ -180,7 +150,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenEmptyProviderName_ShouldReturnEmpty()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(string.Empty).ToList();
@@ -195,7 +165,7 @@ public sealed class RegistryProviderTests
     {
         // Arrange
         var providerName = "NonExistentProvider_" + Guid.NewGuid();
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
@@ -209,7 +179,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenLocalComputer_ShouldExpandEnvironmentVariables()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act - Try to find any legacy provider
         var result = FindAnyLegacyProviderFiles(provider);
@@ -229,7 +199,7 @@ public sealed class RegistryProviderTests
     public async Task GetMessageFilesForLegacyProvider_WhenMultipleProviders_ShouldHandleConcurrentAccess()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         var providerNames = new[]
             { Constants.ApplicationLogName, Constants.SystemLogName, Constants.KernelGeneralLogName };
@@ -253,7 +223,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenMultipleSemicolonSeparatedPaths_ShouldReturnMultipleFiles()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act - Try to find any provider with multiple files
         var result = FindAnyLegacyProviderFiles(provider);
@@ -268,21 +238,20 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenNullComputerName_ShouldUseLocalMachine()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName);
 
         // Assert
         Assert.NotNull(result);
-        // Should not throw when accessing local machine
     }
 
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenProviderExists_ShouldReturnEnumerable()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider("Application");
@@ -297,7 +266,7 @@ public sealed class RegistryProviderTests
     {
         // Arrange
         var mockLogger = Substitute.For<ITraceLogger>();
-        var provider = new RegistryProvider(null, mockLogger);
+        var provider = new RegistryProvider(mockLogger);
 
         // Act - Try common providers until we find one
         var commonProviders = new[]
@@ -328,7 +297,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldBeDllOrExe()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = FindAnyLegacyProviderFiles(provider);
@@ -349,7 +318,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldBeFullPaths()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = FindAnyLegacyProviderFiles(provider);
@@ -371,7 +340,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldNotBeEmpty()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = FindAnyLegacyProviderFiles(provider);
@@ -390,7 +359,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenReturnedPaths_ShouldNotContainDuplicates()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = FindAnyLegacyProviderFiles(provider);
@@ -407,7 +376,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenSameProviderMultipleTimes_ShouldReturnConsistentResults()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result1 = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName).ToList();
@@ -429,7 +398,7 @@ public sealed class RegistryProviderTests
     {
         // Arrange
         var providerName = "Invalid<>Provider|Name";
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
@@ -443,7 +412,7 @@ public sealed class RegistryProviderTests
     public void GetMessageFilesForLegacyProvider_WhenWhitespaceProviderName_ShouldReturnEmpty()
     {
         // Arrange
-        var provider = new RegistryProvider(null);
+        var provider = new RegistryProvider();
 
         // Act
         var result = provider.GetMessageFilesForLegacyProvider("   ").ToList();

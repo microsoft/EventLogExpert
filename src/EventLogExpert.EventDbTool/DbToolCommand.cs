@@ -42,7 +42,7 @@ public class DbToolCommand(ITraceLogger logger)
             // are about to discard (e.g. when --skip-providers-in-file lists most local providers).
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
 
-            yield return new EventMessageProvider(providerName, Logger).LoadProviderDetails();
+            yield return new EventMessageProvider(providerName, logger: Logger).LoadProviderDetails();
         }
     }
 
