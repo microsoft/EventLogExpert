@@ -36,29 +36,22 @@ public sealed class EventMessageProvider(
 
         foreach (var file in legacyProviderFiles)
         {
-            /*
-             * https://stackoverflow.com/questions/33498244/marshaling-a-message-table-resource
-             *
-             * The approach documented there has some issues, so we deviate a bit.
-             *
-             * RT_MESSAGETABLE is not found unless LoadLibraryEx is called with LOAD_LIBRARY_AS_DATAFILE.
-             * So we must use LoadLibraryEx below rather than LoadLibrary. Msedgeupdate.dll exposes this
-             * issue.
-             */
+            using LibraryHandle hModule = LoadMessageModule(file, logger);
 
-            // Splitting file path because this will not resolve %systemroot% and
-            // will instead try to use drive:\windows\%systemroot%\system32\...
-            using LibraryHandle hModule = NativeMethods.LoadLibraryExW(
-                file.Split("\\").Last(),
-                IntPtr.Zero,
-                LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+            if (hModule.IsInvalid)
+            {
+                continue;
+            }
 
-            using LibraryHandle msgTableInfo = NativeMethods.FindResourceExA(hModule, NativeMethods.RT_MESSAGETABLE, 1);
+            // FindResourceEx returns an HRSRC that points into the already-loaded module's
+            // resource section. It is owned by the module handle and must NOT be FreeLibrary'd.
+            IntPtr msgTableInfo = NativeMethods.FindResourceExA(hModule, NativeMethods.RT_MESSAGETABLE, 1);
             int error = Marshal.GetLastWin32Error();
 
-            if (msgTableInfo.IsInvalid)
+            if (msgTableInfo == IntPtr.Zero)
             {
-                logger?.Debug($"No message table found. Returning 0 messages from file:\n{file}\nError: {error}");
+                logger?.Debug(
+                    $"No message table found. Returning 0 messages from file:\n{file}\nFindResourceEx error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Error 1813 (ERROR_RESOURCE_TYPE_NOT_FOUND) commonly means the message table lives in a localized .mui satellite the loader could not locate, but it can also indicate a missing message table, a non-default resource id, or an unavailable language fallback.");
 
                 continue;
             }
@@ -111,6 +104,92 @@ public sealed class EventMessageProvider(
         }
 
         return messages;
+    }
+
+    /// <summary>
+    ///     Loads a message-resource module using flags that honor MUI satellite resolution, with
+    ///     fallbacks for older binaries and unresolved paths. Returns an invalid handle on failure
+    ///     (the caller is expected to skip).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>LOAD_LIBRARY_AS_DATAFILE</c> alone does NOT trigger MUI satellite loading. Modern
+    ///         Windows binaries (e.g., DriverStore-installed services, in-box system EXEs/DLLs)
+    ///         keep their <c>RT_MESSAGETABLE</c> resources in <c>&lt;binary&gt;.mui</c> files under
+    ///         language subfolders rather than in the binary itself. <c>FindResource</c> on a
+    ///         module loaded with only <c>LOAD_LIBRARY_AS_DATAFILE</c> then returns 1813
+    ///         (<c>ERROR_RESOURCE_TYPE_NOT_FOUND</c>). Combining
+    ///         <c>LOAD_LIBRARY_AS_IMAGE_RESOURCE</c> with <c>LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE</c>
+    ///         causes the loader to follow the MUI fallback chain — the same path
+    ///         <c>EvtFormatMessage</c> (and Event Viewer MMC) uses.
+    ///     </para>
+    /// </remarks>
+    private static LibraryHandle LoadMessageModule(string file, ITraceLogger? logger)
+    {
+        // Do NOT call Environment.ExpandEnvironmentVariables here. RegistryProvider already
+        // expands legacy registry values, and ProviderMetadata.MessageFilePath is already a
+        // fully resolved path. A second expansion here is unnecessary and could mask bugs in
+        // upstream resolution.
+
+        // Primary attempt: MUI-aware load using the path as given. Mirrors EvtFormatMessage behavior.
+        const LoadLibraryFlags muiAwareFlags =
+            LoadLibraryFlags.LOAD_LIBRARY_AS_IMAGE_RESOURCE |
+            LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE;
+
+        var hModule = NativeMethods.LoadLibraryExW(file, IntPtr.Zero, muiAwareFlags);
+        int error = Marshal.GetLastWin32Error();
+
+        if (!hModule.IsInvalid)
+        {
+            logger?.Debug(
+                $"LoadLibraryEx succeeded for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE.");
+
+            return hModule;
+        }
+
+        hModule.Dispose();
+
+        logger?.Debug(
+            $"LoadLibraryEx failed for {file} with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Falling back to LOAD_LIBRARY_AS_DATAFILE with leaf filename.");
+
+        // Legacy fallback: LOAD_LIBRARY_AS_DATAFILE with the leaf filename only. Restrict this to
+        // inputs that are not rooted at all — for any rooted input (fully qualified, drive-relative
+        // like "C:foo.dll", or root-relative like "\Windows\foo.dll"), falling back to a bare leaf
+        // name on the default DLL search order could load a different same-named binary and produce
+        // wrong message text.
+        if (Path.IsPathRooted(file))
+        {
+            return LibraryHandle.Zero;
+        }
+
+        var leafName = Path.GetFileName(file);
+
+        if (string.IsNullOrEmpty(leafName))
+        {
+            return LibraryHandle.Zero;
+        }
+
+        hModule = NativeMethods.LoadLibraryExW(
+            leafName,
+            IntPtr.Zero,
+            LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE);
+
+        error = Marshal.GetLastWin32Error();
+
+        if (!hModule.IsInvalid)
+        {
+            logger?.Debug(
+                $"LoadLibraryEx succeeded for {leafName} (leaf-name fallback) with flags LOAD_LIBRARY_AS_DATAFILE.");
+
+            return hModule;
+        }
+
+        hModule.Dispose();
+
+        logger?.Debug(
+            $"LoadLibraryEx failed for {leafName} (leaf-name fallback) with flags LOAD_LIBRARY_AS_DATAFILE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Original requested file was: {file}.");
+
+        return LibraryHandle.Zero;
     }
 
     public ProviderDetails LoadProviderDetails()

@@ -77,8 +77,11 @@ internal static partial class NativeMethods
         return false;
     }
 
+    // Returns an HRSRC, which is a non-owning pointer into the loaded module's resource section.
+    // It must NOT be released with FreeLibrary, so we deliberately marshal it as an IntPtr and
+    // not as a LibraryHandle (whose ReleaseHandle calls FreeLibrary).
     [LibraryImport(Kernel32Api, SetLastError = true)]
-    internal static partial LibraryHandle FindResourceExA(
+    internal static partial IntPtr FindResourceExA(
         LibraryHandle hModule,
         int lpType,
         int lpName,
@@ -125,7 +128,7 @@ internal static partial class NativeMethods
         LoadLibraryFlags dwFlags);
 
     [LibraryImport(Kernel32Api, SetLastError = true)]
-    internal static partial IntPtr LoadResource(LibraryHandle hModule, LibraryHandle hResInfo);
+    internal static partial IntPtr LoadResource(LibraryHandle hModule, IntPtr hResInfo);
 
     [LibraryImport(Kernel32Api)]
     internal static partial IntPtr LockResource(IntPtr hResData);

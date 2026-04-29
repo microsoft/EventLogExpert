@@ -37,6 +37,29 @@ public sealed class EventMessageProviderTests
     }
 
     [Fact]
+    public void GetMessages_WhenBinaryUsesMuiSatellite_ShouldLoadMessagesFromMuiFile()
+    {
+        // wevtsvc.dll on Windows keeps its message table in en-US\wevtsvc.dll.mui rather
+        // than in the binary itself. The previous load path used LOAD_LIBRARY_AS_DATAFILE
+        // with only the leaf filename and therefore failed with ERROR_RESOURCE_TYPE_NOT_FOUND
+        // (1813) for binaries like this — including the WMIRegistrationService.exe scenario
+        // that motivated this fix. The MUI-aware load path should resolve them.
+        const string muiBinary = @"C:\Windows\System32\wevtsvc.dll";
+
+        Assert.SkipUnless(
+            File.Exists(muiBinary) && File.Exists(@"C:\Windows\System32\en-US\wevtsvc.dll.mui"),
+            "Test requires wevtsvc.dll and its en-US MUI satellite to be present.");
+
+        // Act
+        var messages = EventMessageProvider.GetMessages([muiBinary], Constants.TestProviderName);
+
+        // Assert
+        Assert.NotNull(messages);
+        Assert.NotEmpty(messages);
+        Assert.All(messages, m => Assert.Equal(Constants.TestProviderName, m.ProviderName));
+    }
+
+    [Fact]
     public void Constructor_WhenProviderNameAndComputerNameProvided_ShouldCreateInstance()
     {
         // Arrange & Act
@@ -59,9 +82,10 @@ public sealed class EventMessageProviderTests
         // Assert
         Assert.NotNull(messages);
 
-        // Should process both (even though they're the same file)
-        mockLogger.Received(2)
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
+        // Each missing file produces two LoadLibraryEx failure logs (MUI-aware attempt and
+        // leaf-name fallback). Two files therefore produce four such logs total.
+        mockLogger.Received(4)
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("LoadLibraryEx failed")));
     }
 
     [Fact]
@@ -122,9 +146,17 @@ public sealed class EventMessageProviderTests
         // Act
         EventMessageProvider.GetMessages(invalidFiles, Constants.TestProviderName, mockLogger);
 
-        // Assert
+        // Assert: an unresolvable path produces a LoadLibraryEx failure log for both the
+        // MUI-aware primary attempt and the leaf-name fallback.
         mockLogger.Received()
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("LoadLibraryEx failed") &&
+                h.ToString().Contains("LOAD_LIBRARY_AS_IMAGE_RESOURCE")));
+
+        mockLogger.Received()
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("LoadLibraryEx failed") &&
+                h.ToString().Contains("leaf-name fallback")));
     }
 
     [Fact]
@@ -151,9 +183,10 @@ public sealed class EventMessageProviderTests
         // Act
         EventMessageProvider.GetMessages(invalidFiles, Constants.TestProviderName, mockLogger);
 
-        // Assert
-        mockLogger.Received(2)
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No message table found")));
+        // Assert: each missing file produces two LoadLibraryEx failure logs (MUI-aware attempt
+        // and leaf-name fallback), so two files produce four logs total.
+        mockLogger.Received(4)
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("LoadLibraryEx failed")));
     }
 
     [Fact]
