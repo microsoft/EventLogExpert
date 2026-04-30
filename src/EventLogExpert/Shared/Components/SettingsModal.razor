@@ -36,24 +36,24 @@
                 </div>
 
                 <div class="flex-column-scroll">
-                    @if (_databases.Any())
+                    @if (DatabaseService.Entries.Count > 0)
                     {
-                        @foreach (var database in _databases.OrderBy(x => x.name))
+                        @foreach (var entry in DatabaseService.Entries)
                         {
                             <div class="flex-space-between">
                                 <div>
-                                    <text>@database.name</text>
+                                    <text>@entry.FileName</text>
 
-                                    @if (!DatabaseService.LoadedDatabases.Contains(database.name))
+                                    @if (!entry.IsEnabled || entry.Status != DatabaseStatus.Ready)
                                     {
-                                        <button aria-label="@($"Remove database {database.name}")" class="button button-red"
-                                            @onclick="() => RemoveDatabase(database.name)"
+                                        <button aria-label="@($"Remove database {entry.FileName}")" class="button button-red"
+                                            @onclick="() => RemoveDatabase(entry.FileName)"
                                             type="button">
                                             <i aria-hidden="true" class="bi bi-dash-circle"></i>
                                         </button>
                                     }
                                 </div>
-                                <BooleanSelect AriaLabel="@database.name" Value="database.isEnabled" ValueChanged="() => ToggleDatabase(database.name)" />
+                                <BooleanSelect AriaLabel="@entry.FileName" Value="GetEffectiveEnabled(entry)" ValueChanged="() => ToggleDatabase(entry.FileName)" />
                             </div>
                         }
                     }
