@@ -11,6 +11,14 @@ public interface IDatabaseService
 
     IReadOnlyList<DatabaseEntry> Entries { get; }
 
+    /// <summary>
+    ///     Inspects each <see cref="DatabaseEntry" /> on disk (in read-only mode without auto-creating a schema) and
+    ///     updates its <see cref="DatabaseEntry.Status" /> from the on-disk schema version. Per-entry classification
+    ///     failures (e.g., file locked, file missing) leave that entry at its current status and continue with the rest.
+    ///     Raises <see cref="EntriesChanged" /> exactly once when the pass completes.
+    /// </summary>
+    Task ClassifyEntriesAsync(CancellationToken cancellationToken = default);
+
     Task<ImportResult> ImportAsync(IEnumerable<string> sourceFilePaths, CancellationToken cancellationToken = default);
 
     void MarkStatus(string fileName, DatabaseStatus status);

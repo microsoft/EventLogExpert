@@ -5,7 +5,9 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using Microsoft.Data.Sqlite;
 using NSubstitute;
 using System.IO.Compression;
 
@@ -42,6 +44,190 @@ public sealed class DatabaseServiceTests : IDisposable
         // Assert: only TestDb1 (TestDb2 disabled, TestDb3 not ready)
         Assert.Single(activeDatabases);
         Assert.Equal(Path.Join(databasePath, Constants.TestDb1), activeDatabases[0]);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenAnyStatusChanges_ShouldRaiseEntriesChangedExactlyOnce()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb2));
+
+        var service = CreateDatabaseService();
+
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenEmptyFile_ShouldClassifyAsUnrecognizedSchemaWithoutMutation()
+    {
+        // An empty file would otherwise classify as Ready (PRAGMA inspection sees no tables →
+        // currentVersion=Current → no upgrade needed). EventResolver would then EnsureCreated
+        // it on first read, silently rewriting it as a V4 schema. Force it into UnrecognizedSchema
+        // so the user sees the bad file in Settings instead of having it overwritten invisibly.
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        var sizeBefore = new FileInfo(dbPath).Length;
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        SqliteConnection.ClearAllPools();
+        var sizeAfter = new FileInfo(dbPath).Length;
+
+        Assert.Equal(sizeBefore, sizeAfter);
+        Assert.False(File.Exists(dbPath + "-wal"), "WAL sidecar should not be created during classification.");
+        Assert.False(File.Exists(dbPath + "-shm"), "SHM sidecar should not be created during classification.");
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UnrecognizedSchema, entry.Status);
+    }
+
+    [Theory]
+    [InlineData("v1.db")]
+    [InlineData("v2.db")]
+    public async Task ClassifyEntriesAsync_WhenLegacySchema_ShouldDetectAsObsoleteSchema(string fileName)
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, fileName);
+
+        if (fileName == "v1.db")
+        {
+            DatabaseSeedUtils.SeedV1Schema(dbPath);
+        }
+        else
+        {
+            DatabaseSeedUtils.SeedV2Schema(dbPath);
+        }
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.ObsoleteSchema, entry.Status);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenNoStatusesChange_ShouldNotRaiseEntriesChanged()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        // V4 → Ready, but Ready is also the default Refresh status, so nothing actually changes.
+        Assert.Equal(0, raisedCount);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenOneEntryFails_ShouldQuarantineAsClassificationFailed()
+    {
+        var databasePath = CreateDatabaseDirectory();
+
+        var v3Path = Path.Combine(databasePath, "v3.db");
+        DatabaseSeedUtils.SeedV3Schema(v3Path);
+
+        var lockedPath = Path.Combine(databasePath, "locked.db");
+        DatabaseSeedUtils.SeedV3Schema(lockedPath);
+
+        // Hold an exclusive lock on the second file so EventProviderDbContext cannot open it.
+        // The classification pass must mark the locked entry as ClassificationFailed so the
+        // resolver pipeline cannot consume it later (a Ready status would crash IEventResolver
+        // when it tried to open the same locked file).
+        using var blockingHandle = new FileStream(
+            lockedPath,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.None);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, service.Entries.Count);
+        var v3Entry = service.Entries.Single(entry => entry.FileName == "v3.db");
+        var lockedEntry = service.Entries.Single(entry => entry.FileName == "locked.db");
+
+        Assert.Equal(DatabaseStatus.UpgradeRequired, v3Entry.Status);
+        Assert.Equal(DatabaseStatus.ClassificationFailed, lockedEntry.Status);
+
+        // ClassificationFailed must be excluded from ActiveDatabases so the resolver pipeline
+        // never tries to open the file.
+        Assert.DoesNotContain(lockedPath, service.ActiveDatabases);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenSqliteFileWithoutProviderDetailsTable_ShouldClassifyAsUnrecognizedSchema()
+    {
+        // A valid SQLite file that lacks the ProviderDetails table is not one of our schemas
+        // (V1/V2/V3/V4). Without quarantine, EventResolver would later crash on
+        // ProviderDetails.FirstOrDefault(...) with "no such table". Force UnrecognizedSchema so
+        // ActiveDatabases excludes it before the resolver pipeline ever sees it.
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        await using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+            await using var command = connection.CreateCommand();
+            command.CommandText = "CREATE TABLE \"SomeOtherTable\" (\"Id\" INTEGER PRIMARY KEY, \"Value\" TEXT);";
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        SqliteConnection.ClearAllPools();
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UnrecognizedSchema, entry.Status);
+        Assert.DoesNotContain(dbPath, service.ActiveDatabases);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
     }
 
     [Fact]
@@ -110,9 +296,21 @@ public sealed class DatabaseServiceTests : IDisposable
 
     public void Dispose()
     {
+        // SQLite connections opened during ClassifyEntriesAsync are pooled; on Windows the pool
+        // keeps the file handle open after `Database.CloseConnection`, blocking the recursive
+        // delete below. Drop all pools before cleanup.
+        SqliteConnection.ClearAllPools();
+
         if (Directory.Exists(_testDirectory))
         {
-            Directory.Delete(_testDirectory, true);
+            try
+            {
+                Directory.Delete(_testDirectory, true);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup; a residual SQLite handle should not fail an otherwise-passing test.
+            }
         }
     }
 

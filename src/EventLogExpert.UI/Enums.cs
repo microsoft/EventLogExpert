@@ -41,7 +41,8 @@ public enum DatabaseStatus
     UpgradeRequired,
     UpgradeFailed,
     UnrecognizedSchema,
-    ObsoleteSchema
+    ObsoleteSchema,
+    ClassificationFailed
 }
 
 public enum HighlightColor
