@@ -18,12 +18,6 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     [Inject] private IFileLogger FileLogger { get; set; } = null!;
 
-    protected override async Task OnInitializedAsync()
-    {
-        await Refresh();
-        await base.OnInitializedAsync();
-    }
-
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
         if (disposing)
@@ -32,6 +26,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
 
         await base.DisposeAsyncCore(disposing);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Refresh();
+
+        await base.OnInitializedAsync();
     }
 
     private async Task Clear()
@@ -63,12 +64,13 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
                 _data.Add(line);
 
-                if (++sinceRender >= RenderBatchSize)
-                {
-                    sinceRender = 0;
-                    StateHasChanged();
-                    await Task.Yield();
-                }
+                if (++sinceRender < RenderBatchSize) { continue; }
+
+                sinceRender = 0;
+
+                StateHasChanged();
+                
+                await Task.Yield();
             }
         }
         finally
@@ -76,6 +78,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
             if (generation == _loadGeneration)
             {
                 _hasLoaded = true;
+
                 StateHasChanged();
             }
         }
