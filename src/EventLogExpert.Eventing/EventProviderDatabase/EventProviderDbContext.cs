@@ -110,8 +110,12 @@ public sealed class EventProviderDbContext : DbContext
 
             if (!hasAnyColumn)
             {
-                // Empty file or unrelated database — no upgrade needed.
-                currentVersion = ProviderDatabaseSchemaVersion.Current;
+                // No ProviderDetails table at all — could be an empty SQLite file or an unrelated
+                // database. Either way it is not one of our recognized schemas. Report Unknown so
+                // PerformUpgradeIfNeeded fails closed instead of pretending to be Current and
+                // letting EventResolver later crash on `ProviderDetails.FirstOrDefault(...)`
+                // with "no such table".
+                currentVersion = ProviderDatabaseSchemaVersion.Unknown;
             }
             else
             {
