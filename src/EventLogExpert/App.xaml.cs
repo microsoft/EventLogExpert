@@ -1,13 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
@@ -25,12 +23,9 @@ public sealed partial class App : Application
 
     public App(
         IDispatcher fluxorDispatcher,
-        IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
-        IDatabaseService databaseService,
         ISettingsService settings,
         IAppTitleService appTitleService,
-        FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger,
         MauiMenuActionService menuActionService)
     {
@@ -43,12 +38,9 @@ public sealed partial class App : Application
 
         _mainPage = new MainPage(
             fluxorDispatcher,
-            databaseCollectionProvider,
             activeLogs,
-            databaseService,
             settings,
             appTitleService,
-            fileLocationOptions,
             traceLogger,
             menuActionService);
     }

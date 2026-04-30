@@ -1,365 +1,565 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using NSubstitute;
+using System.IO.Compression;
 
 namespace EventLogExpert.UI.Tests.Services;
 
-public sealed class DatabaseServiceTests
+public sealed class DatabaseServiceTests : IDisposable
 {
-    [Fact]
-    public void DisabledDatabases_AfterUpdate_ShouldReturnUpdatedValues()
+    private readonly string _testDirectory;
+
+    public DatabaseServiceTests()
     {
-        // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.InitialDisabled]);
-
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([]);
-
-        var databaseService = CreateDatabaseService(
-            mockEnabledDatabaseCollectionProvider,
-            mockPreferencesProvider);
-
-        // Act
-        databaseService.UpdateDisabledDatabases([Constants.NewDisabled1, Constants.NewDisabled2]);
-        var result = databaseService.DisabledDatabases.ToList();
-
-        // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(Constants.NewDisabled1, result);
-        Assert.Contains(Constants.NewDisabled2, result);
+        _testDirectory = Path.Combine(Path.GetTempPath(), $"DatabaseServiceTests_{Guid.NewGuid()}");
+        Directory.CreateDirectory(_testDirectory);
     }
 
     [Fact]
-    public void DisabledDatabases_WhenAccessed_ShouldReturnFromPreferences()
+    public void ActiveDatabases_ShouldReturnFullPathsOfEnabledReadyEntriesOnly()
     {
         // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.DisabledDb1, Constants.DisabledDb2]);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb2);
+        CreateDatabaseFile(databasePath, Constants.TestDb3);
 
-        var databaseService = CreateDatabaseService(preferencesProvider: mockPreferencesProvider);
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([Constants.TestDb2]);
+
+        var service = CreateDatabaseService(preferences);
+        service.MarkStatus(Constants.TestDb3, DatabaseStatus.UpgradeRequired);
 
         // Act
-        var result = databaseService.DisabledDatabases.ToList();
+        var activeDatabases = service.ActiveDatabases;
 
-        // Assert
-        Assert.Equal(2, result.Count);
-        Assert.Contains(Constants.DisabledDb1, result);
-        Assert.Contains(Constants.DisabledDb2, result);
+        // Assert: only TestDb1 (TestDb2 disabled, TestDb3 not ready)
+        Assert.Single(activeDatabases);
+        Assert.Equal(Path.Join(databasePath, Constants.TestDb1), activeDatabases[0]);
     }
 
     [Fact]
-    public void DisabledDatabases_WhenAccessedMultipleTimes_ShouldCacheResult()
+    public void Constructor_WhenCalled_ShouldSeedEntriesFromDisk()
     {
         // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.DisabledDatabasesPreference.Returns([Constants.DisabledDb]);
-
-        var databaseService = CreateDatabaseService(preferencesProvider: mockPreferencesProvider);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb2);
 
         // Act
-        _ = databaseService.DisabledDatabases;
-        _ = databaseService.DisabledDatabases;
-        _ = databaseService.DisabledDatabases;
+        var service = CreateDatabaseService();
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).DisabledDatabasesPreference;
+        Assert.Equal(2, service.Entries.Count);
+        Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb1);
+        Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb2);
+        Assert.All(service.Entries, entry => Assert.True(entry.IsEnabled));
+        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.Ready, entry.Status));
     }
 
     [Fact]
-    public void LoadDatabases_WhenCalled_ShouldInvokeLoadedDatabasesChanged()
+    public void Constructor_WhenDatabaseDirectoryDoesNotExist_ShouldHaveEmptyEntries()
+    {
+        // Arrange (no directory created)
+        var service = CreateDatabaseService();
+
+        // Assert
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public void Constructor_WhenDisabledFilenameIsCaseDifferent_ShouldStillMarkDisabled()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([Constants.TestDb1.ToUpper()]);
 
-        IEnumerable<string>? receivedDatabases = null;
-        object? receivedSender = null;
+        // Act
+        var service = CreateDatabaseService(preferences);
 
-        databaseService.LoadedDatabasesChanged += (sender, databases) =>
+        // Assert
+        Assert.Single(service.Entries);
+        Assert.False(service.Entries[0].IsEnabled);
+    }
+
+    [Fact]
+    public void Constructor_WhenNonDbFilesPresent_ShouldOnlyIncludeDbFiles()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        File.WriteAllText(Path.Combine(databasePath, "ignored.txt"), "");
+        File.WriteAllText(Path.Combine(databasePath, "ignored.json"), "");
+
+        // Act
+        var service = CreateDatabaseService();
+
+        // Assert
+        Assert.Single(service.Entries);
+        Assert.Equal(Constants.TestDb1, service.Entries[0].FileName);
+    }
+
+    public void Dispose()
+    {
+        if (Directory.Exists(_testDirectory))
         {
-            receivedSender = sender;
-            receivedDatabases = databases;
-        };
+            Directory.Delete(_testDirectory, true);
+        }
+    }
+
+    [Fact]
+    public void Entries_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.Windows10 + ".db");
+        CreateDatabaseFile(databasePath, Constants.Windows11 + ".db");
+        CreateDatabaseFile(databasePath, Constants.SimpleDatabase + ".db");
+        CreateDatabaseFile(databasePath, Constants.AnotherDb + ".db");
 
         // Act
-        databaseService.LoadDatabases();
+        var service = CreateDatabaseService();
+
+        // Assert: non-versioned first, then versioned numeric desc
+        Assert.Equal(4, service.Entries.Count);
+        Assert.Equal(Constants.AnotherDb + ".db", service.Entries[0].FileName);
+        Assert.Equal(Constants.SimpleDatabase + ".db", service.Entries[1].FileName);
+        Assert.Equal(Constants.Windows11 + ".db", service.Entries[2].FileName);
+        Assert.Equal(Constants.Windows10 + ".db", service.Entries[3].FileName);
+    }
+
+    [Fact]
+    public void Entries_WhenNumericVersions_ShouldSortNumericallyNotLexicographically()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.Server1 + ".db");
+        CreateDatabaseFile(databasePath, Constants.Server2 + ".db");
+        CreateDatabaseFile(databasePath, Constants.Server10 + ".db");
+        CreateDatabaseFile(databasePath, Constants.Server20 + ".db");
+
+        // Act
+        var service = CreateDatabaseService();
+
+        // Assert: numeric desc — 20, 10, 2, 1
+        Assert.Equal(Constants.Server20 + ".db", service.Entries[0].FileName);
+        Assert.Equal(Constants.Server10 + ".db", service.Entries[1].FileName);
+        Assert.Equal(Constants.Server2 + ".db", service.Entries[2].FileName);
+        Assert.Equal(Constants.Server1 + ".db", service.Entries[3].FileName);
+    }
+
+    [Fact]
+    public void Entries_WhenSimpleNames_ShouldSortByNameAscThenVersionDesc()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.DatabaseA + ".db");
+        CreateDatabaseFile(databasePath, Constants.DatabaseB + ".db");
+        CreateDatabaseFile(databasePath, Constants.DatabaseC + ".db");
+
+        // Act
+        var service = CreateDatabaseService();
+
+        // Assert: "Database X" splits to "Database " + "X"; FirstPart asc then SecondPart desc
+        Assert.Equal(3, service.Entries.Count);
+        Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
+        Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
+        Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
+    }
+
+    [Fact]
+    public async Task ImportAsync_WhenDbFilesProvided_ShouldCopyAndRefresh()
+    {
+        // Arrange
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        File.WriteAllText(sourceFile, "test content");
+
+        var service = CreateDatabaseService();
+
+        // Act
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.NotNull(receivedDatabases);
-        Assert.Same(databaseService, receivedSender);
-        Assert.Contains(Constants.DatabaseA, receivedDatabases);
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Single(service.Entries);
+        Assert.Equal(Constants.TestDb1, service.Entries[0].FileName);
     }
 
     [Fact]
-    public void LoadDatabases_WhenCalled_ShouldRefreshLoadedDatabases()
+    public async Task ImportAsync_WhenMixedSuccessAndFailure_ShouldReturnPartialResult()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
+        var databasePath = CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
 
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.DatabaseA], [Constants.DatabaseB, Constants.DatabaseC]);
+        var goodZip = Path.Combine(sourceDir, "good.zip");
+        CreateZipWithEntries(goodZip, [(Constants.TestDb1, "good content")]);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        var malformedZip = Path.Combine(sourceDir, "bad.zip");
+        File.WriteAllBytes(malformedZip, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+
+        var service = CreateDatabaseService();
 
         // Act
-        var initialResult = databaseService.LoadedDatabases.ToList();
-        databaseService.LoadDatabases();
-        var refreshedResult = databaseService.LoadedDatabases.ToList();
+        var result = await service.ImportAsync([goodZip, malformedZip], TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Single(initialResult);
-        Assert.Equal(Constants.DatabaseA, initialResult[0]);
-        Assert.Equal(2, refreshedResult.Count);
-        Assert.Contains(Constants.DatabaseB, refreshedResult);
-        Assert.Contains(Constants.DatabaseC, refreshedResult);
+        Assert.Equal(1, result.Imported);
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal("bad.zip", failure.FileName);
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+        Assert.Single(service.Entries);
     }
 
     [Fact]
-    public void LoadDatabases_WhenNoEventHandler_ShouldNotThrow()
+    public async Task ImportAsync_WhenNoFilesProvided_ShouldReturnZeroAndNotRefresh()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-
-        // Act & Assert
-        var exception = Record.Exception(() => databaseService.LoadDatabases());
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void LoadedDatabases_WhenAccessed_ShouldReturnSortedDatabases()
-    {
-        // Arrange
-        // Names with pattern "Name Version" sort by name asc, then version desc
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.DatabaseC, Constants.DatabaseA, Constants.DatabaseB]);
-
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        var service = CreateDatabaseService();
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
 
         // Act
-        var result = databaseService.LoadedDatabases.ToList();
+        var result = await service.ImportAsync([], TestContext.Current.CancellationToken);
 
         // Assert
-        // "Database X" splits to FirstPart="Database " + SecondPart="X"
-        // Sorted by FirstPart asc, then SecondPart desc: C, B, A
-        Assert.Equal(3, result.Count);
-        Assert.Equal(Constants.DatabaseC, result[0]);
-        Assert.Equal(Constants.DatabaseB, result[1]);
-        Assert.Equal(Constants.DatabaseA, result[2]);
+        Assert.Equal(0, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Equal(0, raisedCount);
     }
 
     [Fact]
-    public void LoadedDatabases_WhenAccessedMultipleTimes_ShouldCacheResult()
+    public async Task ImportAsync_WhenTokenAlreadyCanceled_ShouldThrowOperationCanceledException()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var sourcePath = Path.Combine(sourceDir, Constants.TestDb1);
+        File.WriteAllText(sourcePath, "test content");
 
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.DatabaseA]);
+        var service = CreateDatabaseService();
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act + Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => service.ImportAsync([sourcePath], cts.Token));
+    }
+
+    [Fact]
+    public async Task ImportAsync_WhenZipContainsNonDbFiles_ShouldExtractOnlyDbEntries()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var zipPath = Path.Combine(sourceDir, "import.zip");
+        CreateZipWithEntries(zipPath, [(Constants.TestDb1, "db content"), ("readme.txt", "ignored")]);
+
+        var service = CreateDatabaseService();
 
         // Act
-        _ = databaseService.LoadedDatabases;
-        _ = databaseService.LoadedDatabases;
-        _ = databaseService.LoadedDatabases;
+        var result = await service.ImportAsync([zipPath], TestContext.Current.CancellationToken);
 
         // Assert
-        mockEnabledDatabaseCollectionProvider.Received(1).GetEnabledDatabases();
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+        Assert.False(File.Exists(Path.Combine(databasePath, "readme.txt")));
     }
 
     [Fact]
-    public void LoadedDatabases_WhenEmpty_ShouldReturnEmptyCollection()
+    public async Task ImportAsync_WhenZipContainsValidDatabases_ShouldExtractDbFiles()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([]);
+        var databasePath = CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        var zipPath = Path.Combine(sourceDir, "import.zip");
+        CreateZipWithEntries(zipPath, [(Constants.TestDb1, "db1 content"), (Constants.TestDb2, "db2 content")]);
+
+        var service = CreateDatabaseService();
 
         // Act
-        var result = databaseService.LoadedDatabases;
+        var result = await service.ImportAsync([zipPath], TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.Empty(result);
+        Assert.Equal(2, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb2)));
+        Assert.False(File.Exists(Path.Combine(databasePath, "import.zip")));
     }
 
     [Fact]
-    public void LoadedDatabases_WhenVersionedDatabases_ShouldSortByNameThenVersionDescending()
+    public async Task ImportAsync_WhenZipIsMalformed_ShouldReturnFailureAndNotLeakFiles()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
+        var databasePath = CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
 
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.Windows10, Constants.Windows11, Constants.Windows9, Constants.Linux1]);
+        var malformedZip = Path.Combine(sourceDir, "malformed.zip");
+        File.WriteAllBytes(malformedZip, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
+        var service = CreateDatabaseService();
 
         // Act
-        var result = databaseService.LoadedDatabases.ToList();
-
-        // Assert - Numeric sorting: 11 > 10 > 9, 1
-        Assert.Equal(4, result.Count);
-        Assert.Equal(Constants.Linux1, result[0]);
-        Assert.Equal(Constants.Windows11, result[1]);
-        Assert.Equal(Constants.Windows10, result[2]);
-        Assert.Equal(Constants.Windows9, result[3]);
-    }
-
-    [Fact]
-    public void LoadedDatabases_WhenNumericVersions_ShouldSortNumericallyNotLexicographically()
-    {
-        // Arrange
-        // This test ensures "10" sorts after "2" (numeric) rather than before it (lexicographic)
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.Server2, Constants.Server10, Constants.Server1, Constants.Server20]);
-
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-
-        // Act
-        var result = databaseService.LoadedDatabases.ToList();
-
-        // Assert - Numeric descending: 20, 10, 2, 1
-        Assert.Equal(4, result.Count);
-        Assert.Equal(Constants.Server20, result[0]);
-        Assert.Equal(Constants.Server10, result[1]);
-        Assert.Equal(Constants.Server2, result[2]);
-        Assert.Equal(Constants.Server1, result[3]);
-    }
-
-    [Fact]
-    public void LoadedDatabasesChanged_WhenSetToNull_ShouldNotThrowOnLoadDatabases()
-    {
-        // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
-
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-        databaseService.LoadedDatabasesChanged = null;
-
-        // Act & Assert
-        var exception = Record.Exception(() => databaseService.LoadDatabases());
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void SortDatabases_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
-    {
-        // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases()
-            .Returns([Constants.Windows10, Constants.SimpleDatabase, Constants.Windows11, Constants.AnotherDb]);
-
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-
-        // Act
-        var result = databaseService.LoadedDatabases.ToList();
-
-        // Assert - Non-versioned first (no space pattern), then versioned with numeric sort
-        Assert.Equal(4, result.Count);
-        Assert.Equal(Constants.AnotherDb, result[0]);
-        Assert.Equal(Constants.SimpleDatabase, result[1]);
-        Assert.Equal(Constants.Windows11, result[2]);
-        Assert.Equal(Constants.Windows10, result[3]);
-    }
-
-    [Fact]
-    public void UpdateDisabledDatabases_WhenCalled_ShouldInvokeLoadedDatabasesChanged()
-    {
-        // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
-
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-
-        var eventInvoked = false;
-        databaseService.LoadedDatabasesChanged += (_, _) => eventInvoked = true;
-
-        // Act
-        databaseService.UpdateDisabledDatabases([Constants.DisabledDb]);
+        var result = await service.ImportAsync([malformedZip], TestContext.Current.CancellationToken);
 
         // Assert
-        Assert.True(eventInvoked);
+        Assert.Equal(0, result.Imported);
+        var failure = Assert.Single(result.Failures);
+        Assert.Equal("malformed.zip", failure.FileName);
+        Assert.Contains("Could not open archive", failure.Reason, StringComparison.Ordinal);
+        Assert.Empty(Directory.GetFiles(databasePath));
     }
 
     [Fact]
-    public void UpdateDisabledDatabases_WhenCalled_ShouldReloadDatabases()
+    public void MarkStatus_ShouldBePreservedAcrossRefresh()
     {
         // Arrange
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([Constants.DatabaseA]);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var databaseService = CreateDatabaseService(mockEnabledDatabaseCollectionProvider);
-
-        // Act
-        databaseService.UpdateDisabledDatabases([Constants.DisabledDb]);
-
-        // Assert - GetEnabledDatabases should be called once for reload (LoadedDatabases not accessed before)
-        mockEnabledDatabaseCollectionProvider.Received(1).GetEnabledDatabases();
-    }
-
-    [Fact]
-    public void UpdateDisabledDatabases_WhenCalled_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([]);
-
-        var databaseService = CreateDatabaseService(
-            mockEnabledDatabaseCollectionProvider,
-            mockPreferencesProvider);
-
-        var newDisabledDatabases = new List<string> { Constants.NewDisabled1, Constants.NewDisabled2 };
+        var service = CreateDatabaseService();
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.UpgradeFailed);
 
         // Act
-        databaseService.UpdateDisabledDatabases(newDisabledDatabases);
+        service.Refresh();
 
         // Assert
-        mockPreferencesProvider.Received(1).DisabledDatabasesPreference =
-            Arg.Is<IEnumerable<string>>(x => x.Contains(Constants.NewDisabled1) && x.Contains(Constants.NewDisabled2));
+        Assert.Equal(DatabaseStatus.UpgradeFailed, service.Entries[0].Status);
     }
 
     [Fact]
-    public void UpdateDisabledDatabases_WhenCalledWithEmptyList_ShouldUpdatePreferences()
+    public void MarkStatus_WhenStatusChanges_ShouldUpdateAndRaiseEntriesChanged()
     {
         // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        var mockEnabledDatabaseCollectionProvider = Substitute.For<IEnabledDatabaseCollectionProvider>();
-        mockEnabledDatabaseCollectionProvider.GetEnabledDatabases().Returns([]);
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var databaseService = CreateDatabaseService(
-            mockEnabledDatabaseCollectionProvider,
-            mockPreferencesProvider);
+        var service = CreateDatabaseService();
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
 
         // Act
-        databaseService.UpdateDisabledDatabases([]);
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.UpgradeFailed);
 
         // Assert
-        mockPreferencesProvider.Received(1).DisabledDatabasesPreference =
-            Arg.Is<IEnumerable<string>>(x => !x.Any());
+        Assert.Equal(DatabaseStatus.UpgradeFailed, service.Entries[0].Status);
+        Assert.Equal(1, raisedCount);
     }
 
-    private static DatabaseService CreateDatabaseService(
-        IEnabledDatabaseCollectionProvider? enabledDatabaseCollectionProvider = null,
-        IPreferencesProvider? preferencesProvider = null)
+    [Fact]
+    public void MarkStatus_WhenStatusUnchanged_ShouldNotRaiseEntriesChanged()
     {
-        return new DatabaseService(
-            enabledDatabaseCollectionProvider ?? Substitute.For<IEnabledDatabaseCollectionProvider>(),
-            preferencesProvider ?? Substitute.For<IPreferencesProvider>());
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
+
+        // Act (entry already Ready)
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
+
+        // Assert
+        Assert.Equal(0, raisedCount);
+    }
+
+    [Fact]
+    public void Refresh_WhenCalled_ShouldRaiseEntriesChanged()
+    {
+        // Arrange
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+        var raised = false;
+        service.EntriesChanged += (_, _) => raised = true;
+
+        // Act
+        service.Refresh();
+
+        // Assert
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Refresh_WhenNewFilesAppear_ShouldPickThemUp()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+        Assert.Empty(service.Entries);
+
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        // Act
+        service.Refresh();
+
+        // Assert
+        Assert.Single(service.Entries);
+        Assert.Equal(Constants.TestDb1, service.Entries[0].FileName);
+    }
+
+    [Fact]
+    public void Remove_WhenCalled_ShouldDeleteDatabaseAndSidecars()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        File.WriteAllText(Path.Combine(databasePath, $"{Constants.TestDb1}-wal"), "");
+        File.WriteAllText(Path.Combine(databasePath, $"{Constants.TestDb1}-shm"), "");
+
+        var service = CreateDatabaseService();
+
+        // Act
+        service.Remove(Constants.TestDb1);
+
+        // Assert
+        Assert.False(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+        Assert.False(File.Exists(Path.Combine(databasePath, $"{Constants.TestDb1}-wal")));
+        Assert.False(File.Exists(Path.Combine(databasePath, $"{Constants.TestDb1}-shm")));
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public void Remove_WhenCalled_ShouldRaiseEntriesChanged()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+        var raised = false;
+        service.EntriesChanged += (_, _) => raised = true;
+
+        // Act
+        service.Remove(Constants.TestDb1);
+
+        // Assert
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Remove_WhenFileNameUnknown_ShouldThrow()
+    {
+        // Arrange
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+
+        // Act + Assert
+        Assert.Throws<InvalidOperationException>(() => service.Remove("does-not-exist.db"));
+    }
+
+    [Fact]
+    public void Toggle_WhenCalled_ShouldFlipIsEnabledAndPersist()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+
+        // Act
+        service.Toggle(Constants.TestDb1);
+
+        // Assert
+        Assert.False(service.Entries[0].IsEnabled);
+
+        preferences.Received(1).DisabledDatabasesPreference =
+            Arg.Is<IEnumerable<string>>(disabled => disabled.Contains(Constants.TestDb1));
+    }
+
+    [Fact]
+    public void Toggle_WhenCalled_ShouldRaiseEntriesChanged()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+        var raised = false;
+        service.EntriesChanged += (_, _) => raised = true;
+
+        // Act
+        service.Toggle(Constants.TestDb1);
+
+        // Assert
+        Assert.True(raised);
+    }
+
+    [Fact]
+    public void Toggle_WhenFileNameUnknown_ShouldThrow()
+    {
+        // Arrange
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+
+        // Act + Assert
+        Assert.Throws<InvalidOperationException>(() => service.Toggle("does-not-exist.db"));
+    }
+
+    private static void CreateDatabaseFile(string directory, string fileName) =>
+        File.WriteAllText(Path.Combine(directory, fileName), string.Empty);
+
+    private static void CreateZipWithEntries(string zipPath, IEnumerable<(string entryName, string content)> entries)
+    {
+        using var fileStream = File.Create(zipPath);
+        using var archive = new ZipArchive(fileStream, ZipArchiveMode.Create);
+
+        foreach (var (entryName, content) in entries)
+        {
+            var entry = archive.CreateEntry(entryName);
+            using var entryStream = entry.Open();
+            using var writer = new StreamWriter(entryStream);
+            writer.Write(content);
+        }
+    }
+
+    private string CreateDatabaseDirectory()
+    {
+        var path = Path.Join(_testDirectory, "Databases");
+        Directory.CreateDirectory(path);
+        return path;
+    }
+
+    private DatabaseService CreateDatabaseService(IPreferencesProvider? preferences = null)
+    {
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var prefs = preferences ?? Substitute.For<IPreferencesProvider>();
+
+        if (preferences is null)
+        {
+            prefs.DisabledDatabasesPreference.Returns([]);
+        }
+
+        var traceLogger = Substitute.For<ITraceLogger>();
+        return new DatabaseService(fileLocationOptions, prefs, traceLogger);
     }
 }

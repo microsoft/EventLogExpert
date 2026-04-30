@@ -8,6 +8,4 @@ namespace EventLogExpert.Eventing.EventResolvers;
 public interface IDatabaseCollectionProvider
 {
     ImmutableList<string> ActiveDatabases { get; }
-
-    void SetActiveDatabases(IEnumerable<string> activeDatabases);
 }
