@@ -1,0 +1,18 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path=".editorconfig" />
+    <File Path="Directory.Build.props" />
+    <File Path="Directory.Packages.props" />
+  </Folder>
+  <Project Path="EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
+  <Project Path="EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
+  <Project Path="EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
+  <Project Path="EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
+  <Project Path="EventLogExpert.UI/EventLogExpert.UI.csproj" />
+  <Project Path="EventLogExpert/EventLogExpert.csproj">
+    <Deploy Solution="*|Any CPU" />
+  </Project>
+</Solution>

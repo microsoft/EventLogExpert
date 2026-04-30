@@ -26,10 +26,10 @@ jobs:
       with:
         dotnet-version: 10.x
     - name: Restore workloads
-      run: dotnet workload restore EventLogExpert.sln
+      run: dotnet workload restore EventLogExpert.slnx
     - name: Restore dependencies
-      run: dotnet restore EventLogExpert.sln
+      run: dotnet restore EventLogExpert.slnx
     - name: Build
-      run: dotnet build EventLogExpert.sln --no-restore
+      run: dotnet build EventLogExpert.slnx --no-restore
     - name: Test
-      run: dotnet test EventLogExpert.sln --no-build --verbosity normal
+      run: dotnet test EventLogExpert.slnx --no-build --verbosity normal
