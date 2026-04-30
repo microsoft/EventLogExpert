@@ -197,6 +197,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         _dbContexts = [];
 
         var databasesToLoad = SortDatabases(databasePaths);
+        var unknownDbs = new List<string>();
         var obsoleteDbs = new List<string>();
         var newContexts = new List<EventProviderDbContext>();
 
@@ -208,9 +209,17 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
             }
 
             var providerDb = new EventProviderDbContext(file, true, Logger);
-            var (needsv2, needsv3) = providerDb.IsUpgradeNeeded();
+            var state = providerDb.IsUpgradeNeeded();
 
-            if (needsv2 || needsv3)
+            if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+            {
+                unknownDbs.Add(file);
+                providerDb.Dispose();
+
+                continue;
+            }
+
+            if (state.NeedsUpgrade)
             {
                 obsoleteDbs.Add(file);
                 providerDb.Dispose();
@@ -224,18 +233,30 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
 
         _dbContexts = [.. newContexts];
 
+        if (unknownDbs.Count <= 0 && obsoleteDbs.Count <= 0) { return; }
+
+        foreach (var db in _dbContexts)
+        {
+            db.Dispose();
+        }
+
+        _dbContexts = [];
+
+        var messageParts = new List<string>();
+
+        if (unknownDbs.Count > 0)
+        {
+            messageParts.Add("Unrecognized DB format (file may be corrupt or from a newer or incompatible version): " +
+                string.Join(' ', unknownDbs.Select(Path.GetFileName)));
+        }
+
         if (obsoleteDbs.Count > 0)
         {
-            foreach (var db in _dbContexts)
-            {
-                db.Dispose();
-            }
-
-            _dbContexts = [];
-
-            throw new InvalidOperationException("Obsolete DB format: " +
+            messageParts.Add("Obsolete DB format (upgrade required): " +
                 string.Join(' ', obsoleteDbs.Select(Path.GetFileName)));
         }
+
+        throw new InvalidOperationException(string.Join(" | ", messageParts));
     }
 
     private void RemoveGateIfSame(string providerName, Lazy<bool> gate) =>
@@ -283,9 +304,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
 
             foreach (var dbContext in _dbContexts)
             {
-                var details = dbContext.ProviderDetails.FirstOrDefault(p =>
-                    EF.Functions.Collate(p.ProviderName, "NOCASE") ==
-                    EF.Functions.Collate(providerName, "NOCASE"));
+                var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == providerName);
 
                 if (details is null) { continue; }
 
