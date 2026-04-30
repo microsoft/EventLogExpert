@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
@@ -42,6 +43,106 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             .ToImmutableList();
 
     public IReadOnlyList<DatabaseEntry> Entries => _entries;
+
+    public async Task ClassifyEntriesAsync(CancellationToken cancellationToken = default)
+    {
+        // Snapshot under the lock so concurrent Refresh/Toggle/Remove calls cannot trigger an
+        // index-out-of-range during the IO pass below.
+        ImmutableList<DatabaseEntry> snapshot;
+
+        lock (_mutationLock)
+        {
+            snapshot = _entries;
+        }
+
+        if (snapshot.Count == 0) { return; }
+
+        // Whole pass runs on a worker thread because IsUpgradeNeeded performs synchronous SQLite IO
+        // (PRAGMA queries via blocking ADO.NET). Driving it from the UI thread would block render.
+        var statuses = await Task.Run(
+            () =>
+            {
+                var perFile = new Dictionary<string, DatabaseStatus>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var entry in snapshot)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    try
+                    {
+                        // Empty/missing files would otherwise classify as Ready (IsUpgradeNeeded sees
+                        // no columns → currentVersion=Current → no upgrade needed). EventResolver
+                        // would then call EnsureCreated on first access and silently rewrite the
+                        // file with a V4 schema. Force these into UnrecognizedSchema so they are
+                        // quarantined and surfaced in Settings instead of being mutated invisibly.
+                        if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
+                        {
+                            perFile[entry.FileName] = DatabaseStatus.UnrecognizedSchema;
+                            continue;
+                        }
+
+                        // ensureCreated:false so a missing/empty file is NOT auto-populated with the V4 schema
+                        // during inspection — that would silently mask the very thing classification is for.
+                        using var context = new EventProviderDbContext(
+                            entry.FullPath,
+                            readOnly: false,
+                            ensureCreated: false,
+                            _traceLogger);
+
+                        var state = context.IsUpgradeNeeded();
+                        perFile[entry.FileName] = MapSchemaVersionToStatus(state.CurrentVersion);
+                    }
+                    catch (Exception ex) when (ex is not OperationCanceledException)
+                    {
+                        // Per-entry failure (file locked by another process, file deleted between
+                        // existence check and open, corrupt SQLite header, etc.) — quarantine the
+                        // entry so resolver loading cannot consume it later. Without this, the
+                        // entry would stay at its default Ready status from Refresh and EventResolver
+                        // would crash when it tries to open the same DB.
+                        perFile[entry.FileName] = DatabaseStatus.ClassificationFailed;
+
+                        _traceLogger.Warn(
+                            $"{nameof(DatabaseService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}");
+                    }
+                }
+
+                return perFile;
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        if (statuses.Count == 0) { return; }
+
+        var changed = false;
+
+        lock (_mutationLock)
+        {
+            // Re-resolve indexes against the current snapshot — Refresh/Remove may have run while
+            // classification was on the worker thread.
+            var builder = _entries.ToBuilder();
+
+            for (var i = 0; i < builder.Count; i++)
+            {
+                var entry = builder[i];
+
+                if (!statuses.TryGetValue(entry.FileName, out var newStatus)) { continue; }
+
+                if (entry.Status == newStatus) { continue; }
+
+                builder[i] = entry with { Status = newStatus };
+                changed = true;
+            }
+
+            if (changed)
+            {
+                _entries = builder.ToImmutable();
+            }
+        }
+
+        if (changed)
+        {
+            RaiseEntriesChanged();
+        }
+    }
 
     public async Task<ImportResult> ImportAsync(
         IEnumerable<string> sourceFilePaths,
@@ -89,9 +190,23 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
         }
 
-        if (importedCount > 0)
+        if (importedCount <= 0)
         {
-            Refresh();
+            return new ImportResult(importedCount, failures);
+        }
+
+        Refresh();
+
+        // Classify so freshly-imported V3 databases surface in settings as UpgradeRequired
+        // (with the "restart required to upgrade" UX) rather than appearing as Ready.
+        try
+        {
+            await ClassifyEntriesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(ImportAsync)} post-import classification failed: {ex}");
         }
 
         return new ImportResult(importedCount, failures);
@@ -198,6 +313,15 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         snapshot.FindIndex(entry => string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
 
     private static bool IsActive(DatabaseEntry entry) => entry.IsEnabled && entry.Status == DatabaseStatus.Ready;
+
+    private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
+        currentVersion switch
+        {
+            ProviderDatabaseSchemaVersion.Current => DatabaseStatus.Ready,
+            3 => DatabaseStatus.UpgradeRequired,
+            1 or 2 => DatabaseStatus.ObsoleteSchema,
+            _ => DatabaseStatus.UnrecognizedSchema,
+        };
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {
