@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
-using System.Text.Json;
+using System.Data.Common;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
@@ -16,16 +16,23 @@ public sealed class EventProviderDbContext : DbContext
     private readonly bool _readOnly;
 
     public EventProviderDbContext(string path, bool readOnly, ITraceLogger? logger = null)
+        : this(path, readOnly, true, logger) { }
+
+    public EventProviderDbContext(string path, bool readOnly, bool ensureCreated, ITraceLogger? logger = null)
     {
         _logger = logger;
 
-        _logger?.Debug($"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly}");
+        _logger?.Debug(
+            $"Instantiating EventProviderDbContext. path: {path} readOnly: {readOnly} ensureCreated: {ensureCreated}");
 
         Name = System.IO.Path.GetFileNameWithoutExtension(path);
         Path = path;
         _readOnly = readOnly;
 
-        Database.EnsureCreated();
+        if (ensureCreated)
+        {
+            Database.EnsureCreated();
+        }
     }
 
     public string Name { get; }
@@ -34,82 +41,163 @@ public sealed class EventProviderDbContext : DbContext
 
     private string Path { get; }
 
-    public (bool needsV2Upgrade, bool needsV3Upgrade) IsUpgradeNeeded()
+    public ProviderDatabaseSchemaState IsUpgradeNeeded()
     {
-        // Use PRAGMA table_info instead of substring-matching sqlite_schema.sql. The previous
-        // approach matched the literal text `"Parameters" BLOB NOT NULL`, which is brittle across
-        // EF Core / Microsoft.Data.Sqlite versions (whitespace, quoting, constraint ordering, case)
-        // and would silently flip a fresh V3 database into the upgrade-needed path, causing an
-        // unnecessary drop/vacuum/recreate cycle.
+        // Inspect the on-disk schema via PRAGMA table_info / index_xinfo so we are robust to
+        // EF / SQLite text variations across versions and across upgrade levels (V1/V2/V3/V4).
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
 
         try
         {
-            using var command = connection.CreateCommand();
-            command.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
-            using var reader = command.ExecuteReader();
-
             string? messagesType = null;
+            string? eventsType = null;
+            string? keywordsType = null;
+            string? opcodesType = null;
+            string? tasksType = null;
             string? parametersType = null;
             var hasAnyColumn = false;
+            var hasParametersColumn = false;
+            var hasResolvedColumn = false;
 
-            while (reader.Read())
+            using (var command = connection.CreateCommand())
             {
-                hasAnyColumn = true;
+                command.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
+                using var reader = command.ExecuteReader();
 
-                var name = reader["name"]?.ToString();
-                var type = reader["type"]?.ToString();
+                while (reader.Read())
+                {
+                    hasAnyColumn = true;
 
-                if (string.Equals(name, "Messages", StringComparison.Ordinal))
-                {
-                    messagesType = type;
-                }
-                else if (string.Equals(name, "Parameters", StringComparison.Ordinal))
-                {
-                    parametersType = type;
+                    var columnName = reader["name"]?.ToString();
+                    var columnType = reader["type"]?.ToString();
+
+                    if (string.Equals(columnName, "Messages", StringComparison.Ordinal))
+                    {
+                        messagesType = columnType;
+                    }
+                    else if (string.Equals(columnName, "Events", StringComparison.Ordinal))
+                    {
+                        eventsType = columnType;
+                    }
+                    else if (string.Equals(columnName, "Keywords", StringComparison.Ordinal))
+                    {
+                        keywordsType = columnType;
+                    }
+                    else if (string.Equals(columnName, "Opcodes", StringComparison.Ordinal))
+                    {
+                        opcodesType = columnType;
+                    }
+                    else if (string.Equals(columnName, "Tasks", StringComparison.Ordinal))
+                    {
+                        tasksType = columnType;
+                    }
+                    else if (string.Equals(columnName, "Parameters", StringComparison.Ordinal))
+                    {
+                        parametersType = columnType;
+                        hasParametersColumn = true;
+                    }
+                    else if (string.Equals(columnName,
+                        nameof(Providers.ProviderDetails.ResolvedFromOwningPublisher),
+                        StringComparison.Ordinal))
+                    {
+                        hasResolvedColumn = true;
+                    }
                 }
             }
 
-            reader.Close();
+            int currentVersion;
 
-            // V2 schema stored payload columns as JSON-encoded TEXT. V3 stores them as compressed BLOB.
-            // V1 had no Parameters column at all; that case naturally falls into needsV3Upgrade=true
-            // because parametersType remains null below.
-            var messagesIsText = string.Equals(messagesType?.Trim(), "TEXT", StringComparison.OrdinalIgnoreCase);
-            var parametersIsBlob = string.Equals(parametersType?.Trim(), "BLOB", StringComparison.OrdinalIgnoreCase);
+            if (!hasAnyColumn)
+            {
+                // Empty file or unrelated database — no upgrade needed.
+                currentVersion = ProviderDatabaseSchemaVersion.Current;
+            }
+            else
+            {
+                // V1 and V2 stored every payload column as TEXT JSON; V3 and V4 store them all
+                // as compressed BLOB. A mixture of TEXT and BLOB payload columns is not any
+                // recognized schema and is reported as Unknown so the read path can surface a
+                // distinct error instead of crashing on a cast in ReadCompressedRow.
+                var payloadColumnsAllText = IsType(messagesType, "TEXT") &&
+                    IsType(eventsType, "TEXT") &&
+                    IsType(keywordsType, "TEXT") &&
+                    IsType(opcodesType, "TEXT") &&
+                    IsType(tasksType, "TEXT");
 
-            // Only flag upgrades when the ProviderDetails table actually exists. If it does not, the
-            // database is either freshly created (EnsureCreated already ran in the constructor) or
-            // unrelated to this tool — neither case warrants the destructive drop/vacuum/recreate path.
-            var needsV2Upgrade = hasAnyColumn && messagesIsText;
-            var needsV3Upgrade = hasAnyColumn && !parametersIsBlob;
+                var payloadColumnsAllBlob = IsType(messagesType, "BLOB") &&
+                    IsType(eventsType, "BLOB") &&
+                    IsType(keywordsType, "BLOB") &&
+                    IsType(opcodesType, "BLOB") &&
+                    IsType(tasksType, "BLOB");
 
-            _logger?.Debug($"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. needsV2Upgrade: {needsV2Upgrade} needsV3Upgrade: {needsV3Upgrade}");
+                switch (payloadColumnsAllText)
+                {
+                    case true when !hasParametersColumn: currentVersion = 1; break;
+                    case true when IsType(parametersType, "TEXT"): currentVersion = 2; break;
+                    default:
+                        {
+                            if (payloadColumnsAllBlob && IsType(parametersType, "BLOB"))
+                            {
+                                var pkIsNoCase = TryDetectPrimaryKeyNoCaseCollation(connection);
+                                currentVersion = hasResolvedColumn && pkIsNoCase ? 4 : 3;
+                            }
+                            else
+                            {
+                                // Unknown column shape — payload columns are not uniformly TEXT or BLOB, or
+                                // Parameters disagrees with the rest. Report the Unknown sentinel so
+                                // PerformUpgradeIfNeeded can surface a distinct "unrecognized schema" error.
+                                currentVersion = ProviderDatabaseSchemaVersion.Unknown;
+                            }
 
-            return (needsV2Upgrade, needsV3Upgrade);
+                            break;
+                        }
+                }
+            }
+
+            var state = new ProviderDatabaseSchemaState(currentVersion);
+
+            _logger?.Debug(
+                $"{nameof(EventProviderDbContext)}.{nameof(IsUpgradeNeeded)}() for database {Path}. currentVersion: {currentVersion} needsUpgrade: {state.NeedsUpgrade}");
+
+            return state;
         }
         finally
         {
-            // Always close the connection we opened explicitly — leaving it open keeps the SQLite
-            // file locked, blocking other operations (including FileInfo.Length reads on some
-            // platforms) and undermining EF's normal short-lived-connection lifecycle.
             Database.CloseConnection();
         }
     }
 
     public void PerformUpgradeIfNeeded()
     {
-        var (needsV2Upgrade, needsV3Upgrade) = IsUpgradeNeeded();
+        var state = IsUpgradeNeeded();
 
-        if (!needsV2Upgrade && !needsV3Upgrade)
+        if (!state.NeedsUpgrade) { return; }
+
+        // Hard-fail before any destructive step (DROP TABLE) so the on-disk data is preserved
+        // when the upgrade cannot proceed. Two distinct failure modes:
+        //   * Unknown shape — file is not a recognizable ProviderDetails database, possibly
+        //     corrupt or from a future / incompatible version.
+        //   * V1/V2 — pre-V3 legacy schemas are no longer supported by this build; the user
+        //     must upgrade through an older release that supported V3 first, or delete the file.
+        if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
         {
-            return;
+            throw new DatabaseUpgradeException(
+                Path,
+                $"Database '{Path}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
+        }
+
+        if (state.CurrentVersion is 1 or 2)
+        {
+            throw new DatabaseUpgradeException(
+                Path,
+                $"Database '{Path}' is at schema v{state.CurrentVersion}; this version is no longer supported. Upgrade through an older EventLogExpert release that supports v3 first, or delete the file.");
         }
 
         var size = new FileInfo(Path).Length;
 
-        _logger?.Info($"EventProviderDbContext upgrading database. Size: {size} Path: {Path}");
+        _logger?.Info(
+            $"EventProviderDbContext upgrading database (current v{state.CurrentVersion} → v{ProviderDatabaseSchemaVersion.Current}). Size: {size} Path: {Path}");
 
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
@@ -118,59 +206,38 @@ public sealed class EventProviderDbContext : DbContext
 
         try
         {
-            using var command = connection.CreateCommand();
-
-            command.CommandText = "SELECT * FROM \"ProviderDetails\"";
-
-            using (var detailsReader = command.ExecuteReader())
+            using (var command = connection.CreateCommand())
             {
-                if (needsV2Upgrade)
+                command.CommandText = "SELECT * FROM \"ProviderDetails\"";
+
+                using var detailsReader = command.ExecuteReader();
+
+                while (detailsReader.Read())
                 {
-                    while (detailsReader.Read())
-                    {
-                        var providerName = (string)detailsReader["ProviderName"];
-                        var p = new ProviderDetails
-                        {
-                            ProviderName = providerName,
-                            Messages = JsonSerializer.Deserialize<List<MessageModel>>((string)detailsReader["Messages"], ProviderJsonSerializerOptions.Default) ?? new List<MessageModel>(),
-                            Parameters = TryReadParametersJson(detailsReader, providerName),
-                            Events = JsonSerializer.Deserialize<List<EventModel>>((string)detailsReader["Events"], ProviderJsonSerializerOptions.Default) ?? new List<EventModel>(),
-                            Keywords = JsonSerializer.Deserialize<Dictionary<long, string>>((string)detailsReader["Keywords"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<long, string>(),
-                            Opcodes = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Opcodes"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<int, string>(),
-                            Tasks = JsonSerializer.Deserialize<Dictionary<int, string>>((string)detailsReader["Tasks"], ProviderJsonSerializerOptions.Default) ?? new Dictionary<int, string>()
-                        };
-                        allProviderDetails.Add(p);
-                    }
-                }
-                else
-                {
-                    while (detailsReader.Read())
-                    {
-                        var providerName = (string)detailsReader["ProviderName"];
-                        var p = new ProviderDetails
-                        {
-                            ProviderName = providerName,
-                            Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])detailsReader["Messages"]) ?? new List<MessageModel>(),
-                            Parameters = TryReadParametersJson(detailsReader, providerName),
-                            Events = CompressedJsonValueConverter<List<EventModel>>.ConvertFromCompressedJson((byte[])detailsReader["Events"]) ?? new List<EventModel>(),
-                            Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])detailsReader["Keywords"]) ?? new Dictionary<long, string>(),
-                            Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Opcodes"]) ?? new Dictionary<int, string>(),
-                            Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])detailsReader["Tasks"]) ?? new Dictionary<int, string>()
-                        };
-                        allProviderDetails.Add(p);
-                    }
+                    var providerName = (string)detailsReader["ProviderName"];
+
+                    var details = ReadCompressedRow(detailsReader, providerName);
+
+                    allProviderDetails.Add(details);
                 }
             }
 
-            command.CommandText = "DROP TABLE \"ProviderDetails\"";
-            command.ExecuteNonQuery();
-            command.CommandText = "VACUUM";
-            command.ExecuteNonQuery();
+            // Pre-DROP merge: detect case-insensitive duplicates and either merge or hard-fail.
+            // Throwing here (before DROP) preserves the original database contents on conflict.
+            var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(allProviderDetails, Path);
+
+            using (var dropCommand = connection.CreateCommand())
+            {
+                dropCommand.CommandText = "DROP TABLE \"ProviderDetails\"";
+                dropCommand.ExecuteNonQuery();
+                dropCommand.CommandText = "VACUUM";
+                dropCommand.ExecuteNonQuery();
+            }
+
+            allProviderDetails = merged;
         }
         finally
         {
-            // SaveChanges() below will reopen the connection on demand; releasing it here keeps the
-            // explicit open/close balanced and prevents leaking the lock if SaveChanges throws.
             Database.CloseConnection();
         }
 
@@ -188,13 +255,17 @@ public sealed class EventProviderDbContext : DbContext
         _logger?.Info($"EventProviderDbContext upgrade completed. Size: {size} Path: {Path}");
     }
 
-    protected override void OnConfiguring(DbContextOptionsBuilder options)
-        => options.UseSqlite($"Data Source={Path};Mode={(_readOnly ? "ReadOnly" : "ReadWriteCreate")}");
+    protected override void OnConfiguring(DbContextOptionsBuilder options) =>
+        options.UseSqlite($"Data Source={Path};Mode={(_readOnly ? "ReadOnly" : "ReadWriteCreate")}");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<ProviderDetails>()
             .HasKey(e => e.ProviderName);
+
+        modelBuilder.Entity<ProviderDetails>()
+            .Property(e => e.ProviderName)
+            .UseCollation("NOCASE");
 
         modelBuilder.Entity<ProviderDetails>()
             .Property(e => e.Messages)
@@ -221,47 +292,98 @@ public sealed class EventProviderDbContext : DbContext
             .HasConversion<CompressedJsonValueConverter<IDictionary<int, string>>>();
     }
 
-    /// <summary>
-    ///     Reads the optional <c>Parameters</c> column from the pre-upgrade row, if present, and
-    ///     deserializes the JSON payload. V1 schemas have no Parameters column at all (returns empty
-    ///     list); V2 stored it as JSON-encoded TEXT (preserved here). Any failure to parse logs a
-    ///     warning so silent data loss is diagnosable instead of opaque.
-    /// </summary>
-    private List<MessageModel> TryReadParametersJson(IDataReader reader, string providerName)
-    {
-        for (var i = 0; i < reader.FieldCount; i++)
+    private static bool IsType(string? actual, string expected) =>
+        string.Equals(actual?.Trim(), expected, StringComparison.OrdinalIgnoreCase);
+
+    private static ProviderDetails ReadCompressedRow(IDataReader reader, string providerName) =>
+        new()
         {
-            if (!string.Equals(reader.GetName(i), "Parameters", StringComparison.Ordinal))
+            ProviderName = providerName,
+            Messages = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])reader["Messages"]),
+            Parameters = CompressedJsonValueConverter<List<MessageModel>>.ConvertFromCompressedJson((byte[])reader["Parameters"]),
+            Events = CompressedJsonValueConverter<List<EventModel>>.ConvertFromCompressedJson((byte[])reader["Events"]),
+            Keywords = CompressedJsonValueConverter<Dictionary<long, string>>.ConvertFromCompressedJson((byte[])reader["Keywords"]),
+            Opcodes = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])reader["Opcodes"]),
+            Tasks = CompressedJsonValueConverter<Dictionary<int, string>>.ConvertFromCompressedJson((byte[])reader["Tasks"]),
+            ResolvedFromOwningPublisher = TryReadResolvedFromOwningPublisher(reader, providerName)
+        };
+
+    private static bool TryDetectPrimaryKeyNoCaseCollation(DbConnection connection)
+    {
+        // SQLite stores per-column collation on each index entry rather than on the column itself.
+        // Find the auto-generated PK index for ProviderDetails, then read the collation for the
+        // ProviderName entry from PRAGMA index_xinfo.
+        //
+        // Returning false on any "could not detect" branch (missing PK index, missing column entry,
+        // null `coll`) is intentional and safe: the caller treats false as "not V4", which triggers
+        // the V3->V4 upgrade path. The upgrade unconditionally DROPs and recreates the table via
+        // EnsureCreated, so a corrupt-or-unrecognized PK index self-heals on the next launch — there
+        // is no infinite-upgrade-loop risk.
+        string? pkIndexName = null;
+
+        using (var indexListCommand = connection.CreateCommand())
+        {
+            indexListCommand.CommandText = "PRAGMA index_list(\"ProviderDetails\")";
+            
+            using var indexListReader = indexListCommand.ExecuteReader();
+
+            while (indexListReader.Read())
+            {
+                var origin = indexListReader["origin"]?.ToString();
+
+                if (!string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                pkIndexName = indexListReader["name"]?.ToString();
+
+                break;
+            }
+        }
+
+        if (string.IsNullOrEmpty(pkIndexName)) { return false; }
+
+        using var indexInfoCommand = connection.CreateCommand();
+
+        indexInfoCommand.CommandText = $"PRAGMA index_xinfo(\"{pkIndexName}\")";
+
+        using var indexInfoReader = indexInfoCommand.ExecuteReader();
+
+        while (indexInfoReader.Read())
+        {
+            var columnName = indexInfoReader["name"]?.ToString();
+
+            if (!string.Equals(columnName, nameof(Providers.ProviderDetails.ProviderName), StringComparison.Ordinal))
             {
                 continue;
             }
 
-            if (reader.IsDBNull(i))
-            {
-                return [];
-            }
+            var collation = indexInfoReader["coll"]?.ToString();
 
-            var raw = reader.GetValue(i);
-
-            if (raw is string s)
-            {
-                if (string.IsNullOrEmpty(s)) { return []; }
-
-                try
-                {
-                    return JsonSerializer.Deserialize<List<MessageModel>>(s, ProviderJsonSerializerOptions.Default) ?? [];
-                }
-                catch (JsonException ex)
-                {
-                    _logger?.Warn($"EventProviderDbContext upgrade: failed to deserialize Parameters JSON for provider '{providerName}' in {Path}: {ex.Message}. Parameters will be empty after upgrade.");
-                    return [];
-                }
-            }
-
-            _logger?.Warn($"EventProviderDbContext upgrade: Parameters column for provider '{providerName}' in {Path} is of unexpected type '{raw.GetType().Name}'. Parameters will be empty after upgrade.");
-            return [];
+            return string.Equals(collation, "NOCASE", StringComparison.OrdinalIgnoreCase);
         }
 
-        return [];
+        return false;
+    }
+
+    private static string? TryReadResolvedFromOwningPublisher(IDataReader reader, string providerName)
+    {
+        for (var i = 0; i < reader.FieldCount; i++)
+        {
+            if (!string.Equals(reader.GetName(i),
+                nameof(Providers.ProviderDetails.ResolvedFromOwningPublisher),
+                StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            return reader.IsDBNull(i) ? null : reader.GetString(i);
+        }
+
+        // Column not present (V3 schema) — leave null.
+        _ = providerName;
+
+        return null;
     }
 }
