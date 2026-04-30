@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
-using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
@@ -30,8 +29,6 @@ public sealed partial class DetailsPane
     private DisplayEventModel? _selectedEvent;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
-
-    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IEventXmlResolver EventXmlResolver { get; init; } = null!;
 
@@ -108,8 +105,6 @@ public sealed partial class DetailsPane
 
         base.OnInitialized();
     }
-
-    private async Task CopyEvent() => await ClipboardService.CopySelectedEvent(CopyType.Full);
 
     private string GetXmlForDisplay()
     {
