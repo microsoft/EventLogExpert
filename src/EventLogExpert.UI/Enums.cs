@@ -35,6 +35,15 @@ public enum CopyType
     Full
 }
 
+public enum DatabaseStatus
+{
+    Ready,
+    UpgradeRequired,
+    UpgradeFailed,
+    UnrecognizedSchema,
+    ObsoleteSchema
+}
+
 public enum HighlightColor
 {
     None,
