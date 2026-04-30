@@ -113,6 +113,46 @@ internal static class ProviderSource
     }
 
     /// <summary>
+    ///     Returns true when every <c>.db</c> file enumerated from <paramref name="path" /> is at the current
+    ///     schema. When any file is at an unrecognized or stale schema, an actionable error is logged for that
+    ///     file and the method returns false. Use this before workflows where a schema-rejected source file
+    ///     silently producing zero providers would corrupt the result (e.g., diff, where the first source
+    ///     defines the baseline of what to skip from the second source). Single-file workflows that skip
+    ///     individual unreadable sources can rely on the per-file gate inside <see cref="LoadProviderNames(string, ITraceLogger, string?)" />
+    ///     and friends, which logs and yields no rows for the failing file. <c>.evtx</c> files have no schema
+    ///     and are ignored here.
+    /// </summary>
+    public static bool ValidateSourceSchemas(string path, ITraceLogger logger)
+    {
+        var allOk = true;
+
+        foreach (var file in EnumerateSourceFiles(path, logger))
+        {
+            if (!string.Equals(Path.GetExtension(file), DbExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            try
+            {
+                using var providerContext = new EventProviderDbContext(file, true, logger);
+
+                if (!IsSourceSchemaCurrent(providerContext, file, logger))
+                {
+                    allOk = false;
+                }
+            }
+            catch (DbException ex)
+            {
+                logger.Error($"Cannot open source database '{file}': {ex.Message}");
+                allOk = false;
+            }
+        }
+
+        return allOk;
+    }
+
+    /// <summary>
     ///     Expands <paramref name="path" /> into the ordered list of source files: a single .db or .evtx
     ///     when given a file; or all *.db files (sorted) followed by all *.evtx files (sorted) when given a
     ///     folder.
@@ -174,6 +214,9 @@ internal static class ProviderSource
             try
             {
                 using var context = new EventProviderDbContext(file, true, logger);
+
+                if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
+
                 context.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
 
                 // Filter by name without mutating `seen` so that a subsequent catch does not
@@ -239,7 +282,9 @@ internal static class ProviderSource
             try
             {
                 using var providerContext = new EventProviderDbContext(file, true, logger);
-                return providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
+
+                return !IsSourceSchemaCurrent(providerContext, file, logger) ? [] :
+                    providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
             }
             catch (DbException ex)
             {
@@ -256,6 +301,34 @@ internal static class ProviderSource
         logger.Warn($"Skipping unsupported source file: {file}");
 
         return [];
+    }
+
+    /// <summary>
+    /// Returns true if <paramref name="context"/> points to a database at the current schema
+    /// version. Otherwise logs an explicit error and returns false. Without this gate, EF would
+    /// query the source with the V4 model against a V3 schema and either throw a confusing
+    /// <c>DbException</c> for the missing column or — in the names-only path — silently discover
+    /// names that subsequently fail to materialize as full provider rows. Distinguishes the
+    /// "unrecognized schema" case from the "known but stale" case so the error message is actionable.
+    /// </summary>
+    private static bool IsSourceSchemaCurrent(EventProviderDbContext context, string file, ITraceLogger logger)
+    {
+        var state = context.IsUpgradeNeeded();
+
+        if (!state.NeedsUpgrade) { return true; }
+
+        if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        {
+            logger.Error(
+                $"Source database '{file}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
+        }
+        else
+        {
+            logger.Error(
+                $"Source database '{file}' is at schema v{state.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command on the source first.");
+        }
+
+        return false;
     }
 
     private static IEnumerable<ProviderDetails> LoadProvidersIterator(

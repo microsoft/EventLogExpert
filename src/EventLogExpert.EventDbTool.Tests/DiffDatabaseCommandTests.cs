@@ -1,0 +1,118 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.EventDbTool.Tests.TestUtils;
+using EventLogExpert.EventDbTool.Tests.TestUtils.Constants;
+using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.Helpers;
+using NSubstitute;
+
+namespace EventLogExpert.EventDbTool.Tests;
+
+public sealed class DiffDatabaseCommandTests : IDisposable
+{
+    private readonly List<string> _tempPaths = [];
+
+    [Fact]
+    public void DiffDatabase_PreservesResolvedFromOwningPublisher()
+    {
+        // Arrange — first source has Shared, second source has Shared and Second.
+        // The diff output should contain only Second, with its ResolvedFromOwningPublisher value
+        // intact. This locks in the Add(details) projection in DiffDatabase: a hand-projection that
+        // forgot ResolvedFromOwningPublisher (or any future ProviderDetails member) would fail this.
+        var first = CreateTempDb();
+        var second = CreateTempDb();
+        var output = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(first,
+            DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName));
+
+        DatabaseTestUtils.CreateV4Database(second,
+            DatabaseTestUtils.BuildProviderDetails(Constants.SharedProviderName),
+            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName, Constants.OwningPublisherName));
+
+        File.Delete(output);
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+
+        // Assert
+        Assert.True(File.Exists(output), "Diff should have created the output database.");
+
+        using var verify = new EventProviderDbContext(output, true);
+        var rows = verify.ProviderDetails.ToList();
+        var copied = Assert.Single(rows);
+        Assert.Equal(Constants.SecondProviderName, copied.ProviderName);
+        Assert.Equal(Constants.OwningPublisherName, copied.ResolvedFromOwningPublisher);
+    }
+
+    [Fact]
+    public void DiffDatabase_WithObsoleteSecondSource_AbortsWithoutCreatingOutput()
+    {
+        // Arrange — V3 schema in second source. Diff aborts on stale-but-known schema too.
+        var first = CreateTempDb();
+        var second = CreateTempDb();
+        var output = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(first,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+        DatabaseTestUtils.CreateV3Database(second);
+
+        File.Delete(output);
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+
+        // Assert
+        Assert.False(File.Exists(output), "Diff must not create an output database when a source is obsolete.");
+        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
+            handler.ToString().Contains("schema v3") && handler.ToString().Contains(second) && handler.ToString().Contains("upgrade")));
+    }
+
+    [Fact]
+    public void DiffDatabase_WithUnknownFirstSource_AbortsWithoutCreatingOutput()
+    {
+        // Arrange — without the upfront ValidateSourceSchemas check, the schema-rejected first
+        // source would silently yield zero providers, the second source's full contents would be
+        // copied to output as "missing from first", and the user would get a wrong result with
+        // only a single error log line buried earlier in the output.
+        var first = CreateTempDb();
+        var second = CreateTempDb();
+        var output = CreateTempDb();
+
+        DatabaseTestUtils.CreateUnknownShapeDatabase(first);
+        DatabaseTestUtils.CreateV4Database(second,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        File.Delete(output);
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+
+        // Assert
+        Assert.False(File.Exists(output), "Diff must not create an output database when a source is invalid.");
+        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
+            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(first)));
+    }
+
+    public void Dispose()
+    {
+        foreach (var path in _tempPaths)
+        {
+            DatabaseTestUtils.DeleteDatabaseFile(path);
+        }
+    }
+
+    private string CreateTempDb()
+    {
+        var path = DatabaseTestUtils.CreateTempPath();
+        _tempPaths.Add(path);
+        return path;
+    }
+}
