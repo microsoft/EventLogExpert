@@ -13,15 +13,15 @@
     @ref="ChromeRef">
     <ChildContent>
         <div aria-label="Debug log entries" aria-live="polite" class="flex-column-scroll" role="log">
-            @if (_data.Any())
+            @if (_data.Count > 0)
             {
-                @foreach (var line in _data)
+                @for (var i = _data.Count - 1; i >= 0; i--)
                 {
-                    <text>@line</text>
+                    <text>@_data[i]</text>
                     <br />
                 }
             }
-            else
+            else if (_hasLoaded)
             {
                 <text>Log is Empty...</text>
             }

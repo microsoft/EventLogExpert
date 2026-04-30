@@ -9,7 +9,12 @@ namespace EventLogExpert.Shared.Components;
 
 public sealed partial class DebugLogModal : ModalBase<bool>
 {
+    private const int RenderBatchSize = 100;
+
     private readonly List<string> _data = [];
+
+    private bool _hasLoaded;
+    private int _loadGeneration;
 
     [Inject] private IFileLogger FileLogger { get; set; } = null!;
 
@@ -19,9 +24,21 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         await base.OnInitializedAsync();
     }
 
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            _loadGeneration++;
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
     private async Task Clear()
     {
+        _loadGeneration++;
         _data.Clear();
+        _hasLoaded = true;
 
         await FileLogger.ClearAsync();
 
@@ -30,13 +47,37 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
     private async Task Refresh()
     {
+        var generation = ++_loadGeneration;
+
+        _hasLoaded = false;
         _data.Clear();
-
-        await foreach (var line in FileLogger.LoadAsync())
-        {
-            _data.Add(line);
-        }
-
         StateHasChanged();
+
+        var sinceRender = 0;
+
+        try
+        {
+            await foreach (var line in FileLogger.LoadAsync())
+            {
+                if (generation != _loadGeneration) { return; }
+
+                _data.Add(line);
+
+                if (++sinceRender >= RenderBatchSize)
+                {
+                    sinceRender = 0;
+                    StateHasChanged();
+                    await Task.Yield();
+                }
+            }
+        }
+        finally
+        {
+            if (generation == _loadGeneration)
+            {
+                _hasLoaded = true;
+                StateHasChanged();
+            }
+        }
     }
 }
