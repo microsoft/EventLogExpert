@@ -49,11 +49,12 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         using var dbContext = new EventProviderDbContext(file, false, Logger);
 
-        var (needsV2, needsV3) = dbContext.IsUpgradeNeeded();
+        var state = dbContext.IsUpgradeNeeded();
 
-        if (!(needsV2 || needsV3))
+        if (!state.NeedsUpgrade)
         {
             Logger.Info($"This database does not need to be upgraded.");
+
             return;
         }
 

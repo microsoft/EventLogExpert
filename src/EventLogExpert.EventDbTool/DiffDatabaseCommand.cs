@@ -56,10 +56,21 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         return diffDatabaseCommand;
     }
 
-    private void DiffDatabase(string firstSource, string secondSource, string newDb)
+    internal void DiffDatabase(string firstSource, string secondSource, string newDb)
     {
         if (!ProviderSource.TryValidate(firstSource, Logger)) { return; }
+
         if (!ProviderSource.TryValidate(secondSource, Logger)) { return; }
+
+        // Diff treats the first source as the authoritative skip baseline for the second source.
+        // If any .db file in either source is at an unrecognized or stale schema, ProviderSource
+        // would log the error and silently yield zero providers from that file, which would cause
+        // every provider in the second source to be (incorrectly) flagged as "missing from first"
+        // and copied to the new diff db. Validate up front so a single corrupt or obsolete .db
+        // anywhere in either source aborts the whole operation rather than producing a wrong result.
+        if (!ProviderSource.ValidateSourceSchemas(firstSource, Logger)) { return; }
+
+        if (!ProviderSource.ValidateSourceSchemas(secondSource, Logger)) { return; }
 
         if (File.Exists(newDb))
         {
@@ -97,16 +108,11 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
                 newDbContext ??= new EventProviderDbContext(newDb, false, Logger);
 
-                newDbContext.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = details.ProviderName,
-                    Events = details.Events,
-                    Parameters = details.Parameters,
-                    Keywords = details.Keywords,
-                    Messages = details.Messages,
-                    Opcodes = details.Opcodes,
-                    Tasks = details.Tasks
-                });
+                // ProviderSource yields fresh, non-tracked entities — Add(details) is safe and
+                // avoids hand-projecting fields (which silently dropped ResolvedFromOwningPublisher
+                // and would silently drop any future ProviderDetails member added without updating
+                // this projection). Matches the pattern in MergeDatabaseCommand.
+                newDbContext.ProviderDetails.Add(details);
 
                 providersCopied.Add(details);
             }

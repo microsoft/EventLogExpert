@@ -80,6 +80,24 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
 
+        // Reject pre-V4 target databases up front. Without this gate the merge would happily
+        // run against an obsolete schema and either silently mis-handle case-insensitive PK
+        // matching or fail at the SaveChanges step. The user is expected to run the
+        // `upgrade` command first.
+        var schemaState = targetContext.IsUpgradeNeeded();
+
+        if (schemaState.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        {
+            Logger.Error($"Target database '{targetFile}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
+            return;
+        }
+
+        if (schemaState.NeedsUpgrade)
+        {
+            Logger.Error($"Target database '{targetFile}' is at schema v{schemaState.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command first.");
+            return;
+        }
+
         // Query the overlap in the database by chunking sourceNames into IN-clause batches,
         // rather than pulling every target ProviderName into memory. Same chunk size as the
         // delete loop below to stay below SQLite's default parameter limit (999).
@@ -93,17 +111,12 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
                 .Take(ProviderSource.MaxInClauseParameters)
                 .ToList();
 
-            // Use NOCASE collation on the column side so the IN-clause matches case-insensitively,
-            // matching the case-insensitive semantics used elsewhere in the tool (sourceNames is
-            // an OrdinalIgnoreCase HashSet). Without this, a source name "Microsoft-Foo" would
-            // not match a target row stored as "microsoft-foo", causing duplicates on copy or
-            // missed deletes when --overwrite is used. Using NOCASE on the column prevents PK
-            // index use for this query (table scan), but for an admin one-shot merge the
-            // correctness trade-off is acceptable.
+            // The ProviderName column uses NOCASE collation as of schema v4, so a plain
+            // IN-clause matches case-insensitively while still using the PK index.
             targetMatchingNames.AddRange(
                 targetContext.ProviderDetails
                     .AsNoTracking()
-                    .Where(p => chunk.Contains(EF.Functions.Collate(p.ProviderName, "NOCASE")))
+                    .Where(p => chunk.Contains(p.ProviderName))
                     .Select(p => p.ProviderName));
         }
 
