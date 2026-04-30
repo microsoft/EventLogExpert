@@ -15,11 +15,6 @@ using System.Xml.Linq;
 
 namespace EventLogExpert.Services;
 
-public interface IClipboardService
-{
-    Task CopySelectedEvent(CopyType? copyType = null);
-}
-
 public sealed class ClipboardService : IClipboardService
 {
     private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
@@ -62,7 +57,21 @@ public sealed class ClipboardService : IClipboardService
         }
         catch (Exception ex)
         {
-            _traceLogger.Error($"ClipboardService: failed to copy selected event(s): {ex}");
+            _traceLogger.Error($"{nameof(ClipboardService)}.{nameof(CopySelectedEvent)}: failed: {ex}");
+        }
+    }
+
+    public async Task CopyTextAsync(string text)
+    {
+        // Same best-effort contract as CopySelectedEvent: callers (banner copy-details, filter
+        // export, future surfaces) are typically fire-and-forget UI handlers.
+        try
+        {
+            await Clipboard.SetTextAsync(text).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Error($"{nameof(ClipboardService)}.{nameof(CopyTextAsync)}: failed: {ex}");
         }
     }
 
@@ -78,19 +87,8 @@ public sealed class ClipboardService : IClipboardService
         }
     }
 
-    private string FormatEventForCopy(CopyType copyType, DisplayEventModel @event, string xml)
-    {
-        if (copyType == CopyType.Xml)
-        {
-            return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
-        }
-
-        StringBuilder builder = new();
-
-        AppendFormattedEvent(builder, copyType, @event, xml);
-
-        return builder.ToString();
-    }
+    private static string GetLogShortName(string owningLog) =>
+        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
 
     private void AppendFormattedEvent(
         StringBuilder builder,
@@ -155,6 +153,7 @@ public sealed class ClipboardService : IClipboardService
                 break;
             case CopyType.Xml:
                 if (!string.IsNullOrEmpty(xml)) { builder.Append(FormatXmlForCopy(xml)); }
+
                 break;
             case CopyType.Full:
             default:
@@ -180,8 +179,19 @@ public sealed class ClipboardService : IClipboardService
         }
     }
 
-    private static string GetLogShortName(string owningLog) =>
-        owningLog[(owningLog.LastIndexOf('\\') + 1)..];
+    private string FormatEventForCopy(CopyType copyType, DisplayEventModel @event, string xml)
+    {
+        if (copyType == CopyType.Xml)
+        {
+            return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
+        }
+
+        StringBuilder builder = new();
+
+        AppendFormattedEvent(builder, copyType, @event, xml);
+
+        return builder.ToString();
+    }
 
     private async Task<string> GetFormattedEvent(CopyType? copyType)
     {

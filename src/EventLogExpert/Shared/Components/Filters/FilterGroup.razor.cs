@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
@@ -26,6 +27,8 @@ public sealed partial class FilterGroup
     [Parameter] public FilterGroupModal Parent { get; set; } = null!;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
@@ -67,7 +70,7 @@ public sealed partial class FilterGroup
 
     private void CancelGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
 
-    private void CopyGroup()
+    private async Task CopyGroup()
     {
         if (Group.Filters.Count <= 0) { return; }
 
@@ -75,7 +78,7 @@ public sealed partial class FilterGroup
             string.Join(" || ", Group.Filters.Select(filter => $"({filter.ComparisonText})")) :
             Group.Filters[0].ComparisonText;
 
-        _ = Clipboard.SetTextAsync(text);
+        await ClipboardService.CopyTextAsync(text);
     }
 
     private async Task ExportGroup()
