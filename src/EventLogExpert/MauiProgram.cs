@@ -71,11 +71,13 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
         builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
-        builder.Services.AddSingleton<IDatabaseService, DatabaseService>();
+        builder.Services.AddSingleton<DatabaseService>();
+        builder.Services.AddSingleton<IDatabaseService>(static provider =>
+            provider.GetRequiredService<DatabaseService>());
 
         // Provider Services
-        builder.Services.AddSingleton<IEnabledDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
-        builder.Services.AddSingleton<IDatabaseCollectionProvider, EnabledDatabaseCollectionProvider>();
+        builder.Services.AddSingleton<IDatabaseCollectionProvider>(static provider =>
+            provider.GetRequiredService<DatabaseService>());
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();

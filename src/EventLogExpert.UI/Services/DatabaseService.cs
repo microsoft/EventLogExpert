@@ -1,77 +1,223 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Options;
+using System.Collections.Immutable;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Services;
 
-public sealed partial class DatabaseService(
-    IEnabledDatabaseCollectionProvider enabledDatabaseCollectionProvider,
-    IPreferencesProvider preferences) : IDatabaseService
+public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollectionProvider
 {
-    private readonly IEnabledDatabaseCollectionProvider _enabledDatabaseCollectionProvider =
-        enabledDatabaseCollectionProvider;
-    private readonly IPreferencesProvider _preferences = preferences;
+    private readonly FileLocationOptions _fileLocationOptions;
+    private readonly Lock _mutationLock = new();
+    private readonly IPreferencesProvider _preferences;
+    private readonly ITraceLogger _traceLogger;
 
-    public IEnumerable<string> LoadedDatabases
+    private ImmutableList<DatabaseEntry> _entries = [];
+
+    public DatabaseService(
+        FileLocationOptions fileLocationOptions,
+        IPreferencesProvider preferences,
+        ITraceLogger traceLogger)
     {
-        get
+        _fileLocationOptions = fileLocationOptions;
+        _preferences = preferences;
+        _traceLogger = traceLogger;
+
+        Refresh();
+    }
+
+    public event EventHandler? EntriesChanged;
+
+    public ImmutableList<string> ActiveDatabases =>
+        _entries
+            .Where(IsActive)
+            .Select(entry => entry.FullPath)
+            .ToImmutableList();
+
+    public IReadOnlyList<DatabaseEntry> Entries => _entries;
+
+    public async Task<ImportResult> ImportAsync(
+        IEnumerable<string> sourceFilePaths,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(sourceFilePaths);
+
+        var importedCount = 0;
+        var failures = new List<ImportFailure>();
+        Directory.CreateDirectory(_fileLocationOptions.DatabasePath);
+
+        foreach (var sourceFilePath in sourceFilePaths)
         {
-            _loadedDatabases ??= SortDatabases(_enabledDatabaseCollectionProvider.GetEnabledDatabases());
+            cancellationToken.ThrowIfCancellationRequested();
 
-            return _loadedDatabases;
+            if (string.IsNullOrEmpty(sourceFilePath)) { continue; }
+
+            var fileName = Path.GetFileName(sourceFilePath);
+
+            if (string.IsNullOrEmpty(fileName)) { continue; }
+
+            if (Path.GetExtension(fileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                var (zipImported, zipFailures) = await ImportZipAsync(sourceFilePath, fileName, cancellationToken)
+                    .ConfigureAwait(false);
+
+                importedCount += zipImported;
+                failures.AddRange(zipFailures);
+            }
+            else
+            {
+                try
+                {
+                    var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, fileName);
+                    File.Copy(sourceFilePath, destinationPath, true);
+                    importedCount++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failures.Add(new ImportFailure(fileName, ex.Message));
+
+                    _traceLogger.Warn(
+                        $"{nameof(DatabaseService)}.{nameof(ImportAsync)} failed to copy '{fileName}': {ex}");
+                }
+            }
         }
-    }
 
-    private IEnumerable<string>? _disabledDatabases;
-    private IEnumerable<string>? _loadedDatabases;
-
-    public IEnumerable<string> DisabledDatabases
-    {
-        get
+        if (importedCount > 0)
         {
-            _disabledDatabases ??= _preferences.DisabledDatabasesPreference;
-
-            return _disabledDatabases;
+            Refresh();
         }
-        private set
+
+        return new ImportResult(importedCount, failures);
+    }
+
+    public void MarkStatus(string fileName, DatabaseStatus status)
+    {
+        lock (_mutationLock)
         {
-            _disabledDatabases = value.ToList().AsReadOnly();
-            _preferences.DisabledDatabasesPreference = _disabledDatabases;
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index < 0)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DatabaseService)}.{nameof(MarkStatus)}: no entry found with file name '{fileName}'.");
+            }
+
+            var current = _entries[index];
+
+            if (current.Status == status) { return; }
+
+            ImmutableList<DatabaseEntry> nextSnapshot = _entries.SetItem(index, current with { Status = status });
+            _entries = nextSnapshot;
         }
+
+        RaiseEntriesChanged();
     }
 
-    public EventHandler<IEnumerable<string>>? LoadedDatabasesChanged { get; set; }
-
-    public void LoadDatabases()
+    public void Refresh()
     {
-        _loadedDatabases = SortDatabases(_enabledDatabaseCollectionProvider.GetEnabledDatabases());
+        lock (_mutationLock)
+        {
+            var disabled = _preferences.DisabledDatabasesPreference.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        LoadedDatabasesChanged?.Invoke(this, LoadedDatabases);
+            var existingByFileName = _entries.ToDictionary(
+                entry => entry.FileName,
+                StringComparer.OrdinalIgnoreCase);
+
+            var fileNames = EnumerateDatabaseFileNames();
+            var sortedFileNames = SortDatabases(fileNames);
+
+            ImmutableList<DatabaseEntry> nextSnapshot = sortedFileNames
+                .Select(fileName => new DatabaseEntry(
+                    fileName,
+                    Path.Join(_fileLocationOptions.DatabasePath, fileName),
+                    !disabled.Contains(fileName),
+                    existingByFileName.TryGetValue(fileName, out var existing)
+                        ? existing.Status
+                        : DatabaseStatus.Ready))
+                .ToImmutableList();
+
+            _entries = nextSnapshot;
+        }
+
+        RaiseEntriesChanged();
     }
 
-    public void UpdateDisabledDatabases(IEnumerable<string> databases)
+    public void Remove(string fileName)
     {
-        DisabledDatabases = databases;
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
 
-        LoadDatabases();
+            if (index < 0)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DatabaseService)}.{nameof(Remove)}: no entry found with file name '{fileName}'.");
+            }
+
+            DeleteDatabaseFiles(fileName);
+
+            ImmutableList<DatabaseEntry> nextSnapshot = _entries.RemoveAt(index);
+            PersistDisabled(nextSnapshot);
+            _entries = nextSnapshot;
+        }
+
+        RaiseEntriesChanged();
     }
+
+    public void Toggle(string fileName)
+    {
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index < 0)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DatabaseService)}.{nameof(Toggle)}: no entry found with file name '{fileName}'.");
+            }
+
+            var current = _entries[index];
+            var updated = current with { IsEnabled = !current.IsEnabled };
+            ImmutableList<DatabaseEntry> nextSnapshot = _entries.SetItem(index, updated);
+
+            PersistDisabled(nextSnapshot);
+            _entries = nextSnapshot;
+        }
+
+        RaiseEntriesChanged();
+    }
+
+    private static int FindEntryIndex(ImmutableList<DatabaseEntry> snapshot, string fileName) =>
+        snapshot.FindIndex(entry => string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsActive(DatabaseEntry entry) => entry.IsEnabled && entry.Status == DatabaseStatus.Ready;
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {
         if (!databases.Any()) { return []; }
 
-        var r = SplitFileName();
+        var splitter = SplitFileName();
 
         return databases
             .Select(name =>
             {
-                var m = r.Match(name);
+                // Strip the .db extension before applying the version regex so that "Server 20.db"
+                // splits into ("Server ", "20") instead of ("Server ", "20.db") — otherwise the
+                // version capture never parses as a number and numeric sort falls back to
+                // lexicographic ("Server 2.db" < "Server 20.db" but "Server 20.db" > "Server 10.db").
+                var nameWithoutExt = Path.GetFileNameWithoutExtension(name);
+                var match = splitter.Match(nameWithoutExt);
 
-                if (m.Success)
+                if (match.Success)
                 {
-                    var versionString = m.Groups[2].Value;
+                    var versionString = match.Groups[2].Value;
 
                     // Try to parse the version as a number for proper numeric ordering.
                     // This ensures "10" sorts after "2" rather than before it (lexicographic).
@@ -79,7 +225,8 @@ public sealed partial class DatabaseService(
 
                     return new
                     {
-                        FirstPart = m.Groups[1].Value + " ",
+                        OriginalName = name,
+                        FirstPart = match.Groups[1].Value + " ",
                         SecondPart = versionString,
                         NumericVersion = numericVersion
                     };
@@ -87,17 +234,134 @@ public sealed partial class DatabaseService(
 
                 return new
                 {
-                    FirstPart = name,
+                    OriginalName = name,
+                    FirstPart = nameWithoutExt,
                     SecondPart = "",
                     NumericVersion = (int?)null
                 };
             })
-            .OrderBy(n => n.FirstPart)
-            .ThenByDescending(n => n.NumericVersion ?? int.MinValue)
-            .ThenByDescending(n => n.SecondPart)
-            .Select(n => n.FirstPart + n.SecondPart);
+            .OrderBy(name => name.FirstPart)
+            .ThenByDescending(name => name.NumericVersion ?? int.MinValue)
+            .ThenByDescending(name => name.SecondPart)
+            .Select(name => name.OriginalName);
     }
 
     [GeneratedRegex("^(.+) (\\S+)$")]
     private static partial Regex SplitFileName();
+
+    private void DeleteDatabaseFiles(string fileName)
+    {
+        // Delete the .db together with its SQLite sidecars (.db-wal, .db-shm) so a re-import
+        // doesn't pick up stale write-ahead state.
+        var directory = new DirectoryInfo(_fileLocationOptions.DatabasePath);
+
+        if (!directory.Exists) { return; }
+
+        foreach (var file in directory.GetFiles($"{fileName}*"))
+        {
+            file.Delete();
+        }
+    }
+
+    private IEnumerable<string> EnumerateDatabaseFileNames()
+    {
+        if (!Directory.Exists(_fileLocationOptions.DatabasePath)) { return []; }
+
+        try
+        {
+            return Directory
+                .EnumerateFiles(_fileLocationOptions.DatabasePath, "*.db")
+                .Select(Path.GetFileName)
+                .Where(name => !string.IsNullOrEmpty(name))
+                .Cast<string>()
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            _traceLogger.Warn($"{nameof(DatabaseService)}.{nameof(EnumerateDatabaseFileNames)} failed: {ex}");
+            return [];
+        }
+    }
+
+    private async Task<(int Imported, IReadOnlyList<ImportFailure> Failures)> ImportZipAsync(
+        string sourceZipPath,
+        string zipFileName,
+        CancellationToken cancellationToken)
+    {
+        var imported = 0;
+        var failures = new List<ImportFailure>();
+
+        ZipArchive archive;
+
+        try
+        {
+            archive = await ZipFile.OpenReadAsync(sourceZipPath, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            failures.Add(new ImportFailure(zipFileName, $"Could not open archive: {ex.Message}"));
+
+            _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to open '{zipFileName}': {ex}");
+
+            return (imported, failures);
+        }
+
+        await using (archive)
+        {
+            foreach (var entry in archive.Entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrEmpty(entry.Name)) { continue; }
+
+                if (!Path.GetExtension(entry.Name).Equals(".db", StringComparison.OrdinalIgnoreCase)) { continue; }
+
+                var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, entry.Name);
+
+                try
+                {
+                    await using (var entryStream = await entry.OpenAsync(cancellationToken))
+                    {
+                        await using (var fileStream = File.Create(destinationPath))
+                        {
+                            await entryStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                        }
+                    }
+
+                    imported++;
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    failures.Add(new ImportFailure(entry.Name, ex.Message));
+
+                    _traceLogger.Warn(
+                        $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to extract '{entry.Name}' from '{zipFileName}': {ex}");
+
+                    try
+                    {
+                        if (File.Exists(destinationPath))
+                        {
+                            File.Delete(destinationPath);
+                        }
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _traceLogger.Warn(
+                            $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to clean up partial extract '{destinationPath}': {cleanupEx}");
+                    }
+                }
+            }
+        }
+
+        return (imported, failures);
+    }
+
+    private void PersistDisabled(ImmutableList<DatabaseEntry> snapshot) =>
+        _preferences.DisabledDatabasesPreference = snapshot
+            .Where(entry => !entry.IsEnabled)
+            .Select(entry => entry.FileName)
+            .ToList();
+
+    private void RaiseEntriesChanged() => EntriesChanged?.Invoke(this, EventArgs.Empty);
 }

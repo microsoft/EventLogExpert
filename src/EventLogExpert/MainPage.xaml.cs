@@ -1,13 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventResolvers;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
@@ -29,9 +27,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
 {
     private readonly IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> _activeLogs;
     private readonly IAppTitleService _appTitleService;
-    private readonly IDatabaseCollectionProvider _databaseCollectionProvider;
-    private readonly IDatabaseService _databaseService;
-    private readonly FileLocationOptions _fileLocationOptions;
     private readonly MauiMenuActionService _menuActionService;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
@@ -41,12 +36,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     public MainPage(
         IDispatcher fluxorDispatcher,
-        IDatabaseCollectionProvider databaseCollectionProvider,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
-        IDatabaseService databaseService,
         ISettingsService settings,
         IAppTitleService appTitleService,
-        FileLocationOptions fileLocationOptions,
         ITraceLogger traceLogger,
         MauiMenuActionService menuActionService)
     {
@@ -54,9 +46,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         _activeLogs = activeLogs;
         _appTitleService = appTitleService;
-        _databaseCollectionProvider = databaseCollectionProvider;
-        _databaseService = databaseService;
-        _fileLocationOptions = fileLocationOptions;
         _settings = settings;
         _traceLogger = traceLogger;
         _menuActionService = menuActionService;
@@ -64,7 +53,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _activeLogs.Select(state => state.ActiveLogs);
 
         _activeLogs.SelectedValueChanged += OnActiveLogsChanged;
-        _databaseService.LoadedDatabasesChanged += OnLoadedDatabasesChanged;
         _settings.ThemeChanged += OnThemeChanged;
 
         fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
@@ -78,7 +66,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         _disposed = true;
         _activeLogs.SelectedValueChanged -= OnActiveLogsChanged;
-        _databaseService.LoadedDatabasesChanged -= OnLoadedDatabasesChanged;
         _settings.ThemeChanged -= OnThemeChanged;
     }
 
@@ -186,14 +173,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
                     ? null
                     : string.Join(" | ", updatedActiveLogs.Values.Select(log => log.Name)));
         });
-    }
-
-    private void OnLoadedDatabasesChanged(object? sender, IEnumerable<string> loadedProviders)
-    {
-        if (_disposed) { return; }
-
-        _databaseCollectionProvider.SetActiveDatabases(loadedProviders.Select(path =>
-            Path.Join(_fileLocationOptions.DatabasePath, path)));
     }
 
     private void OnThemeChanged() =>

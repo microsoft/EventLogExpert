@@ -1,17 +1,23 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
+
 namespace EventLogExpert.UI.Interfaces;
 
 public interface IDatabaseService
 {
-    IEnumerable<string> DisabledDatabases { get; }
+    event EventHandler? EntriesChanged;
 
-    IEnumerable<string> LoadedDatabases { get; }
+    IReadOnlyList<DatabaseEntry> Entries { get; }
 
-    EventHandler<IEnumerable<string>>? LoadedDatabasesChanged { get; set; }
+    Task<ImportResult> ImportAsync(IEnumerable<string> sourceFilePaths, CancellationToken cancellationToken = default);
 
-    void LoadDatabases();
+    void MarkStatus(string fileName, DatabaseStatus status);
 
-    void UpdateDisabledDatabases(IEnumerable<string> databases);
+    void Refresh();
+
+    void Remove(string fileName);
+
+    void Toggle(string fileName);
 }
