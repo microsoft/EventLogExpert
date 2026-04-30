@@ -98,14 +98,18 @@ public static class MauiProgram
             provider.GetRequiredService<MauiMenuActionService>());
         builder.Services.AddSingleton<KeyboardShortcutService>();
 
+        builder.Services.AddSingleton<IBannerService, BannerService>();
+
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {
             var modalService = provider.GetRequiredService<IModalService>();
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
+            var bannerService = provider.GetRequiredService<IBannerService>();
 
             return new ModalAlertDialogService(
                 modalService,
                 mainThreadService,
+                bannerService,
                 parameters => modalService.Show<AlertModal, bool>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)),
                 async parameters =>
                 {

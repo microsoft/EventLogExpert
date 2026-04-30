@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using NSubstitute;
 
@@ -27,6 +28,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -58,6 +60,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -79,6 +82,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
             parameters => { capturedPrompt = parameters; return Task.FromResult("user-typed"); });
 
@@ -107,6 +111,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             mainThread,
+            Substitute.For<IBannerService>(),
             _ => Task.FromResult(true),
             _ => Task.FromResult(string.Empty));
 
@@ -115,6 +120,131 @@ public sealed class ModalAlertDialogServiceTests
 
         // Assert
         await mainThread.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
+    }
+
+    [Fact]
+    public async Task ShowAlertOneButton_BannerPresentation_DoesNotMarshalThroughMainThreadService()
+    {
+        // Arrange — banner-routed alerts skip the UI-thread marshal because the banner service is thread-safe.
+        var bannerService = Substitute.For<IBannerService>();
+        var mainThread = Substitute.For<IMainThreadService>();
+
+        var sut = new ModalAlertDialogService(
+            Substitute.For<IModalService>(),
+            mainThread,
+            bannerService,
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowAlert("t", "m", "OK", AlertPresentation.Banner);
+
+        // Assert
+        await mainThread.DidNotReceive().InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
+        bannerService.Received(1).ReportInfoBanner("t", "m", BannerSeverity.Warning);
+    }
+
+    [Fact]
+    public async Task ShowAlertOneButton_BannerPresentation_RoutesToReportInfoBanner_WithWarningSeverity()
+    {
+        // Arrange
+        var bannerService = Substitute.For<IBannerService>();
+        var modalService = Substitute.For<IModalService>();
+        var standaloneCalled = false;
+
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            bannerService,
+            _ => { standaloneCalled = true; return Task.FromResult(false); },
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowAlert("Banner Title", "Banner Message", "OK", AlertPresentation.Banner);
+
+        // Assert
+        bannerService.Received(1).ReportInfoBanner("Banner Title", "Banner Message", BannerSeverity.Warning);
+        Assert.False(standaloneCalled);
+        modalService.DidNotReceive().TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>());
+    }
+
+    [Fact]
+    public async Task ShowAlertOneButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var modalService = Substitute.For<IModalService>();
+        modalService.TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act + Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ShowAlert("t", "m", "OK", AlertPresentation.InlineOnly));
+    }
+
+    [Fact]
+    public async Task ShowAlertOneButton_InlineOnlyWithHost_RoutesInline()
+    {
+        // Arrange
+        var host = Substitute.For<IInlineAlertHost>();
+        host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(new InlineAlertResult(true, null)));
+
+        var modalService = Substitute.For<IModalService>();
+        modalService.TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        var standaloneCalled = false;
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            _ => { standaloneCalled = true; return Task.FromResult(false); },
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowAlert("t", "m", "OK", AlertPresentation.InlineOnly);
+
+        // Assert
+        Assert.False(standaloneCalled);
+        await host.Received(1).ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ShowAlertOneButton_PopupOnly_AlwaysOpensStandalone_EvenWithHost()
+    {
+        // Arrange
+        var host = Substitute.For<IInlineAlertHost>();
+        var modalService = Substitute.For<IModalService>();
+        modalService.TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        IReadOnlyDictionary<string, object?>? capturedAlert = null;
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            parameters => { capturedAlert = parameters; return Task.FromResult(true); },
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowAlert("t", "m", "Close", AlertPresentation.PopupOnly);
+
+        // Assert
+        Assert.NotNull(capturedAlert);
+        Assert.Equal("Close", capturedAlert!["CancelLabel"]);
+        await host.DidNotReceive().ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -128,6 +258,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
             _ => Task.FromResult(string.Empty));
 
@@ -140,6 +271,73 @@ public sealed class ModalAlertDialogServiceTests
         Assert.Equal("My Message", capturedAlert["Message"]);
         Assert.Null(capturedAlert["AcceptLabel"]);
         Assert.Equal("Close", capturedAlert["CancelLabel"]);
+    }
+
+    [Fact]
+    public async Task ShowAlertTwoButton_BannerPresentation_ThrowsArgumentException()
+    {
+        // Arrange
+        var sut = new ModalAlertDialogService(
+            Substitute.For<IModalService>(),
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act + Assert — Banner is not valid for accept/cancel pairs.
+        var ex = await Assert.ThrowsAsync<ArgumentException>(() =>
+            sut.ShowAlert("t", "m", "Yes", "No", AlertPresentation.Banner));
+        Assert.Equal("presentation", ex.ParamName);
+    }
+
+    [Fact]
+    public async Task ShowAlertTwoButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
+    {
+        // Arrange
+        var modalService = Substitute.For<IModalService>();
+        modalService.TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act + Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.ShowAlert("t", "m", "Yes", "No", AlertPresentation.InlineOnly));
+    }
+
+    [Fact]
+    public async Task ShowAlertTwoButton_PopupOnly_AlwaysOpensStandalone()
+    {
+        // Arrange
+        var host = Substitute.For<IInlineAlertHost>();
+        var modalService = Substitute.For<IModalService>();
+        modalService.TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        {
+            call[0] = host;
+            return true;
+        });
+
+        IReadOnlyDictionary<string, object?>? capturedAlert = null;
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
+            parameters => { capturedAlert = parameters; return Task.FromResult(true); },
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        var result = await sut.ShowAlert("t", "m", "Yes", "No", AlertPresentation.PopupOnly);
+
+        // Assert
+        Assert.True(result);
+        Assert.NotNull(capturedAlert);
+        Assert.Equal("Yes", capturedAlert!["AcceptLabel"]);
+        Assert.Equal("No", capturedAlert["CancelLabel"]);
+        await host.DidNotReceive().ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -161,6 +359,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
             _ => Task.FromResult(string.Empty));
 
@@ -198,6 +397,7 @@ public sealed class ModalAlertDialogServiceTests
         var sut = new ModalAlertDialogService(
             modalService,
             PassthroughMainThread(),
+            Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
             _ => Task.FromResult(string.Empty));
 
@@ -206,6 +406,52 @@ public sealed class ModalAlertDialogServiceTests
 
         // Assert
         Assert.False(result);
+    }
+
+    [Fact]
+    public async Task ShowCriticalAlert_DoesNotMarshalThroughMainThreadService()
+    {
+        // Arrange — critical alerts go straight to the thread-safe banner service; no UI marshal needed.
+        var bannerService = Substitute.For<IBannerService>();
+        var mainThread = Substitute.For<IMainThreadService>();
+
+        var sut = new ModalAlertDialogService(
+            Substitute.For<IModalService>(),
+            mainThread,
+            bannerService,
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowCriticalAlert("t", "m");
+
+        // Assert
+        await mainThread.DidNotReceive().InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
+        bannerService.Received(1).ReportCritical("t", "m");
+    }
+
+    [Fact]
+    public async Task ShowCriticalAlert_RoutesToBannerServiceReportCritical_WithTitleAndMessage()
+    {
+        // Arrange
+        var bannerService = Substitute.For<IBannerService>();
+        var modalService = Substitute.For<IModalService>();
+        var standaloneCalled = false;
+
+        var sut = new ModalAlertDialogService(
+            modalService,
+            PassthroughMainThread(),
+            bannerService,
+            _ => { standaloneCalled = true; return Task.FromResult(false); },
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowCriticalAlert("Critical Title", "Critical Message");
+
+        // Assert
+        bannerService.Received(1).ReportCritical("Critical Title", "Critical Message");
+        Assert.False(standaloneCalled);
+        modalService.DidNotReceive().TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
 
     private static IMainThreadService PassthroughMainThread() =>
