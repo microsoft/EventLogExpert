@@ -41,13 +41,13 @@
 
         <div aria-expanded="@_isXmlVisible.ToString().ToLower()"
             aria-label="@(_isXmlVisible ? "XML Expanded" : "XML Collapsed")"
-            class="details-row-xml"
+            class="flex-space-between details-row-xml"
             @onclick="ToggleXml"
             @onkeydown="HandleKeyDownXml"
             role="button"
             tabindex="0">
             <div>XML</div>
-            <span class="menu-toggle justify-self-right" data-rotate="@_isXmlVisible.ToString().ToLower()">
+            <span class="menu-toggle" data-rotate="@_isXmlVisible.ToString().ToLower()">
                 <i class="bi bi-caret-up"></i>
             </span>
         </div>

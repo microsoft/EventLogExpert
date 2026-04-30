@@ -500,6 +500,13 @@ public partial class EventResolverBase : IDisposable
         return CountVisibleTemplateProperties(template) == eventPropertyCount;
     }
 
+    private bool DoesTemplateStrictlyMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
+    {
+        if (template.IsEmpty) { return eventPropertyCount == 0; }
+
+        return DoesTemplateMatchPropertyCount(template, eventPropertyCount);
+    }
+
     private string FormatDescription(
         List<string> properties,
         string? descriptionTemplate,
@@ -870,7 +877,7 @@ public partial class EventResolverBase : IDisposable
             break;
         }
 
-        if (modernEvent is not null && DoesTemplateMatchPropertyCount(modernEvent.Template, eventPropertyCount))
+        if (modernEvent is not null && DoesTemplateStrictlyMatchPropertyCount(modernEvent.Template, eventPropertyCount))
         {
             Logger?.Debug($"{nameof(GetModernEvent)}: Exact match found - EventId={eventRecord.Id}, Version={eventRecord.Version}, LogName={eventRecord.LogName}");
 

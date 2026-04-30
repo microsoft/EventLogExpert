@@ -51,12 +51,8 @@
 }
 
 .details-row-xml {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
     user-select: none;
     cursor: pointer;
-
-    & .button-primary { width: 6rem; }
 }
 
 .details-xml {

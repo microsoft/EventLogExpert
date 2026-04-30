@@ -1478,6 +1478,145 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithModernEventEmptyTemplateAndNoProperties_ShouldUseModernDescription()
+    {
+        // Arrange - mimics Microsoft-Windows-WMI 5615 v2: manifest defines no <template>
+        // (so EventModel.Template is the empty string) and the logged event has
+        // <EventData></EventData> (zero properties). The static description must be
+        // returned via the modern path.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 5615,
+                    Version = 2,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "WMI Service started successfully",
+                    Keywords = [],
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 5615,
+            Version = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("WMI Service started successfully", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithModernEventEmptyTemplateAndProperties_ShouldNotUseModernDescription()
+    {
+        // Arrange - defensive: an empty template means the manifest defines no parameters.
+        // If the event nonetheless has properties, the strict exact-match path must NOT
+        // pretend the template matches; the resolver should fall through to its other
+        // fallbacks (here, the single-property fallback).
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 5615,
+                    Version = 2,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Static manifest description",
+                    Keywords = [],
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 5615,
+            Version = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["unexpected-payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("unexpected-payload", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithModernEventNullTemplateAndNoProperties_ShouldUseModernDescription()
+    {
+        // Arrange - defensive: EventModel.Template is declared as nullable, so a null
+        // value should behave the same as the empty-string case above.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 5615,
+                    Version = 2,
+                    LogName = Constants.ApplicationLogName,
+                    Description = "Modern static event description",
+                    Keywords = [],
+                    Template = null
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 5615,
+            Version = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Modern static event description", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithModernEventTemplate_ShouldResolveDescription()
     {
         // Arrange
