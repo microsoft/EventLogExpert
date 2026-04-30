@@ -4,26 +4,24 @@
 using EventLogExpert.Shared.Base;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
-using System.IO.Compression;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Shared.Components;
 
 public sealed partial class SettingsModal : ModalBase<bool>
 {
-    private readonly List<(string name, bool isEnabled, bool hasChanged)> _databases = [];
+    private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
 
     private CopyType _copyType;
-    private bool _databaseRemoved;
+    private bool _databaseStateChanged;
     private bool _isPreReleaseEnabled;
     private LogLevel _logLevel;
-    private bool _shouldReload;
     private bool _showDisplayPaneOnSelectionChange;
     private Theme _theme;
     private string _timeZoneId = string.Empty;
@@ -36,33 +34,39 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
-    [Inject] private FileLocationOptions FileLocationOptions { get; init; } = null!;
-
     [Inject] private ISettingsService Settings { get; init; } = null!;
+
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing)
+        {
+            DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
 
     protected override async Task OnClosingAsync()
     {
-        if (_databaseRemoved)
-        {
-            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
-        }
-
-        if (_shouldReload)
+        if (_databaseStateChanged)
         {
             await ReloadOpenLogs();
-            _shouldReload = false;
+            _databaseStateChanged = false;
         }
     }
 
     protected override void OnInitialized()
     {
         LoadFromSettings();
+        DatabaseService.EntriesChanged += OnDatabaseEntriesChanged;
 
         base.OnInitialized();
     }
 
     protected override async Task OnSaveAsync()
     {
+        await ApplyPendingToggles();
+
         Settings.CopyType = _copyType;
         Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
         Settings.LogLevel = _logLevel;
@@ -70,15 +74,63 @@ public sealed partial class SettingsModal : ModalBase<bool>
         Settings.Theme = _theme;
         Settings.TimeZoneId = _timeZoneId;
 
-        if (_databases.Any(database => database.hasChanged))
-        {
-            DatabaseService.UpdateDisabledDatabases(_databases.Where(db => !db.isEnabled).Select(db => db.name));
-
-            _shouldReload = true;
-        }
-
         await CompleteAsync(true);
     }
+
+    private static (string Title, string Message) BuildImportSummary(ImportResult importResult)
+    {
+        var imported = importResult.Imported;
+        var failures = importResult.Failures;
+
+        if (failures.Count == 0)
+        {
+            var successMessage = imported > 1
+                ? $"{imported} databases have successfully been imported"
+                : "1 database has successfully been imported";
+
+            return ("Import Successful", successMessage);
+        }
+
+        var failureLines = string.Join(Environment.NewLine,
+            failures.Select(failure => $"\u2022 {failure.FileName}: {failure.Reason}"));
+
+        if (imported == 0)
+        {
+            return ("Import Failed", $"No databases were imported.{Environment.NewLine}{Environment.NewLine}Failed:{Environment.NewLine}{failureLines}");
+        }
+
+        var partialMessage = imported > 1
+            ? $"{imported} databases imported successfully."
+            : "1 database imported successfully.";
+
+        return ("Import Completed with Errors",
+            $"{partialMessage}{Environment.NewLine}{Environment.NewLine}Failed:{Environment.NewLine}{failureLines}");
+    }
+
+    private async Task ApplyPendingToggles()
+    {
+        if (_pendingToggles.Count == 0) { return; }
+
+        var toApply = _pendingToggles.ToArray();
+        _pendingToggles.Clear();
+
+        foreach (var (fileName, _) in toApply)
+        {
+            try
+            {
+                DatabaseService.Toggle(fileName);
+            }
+            catch (Exception ex)
+            {
+                await AlertDialogService.ShowAlert("Failed to Update Database",
+                    $"An exception occurred while updating '{fileName}': {ex.Message}",
+                    "OK");
+            }
+        }
+    }
+
+    private bool GetEffectiveEnabled(DatabaseEntry entry) =>
+        _pendingToggles.TryGetValue(entry.FileName, out var pending) ? pending : entry.IsEnabled;
 
     private async Task ImportDatabase()
     {
@@ -98,51 +150,33 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
             if (result.Length <= 0) { return; }
 
-            Directory.CreateDirectory(FileLocationOptions.DatabasePath);
+            var sourcePaths = result
+                .Where(item => item is not null && !string.IsNullOrEmpty(item.FullPath))
+                .Select(item => item!.FullPath)
+                .ToList();
 
-            List<string> importedFiles = [];
+            var importResult = await DatabaseService.ImportAsync(sourcePaths);
 
-            foreach (var item in result)
-            {
-                if (string.IsNullOrEmpty(item?.FileName) || string.IsNullOrEmpty(item.FullPath)) { continue; }
-
-                var destination = Path.Join(FileLocationOptions.DatabasePath, item.FileName);
-                File.Copy(item.FullPath, destination, true);
-
-                importedFiles.Add(item.FileName);
-
-                if (!Path.GetExtension(destination).Equals(".zip", StringComparison.OrdinalIgnoreCase)) { continue; }
-
-                await ZipFile.ExtractToDirectoryAsync(destination, FileLocationOptions.DatabasePath, true);
-                File.Delete(destination);
-            }
-
-            if (importedFiles.Count == 0)
+            if (importResult.Imported == 0 && importResult.Failures.Count == 0)
             {
                 await AlertDialogService.ShowAlert("Import Failed", "No valid database files were selected.", "OK");
                 return;
             }
 
-            var message = importedFiles.Count > 1 ?
-                $"{importedFiles.Count} databases have successfully been imported" :
-                $"{importedFiles[0]} has successfully been imported";
+            var (title, message) = BuildImportSummary(importResult);
+            await AlertDialogService.ShowAlert(title, message, "OK");
 
-            await AlertDialogService.ShowAlert("Import Successful", message, "OK");
-
-            await InvokeAsync(() => CompleteAsync(true));
+            if (importResult.Imported > 0)
+            {
+                await InvokeAsync(OnSaveAsync);
+            }
         }
         catch (Exception ex)
         {
             await AlertDialogService.ShowAlert("Import Failed",
                 $"An exception occurred while importing provider databases: {ex.Message}",
                 "OK");
-
-            return;
         }
-
-        DatabaseService.LoadDatabases();
-
-        await ReloadOpenLogs();
     }
 
     private void LoadFromSettings()
@@ -153,27 +187,12 @@ public sealed partial class SettingsModal : ModalBase<bool>
         _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;
         _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
+    }
 
-        _databases.Clear();
-
-        foreach (var database in DatabaseService.LoadedDatabases)
-        {
-            _databases.Add((database, true, false));
-        }
-
-        foreach (var database in DatabaseService.DisabledDatabases)
-        {
-            var index = _databases.FindIndex(x => string.Equals(x.name, database));
-
-            if (index < 0)
-            {
-                _databases.Add((database, false, false));
-            }
-            else
-            {
-                _databases[index] = (database, false, false);
-            }
-        }
+    private void OnDatabaseEntriesChanged(object? sender, EventArgs e)
+    {
+        _databaseStateChanged = true;
+        _ = InvokeAsync(StateHasChanged);
     }
 
     private async Task ReloadOpenLogs()
@@ -197,21 +216,19 @@ public sealed partial class SettingsModal : ModalBase<bool>
         }
     }
 
-    private async Task RemoveDatabase(string name)
+    private async Task RemoveDatabase(string fileName)
     {
+        var confirmed = await AlertDialogService.ShowAlert("Remove Database",
+            $"Are you sure you want to remove {fileName}?",
+            "Remove",
+            "Cancel");
+
+        if (!confirmed) { return; }
+
         try
         {
-            var databaseDirectory = new DirectoryInfo(FileLocationOptions.DatabasePath);
-
-            // Using wildcard to also remove the db-shm and db-wal files
-            foreach (var file in databaseDirectory.GetFiles($"{name}*"))
-            {
-                file.Delete();
-            }
-
-            _databases.RemoveAll(db => string.Equals(db.name, name));
-
-            _databaseRemoved = true;
+            DatabaseService.Remove(fileName);
+            _pendingToggles.Remove(fileName);
         }
         catch (Exception ex)
         {
@@ -221,14 +238,22 @@ public sealed partial class SettingsModal : ModalBase<bool>
         }
     }
 
-    private void ToggleDatabase(string database)
+    private void ToggleDatabase(string fileName)
     {
-        var index = _databases.FindIndex(x => string.Equals(x.name, database));
+        var entry = DatabaseService.Entries.FirstOrDefault(
+            e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
 
-        if (index < 0) { return; }
+        if (entry is null) { return; }
 
-        var db = _databases[index];
+        var newValue = !GetEffectiveEnabled(entry);
 
-        _databases[index] = (db.name, !db.isEnabled, !db.hasChanged);
+        if (newValue == entry.IsEnabled)
+        {
+            _pendingToggles.Remove(fileName);
+        }
+        else
+        {
+            _pendingToggles[fileName] = newValue;
+        }
     }
 }
