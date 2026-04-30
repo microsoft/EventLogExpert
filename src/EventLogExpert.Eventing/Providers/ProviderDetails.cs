@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Models;
-using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EventLogExpert.Eventing.Providers;
 
@@ -24,15 +23,19 @@ public class ProviderDetails
         }
     }
 
-    /// <summary>True when no provider metadata of any kind is loaded (legacy or modern).
-    /// Used by resolvers to distinguish "provider not found" from "provider known but no matching message".</summary>
+    /// <summary>True when no provider metadata of any kind is loaded (legacy or modern) AND
+    /// no channel-owner fallback has populated this row. Used by resolvers to distinguish
+    /// "provider not found" from "provider known but no matching message". A non-null
+    /// <see cref="ResolvedFromOwningPublisher"/> means a channel-owner fallback succeeded
+    /// (even if the metadata collections happen to be empty), so this row is NOT empty.</summary>
     public bool IsEmpty =>
         Events.Count == 0 &&
         Messages.Count == 0 &&
         Keywords.Count == 0 &&
         Opcodes.Count == 0 &&
         Tasks.Count == 0 &&
-        !Parameters.Any();
+        !Parameters.Any() &&
+        ResolvedFromOwningPublisher is null;
 
     public IDictionary<long, string> Keywords { get; set; } = new Dictionary<long, string>();
 
@@ -58,11 +61,12 @@ public class ProviderDetails
     /// When the provider name on the event was actually a channel path that the resolver
     /// followed back to its owning publisher, this records the publisher name that the
     /// metadata/messages were ultimately loaded from. Null when no channel-owner fallback
-    /// was used. Diagnostic only — does not participate in any cache key or equality check,
-    /// and is excluded from the EF Core schema so existing provider databases are unaffected.
+    /// was used. Does not participate in any cache key or equality check, but does
+    /// contribute to <see cref="IsEmpty"/> so a fallback-resolved row is treated as
+    /// non-empty even if its metadata collections happen to be empty.
+    /// Persisted as of database schema V4.
     /// </summary>
-    [NotMapped]
-    public string? ResolvedFromOwningPublisher { get; set; } // TODO: Should probably be mapped in the DB upgrade
+    public string? ResolvedFromOwningPublisher { get; set; }
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
 

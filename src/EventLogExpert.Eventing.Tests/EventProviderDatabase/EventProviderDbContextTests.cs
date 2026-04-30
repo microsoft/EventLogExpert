@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 
 namespace EventLogExpert.Eventing.Tests.EventProviderDatabase;
@@ -25,6 +26,35 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         // Assert
         Assert.True(File.Exists(dbPath));
+    }
+
+    [Fact]
+    public void Constructor_WithEnsureCreatedFalse_DoesNotCreateDatabase()
+    {
+        // Arrange — read-only inspection should not auto-create the schema. We use ReadWriteCreate
+        // (readOnly: false) so the SQLite file is opened (and a header may be written), then assert
+        // directly on `sqlite_master` that no table was created. Asserting on file size here would
+        // be brittle: SQLite may write a header even without DDL, and a 0-byte file passes only by
+        // coincidence of ReadOnly mode behavior on an empty file.
+        var dbPath = CreateTempDatabasePath();
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, readOnly: false, ensureCreated: false))
+        {
+            // Touching the connection forces SQLite to open the file so the assertion below
+            // exercises the same on-disk state callers would observe.
+            context.Database.OpenConnection();
+            context.Database.CloseConnection();
+        }
+
+        // Assert — the ProviderDetails table was NOT created. This is the contract callers care
+        // about (a fresh, never-upgraded file should not be auto-populated with the V4 schema).
+        using var verifyConnection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        verifyConnection.Open();
+        using var verifyCmd = verifyConnection.CreateCommand();
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM \"sqlite_master\" WHERE \"type\" = 'table' AND \"name\" = 'ProviderDetails'";
+        var tableCount = Convert.ToInt32(verifyCmd.ExecuteScalar());
+        Assert.Equal(0, tableCount);
     }
 
     [Fact]
@@ -114,6 +144,38 @@ public sealed class EventProviderDbContextTests : IDisposable
         Assert.All(results, count => Assert.Equal(10, count));
     }
 
+    [Fact]
+    public void Detection_FreshDatabase_ReportsV4()
+    {
+        // Arrange
+        var dbPath = CreateTempDatabasePath();
+
+        using var context = new EventProviderDbContext(dbPath, false);
+
+        // Act
+        var state = context.IsUpgradeNeeded();
+
+        // Assert
+        Assert.Equal(4, state.CurrentVersion);
+        Assert.False(state.NeedsUpgrade);
+    }
+
+    [Fact]
+    public void Detection_V3Schema_NeedsV4Upgrade()
+    {
+        // Arrange — V3 schema has BLOB columns but no ResolvedFromOwningPublisher and BINARY PK.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        // Act
+        using var context = new EventProviderDbContext(dbPath, false);
+        var state = context.IsUpgradeNeeded();
+
+        // Assert
+        Assert.Equal(3, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
+    }
+
     public void Dispose()
     {
         foreach (var dbPath in _tempDatabases)
@@ -137,12 +199,44 @@ public sealed class EventProviderDbContextTests : IDisposable
         // Assert
         logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
             h.ToString().Contains(nameof(EventProviderDbContext.IsUpgradeNeeded)) &&
-            h.ToString().Contains("needsV2Upgrade") &&
-            h.ToString().Contains("needsV3Upgrade")));
+            h.ToString().Contains("currentVersion") &&
+            h.ToString().Contains("needsUpgrade")));
     }
 
     [Fact]
-    public void IsUpgradeNeeded_WithNewDatabase_ShouldReturnFalseFalse()
+    public void IsUpgradeNeeded_WithMixedPayloadColumnTypes_ReportsUnknownSentinel()
+    {
+        // Arrange — a shape with Parameters BLOB but a non-BLOB Messages column. Without the
+        // payload-column uniformity check this would have been misclassified as V3 and the
+        // subsequent ReadCompressedRow call would crash on the (byte[]) cast for Messages.
+        var dbPath = CreateTempDatabasePath();
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText =
+                "CREATE TABLE \"ProviderDetails\" (" +
+                "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
+                "\"Messages\" INTEGER NOT NULL, " +
+                "\"Parameters\" BLOB NOT NULL, " +
+                "\"Events\" BLOB NOT NULL, " +
+                "\"Keywords\" BLOB NOT NULL, " +
+                "\"Opcodes\" BLOB NOT NULL, " +
+                "\"Tasks\" BLOB NOT NULL)";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Act
+        using var context = new EventProviderDbContext(dbPath, false);
+        var state = context.IsUpgradeNeeded();
+
+        // Assert
+        Assert.Equal(ProviderDatabaseSchemaVersion.Unknown, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
+    }
+
+    [Fact]
+    public void IsUpgradeNeeded_WithNewDatabase_ShouldReportCurrentSchemaAndNoUpgrade()
     {
         // Arrange
         var dbPath = CreateTempDatabasePath();
@@ -150,15 +244,48 @@ public sealed class EventProviderDbContextTests : IDisposable
         using var context = new EventProviderDbContext(dbPath, false);
 
         // Act
-        var (needsV2, needsV3) = context.IsUpgradeNeeded();
+        var state = context.IsUpgradeNeeded();
 
         // Assert
-        Assert.False(needsV2);
-        Assert.False(needsV3);
+        Assert.Equal(ProviderDatabaseSchemaVersion.Current, state.CurrentVersion);
+        Assert.False(state.NeedsUpgrade);
     }
 
     [Fact]
-    public void IsUpgradeNeeded_WithV1Schema_ShouldFlagBothUpgrades()
+    public void IsUpgradeNeeded_WithUnknownShape_ReportsUnknownSentinel()
+    {
+        // Arrange — create a ProviderDetails table whose column shape matches none of V1/V2/V3/V4.
+        // Messages is BLOB but Parameters is TEXT, which never existed as a real schema and signals
+        // either corruption or a foreign / future format.
+        var dbPath = CreateTempDatabasePath();
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText =
+                "CREATE TABLE \"ProviderDetails\" (" +
+                "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
+                "\"Messages\" BLOB NOT NULL, " +
+                "\"Parameters\" TEXT NOT NULL, " +
+                "\"Events\" BLOB NOT NULL, " +
+                "\"Keywords\" BLOB NOT NULL, " +
+                "\"Opcodes\" BLOB NOT NULL, " +
+                "\"Tasks\" BLOB NOT NULL)";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Act
+        using var context = new EventProviderDbContext(dbPath, false);
+        var state = context.IsUpgradeNeeded();
+
+        // Assert — Unknown sentinel is reported (NeedsUpgrade is true so callers route through
+        // PerformUpgradeIfNeeded, which throws a distinct error rather than misclassifying as v1).
+        Assert.Equal(ProviderDatabaseSchemaVersion.Unknown, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
+    }
+
+    [Fact]
+    public void IsUpgradeNeeded_WithV1Schema_ShouldReportV1AndUpgradeNeeded()
     {
         // Arrange — V1 schema had no Parameters column; Messages stored as JSON TEXT.
         var dbPath = CreateTempDatabasePath();
@@ -166,15 +293,15 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         // Act
         using var context = new EventProviderDbContext(dbPath, false);
-        var (needsV2, needsV3) = context.IsUpgradeNeeded();
+        var state = context.IsUpgradeNeeded();
 
         // Assert
-        Assert.True(needsV2);
-        Assert.True(needsV3);
+        Assert.Equal(1, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
     }
 
     [Fact]
-    public void IsUpgradeNeeded_WithV2Schema_ShouldFlagBothUpgrades()
+    public void IsUpgradeNeeded_WithV2Schema_ShouldReportV2AndUpgradeNeeded()
     {
         // Arrange — V2 schema kept TEXT payloads and added Parameters as TEXT.
         var dbPath = CreateTempDatabasePath();
@@ -182,11 +309,11 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         // Act
         using var context = new EventProviderDbContext(dbPath, false);
-        var (needsV2, needsV3) = context.IsUpgradeNeeded();
+        var state = context.IsUpgradeNeeded();
 
         // Assert
-        Assert.True(needsV2);
-        Assert.True(needsV3);
+        Assert.Equal(2, state.CurrentVersion);
+        Assert.True(state.NeedsUpgrade);
     }
 
     [Fact]
@@ -222,7 +349,46 @@ public sealed class EventProviderDbContextTests : IDisposable
     }
 
     [Fact]
-    public void PerformUpgradeIfNeeded_WithV1Schema_ShouldUpgradeAndLeaveParametersEmpty()
+    public void PerformUpgradeIfNeeded_WithUnknownShape_ThrowsAndPreservesTable()
+    {
+        // Arrange — same unknown shape as the detection test.
+        var dbPath = CreateTempDatabasePath();
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText =
+                "CREATE TABLE \"ProviderDetails\" (" +
+                "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
+                "\"Messages\" BLOB NOT NULL, " +
+                "\"Parameters\" TEXT NOT NULL, " +
+                "\"Events\" BLOB NOT NULL, " +
+                "\"Keywords\" BLOB NOT NULL, " +
+                "\"Opcodes\" BLOB NOT NULL, " +
+                "\"Tasks\" BLOB NOT NULL)";
+            cmd.ExecuteNonQuery();
+
+            using var insertCmd = connection.CreateCommand();
+            insertCmd.CommandText =
+                "INSERT INTO \"ProviderDetails\" VALUES ('Unknown-Row', X'00', '[]', X'00', X'00', X'00', X'00')";
+            insertCmd.ExecuteNonQuery();
+        }
+
+        // Act + Assert — distinct error message, file untouched.
+        DatabaseUpgradeException? thrown;
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
+        }
+
+        Assert.Contains("unrecognized schema", thrown.Reason, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(dbPath, thrown.DatabasePath);
+
+        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
+    }
+
+    [Fact]
+    public void PerformUpgradeIfNeeded_WithV1Schema_ThrowsAndPreservesLegacyTable()
     {
         // Arrange — V1 row has no Parameters column; payloads are JSON TEXT.
         var dbPath = CreateTempDatabasePath();
@@ -237,26 +403,27 @@ public sealed class EventProviderDbContextTests : IDisposable
             opcodesJson: "{}",
             tasksJson: "{}");
 
-        // Act
+        // Act + Assert — V1 is no longer auto-upgradable; the upgrade fails fast.
+        DatabaseUpgradeException? thrown;
         using (var context = new EventProviderDbContext(dbPath, false))
         {
-            context.PerformUpgradeIfNeeded();
+            thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
         }
 
-        // Assert — schema is now V3 and the existing row is preserved with empty Parameters.
-        using var verify = new EventProviderDbContext(dbPath, true);
-        var (needsV2After, needsV3After) = verify.IsUpgradeNeeded();
-        Assert.False(needsV2After);
-        Assert.False(needsV3After);
+        Assert.Contains("v1", thrown.Reason);
+        Assert.Contains("no longer supported", thrown.Reason);
+        Assert.Equal(dbPath, thrown.DatabasePath);
 
-        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V1Provider");
-        Assert.Single(row.Messages);
-        Assert.Equal("hello", row.Messages[0].Text);
-        Assert.Empty(row.Parameters);
+        // The original V1 table is preserved (throw fires before DROP); detection still reports v1.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var stateAfter = verify.IsUpgradeNeeded();
+        Assert.Equal(1, stateAfter.CurrentVersion);
+        Assert.True(stateAfter.NeedsUpgrade);
+        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
     }
 
     [Fact]
-    public void PerformUpgradeIfNeeded_WithV2Schema_ShouldPreserveExistingParametersJson()
+    public void PerformUpgradeIfNeeded_WithV2Schema_Throws()
     {
         // Arrange — V2 row stores Parameters as JSON TEXT.
         var dbPath = CreateTempDatabasePath();
@@ -271,23 +438,28 @@ public sealed class EventProviderDbContextTests : IDisposable
             opcodesJson: "{}",
             tasksJson: "{}");
 
-        // Act
+        // Act + Assert
+        DatabaseUpgradeException? thrown;
         using (var context = new EventProviderDbContext(dbPath, false))
         {
-            context.PerformUpgradeIfNeeded();
+            thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
         }
 
-        // Assert — Parameters JSON survived the destructive recreate cycle.
+        Assert.Contains("v2", thrown.Reason);
+        Assert.Contains("no longer supported", thrown.Reason);
+
+        // Original V2 row preserved; detection still reports v2.
         using var verify = new EventProviderDbContext(dbPath, true);
-        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V2Provider");
-        Assert.Single(row.Parameters);
-        Assert.Equal("param-text", row.Parameters.First().Text);
+        var stateAfter = verify.IsUpgradeNeeded();
+        Assert.Equal(2, stateAfter.CurrentVersion);
+        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
     }
 
     [Fact]
-    public void PerformUpgradeIfNeeded_WithV2SchemaAndNullParameters_ShouldYieldEmptyParameters()
+    public void PerformUpgradeIfNeeded_WithV2SchemaAndNullParameters_Throws()
     {
-        // Arrange — V2 row with NULL Parameters column.
+        // Arrange — V2 row with NULL Parameters column; previously this would have silently
+        // round-tripped to an empty list. Now it must surface the same hard-fail as any other V2 row.
         var dbPath = CreateTempDatabasePath();
         SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
         InsertLegacyRow(
@@ -300,16 +472,12 @@ public sealed class EventProviderDbContextTests : IDisposable
             opcodesJson: "{}",
             tasksJson: "{}");
 
-        // Act
-        using (var context = new EventProviderDbContext(dbPath, false))
-        {
-            context.PerformUpgradeIfNeeded();
-        }
+        // Act + Assert
+        using var context = new EventProviderDbContext(dbPath, false);
+        var thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
+        Assert.Contains("v2", thrown.Reason);
 
-        // Assert
-        using var verify = new EventProviderDbContext(dbPath, true);
-        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V2NullParams");
-        Assert.Empty(row.Parameters);
+        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
     }
 
     [Fact]
@@ -629,6 +797,350 @@ public sealed class EventProviderDbContextTests : IDisposable
         }
     }
 
+    [Fact]
+    public void ProviderName_LookupOnV4Schema_UsesPrimaryKeyIndex()
+    {
+        // Arrange — populate a V4 database so EXPLAIN QUERY PLAN has rows to plan against.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            for (var i = 0; i < 5; i++)
+            {
+                context.ProviderDetails.Add(new ProviderDetails
+                {
+                    ProviderName = $"Provider-{i}",
+                    Messages = [],
+                    Parameters = [],
+                    Events = [],
+                    Keywords = new Dictionary<long, string>(),
+                    Opcodes = new Dictionary<int, string>(),
+                    Tasks = new Dictionary<int, string>()
+                });
+            }
+
+            context.SaveChanges();
+        }
+
+        // Act — ask SQLite directly how it would resolve a case-insensitive PK lookup.
+        // The lookup should use the auto-generated PK index, not a table scan.
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText = "EXPLAIN QUERY PLAN SELECT * FROM \"ProviderDetails\" WHERE \"ProviderName\" = 'provider-2'";
+        using var reader = cmd.ExecuteReader();
+
+        var planText = new System.Text.StringBuilder();
+        while (reader.Read())
+        {
+            planText.AppendLine(reader["detail"]?.ToString());
+        }
+
+        var plan = planText.ToString();
+
+        // Assert — weak property: the plan mentions an index (covers `USING INDEX` / `USING COVERING INDEX` /
+        // `SEARCH ... USING INTEGER PRIMARY KEY` variants without anchoring on exact wording across SQLite versions).
+        Assert.True(
+            plan.Contains("USING INDEX", StringComparison.OrdinalIgnoreCase) ||
+                plan.Contains("USING COVERING INDEX", StringComparison.OrdinalIgnoreCase) ||
+                plan.Contains("USING PRIMARY KEY", StringComparison.OrdinalIgnoreCase),
+            $"Expected ProviderName lookup to use the PK index, but plan was:\n{plan}");
+
+        // And explicitly: the plan must NOT be a table scan.
+        Assert.DoesNotContain("SCAN ", plan, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void ResolvedFromOwningPublisher_RoundTripsThroughDatabase()
+    {
+        // Arrange
+        var dbPath = CreateTempDatabasePath();
+        var provider = new ProviderDetails
+        {
+            ProviderName = "ResolvedRoundTrip",
+            Messages = [],
+            Parameters = [],
+            Events = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>(),
+            ResolvedFromOwningPublisher = "Owning-Publisher-Name"
+        };
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.ProviderDetails.Add(provider);
+            context.SaveChanges();
+        }
+
+        // Assert
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var retrieved = verify.ProviderDetails.Single(p => p.ProviderName == "ResolvedRoundTrip");
+        Assert.Equal("Owning-Publisher-Name", retrieved.ResolvedFromOwningPublisher);
+    }
+
+    [Fact]
+    public void Schema_V4_PrimaryKey_UsesNoCaseCollation()
+    {
+        // Arrange — a fresh database is created at the current schema version.
+        var dbPath = CreateTempDatabasePath();
+
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.SaveChanges();
+        }
+
+        // Act
+        var collation = ReadProviderNamePrimaryKeyCollation(dbPath);
+
+        // Assert
+        Assert.Equal("NOCASE", collation, ignoreCase: true);
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_HappyPath()
+    {
+        // Arrange
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        var seeded = new ProviderDetails
+        {
+            ProviderName = "V3-Provider",
+            Messages = [new MessageModel { ProviderName = "V3-Provider", RawId = 1, Text = "from-v3" }],
+            Parameters = [],
+            Events = [],
+            Keywords = new Dictionary<long, string> { { 1L, "kw" } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+        InsertV3Row(dbPath, seeded);
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert
+        Assert.Equal("NOCASE", ReadProviderNamePrimaryKeyCollation(dbPath), ignoreCase: true);
+
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var stateAfter = verify.IsUpgradeNeeded();
+        Assert.Equal(ProviderDatabaseSchemaVersion.Current, stateAfter.CurrentVersion);
+        Assert.False(stateAfter.NeedsUpgrade);
+
+        var row = verify.ProviderDetails.Single();
+        Assert.Equal("V3-Provider", row.ProviderName);
+        Assert.Equal("from-v3", row.Messages.Single().Text);
+        Assert.Equal("kw", row.Keywords[1L]);
+        Assert.Null(row.ResolvedFromOwningPublisher);
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_MergesCaseCollidingProviders()
+    {
+        // Arrange — seed two rows whose ProviderName differs only by case. V3 BINARY PK allows this;
+        // V4 NOCASE PK does not, so the upgrade must merge them.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        var first = new ProviderDetails
+        {
+            ProviderName = "Microsoft-Foo",
+            Messages = [new MessageModel { ProviderName = "Microsoft-Foo", RawId = 1, Text = "shared-text" }],
+            Parameters = [],
+            Events = [new EventModel { Id = 100, Keywords = [], Description = "shared-event" }],
+            Keywords = new Dictionary<long, string> { { 1L, "alpha" } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var second = new ProviderDetails
+        {
+            ProviderName = "microsoft-foo",
+            Messages = [new MessageModel { ProviderName = "microsoft-foo", RawId = 1, Text = "shared-text" }],
+            Parameters = [],
+            Events = [new EventModel { Id = 100, Keywords = [], Description = "shared-event" }],
+            Keywords = new Dictionary<long, string> { { 2L, "beta" } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        InsertV3Row(dbPath, first);
+        InsertV3Row(dbPath, second);
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert — merged into a single row using the first-encountered casing as canonical.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var rows = verify.ProviderDetails.ToList();
+        Assert.Single(rows);
+        Assert.Equal("Microsoft-Foo", rows[0].ProviderName);
+        Assert.Single(rows[0].Messages);
+        Assert.Single(rows[0].Events);
+        Assert.Equal(2, rows[0].Keywords.Count);
+        Assert.Equal("alpha", rows[0].Keywords[1L]);
+        Assert.Equal("beta", rows[0].Keywords[2L]);
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_MergesCaseCollidingProvidersWithParameters()
+    {
+        // Arrange — case-colliding rows with non-empty Parameters that share identity (same
+        // ProviderName, RawId, ShortId, Tag). Without the V3 Parameters BLOB fix this scenario
+        // was masked because Parameters silently came back empty before the merger ran.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        var first = new ProviderDetails
+        {
+            ProviderName = "Microsoft-Foo",
+            Messages = [],
+            Parameters =
+            [
+                new MessageModel { ProviderName = "Microsoft-Foo", RawId = 1, ShortId = 1, Text = "shared-param" }
+            ],
+            Events = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var second = new ProviderDetails
+        {
+            ProviderName = "microsoft-foo",
+            Messages = [],
+            Parameters =
+            [
+                new MessageModel { ProviderName = "microsoft-foo", RawId = 1, ShortId = 1, Text = "shared-param" },
+                new MessageModel { ProviderName = "microsoft-foo", RawId = 2, ShortId = 2, Text = "second-only" }
+            ],
+            Events = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        InsertV3Row(dbPath, first);
+        InsertV3Row(dbPath, second);
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert — single merged row using first-encountered casing; deduplicated parameters union.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var rows = verify.ProviderDetails.ToList();
+        Assert.Single(rows);
+        Assert.Equal("Microsoft-Foo", rows[0].ProviderName);
+        var parameters = rows[0].Parameters.ToList();
+        Assert.Equal(2, parameters.Count);
+        Assert.Contains(parameters, p => p.RawId == 1 && p.Text == "shared-param");
+        Assert.Contains(parameters, p => p.RawId == 2 && p.Text == "second-only");
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_OnConflict_ThrowsAndPreservesOriginalRows()
+    {
+        // Arrange — case-colliding rows whose Keywords disagree on the same numeric key.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        InsertV3Row(dbPath, new ProviderDetails
+        {
+            ProviderName = "Conflict-Provider",
+            Messages = [],
+            Parameters = [],
+            Events = [],
+            Keywords = new Dictionary<long, string> { { 1L, "first" } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        });
+
+        InsertV3Row(dbPath, new ProviderDetails
+        {
+            ProviderName = "conflict-provider",
+            Messages = [],
+            Parameters = [],
+            Events = [],
+            Keywords = new Dictionary<long, string> { { 1L, "second" } },
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        });
+
+        // Act + Assert — upgrade fails fast and the V3 table is not dropped.
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
+        }
+
+        // Original V3 rows are preserved (table still has 2 rows, schema still V3).
+        using var verifyConnection = new SqliteConnection($"Data Source={dbPath}");
+        verifyConnection.Open();
+        using var verifyCmd = verifyConnection.CreateCommand();
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM \"ProviderDetails\"";
+        var count = Convert.ToInt32(verifyCmd.ExecuteScalar());
+        Assert.Equal(2, count);
+    }
+
+    [Fact]
+    public void Upgrade_V3_To_V4_PreservesNonEmptyParameters()
+    {
+        // Arrange — V3 row with non-empty Parameters (compressed BLOB). The earlier read path
+        // mishandled BLOB Parameters and silently emptied them; this test locks in correct preservation.
+        var dbPath = CreateTempDatabasePath();
+        SeedV3Schema(dbPath);
+
+        var seeded = new ProviderDetails
+        {
+            ProviderName = "V3-WithParams",
+            Messages = [],
+            Parameters =
+            [
+                new MessageModel { ProviderName = "V3-WithParams", RawId = 100, ShortId = 100, Text = "param-one" },
+                new MessageModel { ProviderName = "V3-WithParams", RawId = 200, ShortId = 200, Text = "param-two" }
+            ],
+            Events = [],
+            Keywords = new Dictionary<long, string>(),
+            Opcodes = new Dictionary<int, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+        InsertV3Row(dbPath, seeded);
+
+        // Act
+        using (var context = new EventProviderDbContext(dbPath, false))
+        {
+            context.PerformUpgradeIfNeeded();
+        }
+
+        // Assert — both parameter rows survived the destructive upgrade.
+        using var verify = new EventProviderDbContext(dbPath, true);
+        var row = verify.ProviderDetails.Single(p => p.ProviderName == "V3-WithParams");
+        var parameters = row.Parameters.ToList();
+        Assert.Equal(2, parameters.Count);
+        Assert.Contains(parameters, p => p.RawId == 100 && p.Text == "param-one");
+        Assert.Contains(parameters, p => p.RawId == 200 && p.Text == "param-two");
+    }
+
+    private static void AssertProviderDetailsRowCount(string dbPath, int expectedRows)
+    {
+        using var verifyConnection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        verifyConnection.Open();
+        using var verifyCmd = verifyConnection.CreateCommand();
+        verifyCmd.CommandText = "SELECT COUNT(*) FROM \"ProviderDetails\"";
+        var count = Convert.ToInt32(verifyCmd.ExecuteScalar());
+        Assert.Equal(expectedRows, count);
+    }
+
     private static void DeleteDatabaseFile(string path)
     {
         try
@@ -711,6 +1223,66 @@ public sealed class EventProviderDbContextTests : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    private static void InsertV3Row(string dbPath, ProviderDetails details)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText =
+            "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Parameters\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\") " +
+            "VALUES ($name, $messages, $parameters, $events, $keywords, $opcodes, $tasks)";
+        cmd.Parameters.AddWithValue("$name", details.ProviderName);
+        cmd.Parameters.AddWithValue("$messages", CompressedJsonValueConverter<IReadOnlyList<MessageModel>>.ConvertToCompressedJson(details.Messages));
+        cmd.Parameters.AddWithValue("$parameters", CompressedJsonValueConverter<IEnumerable<MessageModel>>.ConvertToCompressedJson(details.Parameters));
+        cmd.Parameters.AddWithValue("$events", CompressedJsonValueConverter<IReadOnlyList<EventModel>>.ConvertToCompressedJson(details.Events));
+        cmd.Parameters.AddWithValue("$keywords", CompressedJsonValueConverter<IDictionary<long, string>>.ConvertToCompressedJson(details.Keywords));
+        cmd.Parameters.AddWithValue("$opcodes", CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Opcodes));
+        cmd.Parameters.AddWithValue("$tasks", CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Tasks));
+        cmd.ExecuteNonQuery();
+    }
+
+    private static string ReadProviderNamePrimaryKeyCollation(string dbPath)
+    {
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        string? pkIndexName = null;
+
+        using (var listCmd = connection.CreateCommand())
+        {
+            listCmd.CommandText = "PRAGMA index_list(\"ProviderDetails\")";
+            using var reader = listCmd.ExecuteReader();
+
+            while (reader.Read())
+            {
+                var origin = reader["origin"]?.ToString();
+                if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
+                {
+                    pkIndexName = reader["name"]?.ToString();
+                    break;
+                }
+            }
+        }
+
+        Assert.False(string.IsNullOrEmpty(pkIndexName), "Expected a primary-key auto-index on ProviderDetails.");
+
+        using var infoCmd = connection.CreateCommand();
+        infoCmd.CommandText = $"PRAGMA index_xinfo(\"{pkIndexName}\")";
+        using var infoReader = infoCmd.ExecuteReader();
+
+        while (infoReader.Read())
+        {
+            var name = infoReader["name"]?.ToString();
+            if (string.Equals(name, nameof(ProviderDetails.ProviderName), StringComparison.Ordinal))
+            {
+                return infoReader["coll"]?.ToString() ?? string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
     private static void SeedLegacySchema(
         string dbPath,
         bool includeParameters,
@@ -741,6 +1313,28 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         using var cmd = connection.CreateCommand();
         cmd.CommandText = $"CREATE TABLE \"ProviderDetails\" ({string.Join(", ", columns)})";
+        cmd.ExecuteNonQuery();
+    }
+
+    private static void SeedV3Schema(string dbPath)
+    {
+        // V3 schema: BLOB payload columns, Parameters as BLOB, no ResolvedFromOwningPublisher
+        // column, default (BINARY) collation on the ProviderName PK. Built by raw SQL so
+        // EventProviderDbContext.EnsureCreated() sees the table as already-existing and skips
+        // its V4 schema generation, exposing the legacy V3 shape to detection and upgrade paths.
+        using var connection = new SqliteConnection($"Data Source={dbPath}");
+        connection.Open();
+
+        using var cmd = connection.CreateCommand();
+        cmd.CommandText =
+            "CREATE TABLE \"ProviderDetails\" (" +
+            "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
+            "\"Messages\" BLOB NOT NULL, " +
+            "\"Parameters\" BLOB NOT NULL, " +
+            "\"Events\" BLOB NOT NULL, " +
+            "\"Keywords\" BLOB NOT NULL, " +
+            "\"Opcodes\" BLOB NOT NULL, " +
+            "\"Tasks\" BLOB NOT NULL)";
         cmd.ExecuteNonQuery();
     }
 
