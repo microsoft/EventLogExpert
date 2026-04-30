@@ -247,14 +247,41 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Disambiguate multiple legacy messages for the same event ID. Returns null when
-    ///     the set is empty or remains ambiguous after both LogLink and severity matching.
+    ///     Disambiguate multiple legacy messages for the same event ID. Tries Qualifier match
+    ///     (high 16 bits of RawId), then LogLink, then severity. Returns null when the set is
+    ///     empty or remains ambiguous after all checks.
     /// </summary>
     private static MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
     {
         if (legacyMessages.Count == 0) { return null; }
 
         if (legacyMessages.Count == 1) { return legacyMessages[0]; }
+
+        // Qualifier match. For classic/legacy events, Windows encodes Qualifiers in
+        // the high 16 bits of the message ID, so RawId == (Qualifiers << 16) | EventId
+        // identifies the exact message-table entry.
+        if (eventRecord.Qualifiers.HasValue)
+        {
+            List<MessageModel>? qualifierMatches = null;
+
+            foreach (var m in legacyMessages)
+            {
+                if ((ushort)((m.RawId >> 16) & 0xFFFF) == eventRecord.Qualifiers.Value)
+                {
+                    (qualifierMatches ??= []).Add(m);
+                }
+            }
+
+            if (qualifierMatches is { Count: 1 })
+            {
+                return qualifierMatches[0];
+            }
+
+            if (qualifierMatches is { Count: > 1 })
+            {
+                legacyMessages = qualifierMatches;
+            }
+        }
 
         // LogLink match
         foreach (var m in legacyMessages)

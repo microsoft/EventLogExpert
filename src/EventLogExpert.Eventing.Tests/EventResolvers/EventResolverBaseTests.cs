@@ -1792,6 +1792,224 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithMultipleLegacyMessagesSameSeverity_ShouldDisambiguateByQualifier()
+    {
+        // Arrange - reproduces the Microsoft-Windows-Defrag EventID 258 case where two
+        // messages share the same EventId and severity but differ in their high 16 bits
+        // (Qualifier). Windows identifies the right entry by full message ID, so
+        // RawId == (Qualifiers << 16) | EventId.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x00000102, // Qualifier=0, severity 00=Success
+                    Text = "The storage optimizer successfully completed %1 on %2"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102, // Qualifier=0x900, severity 00=Success
+                    Text = "The retrim operation was skipped"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 258,
+            Qualifiers = 0,
+            Level = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["defragmentation", "Data (E:)"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("The storage optimizer successfully completed defragmentation on Data (E:)", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithQualifierMatchingMultipleMessages_ShouldNarrowBeforeLogLink()
+    {
+        // Arrange - two messages share the matching qualifier; a third message has a
+        // different qualifier but a LogLink that would otherwise win. Qualifier filter
+        // must narrow the set first so LogLink only considers matching-qualifier candidates.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102,
+                    LogLink = "Application",
+                    Text = "Should not match: wrong LogLink"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102,
+                    LogLink = "System",
+                    Text = "Correct: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x4A000102,
+                    LogLink = "System",
+                    Text = "Should not match: wrong qualifier"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 258,
+            Qualifiers = 0x0900,
+            Level = 0,
+            LogName = "System",
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Correct: payload", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithQualifierMismatch_ShouldFallThroughToSeverity()
+    {
+        // Arrange - event has a Qualifier value that no message matches; disambiguation
+        // must fall through to the existing severity-based check rather than failing.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 100,
+                    RawId = 0x00000064, // Qualifier=0, severity 00=Success
+                    Text = "Success: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 100,
+                    RawId = unchecked((long)0xC0000064), // Qualifier=0xC000, severity 11=Error
+                    Text = "Error: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        // Qualifier 0x1234 matches no message in the table.
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 100,
+            Qualifiers = 0x1234,
+            Level = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - Level=2 maps to severity 11=Error, so fall-through picks the Error message.
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Error: payload", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNullQualifiersAndMultipleLegacyMessages_ShouldFallThroughToSeverity()
+    {
+        // Arrange - Qualifier-based filter must be skipped when the event has no Qualifiers,
+        // preserving the existing severity-based disambiguation behavior.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 50,
+                    RawId = 0x00000032, // severity 00=Success
+                    Text = "Success: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 50,
+                    RawId = unchecked((long)0xC0000032), // severity 11=Error
+                    Text = "Error: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 50,
+            Qualifiers = null,
+            Level = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Error: payload", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithMultipleLengthPrefixedBinaryPairs_ShouldMatchTemplate()
     {
         // Arrange - template has 6 data elements with 2 length-prefixed binary pairs;
