@@ -114,6 +114,7 @@ public sealed class MauiMenuActionService(
 
             _cachedLogNames = await Task.Run<IReadOnlyList<string>>(() =>
                 EventLogSession.GlobalSession.GetLogNames()
+                    .Where(name => !LogNameMethods.HardCodedLiveLogNames.Contains(name))
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .ToList());
 

@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -16,6 +17,7 @@ namespace EventLogExpert.Shared.Components.Menu;
 public sealed partial class MenuBar : IDisposable
 {
     private readonly List<TopLevel> _bars = [];
+
     private ElementReference[] _barElements = [];
     private int _focusedBarIndex;
     private long _openRequestId;
@@ -27,8 +29,13 @@ public sealed partial class MenuBar : IDisposable
     [Inject]
     private IStateSelection<EventLogState, bool> ContinuouslyUpdate { get; init; } = null!;
 
+    [Inject] private ICurrentVersionProvider CurrentVersionProvider { get; init; } = null!;
+
     [Inject]
     private IStateSelection<FilterPaneState, bool> FilterPaneIsEnabled { get; init; } = null!;
+
+    [Inject]
+    private IStateSelection<EventLogState, bool> HasActiveLogs { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -49,6 +56,7 @@ public sealed partial class MenuBar : IDisposable
     {
         ContinuouslyUpdate.Select(state => state.ContinuouslyUpdate);
         FilterPaneIsEnabled.Select(state => state.IsEnabled);
+        HasActiveLogs.Select(state => !state.ActiveLogs.IsEmpty);
 
         Settings.CopyTypeChanged += OnSettingsChanged;
         MenuService.StateChanged += OnMenuServiceStateChanged;
@@ -86,14 +94,19 @@ public sealed partial class MenuBar : IDisposable
         ];
     }
 
-    private IReadOnlyList<MenuItem> BuildFile() =>
-    [
-        MenuItem.SubMenu("Open", BuildOpenSubMenu(false)),
-        MenuItem.SubMenu("Add Another Log To This View", BuildOpenSubMenu(true)),
-        MenuItem.Separator(),
-        MenuItem.Item("Close All Open Logs", () => Actions.CloseAllLogsAsync()),
-        MenuItem.Item("Exit", Actions.Exit),
-    ];
+    private IReadOnlyList<MenuItem> BuildFile()
+    {
+        bool hasActiveLogs = HasActiveLogs.Value;
+
+        return
+        [
+            MenuItem.SubMenu("Open", BuildOpenSubMenu(false)),
+            MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), isEnabled: hasActiveLogs),
+            MenuItem.Separator(),
+            MenuItem.Item("Close All", () => Actions.CloseAllLogsAsync(), isEnabled: hasActiveLogs),
+            MenuItem.Item("Exit", Actions.Exit),
+        ];
+    }
 
     private IReadOnlyList<MenuItem> BuildHelp() =>
     [
@@ -104,22 +117,27 @@ public sealed partial class MenuBar : IDisposable
         MenuItem.Item("View Logs", () => Actions.ShowDebugLogsAsync()),
     ];
 
-    private IReadOnlyList<MenuItem> BuildOpenSubMenu(bool addLog) =>
-    [
-        MenuItem.Item("File", () => Actions.OpenFileAsync(addLog), addLog ? null : "Ctrl+O"),
-        MenuItem.Item("Folder", () => Actions.OpenFolderAsync(addLog)),
-        MenuItem.SubMenu("Live Event Log",
-        [
-            MenuItem.Item("Application", () => Actions.OpenLiveLogAsync("Application", addLog)),
-            MenuItem.Item("System", () => Actions.OpenLiveLogAsync("System", addLog)),
-            MenuItem.Item("Security", () => Actions.OpenLiveLogAsync("Security", addLog)),
-            MenuItem.AsyncSubMenu(
-                "Other Logs",
-                async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), addLog)),
-        ]),
-    ];
+    private IReadOnlyList<MenuItem> BuildOpenSubMenu(bool combineLog)
+    {
+        bool isAdmin = CurrentVersionProvider.IsAdmin;
 
-    private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool addLog)
+        return
+        [
+            MenuItem.Item("File", () => Actions.OpenFileAsync(combineLog), combineLog ? null : "Ctrl+O"),
+            MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog)),
+            MenuItem.SubMenu("Live",
+            [
+                MenuItem.Item("Application", () => Actions.OpenLiveLogAsync("Application", combineLog)),
+                MenuItem.Item("System", () => Actions.OpenLiveLogAsync("System", combineLog)),
+                MenuItem.Item("Security", () => Actions.OpenLiveLogAsync("Security", combineLog), isEnabled: isAdmin),
+                MenuItem.AsyncSubMenu(
+                    "Other Logs",
+                    async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), combineLog, isAdmin)),
+            ]),
+        ];
+    }
+
+    private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool addLog, bool isAdmin)
     {
         var rootChildren = new List<MenuItem>();
         var folderMap = new Dictionary<string, List<MenuItem>>(StringComparer.OrdinalIgnoreCase);
@@ -130,12 +148,13 @@ public sealed partial class MenuBar : IDisposable
 
             if (path.Count == 0) { continue; }
 
-            var leafLabel = path[^1];
-            var leaf = MenuItem.Item(leafLabel, () => Actions.OpenLiveLogAsync(logName, addLog));
+            var log = path[^1];
+            var logIsEnabled = isAdmin || !LogNameMethods.AdminOnlyLiveLogNames.Contains(logName);
+            var logMenuItem = MenuItem.Item(log, () => Actions.OpenLiveLogAsync(logName, addLog), isEnabled: logIsEnabled);
 
             if (path.Count == 1)
             {
-                rootChildren.Add(leaf);
+                rootChildren.Add(logMenuItem);
 
                 continue;
             }
@@ -161,7 +180,7 @@ public sealed partial class MenuBar : IDisposable
                 children = newChildren;
             }
 
-            children.Add(leaf);
+            children.Add(logMenuItem);
         }
 
         return rootChildren;

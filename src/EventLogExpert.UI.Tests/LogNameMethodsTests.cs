@@ -8,6 +8,24 @@ namespace EventLogExpert.UI.Tests;
 public sealed class LogNameMethodsTests
 {
     [Fact]
+    public void AdminOnlyLiveLogNames_ContainsExpectedNames()
+    {
+        Assert.Contains("Security", LogNameMethods.AdminOnlyLiveLogNames);
+        Assert.Contains("State", LogNameMethods.AdminOnlyLiveLogNames);
+        Assert.Equal(2, LogNameMethods.AdminOnlyLiveLogNames.Count);
+    }
+
+    [Theory]
+    [InlineData("security")]
+    [InlineData("SECURITY")]
+    [InlineData("state")]
+    [InlineData("STATE")]
+    public void AdminOnlyLiveLogNames_ShouldMatchCaseInsensitively(string input)
+    {
+        Assert.Contains(input, LogNameMethods.AdminOnlyLiveLogNames);
+    }
+
+    [Fact]
     public void GetMenuPath_WhenChannelHasEmptySegments_ShouldIgnoreEmpties()
     {
         var path = LogNameMethods.GetMenuPath("Provider//Operational");
@@ -118,5 +136,23 @@ public sealed class LogNameMethodsTests
         var path = LogNameMethods.GetMenuPath("Application");
 
         Assert.Equal(["Application"], path);
+    }
+
+    [Fact]
+    public void HardCodedLiveLogNames_ContainsExpectedNames()
+    {
+        Assert.Contains("Application", LogNameMethods.HardCodedLiveLogNames);
+        Assert.Contains("System", LogNameMethods.HardCodedLiveLogNames);
+        Assert.Contains("Security", LogNameMethods.HardCodedLiveLogNames);
+        Assert.Equal(3, LogNameMethods.HardCodedLiveLogNames.Count);
+    }
+
+    [Theory]
+    [InlineData("application")]
+    [InlineData("APPLICATION")]
+    [InlineData("Application")]
+    public void HardCodedLiveLogNames_ShouldMatchCaseInsensitively(string input)
+    {
+        Assert.Contains(input, LogNameMethods.HardCodedLiveLogNames);
     }
 }
