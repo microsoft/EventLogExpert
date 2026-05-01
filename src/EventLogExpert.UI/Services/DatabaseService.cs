@@ -15,6 +15,8 @@ namespace EventLogExpert.UI.Services;
 
 public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollectionProvider
 {
+    public const string UpgradeBackupSuffix = ".upgrade.bak";
+
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly Lock _mutationLock = new();
     private readonly IPreferencesProvider _preferences;
@@ -66,7 +68,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         var statuses = await Task.Run(
             () =>
             {
-                var perFile = new Dictionary<string, DatabaseStatus>(StringComparer.OrdinalIgnoreCase);
+                var perFile = new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var entry in snapshot)
                 {
@@ -81,7 +83,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                         // quarantined and surfaced in Settings instead of being mutated invisibly.
                         if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
                         {
-                            perFile[entry.FileName] = DatabaseStatus.UnrecognizedSchema;
+                            perFile[entry.FileName] = (DatabaseStatus.UnrecognizedSchema, false);
                             continue;
                         }
 
@@ -94,12 +96,14 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                             _traceLogger);
 
                         var state = context.IsUpgradeNeeded();
-                        perFile[entry.FileName] = MapSchemaVersionToStatus(state.CurrentVersion);
+                        var status = MapSchemaVersionToStatus(state.CurrentVersion);
+                        var backupExists = ProbeOrCleanupBackup(entry, status);
+
+                        perFile[entry.FileName] = (status, backupExists);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        // Quarantine so resolver loading cannot consume a broken DB.
-                        perFile[entry.FileName] = DatabaseStatus.ClassificationFailed;
+                        perFile[entry.FileName] = (DatabaseStatus.ClassificationFailed, false);
 
                         SafeLog(() => _traceLogger.Warn(
                             $"{nameof(DatabaseService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}"));
@@ -124,11 +128,12 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             {
                 var entry = builder[i];
 
-                if (!statuses.TryGetValue(entry.FileName, out var newStatus)) { continue; }
+                if (!statuses.TryGetValue(entry.FileName, out var newState)) { continue; }
 
-                if (entry.Status == newStatus) { continue; }
+                if (entry.Status == newState.Status && entry.BackupExists == newState.BackupExists) { continue; }
 
-                builder[i] = entry with { Status = newStatus };
+                builder[i] = entry with { Status = newState.Status, BackupExists = newState.BackupExists };
+
                 changed = true;
             }
 
@@ -497,6 +502,44 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             .Where(entry => !entry.IsEnabled)
             .Select(entry => entry.FileName)
             .ToList();
+
+    private bool ProbeOrCleanupBackup(DatabaseEntry entry, DatabaseStatus status)
+    {
+        var backupPath = entry.FullPath + UpgradeBackupSuffix;
+
+        if (status == DatabaseStatus.UpgradeRequired)
+        {
+            try
+            {
+                return File.Exists(backupPath);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Conservative on probe failure: surface a possibly-spurious recovery prompt
+                // rather than silently denying the user a chance to restore from .upgrade.bak.
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} probe failed for '{entry.FileName}': {ex}"));
+                return true;
+            }
+        }
+
+        if (status == DatabaseStatus.Ready)
+        {
+            // V4 is the canonical post-upgrade state; an existing .upgrade.bak is stale
+            // (we crashed between rename and cleanup). File.Delete is a no-op if absent.
+            try
+            {
+                File.Delete(backupPath);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} stale .upgrade.bak cleanup failed for '{entry.FileName}': {ex}"));
+            }
+        }
+
+        return false;
+    }
 
     private void RaiseEntriesChanged() => EntriesChanged?.Invoke(this, EventArgs.Empty);
 
