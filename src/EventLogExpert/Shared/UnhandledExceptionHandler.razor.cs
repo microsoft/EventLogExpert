@@ -24,7 +24,7 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
     protected override Task OnErrorAsync(Exception exception)
     {
         TraceLogger.Critical($"Unhandled exception in UI:\r\n{exception}");
-        BannerService.ReportError(exception);
+        BannerService.ReportCritical(exception);
 
         return base.OnErrorAsync(exception);
     }
@@ -32,12 +32,14 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
     protected override void OnInitialized()
     {
         base.OnInitialized();
+
         _recoveryRegistration = BannerService.RegisterRecoveryCallback(RecoverFromBannerAsync);
     }
 
     private Task RecoverFromBannerAsync()
     {
         Recover();
+
         return Task.CompletedTask;
     }
 }

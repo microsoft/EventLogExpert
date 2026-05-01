@@ -38,7 +38,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_currentView == BannerView.Error && _previousView != BannerView.Error)
+        if (_currentView == BannerView.Critical && _previousView != BannerView.Critical)
         {
             try
             {
@@ -90,7 +90,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         catch (TaskCanceledException) { }
     }
 
-    private void OnDismissCritical(Guid id) => BannerService.DismissCritical(id);
+    private void OnDismissError(Guid id) => BannerService.DismissError(id);
 
     private void OnDismissInfo(Guid id) => BannerService.DismissInfoBanner(id);
 

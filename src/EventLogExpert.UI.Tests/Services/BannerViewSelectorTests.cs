@@ -19,36 +19,36 @@ public sealed class BannerViewSelectorTests
     }
 
     [Fact]
-    public void Select_AllThree_ErrorWins()
+    public void Select_AllThree_CriticalWins()
     {
         BannerView result = BannerViewSelector.Select(
             new InvalidOperationException("boom"),
-            [BuildCritical()],
+            [BuildError()],
             [BuildInfo()]);
-
-        Assert.Equal(BannerView.Error, result);
-    }
-
-    [Fact]
-    public void Select_CriticalAndInfo_CriticalWins()
-    {
-        BannerView result = BannerViewSelector.Select(null, [BuildCritical()], [BuildInfo()]);
 
         Assert.Equal(BannerView.Critical, result);
     }
 
     [Fact]
-    public void Select_ErrorAndCritical_ErrorWins()
+    public void Select_CriticalAndError_CriticalWins()
     {
-        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [BuildCritical()], []);
+        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [BuildError()], []);
 
-        Assert.Equal(BannerView.Error, result);
+        Assert.Equal(BannerView.Critical, result);
+    }
+
+    [Fact]
+    public void Select_CriticalAndInfo_CriticalWins()
+    {
+        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [], [BuildInfo()]);
+
+        Assert.Equal(BannerView.Critical, result);
     }
 
     [Fact]
     public void Select_ErrorAndInfo_ErrorWins()
     {
-        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [], [BuildInfo()]);
+        BannerView result = BannerViewSelector.Select(null, [BuildError()], [BuildInfo()]);
 
         Assert.Equal(BannerView.Error, result);
     }
@@ -56,7 +56,7 @@ public sealed class BannerViewSelectorTests
     [Fact]
     public void Select_OnlyCritical_ReturnsCritical()
     {
-        BannerView result = BannerViewSelector.Select(null, [BuildCritical()], []);
+        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [], []);
 
         Assert.Equal(BannerView.Critical, result);
     }
@@ -64,7 +64,7 @@ public sealed class BannerViewSelectorTests
     [Fact]
     public void Select_OnlyError_ReturnsError()
     {
-        BannerView result = BannerViewSelector.Select(new InvalidOperationException("boom"), [], []);
+        BannerView result = BannerViewSelector.Select(null, [BuildError()], []);
 
         Assert.Equal(BannerView.Error, result);
     }
@@ -77,8 +77,8 @@ public sealed class BannerViewSelectorTests
         Assert.Equal(BannerView.Info, result);
     }
 
-    private static CriticalAlertEntry BuildCritical() =>
-        new(Guid.NewGuid(), "Critical Title", "Critical Message", s_testTime);
+    private static ErrorBannerEntry BuildError() =>
+        new(Guid.NewGuid(), "Error Title", "Error Message", s_testTime);
 
     private static BannerInfoEntry BuildInfo() =>
         new(Guid.NewGuid(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);

@@ -1,16 +1,15 @@
-@using EventLogExpert.UI.Services
 @{
-    Exception? error = BannerService.UnhandledError;
-    IReadOnlyList<CriticalAlertEntry> criticals = BannerService.CriticalAlerts;
+    Exception? currentCritical = BannerService.CurrentCritical;
+    IReadOnlyList<ErrorBannerEntry> errors = BannerService.ErrorBanners;
     IReadOnlyList<BannerInfoEntry> infos = BannerService.InfoBanners;
-    BannerView view = _currentView = BannerViewSelector.Select(error, criticals, infos);
+    BannerView view = _currentView = BannerViewSelector.Select(currentCritical, errors, infos);
 }
 
 @switch (view)
 {
-    case BannerView.Error when error is { } unhandledError:
-        <aside class="banner banner-error" role="alert">
-            <span class="banner-message">An unexpected error occurred: @unhandledError.GetType().Name: @unhandledError.Message</span>
+    case BannerView.Critical when currentCritical is { } critical:
+        <aside class="banner banner-critical" role="alert">
+            <span class="banner-message">An unexpected error occurred: @critical.GetType().Name: @critical.Message</span>
 
             <div class="banner-actions">
                 <button class="button" @onclick="OnReloadClickedAsync" @ref="_reloadButtonRef" type="button">
@@ -19,7 +18,7 @@
                 <button class="button" @onclick="OnRelaunchClickedAsync" type="button">
                     <i aria-hidden="true" class="bi bi-power"></i> Relaunch
                 </button>
-                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(unhandledError)" type="button">
+                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(critical)" type="button">
                     <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
                 </button>
             </div>
@@ -41,20 +40,20 @@
         </aside>
         break;
 
-    case BannerView.Critical:
+    case BannerView.Error:
     {
-        CriticalAlertEntry alert = criticals[0];
-        <aside class="banner banner-critical" role="alert">
-            <span class="banner-message">@alert.Title: @alert.Message</span>
+        ErrorBannerEntry entry = errors[0];
+        <aside class="banner banner-error" role="alert">
+            <span class="banner-message">@entry.Title: @entry.Message</span>
 
-            @if (criticals.Count > 1)
+            @if (errors.Count > 1)
             {
-                <span class="banner-pagination">1 of @criticals.Count</span>
+                <span class="banner-pagination">1 of @errors.Count</span>
             }
 
-            <button aria-label="Dismiss critical alert"
+            <button aria-label="Dismiss error banner"
                 class="button banner-dismiss"
-                @onclick="() => OnDismissCritical(alert.Id)"
+                @onclick="() => OnDismissError(entry.Id)"
                 type="button">
                 <i aria-hidden="true" class="bi bi-x"></i>
             </button>

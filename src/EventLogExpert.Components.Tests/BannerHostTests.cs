@@ -20,8 +20,8 @@ public sealed class BannerHostTests : BunitContext
 
     public BannerHostTests()
     {
-        _bannerService.UnhandledError.Returns((Exception?)null);
-        _bannerService.CriticalAlerts.Returns([]);
+        _bannerService.CurrentCritical.Returns((Exception?)null);
+        _bannerService.ErrorBanners.Returns([]);
         _bannerService.InfoBanners.Returns([]);
 
         Services.AddSingleton(_bannerService);
@@ -35,31 +35,69 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CopyDetailsClicked_CopiesExceptionAndShowsCopiedChip()
     {
-        var error = new InvalidOperationException("kaboom");
-        _bannerService.UnhandledError.Returns(error);
+        var critical = new InvalidOperationException("kaboom");
+        _bannerService.CurrentCritical.Returns(critical);
 
         var component = Render<BannerHost>();
 
         // Sync Click() returns at the handler's first real async point (the 2s Task.Delay) with
         // the chip rendered; ClickAsync would block for the full delay until the chip clears.
-        component.Find("aside.banner-error .banner-actions button:nth-child(3)").Click();
+        component.Find("aside.banner-critical .banner-actions button:nth-child(3)").Click();
 
         await _clipboardService.Received(1)
             .CopyTextAsync(Arg.Is<string>(s => s.Contains("InvalidOperationException") && s.Contains("kaboom")));
 
-        Assert.Single(component.FindAll("aside.banner-error .banner-feedback .banner-chip"));
+        Assert.Single(component.FindAll("aside.banner-critical .banner-feedback .banner-chip"));
     }
 
     [Fact]
-    public async Task BannerHost_DismissCriticalClicked_CallsDismissCriticalWithEntryId()
+    public void BannerHost_CriticalAndErrorAndInfoAllPresent_RendersOnlyCritical()
     {
-        var alert = new CriticalAlertEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
-        _bannerService.CriticalAlerts.Returns([alert]);
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+
+        _bannerService.ErrorBanners.Returns(
+            [new ErrorBannerEntry(Guid.NewGuid(), "Error", "E", DateTime.UtcNow)]);
+
+        _bannerService.InfoBanners.Returns([
+            new BannerInfoEntry(Guid.NewGuid(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
+        ]);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-critical button.banner-dismiss").ClickAsync(new());
 
-        _bannerService.Received(1).DismissCritical(alert.Id);
+        Assert.Single(component.FindAll("aside.banner-critical"));
+        Assert.Empty(component.FindAll("aside.banner-error"));
+        Assert.Empty(component.FindAll("aside.banner-info"));
+    }
+
+    [Fact]
+    public void BannerHost_CurrentCritical_RendersCriticalBannerWithThreeButtons()
+    {
+        var critical = new InvalidOperationException("kaboom");
+        _bannerService.CurrentCritical.Returns(critical);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-critical");
+        Assert.Contains("InvalidOperationException", banner.TextContent);
+        Assert.Contains("kaboom", banner.TextContent);
+
+        var buttons = component.FindAll("aside.banner-critical .banner-actions button");
+        Assert.Equal(3, buttons.Count);
+        Assert.Contains("Reload", buttons[0].TextContent);
+        Assert.Contains("Relaunch", buttons[1].TextContent);
+        Assert.Contains("Copy details", buttons[2].TextContent);
+    }
+
+    [Fact]
+    public async Task BannerHost_DismissErrorClicked_CallsDismissErrorWithEntryId()
+    {
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-error button.banner-dismiss").ClickAsync(new());
+
+        _bannerService.Received(1).DismissError(entry.Id);
     }
 
     [Fact]
@@ -72,25 +110,6 @@ public sealed class BannerHostTests : BunitContext
         await component.Find("aside.banner-info button.banner-dismiss").ClickAsync(new());
 
         _bannerService.Received(1).DismissInfoBanner(info.Id);
-    }
-
-    [Fact]
-    public void BannerHost_ErrorAndCriticalAndInfoAllPresent_RendersOnlyError()
-    {
-        _bannerService.UnhandledError.Returns(new InvalidOperationException("kaboom"));
-
-        _bannerService.CriticalAlerts.Returns(
-            [new CriticalAlertEntry(Guid.NewGuid(), "Critical", "C", DateTime.UtcNow)]);
-
-        _bannerService.InfoBanners.Returns([
-            new BannerInfoEntry(Guid.NewGuid(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
-        ]);
-
-        var component = Render<BannerHost>();
-
-        Assert.Single(component.FindAll("aside.banner-error"));
-        Assert.Empty(component.FindAll("aside.banner-critical"));
-        Assert.Empty(component.FindAll("aside.banner-info"));
     }
 
     [Fact]
@@ -107,19 +126,19 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public void BannerHost_MultipleCriticalAlerts_RendersFirstWithPagination()
+    public void BannerHost_MultipleErrorBanners_RendersFirstWithPagination()
     {
-        var first = new CriticalAlertEntry(Guid.NewGuid(), "First", "First message", DateTime.UtcNow);
-        var second = new CriticalAlertEntry(Guid.NewGuid(), "Second", "Second message", DateTime.UtcNow);
-        _bannerService.CriticalAlerts.Returns([first, second]);
+        var first = new ErrorBannerEntry(Guid.NewGuid(), "First", "First message", DateTime.UtcNow);
+        var second = new ErrorBannerEntry(Guid.NewGuid(), "Second", "Second message", DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([first, second]);
 
         var component = Render<BannerHost>();
 
-        var banner = component.Find("aside.banner-critical");
+        var banner = component.Find("aside.banner-error");
         Assert.Contains("First: First message", banner.TextContent);
         Assert.DoesNotContain("Second", banner.TextContent);
 
-        var pagination = component.Find("aside.banner-critical .banner-pagination");
+        var pagination = component.Find("aside.banner-error .banner-pagination");
         Assert.Equal("1 of 2", pagination.TextContent.Trim());
     }
 
@@ -134,13 +153,13 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RecoveryThrows_ShowsRecoveryFailureSubtitle()
     {
-        _bannerService.UnhandledError.Returns(new InvalidOperationException("kaboom"));
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _bannerService.TryRecoverAsync().Returns(Task.FromException(new InvalidOperationException("recovery failed")));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error .banner-actions button:nth-child(1)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new());
 
-        var subtitle = component.Find("aside.banner-error .banner-feedback .banner-subtitle");
+        var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
         Assert.Contains("Recovery failed", subtitle.TextContent);
         Assert.Contains("recovery failed", subtitle.TextContent);
     }
@@ -148,11 +167,11 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RelaunchClicked_InvokesTryRestartAsync()
     {
-        _bannerService.UnhandledError.Returns(new InvalidOperationException("kaboom"));
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _applicationRestartService.TryRestartAsync().Returns(true);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error .banner-actions button:nth-child(2)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new());
 
         await _applicationRestartService.Received(1).TryRestartAsync();
     }
@@ -160,59 +179,40 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RelaunchFails_ShowsRestartFailureSubtitle()
     {
-        _bannerService.UnhandledError.Returns(new InvalidOperationException("kaboom"));
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _applicationRestartService.TryRestartAsync().Returns(false);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error .banner-actions button:nth-child(2)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new());
 
-        var subtitle = component.Find("aside.banner-error .banner-feedback .banner-subtitle");
+        var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
         Assert.Contains("Restart failed", subtitle.TextContent);
     }
 
     [Fact]
     public async Task BannerHost_ReloadClicked_InvokesTryRecoverAsync()
     {
-        _bannerService.UnhandledError.Returns(new InvalidOperationException("kaboom"));
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _bannerService.TryRecoverAsync().Returns(Task.CompletedTask);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error .banner-actions button:nth-child(1)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new());
 
         await _bannerService.Received(1).TryRecoverAsync();
     }
 
     [Fact]
-    public void BannerHost_SingleCriticalAlert_RendersWithoutPagination()
+    public void BannerHost_SingleErrorBanner_RendersWithoutPagination()
     {
-        var alert = new CriticalAlertEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
-        _bannerService.CriticalAlerts.Returns([alert]);
-
-        var component = Render<BannerHost>();
-
-        var banner = component.Find("aside.banner-critical");
-        Assert.Contains("Database: Schema invalid", banner.TextContent);
-        Assert.Empty(component.FindAll("aside.banner-critical .banner-pagination"));
-        Assert.Single(component.FindAll("aside.banner-critical button.banner-dismiss"));
-    }
-
-    [Fact]
-    public void BannerHost_UnhandledError_RendersErrorBannerWithThreeButtons()
-    {
-        var error = new InvalidOperationException("kaboom");
-        _bannerService.UnhandledError.Returns(error);
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
 
         var banner = component.Find("aside.banner-error");
-        Assert.Contains("InvalidOperationException", banner.TextContent);
-        Assert.Contains("kaboom", banner.TextContent);
-
-        var buttons = component.FindAll("aside.banner-error .banner-actions button");
-        Assert.Equal(3, buttons.Count);
-        Assert.Contains("Reload", buttons[0].TextContent);
-        Assert.Contains("Relaunch", buttons[1].TextContent);
-        Assert.Contains("Copy details", buttons[2].TextContent);
+        Assert.Contains("Database: Schema invalid", banner.TextContent);
+        Assert.Empty(component.FindAll("aside.banner-error .banner-pagination"));
+        Assert.Single(component.FindAll("aside.banner-error button.banner-dismiss"));
     }
 
     [Fact]

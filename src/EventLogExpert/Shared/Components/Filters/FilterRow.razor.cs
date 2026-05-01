@@ -3,8 +3,8 @@
 
 using EventLogExpert.Shared.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 

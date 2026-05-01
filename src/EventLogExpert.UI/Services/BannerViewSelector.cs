@@ -8,21 +8,21 @@ namespace EventLogExpert.UI.Services;
 public enum BannerView
 {
     None,
-    Error,
     Critical,
+    Error,
     Info
 }
 
 public static class BannerViewSelector
 {
     public static BannerView Select(
-        Exception? unhandledError,
-        IReadOnlyList<CriticalAlertEntry> criticalAlerts,
+        Exception? currentCritical,
+        IReadOnlyList<ErrorBannerEntry> errorBanners,
         IReadOnlyList<BannerInfoEntry> infoBanners)
     {
-        if (unhandledError is not null) { return BannerView.Error; }
+        if (currentCritical is not null) { return BannerView.Critical; }
 
-        if (criticalAlerts.Count > 0) { return BannerView.Critical; }
+        if (errorBanners.Count > 0) { return BannerView.Error; }
 
         return infoBanners.Count > 0 ? BannerView.Info : BannerView.None;
     }

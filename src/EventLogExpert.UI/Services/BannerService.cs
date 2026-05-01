@@ -11,18 +11,22 @@ public sealed class BannerService : IBannerService
 {
     private readonly Lock _stateLock = new();
 
-    private ImmutableList<CriticalAlertEntry> _criticalAlerts = ImmutableList<CriticalAlertEntry>.Empty;
+    private Exception? _currentCritical;
+    private ImmutableList<ErrorBannerEntry> _errorBanners = ImmutableList<ErrorBannerEntry>.Empty;
     private ImmutableList<BannerInfoEntry> _infoBanners = ImmutableList<BannerInfoEntry>.Empty;
     private Func<Task>? _recoveryCallback;
     private object? _recoveryToken;
 
-    private Exception? _unhandledError;
-
     public event Action? StateChanged;
 
-    public IReadOnlyList<CriticalAlertEntry> CriticalAlerts
+    public Exception? CurrentCritical
     {
-        get { lock (_stateLock) { return _criticalAlerts; } }
+        get { lock (_stateLock) { return _currentCritical; } }
+    }
+
+    public IReadOnlyList<ErrorBannerEntry> ErrorBanners
+    {
+        get { lock (_stateLock) { return _errorBanners; } }
     }
 
     public IReadOnlyList<BannerInfoEntry> InfoBanners
@@ -30,30 +34,25 @@ public sealed class BannerService : IBannerService
         get { lock (_stateLock) { return _infoBanners; } }
     }
 
-    public Exception? UnhandledError
-    {
-        get { lock (_stateLock) { return _unhandledError; } }
-    }
-
-    public void ClearError()
+    public void ClearCritical()
     {
         lock (_stateLock)
         {
-            _unhandledError = null;
+            _currentCritical = null;
         }
 
         RaiseStateChanged();
     }
 
-    public void DismissCritical(Guid id)
+    public void DismissError(Guid id)
     {
         bool removed;
 
         lock (_stateLock)
         {
-            ImmutableList<CriticalAlertEntry> next = _criticalAlerts.RemoveAll(entry => entry.Id == id);
-            removed = next.Count != _criticalAlerts.Count;
-            _criticalAlerts = next;
+            ImmutableList<ErrorBannerEntry> next = _errorBanners.RemoveAll(entry => entry.Id == id);
+            removed = next.Count != _errorBanners.Count;
+            _errorBanners = next;
         }
 
         if (removed)
@@ -94,25 +93,25 @@ public sealed class BannerService : IBannerService
         return registration;
     }
 
-    public void ReportCritical(string title, string message)
-    {
-        var entry = new CriticalAlertEntry(Guid.NewGuid(), title, message, DateTime.UtcNow);
-
-        lock (_stateLock)
-        {
-            _criticalAlerts = _criticalAlerts.Add(entry);
-        }
-
-        RaiseStateChanged();
-    }
-
-    public void ReportError(Exception ex)
+    public void ReportCritical(Exception ex)
     {
         ArgumentNullException.ThrowIfNull(ex);
 
         lock (_stateLock)
         {
-            _unhandledError = ex;
+            _currentCritical = ex;
+        }
+
+        RaiseStateChanged();
+    }
+
+    public void ReportError(string title, string message)
+    {
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), title, message, DateTime.UtcNow);
+
+        lock (_stateLock)
+        {
+            _errorBanners = _errorBanners.Add(entry);
         }
 
         RaiseStateChanged();
@@ -132,12 +131,12 @@ public sealed class BannerService : IBannerService
 
     public async Task TryRecoverAsync()
     {
-        Exception? snapshotError;
+        Exception? snapshotCritical;
         Func<Task>? callback;
 
         lock (_stateLock)
         {
-            snapshotError = _unhandledError;
+            snapshotCritical = _currentCritical;
             callback = _recoveryCallback;
         }
 
@@ -150,11 +149,11 @@ public sealed class BannerService : IBannerService
 
         lock (_stateLock)
         {
-            // Only clear if the error is still the one we set out to recover. If a newer error was reported
-            // while the callback was running, leave it visible so the user sees the new state.
-            if (ReferenceEquals(_unhandledError, snapshotError))
+            // Only clear if the critical exception is still the one we set out to recover. If a newer one
+            // was reported while the callback was running, leave it visible so the user sees the new state.
+            if (ReferenceEquals(_currentCritical, snapshotCritical))
             {
-                _unhandledError = null;
+                _currentCritical = null;
                 cleared = true;
             }
         }
