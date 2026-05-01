@@ -32,6 +32,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         _traceLogger = traceLogger;
 
         Refresh();
+
+        InitialClassificationTask = StartInitialClassificationAsync();
     }
 
     public event EventHandler? EntriesChanged;
@@ -43,6 +45,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             .ToImmutableList();
 
     public IReadOnlyList<DatabaseEntry> Entries => _entries;
+
+    public Task InitialClassificationTask { get; }
 
     public async Task ClassifyEntriesAsync(CancellationToken cancellationToken = default)
     {
@@ -94,15 +98,11 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        // Per-entry failure (file locked by another process, file deleted between
-                        // existence check and open, corrupt SQLite header, etc.) — quarantine the
-                        // entry so resolver loading cannot consume it later. Without this, the
-                        // entry would stay at its default Ready status from Refresh and EventResolver
-                        // would crash when it tries to open the same DB.
+                        // Quarantine so resolver loading cannot consume a broken DB.
                         perFile[entry.FileName] = DatabaseStatus.ClassificationFailed;
 
-                        _traceLogger.Warn(
-                            $"{nameof(DatabaseService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}");
+                        SafeLog(() => _traceLogger.Warn(
+                            $"{nameof(DatabaseService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}"));
                     }
                 }
 
@@ -328,6 +328,12 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             _ => DatabaseStatus.UnrecognizedSchema,
         };
 
+    private static void SafeLog(Action log)
+    {
+        try { log(); }
+        catch { /* Ignore */}
+    }
+
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
     {
         if (!databases.Any()) { return []; }
@@ -493,4 +499,18 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             .ToList();
 
     private void RaiseEntriesChanged() => EntriesChanged?.Invoke(this, EventArgs.Empty);
+
+    private async Task StartInitialClassificationAsync()
+    {
+        try
+        {
+            await ClassifyEntriesAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Honor InitialClassificationTask never-fault contract; absorbs subscriber throws.
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
+        }
+    }
 }
