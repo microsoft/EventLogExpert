@@ -454,6 +454,27 @@ public sealed class ModalAlertDialogServiceTests
         modalService.DidNotReceive().TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
 
+    [Fact]
+    public async Task ShowErrorAlert_WithActionLabelAndAction_PassesThroughToBannerService()
+    {
+        // Arrange
+        var bannerService = Substitute.For<IBannerService>();
+        Func<Task> action = () => Task.CompletedTask;
+
+        var sut = new ModalAlertDialogService(
+            Substitute.For<IModalService>(),
+            PassthroughMainThread(),
+            bannerService,
+            _ => Task.FromResult(false),
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowErrorAlert("Error Title", "Error Message", "Resolve", action);
+
+        // Assert
+        bannerService.Received(1).ReportError("Error Title", "Error Message", "Resolve", action);
+    }
+
     private static IMainThreadService PassthroughMainThread() =>
         new MainThreadService(action => { action(); return Task.CompletedTask; });
 }

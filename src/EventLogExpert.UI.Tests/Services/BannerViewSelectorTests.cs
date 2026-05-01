@@ -78,7 +78,7 @@ public sealed class BannerViewSelectorTests
     }
 
     private static ErrorBannerEntry BuildError() =>
-        new(Guid.NewGuid(), "Error Title", "Error Message", s_testTime);
+        new(Guid.NewGuid(), "Error Title", "Error Message", null, null, s_testTime);
 
     private static BannerInfoEntry BuildInfo() =>
         new(Guid.NewGuid(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);

@@ -51,6 +51,15 @@
                 <span class="banner-pagination">1 of @errors.Count</span>
             }
 
+            @if (entry is { ActionLabel: { } actionLabel, Action: { } action })
+            {
+                <button class="button banner-action"
+                    @onclick="() => OnErrorActionClickedAsync(action)"
+                    type="button">
+                    @actionLabel
+                </button>
+            }
+
             <button aria-label="Dismiss error banner"
                 class="button banner-dismiss"
                 @onclick="() => OnDismissError(entry.Id)"

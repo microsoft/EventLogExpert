@@ -56,7 +56,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
 
         _bannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(Guid.NewGuid(), "Error", "E", DateTime.UtcNow)]);
+            [new ErrorBannerEntry(Guid.NewGuid(), "Error", "E", null, null, DateTime.UtcNow)]);
 
         _bannerService.InfoBanners.Returns([
             new BannerInfoEntry(Guid.NewGuid(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
@@ -91,7 +91,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_DismissErrorClicked_CallsDismissErrorWithEntryId()
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
@@ -113,6 +113,82 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public async Task BannerHost_ErrorBannerActionClicked_InvokesSuppliedCallback()
+    {
+        int actionInvocationCount = 0;
+        var entry = new ErrorBannerEntry(
+            Guid.NewGuid(),
+            "Database",
+            "Recovery required",
+            "Resolve",
+            () => { actionInvocationCount++; return Task.CompletedTask; },
+            DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-error button.banner-action").ClickAsync(new());
+
+        Assert.Equal(1, actionInvocationCount);
+    }
+
+    [Fact]
+    public async Task BannerHost_ErrorBannerActionThrows_LogsViaTraceLogger_DoesNotPropagate()
+    {
+        // Arrange — action exceptions must be swallowed by BannerHost so they do not bubble up to ErrorBoundary
+        // and escalate the visible banner from Error to Critical (which would replace the user's actionable error
+        // with a Reload-tier critical banner).
+        var actionException = new InvalidOperationException("action boom");
+        var entry = new ErrorBannerEntry(
+            Guid.NewGuid(),
+            "Database",
+            "Recovery required",
+            "Resolve",
+            () => throw actionException,
+            DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
+
+        var component = Render<BannerHost>();
+
+        // Act
+        await component.Find("aside.banner-error button.banner-action").ClickAsync(new());
+
+        // Assert — banner stays visible, the critical slot was not populated, and the exception was logged.
+        Assert.Single(component.FindAll("aside.banner-error"));
+        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("action boom")));
+    }
+
+    [Fact]
+    public void BannerHost_ErrorBannerWithAction_RendersActionButtonWithLabel()
+    {
+        var entry = new ErrorBannerEntry(
+            Guid.NewGuid(),
+            "Database",
+            "Recovery required",
+            "Resolve",
+            () => Task.CompletedTask,
+            DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
+
+        var component = Render<BannerHost>();
+
+        var actionButton = component.Find("aside.banner-error button.banner-action");
+        Assert.Equal("Resolve", actionButton.TextContent.Trim());
+    }
+
+    [Fact]
+    public void BannerHost_ErrorBannerWithoutAction_DoesNotRenderActionButton()
+    {
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([entry]);
+
+        var component = Render<BannerHost>();
+
+        Assert.Empty(component.FindAll("aside.banner-error button.banner-action"));
+    }
+
+    [Fact]
     public void BannerHost_InfoSeverity_RendersInfoStyledBanner()
     {
         var info = new BannerInfoEntry(Guid.NewGuid(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
@@ -128,8 +204,8 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_MultipleErrorBanners_RendersFirstWithPagination()
     {
-        var first = new ErrorBannerEntry(Guid.NewGuid(), "First", "First message", DateTime.UtcNow);
-        var second = new ErrorBannerEntry(Guid.NewGuid(), "Second", "Second message", DateTime.UtcNow);
+        var first = new ErrorBannerEntry(Guid.NewGuid(), "First", "First message", null, null, DateTime.UtcNow);
+        var second = new ErrorBannerEntry(Guid.NewGuid(), "Second", "Second message", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([first, second]);
 
         var component = Render<BannerHost>();
@@ -204,7 +280,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_SingleErrorBanner_RendersWithoutPagination()
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();

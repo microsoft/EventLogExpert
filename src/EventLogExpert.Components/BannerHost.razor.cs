@@ -94,6 +94,20 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     private void OnDismissInfo(Guid id) => BannerService.DismissInfoBanner(id);
 
+    private async Task OnErrorActionClickedAsync(Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (Exception ex)
+        {
+            // Caller-provided actions own their own error handling; we log and swallow here so a failed action
+            // does not bubble to ErrorBoundary and escalate the visible banner from Error to Critical.
+            TraceLogger.Error($"{nameof(BannerHost)}.{nameof(OnErrorActionClickedAsync)}: action threw: {ex}");
+        }
+    }
+
     private async Task OnRelaunchClickedAsync()
     {
         _recoveryFailureMessage = null;
