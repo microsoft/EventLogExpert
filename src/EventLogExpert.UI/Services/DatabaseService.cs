@@ -89,11 +89,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                         // ensureCreated:false so a missing/empty file is NOT auto-populated with the V4 schema
                         // during inspection — that would silently mask the very thing classification is for.
-                        using var context = new EventProviderDbContext(
-                            entry.FullPath,
-                            readOnly: false,
-                            ensureCreated: false,
-                            _traceLogger);
+                        using var context = new EventProviderDbContext(entry.FullPath, false, false, _traceLogger);
 
                         var state = context.IsUpgradeNeeded();
                         var status = MapSchemaVersionToStatus(state.CurrentVersion);
@@ -147,6 +143,37 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             RaiseEntriesChanged();
         }
+    }
+
+    public async Task<bool> DeleteEntryWithBackupAsync(string fileName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var entry = LookupEntryOrThrow(fileName, nameof(DeleteEntryWithBackupAsync));
+
+        var success = await Task.Run(() => DeleteFilesCore(entry)).ConfigureAwait(false);
+
+        if (!success) { return false; }
+
+        bool removed;
+
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+            ImmutableList<DatabaseEntry> nextSnapshot = index >= 0 ? _entries.RemoveAt(index) : _entries;
+
+            // Always re-persist even if a concurrent Refresh already removed the entry — otherwise a
+            // stale fileName lingers in DisabledDatabasesPreference and a re-import comes back disabled.
+            PersistDisabled(nextSnapshot);
+
+            removed = index >= 0;
+
+            if (removed) { _entries = nextSnapshot; }
+        }
+
+        if (removed) { RaiseEntriesChanged(); }
+
+        return true;
     }
 
     public async Task<ImportResult> ImportAsync(
@@ -296,6 +323,31 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         RaiseEntriesChanged();
     }
 
+    public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var entry = LookupEntryOrThrow(fileName, nameof(RestoreFromBackupAsync));
+
+        var success = await Task.Run(() => RestoreFilesCore(entry)).ConfigureAwait(false);
+
+        if (!success) { return false; }
+
+        try
+        {
+            await ClassifyEntriesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            // Restore already succeeded on disk; absorb any post-classify failure (incl. cancellation)
+            // so the caller's success signal is preserved. The next entries access re-reads disk anyway.
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
+        }
+
+        return true;
+    }
+
     public void Toggle(string fileName)
     {
         lock (_mutationLock)
@@ -336,7 +388,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     private static void SafeLog(Action log)
     {
         try { log(); }
-        catch { /* Ignore */}
+        catch { /* Ignore */ }
     }
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
@@ -401,6 +453,21 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             file.Delete();
         }
+    }
+
+    private bool DeleteFilesCore(DatabaseEntry entry)
+    {
+        var mainPath = entry.FullPath;
+
+        if (!TryDeleteFile(mainPath + "-journal", nameof(DeleteEntryWithBackupAsync))) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-wal", nameof(DeleteEntryWithBackupAsync))) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-shm", nameof(DeleteEntryWithBackupAsync))) { return false; }
+
+        return TryDeleteFile(mainPath + UpgradeBackupSuffix, nameof(DeleteEntryWithBackupAsync)) &&
+            // Delete main last so a partial failure leaves the entry visible to Refresh and retry-able.
+            TryDeleteFile(mainPath, nameof(DeleteEntryWithBackupAsync));
     }
 
     private IEnumerable<string> EnumerateDatabaseFileNames()
@@ -497,6 +564,22 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         return (imported, failures);
     }
 
+    private DatabaseEntry LookupEntryOrThrow(string fileName, string callerName)
+    {
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index < 0)
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DatabaseService)}.{callerName}: no entry found with file name '{fileName}'.");
+            }
+
+            return _entries[index];
+        }
+    }
+
     private void PersistDisabled(ImmutableList<DatabaseEntry> snapshot) =>
         _preferences.DisabledDatabasesPreference = snapshot
             .Where(entry => !entry.IsEnabled)
@@ -519,6 +602,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 // rather than silently denying the user a chance to restore from .upgrade.bak.
                 SafeLog(() => _traceLogger.Warn(
                     $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} probe failed for '{entry.FileName}': {ex}"));
+
                 return true;
             }
         }
@@ -543,6 +627,43 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
     private void RaiseEntriesChanged() => EntriesChanged?.Invoke(this, EventArgs.Empty);
 
+    private bool RestoreFilesCore(DatabaseEntry entry)
+    {
+        var mainPath = entry.FullPath;
+        var backupPath = mainPath + UpgradeBackupSuffix;
+
+        if (!File.Exists(backupPath))
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)}: '{backupPath}' missing; nothing to restore."));
+
+            return false;
+        }
+
+        // Sidecars must be removed before main is overwritten. Otherwise a partial failure leaves a
+        // restored V3 main paired with stale V4 sidecars, which SQLite can roll forward into the
+        // restored database on next open.
+        if (!TryDeleteFile(mainPath + "-journal", nameof(RestoreFromBackupAsync))) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-wal", nameof(RestoreFromBackupAsync))) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-shm", nameof(RestoreFromBackupAsync))) { return false; }
+
+        try
+        {
+            File.Copy(backupPath, mainPath, true);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)}: copy from '{backupPath}' to '{mainPath}' failed: {ex}"));
+
+            return false;
+        }
+
+        return TryDeleteFile(backupPath, nameof(RestoreFromBackupAsync));
+    }
+
     private async Task StartInitialClassificationAsync()
     {
         try
@@ -554,6 +675,22 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             // Honor InitialClassificationTask never-fault contract; absorbs subscriber throws.
             SafeLog(() => _traceLogger.Warn(
                 $"{nameof(DatabaseService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
+        }
+    }
+
+    private bool TryDeleteFile(string path, string callerName)
+    {
+        try
+        {
+            File.Delete(path);
+
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SafeLog(() => _traceLogger.Warn($"{nameof(DatabaseService)}.{callerName}: delete failed for '{path}': {ex}"));
+
+            return false;
         }
     }
 }

@@ -391,6 +391,136 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.TestDb1, service.Entries[0].FileName);
     }
 
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_BackupMissing_StillSucceedsAndRemovesEntry()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var result = await service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.False(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_DeletesMainAllSidecarsAndBackup_RemovesFromEntries()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var journalPath = dbPath + "-journal";
+        var walPath = dbPath + "-wal";
+        var shmPath = dbPath + "-shm";
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(journalPath, "rollback-journal");
+        File.WriteAllText(walPath, "wal-content");
+        File.WriteAllText(shmPath, "shm-content");
+        File.WriteAllText(bakPath, "upgrade-backup");
+
+        var service = CreateDatabaseService();
+
+        var result = await service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.False(File.Exists(dbPath));
+        Assert.False(File.Exists(journalPath));
+        Assert.False(File.Exists(walPath));
+        Assert.False(File.Exists(shmPath));
+        Assert.False(File.Exists(bakPath));
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_DoesNotTouchUserCreatedDotBakFiles()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        const string userBackupContent = "user-created-content";
+        var userBakPath = dbPath + ".bak";
+        File.WriteAllText(userBakPath, userBackupContent);
+
+        var service = CreateDatabaseService();
+
+        var result = await service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.False(File.Exists(dbPath));
+        Assert.True(File.Exists(userBakPath));
+        Assert.Equal(userBackupContent, File.ReadAllText(userBakPath));
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_RaisesEntriesChangedExactlyOnce()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref raisedCount);
+
+        await service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_TokenAlreadyCanceled_Throws()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await service.DeleteEntryWithBackupAsync(Constants.TestDb1, cts.Token));
+
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_UnknownFileName_Throws()
+    {
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.DeleteEntryWithBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task DeleteEntryWithBackupAsync_WhenSidecarDeleteFails_PreservesMainAndEntryAndReturnsFalse()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var walPath = dbPath + "-wal";
+        File.WriteAllText(walPath, "wal-content");
+
+        // Hold the WAL with FileShare.None so File.Delete throws IOException; this simulates the
+        // single-process race where SQLite still has the sidecar mapped at delete time. The main
+        // file and the entry must survive so Refresh keeps the entry visible and the user can retry.
+        using var lockHandle = new FileStream(walPath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        var service = CreateDatabaseService();
+
+        var result = await service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.False(result);
+        Assert.True(File.Exists(dbPath));
+        Assert.Single(service.Entries);
+    }
+
     public void Dispose()
     {
         // SQLite connections opened during ClassifyEntriesAsync are pooled; on Windows the pool
@@ -902,6 +1032,140 @@ public sealed class DatabaseServiceTests : IDisposable
 
         // Act + Assert
         Assert.Throws<InvalidOperationException>(() => service.Remove("does-not-exist.db"));
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_BackupMissing_ReturnsFalseAndDoesNotMutate()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+        var entryBefore = Assert.Single(service.Entries);
+
+        var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.False(result);
+        Assert.True(File.Exists(dbPath));
+        var entryAfter = Assert.Single(service.Entries);
+        Assert.Equal(entryBefore.Status, entryAfter.Status);
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_RaisesEntriesChangedExactlyOnce_AfterReclassification()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        DatabaseSeedUtils.SeedV3Schema(bakPath);
+
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref raisedCount);
+
+        await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_TokenAlreadyCanceled_Throws()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        DatabaseSeedUtils.SeedV3Schema(bakPath);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await service.RestoreFromBackupAsync(Constants.TestDb1, cts.Token));
+
+        Assert.True(File.Exists(bakPath));
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_UnknownFileName_Throws()
+    {
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await service.RestoreFromBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_WhenMainIsV4AndBackupIsV3_RestoresMainDeletesSidecarsAndBackup_StatusBecomesUpgradeRequired()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        DatabaseSeedUtils.SeedV3Schema(bakPath);
+
+        var journalPath = dbPath + "-journal";
+        var walPath = dbPath + "-wal";
+        var shmPath = dbPath + "-shm";
+        File.WriteAllText(journalPath, "stale-journal");
+        File.WriteAllText(walPath, "stale-wal");
+        File.WriteAllText(shmPath, "stale-shm");
+
+        var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.True(result);
+        Assert.True(File.Exists(dbPath));
+        Assert.False(File.Exists(journalPath));
+        Assert.False(File.Exists(walPath));
+        Assert.False(File.Exists(shmPath));
+        Assert.False(File.Exists(bakPath));
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_WhenSidecarDeleteFails_PreservesBackupAndReturnsFalse()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        DatabaseSeedUtils.SeedV3Schema(bakPath);
+
+        var walPath = dbPath + "-wal";
+        File.WriteAllText(walPath, "wal-content");
+
+        var mainBytesBefore = File.ReadAllBytes(dbPath);
+
+        // Hold the WAL with FileShare.None so File.Delete throws IOException; this simulates the
+        // single-process race where SQLite still has the sidecar mapped at restore time. Main must
+        // be untouched and the backup must survive so the user can retry.
+        using var lockHandle = new FileStream(walPath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        var result = await service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.False(result);
+        Assert.True(File.Exists(bakPath));
+        Assert.Equal(mainBytesBefore, File.ReadAllBytes(dbPath));
     }
 
     [Fact]
