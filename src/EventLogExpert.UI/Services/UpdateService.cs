@@ -25,11 +25,19 @@ public sealed class UpdateService(
     IAlertDialogService alertDialogService) : IUpdateService
 {
     private string? _currentRawChanges;
+    private int _hasAutoChecked;
 
     public async Task CheckForUpdates(bool usePreRelease, bool userInitiated = false)
     {
         traceLogger.Debug($"{nameof(CheckForUpdates)} was called. {nameof(usePreRelease)} is {usePreRelease}. " +
             $"{nameof(userInitiated)} is {userInitiated}. {nameof(versionProvider.CurrentVersion)} is {versionProvider.CurrentVersion}.");
+
+        if (!userInitiated && Interlocked.CompareExchange(ref _hasAutoChecked, 1, 0) != 0)
+        {
+            traceLogger.Debug($"{nameof(CheckForUpdates)} skipping automatic check; one already ran this session.");
+
+            return;
+        }
 
         if (versionProvider.IsDevBuild)
         {
@@ -68,7 +76,8 @@ public sealed class UpdateService(
                 if (!usePreRelease && release.IsPreRelease) { continue; }
 
                 // Need to drop the v off the version number provided by GitHub
-                if (versionProvider.CurrentVersion.CompareTo(new Version(release.Version.TrimStart('v'))) != 0) {
+                if (versionProvider.CurrentVersion.CompareTo(new Version(release.Version.TrimStart('v'))) != 0)
+                {
                     latest = release;
 
                     break;

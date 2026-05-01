@@ -38,6 +38,29 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdates_AutoScanCalledTwice_ShouldOnlyFetchReleasesOnce()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService);
+
+        // Act
+        await updateService.CheckForUpdates(false, userInitiated: false);
+        await updateService.CheckForUpdates(false, userInitiated: false);
+
+        // Assert
+        await mockGitHubService.Received(1).GetReleases();
+    }
+
+    [Fact]
     public async Task CheckForUpdates_DeploymentThrowsException_ShouldShowAlert()
     {
         // Arrange
@@ -230,6 +253,31 @@ public sealed class UpdateServiceTests
     }
 
     [Fact]
+    public async Task CheckForUpdates_GetReleasesThrowsThenAutoScan_ShouldNotRetry()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+
+        mockGitHubService.GetReleases().Returns<IEnumerable<GitReleaseModel>>(_ =>
+            throw new HttpRequestException("Network error"));
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService);
+
+        // Act
+        await updateService.CheckForUpdates(false, userInitiated: false);
+        await updateService.CheckForUpdates(false, userInitiated: false);
+
+        // Assert
+        await mockGitHubService.Received(1).GetReleases();
+    }
+
+    [Fact]
     public async Task CheckForUpdates_Latest_ShouldUpdateImmediately()
     {
         // Arrange
@@ -284,6 +332,29 @@ public sealed class UpdateServiceTests
 
         // Assert
         mockDeploymentService.Received(1).UpdateOnNextRestart(Constants.GitHubLatestUri, userInitiated: false);
+    }
+
+    [Fact]
+    public async Task CheckForUpdates_ManualThenAutoScan_ShouldRunBoth()
+    {
+        // Arrange
+        var mockCurrentVersionProvider = Substitute.For<ICurrentVersionProvider>();
+        mockCurrentVersionProvider.CurrentVersion.Returns(new Version(Constants.AppInstalledVersion));
+        mockCurrentVersionProvider.IsDevBuild.Returns(false);
+
+        var mockGitHubService = Substitute.For<IGitHubService>();
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+
+        var updateService = CreateUpdateService(
+            mockCurrentVersionProvider,
+            gitHubService: mockGitHubService);
+
+        // Act
+        await updateService.CheckForUpdates(false, userInitiated: true);
+        await updateService.CheckForUpdates(false, userInitiated: false);
+
+        // Assert
+        await mockGitHubService.Received(2).GetReleases();
     }
 
     [Fact]
