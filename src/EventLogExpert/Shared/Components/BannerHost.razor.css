@@ -19,6 +19,10 @@
     background-color: var(--clr-red);
 }
 
+.banner-error {
+    top: 0;
+}
+
 .banner-warning {
     background-color: var(--clr-yellow);
     color: var(--clr-on-light-highlight);
