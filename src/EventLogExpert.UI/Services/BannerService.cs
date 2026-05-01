@@ -14,6 +14,7 @@ public sealed class BannerService : IBannerService
     private ImmutableList<CriticalAlertEntry> _criticalAlerts = ImmutableList<CriticalAlertEntry>.Empty;
     private ImmutableList<BannerInfoEntry> _infoBanners = ImmutableList<BannerInfoEntry>.Empty;
     private Func<Task>? _recoveryCallback;
+    private object? _recoveryToken;
 
     private Exception? _unhandledError;
 
@@ -78,6 +79,21 @@ public sealed class BannerService : IBannerService
         }
     }
 
+    public IDisposable RegisterRecoveryCallback(Func<Task> recover)
+    {
+        ArgumentNullException.ThrowIfNull(recover);
+
+        var registration = new RecoveryRegistration(this);
+
+        lock (_stateLock)
+        {
+            _recoveryCallback = recover;
+            _recoveryToken = registration;
+        }
+
+        return registration;
+    }
+
     public void ReportCritical(string title, string message)
     {
         var entry = new CriticalAlertEntry(Guid.NewGuid(), title, message, DateTime.UtcNow);
@@ -112,14 +128,6 @@ public sealed class BannerService : IBannerService
         }
 
         RaiseStateChanged();
-    }
-
-    public void SetRecoveryCallback(Func<Task>? recover)
-    {
-        lock (_stateLock)
-        {
-            _recoveryCallback = recover;
-        }
     }
 
     public async Task TryRecoverAsync()
@@ -158,4 +166,25 @@ public sealed class BannerService : IBannerService
     }
 
     private void RaiseStateChanged() => StateChanged?.Invoke();
+
+    private void UnregisterRecoveryIfActive(object token)
+    {
+        lock (_stateLock)
+        {
+            if (!ReferenceEquals(_recoveryToken, token))
+            {
+                return;
+            }
+
+            _recoveryCallback = null;
+            _recoveryToken = null;
+        }
+    }
+
+    private sealed class RecoveryRegistration(BannerService service) : IDisposable
+    {
+        private readonly BannerService _service = service;
+
+        public void Dispose() => _service.UnregisterRecoveryIfActive(this);
+    }
 }

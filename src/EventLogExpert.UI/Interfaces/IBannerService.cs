@@ -41,10 +41,11 @@ public interface IBannerService
     void ReportInfoBanner(string title, string message, BannerSeverity severity);
 
     /// <summary>
-    ///     Register a callback that <see cref="TryRecoverAsync" /> invokes before clearing the error. Replacing an existing
-    ///     callback overwrites the prior one. Pass <see langword="null" /> to unregister.
+    ///     Register a callback that <see cref="TryRecoverAsync" /> invokes before clearing the error. Replaces any prior
+    ///     registration immediately. Dispose the returned handle to unregister; disposal is idempotent and a no-op if a
+    ///     newer registration has already replaced this one.
     /// </summary>
-    void SetRecoveryCallback(Func<Task>? recover);
+    IDisposable RegisterRecoveryCallback(Func<Task> recover);
 
     /// <summary>
     ///     Invoke the registered recovery callback (if any), then clear the error. If no callback is registered, just clears

@@ -100,6 +100,84 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
+    public async Task RegisterRecoveryCallback_DisposingActiveHandle_UnregistersCallback()
+    {
+        // Arrange
+        var sut = new BannerService();
+        sut.ReportError(new InvalidOperationException("boom"));
+        bool callbackInvoked = false;
+        IDisposable registration = sut.RegisterRecoveryCallback(() => { callbackInvoked = true; return Task.CompletedTask; });
+
+        // Act
+        registration.Dispose();
+        await sut.TryRecoverAsync();
+
+        // Assert — callback was unregistered before recovery, so it must not have run.
+        Assert.False(callbackInvoked);
+        Assert.Null(sut.UnhandledError);
+    }
+
+    [Fact]
+    public async Task RegisterRecoveryCallback_DisposingStaleHandle_DoesNotClearActiveCallback()
+    {
+        // Arrange — stale handle from a prior registration must not nuke the newer registration.
+        var sut = new BannerService();
+        sut.ReportError(new InvalidOperationException("boom"));
+        bool firstInvoked = false;
+        bool secondInvoked = false;
+        IDisposable firstRegistration = sut.RegisterRecoveryCallback(() => { firstInvoked = true; return Task.CompletedTask; });
+        sut.RegisterRecoveryCallback(() => { secondInvoked = true; return Task.CompletedTask; });
+
+        // Act — dispose the OLD handle; the second registration must remain active.
+        firstRegistration.Dispose();
+        await sut.TryRecoverAsync();
+
+        // Assert
+        Assert.False(firstInvoked);
+        Assert.True(secondInvoked);
+    }
+
+    [Fact]
+    public void RegisterRecoveryCallback_DisposingTwice_IsIdempotent()
+    {
+        // Arrange
+        var sut = new BannerService();
+        IDisposable registration = sut.RegisterRecoveryCallback(() => Task.CompletedTask);
+
+        // Act + Assert — second dispose must not throw.
+        registration.Dispose();
+        registration.Dispose();
+    }
+
+    [Fact]
+    public void RegisterRecoveryCallback_WhenCallbackIsNull_Throws()
+    {
+        // Arrange
+        var sut = new BannerService();
+
+        // Act + Assert
+        Assert.Throws<ArgumentNullException>(() => sut.RegisterRecoveryCallback(null!));
+    }
+
+    [Fact]
+    public async Task RegisterRecoveryCallback_WhenCalledTwice_OverwritesPriorCallback()
+    {
+        // Arrange
+        var sut = new BannerService();
+        int firstInvokeCount = 0;
+        int secondInvokeCount = 0;
+        sut.RegisterRecoveryCallback(() => { firstInvokeCount++; return Task.CompletedTask; });
+        sut.RegisterRecoveryCallback(() => { secondInvokeCount++; return Task.CompletedTask; });
+
+        // Act
+        await sut.TryRecoverAsync();
+
+        // Assert
+        Assert.Equal(0, firstInvokeCount);
+        Assert.Equal(1, secondInvokeCount);
+    }
+
+    [Fact]
     public void ReportCritical_AppendsToList_RaisesStateChanged()
     {
         // Arrange
@@ -219,31 +297,13 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
-    public async Task SetRecoveryCallback_OverwritesPriorCallback()
-    {
-        // Arrange
-        var sut = new BannerService();
-        int firstInvokeCount = 0;
-        int secondInvokeCount = 0;
-        sut.SetRecoveryCallback(() => { firstInvokeCount++; return Task.CompletedTask; });
-        sut.SetRecoveryCallback(() => { secondInvokeCount++; return Task.CompletedTask; });
-
-        // Act
-        await sut.TryRecoverAsync();
-
-        // Assert
-        Assert.Equal(0, firstInvokeCount);
-        Assert.Equal(1, secondInvokeCount);
-    }
-
-    [Fact]
     public async Task TryRecoverAsync_InvokesRegisteredCallback_ThenClearsError()
     {
         // Arrange
         var sut = new BannerService();
         sut.ReportError(new InvalidOperationException("boom"));
         bool callbackInvoked = false;
-        sut.SetRecoveryCallback(() => { callbackInvoked = true; return Task.CompletedTask; });
+        sut.RegisterRecoveryCallback(() => { callbackInvoked = true; return Task.CompletedTask; });
 
         // Act
         await sut.TryRecoverAsync();
@@ -260,7 +320,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService();
         var error = new InvalidOperationException("boom");
         sut.ReportError(error);
-        sut.SetRecoveryCallback(() => throw new InvalidOperationException("recover failed"));
+        sut.RegisterRecoveryCallback(() => throw new InvalidOperationException("recover failed"));
 
         // Act + Assert — callback exception propagates; error remains so user can retry or see persistent state.
         await Assert.ThrowsAsync<InvalidOperationException>(() => sut.TryRecoverAsync());
@@ -277,7 +337,7 @@ public sealed class BannerServiceTests
         sut.ReportError(oldError);
         var callbackStarted = new TaskCompletionSource();
         var callbackCanFinish = new TaskCompletionSource();
-        sut.SetRecoveryCallback(async () =>
+        sut.RegisterRecoveryCallback(async () =>
         {
             callbackStarted.SetResult();
             await callbackCanFinish.Task;
@@ -302,7 +362,7 @@ public sealed class BannerServiceTests
         sut.ReportError(new InvalidOperationException("old"));
         var callbackStarted = new TaskCompletionSource();
         var callbackCanFinish = new TaskCompletionSource();
-        sut.SetRecoveryCallback(async () =>
+        sut.RegisterRecoveryCallback(async () =>
         {
             callbackStarted.SetResult();
             await callbackCanFinish.Task;
