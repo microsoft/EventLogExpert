@@ -31,10 +31,13 @@ public interface IAlertDialogService
     Task<bool> ShowAlert(string title, string message, string accept, string cancel, AlertPresentation presentation);
 
     /// <summary>
-    ///     Surface an error alert via <see cref="IBannerService.ReportError(string, string)" />. Always routes to the
-    ///     banner queue regardless of whether an inline host is active. The returned task completes immediately after the
-    ///     alert is queued; it does NOT wait for the user to dismiss the banner. Caller is responsible for ensuring it is
-    ///     appropriate to interrupt the user with a banner.
+    ///     Surface an error alert via <see cref="IBannerService.ReportError" />. Always routes to the banner queue
+    ///     regardless of whether an inline host is active. The returned task completes immediately after the alert is
+    ///     queued; it does NOT wait for the user to dismiss the banner. Caller is responsible for ensuring it is
+    ///     appropriate to interrupt the user with a banner. <paramref name="actionLabel" /> and <paramref name="action" />
+    ///     are passed through to the banner; both must be provided together or both omitted (see
+    ///     <see cref="IBannerService.ReportError" /> for validation rules). Callers needing the new banner's id (e.g., to
+    ///     self-dismiss from within the action) should call <see cref="IBannerService.ReportError" /> directly.
     /// </summary>
-    Task ShowErrorAlert(string title, string message);
+    Task ShowErrorAlert(string title, string message, string? actionLabel = null, Func<Task>? action = null);
 }

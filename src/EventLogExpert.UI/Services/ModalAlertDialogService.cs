@@ -60,9 +60,9 @@ public sealed class ModalAlertDialogService(
         return ShowAlertCore(title, message, accept, cancel, presentation);
     }
 
-    public Task ShowErrorAlert(string title, string message)
+    public Task ShowErrorAlert(string title, string message, string? actionLabel = null, Func<Task>? action = null)
     {
-        _bannerService.ReportError(title, message);
+        _bannerService.ReportError(title, message, actionLabel, action);
 
         return Task.CompletedTask;
     }

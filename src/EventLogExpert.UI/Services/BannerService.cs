@@ -105,9 +105,21 @@ public sealed class BannerService : IBannerService
         RaiseStateChanged();
     }
 
-    public void ReportError(string title, string message)
+    public Guid ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null)
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), title, message, DateTime.UtcNow);
+        bool hasAction = action is not null;
+        bool hasLabel = !string.IsNullOrWhiteSpace(actionLabel);
+
+        if (hasAction != hasLabel)
+        {
+            throw new ArgumentException(
+                "actionLabel and action must both be provided together, or both omitted.",
+                hasAction ? nameof(actionLabel) : nameof(action));
+        }
+
+        string? normalizedLabel = hasLabel ? actionLabel : null;
+        Func<Task>? normalizedAction = hasAction ? action : null;
+        var entry = new ErrorBannerEntry(Guid.NewGuid(), title, message, normalizedLabel, normalizedAction, DateTime.UtcNow);
 
         lock (_stateLock)
         {
@@ -115,6 +127,7 @@ public sealed class BannerService : IBannerService
         }
 
         RaiseStateChanged();
+        return entry.Id;
     }
 
     public void ReportInfoBanner(string title, string message, BannerSeverity severity)

@@ -238,8 +238,24 @@ public sealed class BannerServiceTests
         Assert.Single(sut.ErrorBanners);
         Assert.Equal("Title", sut.ErrorBanners[0].Title);
         Assert.Equal("Message", sut.ErrorBanners[0].Message);
+        Assert.Null(sut.ErrorBanners[0].ActionLabel);
+        Assert.Null(sut.ErrorBanners[0].Action);
         Assert.NotEqual(Guid.Empty, sut.ErrorBanners[0].Id);
         Assert.Equal(1, stateChangedCount);
+    }
+
+    [Fact]
+    public void ReportError_ReturnsNewEntryId_MatchesAddedBanner()
+    {
+        // Arrange
+        var sut = new BannerService();
+
+        // Act
+        Guid id = sut.ReportError("Title", "Message");
+
+        // Assert
+        Assert.NotEqual(Guid.Empty, id);
+        Assert.Equal(id, sut.ErrorBanners[0].Id);
     }
 
     [Fact]
@@ -256,6 +272,75 @@ public sealed class BannerServiceTests
         Assert.Equal(2, sut.ErrorBanners.Count);
         Assert.Equal("First Title", sut.ErrorBanners[0].Title);
         Assert.Equal("Second Title", sut.ErrorBanners[1].Title);
+    }
+
+    [Fact]
+    public void ReportError_WithActionButNoLabel_Throws()
+    {
+        // Arrange
+        var sut = new BannerService();
+        string? actionLabel = null;
+        Func<Task> action = () => Task.CompletedTask;
+
+        // Act + Assert
+        var ex = Assert.Throws<ArgumentException>(() =>
+            sut.ReportError("Title", "Message", actionLabel: actionLabel, action: action));
+        Assert.Equal(nameof(actionLabel), ex.ParamName);
+    }
+
+    [Fact]
+    public void ReportError_WithActionLabelAndAction_StoresBothOnEntry()
+    {
+        // Arrange
+        var sut = new BannerService();
+        Func<Task> action = () => Task.CompletedTask;
+
+        // Act
+        sut.ReportError("Title", "Message", "Resolve", action);
+
+        // Assert
+        Assert.Equal("Resolve", sut.ErrorBanners[0].ActionLabel);
+        Assert.Same(action, sut.ErrorBanners[0].Action);
+    }
+
+    [Fact]
+    public void ReportError_WithActionLabelButNoAction_Throws()
+    {
+        // Arrange
+        var sut = new BannerService();
+        Func<Task>? action = null;
+
+        // Act + Assert
+        var ex = Assert.Throws<ArgumentException>(() =>
+            sut.ReportError("Title", "Message", "Resolve", action: action));
+        Assert.Equal(nameof(action), ex.ParamName);
+    }
+
+    [Fact]
+    public void ReportError_WithWhitespaceLabelAndAction_Throws()
+    {
+        // Arrange — whitespace label is not a renderable button label, so it must be rejected when an action is supplied.
+        var sut = new BannerService();
+        string actionLabel = "   ";
+
+        // Act + Assert
+        var ex = Assert.Throws<ArgumentException>(() =>
+            sut.ReportError("Title", "Message", actionLabel: actionLabel, () => Task.CompletedTask));
+        Assert.Equal(nameof(actionLabel), ex.ParamName);
+    }
+
+    [Fact]
+    public void ReportError_WithWhitespaceLabelAndNoAction_AcceptsAndStoresNull()
+    {
+        // Arrange — both effectively absent: the whitespace label is normalized to null and no action is supplied.
+        var sut = new BannerService();
+
+        // Act
+        sut.ReportError("Title", "Message", "   ", action: null);
+
+        // Assert
+        Assert.Null(sut.ErrorBanners[0].ActionLabel);
+        Assert.Null(sut.ErrorBanners[0].Action);
     }
 
     [Fact]
