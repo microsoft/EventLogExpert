@@ -19,7 +19,7 @@
     background-color: var(--clr-red);
 }
 
-.banner-error {
+.banner-critical {
     top: 0;
 }
 

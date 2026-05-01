@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.Models;
 
-public sealed record CriticalAlertEntry(Guid Id, string Title, string Message, DateTime CreatedUtc);
+public sealed record ErrorBannerEntry(Guid Id, string Title, string Message, DateTime CreatedUtc);

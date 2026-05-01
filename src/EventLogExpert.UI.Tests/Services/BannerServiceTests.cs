@@ -9,56 +9,56 @@ namespace EventLogExpert.UI.Tests.Services;
 public sealed class BannerServiceTests
 {
     [Fact]
-    public void ClearError_RaisesStateChanged_AndNullsUnhandledError()
+    public void ClearCritical_RaisesStateChanged_AndNullsCurrentCritical()
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("boom"));
+        sut.ReportCritical(new InvalidOperationException("boom"));
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.ClearError();
+        sut.ClearCritical();
 
         // Assert
-        Assert.Null(sut.UnhandledError);
+        Assert.Null(sut.CurrentCritical);
         Assert.Equal(1, stateChangedCount);
     }
 
     [Fact]
-    public void DismissCritical_RemovesByGuid_RaisesStateChanged()
+    public void DismissError_RemovesByGuid_RaisesStateChanged()
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportCritical("First Title", "First Message");
-        sut.ReportCritical("Second Title", "Second Message");
-        Guid firstId = sut.CriticalAlerts[0].Id;
+        sut.ReportError("First Title", "First Message");
+        sut.ReportError("Second Title", "Second Message");
+        Guid firstId = sut.ErrorBanners[0].Id;
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.DismissCritical(firstId);
+        sut.DismissError(firstId);
 
         // Assert
-        Assert.Single(sut.CriticalAlerts);
-        Assert.Equal("Second Title", sut.CriticalAlerts[0].Title);
+        Assert.Single(sut.ErrorBanners);
+        Assert.Equal("Second Title", sut.ErrorBanners[0].Title);
         Assert.Equal(1, stateChangedCount);
     }
 
     [Fact]
-    public void DismissCritical_WithUnknownId_NoOp()
+    public void DismissError_WithUnknownId_NoOp()
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportCritical("Title", "Message");
+        sut.ReportError("Title", "Message");
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.DismissCritical(Guid.NewGuid());
+        sut.DismissError(Guid.NewGuid());
 
         // Assert
-        Assert.Single(sut.CriticalAlerts);
+        Assert.Single(sut.ErrorBanners);
         Assert.Equal(0, stateChangedCount);
     }
 
@@ -104,7 +104,7 @@ public sealed class BannerServiceTests
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("boom"));
+        sut.ReportCritical(new InvalidOperationException("boom"));
         bool callbackInvoked = false;
         IDisposable registration = sut.RegisterRecoveryCallback(() => { callbackInvoked = true; return Task.CompletedTask; });
 
@@ -114,21 +114,21 @@ public sealed class BannerServiceTests
 
         // Assert — callback was unregistered before recovery, so it must not have run.
         Assert.False(callbackInvoked);
-        Assert.Null(sut.UnhandledError);
+        Assert.Null(sut.CurrentCritical);
     }
 
     [Fact]
     public async Task RegisterRecoveryCallback_DisposingStaleHandle_DoesNotClearActiveCallback()
     {
-        // Arrange — stale handle from a prior registration must not nuke the newer registration.
+        // Arrange — stale handle from a prior registration must not clear the newer registration.
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("boom"));
+        sut.ReportCritical(new InvalidOperationException("boom"));
         bool firstInvoked = false;
         bool secondInvoked = false;
         IDisposable firstRegistration = sut.RegisterRecoveryCallback(() => { firstInvoked = true; return Task.CompletedTask; });
         sut.RegisterRecoveryCallback(() => { secondInvoked = true; return Task.CompletedTask; });
 
-        // Act — dispose the OLD handle; the second registration must remain active.
+        // Act
         firstRegistration.Dispose();
         await sut.TryRecoverAsync();
 
@@ -178,59 +178,24 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
-    public void ReportCritical_AppendsToList_RaisesStateChanged()
+    public void ReportCritical_RaisesStateChanged_AndPopulatesCurrentCritical()
     {
         // Arrange
         var sut = new BannerService();
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
+        var critical = new InvalidOperationException("boom");
 
         // Act
-        sut.ReportCritical("Title", "Message");
+        sut.ReportCritical(critical);
 
         // Assert
-        Assert.Single(sut.CriticalAlerts);
-        Assert.Equal("Title", sut.CriticalAlerts[0].Title);
-        Assert.Equal("Message", sut.CriticalAlerts[0].Message);
-        Assert.NotEqual(Guid.Empty, sut.CriticalAlerts[0].Id);
+        Assert.Same(critical, sut.CurrentCritical);
         Assert.Equal(1, stateChangedCount);
     }
 
     [Fact]
-    public void ReportCritical_TwiceQueuesBoth_FifoOrder()
-    {
-        // Arrange
-        var sut = new BannerService();
-
-        // Act
-        sut.ReportCritical("First Title", "First Message");
-        sut.ReportCritical("Second Title", "Second Message");
-
-        // Assert
-        Assert.Equal(2, sut.CriticalAlerts.Count);
-        Assert.Equal("First Title", sut.CriticalAlerts[0].Title);
-        Assert.Equal("Second Title", sut.CriticalAlerts[1].Title);
-    }
-
-    [Fact]
-    public void ReportError_RaisesStateChanged_AndPopulatesUnhandledError()
-    {
-        // Arrange
-        var sut = new BannerService();
-        int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
-        var error = new InvalidOperationException("boom");
-
-        // Act
-        sut.ReportError(error);
-
-        // Assert
-        Assert.Same(error, sut.UnhandledError);
-        Assert.Equal(1, stateChangedCount);
-    }
-
-    [Fact]
-    public void ReportError_TwiceReplacesPrior_RaisesStateChangedTwice()
+    public void ReportCritical_TwiceReplacesPrior_RaisesStateChangedTwice()
     {
         // Arrange
         var sut = new BannerService();
@@ -240,22 +205,57 @@ public sealed class BannerServiceTests
         var second = new InvalidOperationException("second");
 
         // Act
-        sut.ReportError(first);
-        sut.ReportError(second);
+        sut.ReportCritical(first);
+        sut.ReportCritical(second);
 
         // Assert
-        Assert.Same(second, sut.UnhandledError);
+        Assert.Same(second, sut.CurrentCritical);
         Assert.Equal(2, stateChangedCount);
     }
 
     [Fact]
-    public void ReportError_WithNull_Throws()
+    public void ReportCritical_WithNull_Throws()
     {
         // Arrange
         var sut = new BannerService();
 
         // Act + Assert
-        Assert.Throws<ArgumentNullException>(() => sut.ReportError(null!));
+        Assert.Throws<ArgumentNullException>(() => sut.ReportCritical(null!));
+    }
+
+    [Fact]
+    public void ReportError_AppendsToList_RaisesStateChanged()
+    {
+        // Arrange
+        var sut = new BannerService();
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+
+        // Act
+        sut.ReportError("Title", "Message");
+
+        // Assert
+        Assert.Single(sut.ErrorBanners);
+        Assert.Equal("Title", sut.ErrorBanners[0].Title);
+        Assert.Equal("Message", sut.ErrorBanners[0].Message);
+        Assert.NotEqual(Guid.Empty, sut.ErrorBanners[0].Id);
+        Assert.Equal(1, stateChangedCount);
+    }
+
+    [Fact]
+    public void ReportError_TwiceQueuesBoth_FifoOrder()
+    {
+        // Arrange
+        var sut = new BannerService();
+
+        // Act
+        sut.ReportError("First Title", "First Message");
+        sut.ReportError("Second Title", "Second Message");
+
+        // Assert
+        Assert.Equal(2, sut.ErrorBanners.Count);
+        Assert.Equal("First Title", sut.ErrorBanners[0].Title);
+        Assert.Equal("Second Title", sut.ErrorBanners[1].Title);
     }
 
     [Fact]
@@ -297,11 +297,11 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
-    public async Task TryRecoverAsync_InvokesRegisteredCallback_ThenClearsError()
+    public async Task TryRecoverAsync_InvokesRegisteredCallback_ThenClearsCritical()
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("boom"));
+        sut.ReportCritical(new InvalidOperationException("boom"));
         bool callbackInvoked = false;
         sut.RegisterRecoveryCallback(() => { callbackInvoked = true; return Task.CompletedTask; });
 
@@ -310,31 +310,31 @@ public sealed class BannerServiceTests
 
         // Assert
         Assert.True(callbackInvoked);
-        Assert.Null(sut.UnhandledError);
+        Assert.Null(sut.CurrentCritical);
     }
 
     [Fact]
-    public async Task TryRecoverAsync_WhenCallbackThrows_DoesNotClearError()
+    public async Task TryRecoverAsync_WhenCallbackThrows_DoesNotClearCritical()
     {
         // Arrange
         var sut = new BannerService();
-        var error = new InvalidOperationException("boom");
-        sut.ReportError(error);
+        var critical = new InvalidOperationException("boom");
+        sut.ReportCritical(critical);
         sut.RegisterRecoveryCallback(() => throw new InvalidOperationException("recover failed"));
 
-        // Act + Assert — callback exception propagates; error remains so user can retry or see persistent state.
+        // Act + Assert
         await Assert.ThrowsAsync<InvalidOperationException>(() => sut.TryRecoverAsync());
-        Assert.Same(error, sut.UnhandledError);
+        Assert.Same(critical, sut.CurrentCritical);
     }
 
     [Fact]
-    public async Task TryRecoverAsync_WhenNewErrorReportedDuringCallback_DoesNotClearNewError()
+    public async Task TryRecoverAsync_WhenNewCriticalReportedDuringCallback_DoesNotClearNewCritical()
     {
-        // Arrange — recovery callback awaits a gate; a different thread reports a new error before the gate releases.
+        // Arrange — recovery callback awaits a gate; another thread reports a new critical before the gate releases.
         var sut = new BannerService();
-        var oldError = new InvalidOperationException("old");
-        var newError = new InvalidOperationException("new");
-        sut.ReportError(oldError);
+        var oldCritical = new InvalidOperationException("old");
+        var newCritical = new InvalidOperationException("new");
+        sut.ReportCritical(oldCritical);
         var callbackStarted = new TaskCompletionSource();
         var callbackCanFinish = new TaskCompletionSource();
         sut.RegisterRecoveryCallback(async () =>
@@ -346,20 +346,20 @@ public sealed class BannerServiceTests
         // Act
         Task recoverTask = sut.TryRecoverAsync();
         await callbackStarted.Task;
-        sut.ReportError(newError);
+        sut.ReportCritical(newCritical);
         callbackCanFinish.SetResult();
         await recoverTask;
 
-        // Assert — the newer error survives the recovery completion.
-        Assert.Same(newError, sut.UnhandledError);
+        // Assert
+        Assert.Same(newCritical, sut.CurrentCritical);
     }
 
     [Fact]
-    public async Task TryRecoverAsync_WhenNewErrorReportedDuringCallback_DoesNotRaiseExtraStateChanged()
+    public async Task TryRecoverAsync_WhenNewCriticalReportedDuringCallback_DoesNotRaiseExtraStateChanged()
     {
-        // Arrange — verify we do not double-fire StateChanged when the snapshot mismatch path is taken.
+        // Arrange — verify the snapshot-mismatch path does not double-fire StateChanged.
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("old"));
+        sut.ReportCritical(new InvalidOperationException("old"));
         var callbackStarted = new TaskCompletionSource();
         var callbackCanFinish = new TaskCompletionSource();
         sut.RegisterRecoveryCallback(async () =>
@@ -372,25 +372,25 @@ public sealed class BannerServiceTests
         await callbackStarted.Task;
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
-        sut.ReportError(new InvalidOperationException("new"));
+        sut.ReportCritical(new InvalidOperationException("new"));
         callbackCanFinish.SetResult();
         await recoverTask;
 
-        // Assert — only the in-flight ReportError raised StateChanged; the recovery did NOT add a clear-event.
+        // Assert — only the in-flight ReportCritical raised StateChanged; recovery did NOT add a clear-event.
         Assert.Equal(1, stateChangedCount);
     }
 
     [Fact]
-    public async Task TryRecoverAsync_WithNoRegisteredCallback_StillClearsError_DoesNotThrow()
+    public async Task TryRecoverAsync_WithNoRegisteredCallback_StillClearsCritical_DoesNotThrow()
     {
         // Arrange
         var sut = new BannerService();
-        sut.ReportError(new InvalidOperationException("boom"));
+        sut.ReportCritical(new InvalidOperationException("boom"));
 
         // Act
         await sut.TryRecoverAsync();
 
         // Assert
-        Assert.Null(sut.UnhandledError);
+        Assert.Null(sut.CurrentCritical);
     }
 }

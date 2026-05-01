@@ -409,9 +409,9 @@ public sealed class ModalAlertDialogServiceTests
     }
 
     [Fact]
-    public async Task ShowCriticalAlert_DoesNotMarshalThroughMainThreadService()
+    public async Task ShowErrorAlert_DoesNotMarshalThroughMainThreadService()
     {
-        // Arrange — critical alerts go straight to the thread-safe banner service; no UI marshal needed.
+        // Arrange — error alerts go straight to the thread-safe banner service; no UI marshal needed.
         var bannerService = Substitute.For<IBannerService>();
         var mainThread = Substitute.For<IMainThreadService>();
 
@@ -423,15 +423,15 @@ public sealed class ModalAlertDialogServiceTests
             _ => Task.FromResult(string.Empty));
 
         // Act
-        await sut.ShowCriticalAlert("t", "m");
+        await sut.ShowErrorAlert("t", "m");
 
         // Assert
         await mainThread.DidNotReceive().InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
-        bannerService.Received(1).ReportCritical("t", "m");
+        bannerService.Received(1).ReportError("t", "m");
     }
 
     [Fact]
-    public async Task ShowCriticalAlert_RoutesToBannerServiceReportCritical_WithTitleAndMessage()
+    public async Task ShowErrorAlert_RoutesToBannerServiceReportError_WithTitleAndMessage()
     {
         // Arrange
         var bannerService = Substitute.For<IBannerService>();
@@ -446,10 +446,10 @@ public sealed class ModalAlertDialogServiceTests
             _ => Task.FromResult(string.Empty));
 
         // Act
-        await sut.ShowCriticalAlert("Critical Title", "Critical Message");
+        await sut.ShowErrorAlert("Error Title", "Error Message");
 
         // Assert
-        bannerService.Received(1).ReportCritical("Critical Title", "Critical Message");
+        bannerService.Received(1).ReportError("Error Title", "Error Message");
         Assert.False(standaloneCalled);
         modalService.DidNotReceive().TryGetActiveAlertHost(out Arg.Any<IInlineAlertHost?>());
     }

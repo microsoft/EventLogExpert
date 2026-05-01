@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Shared.Base;
+using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
