@@ -443,16 +443,13 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
     private void DeleteDatabaseFiles(string fileName)
     {
-        // Delete the .db together with its SQLite sidecars (.db-wal, .db-shm) so a re-import
-        // doesn't pick up stale write-ahead state.
-        var directory = new DirectoryInfo(_fileLocationOptions.DatabasePath);
+        var basePath = Path.Combine(_fileLocationOptions.DatabasePath, fileName);
 
-        if (!directory.Exists) { return; }
-
-        foreach (var file in directory.GetFiles($"{fileName}*"))
-        {
-            file.Delete();
-        }
+        File.Delete(basePath + "-journal");
+        File.Delete(basePath + "-wal");
+        File.Delete(basePath + "-shm");
+        File.Delete(basePath + UpgradeBackupSuffix);
+        File.Delete(basePath);
     }
 
     private bool DeleteFilesCore(DatabaseEntry entry)
