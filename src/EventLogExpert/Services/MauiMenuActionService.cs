@@ -20,8 +20,9 @@ namespace EventLogExpert.Services;
 
 /// <summary>
 ///     MAUI implementation of <see cref="IMenuActionService" />. Owns the cancellation token that gates background
-///     log loads (replaces the legacy field on MainPage). Exposes <see cref="OpenLogAsync" /> publicly so the page-level
-///     drag/drop handler can reuse the same cancellation lifecycle.
+///     log loads (replaces the legacy field on MainPage). Exposes <see cref="OpenLogsBatchAsync" /> publicly so the
+///     page-level drag/drop and command-line handlers can batch multiple opens through the same cancellation lifecycle
+///     and surface one banner alert per gesture for empty logs.
 /// </summary>
 public sealed class MauiMenuActionService(
     IDispatcher dispatcher,
@@ -148,12 +149,12 @@ public sealed class MauiMenuActionService(
             await CloseAllLogsAsync();
         }
 
-        foreach (var file in files)
-        {
-            if (file?.FullPath is null) { continue; }
+        var paths = files
+            .Where(file => file is not null && !string.IsNullOrEmpty(file.FullPath))
+            .Select(file => (file!.FullPath, PathType.FilePath))
+            .ToList();
 
-            await OpenLogAsync(file.FullPath, PathType.FilePath, true);
-        }
+        await OpenLogsBatchAsync(paths, combineLog: true);
     }
 
     public async Task OpenFolderAsync(bool combineLog)
@@ -162,7 +163,9 @@ public sealed class MauiMenuActionService(
 
         if (folderPath is null) { return; }
 
-        var files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly).ToList();
+        var files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly)
+            .Select(file => (file, PathType.FilePath))
+            .ToList();
 
         if (files.Count == 0) { return; }
 
@@ -171,21 +174,18 @@ public sealed class MauiMenuActionService(
             await CloseAllLogsAsync();
         }
 
-        foreach (var file in files)
-        {
-            await OpenLogAsync(file, PathType.FilePath, true);
-        }
+        await OpenLogsBatchAsync(files, combineLog: true);
     }
 
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
-    public Task OpenLiveLogAsync(string logName, bool combineLog) => OpenLogAsync(logName, PathType.LogName, combineLog);
+    public Task OpenLiveLogAsync(string logName, bool combineLog) =>
+        OpenLogsBatchAsync([(logName, PathType.LogName)], combineLog);
 
-    public async Task OpenLogAsync(string logPath, PathType pathType, bool combineLog = false)
+    public async Task<OpenLogStatus> OpenLogAsync(string logPath, PathType pathType, bool combineLog = false)
     {
-        if (string.IsNullOrWhiteSpace(logPath)) { return; }
-
-        if (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath)) { return; }
+        if (string.IsNullOrWhiteSpace(logPath) ||
+            (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath))) { return OpenLogStatus.Loaded; }
 
         EventLogInformation? eventLogInformation;
 
@@ -200,19 +200,18 @@ public sealed class MauiMenuActionService(
                 "Please relaunch with \"Run as Administrator\" to open this log",
                 "Ok");
 
-            return;
+            return OpenLogStatus.Loaded;
         }
         catch (Exception ex)
         {
             await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
 
-            return;
+            return OpenLogStatus.Loaded;
         }
 
         if (eventLogInformation.RecordCount is null or <= 0)
         {
-            await _dialogService.ShowAlert("Empty log", "Log contains no events", "Ok");
-            return;
+            return OpenLogStatus.Empty;
         }
 
         if (!combineLog)
@@ -227,6 +226,37 @@ public sealed class MauiMenuActionService(
         }
 
         _dispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
+        return OpenLogStatus.Loaded;
+    }
+
+    /// <summary>
+    ///     Opens each log in <paramref name="logs" /> sequentially and surfaces a single banner alert at the end naming
+    ///     every log that contained zero events. Use this from any call site that may open multiple logs in one user
+    ///     gesture (multi-file picker, folder open, drag-drop, command line) so the user sees one batched alert instead
+    ///     of one popup per empty file.
+    /// </summary>
+    public async Task OpenLogsBatchAsync(IEnumerable<(string Path, PathType Type)> logs, bool combineLog)
+    {
+        ArgumentNullException.ThrowIfNull(logs);
+
+        List<string>? emptyDisplayNames = null;
+
+        foreach (var (path, type) in logs)
+        {
+            if (await OpenLogAsync(path, type, combineLog) == OpenLogStatus.Empty)
+            {
+                (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
+            }
+        }
+
+        if (emptyDisplayNames is { Count: > 0 })
+        {
+            await _dialogService.ShowAlert(
+                "Empty log",
+                EmptyLogAlertFormatter.BuildMessage(emptyDisplayNames),
+                "Ok",
+                AlertPresentation.Banner);
+        }
     }
 
     public Task OpenSettingsAsync() => ShowModalAsync<SettingsModal>("settings");
@@ -270,6 +300,15 @@ public sealed class MauiMenuActionService(
     }
 
     public void ToggleShowAllEvents() => _dispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
+
+    private static string GetEmptyLogDisplayName(string path, PathType type)
+    {
+        if (type != PathType.FilePath) { return path; }
+
+        var fileName = Path.GetFileName(path);
+
+        return string.IsNullOrEmpty(fileName) ? path : fileName;
+    }
 
     private async Task OpenBrowserAsync(string url)
     {

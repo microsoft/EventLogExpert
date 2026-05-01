@@ -98,6 +98,12 @@ public enum FilterType
     Cached
 }
 
+public enum OpenLogStatus
+{
+    Loaded,
+    Empty
+}
+
 public enum Theme
 {
     System,

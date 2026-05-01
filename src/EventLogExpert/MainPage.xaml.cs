@@ -137,15 +137,14 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         IReadOnlyList<IStorageItem> items = await e.PlatformArgs.DragEventArgs.DataView.GetStorageItemsAsync();
 
-        foreach (var item in items)
-        {
-            if (item is not StorageFile file || _activeLogs.Value.ContainsKey(file.Path))
-            {
-                continue;
-            }
+        var droppedFilePaths = items.OfType<StorageFile>()
+            .Where(file => !string.IsNullOrEmpty(file.Path))
+            .Select(file => (file.Path, PathType.FilePath))
+            .ToList();
 
-            await _menuActionService.OpenLogAsync(file.Path, PathType.FilePath, true);
-        }
+        if (droppedFilePaths.Count == 0) { return; }
+
+        await _menuActionService.OpenLogsBatchAsync(droppedFilePaths, combineLog: true);
     }
 
     private void MainWebView_BlazorWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
@@ -206,15 +205,14 @@ public sealed partial class MainPage : ContentPage, IDisposable
     {
         try
         {
-            var args = Environment.GetCommandLineArgs();
+            var evtxArgs = Environment.GetCommandLineArgs()
+                .Where(arg => arg.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase))
+                .Select(arg => (arg, PathType.FilePath))
+                .ToList();
 
-            foreach (var arg in args)
-            {
-                if (arg.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase))
-                {
-                    await _menuActionService.OpenLogAsync(arg, PathType.FilePath);
-                }
-            }
+            if (evtxArgs.Count == 0) { return; }
+
+            await _menuActionService.OpenLogsBatchAsync(evtxArgs, combineLog: true);
         }
         catch (Exception e)
         {
