@@ -985,6 +985,26 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public void Remove_DoesNotTouchUserCreatedDotBakFiles()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        const string userBackupContent = "user-created-content";
+        var userBakPath = dbPath + ".bak";
+        File.WriteAllText(userBakPath, userBackupContent);
+
+        var service = CreateDatabaseService();
+
+        service.Remove(Constants.TestDb1);
+
+        Assert.False(File.Exists(dbPath));
+        Assert.True(File.Exists(userBakPath));
+        Assert.Equal(userBackupContent, File.ReadAllText(userBakPath));
+    }
+
+    [Fact]
     public void Remove_WhenCalled_ShouldDeleteDatabaseAndSidecars()
     {
         // Arrange
