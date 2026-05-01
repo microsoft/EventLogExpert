@@ -30,13 +30,13 @@ public interface IMenuActionService
 
     Task OpenDocsAsync();
 
-    Task OpenFileAsync(bool addLog);
+    Task OpenFileAsync(bool combineLog);
 
-    Task OpenFolderAsync(bool addLog);
+    Task OpenFolderAsync(bool combineLog);
 
     Task OpenIssueAsync();
 
-    Task OpenLiveLogAsync(string logName, bool addLog);
+    Task OpenLiveLogAsync(string logName, bool combineLog);
 
     Task OpenSettingsAsync();
 

@@ -34,7 +34,7 @@ public class RegistryProvider(ITraceLogger? logger = null)
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
             // Skip Security and State since it requires elevation
-            if (logSubKeyName is "Security" or "State")
+            if (LogNames.AdminOnlyLiveLogNames.Contains(logSubKeyName))
             {
                 continue;
             }

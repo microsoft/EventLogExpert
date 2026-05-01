@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
@@ -127,9 +128,9 @@ public sealed partial class MenuBar : IDisposable
             MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog)),
             MenuItem.SubMenu("Live",
             [
-                MenuItem.Item("Application", () => Actions.OpenLiveLogAsync("Application", combineLog)),
-                MenuItem.Item("System", () => Actions.OpenLiveLogAsync("System", combineLog)),
-                MenuItem.Item("Security", () => Actions.OpenLiveLogAsync("Security", combineLog), isEnabled: isAdmin),
+                MenuItem.Item(LogNames.ApplicationLog, () => Actions.OpenLiveLogAsync(LogNames.ApplicationLog, combineLog)),
+                MenuItem.Item(LogNames.SystemLog, () => Actions.OpenLiveLogAsync(LogNames.SystemLog, combineLog)),
+                MenuItem.Item(LogNames.SecurityLog, () => Actions.OpenLiveLogAsync(LogNames.SecurityLog, combineLog), isEnabled: isAdmin),
                 MenuItem.AsyncSubMenu(
                     "Other Logs",
                     async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), combineLog, isAdmin)),
@@ -137,7 +138,7 @@ public sealed partial class MenuBar : IDisposable
         ];
     }
 
-    private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool addLog, bool isAdmin)
+    private IReadOnlyList<MenuItem> BuildOtherLogsTree(IReadOnlyList<string> logNames, bool combineLog, bool isAdmin)
     {
         var rootChildren = new List<MenuItem>();
         var folderMap = new Dictionary<string, List<MenuItem>>(StringComparer.OrdinalIgnoreCase);
@@ -149,8 +150,8 @@ public sealed partial class MenuBar : IDisposable
             if (path.Count == 0) { continue; }
 
             var log = path[^1];
-            var logIsEnabled = isAdmin || !LogNameMethods.AdminOnlyLiveLogNames.Contains(logName);
-            var logMenuItem = MenuItem.Item(log, () => Actions.OpenLiveLogAsync(logName, addLog), isEnabled: logIsEnabled);
+            var logIsEnabled = isAdmin || !LogNames.AdminOnlyLiveLogNames.Contains(logName);
+            var logMenuItem = MenuItem.Item(log, () => Actions.OpenLiveLogAsync(logName, combineLog), isEnabled: logIsEnabled);
 
             if (path.Count == 1)
             {

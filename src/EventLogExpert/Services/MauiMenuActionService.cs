@@ -131,7 +131,7 @@ public sealed class MauiMenuActionService(
     public Task OpenDocsAsync() =>
         OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
 
-    public async Task OpenFileAsync(bool addLog)
+    public async Task OpenFileAsync(bool combineLog)
     {
         var options = new PickOptions
         {
@@ -143,7 +143,7 @@ public sealed class MauiMenuActionService(
 
         if (!files.Any()) { return; }
 
-        if (!addLog)
+        if (!combineLog)
         {
             await CloseAllLogsAsync();
         }
@@ -156,7 +156,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public async Task OpenFolderAsync(bool addLog)
+    public async Task OpenFolderAsync(bool combineLog)
     {
         string? folderPath = await FolderPickerHelper.PickFolderAsync();
 
@@ -166,7 +166,7 @@ public sealed class MauiMenuActionService(
 
         if (files.Count == 0) { return; }
 
-        if (!addLog)
+        if (!combineLog)
         {
             await CloseAllLogsAsync();
         }
@@ -179,13 +179,13 @@ public sealed class MauiMenuActionService(
 
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
-    public Task OpenLiveLogAsync(string logName, bool addLog) => OpenLogAsync(logName, PathType.LogName, addLog);
+    public Task OpenLiveLogAsync(string logName, bool combineLog) => OpenLogAsync(logName, PathType.LogName, combineLog);
 
-    public async Task OpenLogAsync(string logPath, PathType pathType, bool shouldAddLog = false)
+    public async Task OpenLogAsync(string logPath, PathType pathType, bool combineLog = false)
     {
         if (string.IsNullOrWhiteSpace(logPath)) { return; }
 
-        if (shouldAddLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath)) { return; }
+        if (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath)) { return; }
 
         EventLogInformation? eventLogInformation;
 
@@ -215,7 +215,7 @@ public sealed class MauiMenuActionService(
             return;
         }
 
-        if (!shouldAddLog)
+        if (!combineLog)
         {
             await _cancellationTokenSource.CancelAsync();
             _dispatcher.Dispatch(new EventLogAction.CloseAll());

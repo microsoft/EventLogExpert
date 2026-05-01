@@ -1,25 +1,20 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
+
 namespace EventLogExpert.UI;
 
 public static class LogNameMethods
 {
     private const string MicrosoftWindowsPrefix = "Microsoft-Windows-";
 
-    /// <summary>Live event log names that require process elevation to read.</summary>
-    public static IReadOnlySet<string> AdminOnlyLiveLogNames { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "Security",
-        "State",
-    };
-
     /// <summary>Live event log names hard-coded in MenuBar's File menu — filter these from dynamic log enumeration to avoid duplicates.</summary>
     public static IReadOnlySet<string> HardCodedLiveLogNames { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "Application",
-        "System",
-        "Security",
+        LogNames.ApplicationLog,
+        LogNames.SystemLog,
+        LogNames.SecurityLog,
     };
 
     public static IReadOnlyList<string> GetMenuPath(string logName)

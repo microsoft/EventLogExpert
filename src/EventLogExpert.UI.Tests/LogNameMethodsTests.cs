@@ -8,24 +8,6 @@ namespace EventLogExpert.UI.Tests;
 public sealed class LogNameMethodsTests
 {
     [Fact]
-    public void AdminOnlyLiveLogNames_ContainsExpectedNames()
-    {
-        Assert.Contains("Security", LogNameMethods.AdminOnlyLiveLogNames);
-        Assert.Contains("State", LogNameMethods.AdminOnlyLiveLogNames);
-        Assert.Equal(2, LogNameMethods.AdminOnlyLiveLogNames.Count);
-    }
-
-    [Theory]
-    [InlineData("security")]
-    [InlineData("SECURITY")]
-    [InlineData("state")]
-    [InlineData("STATE")]
-    public void AdminOnlyLiveLogNames_ShouldMatchCaseInsensitively(string input)
-    {
-        Assert.Contains(input, LogNameMethods.AdminOnlyLiveLogNames);
-    }
-
-    [Fact]
     public void GetMenuPath_WhenChannelHasEmptySegments_ShouldIgnoreEmpties()
     {
         var path = LogNameMethods.GetMenuPath("Provider//Operational");
