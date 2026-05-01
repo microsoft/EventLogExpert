@@ -57,6 +57,12 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
+        // Reset to NotClassified so the explicit ClassifyEntriesAsync call below produces real
+        // status changes (V3 → UpgradeRequired). The CreateDatabaseService helper already drained
+        // the ctor-initiated classification.
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.NotClassified);
+        service.MarkStatus(Constants.TestDb2, DatabaseStatus.NotClassified);
+
         var raisedCount = 0;
         service.EntriesChanged += (_, _) => raisedCount++;
 
@@ -248,7 +254,6 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb1);
         Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb2);
         Assert.All(service.Entries, entry => Assert.True(entry.IsEnabled));
-        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.NotClassified, entry.Status));
         Assert.All(service.Entries, entry => Assert.False(entry.BackupExists));
     }
 
@@ -538,6 +543,117 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task InitialClassificationTask_NeverFaults_EvenWhenAllEntriesThrow()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var db1Path = Path.Combine(databasePath, Constants.TestDb1);
+        var db2Path = Path.Combine(databasePath, Constants.TestDb2);
+        DatabaseSeedUtils.SeedV3Schema(db1Path);
+        DatabaseSeedUtils.SeedV3Schema(db2Path);
+
+        // Hold exclusive locks on every DB file so EventProviderDbContext cannot open any of them.
+        // The per-entry catch must turn each failure into ClassificationFailed and the outer
+        // wrapper must keep the exposed task in RanToCompletion.
+        using var handle1 = new FileStream(db1Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var handle2 = new FileStream(db2Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        var service = CreateDatabaseService();
+
+        await service.InitialClassificationTask;
+
+        Assert.Equal(TaskStatus.RanToCompletion, service.InitialClassificationTask.Status);
+        Assert.Equal(2, service.Entries.Count);
+        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.ClassificationFailed, entry.Status));
+    }
+
+    [Fact]
+    public async Task InitialClassificationTask_WhenAllSchemasValid_CompletesSuccessfullyAndPopulatesStatuses()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb2));
+
+        var service = CreateDatabaseService();
+
+        await service.InitialClassificationTask;
+
+        Assert.Equal(TaskStatus.RanToCompletion, service.InitialClassificationTask.Status);
+        var v4 = service.Entries.Single(entry => entry.FileName == Constants.TestDb1);
+        var v3 = service.Entries.Single(entry => entry.FileName == Constants.TestDb2);
+        Assert.Equal(DatabaseStatus.Ready, v4.Status);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, v3.Status);
+    }
+
+    [Fact]
+    public async Task InitialClassificationTask_WhenLoggerThrowsOnWarn_StillCompletesAndAppliesStatuses()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var db1Path = Path.Combine(databasePath, Constants.TestDb1);
+        var db2Path = Path.Combine(databasePath, Constants.TestDb2);
+        DatabaseSeedUtils.SeedV3Schema(db1Path);
+        DatabaseSeedUtils.SeedV3Schema(db2Path);
+
+        // Force per-entry classification failures so the per-entry catch fires Warn for every entry.
+        using var handle1 = new FileStream(db1Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+        using var handle2 = new FileStream(db2Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        // Logger throws on every Warn — simulates debug.log being locked. Without SafeLog the
+        // per-entry catch would propagate, faulting the worker before statuses are applied.
+        var throwingLogger = Substitute.For<ITraceLogger>();
+        throwingLogger.When(logger => logger.Warn(Arg.Any<WarnLogHandler>()))
+            .Do(_ => throw new IOException("simulated log file lock"));
+
+        var service = CreateDatabaseService(traceLogger: throwingLogger);
+
+        await service.InitialClassificationTask;
+
+        Assert.Equal(TaskStatus.RanToCompletion, service.InitialClassificationTask.Status);
+        Assert.Equal(2, service.Entries.Count);
+        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.ClassificationFailed, entry.Status));
+    }
+
+    [Fact]
+    public async Task InitialClassificationTask_WhenSubscriberAndLoggerBothThrow_StillCompletes()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        // Lock the DB so per-entry classification fails — that fires the per-entry SafeLog,
+        // which we use as a synchronization point to attach the throwing EntriesChanged
+        // subscriber BEFORE ClassifyEntriesAsync reaches RaiseEntriesChanged.
+        using var handle = new FileStream(dbPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        using var subscriberAttached = new ManualResetEventSlim(false);
+
+        var throwingLogger = Substitute.For<ITraceLogger>();
+        throwingLogger.When(logger => logger.Warn(Arg.Any<WarnLogHandler>()))
+            .Do(_ =>
+            {
+                // Worker blocks here until subscriberAttached.Set() below; ensures the
+                // subscriber is wired before the wrapper-catch path can fire. 10s is a
+                // safety valve for slow CI — normal completion is sub-millisecond.
+                subscriberAttached.Wait(TimeSpan.FromSeconds(10));
+                throw new IOException("simulated log file lock");
+            });
+
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var prefs = Substitute.For<IPreferencesProvider>();
+        prefs.DisabledDatabasesPreference.Returns([]);
+        var service = new DatabaseService(fileLocationOptions, prefs, throwingLogger);
+        Assert.Single(service.Entries);
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("subscriber fault");
+        subscriberAttached.Set();
+
+        await service.InitialClassificationTask;
+
+        Assert.Equal(TaskStatus.RanToCompletion, service.InitialClassificationTask.Status);
+        // Per-entry SafeLog (ClassificationFailed) plus wrapper SafeLog (subscriber fault) — both
+        // fired and both throws were swallowed for the task to RanToCompletion.
+        throwingLogger.Received(2).Warn(Arg.Any<WarnLogHandler>());
+    }
+
+    [Fact]
     public void MarkStatus_ShouldBePreservedAcrossRefresh()
     {
         // Arrange
@@ -749,7 +865,7 @@ public sealed class DatabaseServiceTests : IDisposable
         return path;
     }
 
-    private DatabaseService CreateDatabaseService(IPreferencesProvider? preferences = null)
+    private DatabaseService CreateDatabaseService(IPreferencesProvider? preferences = null, ITraceLogger? traceLogger = null)
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var prefs = preferences ?? Substitute.For<IPreferencesProvider>();
@@ -759,7 +875,14 @@ public sealed class DatabaseServiceTests : IDisposable
             prefs.DisabledDatabasesPreference.Returns([]);
         }
 
-        var traceLogger = Substitute.For<ITraceLogger>();
-        return new DatabaseService(fileLocationOptions, prefs, traceLogger);
+        var logger = traceLogger ?? Substitute.For<ITraceLogger>();
+        var service = new DatabaseService(fileLocationOptions, prefs, logger);
+
+        // Block until ctor-initiated classification finishes so tests observe a stable post-classification
+        // state. Tests that need to observe pre-classification state (e.g., InitialClassificationTask
+        // contract tests) construct DatabaseService directly. Safe to block synchronously here because
+        // ClassifyEntriesAsync runs on Task.Run worker threads and does not capture a sync context.
+        service.InitialClassificationTask.GetAwaiter().GetResult();
+        return service;
     }
 }
