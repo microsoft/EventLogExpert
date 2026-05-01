@@ -3,4 +3,9 @@
 
 namespace EventLogExpert.UI.Models;
 
-public sealed record DatabaseEntry(string FileName, string FullPath, bool IsEnabled, DatabaseStatus Status);
+public sealed record DatabaseEntry(
+    string FileName,
+    string FullPath,
+    bool IsEnabled,
+    DatabaseStatus Status,
+    bool BackupExists = false);

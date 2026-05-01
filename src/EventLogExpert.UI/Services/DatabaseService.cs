@@ -249,13 +249,18 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             var sortedFileNames = SortDatabases(fileNames);
 
             ImmutableList<DatabaseEntry> nextSnapshot = sortedFileNames
-                .Select(fileName => new DatabaseEntry(
-                    fileName,
-                    Path.Join(_fileLocationOptions.DatabasePath, fileName),
-                    !disabled.Contains(fileName),
-                    existingByFileName.TryGetValue(fileName, out var existing)
-                        ? existing.Status
-                        : DatabaseStatus.Ready))
+                .Select(fileName =>
+                {
+                    var isEnabled = !disabled.Contains(fileName);
+
+                    return existingByFileName.TryGetValue(fileName, out var existing)
+                        ? existing with { IsEnabled = isEnabled }
+                        : new DatabaseEntry(
+                            fileName,
+                            Path.Join(_fileLocationOptions.DatabasePath, fileName),
+                            isEnabled,
+                            DatabaseStatus.NotClassified);
+                })
                 .ToImmutableList();
 
             _entries = nextSnapshot;
