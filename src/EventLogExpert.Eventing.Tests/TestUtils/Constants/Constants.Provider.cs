@@ -17,7 +17,6 @@ public sealed partial class Constants
     public const string NonExistentDatabaseFullPath = @"C:\Test\NonExistentDatabase.db";
     public const string NonExistentDll = "NonExistent.dll";
     public const string NonExistentDllFullPath = @"C:\Windows\System32\NonExistent.dll";
-    public const string NonExistentDllSystemRootFullPath = @"%SystemRoot%\System32\NonExistent.dll";
     public const string NonExistentProviderName = "NonExistentProvider";
 
     public const string Localhost = "localhost";

@@ -938,15 +938,40 @@ public partial class EventResolverBase : IDisposable
             return @event;
         }
 
-        // Try again forcing the long to a short and with no log name.
-        // This is needed for providers such as Microsoft-Windows-Complus
+        // Try again forcing the long to a short and with no log name. Needed for providers
+        // such as Microsoft-Windows-Complus and Microsoft-Windows-WPDClassInstaller that store
+        // events with the full 32-bit RawId (high 16 bits = Qualifiers, low 16 bits = EventId).
+        // Strict template match accepts empty template + zero EventData properties, which is the
+        // shape WPDClassInstaller emits for its full-RawId entries. When the record carries a
+        // Qualifiers value, prefer the exact full-RawId match before the low-16 ambiguity check.
+        if (eventRecord.Qualifiers is { } qualifier)
+        {
+            var fullRawId = ((long)qualifier << 16) | eventRecord.Id;
+
+            foreach (var @event in details.Events)
+            {
+                if (@event.Id != fullRawId || @event.Version != eventRecord.Version) { continue; }
+
+                if (!DoesTemplateStrictlyMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+
+                Logger?.Debug($"{nameof(GetModernEvent)}: Match by full RawId fallback - RawId={fullRawId:X}, Version={eventRecord.Version}");
+
+                return @event;
+            }
+        }
+
         EventModel? shortIdMatch = null;
 
         foreach (var @event in details.Events)
         {
-            if ((short)@event.Id != eventRecord.Id || @event.Version != eventRecord.Version) { continue; }
+            if ((ushort)@event.Id != eventRecord.Id || @event.Version != eventRecord.Version) { continue; }
 
-            if (!DoesTemplateMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
+            // When the record's qualifier is known, full-RawId entries with conflicting high
+            // bits would have been caught above. Skip them here so they do not mask short-only
+            // entries or trigger a false ambiguity.
+            if (eventRecord.Qualifiers is not null && @event.Id > ushort.MaxValue) { continue; }
+
+            if (!DoesTemplateStrictlyMatchPropertyCount(@event.Template, eventPropertyCount)) { continue; }
 
             if (shortIdMatch is not null)
             {

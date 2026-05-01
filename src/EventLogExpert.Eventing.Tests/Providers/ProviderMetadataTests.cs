@@ -497,6 +497,23 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
+    public void MessageFilePath_WhenManifestUsesEnvironmentVariables_ShouldReturnExpandedPath()
+    {
+        // Microsoft-Windows-Security-Auditing's publisher manifest declares MessageFilePath
+        // as "%SystemRoot%\system32\adtschema.dll". LoadLibraryEx cannot resolve %SystemRoot%
+        // literally, so the property must expand environment variables before returning.
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+
+        Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
+
+        var messageFilePath = metadata!.MessageFilePath;
+
+        Assert.NotNull(messageFilePath);
+        Assert.DoesNotContain("%", messageFilePath);
+        Assert.True(File.Exists(messageFilePath), $"Expanded MessageFilePath should exist on disk: {messageFilePath}");
+    }
+
+    [Fact]
     public void MessageFilePath_WhenValidProvider_ShouldContainDllExtension()
     {
         // Arrange
@@ -665,6 +682,23 @@ public sealed class ProviderMetadataTests
         Assert.NotNull(path1);
         Assert.NotNull(path2);
         Assert.Equal(path1, path2);
+    }
+
+    [Fact]
+    public void ParameterFilePath_WhenManifestUsesEnvironmentVariables_ShouldReturnExpandedPath()
+    {
+        // Microsoft-Windows-Security-Auditing's publisher manifest declares ParameterFilePath
+        // as "%SystemRoot%\system32\msobjs.dll". LoadLibraryEx cannot resolve %SystemRoot%
+        // literally, so the property must expand environment variables before returning.
+        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
+
+        Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
+
+        var parameterFilePath = metadata!.ParameterFilePath;
+
+        Assert.NotNull(parameterFilePath);
+        Assert.DoesNotContain("%", parameterFilePath);
+        Assert.True(File.Exists(parameterFilePath), $"Expanded ParameterFilePath should exist on disk: {parameterFilePath}");
     }
 
     [Fact]

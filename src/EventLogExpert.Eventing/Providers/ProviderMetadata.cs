@@ -174,7 +174,7 @@ internal sealed partial class ProviderMetadata
         }
     }
 
-    public string MessageFilePath => GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.MessageFilePath);
+    public string MessageFilePath => Environment.ExpandEnvironmentVariables(GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.MessageFilePath));
 
     public IDictionary<int, string> Opcodes
     {
@@ -228,7 +228,7 @@ internal sealed partial class ProviderMetadata
         }
     }
 
-    public string ParameterFilePath => GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.ParameterFilePath);
+    public string ParameterFilePath => Environment.ExpandEnvironmentVariables(GetPublisherMetadataProperty(EvtPublisherMetadataPropertyId.ParameterFilePath));
 
     public IDictionary<int, string> Tasks
     {

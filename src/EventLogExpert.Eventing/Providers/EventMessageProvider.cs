@@ -143,10 +143,10 @@ public sealed class EventMessageProvider(
     /// </remarks>
     private static LibraryHandle LoadMessageModule(string file, ITraceLogger? logger)
     {
-        // Do NOT call Environment.ExpandEnvironmentVariables here. RegistryProvider already
-        // expands legacy registry values, and ProviderMetadata.MessageFilePath is already a
-        // fully resolved path. A second expansion here is unnecessary and could mask bugs in
-        // upstream resolution.
+        // LoadLibraryEx does not expand environment variables. Publisher manifests typically
+        // store paths like %SystemRoot%\System32\foo.dll, so normalize at the loader as the
+        // last chokepoint before the P/Invoke. Idempotent on already-expanded paths.
+        file = Environment.ExpandEnvironmentVariables(file);
 
         // Primary attempt: MUI-aware load using the path as given. Mirrors EvtFormatMessage behavior.
         const LoadLibraryFlags muiAwareFlags =

@@ -1636,6 +1636,114 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithModernManifestFullRawIdAndConflictingLowIds_ShouldDisambiguateByQualifier()
+    {
+        // Arrange - two manifest entries share low-16 EventID 0x6001 (24577) but differ in
+        // their high 16 bits. The broadened template gate now lets both pass the short-id loop,
+        // which would yield ambiguous=null. The full-RawId narrowing must pick the entry that
+        // matches the record's Qualifiers value.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 0x40016001,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.SystemLogName,
+                    Description = "Qualifier 0x4001 message.",
+                    Template = string.Empty
+                },
+                new EventModel
+                {
+                    Id = 0x80006001,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.SystemLogName,
+                    Description = "Qualifier 0x8000 message.",
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 24577,
+            Qualifiers = 0x4001,
+            Version = 0,
+            LogName = Constants.SystemLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Qualifier 0x4001 message", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithModernManifestFullRawIdAndEmptyTemplate_ShouldResolveViaShortIdFallback()
+    {
+        // Arrange - reproduces the Microsoft-Windows-WPDClassInstaller EventID 24577 case.
+        // The classic-emitted event has Qualifiers=0x4001 and EventID=24577 (=0x6001), but
+        // the modern manifest stores it under the full 32-bit RawId (0x4001 << 16) | 0x6001
+        // = 0x40016001 (1073831937). GetEventsById(24577) returns nothing, so the short-cast
+        // fallback in GetModernEvent is the only path that can match. The manifest entry has
+        // an empty Template and the event carries no EventData properties — the fallback's
+        // template gate must accept that combination.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 0x40016001,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.SystemLogName,
+                    Description = "Compatibility layers registered.",
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 24577,
+            Qualifiers = 0x4001,
+            Version = 0,
+            LogName = Constants.SystemLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Compatibility layers registered", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithMultipleDataNodesOnOneLine_ShouldCountAllElements()
     {
         // Arrange - minified template with multiple data elements on one line
@@ -1842,171 +1950,6 @@ public sealed class EventResolverBaseTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Equal("The storage optimizer successfully completed defragmentation on Data (E:)", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithQualifierMatchingMultipleMessages_ShouldNarrowBeforeLogLink()
-    {
-        // Arrange - two messages share the matching qualifier; a third message has a
-        // different qualifier but a LogLink that would otherwise win. Qualifier filter
-        // must narrow the set first so LogLink only considers matching-qualifier candidates.
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 258,
-                    RawId = 0x09000102,
-                    LogLink = "Application",
-                    Text = "Should not match: wrong LogLink"
-                },
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 258,
-                    RawId = 0x09000102,
-                    LogLink = "System",
-                    Text = "Correct: %1"
-                },
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 258,
-                    RawId = 0x4A000102,
-                    LogLink = "System",
-                    Text = "Should not match: wrong qualifier"
-                }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 258,
-            Qualifiers = 0x0900,
-            Level = 0,
-            LogName = "System",
-            Properties = ["payload"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Equal("Correct: payload", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithQualifierMismatch_ShouldFallThroughToSeverity()
-    {
-        // Arrange - event has a Qualifier value that no message matches; disambiguation
-        // must fall through to the existing severity-based check rather than failing.
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 100,
-                    RawId = 0x00000064, // Qualifier=0, severity 00=Success
-                    Text = "Success: %1"
-                },
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 100,
-                    RawId = unchecked((long)0xC0000064), // Qualifier=0xC000, severity 11=Error
-                    Text = "Error: %1"
-                }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        // Qualifier 0x1234 matches no message in the table.
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 100,
-            Qualifiers = 0x1234,
-            Level = 2,
-            LogName = Constants.ApplicationLogName,
-            Properties = ["payload"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert - Level=2 maps to severity 11=Error, so fall-through picks the Error message.
-        Assert.NotNull(displayEvent);
-        Assert.Contains("Error: payload", displayEvent.Description);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithNullQualifiersAndMultipleLegacyMessages_ShouldFallThroughToSeverity()
-    {
-        // Arrange - Qualifier-based filter must be skipped when the event has no Qualifiers,
-        // preserving the existing severity-based disambiguation behavior.
-        var providerDetails = new ProviderDetails
-        {
-            ProviderName = Constants.TestProviderName,
-            Events = [],
-            Messages =
-            [
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 50,
-                    RawId = 0x00000032, // severity 00=Success
-                    Text = "Success: %1"
-                },
-                new MessageModel
-                {
-                    ProviderName = Constants.TestProviderName,
-                    ShortId = 50,
-                    RawId = unchecked((long)0xC0000032), // severity 11=Error
-                    Text = "Error: %1"
-                }
-            ],
-            Parameters = [],
-            Keywords = new Dictionary<long, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
-
-        var resolver = new TestEventResolver([providerDetails]);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 50,
-            Qualifiers = null,
-            Level = 2,
-            LogName = Constants.ApplicationLogName,
-            Properties = ["payload"]
-        };
-
-        // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Contains("Error: payload", displayEvent.Description);
     }
 
     [Fact]
@@ -2329,6 +2272,57 @@ public sealed class EventResolverBaseTests
         // Assert - null LogName in EventModel should match "" in EventRecord
         Assert.NotNull(displayEvent);
         Assert.Contains("Matched with null LogName: hello", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithNullQualifiersAndMultipleLegacyMessages_ShouldFallThroughToSeverity()
+    {
+        // Arrange - Qualifier-based filter must be skipped when the event has no Qualifiers,
+        // preserving the existing severity-based disambiguation behavior.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 50,
+                    RawId = 0x00000032, // severity 00=Success
+                    Text = "Success: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 50,
+                    RawId = unchecked((long)0xC0000032), // severity 11=Error
+                    Text = "Error: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 50,
+            Qualifiers = null,
+            Level = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Error: payload", displayEvent.Description);
     }
 
     [Fact]
@@ -2827,6 +2821,167 @@ public sealed class EventResolverBaseTests
     }
 
     [Fact]
+    public void ResolveEvent_WithQualifierMatchingMultipleMessages_ShouldNarrowBeforeLogLink()
+    {
+        // Arrange - two messages share the matching qualifier; a third message has a
+        // different qualifier but a LogLink that would otherwise win. Qualifier filter
+        // must narrow the set first so LogLink only considers matching-qualifier candidates.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102,
+                    LogLink = "Application",
+                    Text = "Should not match: wrong LogLink"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x09000102,
+                    LogLink = "System",
+                    Text = "Correct: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 258,
+                    RawId = 0x4A000102,
+                    LogLink = "System",
+                    Text = "Should not match: wrong qualifier"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 258,
+            Qualifiers = 0x0900,
+            Level = 0,
+            LogName = "System",
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal("Correct: payload", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithQualifierMismatch_ShouldFallThroughToSeverity()
+    {
+        // Arrange - event has a Qualifier value that no message matches; disambiguation
+        // must fall through to the existing severity-based check rather than failing.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events = [],
+            Messages =
+            [
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 100,
+                    RawId = 0x00000064, // Qualifier=0, severity 00=Success
+                    Text = "Success: %1"
+                },
+                new MessageModel
+                {
+                    ProviderName = Constants.TestProviderName,
+                    ShortId = 100,
+                    RawId = unchecked((long)0xC0000064), // Qualifier=0xC000, severity 11=Error
+                    Text = "Error: %1"
+                }
+            ],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        // Qualifier 0x1234 matches no message in the table.
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 100,
+            Qualifiers = 0x1234,
+            Level = 2,
+            LogName = Constants.ApplicationLogName,
+            Properties = ["payload"]
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert - Level=2 maps to severity 11=Error, so fall-through picks the Error message.
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Error: payload", displayEvent.Description);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithQualifiersPresentAndShortOnlyManifest_ShouldFallBackToShortMatch()
+    {
+        // Arrange - record carries Qualifiers=0x4001 but the manifest only has the short-id
+        // entry (no full-RawId encoded variant). Full-RawId narrowing finds nothing, so the
+        // low-16 fallback must still match the short-only entry.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 24577,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.SystemLogName,
+                    Description = "Short-only manifest entry.",
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 24577,
+            Qualifiers = 0x4001,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("Short-only manifest entry", displayEvent.Description);
+    }
+
+    [Fact]
     public void ResolveEvent_WithSeverityLevel_ShouldResolveLevelString()
     {
         // Arrange
@@ -2858,6 +3013,54 @@ public sealed class EventResolverBaseTests
             // Assert
             Assert.Equal(testCase.Expected, displayEvent.Level);
         }
+    }
+
+    [Fact]
+    public void ResolveEvent_WithShortCastFallbackAndHighEventId_ShouldMatchUsingUnsignedComparison()
+    {
+        // Arrange - record has no Qualifiers and an EventID > 0x7FFF (40000 = 0x9C40). The
+        // manifest entry's Id has the same low 16 bits but encodes high bits as well. A signed
+        // (short) cast would sign-extend 0x9C40 to a negative number and never match the
+        // unsigned record Id, so the fallback must use an unsigned comparison.
+        var providerDetails = new ProviderDetails
+        {
+            ProviderName = Constants.TestProviderName,
+            Events =
+            [
+                new EventModel
+                {
+                    Id = 0x40019C40,
+                    Version = 0,
+                    Keywords = [],
+                    LogName = Constants.SystemLogName,
+                    Description = "High EventID match.",
+                    Template = string.Empty
+                }
+            ],
+            Messages = [],
+            Parameters = [],
+            Keywords = new Dictionary<long, string>(),
+            Tasks = new Dictionary<int, string>()
+        };
+
+        var resolver = new TestEventResolver([providerDetails]);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 40000,
+            Qualifiers = null,
+            Version = 0,
+            LogName = Constants.ApplicationLogName,
+            Properties = []
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Contains("High EventID match", displayEvent.Description);
     }
 
     [Fact]

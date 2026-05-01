@@ -99,14 +99,26 @@ public sealed class EventMessageProviderTests
     [Fact]
     public void GetMessages_WhenFilePathContainsEnvironmentVariable_ShouldHandleCorrectly()
     {
-        // Arrange
-        var filesWithEnvVar = new[] { Constants.NonExistentDllSystemRootFullPath };
+        // LoadLibraryEx does not expand environment variables. Channel-named providers like
+        // Microsoft-Windows-AppXDeploymentServer/Operational supply paths such as
+        // "%SystemRoot%\system32\AppXDeploymentServer.dll" through the publisher manifest;
+        // EventMessageProvider must expand them defensively before calling LoadLibraryEx,
+        // otherwise the load fails with ERROR_FILE_NOT_FOUND. We exercise the same path
+        // here with wevtsvc.dll, which is present on every Windows host.
+        var systemDirectory = Environment.SystemDirectory;
+        var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
-        // Act
+        Assert.SkipUnless(
+            File.Exists(muiBinary) && TryFindMuiSatellite(systemDirectory, "wevtsvc.dll", out _),
+            "Test requires wevtsvc.dll and a matching .mui satellite in the loader's MUI fallback chain (current UI culture or en-US).");
+
+        var filesWithEnvVar = new[] { @"%SystemRoot%\System32\wevtsvc.dll" };
+
         var messages = EventMessageProvider.GetMessages(filesWithEnvVar, Constants.TestProviderName);
 
-        // Assert
         Assert.NotNull(messages);
+        Assert.NotEmpty(messages);
+        Assert.All(messages, m => Assert.Equal(Constants.TestProviderName, m.ProviderName));
     }
 
     [Fact]
