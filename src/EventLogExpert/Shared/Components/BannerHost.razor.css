@@ -1,0 +1,85 @@
+.banner {
+    position: fixed;
+    top: var(--menu-bar-height);
+    left: 0;
+    right: 0;
+    z-index: var(--z-error-ui);
+
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .5rem 1rem;
+
+    color: var(--clr-white);
+    box-shadow: var(--shadow-modal);
+}
+
+.banner-error,
+.banner-critical {
+    background-color: var(--clr-red);
+}
+
+.banner-warning {
+    background-color: var(--clr-yellow);
+    color: var(--clr-on-light-highlight);
+}
+
+.banner-info {
+    background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
+}
+
+.banner-message {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.banner-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: 0 0 auto;
+}
+
+.banner-feedback {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex: 0 0 auto;
+    min-height: 1.5rem;
+}
+
+.banner-chip {
+    padding: .15rem .5rem;
+
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: .75rem;
+    font-size: .85rem;
+}
+
+.banner-subtitle {
+    font-size: .85rem;
+    opacity: .9;
+}
+
+.banner-pagination {
+    flex: 0 0 auto;
+
+    font-size: .85rem;
+    opacity: .85;
+}
+
+.banner-dismiss {
+    flex: 0 0 auto;
+    padding: 0 .5rem;
+
+    line-height: 1;
+    font-size: 1.2rem;
+    background: transparent;
+    color: inherit;
+    border: 0;
+}

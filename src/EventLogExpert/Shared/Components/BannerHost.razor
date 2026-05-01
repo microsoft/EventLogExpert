@@ -1,0 +1,86 @@
+@using EventLogExpert.UI.Services
+@{
+    Exception? error = BannerService.UnhandledError;
+    IReadOnlyList<CriticalAlertEntry> criticals = BannerService.CriticalAlerts;
+    IReadOnlyList<BannerInfoEntry> infos = BannerService.InfoBanners;
+    BannerView view = BannerViewSelector.Select(error, criticals, infos);
+}
+
+@switch (view)
+{
+    case BannerView.Error:
+        <aside class="banner banner-error" role="alert">
+            <span class="banner-message">An unexpected error occurred: @error!.GetType().Name: @error.Message</span>
+
+            <div class="banner-actions">
+                <button class="button" @onclick="OnReloadClickedAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Reload
+                </button>
+                <button class="button" @onclick="OnRelaunchClickedAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-power"></i> Relaunch
+                </button>
+                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(error)" type="button">
+                    <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
+                </button>
+            </div>
+
+            <div class="banner-feedback" role="status">
+                @if (_showCopiedFeedback)
+                {
+                    <span class="banner-chip">Copied</span>
+                }
+                @if (!string.IsNullOrEmpty(_recoveryFailureMessage))
+                {
+                    <span class="banner-subtitle">@_recoveryFailureMessage</span>
+                }
+                @if (!string.IsNullOrEmpty(_restartFailureMessage))
+                {
+                    <span class="banner-subtitle">@_restartFailureMessage</span>
+                }
+            </div>
+        </aside>
+        break;
+
+    case BannerView.Critical:
+    {
+        CriticalAlertEntry alert = criticals[0];
+        <aside class="banner banner-critical" role="alert">
+            <span class="banner-message">@alert.Title: @alert.Message</span>
+
+            @if (criticals.Count > 1)
+            {
+                <span class="banner-pagination">1 of @criticals.Count</span>
+            }
+
+            <button aria-label="Dismiss critical alert"
+                class="button banner-dismiss"
+                @onclick="() => OnDismissCritical(alert.Id)"
+                type="button">
+                <i aria-hidden="true" class="bi bi-x"></i>
+            </button>
+        </aside>
+        break;
+    }
+
+    case BannerView.Info:
+    {
+        BannerInfoEntry info = infos[0];
+        string severityClass = info.Severity == BannerSeverity.Warning ? "banner-warning" : "banner-info";
+        <aside class="banner @severityClass" role="status">
+            <span class="banner-message">@info.Title: @info.Message</span>
+
+            @if (infos.Count > 1)
+            {
+                <span class="banner-pagination">1 of @infos.Count</span>
+            }
+
+            <button aria-label="Dismiss banner"
+                class="button banner-dismiss"
+                @onclick="() => OnDismissInfo(info.Id)"
+                type="button">
+                <i aria-hidden="true" class="bi bi-x"></i>
+            </button>
+        </aside>
+        break;
+    }
+}
