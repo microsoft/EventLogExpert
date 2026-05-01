@@ -3,7 +3,7 @@
     Exception? error = BannerService.UnhandledError;
     IReadOnlyList<CriticalAlertEntry> criticals = BannerService.CriticalAlerts;
     IReadOnlyList<BannerInfoEntry> infos = BannerService.InfoBanners;
-    BannerView view = BannerViewSelector.Select(error, criticals, infos);
+    BannerView view = _currentView = BannerViewSelector.Select(error, criticals, infos);
 }
 
 @switch (view)
@@ -13,7 +13,7 @@
             <span class="banner-message">An unexpected error occurred: @error!.GetType().Name: @error.Message</span>
 
             <div class="banner-actions">
-                <button class="button" @onclick="OnReloadClickedAsync" type="button">
+                <button class="button" @onclick="OnReloadClickedAsync" @ref="_reloadButtonRef" type="button">
                     <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Reload
                 </button>
                 <button class="button" @onclick="OnRelaunchClickedAsync" type="button">

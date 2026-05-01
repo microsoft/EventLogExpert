@@ -3,14 +3,19 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.JSInterop;
 
 namespace EventLogExpert.Shared.Components;
 
 public sealed partial class BannerHost : ComponentBase, IDisposable
 {
     private CancellationTokenSource? _copiedFeedbackCts;
+    private BannerView _currentView;
+    private BannerView _previousView = BannerView.None;
     private string? _recoveryFailureMessage;
+    private ElementReference _reloadButtonRef;
     private string? _restartFailureMessage;
     private bool _showCopiedFeedback;
 
@@ -29,6 +34,23 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         _copiedFeedbackCts = null;
         cts?.Cancel();
         cts?.Dispose();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_currentView == BannerView.Error && _previousView != BannerView.Error)
+        {
+            try
+            {
+                await _reloadButtonRef.FocusAsync();
+            }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+        }
+
+        _previousView = _currentView;
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override void OnInitialized()
