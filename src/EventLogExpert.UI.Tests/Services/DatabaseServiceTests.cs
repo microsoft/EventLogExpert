@@ -142,6 +142,26 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ClassifyEntriesAsync_WhenObsoleteSchemaWithUpgradeBak_ShouldNotDeleteBakAndBackupExistsFalse()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, "v1.db");
+        DatabaseSeedUtils.SeedV1Schema(dbPath);
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(bakPath, "stale-backup-contents");
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.ObsoleteSchema, entry.Status);
+        Assert.False(entry.BackupExists);
+        Assert.True(File.Exists(bakPath));
+    }
+
+    [Fact]
     public async Task ClassifyEntriesAsync_WhenOneEntryFails_ShouldQuarantineAsClassificationFailed()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -209,6 +229,33 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ClassifyEntriesAsync_WhenV3BakAppearsBetweenClassifications_ShouldUpdateBackupExistsAndRaiseEntriesChanged()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var firstEntry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, firstEntry.Status);
+        Assert.False(firstEntry.BackupExists);
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(bakPath, "interrupted-upgrade-backup");
+
+        var raisedCount = 0;
+        service.EntriesChanged += (_, _) => raisedCount++;
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.True(entry.BackupExists);
+        Assert.Equal(1, raisedCount);
+    }
+
+    [Fact]
     public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -221,6 +268,27 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var entry = Assert.Single(service.Entries);
         Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV3SchemaWithUpgradeBak_ShouldDetectAsUpgradeRequiredAndBackupExistsTrue()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(bakPath, "interrupted-upgrade-backup");
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.True(entry.BackupExists);
+        Assert.True(File.Exists(bakPath), ".upgrade.bak must be preserved for V3 entries so recovery can restore it.");
     }
 
     [Fact]
@@ -236,6 +304,27 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var entry = Assert.Single(service.Entries);
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV4SchemaWithUpgradeBak_ShouldDeleteBakAndDetectAsReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var bakPath = dbPath + DatabaseService.UpgradeBackupSuffix;
+        File.WriteAllText(bakPath, "stale-backup-from-successful-upgrade");
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.False(entry.BackupExists);
+        Assert.False(File.Exists(bakPath), "Stale .upgrade.bak must be cleaned up once the main file reaches V4.");
     }
 
     [Fact]
@@ -704,6 +793,31 @@ public sealed class DatabaseServiceTests : IDisposable
         service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
 
         Assert.Equal(0, raisedCount);
+    }
+
+    [Fact]
+    public async Task Refresh_AfterClassificationSetsBackupExistsTrue_ShouldPreserveBackupExists()
+    {
+        // Regression: c9 refactored Refresh() to use `existing with { IsEnabled = ... }` so all
+        // other fields (Status, BackupExists) survive. This test pins that invariant — if a
+        // future change reverts to the positional constructor, BackupExists silently drops to
+        // false and the recovery dialog stops surfacing interrupted upgrades.
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+        File.WriteAllText(dbPath + DatabaseService.UpgradeBackupSuffix, "interrupted-upgrade-backup");
+
+        var service = CreateDatabaseService();
+
+        var beforeRefresh = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, beforeRefresh.Status);
+        Assert.True(beforeRefresh.BackupExists);
+
+        service.Refresh();
+
+        var afterRefresh = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, afterRefresh.Status);
+        Assert.True(afterRefresh.BackupExists);
     }
 
     [Fact]
