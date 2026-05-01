@@ -37,6 +37,7 @@ public enum CopyType
 
 public enum DatabaseStatus
 {
+    NotClassified,
     Ready,
     UpgradeRequired,
     UpgradeFailed,

@@ -36,6 +36,8 @@ public sealed class DatabaseServiceTests : IDisposable
         preferences.DisabledDatabasesPreference.Returns([Constants.TestDb2]);
 
         var service = CreateDatabaseService(preferences);
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
+        service.MarkStatus(Constants.TestDb2, DatabaseStatus.Ready);
         service.MarkStatus(Constants.TestDb3, DatabaseStatus.UpgradeRequired);
 
         // Act
@@ -123,13 +125,13 @@ public sealed class DatabaseServiceTests : IDisposable
         DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
 
         var service = CreateDatabaseService();
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
 
         var raisedCount = 0;
         service.EntriesChanged += (_, _) => raisedCount++;
 
         await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
 
-        // V4 → Ready, but Ready is also the default Refresh status, so nothing actually changes.
         Assert.Equal(0, raisedCount);
     }
 
@@ -246,7 +248,8 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb1);
         Assert.Contains(service.Entries, entry => entry.FileName == Constants.TestDb2);
         Assert.All(service.Entries, entry => Assert.True(entry.IsEnabled));
-        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.Ready, entry.Status));
+        Assert.All(service.Entries, entry => Assert.Equal(DatabaseStatus.NotClassified, entry.Status));
+        Assert.All(service.Entries, entry => Assert.False(entry.BackupExists));
     }
 
     [Fact]
@@ -573,18 +576,17 @@ public sealed class DatabaseServiceTests : IDisposable
     [Fact]
     public void MarkStatus_WhenStatusUnchanged_ShouldNotRaiseEntriesChanged()
     {
-        // Arrange
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
         var service = CreateDatabaseService();
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
+
         var raisedCount = 0;
         service.EntriesChanged += (_, _) => raisedCount++;
 
-        // Act (entry already Ready)
         service.MarkStatus(Constants.TestDb1, DatabaseStatus.Ready);
 
-        // Assert
         Assert.Equal(0, raisedCount);
     }
 
