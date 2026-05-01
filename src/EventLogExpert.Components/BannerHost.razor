@@ -8,9 +8,9 @@
 
 @switch (view)
 {
-    case BannerView.Error:
+    case BannerView.Error when error is { } unhandledError:
         <aside class="banner banner-error" role="alert">
-            <span class="banner-message">An unexpected error occurred: @error!.GetType().Name: @error.Message</span>
+            <span class="banner-message">An unexpected error occurred: @unhandledError.GetType().Name: @unhandledError.Message</span>
 
             <div class="banner-actions">
                 <button class="button" @onclick="OnReloadClickedAsync" @ref="_reloadButtonRef" type="button">
@@ -19,7 +19,7 @@
                 <button class="button" @onclick="OnRelaunchClickedAsync" type="button">
                     <i aria-hidden="true" class="bi bi-power"></i> Relaunch
                 </button>
-                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(error)" type="button">
+                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(unhandledError)" type="button">
                     <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
                 </button>
             </div>

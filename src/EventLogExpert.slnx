@@ -12,6 +12,8 @@
   <Project Path="EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
   <Project Path="EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
   <Project Path="EventLogExpert.UI/EventLogExpert.UI.csproj" />
+  <Project Path="EventLogExpert.Components/EventLogExpert.Components.csproj" />
+  <Project Path="EventLogExpert.Components.Tests/EventLogExpert.Components.Tests.csproj" />
   <Project Path="EventLogExpert/EventLogExpert.csproj">
     <Deploy Solution="*|Any CPU" />
   </Project>

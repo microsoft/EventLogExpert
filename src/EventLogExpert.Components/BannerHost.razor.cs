@@ -7,7 +7,7 @@ using EventLogExpert.UI.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Shared.Components;
+namespace EventLogExpert.Components;
 
 public sealed partial class BannerHost : ComponentBase, IDisposable
 {
@@ -65,8 +65,12 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
         CancellationTokenSource? previous = _copiedFeedbackCts;
         _copiedFeedbackCts = null;
-        previous?.CancelAsync();
-        previous?.Dispose();
+
+        if (previous is not null)
+        {
+            await previous.CancelAsync();
+            previous.Dispose();
+        }
 
         var cts = new CancellationTokenSource();
         _copiedFeedbackCts = cts;
