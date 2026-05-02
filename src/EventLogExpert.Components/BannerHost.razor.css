@@ -33,6 +33,40 @@
     color: var(--text-on-statusbar);
 }
 
+.banner-attention {
+    background-color: var(--clr-yellow);
+    color: var(--clr-on-light-highlight);
+}
+
+.banner-upgrade-progress {
+    background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
+}
+
+.banner-spinner {
+    flex: 0 0 auto;
+    animation: banner-spin 1.5s linear infinite;
+}
+
+@keyframes banner-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.banner-cycle-prev,
+.banner-cycle-next {
+    flex: 0 0 auto;
+    padding: 0 .35rem;
+
+    line-height: 1;
+    font-size: 1rem;
+    background: transparent;
+    color: inherit;
+    border: 0;
+
+    &:disabled { opacity: .35; }
+}
+
 .banner-message {
     flex: 1 1 auto;
     min-width: 0;

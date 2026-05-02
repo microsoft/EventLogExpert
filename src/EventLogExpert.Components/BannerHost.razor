@@ -2,7 +2,35 @@
     Exception? currentCritical = BannerService.CurrentCritical;
     IReadOnlyList<ErrorBannerEntry> errors = BannerService.ErrorBanners;
     IReadOnlyList<BannerInfoEntry> infos = BannerService.InfoBanners;
-    BannerView view = _currentView = BannerViewSelector.Select(currentCritical, errors, infos);
+    IReadOnlyList<DatabaseEntry> attentionEntries = BannerService.AttentionEntries;
+    bool attentionDismissed = BannerService.AttentionDismissed;
+    BannerProgressEntry? backgroundProgress = BannerService.BackgroundProgress;
+
+    (BannerCycleItem? selected, BannerView view) = RebuildItemsAndPickSelected(
+        currentCritical, errors, attentionEntries, attentionDismissed, backgroundProgress, infos);
+    _currentView = view;
+    bool showCyclePagination = _items.Count > 1 && view != BannerView.Critical;
+
+    RenderFragment cycleNav =@<text>
+        @if (showCyclePagination)
+        {
+            <span class="banner-pagination">@(_displayedIndex + 1) of @_items.Count</span>
+            <button aria-label="Previous banner"
+                class="button banner-cycle-prev"
+                disabled="@(_displayedIndex == 0)"
+                @onclick="OnCyclePrev"
+                type="button">
+                <i aria-hidden="true" class="bi bi-chevron-left"></i>
+            </button>
+            <button aria-label="Next banner"
+                class="button banner-cycle-next"
+                disabled="@(_displayedIndex == _items.Count - 1)"
+                @onclick="OnCycleNext"
+                type="button">
+                <i aria-hidden="true" class="bi bi-chevron-right"></i>
+            </button>
+        }
+    </text>;
 }
 
 @switch (view)
@@ -40,16 +68,13 @@
         </aside>
         break;
 
-    case BannerView.Error:
+    case BannerView.Error when selected is { } errorItem && errorItem.IndexWithinSlice < errors.Count:
     {
-        ErrorBannerEntry entry = errors[0];
+        ErrorBannerEntry entry = errors[errorItem.IndexWithinSlice];
         <aside class="banner banner-error" role="alert">
             <span class="banner-message">@entry.Title: @entry.Message</span>
 
-            @if (errors.Count > 1)
-            {
-                <span class="banner-pagination">1 of @errors.Count</span>
-            }
+            @cycleNav
 
             @if (entry is { ActionLabel: { } actionLabel, Action: { } action })
             {
@@ -70,17 +95,67 @@
         break;
     }
 
-    case BannerView.Info:
+    case BannerView.Attention when attentionEntries.Count > 0:
     {
-        BannerInfoEntry info = infos[0];
+        int attentionCount = attentionEntries.Count;
+        string databasesLabel = attentionCount == 1 ? "database" : "databases";
+        <aside class="banner banner-attention" role="alert">
+            <span class="banner-message">@attentionCount @databasesLabel need attention. Open Settings to enable or remove them.</span>
+
+            @cycleNav
+
+            <button class="button banner-action"
+                @onclick="OnOpenSettingsClickedAsync"
+                type="button">
+                Open Settings
+            </button>
+
+            <button aria-label="Dismiss attention banner"
+                class="button banner-dismiss"
+                @onclick="OnDismissAttention"
+                type="button">
+                <i aria-hidden="true" class="bi bi-x"></i>
+            </button>
+        </aside>
+        break;
+    }
+
+    case BannerView.UpgradeProgress when backgroundProgress is { } progress:
+        <aside class="banner banner-upgrade-progress" role="status">
+            <i aria-hidden="true" class="bi bi-arrow-repeat banner-spinner"></i>
+
+            @if (string.IsNullOrEmpty(progress.CurrentEntryName))
+            {
+                <span class="banner-message">Preparing upgrade of @progress.CurrentBatchSize @(progress.CurrentBatchSize == 1 ? "database" : "databases")&hellip;</span>
+            }
+            else
+            {
+                <span class="banner-message">Upgrading database @progress.CurrentBatchPosition of @progress.CurrentBatchSize: @progress.CurrentEntryName &mdash; @progress.CurrentPhase</span>
+            }
+
+            @if (progress.QueuedBatchesAfter > 0)
+            {
+                <span class="banner-subtitle">(+@progress.QueuedBatchesAfter @(progress.QueuedBatchesAfter == 1 ? "batch" : "batches") queued)</span>
+            }
+
+            @cycleNav
+
+            <button class="button banner-action"
+                @onclick="() => OnCancelUpgradeClickedAsync(progress)"
+                type="button">
+                Cancel
+            </button>
+        </aside>
+        break;
+
+    case BannerView.Info when selected is { } infoItem && infoItem.IndexWithinSlice < infos.Count:
+    {
+        BannerInfoEntry info = infos[infoItem.IndexWithinSlice];
         string severityClass = info.Severity == BannerSeverity.Warning ? "banner-warning" : "banner-info";
         <aside class="banner @severityClass" role="status">
             <span class="banner-message">@info.Title: @info.Message</span>
 
-            @if (infos.Count > 1)
-            {
-                <span class="banner-pagination">1 of @infos.Count</span>
-            }
+            @cycleNav
 
             <button aria-label="Dismiss banner"
                 class="button banner-dismiss"

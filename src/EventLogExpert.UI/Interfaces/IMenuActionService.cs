@@ -38,7 +38,7 @@ public interface IMenuActionService
 
     Task OpenLiveLogAsync(string logName, bool combineLog);
 
-    Task OpenSettingsAsync();
+    Task<bool> OpenSettingsAsync();
 
     Task SaveAllFiltersAsync();
 

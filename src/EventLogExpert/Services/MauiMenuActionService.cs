@@ -259,7 +259,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public Task OpenSettingsAsync() => ShowModalAsync<SettingsModal>("settings");
+    public Task<bool> OpenSettingsAsync() => ShowModalAsync<SettingsModal>("settings");
 
     public async Task SaveAllFiltersAsync()
     {
@@ -322,16 +322,20 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    private async Task ShowModalAsync<TModal>(string label)
+    private async Task<bool> ShowModalAsync<TModal>(string label)
         where TModal : IComponent
     {
         try
         {
             await _modalService.Show<TModal, bool>();
+
+            return true;
         }
         catch (Exception ex)
         {
             _traceLogger.Error($"Failed to open {label} modal: {ex}");
+
+            return false;
         }
     }
 }
