@@ -27,11 +27,15 @@ public sealed class EventLogEffects(
     ILogWatcherService logWatcherService,
     IEventResolverCache resolverCache,
     IEventXmlResolver xmlResolver,
-    IServiceScopeFactory serviceScopeFactory)
+    IServiceScopeFactory serviceScopeFactory,
+    IDatabaseService databaseService,
+    IBannerService bannerService)
 {
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
 
+    private readonly IBannerService _bannerService = bannerService;
+    private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly Lock _globalCtsLock = new();
@@ -209,22 +213,14 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        // Snapshot the cancel generation before any state checks. If CancelAllLoads
-        // increments this before we finish linking, we know our load must be canceled
-        // (it may have linked to the post-swap uncanceled global CTS).
+        // Snapshot the cancel generation FIRST. If CancelAllLoads fires between this
+        // snapshot and the CTS link below — including the new window introduced by
+        // the InitialClassificationTask await — the self-cancel check below will
+        // observe the generation drift and cancel our load.
         long startGeneration = Volatile.Read(ref _cancelGeneration);
 
-        using var serviceScope = _serviceScopeFactory.CreateScope();
-
-        var eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
-
-        if (eventResolver is null)
-        {
-            dispatcher.Dispatch(new StatusBarAction.SetResolverStatus("Error: No event resolver available"));
-
-            return;
-        }
-
+        // Cheap exit when the log is no longer in ActiveLogs (caller raced this open
+        // against a CloseLog) — skip scope creation and classification waits entirely.
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
         {
             dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to open {action.LogName}"));
@@ -258,6 +254,61 @@ public sealed class EventLogEffects(
 
         try
         {
+            // Wait for the initial database classification scan so resolvers are
+            // built against verified-Ready entries (rather than the NotClassified
+            // default). The task is contractually non-faulting per IDatabaseService;
+            // the catch is defense-in-depth so an unexpected fault never poisons opens.
+            try
+            {
+                await _databaseService.InitialClassificationTask;
+            }
+            catch (Exception ex)
+            {
+                _logger.Trace($"InitialClassificationTask faulted unexpectedly during HandleOpenLog: {ex}");
+            }
+
+            // After the classification await, the user may have closed this log
+            // (HandleCloseLog removes it from ActiveLogs) or all logs (HandleCloseAll
+            // dispatches EventTableAction.CloseAll), or even closed-and-reopened the
+            // same name under a new EventLogId. Bail out without reaching LoadLogAsync —
+            // its AddTable dispatch would otherwise resurrect an entry the user already
+            // dismissed, leaving an orphan in EventTableState.
+            //
+            // We deliberately do NOT bail on token-cancellation alone: a pre-canceled
+            // caller token (or a CancelAllLoads that didn't dispatch CloseAll) leaves the
+            // log in ActiveLogs, so we must still proceed into LoadLogAsync where the
+            // existing OCE handler dispatches the user-visible CloseLog + ClearStatus
+            // cleanup. Identity-based bail covers exactly the orphan-table scenario.
+            if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var current)
+                || current.Id != logData.Id)
+            {
+                return;
+            }
+
+            using var serviceScope = _serviceScopeFactory.CreateScope();
+
+            IEventResolver? eventResolver;
+
+            try
+            {
+                eventResolver = serviceScope.ServiceProvider.GetService<IEventResolver>();
+            }
+            catch (Exception ex)
+            {
+                // Resolver factory threw during construction — surface as a Reload-tier
+                // banner so the user can recover instead of silently failing the open.
+                _bannerService.ReportCritical(ex);
+
+                return;
+            }
+
+            if (eventResolver is null)
+            {
+                dispatcher.Dispatch(new StatusBarAction.SetResolverStatus("Error: No event resolver available"));
+
+                return;
+            }
+
             await LoadLogAsync(action, logData, eventResolver, serviceScope, dispatcher, token);
         }
         finally
