@@ -5,7 +5,7 @@ using EventLogExpert.UI.Interfaces;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Shared.Base;
+namespace EventLogExpert.Components.Base;
 
 /// <summary>
 ///     Renders the shared <c>&lt;dialog&gt;</c> chrome (header, body, footer) for a modal. Owned by

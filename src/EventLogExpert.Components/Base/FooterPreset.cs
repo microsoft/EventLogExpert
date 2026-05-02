@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Shared.Base;
+namespace EventLogExpert.Components.Base;
 
 /// <summary>Predefined footer button layouts for <see cref="ModalChrome"/>.</summary>
 public enum FooterPreset
