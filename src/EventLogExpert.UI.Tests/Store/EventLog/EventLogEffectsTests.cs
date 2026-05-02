@@ -158,7 +158,9 @@ public sealed class EventLogEffectsTests
             Substitute.For<ILogWatcherService>(),
             Substitute.For<IEventResolverCache>(),
             mockXmlResolver,
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            Substitute.For<IDatabaseService>(),
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
@@ -213,7 +215,9 @@ public sealed class EventLogEffectsTests
             Substitute.For<ILogWatcherService>(),
             Substitute.For<IEventResolverCache>(),
             mockXmlResolver,
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            Substitute.For<IDatabaseService>(),
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
         var action = new EventLogAction.CloseLog(logId, Constants.LogNameTestLog);
@@ -398,6 +402,135 @@ public sealed class EventLogEffectsTests
         Assert.Equal(2, captured!.EventsByLog.Count);
         Assert.Equal(2, captured.EventsByLog[applicationLog.Id].Count);
         Assert.Single(captured.EventsByLog[testLog.Id]);
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_AwaitsInitialClassificationTask_BeforeResolverConstruction()
+    {
+        // Arrange — block classification with a pending TCS so we can verify the resolver
+        // is NOT looked up until classification completes. Determinism comes from the await
+        // semantics: the IServiceProvider mock cannot be invoked while the await is parked
+        // on an incomplete task, so an immediate post-call assertion is sufficient.
+        var logData = new EventLogData(Constants.LogNameApplication, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
+
+        var classificationTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var (effects, mockDispatcher, mockServiceProvider, _, mockDatabaseService) =
+            CreateEffectsForOpenLogGuards(activeLogs);
+
+        mockDatabaseService.InitialClassificationTask.Returns(classificationTcs.Task);
+
+        var action = new EventLogAction.OpenLog(Constants.LogNameApplication, PathType.LogName);
+
+        // Act 1 — start the open; await yields back at InitialClassificationTask.
+        var openTask = effects.HandleOpenLog(action, mockDispatcher);
+
+        // Assert 1 — resolver lookup MUST NOT have been touched yet.
+        mockServiceProvider.DidNotReceive().GetService(typeof(IEventResolver));
+
+        // Act 2 — release classification; let HandleOpenLog finish.
+        classificationTcs.SetResult(true);
+        await openTask;
+
+        // Assert 2 — resolver lookup happens after classification.
+        mockServiceProvider.Received(1).GetService(typeof(IEventResolver));
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_LogClosedDuringClassificationAwait_DoesNotDispatchAddTable()
+    {
+        // Arrange — simulate the user closing the log (HandleCloseLog dispatch already removed
+        // it from ActiveLogs and canceled its CTS) while HandleOpenLog is parked on the
+        // classification await. After the await releases, HandleOpenLog must bail BEFORE
+        // calling LoadLogAsync — otherwise LoadLogAsync's AddTable dispatch would resurrect
+        // a table entry the user already dismissed, leaving an orphan in EventTableState.
+        var logData = new EventLogData(Constants.LogNameApplication, PathType.LogName, []);
+        var initialActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
+
+        var classificationTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Use a mutable IState so we can flip ActiveLogs to "log closed" partway through.
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+        var initialState = new EventLogState
+        {
+            ActiveLogs = initialActiveLogs,
+            AppliedFilter = new EventFilter(null, [])
+        };
+        mockEventLogState.Value.Returns(initialState);
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        var mockEventResolver = Substitute.For<IEventResolver>();
+        mockServiceProvider.GetService(typeof(IEventResolver)).Returns(mockEventResolver);
+
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(classificationTcs.Task);
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            Substitute.For<IFilterService>(),
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<IBannerService>());
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+        var action = new EventLogAction.OpenLog(Constants.LogNameApplication, PathType.LogName);
+
+        // Act 1 — start the open; await yields back at InitialClassificationTask.
+        var openTask = effects.HandleOpenLog(action, mockDispatcher);
+
+        // Act 2 — simulate HandleCloseLog: remove the log from ActiveLogs.
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            AppliedFilter = new EventFilter(null, [])
+        });
+
+        // Act 3 — release classification; HandleOpenLog should detect the missing log and bail.
+        classificationTcs.SetResult(true);
+        await openTask;
+
+        // Assert — neither AddTable (would orphan in EventTableState) nor any resolver work
+        // happened. The bail-out path returns silently after the post-await identity check.
+        mockServiceProvider.DidNotReceive().GetService(typeof(IEventResolver));
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.AddTable>());
+    }
+
+    [Fact]
+    public async Task HandleOpenLog_ResolverThrows_CallsReportCritical_DoesNotPropagate()
+    {
+        // Arrange — resolver factory throws (e.g., DI graph misconfiguration). HandleOpenLog
+        // must surface this as a Reload-tier banner via IBannerService.ReportCritical and
+        // return cleanly instead of letting the exception escape the effect.
+        var logData = new EventLogData(Constants.LogNameApplication, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
+
+        var (effects, mockDispatcher, mockServiceProvider, mockBannerService, _) =
+            CreateEffectsForOpenLogGuards(activeLogs);
+
+        var thrown = new InvalidOperationException("resolver factory failed");
+        mockServiceProvider.When(p => p.GetService(typeof(IEventResolver))).Do(_ => throw thrown);
+
+        var action = new EventLogAction.OpenLog(Constants.LogNameApplication, PathType.LogName);
+
+        // Act — must not throw.
+        await effects.HandleOpenLog(action, mockDispatcher);
+
+        // Assert — exact exception forwarded to banner; no resolver-status dispatch fired.
+        mockBannerService.Received(1).ReportCritical(thrown);
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<StatusBarAction.SetResolverStatus>());
     }
 
     [Fact]
@@ -932,7 +1065,9 @@ public sealed class EventLogEffectsTests
             Substitute.For<ILogWatcherService>(),
             Substitute.For<IEventResolverCache>(),
             Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            Substitute.For<IDatabaseService>(),
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
@@ -1033,6 +1168,9 @@ public sealed class EventLogEffectsTests
             mockServiceProvider.GetService(typeof(IEventResolver)).Returns((IEventResolver?)null);
         }
 
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1040,7 +1178,9 @@ public sealed class EventLogEffectsTests
             mockLogWatcherService,
             mockResolverCache,
             Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
@@ -1073,6 +1213,9 @@ public sealed class EventLogEffectsTests
         mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
         mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
 
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1080,11 +1223,63 @@ public sealed class EventLogEffectsTests
             mockLogWatcherService,
             mockResolverCache,
             Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher, mockFilterService);
+    }
+
+    private static (EventLogEffects effects,
+        IDispatcher mockDispatcher,
+        IServiceProvider mockServiceProvider,
+        IBannerService mockBannerService,
+        IDatabaseService mockDatabaseService) CreateEffectsForOpenLogGuards(
+            ImmutableDictionary<string, EventLogData> activeLogs)
+    {
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = activeLogs,
+            AppliedFilter = new EventFilter(null, [])
+        });
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        var mockEventResolver = Substitute.For<IEventResolver>();
+
+        mockEventResolver.ResolveEvent(Arg.Any<EventRecord>())
+            .Returns(_ => EventUtils.CreateTestEvent(100));
+
+        mockServiceProvider.GetService(typeof(IEventResolver)).Returns(mockEventResolver);
+
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
+        var mockBannerService = Substitute.For<IBannerService>();
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            Substitute.For<IFilterService>(),
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            mockBannerService);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        return (effects, mockDispatcher, mockServiceProvider, mockBannerService, mockDatabaseService);
     }
 
     private static (EventLogEffects effects,
@@ -1125,6 +1320,9 @@ public sealed class EventLogEffectsTests
         mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
         mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
 
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1132,7 +1330,9 @@ public sealed class EventLogEffectsTests
             mockLogWatcherService,
             mockResolverCache,
             Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory);
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<IBannerService>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
