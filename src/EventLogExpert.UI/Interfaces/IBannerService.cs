@@ -17,6 +17,22 @@ public interface IBannerService
     event Action StateChanged;
 
     /// <summary>
+    ///     <c>true</c> when the user has explicitly dismissed the attention banner this session. Resets
+    ///     automatically the next time a file enters <see cref="AttentionEntries" /> with a name that
+    ///     wasn't present at the last <see cref="DismissAttention" /> call (FileName-ratchet) so newly
+    ///     introduced problems re-surface the banner. Resets unconditionally on app restart.
+    /// </summary>
+    bool AttentionDismissed { get; }
+
+    /// <summary>
+    ///     Snapshot of database entries whose status indicates the user must take action: not yet
+    ///     upgraded, last upgrade failed, schema unrecognized or obsolete, or classification failed.
+    ///     Recomputed when <see cref="IDatabaseService.EntriesChanged" /> fires; never returns stale
+    ///     <see cref="DatabaseEntry" /> instances even when set composition is unchanged.
+    /// </summary>
+    IReadOnlyList<DatabaseEntry> AttentionEntries { get; }
+
+    /// <summary>
     ///     Snapshot of the currently-running background-scope upgrade batch (e.g., import-triggered auto-upgrades), or
     ///     <c>null</c> when no background batch is in flight. At most one of <see cref="BackgroundProgress" /> and
     ///     <see cref="SettingsProgress" /> is non-null at any time because the database service processes batches
@@ -40,6 +56,13 @@ public interface IBannerService
 
     /// <summary>Clear the current critical exception and raise <see cref="StateChanged" />.</summary>
     void ClearCritical();
+
+    /// <summary>
+    ///     Mark the attention banner dismissed and raise <see cref="StateChanged" /> if the state changed. The dismissal is
+    ///     ratcheted by file name: any future attention entry with a file name not present at this call un-dismisses the
+    ///     banner so newly introduced problems re-surface. No-op when already dismissed.
+    /// </summary>
+    void DismissAttention();
 
     /// <summary>Remove an error banner by id and raise <see cref="StateChanged" />. No-op if the id is not present.</summary>
     void DismissError(Guid id);

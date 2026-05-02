@@ -14,8 +14,11 @@ public sealed class BannerService : IBannerService
     private readonly Lock _stateLock = new();
     private readonly ITraceLogger _traceLogger;
 
+    private bool _attentionDismissed;
+    private ImmutableList<DatabaseEntry> _attentionEntries = ImmutableList<DatabaseEntry>.Empty;
     private BannerProgressEntry? _backgroundProgress;
     private Exception? _currentCritical;
+    private ImmutableHashSet<string> _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
     private ImmutableList<ErrorBannerEntry> _errorBanners = ImmutableList<ErrorBannerEntry>.Empty;
     private ImmutableList<BannerInfoEntry> _infoBanners = ImmutableList<BannerInfoEntry>.Empty;
     private Func<Task>? _recoveryCallback;
@@ -32,9 +35,26 @@ public sealed class BannerService : IBannerService
         _databaseService.UpgradeBatchStarted += OnUpgradeBatchStarted;
         _databaseService.UpgradeBatchProgress += OnUpgradeBatchProgress;
         _databaseService.UpgradeBatchCompleted += OnUpgradeBatchCompleted;
+
+        // Subscribe to EntriesChanged FIRST, then invoke the handler manually for the initial pull.
+        // Pull-then-subscribe leaves a race where an EntriesChanged firing between pull and
+        // subscribe would be missed. Subscribe-then-invoke is idempotent: if a real EntriesChanged
+        // races with the manual call, both serialize on _stateLock and converge to the latest state.
+        _databaseService.EntriesChanged += OnEntriesChanged;
+        OnEntriesChanged(this, EventArgs.Empty);
     }
 
     public event Action? StateChanged;
+
+    public bool AttentionDismissed
+    {
+        get { lock (_stateLock) { return _attentionDismissed; } }
+    }
+
+    public IReadOnlyList<DatabaseEntry> AttentionEntries
+    {
+        get { lock (_stateLock) { return _attentionEntries; } }
+    }
 
     public BannerProgressEntry? BackgroundProgress
     {
@@ -69,6 +89,31 @@ public sealed class BannerService : IBannerService
         }
 
         RaiseStateChanged();
+    }
+
+    public void DismissAttention()
+    {
+        bool changed;
+
+        lock (_stateLock)
+        {
+            changed = !_attentionDismissed;
+            if (changed)
+            {
+                _attentionDismissed = true;
+                // Snapshot the file names that were in attention at dismissal time. The handler
+                // un-dismisses if any future attention entry has a file name not in this snapshot
+                // (FileName-ratchet) so that newly-introduced problems re-surface the banner.
+                _dismissedAttentionFileNames = _attentionEntries
+                    .Select(entry => entry.FileName)
+                    .ToImmutableHashSet();
+            }
+        }
+
+        if (changed)
+        {
+            RaiseStateChanged();
+        }
     }
 
     public void DismissError(Guid id)
@@ -222,6 +267,58 @@ public sealed class BannerService : IBannerService
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown upgrade progress scope.");
+        }
+    }
+
+    private void OnEntriesChanged(object? sender, EventArgs args)
+    {
+        bool stateChanged;
+
+        lock (_stateLock)
+        {
+            // Read AND filter under the lock so that two handlers running concurrently can never
+            // produce out-of-order assignments. Without the lock here, an older handler (still
+            // computing newAttention from a stale Entries snapshot) could acquire the lock AFTER
+            // a newer handler had already applied the latest snapshot, overwriting the newer
+            // state with the older one. _databaseService.Entries is an atomic ref read of an
+            // immutable list and the filter is small and cheap (entries count is bounded by the
+            // user's database list), so doing this work under the lock is safe and necessary.
+            ImmutableList<DatabaseEntry> newAttention = _databaseService.Entries
+                .Where(entry => entry.Status is DatabaseStatus.UpgradeRequired
+                    or DatabaseStatus.UpgradeFailed
+                    or DatabaseStatus.UnrecognizedSchema
+                    or DatabaseStatus.ObsoleteSchema
+                    or DatabaseStatus.ClassificationFailed)
+                .ToImmutableList();
+
+            // Always assign the latest list so AttentionEntries never returns stale DatabaseEntry
+            // instances, even when the set composition (by file name) is unchanged.
+            stateChanged = !_attentionEntries.SequenceEqual(newAttention);
+            _attentionEntries = newAttention;
+
+            if (_attentionDismissed)
+            {
+                foreach (var entry in newAttention)
+                {
+                    if (_dismissedAttentionFileNames.Contains(entry.FileName))
+                    {
+                        continue;
+                    }
+
+                    // FileName-ratchet: a previously-unseen attention entry means new info
+                    // for the user, so un-dismiss and clear the snapshot. Subsequent
+                    // DismissAttention() calls re-snapshot from the then-current set.
+                    _attentionDismissed = false;
+                    _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
+                    stateChanged = true;
+                    break;
+                }
+            }
+        }
+
+        if (stateChanged)
+        {
+            RaiseStateChanged();
         }
     }
 
