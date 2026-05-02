@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -15,6 +16,7 @@ namespace EventLogExpert.UI.Tests.Services;
 
 public sealed class DatabaseServiceTests : IDisposable
 {
+    private readonly List<DatabaseService> _services = [];
     private readonly string _testDirectory;
 
     public DatabaseServiceTests()
@@ -457,6 +459,41 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteEntryWithBackupAsync_DuringInFlightUpgrade_ShouldThrowInvalidOperationException()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        using var inFlight = new ManualResetEventSlim(initialState: false);
+        using var release = new ManualResetEventSlim(initialState: false);
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp)
+            {
+                inFlight.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var batchTask = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+        Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        release.Set();
+        await batchTask;
+    }
+
+    [Fact]
     public async Task DeleteEntryWithBackupAsync_RaisesEntriesChangedExactlyOnce()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -523,6 +560,20 @@ public sealed class DatabaseServiceTests : IDisposable
 
     public void Dispose()
     {
+        // Dispose all services first so the consumer task halts and any in-flight upgrade rolls
+        // back BEFORE we tear down the temp directory underneath it.
+        foreach (var service in _services)
+        {
+            try
+            {
+                service.DisposeAsync().AsTask().Wait(TimeSpan.FromSeconds(5));
+            }
+            catch (Exception)
+            {
+                // Best-effort cleanup; a hung disposal should not fail an otherwise-passing test.
+            }
+        }
+
         // SQLite connections opened during ClassifyEntriesAsync are pooled; on Windows the pool
         // keeps the file handle open after `Database.CloseConnection`, blocking the recursive
         // delete below. Drop all pools before cleanup.
@@ -539,6 +590,61 @@ public sealed class DatabaseServiceTests : IDisposable
                 // Best-effort cleanup; a residual SQLite handle should not fail an otherwise-passing test.
             }
         }
+    }
+
+    [Fact]
+    public async Task DisposeAsync_WithPendingBatches_ShouldCancelInFlightAndPendingBatches()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb2));
+
+        var service = CreateDatabaseService();
+
+        using var inFlight = new ManualResetEventSlim(initialState: false);
+        using var release = new ManualResetEventSlim(initialState: false);
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            {
+                inFlight.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var firstBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        var pendingBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb2],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, service.QueuedBatchCount);
+
+        var disposeTask = service.DisposeAsync().AsTask();
+
+        release.Set();
+        await disposeTask;
+
+        // First batch was mid-upgrade when dispose cancelled; rollback restores it and surfaces as
+        // Cancelled.
+        var firstResult = await firstBatch;
+        Assert.Empty(firstResult.Succeeded);
+        Assert.Single(firstResult.Cancelled);
+        Assert.Equal(Constants.TestDb1, firstResult.Cancelled[0]);
+
+        // Pending batch was drained by the consumer, observed cancellation per-entry, and surfaced
+        // as Cancelled — strictly more useful than throwing OperationCanceledException.
+        var pendingResult = await pendingBatch;
+        Assert.Empty(pendingResult.Succeeded);
+        Assert.Single(pendingResult.Cancelled);
+        Assert.Equal(Constants.TestDb2, pendingResult.Cancelled[0]);
     }
 
     [Fact]
@@ -599,6 +705,25 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
         Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
         Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
+    }
+
+    [Fact]
+    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        service.Toggle(Constants.TestDb1);
+
+        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(1, secondSubscriberInvocations);
     }
 
     [Fact]
@@ -926,6 +1051,53 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task QueuedBatchCount_ShouldReflectQueuedBatchesNotCountingInFlight()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb2));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb3));
+
+        var service = CreateDatabaseService();
+
+        using var inFlight = new ManualResetEventSlim(initialState: false);
+        using var release = new ManualResetEventSlim(initialState: false);
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            {
+                inFlight.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var firstBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+        Assert.Equal(0, service.QueuedBatchCount);
+
+        var secondBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb2],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+        var thirdBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb3],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, service.QueuedBatchCount);
+
+        release.Set();
+        await Task.WhenAll(firstBatch, secondBatch, thirdBatch);
+
+        Assert.Equal(0, service.QueuedBatchCount);
+    }
+
+    [Fact]
     public async Task Refresh_AfterClassificationSetsBackupExistsTrue_ShouldPreserveBackupExists()
     {
         // Regression: c9 refactored Refresh() to use `existing with { IsEnabled = ... }` so all
@@ -1005,6 +1177,40 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Remove_DuringInFlightUpgrade_ShouldThrowInvalidOperationException()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        using var inFlight = new ManualResetEventSlim(initialState: false);
+        using var release = new ManualResetEventSlim(initialState: false);
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp)
+            {
+                inFlight.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var batchTask = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        var ex = Assert.Throws<InvalidOperationException>(() => service.Remove(Constants.TestDb1));
+        Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        release.Set();
+        await batchTask;
+    }
+
+    [Fact]
     public void Remove_WhenCalled_ShouldDeleteDatabaseAndSidecars()
     {
         // Arrange
@@ -1070,6 +1276,41 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.True(File.Exists(dbPath));
         var entryAfter = Assert.Single(service.Entries);
         Assert.Equal(entryBefore.Status, entryAfter.Status);
+    }
+
+    [Fact]
+    public async Task RestoreFromBackupAsync_DuringInFlightUpgrade_ShouldThrowInvalidOperationException()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        using var inFlight = new ManualResetEventSlim(initialState: false);
+        using var release = new ManualResetEventSlim(initialState: false);
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp)
+            {
+                inFlight.Set();
+                release.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var batchTask = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+        Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
+
+        release.Set();
+        await batchTask;
     }
 
     [Fact]
@@ -1239,6 +1480,429 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => service.Toggle("does-not-exist.db"));
     }
 
+    [Fact]
+    public async Task UpgradeBatchAsync_AfterDispose_ShouldThrowObjectDisposedException()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+        await service.DisposeAsync();
+
+        await Assert.ThrowsAsync<ObjectDisposedException>(
+            () => service.UpgradeBatchAsync(
+                [Constants.TestDb1],
+                UpgradeProgressScope.Background,
+                TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_AllEntriesRejected_ShouldShortCircuitWithoutRaisingEvents()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+
+        var raisedEvents = 0;
+        service.UpgradeBatchStarted += (_, _) => Interlocked.Increment(ref raisedEvents);
+        service.UpgradeBatchProgress += (_, _) => Interlocked.Increment(ref raisedEvents);
+        service.UpgradeBatchCompleted += (_, _) => Interlocked.Increment(ref raisedEvents);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Succeeded);
+        Assert.Empty(result.Cancelled);
+        Assert.Single(result.Failed);
+        Assert.Equal(Constants.TestDb1, result.Failed[0].FileName);
+        Assert.Equal(0, raisedEvents);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_AlreadyCancelledCallerToken_ShouldShortCircuitWithoutRaisingEvents()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+        var raisedEvents = 0;
+        service.UpgradeBatchStarted += (_, _) => Interlocked.Increment(ref raisedEvents);
+        service.UpgradeBatchProgress += (_, _) => Interlocked.Increment(ref raisedEvents);
+        service.UpgradeBatchCompleted += (_, _) => Interlocked.Increment(ref raisedEvents);
+
+        using var cts = new CancellationTokenSource();
+        await cts.CancelAsync();
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            cts.Token);
+
+        Assert.Empty(result.Succeeded);
+        Assert.Single(result.Cancelled);
+        Assert.Equal(Constants.TestDb1, result.Cancelled[0]);
+        Assert.Empty(result.Failed);
+        Assert.Equal(0, raisedEvents);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_BackupAppearsAfterEnqueue_ShouldFailWithRecoveryRequired_AndNotOverwriteBackup()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        // Caller passed validation (no .upgrade.bak at enqueue), but a stale backup appears between
+        // enqueue and the per-entry TOCTOU re-check inside UpgradeAsync.
+        var stalePayload = new byte[] { 0x42, 0x43 };
+        File.WriteAllBytes(dbPath + ".upgrade.bak", stalePayload);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Failed);
+        Assert.Contains("Recovery required", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(stalePayload, File.ReadAllBytes(dbPath + ".upgrade.bak"));
+
+        // Disk truth must be reflected on the entry so the recovery host prompts immediately rather
+        // than waiting for the next classification pass.
+        Assert.True(service.Entries[0].BackupExists);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_BackupCleanupFails_ShouldMarkReadyWithBackupAndReportFailure()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        var backupPath = dbPath + ".upgrade.bak";
+        FileStream? backupLock = null;
+
+        // After File.Copy creates the backup (during BackingUp phase), MigratingSchema fires.
+        // We hold an exclusive lock on the backup so the post-success TryDeleteFile fails — exercising
+        // the cleanup-failure path that previously rolled back the successful upgrade.
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.MigratingSchema && backupLock is null)
+            {
+                backupLock = new FileStream(backupPath, FileMode.Open, FileAccess.Read, FileShare.None);
+            }
+        };
+
+        try
+        {
+            var result = await service.UpgradeBatchAsync(
+                [Constants.TestDb1],
+                UpgradeProgressScope.Background,
+                TestContext.Current.CancellationToken);
+
+            Assert.Empty(result.Succeeded);
+            Assert.Empty(result.Cancelled);
+            Assert.Single(result.Failed);
+            Assert.Contains("backup cleanup failed", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+
+            var entry = service.Entries[0];
+            Assert.Equal(DatabaseStatus.Ready, entry.Status);
+            Assert.True(entry.BackupExists);
+            Assert.True(File.Exists(backupPath));
+        }
+        finally
+        {
+            backupLock?.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_DuplicateFileNames_ShouldDedupePreservingFirstOccurrence()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        var startedBatchSizes = new List<int>();
+        service.UpgradeBatchStarted += (_, args) => startedBatchSizes.Add(args.BatchSize);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1, Constants.TestDb1, Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(startedBatchSizes);
+        Assert.Equal(1, startedBatchSizes[0]);
+        Assert.Single(result.Succeeded);
+        Assert.Equal(Constants.TestDb1, result.Succeeded[0]);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_DuringMigration_ShouldNotSetBackupExistsOnEntry()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        bool? backupExistsDuringMigration = null;
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.MigratingSchema)
+            {
+                backupExistsDuringMigration = service.Entries[0].BackupExists;
+            }
+        };
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Succeeded);
+        Assert.NotNull(backupExistsDuringMigration);
+        Assert.False(backupExistsDuringMigration!.Value);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_EntryWithBackupExists_ShouldRejectWithRecoveryRequiredMessage()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+        File.WriteAllText(dbPath + ".upgrade.bak", "stale-backup");
+
+        var service = CreateDatabaseService();
+
+        Assert.True(service.Entries[0].BackupExists);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.Succeeded);
+        Assert.Empty(result.Cancelled);
+        Assert.Single(result.Failed);
+        Assert.Contains("Recovery required", result.Failed[0].Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_HappyPath_ShouldRaiseStartedProgressCompletedInOrder_WithMatchingBatchId()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        var events = new List<(string Name, Guid BatchId)>();
+        var eventLock = new object();
+
+        service.UpgradeBatchStarted += (_, args) =>
+        {
+            lock (eventLock) { events.Add((nameof(IDatabaseService.UpgradeBatchStarted), args.BatchId)); }
+        };
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            lock (eventLock) { events.Add(($"Progress.{args.Phase}", args.BatchId)); }
+        };
+
+        service.UpgradeBatchCompleted += (_, args) =>
+        {
+            lock (eventLock) { events.Add((nameof(IDatabaseService.UpgradeBatchCompleted), args.BatchId)); }
+        };
+
+        await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        lock (eventLock)
+        {
+            Assert.Equal(5, events.Count);
+            Assert.Equal(nameof(IDatabaseService.UpgradeBatchStarted), events[0].Name);
+            Assert.Equal($"Progress.{UpgradePhase.BackingUp}", events[1].Name);
+            Assert.Equal($"Progress.{UpgradePhase.MigratingSchema}", events[2].Name);
+            Assert.Equal($"Progress.{UpgradePhase.Verifying}", events[3].Name);
+            Assert.Equal(nameof(IDatabaseService.UpgradeBatchCompleted), events[4].Name);
+
+            var batchId = events[0].BatchId;
+            Assert.NotEqual(Guid.Empty, batchId);
+            Assert.All(events, e => Assert.Equal(batchId, e.BatchId));
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_HappyPath_ShouldUpgradeFile_DeleteBackup_AndMarkReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        Assert.Equal(DatabaseStatus.UpgradeRequired, service.Entries[0].Status);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Succeeded);
+        Assert.Equal(Constants.TestDb1, result.Succeeded[0]);
+        Assert.Empty(result.Cancelled);
+        Assert.Empty(result.Failed);
+
+        Assert.False(File.Exists(dbPath + ".upgrade.bak"));
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+        Assert.False(service.Entries[0].BackupExists);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_MultipleProgressSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.UpgradeBatchProgress += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.UpgradeBatchProgress += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Succeeded);
+
+        // BackingUp + MigratingSchema + Verifying = 3 progress events per entry. If multicast invoke
+        // aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(3, secondSubscriberInvocations);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_SubscriberThrows_ShouldNotBreakConsumer_AndCompleteBatch()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+
+        service.UpgradeBatchStarted += (_, _) => throw new InvalidOperationException("subscriber-threw");
+        service.UpgradeBatchProgress += (_, _) => throw new InvalidOperationException("subscriber-threw");
+        service.UpgradeBatchCompleted += (_, _) => throw new InvalidOperationException("subscriber-threw");
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Succeeded);
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_TwoConcurrentBatches_ShouldRunSequentiallyInFifoOrder()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
+        DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb2));
+
+        var service = CreateDatabaseService();
+
+        using var firstBackingUp = new ManualResetEventSlim(initialState: false);
+        using var releaseFirst = new ManualResetEventSlim(initialState: false);
+        var startedBatchIds = new List<Guid>();
+        var startedTimes = new List<DateTime>();
+
+        service.UpgradeBatchStarted += (_, args) =>
+        {
+            lock (startedBatchIds)
+            {
+                startedBatchIds.Add(args.BatchId);
+                startedTimes.Add(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc).AddTicks(Environment.TickCount64));
+            }
+        };
+
+        service.UpgradeBatchProgress += (_, args) =>
+        {
+            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            {
+                firstBackingUp.Set();
+                releaseFirst.Wait(TimeSpan.FromSeconds(10));
+            }
+        };
+
+        var firstBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.True(firstBackingUp.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
+
+        var secondBatch = service.UpgradeBatchAsync(
+            [Constants.TestDb2],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+
+        lock (startedBatchIds)
+        {
+            Assert.Single(startedBatchIds);
+        }
+
+        releaseFirst.Set();
+
+        var firstResult = await firstBatch;
+        var secondResult = await secondBatch;
+
+        Assert.Single(firstResult.Succeeded);
+        Assert.Equal(Constants.TestDb1, firstResult.Succeeded[0]);
+        Assert.Single(secondResult.Succeeded);
+        Assert.Equal(Constants.TestDb2, secondResult.Succeeded[0]);
+
+        lock (startedBatchIds)
+        {
+            Assert.Equal(2, startedBatchIds.Count);
+        }
+    }
+
+    [Fact]
+    public async Task UpgradeBatchAsync_UpgradeFailedEntryWithoutBackup_ShouldBeRetryable()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.UpgradeFailed);
+
+        var result = await service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Succeeded);
+        Assert.Equal(Constants.TestDb1, result.Succeeded[0]);
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+    }
+
     private static void CreateDatabaseFile(string directory, string fileName) =>
         File.WriteAllText(Path.Combine(directory, fileName), string.Empty);
 
@@ -1275,6 +1939,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var logger = traceLogger ?? Substitute.For<ITraceLogger>();
         var service = new DatabaseService(fileLocationOptions, prefs, logger);
+        _services.Add(service);
 
         // Block until ctor-initiated classification finishes so tests observe a stable post-classification
         // state. Tests that need to observe pre-classification state (e.g., InitialClassificationTask

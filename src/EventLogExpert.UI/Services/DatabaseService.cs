@@ -7,9 +7,11 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
+using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Threading.Channels;
 
 namespace EventLogExpert.UI.Services;
 
@@ -17,12 +19,19 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 {
     public const string UpgradeBackupSuffix = ".upgrade.bak";
 
+    private readonly Task _consumerTask;
+    private readonly CancellationTokenSource _disposeCts = new();
     private readonly FileLocationOptions _fileLocationOptions;
+
+    private readonly HashSet<string> _filesInOperation = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _mutationLock = new();
     private readonly IPreferencesProvider _preferences;
     private readonly ITraceLogger _traceLogger;
-
+    private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
+        new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+    private int _disposed;
     private ImmutableList<DatabaseEntry> _entries = [];
+    private int _queuedBatchCount;
 
     public DatabaseService(
         FileLocationOptions fileLocationOptions,
@@ -36,9 +45,17 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         Refresh();
 
         InitialClassificationTask = StartInitialClassificationAsync();
+
+        _consumerTask = Task.Run(ConsumeUpgradeQueueAsync);
     }
 
     public event EventHandler? EntriesChanged;
+
+    public event EventHandler<UpgradeBatchCompletedEventArgs>? UpgradeBatchCompleted;
+
+    public event EventHandler<UpgradeBatchProgressEventArgs>? UpgradeBatchProgress;
+
+    public event EventHandler<UpgradeBatchStartedEventArgs>? UpgradeBatchStarted;
 
     public ImmutableList<string> ActiveDatabases =>
         _entries
@@ -49,6 +66,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     public IReadOnlyList<DatabaseEntry> Entries => _entries;
 
     public Task InitialClassificationTask { get; }
+
+    public int QueuedBatchCount => Volatile.Read(ref _queuedBatchCount);
 
     public async Task ClassifyEntriesAsync(CancellationToken cancellationToken = default)
     {
@@ -149,6 +168,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        using var reservation = ReserveFileOperation(fileName, nameof(DeleteEntryWithBackupAsync));
+
         var entry = LookupEntryOrThrow(fileName, nameof(DeleteEntryWithBackupAsync));
 
         var success = await Task.Run(() => DeleteFilesCore(entry)).ConfigureAwait(false);
@@ -174,6 +195,39 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         if (removed) { RaiseEntriesChanged(); }
 
         return true;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
+
+        _upgradeQueue.Writer.TryComplete();
+
+        try
+        {
+            await _disposeCts.CancelAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(DisposeAsync)}: cancellation source faulted: {ex}"));
+        }
+
+        try
+        {
+            await _consumerTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on disposal.
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(DisposeAsync)}: consumer task faulted: {ex}"));
+        }
+
+        _disposeCts.Dispose();
     }
 
     public async Task<ImportResult> ImportAsync(
@@ -303,6 +357,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
     public void Remove(string fileName)
     {
+        using var reservation = ReserveFileOperation(fileName, nameof(Remove));
+
         lock (_mutationLock)
         {
             var index = FindEntryIndex(_entries, fileName);
@@ -326,6 +382,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+
+        using var reservation = ReserveFileOperation(fileName, nameof(RestoreFromBackupAsync));
 
         var entry = LookupEntryOrThrow(fileName, nameof(RestoreFromBackupAsync));
 
@@ -371,10 +429,131 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         RaiseEntriesChanged();
     }
 
+    public async Task<UpgradeBatchResult> UpgradeBatchAsync(
+        IReadOnlyList<string> fileNames,
+        UpgradeProgressScope scope,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(fileNames);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+        var dedupedNames = DedupePreservingOrder(fileNames);
+
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return new UpgradeBatchResult(
+                Succeeded: [],
+                Cancelled: dedupedNames,
+                Failed: []);
+        }
+
+        // Awaited explicitly so callers that race the ctor get a meaningful classification before
+        // partitioning, rather than a batch full of false "NotClassified" rejections.
+        try
+        {
+            await InitialClassificationTask.ConfigureAwait(false);
+        }
+        catch
+        {
+            // InitialClassificationTask is contractually never-faulting; defensive try/catch only.
+        }
+
+        var acceptable = new List<DatabaseEntry>(dedupedNames.Count);
+        var rejected = new List<UpgradeFailure>();
+
+        lock (_mutationLock)
+        {
+            var snapshot = _entries;
+            var byName = new Dictionary<string, DatabaseEntry>(snapshot.Count, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in snapshot)
+            {
+                byName[entry.FileName] = entry;
+            }
+
+            foreach (var fileName in dedupedNames)
+            {
+                if (!byName.TryGetValue(fileName, out var entry))
+                {
+                    rejected.Add(new UpgradeFailure(fileName, "Entry not found"));
+                    continue;
+                }
+
+                if (entry.BackupExists)
+                {
+                    rejected.Add(new UpgradeFailure(
+                        fileName,
+                        "Recovery required — resolve via Settings or recovery prompt first"));
+                    continue;
+                }
+
+                if (entry.Status is not (DatabaseStatus.UpgradeRequired or DatabaseStatus.UpgradeFailed))
+                {
+                    rejected.Add(new UpgradeFailure(
+                        fileName,
+                        $"Cannot upgrade entry in status '{entry.Status}'"));
+                    continue;
+                }
+
+                acceptable.Add(entry);
+            }
+        }
+
+        if (acceptable.Count == 0)
+        {
+            return new UpgradeBatchResult(Succeeded: [], Cancelled: [], Failed: rejected);
+        }
+
+        var batchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
+
+        var tcs = new TaskCompletionSource<UpgradeBatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var batch = new UpgradeBatch(
+            Guid.NewGuid(),
+            scope,
+            acceptable,
+            tcs,
+            batchCts,
+            rejected);
+
+        Interlocked.Increment(ref _queuedBatchCount);
+
+        if (!_upgradeQueue.Writer.TryWrite(batch))
+        {
+            // Channel already completed (disposal raced this enqueue). Surface the work as cancelled
+            // and roll back the counter increment so QueuedBatchCount reflects reality.
+            Interlocked.Decrement(ref _queuedBatchCount);
+            batchCts.Dispose();
+
+            return new UpgradeBatchResult(
+                Succeeded: [],
+                Cancelled: acceptable.Select(entry => entry.FileName).ToArray(),
+                Failed: rejected);
+        }
+
+        return await tcs.Task.ConfigureAwait(false);
+    }
+
+    private static IReadOnlyList<string> DedupePreservingOrder(IReadOnlyList<string> source)
+    {
+        var seen = new HashSet<string>(source.Count, StringComparer.OrdinalIgnoreCase);
+        var deduped = new List<string>(source.Count);
+
+        foreach (var item in source)
+        {
+            if (seen.Add(item))
+            {
+                deduped.Add(item);
+            }
+        }
+
+        return deduped;
+    }
+
     private static int FindEntryIndex(ImmutableList<DatabaseEntry> snapshot, string fileName) =>
         snapshot.FindIndex(entry => string.Equals(entry.FileName, fileName, StringComparison.OrdinalIgnoreCase));
 
-    private static bool IsActive(DatabaseEntry entry) => entry.IsEnabled && entry.Status == DatabaseStatus.Ready;
+    private static bool IsActive(DatabaseEntry entry) => entry is { IsEnabled: true, Status: DatabaseStatus.Ready };
 
     private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
         currentVersion switch
@@ -441,6 +620,47 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     [GeneratedRegex("^(.+) (\\S+)$")]
     private static partial Regex SplitFileName();
 
+    private static void WalCheckpoint(string dbPath)
+    {
+        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
+        {
+            connection.Open();
+
+            using var cmd = connection.CreateCommand();
+
+            cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            cmd.ExecuteNonQuery();
+        }
+
+        // Drop the pool so the OS handle is released BEFORE File.Copy reads the file. Otherwise on
+        // Windows the copy can race with the pooled connection still holding the handle.
+        SqliteConnection.ClearAllPools();
+    }
+
+    private async Task ConsumeUpgradeQueueAsync()
+    {
+        try
+        {
+            await foreach (var batch in _upgradeQueue.Reader.ReadAllAsync(_disposeCts.Token).ConfigureAwait(false))
+            {
+                await ProcessBatchAsync(batch).ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on dispose.
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(ConsumeUpgradeQueueAsync)}: consumer faulted: {ex}"));
+        }
+        finally
+        {
+            DrainPendingBatches();
+        }
+    }
+
     private void DeleteDatabaseFiles(string fileName)
     {
         var basePath = Path.Combine(_fileLocationOptions.DatabasePath, fileName);
@@ -465,6 +685,23 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         return TryDeleteFile(mainPath + UpgradeBackupSuffix, nameof(DeleteEntryWithBackupAsync)) &&
             // Delete main last so a partial failure leaves the entry visible to Refresh and retry-able.
             TryDeleteFile(mainPath, nameof(DeleteEntryWithBackupAsync));
+    }
+
+    private void DrainPendingBatches()
+    {
+        while (_upgradeQueue.Reader.TryRead(out var batch))
+        {
+            Interlocked.Decrement(ref _queuedBatchCount);
+
+            try { batch.BatchCts.Cancel(); }
+            catch (Exception) { /* CTS may already be disposed; cancellation moot */ }
+
+            try { batch.BatchCts.Dispose(); }
+            catch (Exception) { /* Already disposed; ignore. */ }
+
+            batch.Tcs.TrySetException(
+                new OperationCanceledException("DatabaseService disposed before batch processed."));
+        }
     }
 
     private IEnumerable<string> EnumerateDatabaseFileNames()
@@ -622,7 +859,150 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         return false;
     }
 
-    private void RaiseEntriesChanged() => EntriesChanged?.Invoke(this, EventArgs.Empty);
+    private async Task ProcessBatchAsync(UpgradeBatch batch)
+    {
+        Interlocked.Decrement(ref _queuedBatchCount);
+
+        var succeeded = new List<string>(batch.Entries.Count);
+        var cancelled = new List<string>(batch.Entries.Count);
+        var failed = new List<UpgradeFailure>(batch.AlreadyRejected.Count + batch.Entries.Count);
+        failed.AddRange(batch.AlreadyRejected);
+        var wasCancelled = false;
+
+        try
+        {
+            SafeRaise(
+                UpgradeBatchStarted,
+                new UpgradeBatchStartedEventArgs(batch.Id, batch.Scope, batch.Entries.Count, batch.BatchCts),
+                nameof(UpgradeBatchStarted));
+
+            for (var i = 0; i < batch.Entries.Count; i++)
+            {
+                var entry = batch.Entries[i];
+
+                if (batch.BatchCts.Token.IsCancellationRequested)
+                {
+                    wasCancelled = true;
+
+                    for (var j = i; j < batch.Entries.Count; j++)
+                    {
+                        cancelled.Add(batch.Entries[j].FileName);
+                    }
+
+                    break;
+                }
+
+                try
+                {
+                    await UpgradeAsync(entry.FileName, i + 1, batch.Id, batch.BatchCts.Token).ConfigureAwait(false);
+
+                    succeeded.Add(entry.FileName);
+                }
+                catch (OperationCanceledException) when (batch.BatchCts.Token.IsCancellationRequested)
+                {
+                    wasCancelled = true;
+                    cancelled.Add(entry.FileName);
+
+                    for (var j = i + 1; j < batch.Entries.Count; j++)
+                    {
+                        cancelled.Add(batch.Entries[j].FileName);
+                    }
+
+                    break;
+                }
+                catch (UpgradeRollbackFailedException ex)
+                {
+                    failed.Add(new UpgradeFailure(entry.FileName, ex.Message));
+
+                    if (!batch.BatchCts.Token.IsCancellationRequested)
+                    {
+                        continue;
+                    }
+
+                    wasCancelled = true;
+
+                    for (var j = i + 1; j < batch.Entries.Count; j++)
+                    {
+                        cancelled.Add(batch.Entries[j].FileName);
+                    }
+
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    var message = ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message;
+                    failed.Add(new UpgradeFailure(entry.FileName, message));
+
+                    SafeLog(() => _traceLogger.Warn(
+                        $"{nameof(DatabaseService)}.{nameof(ProcessBatchAsync)}: '{entry.FileName}' upgrade threw: {ex}"));
+                }
+            }
+
+            var result = new UpgradeBatchResult(succeeded, cancelled, failed);
+
+            SafeRaise(
+                UpgradeBatchCompleted,
+                new UpgradeBatchCompletedEventArgs(batch.Id, result, wasCancelled),
+                nameof(UpgradeBatchCompleted));
+
+            batch.Tcs.TrySetResult(result);
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(ProcessBatchAsync)}: unhandled batch error: {ex}"));
+            batch.Tcs.TrySetException(ex);
+        }
+        finally
+        {
+            try { batch.BatchCts.Dispose(); }
+            catch (Exception) { /* Already disposed; ignore. */ }
+        }
+    }
+
+    private void RaiseEntriesChanged()
+    {
+        var handler = EntriesChanged;
+
+        if (handler is null) { return; }
+
+        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
+        // a direct multicast Invoke aborts the chain on first exception.
+        foreach (var subscriber in handler.GetInvocationList())
+        {
+            try
+            {
+                ((EventHandler)subscriber).Invoke(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(DatabaseService)}.{nameof(RaiseEntriesChanged)}: subscriber threw: {ex}"));
+            }
+        }
+    }
+
+    private void ReleaseFileOperation(string fileName)
+    {
+        lock (_mutationLock)
+        {
+            _filesInOperation.Remove(fileName);
+        }
+    }
+
+    private FileOperationReservation ReserveFileOperation(string fileName, string callerName)
+    {
+        lock (_mutationLock)
+        {
+            if (!_filesInOperation.Add(fileName))
+            {
+                throw new InvalidOperationException(
+                    $"{nameof(DatabaseService)}.{callerName}: cannot operate on '{fileName}' while another operation is in progress for the same database.");
+            }
+        }
+
+        return new FileOperationReservation(this, fileName);
+    }
 
     private bool RestoreFilesCore(DatabaseEntry entry)
     {
@@ -661,6 +1041,27 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         return TryDeleteFile(backupPath, nameof(RestoreFromBackupAsync));
     }
 
+    private void SafeRaise<TArgs>(EventHandler<TArgs>? handler, TArgs args, string eventName)
+        where TArgs : EventArgs
+    {
+        if (handler is null) { return; }
+
+        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
+        // a direct multicast Invoke aborts the chain on first exception.
+        foreach (var subscriber in handler.GetInvocationList())
+        {
+            try
+            {
+                ((EventHandler<TArgs>)subscriber).Invoke(this, args);
+            }
+            catch (Exception ex)
+            {
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(DatabaseService)}.{eventName}: subscriber threw: {ex}"));
+            }
+        }
+    }
+
     private async Task StartInitialClassificationAsync()
     {
         try
@@ -690,4 +1091,267 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             return false;
         }
     }
+
+    private bool UpdateEntryStatusAndBackup(string fileName, DatabaseStatus status, bool backupExists)
+    {
+        var changed = false;
+
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index < 0) { return false; }
+
+            var current = _entries[index];
+
+            if (current.Status == status && current.BackupExists == backupExists) { return true; }
+
+            _entries = _entries.SetItem(index, current with { Status = status, BackupExists = backupExists });
+            changed = true;
+        }
+
+        if (changed) { RaiseEntriesChanged(); }
+
+        return true;
+    }
+
+    private async Task UpgradeAsync(string fileName, int position, Guid batchId, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Reserve before any file checks so concurrent Remove/RestoreFromBackup/DeleteEntryWithBackup
+        // calls observe an in-flight operation and cannot race the precheck → Task.Run window.
+        using var reservation = ReserveFileOperation(fileName, nameof(UpgradeAsync));
+
+        var entry = LookupEntryOrThrow(fileName, nameof(UpgradeAsync));
+
+        if (entry.Status is not (DatabaseStatus.UpgradeRequired or DatabaseStatus.UpgradeFailed))
+        {
+            throw new InvalidOperationException($"Cannot upgrade entry in status '{entry.Status}'");
+        }
+
+        if (entry.BackupExists)
+        {
+            throw new InvalidOperationException("Recovery required — backup exists");
+        }
+
+        var backupPath = entry.FullPath + UpgradeBackupSuffix;
+
+        // TOCTOU re-check immediately before backup; the explicit check distinguishes the
+        // "backup already on disk" case from a generic IO failure later in File.Copy.
+        if (File.Exists(backupPath))
+        {
+            // Surface the disk truth on the entry so the recovery host can prompt without waiting
+            // for the next classification pass.
+            UpdateEntryStatusAndBackup(fileName, entry.Status, backupExists: true);
+
+            throw new InvalidOperationException("Recovery required — .upgrade.bak already present");
+        }
+
+        await Task.Run(
+            () =>
+            {
+                var backupCreated = false;
+                var migrationStarted = false;
+                var migrationCompleted = false;
+
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    WalCheckpoint(entry.FullPath);
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    SafeRaise(
+                        UpgradeBatchProgress,
+                        new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.BackingUp),
+                        nameof(UpgradeBatchProgress));
+
+                    try
+                    {
+                        File.Copy(entry.FullPath, backupPath, overwrite: false);
+                    }
+                    catch (IOException ex) when (File.Exists(backupPath))
+                    {
+                        // TOCTOU: backup file appeared between the precheck above and File.Copy.
+                        // Surface as recovery-required for consistency with the explicit precheck
+                        // rather than letting the raw IOException leak. Reflect the disk truth on
+                        // the entry so the recovery host can prompt immediately.
+                        UpdateEntryStatusAndBackup(fileName, entry.Status, backupExists: true);
+
+                        throw new InvalidOperationException(
+                            "Recovery required — .upgrade.bak appeared during backup",
+                            ex);
+                    }
+
+                    backupCreated = true;
+
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    SafeRaise(
+                        UpgradeBatchProgress,
+                        new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.MigratingSchema),
+                        nameof(UpgradeBatchProgress));
+
+                    migrationStarted = true;
+
+                    using (var context = new EventProviderDbContext(
+                        entry.FullPath,
+                        readOnly: false,
+                        ensureCreated: false,
+                        _traceLogger))
+                    {
+                        context.PerformUpgradeIfNeeded();
+                    }
+
+                    migrationCompleted = true;
+                    SqliteConnection.ClearAllPools();
+
+                    // Late-cancellation cutoff: once migration completes (destructive work done),
+                    // do NOT honor cancellation for THIS entry — finish verify+cleanup so the
+                    // successful schema rewrite is not wasted on a rollback. Remaining entries in
+                    // the batch will still observe cancellation in ProcessBatchAsync.
+                    SafeRaise(
+                        UpgradeBatchProgress,
+                        new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.Verifying),
+                        nameof(UpgradeBatchProgress));
+
+                    if (!VerifyEntryReady(entry.FullPath))
+                    {
+                        throw new InvalidOperationException("Upgrade verification failed");
+                    }
+
+                    if (!TryDeleteFile(backupPath, nameof(UpgradeAsync)))
+                    {
+                        // Backup deletion failed but data is upgraded; leave .bak on disk so the
+                        // user can manually recover, and surface so the recovery host can prompt.
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, backupExists: true);
+                        throw new UpgradeCleanupFailedException(
+                            "Upgrade succeeded but backup cleanup failed; .upgrade.bak remains on disk");
+                    }
+
+                    UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, backupExists: false);
+                }
+                catch (UpgradeCleanupFailedException)
+                {
+                    // Entry is already in the correct state (Ready + BackupExists=true). Skip the
+                    // generic catch (Exception) below that would treat this as a post-migration
+                    // failure and roll back the successful upgrade by restoring from .upgrade.bak.
+                    throw;
+                }
+                catch (OperationCanceledException)
+                {
+                    if (!backupCreated || migrationCompleted) { throw; }
+
+                    if (RestoreFilesCore(entry))
+                    {
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeRequired, backupExists: false);
+                    }
+                    else
+                    {
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                        throw new UpgradeRollbackFailedException(
+                            $"Cancellation rollback failed for '{fileName}'; .upgrade.bak remains on disk");
+                    }
+
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    if (migrationStarted && !migrationCompleted)
+                    {
+                        if (!RestoreFilesCore(entry))
+                        {
+                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                            throw new UpgradeRollbackFailedException(
+                                $"Migration failed and rollback also failed for '{fileName}': {(ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message)}");
+                        }
+
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: false);
+                    }
+                    else if (migrationCompleted)
+                    {
+                        // Verify or post-migration cleanup failed; main file IS in a different
+                        // shape than the backup represents, so rollback puts the disk back in a
+                        // pre-upgrade state.
+                        if (!RestoreFilesCore(entry))
+                        {
+                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                            throw new UpgradeRollbackFailedException(
+                                $"Verification or cleanup failed and rollback also failed for '{fileName}'");
+                        }
+
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: false);
+                    }
+                    else if (backupCreated)
+                    {
+                        // Failure happened before migration touched main; backup is the only
+                        // residue. Best-effort delete leaves status untouched so the entry
+                        // remains retry-able as UpgradeRequired.
+                        TryDeleteFile(backupPath, nameof(UpgradeAsync));
+                    }
+
+                    throw;
+                }
+            },
+            cancellationToken).ConfigureAwait(false);
+    }
+
+    private bool VerifyEntryReady(string fullPath)
+    {
+        try
+        {
+            using var context = new EventProviderDbContext(
+                fullPath,
+                readOnly: true,
+                ensureCreated: false,
+                _traceLogger);
+
+            return context.IsUpgradeNeeded().CurrentVersion == ProviderDatabaseSchemaVersion.Current;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(VerifyEntryReady)}: '{fullPath}' verification threw: {ex}"));
+
+            return false;
+        }
+    }
+
+    private struct FileOperationReservation : IDisposable
+    {
+        private readonly DatabaseService _service;
+        private readonly string _fileName;
+        private bool _disposed;
+
+        internal FileOperationReservation(DatabaseService service, string fileName)
+        {
+            _service = service;
+            _fileName = fileName;
+            _disposed = false;
+        }
+
+        public void Dispose()
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            _service.ReleaseFileOperation(_fileName);
+        }
+    }
+
+    private sealed class UpgradeCleanupFailedException(string message) : Exception(message);
+
+    private sealed class UpgradeRollbackFailedException(string message) : Exception(message);
+
+    private sealed record UpgradeBatch(
+        Guid Id,
+        UpgradeProgressScope Scope,
+        IReadOnlyList<DatabaseEntry> Entries,
+        TaskCompletionSource<UpgradeBatchResult> Tcs,
+        CancellationTokenSource BatchCts,
+        IReadOnlyList<UpgradeFailure> AlreadyRejected);
 }

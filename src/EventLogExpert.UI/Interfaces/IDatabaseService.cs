@@ -5,9 +5,35 @@ using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Interfaces;
 
-public interface IDatabaseService
+public interface IDatabaseService : IAsyncDisposable
 {
     event EventHandler? EntriesChanged;
+
+    /// <summary>
+    ///     Raised once per batch after every entry has either succeeded, been cancelled, or failed.
+    ///     The companion <see cref="UpgradeBatchResult" /> in the args carries the per-entry outcome
+    ///     plus any entries that were rejected up-front (e.g., recovery-required) and never enqueued
+    ///     for actual upgrade work.
+    /// </summary>
+    event EventHandler<UpgradeBatchCompletedEventArgs>? UpgradeBatchCompleted;
+
+    /// <summary>
+    ///     Raised at each phase transition for the entry currently being upgraded
+    ///     (<see cref="UpgradePhase.BackingUp" /> → <see cref="UpgradePhase.MigratingSchema" /> →
+    ///     <see cref="UpgradePhase.Verifying" />). Every invocation carries the batch identifier from
+    ///     the matching <see cref="UpgradeBatchStarted" />.
+    /// </summary>
+    event EventHandler<UpgradeBatchProgressEventArgs>? UpgradeBatchProgress;
+
+    /// <summary>
+    ///     Raised when the consumer task starts processing a queued upgrade batch (after any
+    ///     short-circuited / fully-rejected batches have already returned). Subscribers receive the
+    ///     batch identifier (used to correlate with later progress and completion events) and a
+    ///     <see cref="UpgradeBatchStartedEventArgs.Cancel" /> hook to request cancellation. Always
+    ///     followed by either <see cref="UpgradeBatchProgress" /> + <see cref="UpgradeBatchCompleted" />
+    ///     or just <see cref="UpgradeBatchCompleted" /> if every entry fails immediately.
+    /// </summary>
+    event EventHandler<UpgradeBatchStartedEventArgs>? UpgradeBatchStarted;
 
     IReadOnlyList<DatabaseEntry> Entries { get; }
 
@@ -19,6 +45,13 @@ public interface IDatabaseService
     ///     a faulted task here would poison every subsequent open for the rest of app lifetime.
     /// </summary>
     Task InitialClassificationTask { get; }
+
+    /// <summary>
+    ///     Snapshot count of upgrade batches accepted by <see cref="UpgradeBatchAsync" /> that are
+    ///     waiting in the queue and have not yet started processing. Excludes the batch (if any)
+    ///     currently being processed by the consumer task. Updated atomically on enqueue/dequeue.
+    /// </summary>
+    int QueuedBatchCount { get; }
 
     /// <summary>
     ///     Inspects each <see cref="DatabaseEntry" /> on disk (in read-only mode without auto-creating a schema) and
@@ -58,4 +91,23 @@ public interface IDatabaseService
     Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default);
 
     void Toggle(string fileName);
+
+    /// <summary>
+    ///     Enqueues an upgrade batch for the named entries and returns a task that completes when
+    ///     the batch has been processed. Batches are processed sequentially in FIFO order by a single
+    ///     consumer task; callers may safely invoke this concurrently from multiple threads. Entries
+    ///     are filtered up-front: those whose status is not
+    ///     <see cref="DatabaseStatus.UpgradeRequired" /> or <see cref="DatabaseStatus.UpgradeFailed" />,
+    ///     or whose <see cref="DatabaseEntry.BackupExists" /> is true (recovery required), or that are
+    ///     unknown to the service, are returned in the result's
+    ///     <see cref="UpgradeBatchResult.Failed" /> list with a descriptive reason and never reach the
+    ///     consumer. If every entry is filtered out, the call returns immediately without raising any
+    ///     events. Cancelling <paramref name="cancellationToken" /> after the batch has been enqueued
+    ///     causes the in-flight entry to roll back from its <c>.upgrade.bak</c> backup; previously
+    ///     completed entries in the same batch keep their upgraded state.
+    /// </summary>
+    Task<UpgradeBatchResult> UpgradeBatchAsync(
+        IReadOnlyList<string> fileNames,
+        UpgradeProgressScope scope,
+        CancellationToken cancellationToken = default);
 }
