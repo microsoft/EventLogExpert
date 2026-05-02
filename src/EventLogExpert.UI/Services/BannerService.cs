@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using System.Collections.Immutable;
@@ -9,15 +10,36 @@ namespace EventLogExpert.UI.Services;
 
 public sealed class BannerService : IBannerService
 {
+    private readonly IDatabaseService _databaseService;
     private readonly Lock _stateLock = new();
+    private readonly ITraceLogger _traceLogger;
 
+    private BannerProgressEntry? _backgroundProgress;
     private Exception? _currentCritical;
     private ImmutableList<ErrorBannerEntry> _errorBanners = ImmutableList<ErrorBannerEntry>.Empty;
     private ImmutableList<BannerInfoEntry> _infoBanners = ImmutableList<BannerInfoEntry>.Empty;
     private Func<Task>? _recoveryCallback;
     private object? _recoveryToken;
+    private BannerProgressEntry? _settingsProgress;
+
+    public BannerService(IDatabaseService databaseService, ITraceLogger traceLogger)
+    {
+        ArgumentNullException.ThrowIfNull(databaseService);
+        ArgumentNullException.ThrowIfNull(traceLogger);
+
+        _databaseService = databaseService;
+        _traceLogger = traceLogger;
+        _databaseService.UpgradeBatchStarted += OnUpgradeBatchStarted;
+        _databaseService.UpgradeBatchProgress += OnUpgradeBatchProgress;
+        _databaseService.UpgradeBatchCompleted += OnUpgradeBatchCompleted;
+    }
 
     public event Action? StateChanged;
+
+    public BannerProgressEntry? BackgroundProgress
+    {
+        get { lock (_stateLock) { return _backgroundProgress; } }
+    }
 
     public Exception? CurrentCritical
     {
@@ -32,6 +54,11 @@ public sealed class BannerService : IBannerService
     public IReadOnlyList<BannerInfoEntry> InfoBanners
     {
         get { lock (_stateLock) { return _infoBanners; } }
+    }
+
+    public BannerProgressEntry? SettingsProgress
+    {
+        get { lock (_stateLock) { return _settingsProgress; } }
     }
 
     public void ClearCritical()
@@ -177,7 +204,131 @@ public sealed class BannerService : IBannerService
         }
     }
 
-    private void RaiseStateChanged() => StateChanged?.Invoke();
+    private static void SafeLog(Action log)
+    {
+        try { log(); }
+        catch { /* Ignore */ }
+    }
+
+    private void AssignProgressSlot(UpgradeProgressScope scope, BannerProgressEntry entry)
+    {
+        switch (scope)
+        {
+            case UpgradeProgressScope.Background:
+                _backgroundProgress = entry;
+                break;
+            case UpgradeProgressScope.SettingsTriggered:
+                _settingsProgress = entry;
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown upgrade progress scope.");
+        }
+    }
+
+    private void OnUpgradeBatchCompleted(object? sender, UpgradeBatchCompletedEventArgs args)
+    {
+        bool cleared = false;
+
+        lock (_stateLock)
+        {
+            if (_backgroundProgress is not null && _backgroundProgress.BatchId == args.BatchId)
+            {
+                _backgroundProgress = null;
+                cleared = true;
+            }
+            else if (_settingsProgress is not null && _settingsProgress.BatchId == args.BatchId)
+            {
+                _settingsProgress = null;
+                cleared = true;
+            }
+        }
+
+        if (cleared)
+        {
+            RaiseStateChanged();
+        }
+    }
+
+    private void OnUpgradeBatchProgress(object? sender, UpgradeBatchProgressEventArgs args)
+    {
+        BannerProgressEntry? next = null;
+
+        lock (_stateLock)
+        {
+            BannerProgressEntry? backgroundSlot = _backgroundProgress;
+            BannerProgressEntry? settingsSlot = _settingsProgress;
+
+            if (backgroundSlot is not null && backgroundSlot.BatchId == args.BatchId)
+            {
+                next = backgroundSlot with
+                {
+                    CurrentBatchPosition = args.Position,
+                    CurrentEntryName = args.FileName,
+                    CurrentPhase = args.Phase,
+                    QueuedBatchesAfter = _databaseService.QueuedBatchCount
+                };
+                _backgroundProgress = next;
+            }
+            else if (settingsSlot is not null && settingsSlot.BatchId == args.BatchId)
+            {
+                next = settingsSlot with
+                {
+                    CurrentBatchPosition = args.Position,
+                    CurrentEntryName = args.FileName,
+                    CurrentPhase = args.Phase,
+                    QueuedBatchesAfter = _databaseService.QueuedBatchCount
+                };
+                _settingsProgress = next;
+            }
+        }
+
+        if (next is not null)
+        {
+            RaiseStateChanged();
+        }
+    }
+
+    private void OnUpgradeBatchStarted(object? sender, UpgradeBatchStartedEventArgs args)
+    {
+        var entry = new BannerProgressEntry(
+            args.BatchId,
+            args.Scope,
+            CurrentBatchPosition: 0,
+            CurrentBatchSize: args.BatchSize,
+            CurrentEntryName: string.Empty,
+            CurrentPhase: UpgradePhase.BackingUp,
+            QueuedBatchesAfter: _databaseService.QueuedBatchCount,
+            Cancel: args.Cancel);
+
+        lock (_stateLock)
+        {
+            AssignProgressSlot(args.Scope, entry);
+        }
+
+        RaiseStateChanged();
+    }
+
+    private void RaiseStateChanged()
+    {
+        var handler = StateChanged;
+
+        if (handler is null) { return; }
+
+        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
+        // a direct multicast Invoke aborts the chain on first exception.
+        foreach (var subscriber in handler.GetInvocationList())
+        {
+            try
+            {
+                ((Action)subscriber).Invoke();
+            }
+            catch (Exception ex)
+            {
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(BannerService)}.{nameof(StateChanged)}: subscriber threw: {ex}"));
+            }
+        }
+    }
 
     private void UnregisterRecoveryIfActive(object token)
     {

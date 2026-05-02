@@ -120,6 +120,14 @@ public static class MauiProgram
                 });
         });
 
-        return builder.Build();
+        var mauiApp = builder.Build();
+
+        // Eagerly resolve BannerService so it subscribes to DatabaseService upgrade events before any
+        // user-driven action (importing a database, opening Settings) can call UpgradeBatchAsync. Without
+        // this, BannerService would not be constructed until BannerHost first renders, and any UpgradeBatch*
+        // events raised before that point would be missed.
+        mauiApp.Services.GetRequiredService<IBannerService>();
+
+        return mauiApp;
     }
 }
