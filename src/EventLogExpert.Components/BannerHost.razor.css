@@ -17,6 +17,7 @@
 .banner-error,
 .banner-critical {
     background-color: var(--clr-red);
+    color: var(--clr-on-status-fill);
 }
 
 .banner-critical {
@@ -25,7 +26,7 @@
 
 .banner-warning {
     background-color: var(--clr-yellow);
-    color: var(--clr-on-light-highlight);
+    color: var(--clr-on-status-fill);
 }
 
 .banner-info {
@@ -35,7 +36,7 @@
 
 .banner-attention {
     background-color: var(--clr-yellow);
-    color: var(--clr-on-light-highlight);
+    color: var(--clr-on-status-fill);
 }
 
 .banner-upgrade-progress {

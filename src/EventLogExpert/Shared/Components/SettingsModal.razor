@@ -38,6 +38,14 @@
                     </button>
                 </div>
 
+                @if (IsClassificationPending)
+                {
+                    <div class="classification-pending" role="status">
+                        <i aria-hidden="true" class="bi bi-arrow-repeat banner-spinner"></i>
+                        <span>Classifying databases&hellip;</span>
+                    </div>
+                }
+
                 <div class="flex-column-scroll">
                     @if (DatabaseService.Entries.Count > 0)
                     {
@@ -46,6 +54,11 @@
                             <div class="flex-space-between">
                                 <div>
                                     <text>@entry.FileName</text>
+
+                                    @if (entry.Status != DatabaseStatus.Ready)
+                                    {
+                                        <span class="entry-status-badge" data-status="@entry.Status">@DatabaseStatusLabels.GetDisplayLabel(entry.Status)</span>
+                                    }
 
                                     @if (!entry.IsEnabled || entry.Status != DatabaseStatus.Ready)
                                     {
@@ -56,7 +69,7 @@
                                         </button>
                                     }
                                 </div>
-                                <BooleanSelect AriaLabel="@entry.FileName" Value="GetEffectiveEnabled(entry)" ValueChanged="() => ToggleDatabase(entry.FileName)" />
+                                <BooleanSelect AriaLabel="@entry.FileName" Disabled="@IsClassificationPending" Value="GetEffectiveEnabled(entry)" ValueChanged="() => ToggleDatabase(entry.FileName)" />
                             </div>
                         }
                     }

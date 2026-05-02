@@ -9,3 +9,52 @@
 .tz-row { margin-bottom: .5rem; }
 
 .fixed-width { width: 50px; }
+
+.classification-pending {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    padding: .25rem .5rem;
+
+    color: var(--clr-lightblue);
+    font-style: italic;
+}
+
+.classification-pending i {
+    flex: 0 0 auto;
+    animation: classification-spin 1.5s linear infinite;
+}
+
+@keyframes classification-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.entry-status-badge {
+    display: inline-block;
+    margin-left: .5rem;
+    padding: .1rem .4rem;
+
+    font-size: .85em;
+    background-color: var(--background-darkgray);
+    color: var(--clr-lightblue);
+    border-radius: .25rem;
+    vertical-align: middle;
+}
+
+.entry-status-badge[data-status="UpgradeRequired"] {
+    background-color: var(--clr-yellow);
+    color: var(--clr-on-status-fill);
+}
+
+.entry-status-badge[data-status="UpgradeFailed"],
+.entry-status-badge[data-status="UnrecognizedSchema"],
+.entry-status-badge[data-status="ObsoleteSchema"],
+.entry-status-badge[data-status="ClassificationFailed"] {
+    background-color: var(--clr-red);
+    color: var(--clr-on-status-fill);
+}
+
+.entry-status-badge[data-status="NotClassified"] {
+    font-style: italic;
+}
