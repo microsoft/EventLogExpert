@@ -22,13 +22,13 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     private readonly Task _consumerTask;
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly FileLocationOptions _fileLocationOptions;
-
     private readonly HashSet<string> _filesInOperation = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _mutationLock = new();
     private readonly IPreferencesProvider _preferences;
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
+    
     private int _disposed;
     private ImmutableList<DatabaseEntry> _entries = [];
     private int _queuedBatchCount;
@@ -87,7 +87,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         var statuses = await Task.Run(
             () =>
             {
-                var perFile = new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase);
+                var perFile =
+                    new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase);
 
                 foreach (var entry in snapshot)
                 {
@@ -103,6 +104,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                         if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
                         {
                             perFile[entry.FileName] = (DatabaseStatus.UnrecognizedSchema, false);
+
                             continue;
                         }
 
@@ -230,15 +232,76 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         _disposeCts.Dispose();
     }
 
+    public async Task<IReadOnlyList<string>> EnumerateZipDbEntryNamesAsync(
+        string sourceZipPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sourceZipPath);
+
+        ZipArchive archive;
+
+        try
+        {
+            archive = await ZipFile.OpenReadAsync(sourceZipPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(EnumerateZipDbEntryNamesAsync)} failed to open '{sourceZipPath}': {ex}");
+
+            return [];
+        }
+
+        await using (archive)
+        {
+            var names = new List<string>();
+
+            foreach (var entry in archive.Entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrEmpty(entry.Name)) { continue; }
+
+                if (!Path.GetExtension(entry.Name).Equals(".db", StringComparison.OrdinalIgnoreCase)) { continue; }
+
+                names.Add(entry.Name);
+            }
+
+            return names;
+        }
+    }
+
     public async Task<ImportResult> ImportAsync(
         IEnumerable<string> sourceFilePaths,
+        CancellationToken cancellationToken = default) =>
+        await ImportAsync(sourceFilePaths, ImmutableHashSet<string>.Empty, cancellationToken)
+            .ConfigureAwait(false);
+
+    public async Task<ImportResult> ImportAsync(
+        IEnumerable<string> sourceFilePaths,
+        IReadOnlySet<string> skipFileNames,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(sourceFilePaths);
+        ArgumentNullException.ThrowIfNull(skipFileNames);
+
+        // Enforce the documented case-insensitive skip semantics regardless of the comparer the
+        // caller chose for their set (defaults to case-sensitive Ordinal otherwise).
+        var skipSet = skipFileNames as HashSet<string> is { Comparer: var comparer } &&
+            comparer.Equals(StringComparer.OrdinalIgnoreCase)
+                ? skipFileNames
+                : skipFileNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         var importedCount = 0;
         var failures = new List<ImportFailure>();
+        var importedNames = new List<string>();
+        var freshlyImportedNames = new List<string>();
+
         Directory.CreateDirectory(_fileLocationOptions.DatabasePath);
+
+        var existingFileNames = _entries
+            .Select(entry => entry.FileName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         foreach (var sourceFilePath in sourceFilePaths)
         {
@@ -252,19 +315,40 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
             if (Path.GetExtension(fileName).Equals(".zip", StringComparison.OrdinalIgnoreCase))
             {
-                var (zipImported, zipFailures) = await ImportZipAsync(sourceFilePath, fileName, cancellationToken)
+                var (zipImported, zipFailures, zipImportedNames) = await ImportZipAsync(
+                        sourceFilePath,
+                        fileName,
+                        skipSet,
+                        cancellationToken)
                     .ConfigureAwait(false);
 
                 importedCount += zipImported;
                 failures.AddRange(zipFailures);
+
+                foreach (var name in zipImportedNames)
+                {
+                    importedNames.Add(name);
+
+                    if (!existingFileNames.Contains(name)) { freshlyImportedNames.Add(name); }
+                }
             }
             else
             {
+                if (skipSet.Contains(fileName)) { continue; }
+
                 try
                 {
                     var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, fileName);
-                    File.Copy(sourceFilePath, destinationPath, true);
+
+                    using (ReserveFileOperation(fileName, nameof(ImportAsync)))
+                    {
+                        File.Copy(sourceFilePath, destinationPath, true);
+                    }
+
                     importedCount++;
+                    importedNames.Add(fileName);
+
+                    if (!existingFileNames.Contains(fileName)) { freshlyImportedNames.Add(fileName); }
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -278,13 +362,34 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (importedCount <= 0)
         {
-            return new ImportResult(importedCount, failures);
+            return new ImportResult(importedCount, failures, []);
+        }
+
+        // Persist freshly-imported names as disabled BEFORE Refresh so the next snapshot is correct
+        // first time and consumers don't observe a transient enabled→disabled flicker.
+        if (freshlyImportedNames.Count > 0)
+        {
+            lock (_mutationLock)
+            {
+                var disabledSet = _preferences.DisabledDatabasesPreference
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var added = false;
+
+                foreach (var name in freshlyImportedNames)
+                {
+                    if (disabledSet.Add(name)) { added = true; }
+                }
+
+                if (added)
+                {
+                    _preferences.DisabledDatabasesPreference = disabledSet.ToList();
+                }
+            }
         }
 
         Refresh();
 
-        // Classify so freshly-imported V3 databases surface in settings as UpgradeRequired
-        // (with the "restart required to upgrade" UX) rather than appearing as Ready.
         try
         {
             await ClassifyEntriesAsync(cancellationToken).ConfigureAwait(false);
@@ -295,7 +400,31 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 $"{nameof(DatabaseService)}.{nameof(ImportAsync)} post-import classification failed: {ex}");
         }
 
-        return new ImportResult(importedCount, failures);
+        IReadOnlyList<ImportFailure> upgradeFailures = [];
+
+        var importedSet = importedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var upgradeNeeded = _entries
+            .Where(entry => importedSet.Contains(entry.FileName) && entry.Status == DatabaseStatus.UpgradeRequired)
+            .Select(entry => entry.FileName)
+            .ToList();
+
+        if (upgradeNeeded.Count <= 0)
+        {
+            return new ImportResult(importedCount, failures, upgradeFailures);
+        }
+
+        var batchResult = await UpgradeBatchAsync(
+                upgradeNeeded,
+                UpgradeProgressScope.Background,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        upgradeFailures = batchResult.Failed
+            .Select(failure => new ImportFailure(failure.FileName, failure.Message))
+            .ToList();
+
+        return new ImportResult(importedCount, failures, upgradeFailures);
     }
 
     public void MarkStatus(string fileName, DatabaseStatus status)
@@ -441,10 +570,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (cancellationToken.IsCancellationRequested)
         {
-            return new UpgradeBatchResult(
-                Succeeded: [],
-                Cancelled: dedupedNames,
-                Failed: []);
+            return new UpgradeBatchResult([], dedupedNames, []);
         }
 
         // Awaited explicitly so callers that race the ctor get a meaningful classification before
@@ -484,6 +610,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     rejected.Add(new UpgradeFailure(
                         fileName,
                         "Recovery required — resolve via Settings or recovery prompt first"));
+
                     continue;
                 }
 
@@ -492,6 +619,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     rejected.Add(new UpgradeFailure(
                         fileName,
                         $"Cannot upgrade entry in status '{entry.Status}'"));
+
                     continue;
                 }
 
@@ -501,7 +629,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (acceptable.Count == 0)
         {
-            return new UpgradeBatchResult(Succeeded: [], Cancelled: [], Failed: rejected);
+            return new UpgradeBatchResult([], [], rejected);
         }
 
         var batchCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _disposeCts.Token);
@@ -518,20 +646,17 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         Interlocked.Increment(ref _queuedBatchCount);
 
-        if (!_upgradeQueue.Writer.TryWrite(batch))
+        if (_upgradeQueue.Writer.TryWrite(batch))
         {
-            // Channel already completed (disposal raced this enqueue). Surface the work as cancelled
-            // and roll back the counter increment so QueuedBatchCount reflects reality.
-            Interlocked.Decrement(ref _queuedBatchCount);
-            batchCts.Dispose();
-
-            return new UpgradeBatchResult(
-                Succeeded: [],
-                Cancelled: acceptable.Select(entry => entry.FileName).ToArray(),
-                Failed: rejected);
+            return await tcs.Task.ConfigureAwait(false);
         }
 
-        return await tcs.Task.ConfigureAwait(false);
+        // Channel already completed (disposal raced this enqueue). Surface the work as cancelled
+        // and roll back the counter increment so QueuedBatchCount reflects reality.
+        Interlocked.Decrement(ref _queuedBatchCount);
+        batchCts.Dispose();
+
+        return new UpgradeBatchResult([], acceptable.Select(entry => entry.FileName).ToArray(), rejected);
     }
 
     private static IReadOnlyList<string> DedupePreservingOrder(IReadOnlyList<string> source)
@@ -724,13 +849,16 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
     }
 
-    private async Task<(int Imported, IReadOnlyList<ImportFailure> Failures)> ImportZipAsync(
-        string sourceZipPath,
-        string zipFileName,
-        CancellationToken cancellationToken)
+    private async Task<(int Imported, IReadOnlyList<ImportFailure> Failures, IReadOnlyList<string> ImportedNames)>
+        ImportZipAsync(
+            string sourceZipPath,
+            string zipFileName,
+            IReadOnlySet<string> skipFileNames,
+            CancellationToken cancellationToken)
     {
         var imported = 0;
         var failures = new List<ImportFailure>();
+        var importedNames = new List<string>();
 
         ZipArchive archive;
 
@@ -738,14 +866,14 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             archive = await ZipFile.OpenReadAsync(sourceZipPath, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             failures.Add(new ImportFailure(zipFileName, $"Could not open archive: {ex.Message}"));
 
             _traceLogger.Warn(
                 $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to open '{zipFileName}': {ex}");
 
-            return (imported, failures);
+            return (imported, failures, importedNames);
         }
 
         await using (archive)
@@ -758,19 +886,25 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                 if (!Path.GetExtension(entry.Name).Equals(".db", StringComparison.OrdinalIgnoreCase)) { continue; }
 
+                if (skipFileNames.Contains(entry.Name)) { continue; }
+
                 var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, entry.Name);
 
                 try
                 {
-                    await using (var entryStream = await entry.OpenAsync(cancellationToken))
+                    using (ReserveFileOperation(entry.Name, nameof(ImportZipAsync)))
                     {
-                        await using (var fileStream = File.Create(destinationPath))
+                        await using (var entryStream = await entry.OpenAsync(cancellationToken))
                         {
-                            await entryStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                            await using (var fileStream = File.Create(destinationPath))
+                            {
+                                await entryStream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                            }
                         }
                     }
 
                     imported++;
+                    importedNames.Add(entry.Name);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
@@ -795,7 +929,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
         }
 
-        return (imported, failures);
+        return (imported, failures, importedNames);
     }
 
     private DatabaseEntry LookupEntryOrThrow(string fileName, string callerName)
@@ -951,6 +1085,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             SafeLog(() => _traceLogger.Warn(
                 $"{nameof(DatabaseService)}.{nameof(ProcessBatchAsync)}: unhandled batch error: {ex}"));
+
             batch.Tcs.TrySetException(ex);
         }
         finally
@@ -1086,7 +1221,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            SafeLog(() => _traceLogger.Warn($"{nameof(DatabaseService)}.{callerName}: delete failed for '{path}': {ex}"));
+            SafeLog(() =>
+                _traceLogger.Warn($"{nameof(DatabaseService)}.{callerName}: delete failed for '{path}': {ex}"));
 
             return false;
         }
@@ -1143,7 +1279,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             // Surface the disk truth on the entry so the recovery host can prompt without waiting
             // for the next classification pass.
-            UpdateEntryStatusAndBackup(fileName, entry.Status, backupExists: true);
+            UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
             throw new InvalidOperationException("Recovery required — .upgrade.bak already present");
         }
@@ -1169,7 +1305,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     try
                     {
-                        File.Copy(entry.FullPath, backupPath, overwrite: false);
+                        File.Copy(entry.FullPath, backupPath, false);
                     }
                     catch (IOException ex) when (File.Exists(backupPath))
                     {
@@ -1177,7 +1313,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                         // Surface as recovery-required for consistency with the explicit precheck
                         // rather than letting the raw IOException leak. Reflect the disk truth on
                         // the entry so the recovery host can prompt immediately.
-                        UpdateEntryStatusAndBackup(fileName, entry.Status, backupExists: true);
+                        UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
                         throw new InvalidOperationException(
                             "Recovery required — .upgrade.bak appeared during backup",
@@ -1195,11 +1331,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     migrationStarted = true;
 
-                    using (var context = new EventProviderDbContext(
-                        entry.FullPath,
-                        readOnly: false,
-                        ensureCreated: false,
-                        _traceLogger))
+                    using (var context = new EventProviderDbContext(entry.FullPath, false, false, _traceLogger))
                     {
                         context.PerformUpgradeIfNeeded();
                     }
@@ -1225,12 +1357,13 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     {
                         // Backup deletion failed but data is upgraded; leave .bak on disk so the
                         // user can manually recover, and surface so the recovery host can prompt.
-                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, backupExists: true);
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, true);
+
                         throw new UpgradeCleanupFailedException(
                             "Upgrade succeeded but backup cleanup failed; .upgrade.bak remains on disk");
                     }
 
-                    UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, backupExists: false);
+                    UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, false);
                 }
                 catch (UpgradeCleanupFailedException)
                 {
@@ -1245,11 +1378,12 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     if (RestoreFilesCore(entry))
                     {
-                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeRequired, backupExists: false);
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeRequired, false);
                     }
                     else
                     {
-                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+
                         throw new UpgradeRollbackFailedException(
                             $"Cancellation rollback failed for '{fileName}'; .upgrade.bak remains on disk");
                     }
@@ -1262,12 +1396,13 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     {
                         if (!RestoreFilesCore(entry))
                         {
-                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+
                             throw new UpgradeRollbackFailedException(
                                 $"Migration failed and rollback also failed for '{fileName}': {(ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message)}");
                         }
 
-                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: false);
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
                     }
                     else if (migrationCompleted)
                     {
@@ -1276,12 +1411,13 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                         // pre-upgrade state.
                         if (!RestoreFilesCore(entry))
                         {
-                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: true);
+                            UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+
                             throw new UpgradeRollbackFailedException(
                                 $"Verification or cleanup failed and rollback also failed for '{fileName}'");
                         }
 
-                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, backupExists: false);
+                        UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
                     }
                     else if (backupCreated)
                     {
@@ -1301,11 +1437,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         try
         {
-            using var context = new EventProviderDbContext(
-                fullPath,
-                readOnly: true,
-                ensureCreated: false,
-                _traceLogger);
+            using var context = new EventProviderDbContext(fullPath, true, false, _traceLogger);
 
             return context.IsUpgradeNeeded().CurrentVersion == ProviderDatabaseSchemaVersion.Current;
         }
