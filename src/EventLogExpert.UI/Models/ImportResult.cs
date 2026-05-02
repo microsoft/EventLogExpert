@@ -3,4 +3,7 @@
 
 namespace EventLogExpert.UI.Models;
 
-public sealed record ImportResult(int Imported, IReadOnlyList<ImportFailure> Failures);
+public sealed record ImportResult(
+    int Imported,
+    IReadOnlyList<ImportFailure> Failures,
+    IReadOnlyList<ImportFailure> UpgradeFailures);

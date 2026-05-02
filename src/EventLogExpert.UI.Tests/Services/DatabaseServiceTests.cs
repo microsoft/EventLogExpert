@@ -727,6 +727,318 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EnumerateZipDbEntryNamesAsync_MalformedZip_ShouldReturnEmpty_NotThrow()
+    {
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var malformedZip = Path.Combine(sourceDir, "malformed.zip");
+        File.WriteAllBytes(malformedZip, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
+
+        var service = CreateDatabaseService();
+
+        var names = await service.EnumerateZipDbEntryNamesAsync(
+            malformedZip,
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(names);
+    }
+
+    [Fact]
+    public async Task EnumerateZipDbEntryNamesAsync_ShouldReturnDbEntries_NotOtherFileTypes()
+    {
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var zipPath = Path.Combine(sourceDir, "import.zip");
+        CreateZipWithEntries(zipPath,
+        [
+            (Constants.TestDb1, "db1"),
+            ("readme.txt", "ignored"),
+            (Constants.TestDb2, "db2")
+        ]);
+
+        var service = CreateDatabaseService();
+
+        var names = await service.EnumerateZipDbEntryNamesAsync(zipPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, names.Count);
+        Assert.Contains(Constants.TestDb1, names);
+        Assert.Contains(Constants.TestDb2, names);
+        Assert.DoesNotContain("readme.txt", names);
+    }
+
+    [Fact]
+    public async Task ImportAsync_FreshlyImportedV3Db_ShouldAutoUpgradeToReady_AndStayDisabled()
+    {
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(sourceFile);
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(Constants.TestDb1, entry.FileName);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.False(entry.IsEnabled);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task ImportAsync_FreshlyImportedV3Db_WithStaleBackupAtDestination_ShouldPopulateUpgradeFailures()
+    {
+        var databasePath = CreateDatabaseDirectory();
+
+        // Stale .upgrade.bak at destination (no main file present yet) — simulates a recovery
+        // scenario where a backup is sitting on disk waiting for the next upgrade attempt.
+        File.WriteAllText(Path.Combine(databasePath, Constants.TestDb1 + ".upgrade.bak"), "stale-backup");
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(sourceFile);
+
+        var service = CreateDatabaseService();
+
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+
+        var failure = Assert.Single(result.UpgradeFailures);
+        Assert.Equal(Constants.TestDb1, failure.FileName);
+        Assert.Contains("Recovery required", failure.Reason, StringComparison.OrdinalIgnoreCase);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.True(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task ImportAsync_FreshlyImportedV4Db_ShouldDefaultDisabled_AndNotEnqueueUpgradeBatch()
+    {
+        CreateDatabaseDirectory();
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(sourceFile);
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+
+        var batchStartedCount = 0;
+        service.UpgradeBatchStarted += (_, _) => Interlocked.Increment(ref batchStartedCount);
+
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+        Assert.Equal(0, batchStartedCount);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(Constants.TestDb1, entry.FileName);
+        Assert.False(entry.IsEnabled);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+
+        preferences.Received().DisabledDatabasesPreference =
+            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReimportedDb_NotOnSkipList_ShouldOverwriteAndPreserveEnabledState()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var existingPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(existingPath);
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+        Assert.True(service.Entries[0].IsEnabled);
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+
+        const string overwriteContent = "fresh-overwrite-content";
+        File.WriteAllText(sourceFile, overwriteContent);
+
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(overwriteContent, File.ReadAllText(existingPath));
+
+        var entry = Assert.Single(service.Entries);
+        Assert.True(entry.IsEnabled);
+
+        preferences.DidNotReceive().DisabledDatabasesPreference =
+            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReimportedDb_OnSkipList_ShouldPreserveExistingFileAndEnabledState()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var existingPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(existingPath);
+        var existingLength = new FileInfo(existingPath).Length;
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+        Assert.True(service.Entries[0].IsEnabled);
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        File.WriteAllText(sourceFile, "would-overwrite-if-not-skipped");
+
+        var skipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Constants.TestDb1 };
+
+        var result = await service.ImportAsync([sourceFile], skipNames, TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(existingLength, new FileInfo(existingPath).Length);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.True(entry.IsEnabled);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+
+        preferences.DidNotReceive().DisabledDatabasesPreference =
+            Arg.Is<List<string>>(disabled => disabled.Contains(Constants.TestDb1, StringComparer.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ImportAsync_ReimportedV3DbOverV4_ShouldAutoUpgradeAndPreservePriorEnabledState()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var existingPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(existingPath);
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+        Assert.True(service.Entries[0].IsEnabled);
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(sourceFile);
+
+        var result = await service.ImportAsync([sourceFile], TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.True(entry.IsEnabled);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+    }
+
+    [Fact]
+    public async Task ImportAsync_SkipFileNamesProvidedAsCaseSensitiveSet_ShouldStillSkipCaseInsensitively()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var existingPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(existingPath);
+        var existingLength = new FileInfo(existingPath).Length;
+
+        var preferences = Substitute.For<IPreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+
+        var service = CreateDatabaseService(preferences);
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
+        File.WriteAllText(sourceFile, "would-overwrite-if-comparer-mismatched");
+
+        // Caller uses an explicitly case-sensitive set with the upper-cased name. Service should
+        // honor its documented case-insensitive skip contract and not overwrite the existing file.
+        var caseSensitiveSkip = new HashSet<string>(StringComparer.Ordinal)
+        {
+            Constants.TestDb1.ToUpperInvariant()
+        };
+
+        var result = await service.ImportAsync(
+            [sourceFile],
+            caseSensitiveSkip,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(0, result.Imported);
+        Assert.Empty(result.Failures);
+        Assert.Empty(result.UpgradeFailures);
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(existingLength, new FileInfo(existingPath).Length);
+    }
+
+    [Fact]
+    public async Task ImportAsync_SkipNamesIncludesZipEntry_ShouldNotExtractThatEntry_OthersExtracted()
+    {
+        var databasePath = CreateDatabaseDirectory();
+
+        // Pre-create the entry that we'll ask the import to skip.
+        var preExistingPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(preExistingPath);
+        var preExistingLength = new FileInfo(preExistingPath).Length;
+
+        var sourceDir = Path.Combine(_testDirectory, "source");
+        Directory.CreateDirectory(sourceDir);
+        var zipPath = Path.Combine(sourceDir, "import.zip");
+        CreateZipWithEntries(zipPath,
+        [
+            (Constants.TestDb1, "would-overwrite-if-not-skipped"),
+            (Constants.TestDb2, "fresh content")
+        ]);
+
+        var service = CreateDatabaseService();
+
+        var skipNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { Constants.TestDb1 };
+
+        var result = await service.ImportAsync([zipPath], skipNames, TestContext.Current.CancellationToken);
+
+        Assert.Equal(1, result.Imported);
+        Assert.Empty(result.Failures);
+
+        SqliteConnection.ClearAllPools();
+        Assert.Equal(preExistingLength, new FileInfo(preExistingPath).Length);
+        Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb2)));
+        Assert.Equal(2, service.Entries.Count);
+    }
+
+    [Fact]
     public async Task ImportAsync_WhenDbFilesProvided_ShouldCopyAndRefresh()
     {
         // Arrange
