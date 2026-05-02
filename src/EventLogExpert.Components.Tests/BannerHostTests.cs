@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,7 @@ public sealed class BannerHostTests : BunitContext
         Substitute.For<IApplicationRestartService>();
     private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
     private readonly IClipboardService _clipboardService = Substitute.For<IClipboardService>();
+    private readonly IMenuActionService _menuActionService = Substitute.For<IMenuActionService>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     public BannerHostTests()
@@ -23,13 +25,177 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.CurrentCritical.Returns((Exception?)null);
         _bannerService.ErrorBanners.Returns([]);
         _bannerService.InfoBanners.Returns([]);
+        _bannerService.AttentionEntries.Returns([]);
+        _bannerService.AttentionDismissed.Returns(false);
+        _bannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
 
         Services.AddSingleton(_bannerService);
         Services.AddSingleton(_applicationRestartService);
         Services.AddSingleton(_clipboardService);
+        Services.AddSingleton(_menuActionService);
         Services.AddSingleton(_traceLogger);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
+    }
+
+    [Fact]
+    public async Task BannerHost_AttentionDismissClicked_CallsDismissAttention()
+    {
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-attention button.banner-dismiss").ClickAsync(new());
+
+        _bannerService.Received(1).DismissAttention();
+    }
+
+    [Fact]
+    public void BannerHost_AttentionDismissed_DoesNotRenderAttentionBanner()
+    {
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _bannerService.AttentionDismissed.Returns(true);
+
+        var component = Render<BannerHost>();
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void BannerHost_AttentionEntries_RendersAttentionBannerWithOpenSettingsAndDismiss()
+    {
+        _bannerService.AttentionEntries.Returns(
+            [BuildDatabaseEntry("a.db"), BuildDatabaseEntry("b.db")]);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-attention");
+        Assert.Contains("2 databases need attention", banner.TextContent);
+        Assert.Equal("Open Settings", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
+        Assert.Single(component.FindAll("aside.banner-attention button.banner-dismiss"));
+    }
+
+    [Fact]
+    public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
+    {
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-attention");
+        Assert.Contains("1 database need", banner.TextContent);
+        Assert.DoesNotContain("databases need", banner.TextContent);
+    }
+
+    [Fact]
+    public void BannerHost_BackgroundProgressWithEmptyEntryName_RendersPreparingMessage()
+    {
+        // Pre-first-tick rendering: BannerService creates the entry with Position=0/EntryName="" before the
+        // first per-entry progress event arrives. The "Preparing..." text avoids the misleading
+        // "Upgrading database 0 of N: " string in that gap.
+        _bannerService.BackgroundProgress.Returns(
+            new BannerProgressEntry(
+                Guid.NewGuid(),
+                UpgradeProgressScope.Background,
+                CurrentBatchPosition: 0,
+                CurrentBatchSize: 3,
+                CurrentEntryName: string.Empty,
+                CurrentPhase: UpgradePhase.BackingUp,
+                QueuedBatchesAfter: 0,
+                Cancel: () => { }));
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-upgrade-progress");
+        Assert.Contains("Preparing upgrade of 3 databases", banner.TextContent);
+        Assert.DoesNotContain("Upgrading database 0", banner.TextContent);
+    }
+
+    [Fact]
+    public void BannerHost_BackgroundProgressWithEntryName_RendersUpgradeProgressBannerWithCancelButton()
+    {
+        _bannerService.BackgroundProgress.Returns(
+            new BannerProgressEntry(
+                Guid.NewGuid(),
+                UpgradeProgressScope.Background,
+                CurrentBatchPosition: 2,
+                CurrentBatchSize: 5,
+                CurrentEntryName: "MyDb.evtx",
+                CurrentPhase: UpgradePhase.MigratingSchema,
+                QueuedBatchesAfter: 0,
+                Cancel: () => { }));
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-upgrade-progress");
+        Assert.Contains("Upgrading database 2 of 5", banner.TextContent);
+        Assert.Contains("MyDb.evtx", banner.TextContent);
+        Assert.Contains("MigratingSchema", banner.TextContent);
+        Assert.Equal("Cancel", component.Find("aside.banner-upgrade-progress button.banner-action").TextContent.Trim());
+        Assert.Single(component.FindAll("aside.banner-upgrade-progress .banner-spinner"));
+    }
+
+    [Fact]
+    public void BannerHost_BackgroundProgressWithQueuedBatches_RendersQueuedBatchesSubtitle()
+    {
+        _bannerService.BackgroundProgress.Returns(
+            new BannerProgressEntry(
+                Guid.NewGuid(),
+                UpgradeProgressScope.Background,
+                CurrentBatchPosition: 1,
+                CurrentBatchSize: 2,
+                CurrentEntryName: "x.evtx",
+                CurrentPhase: UpgradePhase.Verifying,
+                QueuedBatchesAfter: 3,
+                Cancel: () => { }));
+
+        var component = Render<BannerHost>();
+
+        var subtitle = component.Find("aside.banner-upgrade-progress .banner-subtitle");
+        Assert.Contains("+3 batches queued", subtitle.TextContent);
+    }
+
+    [Fact]
+    public async Task BannerHost_CancelUpgradeClicked_InvokesCancelDelegate()
+    {
+        int cancelInvocationCount = 0;
+        _bannerService.BackgroundProgress.Returns(
+            new BannerProgressEntry(
+                Guid.NewGuid(),
+                UpgradeProgressScope.Background,
+                CurrentBatchPosition: 1,
+                CurrentBatchSize: 1,
+                CurrentEntryName: "x.evtx",
+                CurrentPhase: UpgradePhase.MigratingSchema,
+                QueuedBatchesAfter: 0,
+                Cancel: () => cancelInvocationCount++));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new());
+
+        Assert.Equal(1, cancelInvocationCount);
+    }
+
+    [Fact]
+    public async Task BannerHost_CancelUpgradeThrows_LogsViaTraceLogger_DoesNotPropagate()
+    {
+        _bannerService.BackgroundProgress.Returns(
+            new BannerProgressEntry(
+                Guid.NewGuid(),
+                UpgradeProgressScope.Background,
+                CurrentBatchPosition: 1,
+                CurrentBatchSize: 1,
+                CurrentEntryName: "x.evtx",
+                CurrentPhase: UpgradePhase.MigratingSchema,
+                QueuedBatchesAfter: 0,
+                Cancel: () => throw new InvalidOperationException("cts disposed")));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new());
+
+        Assert.Single(component.FindAll("aside.banner-upgrade-progress"));
+        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("cts disposed")));
     }
 
     [Fact]
@@ -48,6 +214,23 @@ public sealed class BannerHostTests : BunitContext
             .CopyTextAsync(Arg.Is<string>(s => s.Contains("InvalidOperationException") && s.Contains("kaboom")));
 
         Assert.Single(component.FindAll("aside.banner-critical .banner-feedback .banner-chip"));
+    }
+
+    [Fact]
+    public void BannerHost_CriticalActive_DoesNotRenderCycleNav_EvenWithOtherSlices()
+    {
+        // Critical pre-empts the entire cycle — no Prev/Next chevrons should appear.
+        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _bannerService.ErrorBanners.Returns(
+            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+
+        Assert.Single(component.FindAll("aside.banner-critical"));
+        Assert.Empty(component.FindAll("button.banner-cycle-prev"));
+        Assert.Empty(component.FindAll("button.banner-cycle-next"));
+        Assert.Empty(component.FindAll(".banner-pagination"));
     }
 
     [Fact]
@@ -86,6 +269,111 @@ public sealed class BannerHostTests : BunitContext
         Assert.Contains("Reload", buttons[0].TextContent);
         Assert.Contains("Relaunch", buttons[1].TextContent);
         Assert.Contains("Copy details", buttons[2].TextContent);
+    }
+
+    [Fact]
+    public void BannerHost_CycleErrorAndAttention_RendersFirstErrorWithCyclePagination_TwoOfTwo()
+    {
+        var error = new ErrorBannerEntry(Guid.NewGuid(), "Err", "msg", null, null, DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([error]);
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-error");
+        var pagination = component.Find("aside.banner-error .banner-pagination");
+        Assert.Equal("1 of 2", pagination.TextContent.Trim());
+        Assert.Contains("Err: msg", banner.TextContent);
+    }
+
+    [Fact]
+    public async Task BannerHost_CycleNextAtLast_DisabledAndDoesNotAdvance()
+    {
+        _bannerService.ErrorBanners.Returns(
+            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        // Advance to last item (index 1).
+        await component.Find("button.banner-cycle-next").ClickAsync(new());
+
+        var next = component.Find("button.banner-cycle-next");
+        Assert.True(next.HasAttribute("disabled"));
+
+        await next.ClickAsync(new());
+
+        // Index stays at 1.
+        Assert.Equal("2 of 2", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Single(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public async Task BannerHost_CycleNextClicked_AdvancesToAttentionItem()
+    {
+        var error = new ErrorBannerEntry(Guid.NewGuid(), "Err", "msg", null, null, DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([error]);
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        await component.Find("button.banner-cycle-next").ClickAsync(new());
+
+        var pagination = component.Find(".banner-pagination");
+        Assert.Equal("2 of 2", pagination.TextContent.Trim());
+        Assert.Single(component.FindAll("aside.banner-attention"));
+        Assert.Empty(component.FindAll("aside.banner-error"));
+    }
+
+    [Fact]
+    public async Task BannerHost_CyclePrevAtFirst_DisabledAndDoesNotAdvance()
+    {
+        _bannerService.ErrorBanners.Returns(
+            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        var prev = component.Find("button.banner-cycle-prev");
+        Assert.True(prev.HasAttribute("disabled"));
+
+        await prev.ClickAsync(new());
+
+        // Index stays at 0 — first error still rendered.
+        Assert.Equal("1 of 2", component.Find(".banner-pagination").TextContent.Trim());
+        Assert.Single(component.FindAll("aside.banner-error"));
+    }
+
+    [Fact]
+    public async Task BannerHost_CycleStableSelection_DismissingPrecedingError_StaysOnSameLogicalError()
+    {
+        // Regression: an earlier design matched selection by (View, IndexWithinSlice) record equality, which
+        // silently jumped the user to a different error whenever a preceding error was dismissed (e.g., user on
+        // E1 = index 1, then E0 dismissed → new (Error, 1) refers to E2 → user is now reading E2 without any
+        // intent to navigate). BannerCycleItem.EntryId provides stable identity so the user stays on E1.
+        var e0 = new ErrorBannerEntry(Guid.NewGuid(), "First", "first message", null, null, DateTime.UtcNow);
+        var e1 = new ErrorBannerEntry(Guid.NewGuid(), "Second", "second message", null, null, DateTime.UtcNow);
+        var e2 = new ErrorBannerEntry(Guid.NewGuid(), "Third", "third message", null, null, DateTime.UtcNow);
+        _bannerService.ErrorBanners.Returns([e0, e1, e2]);
+
+        var component = Render<BannerHost>();
+        // Advance to e1.
+        await component.Find("button.banner-cycle-next").ClickAsync(new());
+        Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
+        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+
+        // Simulate e0 being dismissed externally — IndexWithinSlice for e1/e2 shifts down by one, but EntryId
+        // stays stable so selection-by-EntryId still resolves to e1.
+        _bannerService.ErrorBanners.Returns([e1, e2]);
+        _bannerService.StateChanged += Raise.Event<Action>();
+
+        component.WaitForState(() =>
+        {
+            var pages = component.FindAll(".banner-pagination");
+            return pages.Count > 0 && pages[0].TextContent.Trim() == "1 of 2";
+        });
+
+        // After rebuild, the user must still see e1 (now at index 0). The bug being prevented: jumping to e2
+        // because the old (Error, 1) tuple matched e2's new (Error, 1) position.
+        Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
+        Assert.DoesNotContain("Third", component.Find("aside.banner-error").TextContent);
     }
 
     [Fact]
@@ -227,6 +515,126 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public async Task BannerHost_OpenSettingsClickedAndSucceeded_InvokesOpenSettings_ThenDismissesAttention()
+    {
+        // The dismiss MUST happen AFTER the open returns success — dismissing first would leave the user with
+        // no banner if the open silently failed (which is what `MauiMenuActionService.ShowModalAsync` does
+        // internally for unexpected exceptions).
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(true));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+
+        Received.InOrder(
+            () =>
+            {
+                _ = _menuActionService.OpenSettingsAsync();
+                _bannerService.DismissAttention();
+            });
+        _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task BannerHost_OpenSettingsReturnsFalse_DoesNotDismissAttention_ReportsRecoverableError()
+    {
+        // OpenSettingsAsync caught internally and returned false. Attention banner must stay up — the underlying
+        // databases still need attention — and a recoverable Error must surface so the user knows the click was
+        // received but the modal failed to open.
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+
+        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.Received(1)
+            .ReportError("Settings", Arg.Is<string>(s => s.Contains("Failed to open settings")));
+        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+    }
+
+    [Fact]
+    public async Task BannerHost_OpenSettingsReturnsFalse_RendersNewErrorBanner_NotStaleAttention()
+    {
+        // Round-2 regression: without explicitly steering _selectedItem to the new error after ReportError,
+        // ItemMatches preserves the stale Attention selection by (View=Attention, EntryId=null) and the user
+        // never sees the failure message they need — the error banner would be one page back in the cycle.
+        var attention = BuildDatabaseEntry("a.db");
+        var newErrorId = Guid.NewGuid();
+        var newError = new ErrorBannerEntry(
+            newErrorId,
+            "Settings",
+            "Failed to open settings; try again from the menu.",
+            null,
+            null,
+            DateTime.UtcNow);
+
+        _bannerService.AttentionEntries.Returns([attention]);
+        _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
+        _bannerService.ReportError("Settings", Arg.Any<string>())
+            .Returns(_ =>
+            {
+                // Simulate the real BannerService side effect: the new error joins the ErrorBanners list so
+                // the next rebuild has both [Error, Attention] in the cycle.
+                _bannerService.ErrorBanners.Returns([newError]);
+                return newErrorId;
+            });
+
+        var component = Render<BannerHost>();
+        Assert.Single(component.FindAll("aside.banner-attention"));
+
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        // Real BannerService raises StateChanged from inside ReportError; the mock does not, so raise it here
+        // to drive the re-render that proves _selectedItem was steered to the new error.
+        _bannerService.StateChanged += Raise.Event<Action>();
+
+        component.WaitForState(() => component.FindAll("aside.banner-error").Count > 0);
+
+        var errorBanner = component.Find("aside.banner-error");
+        Assert.Contains("Failed to open settings; try again from the menu.", errorBanner.TextContent);
+        // Bug being prevented: stale Attention selection would render Attention here instead of Error.
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public async Task BannerHost_OpenSettingsThrowsJSDisconnected_SwallowedWithoutErrorReport()
+    {
+        // Per rule 3.9, JSDisconnectedException is expected during teardown and must be caught silently — it
+        // does not warrant ReportError surface (the user closed the circuit themselves).
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _menuActionService.OpenSettingsAsync()
+            .Returns(Task.FromException<bool>(new Microsoft.JSInterop.JSDisconnectedException("circuit gone")));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+
+        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+    }
+
+    [Fact]
+    public async Task BannerHost_OpenSettingsThrowsUnexpectedly_LogsAndReportsRecoverableError_DoesNotPropagate()
+    {
+        // Defensive path: contract says OpenSettingsAsync catches internally, but a synchronous throw before the
+        // first await would still bubble. Must not propagate to ErrorBoundary (which would escalate the visible
+        // banner from Attention to Critical). Surface as Error and leave attention up.
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        var openException = new InvalidOperationException("modal boom");
+        _menuActionService.OpenSettingsAsync().Returns(Task.FromException<bool>(openException));
+
+        var component = Render<BannerHost>();
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+
+        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.Received(1)
+            .ReportError("Settings", Arg.Is<string>(s => s.Contains("modal boom")));
+        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("modal boom")));
+    }
+
+    [Fact]
     public async Task BannerHost_RecoveryThrows_ShowsRecoveryFailureSubtitle()
     {
         _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
@@ -307,4 +715,7 @@ public sealed class BannerHostTests : BunitContext
         Assert.Single(component.FindAll("aside.banner.banner-warning"));
         Assert.Empty(component.FindAll("aside.banner.banner-info"));
     }
+
+    private static DatabaseEntry BuildDatabaseEntry(string fileName) =>
+        new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
 }
