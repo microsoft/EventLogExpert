@@ -20,12 +20,15 @@ public sealed partial class SettingsModal : ModalBase<bool>
     private CopyType _copyType;
     private bool _databaseStateChanged;
     private bool _isPreReleaseEnabled;
+    private bool _isUpgradeInFlight;
     private LogLevel _logLevel;
     private bool _showDisplayPaneOnSelectionChange;
     private Theme _theme;
     private string _timeZoneId = string.Empty;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
+
+    [Inject] private IBannerService BannerService { get; init; } = null!;
 
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
@@ -35,11 +38,23 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
+    /// <summary>
+    ///     <c>true</c> while a settings-triggered upgrade has been initiated from this modal but not yet observed
+    ///     to drain through the BannerService progress slot. Covers the queued-but-not-yet-started window
+    ///     (<see cref="IDatabaseService.UpgradeBatchAsync" /> can sit behind another batch before
+    ///     <see cref="IDatabaseService.UpgradeBatchStarted" /> fires) where
+    ///     <see cref="IBannerService.SettingsProgress" /> alone would still be <c>null</c>. Composed with the banner
+    ///     slot so once the consumer picks up the batch and the slot is populated, the predicate stays true through
+    ///     completion.
+    /// </summary>
+    private bool IsCloseBlocked => _isUpgradeInFlight || BannerService.SettingsProgress is not null;
+
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
         if (disposing)
         {
             DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
+            BannerService.StateChanged -= OnBannerStateChanged;
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -54,16 +69,27 @@ public sealed partial class SettingsModal : ModalBase<bool>
         }
     }
 
+    protected override Task OnCancelAsync() =>
+        IsCloseBlocked
+            ? Task.CompletedTask
+            : base.OnCancelAsync();
+
     protected override void OnInitialized()
     {
         LoadFromSettings();
+
         DatabaseService.EntriesChanged += OnDatabaseEntriesChanged;
+        BannerService.StateChanged += OnBannerStateChanged;
 
         base.OnInitialized();
     }
 
     protected override async Task OnSaveAsync()
     {
+        if (IsCloseBlocked) { return; }
+
+        if (!await TryRunUpgradesAsync()) { return; }
+
         await ApplyPendingToggles();
 
         Settings.CopyType = _copyType;
@@ -128,6 +154,109 @@ public sealed partial class SettingsModal : ModalBase<bool>
         }
     }
 
+    /// <summary>
+    ///     Identify pending enable-toggles whose target entry needs an upgrade first, prompt for confirmation, run
+    ///     the batch upgrade through the settings-scope progress slot, then re-stage the entries that succeeded so
+    ///     they are committed by the normal Save flow (no immediate <see cref="IDatabaseService.Toggle" /> calls).
+    ///     Surfaces per-entry failures via <see cref="IAlertDialogService.ShowErrorAlert" />. Returns <c>false</c>
+    ///     when the user declines the upgrade prompt, the upgrade throws, OR the user cancels the in-flight upgrade
+    ///     — the caller should abort the save in any of those cases so the modal stays open and the user can either
+    ///     retry or click Exit to discard. The principle: <see cref="IDatabaseService.Toggle" /> represents the
+    ///     "commit" step and must only run as part of a successful Save, never as a side effect of the upgrade
+    ///     batch itself.
+    /// </summary>
+    private async Task<bool> TryRunUpgradesAsync()
+    {
+        if (_pendingToggles.Count == 0) { return true; }
+
+        var entriesByName = DatabaseService.Entries.ToDictionary(
+            entry => entry.FileName,
+            StringComparer.OrdinalIgnoreCase);
+
+        var fileNamesNeedingUpgrade = _pendingToggles
+            .Where(pair => pair.Value
+                && entriesByName.TryGetValue(pair.Key, out var entry)
+                && entry.Status is DatabaseStatus.UpgradeRequired or DatabaseStatus.UpgradeFailed)
+            .Select(pair => pair.Key)
+            .ToList();
+
+        if (fileNamesNeedingUpgrade.Count == 0) { return true; }
+
+        var confirmed = await AlertDialogService.ShowAlert(
+            "Upgrade Required",
+            fileNamesNeedingUpgrade.Count == 1
+                ? "1 database requires an upgrade before it can be enabled. Upgrade now?"
+                : $"{fileNamesNeedingUpgrade.Count} databases require an upgrade before they can be enabled. Upgrade now?",
+            "Upgrade and enable",
+            "Cancel");
+
+        if (!confirmed) { return false; }
+
+        foreach (var fileName in fileNamesNeedingUpgrade)
+        {
+            _pendingToggles.Remove(fileName);
+        }
+
+        UpgradeBatchResult result;
+
+        _isUpgradeInFlight = true;
+
+        try
+        {
+            result = await DatabaseService.UpgradeBatchAsync(
+                fileNamesNeedingUpgrade,
+                UpgradeProgressScope.SettingsTriggered);
+        }
+        catch (Exception ex)
+        {
+            // Restore every entry whose toggle we removed so the user can retry or click Exit to discard.
+            // Without this restore, returning to OnSaveAsync would either commit a now-empty pending set
+            // or (with the previous return-true behavior) silently drop the user's enable intent.
+            foreach (var fileName in fileNamesNeedingUpgrade)
+            {
+                _pendingToggles[fileName] = true;
+            }
+
+            await AlertDialogService.ShowAlert("Database Upgrade Failed",
+                $"An exception occurred while upgrading databases: {ex.Message}",
+                "OK");
+
+            return false;
+        }
+        finally
+        {
+            _isUpgradeInFlight = false;
+        }
+
+        // Re-stage successes as pending so ApplyPendingToggles enables them as part of the normal Save commit.
+        // We do NOT call DatabaseService.Toggle here directly: per the modal contract, no toggle should take
+        // effect until the user's Save click reaches CompleteAsync — otherwise a subsequent Cancel/Exit would
+        // leave partial commits behind.
+        foreach (var fileName in result.Succeeded)
+        {
+            _pendingToggles[fileName] = true;
+        }
+
+        foreach (var failure in result.Failed)
+        {
+            await AlertDialogService.ShowErrorAlert(
+                "Database Upgrade Failed",
+                $"Failed to upgrade '{failure.FileName}': {failure.Message}");
+        }
+
+        // Cancellation is the user's "abort" signal — restore the cancelled enable-toggles to pending so
+        // they re-appear next Save, and abort this save so the modal stays open. Without this restore,
+        // cancelled entries' toggles would be silently consumed and the user would have to re-toggle.
+        if (result.Cancelled.Count <= 0) { return true; }
+
+        foreach (var fileName in result.Cancelled)
+        {
+            _pendingToggles[fileName] = true;
+        }
+
+        return false;
+    }
+
     private bool GetEffectiveEnabled(DatabaseEntry entry) =>
         _pendingToggles.TryGetValue(entry.FileName, out var pending) ? pending : entry.IsEnabled;
 
@@ -187,6 +316,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
         _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
     }
+
+    private void OnBannerStateChanged() => _ = InvokeAsync(StateHasChanged);
 
     private void OnDatabaseEntriesChanged(object? sender, EventArgs e)
     {

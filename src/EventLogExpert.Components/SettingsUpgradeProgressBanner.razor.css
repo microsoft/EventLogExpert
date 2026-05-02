@@ -1,0 +1,53 @@
+.settings-upgrade-banner {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .5rem 1rem;
+    margin-bottom: .5rem;
+
+    background-color: var(--clr-statusbar);
+    color: var(--text-on-statusbar);
+    box-shadow: var(--shadow-modal);
+}
+
+.banner-spinner {
+    flex: 0 0 auto;
+    animation: banner-spin 1.5s linear infinite;
+}
+
+@keyframes banner-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.banner-message {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.banner-subtitle {
+    flex: 0 0 auto;
+
+    font-size: .85rem;
+    opacity: .9;
+}
+
+.banner-action {
+    flex: 0 0 auto;
+    padding: .15rem .75rem;
+
+    background: transparent;
+    color: inherit;
+    border: 1px solid currentColor;
+    border-radius: .25rem;
+
+    &:hover { background-color: rgba(255, 255, 255, 0.15); }
+}
