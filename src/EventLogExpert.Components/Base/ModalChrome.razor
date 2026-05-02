@@ -45,7 +45,7 @@
                 case FooterPreset.CloseOnly:
                     <button autofocus
                         class="button"
-                        disabled="@HasInlineAlert"
+                        disabled="@(HasInlineAlert || FooterDisabled)"
                         @onclick="HandleCloseButtonAsync"
                         type="button">
                         @CloseLabel
@@ -55,14 +55,14 @@
                 case FooterPreset.SaveCancel:
                     <div class="button-group">
                         <button class="button button-green"
-                            disabled="@HasInlineAlert"
+                            disabled="@(HasInlineAlert || FooterDisabled)"
                             @onclick="HandleSaveAsync"
                             type="button">
                             @SaveLabel
                         </button>
                         <button autofocus
                             class="button"
-                            disabled="@HasInlineAlert"
+                            disabled="@(HasInlineAlert || FooterDisabled)"
                             @onclick="HandleCancelButtonAsync"
                             type="button">
                             @CancelLabel
@@ -73,13 +73,13 @@
                 case FooterPreset.ImportExportClose:
                     <div class="button-group">
                         <button class="button"
-                            disabled="@HasInlineAlert"
+                            disabled="@(HasInlineAlert || FooterDisabled)"
                             @onclick="HandleImportAsync"
                             type="button">
                             @ImportLabel
                         </button>
                         <button class="button"
-                            disabled="@HasInlineAlert"
+                            disabled="@(HasInlineAlert || FooterDisabled)"
                             @onclick="HandleExportAsync"
                             type="button">
                             @ExportLabel
@@ -88,7 +88,7 @@
 
                     <button autofocus
                         class="button"
-                        disabled="@HasInlineAlert"
+                        disabled="@(HasInlineAlert || FooterDisabled)"
                         @onclick="HandleCloseButtonAsync"
                         type="button">
                         @CloseLabel
@@ -98,7 +98,7 @@
                 case FooterPreset.Dismiss:
                     <button autofocus
                         class="button"
-                        disabled="@HasInlineAlert"
+                        disabled="@(HasInlineAlert || FooterDisabled)"
                         @onclick="HandleAcceptAsync"
                         type="button">
                         @AcceptLabel
@@ -108,13 +108,13 @@
                 case FooterPreset.AcceptCancel:
                     <button autofocus
                         class="button button-green"
-                        disabled="@HasInlineAlert"
+                        disabled="@(HasInlineAlert || FooterDisabled)"
                         @onclick="HandleAcceptAsync"
                         type="button">
                         @AcceptLabel
                     </button>
                     <button class="button"
-                        disabled="@HasInlineAlert"
+                        disabled="@(HasInlineAlert || FooterDisabled)"
                         @onclick="HandleCancelButtonAsync"
                         type="button">
                         @CancelLabel

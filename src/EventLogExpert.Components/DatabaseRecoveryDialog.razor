@@ -1,0 +1,63 @@
+@using EventLogExpert.Components.Base
+@if (!_isDismissed && _entries.Count > 0)
+{
+    <ModalChrome AcceptLabel="Apply"
+        CancelLabel="Cancel"
+        Footer="FooterPreset.AcceptCancel"
+        FooterDisabled="@_isApplying"
+        MaxWidth="40rem"
+        MinWidth="28rem"
+        OnAccept="ApplyAsync"
+        OnCancel="HandleCancelOrEscAsync"
+        OnDialogClosedByUser="HandleCancelOrEscAsync"
+        @ref="_chrome"
+        Title="Database upgrade recovery">
+        <p class="recovery-description">
+            The following database(s) had their upgrade interrupted. Restore from backup keeps the V3
+            data; Delete removes both the partial entry and its backup.
+        </p>
+
+        <div class="recovery-batch-actions">
+            <button class="button"
+                disabled="@_isApplying"
+                @onclick="RestoreAll"
+                type="button">
+                Restore all
+            </button>
+            <button class="button"
+                disabled="@_isApplying"
+                @onclick="DeleteAll"
+                type="button">
+                Delete all
+            </button>
+        </div>
+
+        <ul class="recovery-rows">
+            @foreach (var entry in _entries)
+            {
+                var rowFailed = _failedFileNames.Contains(entry.FileName);
+                var radioGroup = $"recovery-action-{entry.FileName}";
+
+                <li class="recovery-row @(rowFailed ? "recovery-row-failed" : "")">
+                    <span class="recovery-row-name">@entry.FileName</span>
+                    <label class="recovery-row-option">
+                        <input checked="@(_selectedActions.GetValueOrDefault(entry.FileName) == RecoveryAction.Restore)"
+                            disabled="@_isApplying"
+                            name="@radioGroup"
+                            @onchange="@(() => SelectAction(entry.FileName, RecoveryAction.Restore))"
+                            type="radio" />
+                        Restore
+                    </label>
+                    <label class="recovery-row-option">
+                        <input checked="@(_selectedActions.GetValueOrDefault(entry.FileName) == RecoveryAction.Delete)"
+                            disabled="@_isApplying"
+                            name="@radioGroup"
+                            @onchange="@(() => SelectAction(entry.FileName, RecoveryAction.Delete))"
+                            type="radio" />
+                        Delete
+                    </label>
+                </li>
+            }
+        </ul>
+    </ModalChrome>
+}

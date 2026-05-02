@@ -1,0 +1,55 @@
+/* Body content styling. Dialog chrome (header, footer, sizing, dialog box) is rendered by
+   ModalChrome — see EventLogExpert.Components.Base.ModalChrome. */
+
+.recovery-description {
+    margin: 0;
+
+    font-size: .9rem;
+}
+
+.recovery-batch-actions {
+    display: flex;
+    gap: .5rem;
+}
+
+.recovery-rows {
+    margin: 0;
+    padding: 0;
+
+    list-style: none;
+}
+
+.recovery-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    padding: .35rem .5rem;
+    border-bottom: 1px solid var(--clr-statusbar);
+}
+
+.recovery-row:last-child {
+    border-bottom: 0;
+}
+
+.recovery-row-failed {
+    background-color: rgba(220, 53, 69, 0.15);
+    border-left: 3px solid var(--clr-red);
+}
+
+.recovery-row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recovery-row-option {
+    flex: 0 0 auto;
+
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+}

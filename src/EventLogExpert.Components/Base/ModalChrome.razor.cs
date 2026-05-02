@@ -51,6 +51,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public FooterPreset Footer { get; set; } = FooterPreset.CloseOnly;
 
+    /// <summary>When true, all preset footer buttons render disabled. Useful while a long-running
+    /// operation triggered by the modal is in flight so the user can't re-trigger or dismiss
+    /// mid-action. Independent of inline-alert disable semantics.</summary>
+    [Parameter] public bool FooterDisabled { get; set; }
+
     /// <summary>Optional height (e.g. <c>"60%"</c>, <c>"40rem"</c>) exposed as <c>var(--modal-height)</c>.</summary>
     [Parameter] public string? Height { get; set; }
 
