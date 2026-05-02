@@ -10,6 +10,8 @@ public sealed partial class BooleanSelect : InputComponent<bool>
 {
     [Parameter] public string AriaLabel { get; set; } = string.Empty;
 
+    [Parameter] public bool Disabled { get; set; }
+
     [Parameter] public string DisabledString { get; set; } = "Disabled";
 
     [Parameter] public string EnabledString { get; set; } = "Enabled";

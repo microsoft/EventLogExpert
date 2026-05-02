@@ -18,8 +18,10 @@ public sealed partial class SettingsModal : ModalBase<bool>
 {
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
 
+    private CancellationTokenSource? _classificationCts;
     private CopyType _copyType;
     private bool _databaseStateChanged;
+    private volatile bool _disposed;
     private bool _isPreReleaseEnabled;
     private bool _isUpgradeInFlight;
     private LogLevel _logLevel;
@@ -38,6 +40,13 @@ public sealed partial class SettingsModal : ModalBase<bool>
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     /// <summary>
+    ///     <c>true</c> while <see cref="IDatabaseService.InitialClassificationTask" /> has not completed. Drives the
+    ///     "Classifying databases…" header indicator and disables every per-entry toggle so the user cannot trigger an
+    ///     upgrade-required prompt against a status snapshot that is still being computed.
+    /// </summary>
+    private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
+
+    /// <summary>
     ///     <c>true</c> while a settings-triggered upgrade has been initiated from this modal but not yet observed to
     ///     drain through the BannerService progress slot. Covers the queued-but-not-yet-started window (
     ///     <see cref="IDatabaseService.UpgradeBatchAsync" /> can sit behind another batch before
@@ -53,6 +62,10 @@ public sealed partial class SettingsModal : ModalBase<bool>
     {
         if (disposing)
         {
+            _disposed = true;
+            _classificationCts?.Cancel();
+            _classificationCts?.Dispose();
+            _classificationCts = null;
             DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
             BannerService.StateChanged -= OnBannerStateChanged;
         }
@@ -81,6 +94,19 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         DatabaseService.EntriesChanged += OnDatabaseEntriesChanged;
         BannerService.StateChanged += OnBannerStateChanged;
+
+        if (!DatabaseService.InitialClassificationTask.IsCompleted)
+        {
+            // EntriesChanged fires synchronously inside ClassifyEntriesAsync (DatabaseService.cs:163-165),
+            // before StartInitialClassificationAsync returns — so the entries-changed handler observes
+            // InitialClassificationTask.IsCompleted == false. We need a separate continuation that runs
+            // after the task object itself completes to flip IsClassificationPending in the UI.
+            // The CTS lets us cancel the WaitAsync proxy on dispose so the captured `this` reference
+            // is released even if the underlying classification task is still running, preventing the
+            // modal from leaking across open/close cycles during a long classification.
+            _classificationCts = new CancellationTokenSource();
+            _ = ObserveClassificationCompletionAsync(_classificationCts.Token);
+        }
 
         base.OnInitialized();
     }
@@ -233,6 +259,35 @@ public sealed partial class SettingsModal : ModalBase<bool>
         _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;
         _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
+    }
+
+    private async Task ObserveClassificationCompletionAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await DatabaseService.InitialClassificationTask.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Modal was disposed before classification completed; drop the captured `this` reference.
+            return;
+        }
+        catch
+        {
+            // InitialClassificationTask is contractually never-faulting (DatabaseService.cs:1200-1212);
+            // defensive try/catch so a future contract drift cannot orphan this fire-and-forget task.
+        }
+
+        if (_disposed) { return; }
+
+        try
+        {
+            await InvokeAsync(StateHasChanged);
+        }
+        catch (ObjectDisposedException)
+        {
+            // Modal was torn down between the _disposed check and the dispatcher call; safe to ignore.
+        }
     }
 
     private void OnBannerStateChanged() => _ = InvokeAsync(StateHasChanged);
