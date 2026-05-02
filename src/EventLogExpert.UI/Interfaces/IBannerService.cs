@@ -16,11 +16,27 @@ public interface IBannerService
 {
     event Action StateChanged;
 
+    /// <summary>
+    ///     Snapshot of the currently-running background-scope upgrade batch (e.g., import-triggered auto-upgrades), or
+    ///     <c>null</c> when no background batch is in flight. At most one of <see cref="BackgroundProgress" /> and
+    ///     <see cref="SettingsProgress" /> is non-null at any time because the database service processes batches
+    ///     sequentially, but the two slots are kept separate so the top-level banner host and the inline settings banner
+    ///     can each query their own slot without needing scope-discrimination logic.
+    /// </summary>
+    BannerProgressEntry? BackgroundProgress { get; }
+
     Exception? CurrentCritical { get; }
 
     IReadOnlyList<ErrorBannerEntry> ErrorBanners { get; }
 
     IReadOnlyList<BannerInfoEntry> InfoBanners { get; }
+
+    /// <summary>
+    ///     Snapshot of the currently-running settings-scope upgrade batch (triggered from the SettingsModal toggle
+    ///     confirmation), or <c>null</c> when no settings batch is in flight. See <see cref="BackgroundProgress" /> for
+    ///     scope-routing rationale.
+    /// </summary>
+    BannerProgressEntry? SettingsProgress { get; }
 
     /// <summary>Clear the current critical exception and raise <see cref="StateChanged" />.</summary>
     void ClearCritical();
