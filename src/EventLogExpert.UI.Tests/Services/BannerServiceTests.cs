@@ -11,6 +11,30 @@ namespace EventLogExpert.UI.Tests.Services;
 
 public sealed class BannerServiceTests
 {
+    [Theory]
+    [InlineData(DatabaseStatus.UpgradeRequired, true)]
+    [InlineData(DatabaseStatus.UpgradeFailed, true)]
+    [InlineData(DatabaseStatus.UnrecognizedSchema, true)]
+    [InlineData(DatabaseStatus.ObsoleteSchema, true)]
+    [InlineData(DatabaseStatus.ClassificationFailed, true)]
+    [InlineData(DatabaseStatus.Ready, false)]
+    [InlineData(DatabaseStatus.NotClassified, false)]
+    public void AttentionEntries_FilterIncludesEachAttentionStatus_AndExcludesReadyAndNotClassified(
+        DatabaseStatus status,
+        bool expectedInAttention)
+    {
+        // Arrange — single entry whose Status is the one under test.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entry = new DatabaseEntry("test.db", @"c:\dbs\test.db", true, status);
+        databaseService.Entries.Returns(new[] { entry });
+
+        // Act
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+
+        // Assert
+        Assert.Equal(expectedInAttention, sut.AttentionEntries.Contains(entry));
+    }
+
     [Fact]
     public void BannerProgressEntry_Cancel_InvokesUnderlyingEventArgsCancel()
     {
@@ -46,6 +70,202 @@ public sealed class BannerServiceTests
         // Assert
         Assert.Null(sut.CurrentCritical);
         Assert.Equal(1, stateChangedCount);
+    }
+
+    [Fact]
+    public void Ctor_PullsAttentionEntriesFromCurrentDatabaseEntries()
+    {
+        // Arrange — mix of attention-worthy and Ready/NotClassified entries.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var upgradeRequired = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        var ready = new DatabaseEntry("b.db", @"c:\dbs\b.db", true, DatabaseStatus.Ready);
+        var unrecognized = new DatabaseEntry("c.db", @"c:\dbs\c.db", false, DatabaseStatus.UnrecognizedSchema);
+        databaseService.Entries.Returns(new[] { upgradeRequired, ready, unrecognized });
+
+        // Act
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+
+        // Assert — attention list has the two attention-worthy entries, Ready filtered out.
+        Assert.Equal(2, sut.AttentionEntries.Count);
+        Assert.Contains(upgradeRequired, sut.AttentionEntries);
+        Assert.Contains(unrecognized, sut.AttentionEntries);
+        Assert.DoesNotContain(ready, sut.AttentionEntries);
+    }
+
+    [Fact]
+    public void DismissAttention_AfterReset_NewlyDismissedSnapshotReflectsCurrentEntries()
+    {
+        // Arrange — dismiss with {a.db}, then b.db arrives and resets. After re-dismissing with both
+        // present, a third file c.db appearing must reset again (b.db is now in the dismissed snapshot).
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entryA = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        var entryB = new DatabaseEntry("b.db", @"c:\dbs\b.db", true, DatabaseStatus.UpgradeRequired);
+        var entryC = new DatabaseEntry("c.db", @"c:\dbs\c.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entryA });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        databaseService.Entries.Returns(new[] { entryA, entryB });
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+        Assert.False(sut.AttentionDismissed);
+        sut.DismissAttention();
+        Assert.True(sut.AttentionDismissed);
+        databaseService.Entries.Returns(new[] { entryA, entryB, entryC });
+
+        // Act — c.db is the first file with a name not in the post-reset snapshot.
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert — reset triggers again because the dismissed snapshot was rebuilt to {a.db, b.db}.
+        Assert.False(sut.AttentionDismissed);
+        Assert.Equal(3, sut.AttentionEntries.Count);
+    }
+
+    [Fact]
+    public void DismissAttention_DoesNotMutateAttentionEntriesList()
+    {
+        // Arrange
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entry = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entry });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        IReadOnlyList<DatabaseEntry> beforeDismiss = sut.AttentionEntries;
+
+        // Act
+        sut.DismissAttention();
+
+        // Assert
+        Assert.Same(beforeDismiss, sut.AttentionEntries);
+    }
+
+    [Fact]
+    public void DismissAttention_FileLeavesAndReturns_DoesNotResetDismiss()
+    {
+        // Arrange — ratchet stability: file leaves attention then re-enters. Its FileName remained in
+        // the dismissed snapshot, so the re-entry does NOT count as growth.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entryA = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entryA });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        databaseService.Entries.Returns(new[] { entryA with { Status = DatabaseStatus.Ready } });
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+        Assert.Empty(sut.AttentionEntries);
+        databaseService.Entries.Returns(new[] { entryA with { Status = DatabaseStatus.UpgradeFailed } });
+
+        // Act — a.db re-enters attention.
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert — still dismissed because a.db's name was already in the dismissed snapshot.
+        Assert.True(sut.AttentionDismissed);
+        Assert.Single(sut.AttentionEntries);
+    }
+
+    [Fact]
+    public void DismissAttention_FileLeavesAttention_DoesNotResetDismiss()
+    {
+        // Arrange — dismiss with {a.db, b.db}, then a.db transitions to Ready (set shrinks). Shrinkage
+        // alone must NEVER reset dismissal — only growth-by-name does.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entryA = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        var entryB = new DatabaseEntry("b.db", @"c:\dbs\b.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entryA, entryB });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        databaseService.Entries.Returns(new[] { entryA with { Status = DatabaseStatus.Ready }, entryB });
+
+        // Act
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert
+        Assert.True(sut.AttentionDismissed);
+        Assert.Single(sut.AttentionEntries);
+    }
+
+    [Fact]
+    public void DismissAttention_FirstCall_RaisesStateChanged_AndSetsDismissedTrue()
+    {
+        // Arrange
+        var databaseService = Substitute.For<IDatabaseService>();
+        databaseService.Entries.Returns(new[]
+        {
+            new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired),
+        });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+
+        // Act
+        sut.DismissAttention();
+
+        // Assert
+        Assert.True(sut.AttentionDismissed);
+        Assert.Equal(1, stateChangedCount);
+    }
+
+    [Fact]
+    public void DismissAttention_NewFileEntersAttention_ResetsDismiss_RaisesStateChanged()
+    {
+        // Arrange — dismiss with {a.db}, then EntriesChanged adds a NEW file b.db.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entryA = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entryA });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        Assert.True(sut.AttentionDismissed);
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+        var entryB = new DatabaseEntry("b.db", @"c:\dbs\b.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entryA, entryB });
+
+        // Act — b.db's FileName is not in the dismissed-set snapshot, so dismissal must reset.
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert — un-dismissed AND state-changed raised (set grew + reset together count as one raise).
+        Assert.False(sut.AttentionDismissed);
+        Assert.Equal(1, stateChangedCount);
+        Assert.Equal(2, sut.AttentionEntries.Count);
+    }
+
+    [Fact]
+    public void DismissAttention_SameFileChangesStatus_DoesNotResetDismiss()
+    {
+        // Arrange — dismiss with {a.db: UpgradeRequired}, then status churns to UpgradeFailed. Same
+        // FileName, so the ratchet must NOT reset (user already dismissed knowledge of a.db).
+        var databaseService = Substitute.For<IDatabaseService>();
+        var initial = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { initial });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        var updated = initial with { Status = DatabaseStatus.UpgradeFailed };
+        databaseService.Entries.Returns(new[] { updated });
+
+        // Act
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert — still dismissed; entries list refreshed to the new status.
+        Assert.True(sut.AttentionDismissed);
+        Assert.Equal(DatabaseStatus.UpgradeFailed, sut.AttentionEntries[0].Status);
+    }
+
+    [Fact]
+    public void DismissAttention_SecondCall_NoOp_DoesNotRaiseStateChanged()
+    {
+        // Arrange — already dismissed.
+        var databaseService = Substitute.For<IDatabaseService>();
+        databaseService.Entries.Returns(new[]
+        {
+            new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired),
+        });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        sut.DismissAttention();
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+
+        // Act
+        sut.DismissAttention();
+
+        // Assert
+        Assert.True(sut.AttentionDismissed);
+        Assert.Equal(0, stateChangedCount);
     }
 
     [Fact]
@@ -120,6 +340,91 @@ public sealed class BannerServiceTests
         // Assert
         Assert.Single(sut.InfoBanners);
         Assert.Equal(0, stateChangedCount);
+    }
+
+    [Fact]
+    public void EntriesChanged_FileLeavesAttentionBucket_RaisesStateChanged()
+    {
+        // Arrange — one attention entry initially, then it transitions to Ready.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var initialEntry = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { initialEntry });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+        var readyEntry = initialEntry with { Status = DatabaseStatus.Ready };
+        databaseService.Entries.Returns(new[] { readyEntry });
+
+        // Act
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert
+        Assert.Equal(1, stateChangedCount);
+        Assert.Empty(sut.AttentionEntries);
+    }
+
+    [Fact]
+    public void EntriesChanged_NewFileAppearsInAttention_RaisesStateChanged()
+    {
+        // Arrange — start with no attention entries, then add one via EntriesChanged.
+        var databaseService = Substitute.For<IDatabaseService>();
+        databaseService.Entries.Returns(Array.Empty<DatabaseEntry>());
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+        var newEntry = new DatabaseEntry("new.db", @"c:\dbs\new.db", false, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { newEntry });
+
+        // Act
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert
+        Assert.Equal(1, stateChangedCount);
+        Assert.Single(sut.AttentionEntries);
+        Assert.Same(newEntry, sut.AttentionEntries[0]);
+    }
+
+    [Fact]
+    public void EntriesChanged_StatusChangesWithinAttentionBucket_AssignsFreshList_RaisesStateChanged()
+    {
+        // Arrange — same FileName/FullPath but Status changes UpgradeRequired -> UpgradeFailed. Record
+        // value-equality must detect the change (different Status field) so AttentionEntries reflects
+        // the latest record instance, not the stale one captured at construction.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var initialEntry = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { initialEntry });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+        var updatedEntry = initialEntry with { Status = DatabaseStatus.UpgradeFailed };
+        databaseService.Entries.Returns(new[] { updatedEntry });
+
+        // Act
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert
+        Assert.Equal(1, stateChangedCount);
+        Assert.Single(sut.AttentionEntries);
+        Assert.Equal(DatabaseStatus.UpgradeFailed, sut.AttentionEntries[0].Status);
+    }
+
+    [Fact]
+    public void EntriesChanged_WithIdenticalAttentionSet_DoesNotRaiseStateChanged()
+    {
+        // Arrange — same attention entries before and after; SequenceEqual must short-circuit the raise.
+        var databaseService = Substitute.For<IDatabaseService>();
+        var entry = new DatabaseEntry("a.db", @"c:\dbs\a.db", true, DatabaseStatus.UpgradeRequired);
+        databaseService.Entries.Returns(new[] { entry });
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        int stateChangedCount = 0;
+        sut.StateChanged += () => stateChangedCount++;
+
+        // Act — same Entries content, just a new EntriesChanged firing.
+        databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
+
+        // Assert
+        Assert.Equal(0, stateChangedCount);
+        Assert.Single(sut.AttentionEntries);
     }
 
     [Fact]
