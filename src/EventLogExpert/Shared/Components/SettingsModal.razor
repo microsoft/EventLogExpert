@@ -6,6 +6,7 @@
 <ModalChrome AriaLabel="Settings"
     CancelLabel="Exit"
     Footer="FooterPreset.SaveCancel"
+    FooterDisabled="@IsCloseBlocked"
     Height="60%"
     InlineAlert="@CurrentInlineAlert"
     OnCancel="OnCancelAsync"
@@ -17,6 +18,8 @@
     <ChildContent>
         <div class="settings-form">
             <div class="flex-column-scroll">
+                <SettingsUpgradeProgressBanner />
+
                 <div class="flex-center-aligned-row tz-row">
                     <text>Time Zone:</text>
                     <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
