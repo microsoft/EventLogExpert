@@ -71,8 +71,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
     public async Task ClassifyEntriesAsync(CancellationToken cancellationToken = default)
     {
-        // Snapshot under the lock so concurrent Refresh/Toggle/Remove calls cannot trigger an
-        // index-out-of-range during the IO pass below.
         ImmutableList<DatabaseEntry> snapshot;
 
         lock (_mutationLock)
@@ -82,8 +80,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (snapshot.Count == 0) { return; }
 
-        // Whole pass runs on a worker thread because IsUpgradeNeeded performs synchronous SQLite IO
-        // (PRAGMA queries via blocking ADO.NET). Driving it from the UI thread would block render.
         var statuses = await Task.Run(
             () =>
             {
@@ -96,11 +92,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     try
                     {
-                        // Empty/missing files would otherwise classify as Ready (IsUpgradeNeeded sees
-                        // no columns → currentVersion=Current → no upgrade needed). EventResolver
-                        // would then call EnsureCreated on first access and silently rewrite the
-                        // file with a V4 schema. Force these into UnrecognizedSchema so they are
-                        // quarantined and surfaced in Settings instead of being mutated invisibly.
                         if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
                         {
                             perFile[entry.FileName] = (DatabaseStatus.UnrecognizedSchema, false);
@@ -108,9 +99,11 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                             continue;
                         }
 
-                        // ensureCreated:false so a missing/empty file is NOT auto-populated with the V4 schema
-                        // during inspection — that would silently mask the very thing classification is for.
-                        using var context = new EventProviderDbContext(entry.FullPath, false, false, _traceLogger);
+                        using var context = new EventProviderDbContext(
+                            entry.FullPath,
+                            readOnly: false,
+                            ensureCreated: false,
+                            logger: _traceLogger);
 
                         var state = context.IsUpgradeNeeded();
                         var status = MapSchemaVersionToStatus(state.CurrentVersion);
@@ -137,8 +130,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         lock (_mutationLock)
         {
-            // Re-resolve indexes against the current snapshot — Refresh/Remove may have run while
-            // classification was on the worker thread.
             var builder = _entries.ToBuilder();
 
             for (var i = 0; i < builder.Count; i++)
@@ -185,8 +176,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             var index = FindEntryIndex(_entries, fileName);
             ImmutableList<DatabaseEntry> nextSnapshot = index >= 0 ? _entries.RemoveAt(index) : _entries;
 
-            // Always re-persist even if a concurrent Refresh already removed the entry — otherwise a
-            // stale fileName lingers in DisabledDatabasesPreference and a re-import comes back disabled.
             PersistDisabled(nextSnapshot);
 
             removed = index >= 0;
@@ -285,8 +274,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         ArgumentNullException.ThrowIfNull(sourceFilePaths);
         ArgumentNullException.ThrowIfNull(skipFileNames);
 
-        // Enforce the documented case-insensitive skip semantics regardless of the comparer the
-        // caller chose for their set (defaults to case-sensitive Ordinal otherwise).
         var skipSet = skipFileNames as HashSet<string> is { Comparer: var comparer } &&
             comparer.Equals(StringComparer.OrdinalIgnoreCase)
                 ? skipFileNames
@@ -365,8 +352,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             return new ImportResult(importedCount, failures, []);
         }
 
-        // Persist freshly-imported names as disabled BEFORE Refresh so the next snapshot is correct
-        // first time and consumers don't observe a transient enabled→disabled flicker.
         if (freshlyImportedNames.Count > 0)
         {
             lock (_mutationLock)
@@ -526,8 +511,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            // Restore already succeeded on disk; absorb any post-classify failure (incl. cancellation)
-            // so the caller's success signal is preserved. The next entries access re-reads disk anyway.
             SafeLog(() => _traceLogger.Warn(
                 $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
         }
@@ -573,8 +556,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             return new UpgradeBatchResult([], dedupedNames, []);
         }
 
-        // Awaited explicitly so callers that race the ctor get a meaningful classification before
-        // partitioning, rather than a batch full of false "NotClassified" rejections.
         try
         {
             await InitialClassificationTask.ConfigureAwait(false);
@@ -651,8 +632,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             return await tcs.Task.ConfigureAwait(false);
         }
 
-        // Channel already completed (disposal raced this enqueue). Surface the work as cancelled
-        // and roll back the counter increment so QueuedBatchCount reflects reality.
         Interlocked.Decrement(ref _queuedBatchCount);
         batchCts.Dispose();
 
@@ -692,7 +671,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     private static void SafeLog(Action log)
     {
         try { log(); }
-        catch { /* Ignore */ }
+        catch { /* Logger faults must not propagate from defensive logging sites. */ }
     }
 
     private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
@@ -704,10 +683,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         return databases
             .Select(name =>
             {
-                // Strip the .db extension before applying the version regex so that "Server 20.db"
-                // splits into ("Server ", "20") instead of ("Server ", "20.db") — otherwise the
-                // version capture never parses as a number and numeric sort falls back to
-                // lexicographic ("Server 2.db" < "Server 20.db" but "Server 20.db" > "Server 10.db").
                 var nameWithoutExt = Path.GetFileNameWithoutExtension(name);
                 var match = splitter.Match(nameWithoutExt);
 
@@ -757,8 +732,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             cmd.ExecuteNonQuery();
         }
 
-        // Drop the pool so the OS handle is released BEFORE File.Copy reads the file. Otherwise on
-        // Windows the copy can race with the pooled connection still holding the handle.
         SqliteConnection.ClearAllPools();
     }
 
@@ -808,7 +781,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         if (!TryDeleteFile(mainPath + "-shm", nameof(DeleteEntryWithBackupAsync))) { return false; }
 
         return TryDeleteFile(mainPath + UpgradeBackupSuffix, nameof(DeleteEntryWithBackupAsync)) &&
-            // Delete main last so a partial failure leaves the entry visible to Refresh and retry-able.
             TryDeleteFile(mainPath, nameof(DeleteEntryWithBackupAsync));
     }
 
@@ -819,7 +791,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             Interlocked.Decrement(ref _queuedBatchCount);
 
             try { batch.BatchCts.Cancel(); }
-            catch (Exception) { /* CTS may already be disposed; cancellation moot */ }
+            catch (Exception) { /* CTS may already be disposed; cancellation moot. */ }
 
             try { batch.BatchCts.Dispose(); }
             catch (Exception) { /* Already disposed; ignore. */ }
@@ -966,8 +938,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                // Conservative on probe failure: surface a possibly-spurious recovery prompt
-                // rather than silently denying the user a chance to restore from .upgrade.bak.
                 SafeLog(() => _traceLogger.Warn(
                     $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} probe failed for '{entry.FileName}': {ex}"));
 
@@ -977,8 +947,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (status == DatabaseStatus.Ready)
         {
-            // V4 is the canonical post-upgrade state; an existing .upgrade.bak is stale
-            // (we crashed between rename and cleanup). File.Delete is a no-op if absent.
             try
             {
                 File.Delete(backupPath);
@@ -1101,8 +1069,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (handler is null) { return; }
 
-        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
-        // a direct multicast Invoke aborts the chain on first exception.
         foreach (var subscriber in handler.GetInvocationList())
         {
             try
@@ -1152,9 +1118,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             return false;
         }
 
-        // Sidecars must be removed before main is overwritten. Otherwise a partial failure leaves a
-        // restored V3 main paired with stale V4 sidecars, which SQLite can roll forward into the
-        // restored database on next open.
         if (!TryDeleteFile(mainPath + "-journal", nameof(RestoreFromBackupAsync))) { return false; }
 
         if (!TryDeleteFile(mainPath + "-wal", nameof(RestoreFromBackupAsync))) { return false; }
@@ -1181,8 +1144,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         if (handler is null) { return; }
 
-        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
-        // a direct multicast Invoke aborts the chain on first exception.
         foreach (var subscriber in handler.GetInvocationList())
         {
             try
@@ -1205,7 +1166,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            // Honor InitialClassificationTask never-fault contract; absorbs subscriber throws.
             SafeLog(() => _traceLogger.Warn(
                 $"{nameof(DatabaseService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
         }
@@ -1255,8 +1215,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Reserve before any file checks so concurrent Remove/RestoreFromBackup/DeleteEntryWithBackup
-        // calls observe an in-flight operation and cannot race the precheck → Task.Run window.
         using var reservation = ReserveFileOperation(fileName, nameof(UpgradeAsync));
 
         var entry = LookupEntryOrThrow(fileName, nameof(UpgradeAsync));
@@ -1273,12 +1231,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         var backupPath = entry.FullPath + UpgradeBackupSuffix;
 
-        // TOCTOU re-check immediately before backup; the explicit check distinguishes the
-        // "backup already on disk" case from a generic IO failure later in File.Copy.
         if (File.Exists(backupPath))
         {
-            // Surface the disk truth on the entry so the recovery host can prompt without waiting
-            // for the next classification pass.
             UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
             throw new InvalidOperationException("Recovery required — .upgrade.bak already present");
@@ -1309,10 +1263,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     }
                     catch (IOException ex) when (File.Exists(backupPath))
                     {
-                        // TOCTOU: backup file appeared between the precheck above and File.Copy.
-                        // Surface as recovery-required for consistency with the explicit precheck
-                        // rather than letting the raw IOException leak. Reflect the disk truth on
-                        // the entry so the recovery host can prompt immediately.
                         UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
                         throw new InvalidOperationException(
@@ -1331,7 +1281,11 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     migrationStarted = true;
 
-                    using (var context = new EventProviderDbContext(entry.FullPath, false, false, _traceLogger))
+                    using (var context = new EventProviderDbContext(
+                        entry.FullPath,
+                        readOnly: false,
+                        ensureCreated: false,
+                        logger: _traceLogger))
                     {
                         context.PerformUpgradeIfNeeded();
                     }
@@ -1339,10 +1293,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     migrationCompleted = true;
                     SqliteConnection.ClearAllPools();
 
-                    // Late-cancellation cutoff: once migration completes (destructive work done),
-                    // do NOT honor cancellation for THIS entry — finish verify+cleanup so the
-                    // successful schema rewrite is not wasted on a rollback. Remaining entries in
-                    // the batch will still observe cancellation in ProcessBatchAsync.
                     SafeRaise(
                         UpgradeBatchProgress,
                         new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.Verifying),
@@ -1355,8 +1305,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     if (!TryDeleteFile(backupPath, nameof(UpgradeAsync)))
                     {
-                        // Backup deletion failed but data is upgraded; leave .bak on disk so the
-                        // user can manually recover, and surface so the recovery host can prompt.
                         UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, true);
 
                         throw new UpgradeCleanupFailedException(
@@ -1367,9 +1315,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 }
                 catch (UpgradeCleanupFailedException)
                 {
-                    // Entry is already in the correct state (Ready + BackupExists=true). Skip the
-                    // generic catch (Exception) below that would treat this as a post-migration
-                    // failure and roll back the successful upgrade by restoring from .upgrade.bak.
                     throw;
                 }
                 catch (OperationCanceledException)
@@ -1406,9 +1351,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     }
                     else if (migrationCompleted)
                     {
-                        // Verify or post-migration cleanup failed; main file IS in a different
-                        // shape than the backup represents, so rollback puts the disk back in a
-                        // pre-upgrade state.
                         if (!RestoreFilesCore(entry))
                         {
                             UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
@@ -1421,9 +1363,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     }
                     else if (backupCreated)
                     {
-                        // Failure happened before migration touched main; backup is the only
-                        // residue. Best-effort delete leaves status untouched so the entry
-                        // remains retry-able as UpgradeRequired.
                         TryDeleteFile(backupPath, nameof(UpgradeAsync));
                     }
 
@@ -1437,7 +1376,11 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         try
         {
-            using var context = new EventProviderDbContext(fullPath, true, false, _traceLogger);
+            using var context = new EventProviderDbContext(
+                fullPath,
+                readOnly: true,
+                ensureCreated: false,
+                logger: _traceLogger);
 
             return context.IsUpgradeNeeded().CurrentVersion == ProviderDatabaseSchemaVersion.Current;
         }

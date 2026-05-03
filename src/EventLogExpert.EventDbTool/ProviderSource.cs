@@ -112,16 +112,6 @@ internal static class ProviderSource
         return false;
     }
 
-    /// <summary>
-    ///     Returns true when every <c>.db</c> file enumerated from <paramref name="path" /> is at the current
-    ///     schema. When any file is at an unrecognized or stale schema, an actionable error is logged for that
-    ///     file and the method returns false. Use this before workflows where a schema-rejected source file
-    ///     silently producing zero providers would corrupt the result (e.g., diff, where the first source
-    ///     defines the baseline of what to skip from the second source). Single-file workflows that skip
-    ///     individual unreadable sources can rely on the per-file gate inside <see cref="LoadProviderNames(string, ITraceLogger, string?)" />
-    ///     and friends, which logs and yields no rows for the failing file. <c>.evtx</c> files have no schema
-    ///     and are ignored here.
-    /// </summary>
     public static bool ValidateSourceSchemas(string path, ITraceLogger logger)
     {
         var allOk = true;
@@ -303,14 +293,6 @@ internal static class ProviderSource
         return [];
     }
 
-    /// <summary>
-    /// Returns true if <paramref name="context"/> points to a database at the current schema
-    /// version. Otherwise logs an explicit error and returns false. Without this gate, EF would
-    /// query the source with the V4 model against a V3 schema and either throw a confusing
-    /// <c>DbException</c> for the missing column or — in the names-only path — silently discover
-    /// names that subsequently fail to materialize as full provider rows. Distinguishes the
-    /// "unrecognized schema" case from the "known but stale" case so the error message is actionable.
-    /// </summary>
     private static bool IsSourceSchemaCurrent(EventProviderDbContext context, string file, ITraceLogger logger)
     {
         var state = context.IsUpgradeNeeded();

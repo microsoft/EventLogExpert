@@ -73,9 +73,8 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
         }
         catch
         {
-            // Don't poison the provider for the resolver's lifetime — clear the gate so a later
-            // call can retry. Use compare-remove so we don't yank a newer gate created mid-retry.
             RemoveGateIfSame(providerName, gate);
+
             throw;
         }
 

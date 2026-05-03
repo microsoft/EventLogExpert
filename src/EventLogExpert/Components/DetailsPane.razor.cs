@@ -59,14 +59,15 @@ public sealed partial class DetailsPane
         {
             SelectedEvent.SelectedValueChanged -= OnSelectedEventChanged;
 
-            try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { }
+            try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
+
             _xmlResolveCts?.Dispose();
 
             try
             {
                 await JSRuntime.InvokeVoidAsync("disposeDetailsPaneResizer");
             }
-            catch (JSDisconnectedException) { }
+            catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
 
             _dotNetRef?.Dispose();
         }
@@ -150,7 +151,7 @@ public sealed partial class DetailsPane
 
             // Cancel any in-flight resolution from a prior selection so a stale fetch
             // can't overwrite the resolved XML for the now-current selection.
-            try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { }
+            try { _xmlResolveCts?.Cancel(); } catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
 
             _xmlResolveCts?.Dispose();
             _xmlResolveCts = null;

@@ -11,6 +11,5 @@ public sealed class UpgradeBatchProgressEventArgs(Guid batchId, int position, st
 
     public UpgradePhase Phase { get; } = phase;
 
-    /// <summary>One-based index of <see cref="FileName" /> within its batch.</summary>
     public int Position { get; } = position;
 }

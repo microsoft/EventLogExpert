@@ -8,11 +8,6 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components;
 
-/// <summary>
-///     Inline banner rendered inside <c>SettingsModal</c> that mirrors the top-level upgrade-progress card but
-///     observes <see cref="IBannerService.SettingsProgress" /> instead of the background slot. Renders nothing
-///     when no settings-scope upgrade batch is in flight.
-/// </summary>
 public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisposable
 {
     private bool _disposed;
@@ -26,12 +21,14 @@ public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisp
         if (_disposed) { return; }
 
         _disposed = true;
+
         BannerService.StateChanged -= OnStateChanged;
     }
 
     protected override void OnInitialized()
     {
         BannerService.StateChanged += OnStateChanged;
+
         base.OnInitialized();
     }
 
@@ -43,8 +40,7 @@ public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisp
         }
         catch (Exception ex)
         {
-            TraceLogger.Error(
-                $"{nameof(SettingsUpgradeProgressBanner)}.{nameof(OnCancelClickedAsync)}: cancel threw: {ex}");
+            TraceLogger.Error($"{nameof(SettingsUpgradeProgressBanner)}.{nameof(OnCancelClickedAsync)}: cancel threw: {ex}");
         }
 
         await Task.CompletedTask;

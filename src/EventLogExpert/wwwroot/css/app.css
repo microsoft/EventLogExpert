@@ -41,12 +41,6 @@
     /* Inverted text for badges / scrollbar thumbs that always appear on the
        statusbar (blue) background. */
     --text-on-statusbar: var(--clr-white);
-    /* Foreground for filled status surfaces (warning/error/status-toggle banners,
-       badges, and toggle fills) where the fill is theme-aware
-       (--clr-yellow / --clr-red / --clr-green). White on the dark light-mode fills,
-       near-black on the bright dark-mode fills — meets WCAG AA in both themes
-       against all three. Distinct from --clr-on-light-highlight, which is dark
-       in both themes and only safe over the always-bright --highlight-light* tints. */
     --clr-on-status-fill: light-dark(var(--clr-white), #1A1A1A);
     /* Muted/secondary text (disabled menu items, shortcut hints, etc.). */
     --text-secondary: light-dark(#555, var(--clr-lightgray));

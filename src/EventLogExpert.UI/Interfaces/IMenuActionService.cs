@@ -3,11 +3,6 @@
 
 namespace EventLogExpert.UI.Interfaces;
 
-/// <summary>
-///     Platform-neutral surface invoked by the Blazor menu bar and keyboard shortcut handler.
-///     Returns only primitives — never MAUI/WinUI/MenuItem types — so the menu UI can be unit-tested
-///     and the platform implementation can evolve independently.
-/// </summary>
 public interface IMenuActionService
 {
     Task CheckForUpdatesAsync();

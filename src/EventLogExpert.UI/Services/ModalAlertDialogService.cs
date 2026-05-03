@@ -6,14 +6,6 @@ using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Services;
 
-/// <summary>
-///     Routes <see cref="IAlertDialogService" /> calls through <see cref="IModalService" />. Active modals exposing
-///     <see cref="IInlineAlertHost" /> get the request as an inline banner; otherwise a standalone alert/prompt modal is
-///     opened via the supplied delegates. <see cref="AlertPresentation.Banner" /> requests and
-///     <see cref="ShowErrorAlert" /> bypass the modal routing and go directly to <see cref="IBannerService" />. All
-///     popup/inline routing is marshaled to the main thread so background callers (UpdateService, DeploymentService) are
-///     safe; banner-routed paths are not marshaled because <see cref="IBannerService" /> is thread-safe.
-/// </summary>
 public sealed class ModalAlertDialogService(
     IModalService modalService,
     IMainThreadService mainThreadService,

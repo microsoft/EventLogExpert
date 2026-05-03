@@ -23,11 +23,6 @@ public class ProviderDetails
         }
     }
 
-    /// <summary>True when no provider metadata of any kind is loaded (legacy or modern) AND
-    /// no channel-owner fallback has populated this row. Used by resolvers to distinguish
-    /// "provider not found" from "provider known but no matching message". A non-null
-    /// <see cref="ResolvedFromOwningPublisher"/> means a channel-owner fallback succeeded
-    /// (even if the metadata collections happen to be empty), so this row is NOT empty.</summary>
     public bool IsEmpty =>
         Events.Count == 0 &&
         Messages.Count == 0 &&
@@ -57,15 +52,6 @@ public class ProviderDetails
 
     public string ProviderName { get; set; } = string.Empty;
 
-    /// <summary>
-    /// When the provider name on the event was actually a channel path that the resolver
-    /// followed back to its owning publisher, this records the publisher name that the
-    /// metadata/messages were ultimately loaded from. Null when no channel-owner fallback
-    /// was used. Does not participate in any cache key or equality check, but does
-    /// contribute to <see cref="IsEmpty"/> so a fallback-resolved row is treated as
-    /// non-empty even if its metadata collections happen to be empty.
-    /// Persisted as of database schema V4.
-    /// </summary>
     public string? ResolvedFromOwningPublisher { get; set; }
 
     public IDictionary<int, string> Tasks { get; set; } = new Dictionary<int, string>();
