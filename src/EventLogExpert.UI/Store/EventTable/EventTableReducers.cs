@@ -22,11 +22,14 @@ public sealed class EventTableReducers
             IsLoading = true
         };
 
+        var counts = state.EventCountByLog.SetItem(newTable.Id, 0);
+
         if (state.EventTables.IsEmpty)
         {
             return state with
             {
                 EventTables = state.EventTables.Add(newTable),
+                EventCountByLog = counts,
                 ActiveEventLogId = newTable.Id
             };
         }
@@ -35,7 +38,11 @@ public sealed class EventTableReducers
 
         if (combinedTable is not null)
         {
-            return state with { EventTables = state.EventTables.Add(newTable) };
+            return state with
+            {
+                EventTables = state.EventTables.Add(newTable),
+                EventCountByLog = counts
+            };
         }
 
         combinedTable = new EventTableModel(EventLogId.Create()) { IsCombined = true };
@@ -45,6 +52,7 @@ public sealed class EventTableReducers
             EventTables = state.EventTables
                 .Add(combinedTable)
                 .Add(newTable),
+            EventCountByLog = counts,
             ActiveEventLogId = combinedTable.Id
         };
     }
@@ -54,20 +62,24 @@ public sealed class EventTableReducers
     {
         var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
 
-        if (table is null) { return state; }
+        if (table is null || table.IsCombined || action.Events.Count == 0) { return state; }
 
         var merged = FilterMethods.MergeSorted(
-            table.DisplayedEvents,
+            state.DisplayedEvents,
             action.Events,
             GetEffectiveOrderBy(state.OrderBy),
             state.IsDescending);
 
+        var updatedTable = SetComputerNameIfFirstEvent(table, action.Events);
+        var counts = IncrementCount(state.EventCountByLog, table.Id, action.Events.Count);
+
         return state with
         {
-            EventTables = state.EventTables.Replace(table, table with
-            {
-                DisplayedEvents = merged
-            })
+            DisplayedEvents = merged,
+            EventTables = ReferenceEquals(updatedTable, table) ?
+                state.EventTables :
+                state.EventTables.Replace(table, updatedTable),
+            EventCountByLog = counts
         };
     }
 
@@ -78,70 +90,108 @@ public sealed class EventTableReducers
     {
         if (action.EventsByLog.Count == 0) { return state; }
 
-        var updatedTables = new List<EventTableModel>(state.EventTables.Count);
-        var changed = false;
+        // Skip batches for closed logs: avoid resurrecting events and stale counts.
+        int totalNew = 0;
+        var combinedBatch = new List<DisplayEventModel>();
+        var counts = state.EventCountByLog;
+        var updatedTables = state.EventTables;
 
-        foreach (var table in state.EventTables)
+        foreach (var (logId, events) in action.EventsByLog)
         {
-            if (!action.EventsByLog.TryGetValue(table.Id, out var newEvents) || newEvents.Count == 0)
+            if (events.Count == 0) { continue; }
+
+            var table = updatedTables.FirstOrDefault(t => t.Id == logId);
+
+            if (table is null || table.IsCombined) { continue; }
+
+            combinedBatch.AddRange(events);
+            counts = IncrementCount(counts, logId, events.Count);
+            totalNew += events.Count;
+
+            var updatedTable = SetComputerNameIfFirstEvent(table, events);
+
+            if (!ReferenceEquals(updatedTable, table))
             {
-                updatedTables.Add(table);
-
-                continue;
+                updatedTables = updatedTables.Replace(table, updatedTable);
             }
-
-            var merged = FilterMethods.MergeSorted(
-                table.DisplayedEvents,
-                newEvents,
-                GetEffectiveOrderBy(state.OrderBy),
-                state.IsDescending);
-
-            updatedTables.Add(table with { DisplayedEvents = merged });
-            changed = true;
         }
 
-        if (!changed) { return state; }
+        if (totalNew == 0) { return state; }
 
-        return state with { EventTables = [.. updatedTables] };
+        var merged = FilterMethods.MergeSorted(
+            state.DisplayedEvents,
+            combinedBatch,
+            GetEffectiveOrderBy(state.OrderBy),
+            state.IsDescending);
+
+        return state with
+        {
+            DisplayedEvents = merged,
+            EventTables = updatedTables,
+            EventCountByLog = counts
+        };
     }
 
     [ReducerMethod(typeof(EventTableAction.CloseAll))]
     public static EventTableState ReduceCloseAll(EventTableState state) =>
-        state with { EventTables = [], ActiveEventLogId = null };
+        state with
+        {
+            EventTables = [],
+            DisplayedEvents = [],
+            EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
+            ActiveEventLogId = null
+        };
 
     [ReducerMethod]
     public static EventTableState ReduceCloseLog(EventTableState state, EventTableAction.CloseLog action)
     {
-        var updatedTables = state.EventTables
+        var closingTable = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
+
+        if (closingTable is null || closingTable.IsCombined) { return state; }
+
+        var remainingPerLogTables = state.EventTables
             .Where(table => table.Id != action.LogId && !table.IsCombined)
             .ToImmutableList();
 
-        switch (updatedTables.Count)
-        {
-            case <= 0: return state with { EventTables = [], ActiveEventLogId = null };
-            case <= 1:
-                return state with
-                {
-                    EventTables = updatedTables,
-                    ActiveEventLogId = updatedTables.First().Id
-                };
-            default:
-                var combinedTable = new EventTableModel(EventLogId.Create())
-                {
-                    IsCombined = true,
-                    DisplayedEvents = GetCombinedEvents(
-                        updatedTables.Select(log => log.DisplayedEvents),
-                        GetEffectiveOrderBy(state.OrderBy),
-                        state.IsDescending)
-                };
+        var counts = state.EventCountByLog.Remove(action.LogId);
 
+        switch (remainingPerLogTables.Count)
+        {
+            case <= 0:
                 return state with
                 {
-                    EventTables = updatedTables.Add(combinedTable),
-                    ActiveEventLogId =
-                    updatedTables.FirstOrDefault(table => table.Id == state.ActiveEventLogId) is not null ?
-                        state.ActiveEventLogId : combinedTable.Id
+                    EventTables = [],
+                    DisplayedEvents = [],
+                    EventCountByLog = ImmutableDictionary<EventLogId, int>.Empty,
+                    ActiveEventLogId = null
                 };
+            case 1:
+                {
+                    var soleRemaining = remainingPerLogTables[0];
+                    var filtered = FilterByOwningLog(state.DisplayedEvents, soleRemaining.LogName);
+
+                    return state with
+                    {
+                        EventTables = remainingPerLogTables,
+                        DisplayedEvents = filtered,
+                        EventCountByLog = counts,
+                        ActiveEventLogId = soleRemaining.Id
+                    };
+                }
+            default:
+                {
+                    var combinedTable = new EventTableModel(EventLogId.Create()) { IsCombined = true };
+                    var filtered = FilterOutOwningLog(state.DisplayedEvents, closingTable.LogName);
+
+                    return state with
+                    {
+                        EventTables = remainingPerLogTables.Insert(0, combinedTable),
+                        DisplayedEvents = filtered,
+                        EventCountByLog = counts,
+                        ActiveEventLogId = remainingPerLogTables.Any(t => t.Id == state.ActiveEventLogId) ?
+                            state.ActiveEventLogId : combinedTable.Id
+                    };
+                }
         }
     }
 
@@ -214,71 +264,95 @@ public sealed class EventTableReducers
     public static EventTableState ReduceToggleSorting(EventTableState state) =>
         SortDisplayEvents(state, state.OrderBy, !state.IsDescending);
 
-    [ReducerMethod(typeof(EventTableAction.UpdateCombinedEvents))]
-    public static EventTableState ReduceUpdateCombinedEvents(EventTableState state)
-    {
-        if (state.EventTables.Count <= 1) { return state; }
-
-        var nonCombinedTables = state.EventTables.Where(table => !table.IsCombined);
-
-        if (nonCombinedTables.All(table => table.IsLoading)) { return state; }
-
-        var existingCombinedTable = state.EventTables.FirstOrDefault(table => table.IsCombined);
-
-        if (existingCombinedTable is null) { return state; }
-
-        var combinedEvents = GetCombinedEvents(
-            state.EventTables
-                .Where(table => !table.IsCombined)
-                .Select(table => table.DisplayedEvents),
-            GetEffectiveOrderBy(state.OrderBy),
-            state.IsDescending);
-
-        if (combinedEvents.Count == existingCombinedTable.DisplayedEvents.Count &&
-            combinedEvents.Select(e => (e.OwningLog, e.RecordId))
-                .SequenceEqual(existingCombinedTable.DisplayedEvents.Select(e => (e.OwningLog, e.RecordId))))
-        {
-            return state;
-        }
-
-        return state with
-        {
-            EventTables = state.EventTables
-                .Remove(existingCombinedTable)
-                .Add(existingCombinedTable with { DisplayedEvents = combinedEvents })
-        };
-    }
-
     [ReducerMethod]
     public static EventTableState ReduceUpdateDisplayedEvents(
         EventTableState state,
         EventTableAction.UpdateDisplayedEvents action)
     {
-        List<EventTableModel> updatedTables = [];
+        // Skip log ids absent from EventTables: log closed while filter ran.
+        var tablesById = state.EventTables
+            .Where(table => !table.IsCombined)
+            .ToDictionary(table => table.Id);
 
-        foreach (var table in state.EventTables)
+        // Logs absent from ActiveLogs keep their current rows (stale-snapshot protection).
+        var logNamesBeingReplaced = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var (logId, _) in action.ActiveLogs)
         {
-            if (table.IsCombined)
+            if (tablesById.TryGetValue(logId, out var table))
             {
-                updatedTables.Add(table);
-
-                continue;
+                logNamesBeingReplaced.Add(table.LogName);
             }
-
-            if (!action.ActiveLogs.TryGetValue(table.Id, out var currentActiveLog))
-            {
-                updatedTables.Add(table);
-
-                continue;
-            }
-
-            updatedTables.Add(table with
-            {
-                DisplayedEvents = currentActiveLog.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending)
-            });
         }
 
-        return state with { EventTables = [.. updatedTables] };
+        // Defensive: orphan rows whose OwningLog has no current table get dropped.
+        var currentLogNames = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var table in tablesById.Values)
+        {
+            currentLogNames.Add(table.LogName);
+        }
+
+        int preservedCount = 0;
+
+        for (int eventIndex = 0; eventIndex < state.DisplayedEvents.Count; eventIndex++)
+        {
+            var existing = state.DisplayedEvents[eventIndex];
+
+            if (currentLogNames.Contains(existing.OwningLog) &&
+                !logNamesBeingReplaced.Contains(existing.OwningLog))
+            {
+                preservedCount++;
+            }
+        }
+
+        int totalCount = preservedCount;
+
+        foreach (var (logId, events) in action.ActiveLogs)
+        {
+            if (tablesById.ContainsKey(logId)) { totalCount += events.Count; }
+        }
+
+        var concatenated = new List<DisplayEventModel>(totalCount);
+
+        for (int eventIndex = 0; eventIndex < state.DisplayedEvents.Count; eventIndex++)
+        {
+            var existing = state.DisplayedEvents[eventIndex];
+
+            if (currentLogNames.Contains(existing.OwningLog) &&
+                !logNamesBeingReplaced.Contains(existing.OwningLog))
+            {
+                concatenated.Add(existing);
+            }
+        }
+
+        var counts = state.EventCountByLog;
+        var tables = state.EventTables;
+
+        foreach (var (logId, events) in action.ActiveLogs)
+        {
+            if (!tablesById.TryGetValue(logId, out var table)) { continue; }
+
+            concatenated.AddRange(events);
+            counts = counts.SetItem(logId, events.Count);
+
+            // Filter-clear may be the first event-bearing path for a log; latch ComputerName.
+            var updatedTable = SetComputerNameIfFirstEvent(table, events);
+
+            if (!ReferenceEquals(updatedTable, table))
+            {
+                tables = tables.Replace(table, updatedTable);
+            }
+        }
+
+        var sorted = concatenated.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending);
+
+        return state with
+        {
+            DisplayedEvents = sorted,
+            EventTables = tables,
+            EventCountByLog = counts
+        };
     }
 
     [ReducerMethod]
@@ -286,45 +360,107 @@ public sealed class EventTableReducers
     {
         var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
 
-        if (table is null) { return state; }
+        if (table is null || table.IsCombined) { return state; }
+
+        // UpdateTable carries the full slice; drop existing rows before merging.
+        bool hasExistingRowsForLog = state.EventCountByLog.TryGetValue(table.Id, out int existingCount) && existingCount > 0;
+
+        var existing = hasExistingRowsForLog
+            ? FilterOutOwningLog(state.DisplayedEvents, table.LogName)
+            : state.DisplayedEvents;
+
+        var merged = FilterMethods.MergeSorted(
+            existing,
+            action.Events,
+            GetEffectiveOrderBy(state.OrderBy),
+            state.IsDescending);
+
+        var updatedTable = SetComputerNameIfFirstEvent(table, action.Events) with { IsLoading = false };
+        var counts = state.EventCountByLog.SetItem(table.Id, action.Events.Count);
 
         return state with
         {
-            EventTables = state.EventTables.Replace(table, table with
-            {
-                DisplayedEvents = action.Events.SortEvents(GetEffectiveOrderBy(state.OrderBy), state.IsDescending),
-                IsLoading = false
-            })
+            DisplayedEvents = merged,
+            EventTables = state.EventTables.Replace(table, updatedTable),
+            EventCountByLog = counts
         };
     }
 
-    private static IReadOnlyList<DisplayEventModel> GetCombinedEvents(
-        IEnumerable<IReadOnlyList<DisplayEventModel>> sortedEventLists,
-        ColumnName orderBy,
-        bool isDescending) =>
-        FilterMethods.MergeSorted([.. sortedEventLists], orderBy, isDescending);
+    private static IReadOnlyList<DisplayEventModel> FilterByOwningLog(
+        IReadOnlyList<DisplayEventModel> events,
+        string owningLog)
+    {
+        var filtered = new List<DisplayEventModel>(events.Count);
 
-    // The k-way merge in GetCombinedEvents requires every per-log list to have been sorted with
-    // the same comparator. Funnel all per-log sort and combined-merge call sites through this
-    // helper so the effective default (DateAndTime) is applied consistently in both directions.
+        for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
+        {
+            var current = events[eventIndex];
+
+            if (string.Equals(current.OwningLog, owningLog, StringComparison.Ordinal))
+            {
+                filtered.Add(current);
+            }
+        }
+
+        return filtered.AsReadOnly();
+    }
+
+    private static IReadOnlyList<DisplayEventModel> FilterOutOwningLog(
+        IReadOnlyList<DisplayEventModel> events,
+        string owningLog)
+    {
+        var filtered = new List<DisplayEventModel>(events.Count);
+
+        for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
+        {
+            var current = events[eventIndex];
+
+            if (!string.Equals(current.OwningLog, owningLog, StringComparison.Ordinal))
+            {
+                filtered.Add(current);
+            }
+        }
+
+        return filtered.AsReadOnly();
+    }
+
     private static ColumnName GetEffectiveOrderBy(ColumnName? orderBy) =>
         orderBy ?? ColumnName.DateAndTime;
 
+    private static ImmutableDictionary<EventLogId, int> IncrementCount(
+        ImmutableDictionary<EventLogId, int> counts,
+        EventLogId logId,
+        int delta)
+    {
+        int current = counts.TryGetValue(logId, out int existing) ? existing : 0;
+        return counts.SetItem(logId, current + delta);
+    }
+
+    private static EventTableModel SetComputerNameIfFirstEvent(EventTableModel table, IReadOnlyList<DisplayEventModel> newEvents)
+    {
+        if (!string.IsNullOrEmpty(table.ComputerName) || newEvents.Count == 0) { return table; }
+
+        // events[0].ComputerName may be empty (resolver miss); scan for first non-empty.
+        for (int i = 0; i < newEvents.Count; i++)
+        {
+            var candidate = newEvents[i];
+
+            if (!string.IsNullOrEmpty(candidate.ComputerName))
+            {
+                return table with { ComputerName = candidate.ComputerName };
+            }
+        }
+
+        return table;
+    }
+
     private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)
     {
-        List<EventTableModel> updatedTables = [];
         var effectiveOrderBy = GetEffectiveOrderBy(orderBy);
-
-        updatedTables.AddRange(
-            state.EventTables.Select(
-                logData => logData with
-                {
-                    DisplayedEvents = logData.DisplayedEvents.SortEvents(effectiveOrderBy, isDescending)
-                }));
 
         return state with
         {
-            EventTables = [.. updatedTables],
+            DisplayedEvents = state.DisplayedEvents.SortEvents(effectiveOrderBy, isDescending),
             OrderBy = orderBy,
             IsDescending = isDescending
         };

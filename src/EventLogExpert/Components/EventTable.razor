@@ -7,7 +7,7 @@
 <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
     <table aria-label="Event Log Table"
         aria-multiselectable="true"
-        aria-rowcount="@(_currentTable?.DisplayedEvents.Count + 1 ?? 1)"
+        aria-rowcount="@(_activeDisplayedEvents.Count + 1)"
         id="eventTable"
         role="grid">
         <thead @oncontextmenu="InvokeTableColumnMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
@@ -48,7 +48,7 @@
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         @if (_currentTable is not null)
         {
-            <Virtualize Context="evt" Items="@(_currentTable.DisplayedEvents as ICollection<DisplayEventModel> ?? [])">
+            <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<DisplayEventModel> ?? [])">
                 <tr aria-rowindex="@GetRowIndex(evt)"
                     aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
                     class="@GetCss(evt)"

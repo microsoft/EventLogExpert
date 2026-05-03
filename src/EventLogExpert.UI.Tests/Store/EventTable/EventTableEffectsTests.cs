@@ -383,32 +383,6 @@ public sealed class EventTableEffectsTests
                 columns.Count() == 2);
     }
 
-    [Fact]
-    public async Task HandleUpdateDisplayedEvents_ShouldDispatchUpdateCombinedEvents()
-    {
-        // Arrange
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
-        // Act
-        await EventTableEffects.HandleUpdateDisplayedEvents(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateCombinedEvents>());
-    }
-
-    [Fact]
-    public async Task HandleUpdateTable_ShouldDispatchUpdateCombinedEvents()
-    {
-        // Arrange
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
-        // Act
-        await EventTableEffects.HandleUpdateTable(mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.UpdateCombinedEvents>());
-    }
-
     private static (EventTableEffects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
         CreateEffects(List<ColumnName>? enabledColumns = null, EventTableState? state = null)
     {

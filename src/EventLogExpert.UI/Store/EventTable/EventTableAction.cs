@@ -42,8 +42,6 @@ public sealed record EventTableAction
 
     public sealed record ToggleSorting;
 
-    public sealed record UpdateCombinedEvents;
-
     public sealed record UpdateDisplayedEvents(
         IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> ActiveLogs);
 

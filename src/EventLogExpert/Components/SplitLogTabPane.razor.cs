@@ -51,7 +51,7 @@ public sealed partial class SplitLogTabPane
         return true;
     }
 
-    private static string GetTabName(EventTableModel table)
+    private string GetTabName(EventTableModel table)
     {
         if (table.IsCombined) { return "Combined"; }
 
@@ -59,7 +59,11 @@ public sealed partial class SplitLogTabPane
             Path.GetFileNameWithoutExtension(table.FileName)!.Split("\\").Last() :
             $"{table.LogName} - {table.ComputerName}";
 
-        return table.DisplayedEvents.Count <= 0 && !table.IsLoading ? $"(Empty) {tabName}" : tabName;
+        if (table.IsLoading) { return tabName; }
+
+        int count = _eventTableState.EventCountByLog.GetValueOrDefault(table.Id, 0);
+
+        return count <= 0 ? $"(Empty) {tabName}" : tabName;
     }
 
     private static string GetTabTooltip(EventTableModel table)
