@@ -13,9 +13,9 @@ public interface ILogWatcherService
 {
     void AddLog(string logName, string? bookmark, bool renderXml = false);
 
-    void RemoveAll();
+    Task RemoveAllAsync();
 
-    void RemoveLog(string logName);
+    Task RemoveLogAsync(string logName);
 }
 
 public sealed class LiveLogWatcherService : ILogWatcherService
@@ -45,7 +45,10 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         {
             if (isFull)
             {
-                StopWatching();
+                // Buffer-full is a state change, not a coordinated delete: fire-and-forget
+                // is fine because nothing downstream is waiting for the old per-event
+                // resolver scopes to finish disposing.
+                _ = StopAllWatchersAsync();
             }
             else
             {
@@ -71,7 +74,7 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         // If this is the first log added, or if we're already watching
         // other logs, then we need to start watching this one.
         //
-        // If we have _logsToWatch but no watchers, that means StopWatching()
+        // If we have _logsToWatch but no watchers, that means StopAllWatchersAsync()
         // was called due to a full buffer. In that case we do not want to
         // start watching the new log.
         if (_logsToWatch.Count == 1 || IsWatching())
@@ -80,25 +83,51 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         }
     }
 
-    public void RemoveAll()
+    public Task RemoveAllAsync()
     {
-        using var scope = _watchersLock.EnterScope();
+        List<string> logNames;
 
-        while (_logsToWatch.Count > 0)
+        using (_watchersLock.EnterScope())
         {
-            RemoveLog(_logsToWatch[0]);
+            // Snapshot the names before iterating so RemoveLogAsync can mutate
+            // _logsToWatch without invalidating our enumerator.
+            logNames = [.. _logsToWatch];
         }
+
+        var tasks = new List<Task>(logNames.Count);
+
+        foreach (var logName in logNames)
+        {
+            tasks.Add(RemoveLogAsync(logName));
+        }
+
+        return Task.WhenAll(tasks);
     }
 
-    public void RemoveLog(string logName)
+    public Task RemoveLogAsync(string logName)
     {
-        using var scope = _watchersLock.EnterScope();
+        EventLogWatcher? watcher;
 
-        _logsToWatch.Remove(logName);
-        _bookmarks.Remove(logName);
-        _renderXmlByLog.Remove(logName);
+        using (_watchersLock.EnterScope())
+        {
+            _logsToWatch.Remove(logName);
+            _bookmarks.Remove(logName);
+            _renderXmlByLog.Remove(logName);
 
-        StopWatching(logName);
+            if (!_watchers.Remove(logName, out watcher)) { return Task.CompletedTask; }
+        }
+
+        // Always dispose on a background thread to avoid a deadlock if this is
+        // called on the UI thread. EventLogWatcher.Unsubscribe blocks until all
+        // in-flight ProcessNewEvents callbacks have completed (so the per-event
+        // service scopes — and the SQLite handles they hold — are released
+        // before this Task completes).
+        return Task.Run(() =>
+        {
+            watcher.Dispose();
+
+            _debugLogger.Info($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
+        });
     }
 
     private bool IsWatching()
@@ -175,36 +204,40 @@ public sealed class LiveLogWatcherService : ILogWatcherService
         });
     }
 
-    private void StopWatching()
+    private Task StopAllWatchersAsync()
     {
-        using var scope = _watchersLock.EnterScope();
+        List<string> logNames;
 
-        foreach (var logName in _watchers.Keys)
+        using (_watchersLock.EnterScope())
         {
-            StopWatching(logName);
+            // Snapshot keys before iterating; StopWatchingAsync mutates the dict.
+            logNames = [.. _watchers.Keys];
         }
+
+        var tasks = new List<Task>(logNames.Count);
+
+        foreach (var logName in logNames)
+        {
+            tasks.Add(StopWatchingAsync(logName));
+        }
+
+        return Task.WhenAll(tasks);
     }
 
-    private void StopWatching(string logName)
+    private Task StopWatchingAsync(string logName)
     {
-        using var scope = _watchersLock.EnterScope();
+        EventLogWatcher? watcher;
 
-        if (!_watchers.Remove(logName, out var watcher))
+        using (_watchersLock.EnterScope())
         {
-            return;
+            if (!_watchers.Remove(logName, out watcher)) { return Task.CompletedTask; }
         }
 
-        // Always do this on a background thread to avoid a deadlock
-        // if this is called on the UI thread. EventLogWatcher.Enabled = false
-        // will cause the thread to block until all outstanding callbacks
-        // have completed.
-        Task.Run(() =>
+        return Task.Run(() =>
         {
             watcher.Dispose();
 
             _debugLogger.Info($"{nameof(LiveLogWatcherService)} disposed the old watcher for log {logName}.");
         });
-
-        _debugLogger.Debug($"{nameof(LiveLogWatcherService)} dispatched a task to stop the watcher for log {logName}.");
     }
 }

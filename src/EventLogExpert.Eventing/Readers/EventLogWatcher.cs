@@ -189,7 +189,16 @@ public sealed partial class EventLogWatcher : IDisposable
 
         if (_waitHandle is not null)
         {
-            _waitHandle.Unregister(null);
+            // Pass a wait object (not null) so Unregister blocks until all in-flight
+            // ProcessNewEvents callbacks have completed. Per the .NET docs on
+            // RegisteredWaitHandle.Unregister, passing null does NOT wait — and our
+            // callback creates per-event resolver scopes that hold pooled SQLite
+            // connections, so callers (e.g., DatabaseService delete) need a hard
+            // guarantee that no callback can fire after Unregister returns.
+            using var unregisterSignal = new ManualResetEvent(false);
+
+            _waitHandle.Unregister(unregisterSignal);
+            unregisterSignal.WaitOne();
             _waitHandle = null;
         }
 

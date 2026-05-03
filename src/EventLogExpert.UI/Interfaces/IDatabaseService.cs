@@ -40,7 +40,10 @@ public interface IDatabaseService : IAsyncDisposable
 
     void Refresh();
 
-    void Remove(string fileName);
+    Task RemoveAsync(
+        string fileName,
+        Func<CancellationToken, Task>? prepareForDeletionAsync = null,
+        CancellationToken cancellationToken = default);
 
     Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default);
 

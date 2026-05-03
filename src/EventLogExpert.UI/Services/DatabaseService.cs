@@ -28,7 +28,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
-    
+
     private int _disposed;
     private ImmutableList<DatabaseEntry> _entries = [];
     private int _queuedBatchCount;
@@ -469,9 +469,34 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         RaiseEntriesChanged();
     }
 
-    public void Remove(string fileName)
+    public async Task RemoveAsync(
+        string fileName,
+        Func<CancellationToken, Task>? prepareForDeletionAsync = null,
+        CancellationToken cancellationToken = default)
     {
-        using var reservation = ReserveFileOperation(fileName, nameof(Remove));
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var reservation = ReserveFileOperation(fileName, nameof(RemoveAsync));
+
+        // Wait for initial classification so callers don't race with the background scan
+        // (which can mutate IsEnabled / Status / BackupExists for this entry mid-flight).
+        try
+        {
+            await InitialClassificationTask.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Trace(
+                $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: InitialClassificationTask faulted unexpectedly: {ex}"));
+        }
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // Phase 1: disable the entry under the mutation lock so EventResolver can no longer
+        // pick this database up on its next construction. Capture wasEnabled so we can
+        // restore on rollback if a later phase fails. RaiseEntriesChanged outside the lock.
+        bool wasEnabled;
+        bool entryFound;
 
         lock (_mutationLock)
         {
@@ -480,17 +505,82 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             if (index < 0)
             {
                 throw new InvalidOperationException(
-                    $"{nameof(DatabaseService)}.{nameof(Remove)}: no entry found with file name '{fileName}'.");
+                    $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: no entry found with file name '{fileName}'.");
             }
 
-            DeleteDatabaseFiles(fileName);
+            var current = _entries[index];
+            wasEnabled = current.IsEnabled;
+            entryFound = true;
 
-            ImmutableList<DatabaseEntry> nextSnapshot = _entries.RemoveAt(index);
-            PersistDisabled(nextSnapshot);
-            _entries = nextSnapshot;
+            if (wasEnabled)
+            {
+                _entries = _entries.SetItem(index, current with { IsEnabled = false });
+                PersistDisabled(_entries);
+            }
         }
 
-        RaiseEntriesChanged();
+        if (entryFound && wasEnabled) { RaiseEntriesChanged(); }
+
+        // Phase 2: let the caller close any open log views before we touch the file.
+        // Always invoked when a callback is supplied — a previously-disabled entry can still
+        // be referenced by IEventResolver instances constructed before the disable (e.g., the
+        // user disabled this DB and declined the modal-close reload prompt). Those resolvers
+        // hold DbContexts whose connections are NOT in the pool until the per-event service
+        // scope disposes, so ClearAllPools below cannot release them and File.Delete races.
+        if (prepareForDeletionAsync is not null)
+        {
+            try
+            {
+                await prepareForDeletionAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                SafeLog(() => _traceLogger.Warn(
+                    $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: prepare-for-deletion callback failed: {ex}"));
+
+                RestoreEnabledIfChanged(fileName, wasEnabled);
+
+                throw;
+            }
+        }
+
+        // Phase 3: clear the SQLite connection pool and delete the files. Pool clear is
+        // required so the OS file handles backing the pooled connections are closed; the
+        // closed-but-pooled connections still hold the file handle without
+        // FILE_SHARE_DELETE on Windows.
+        try
+        {
+            SqliteConnection.ClearAllPools();
+
+            DeleteDatabaseFiles(fileName);
+        }
+        catch (Exception ex)
+        {
+            SafeLog(() => _traceLogger.Warn(
+                $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: deleting files for '{fileName}' failed: {ex}"));
+
+            RestoreEnabledIfChanged(fileName, wasEnabled);
+
+            throw;
+        }
+
+        // Phase 4: drop the entry from the snapshot. Re-find by fileName under the lock —
+        // the snapshot reference captured in Phase 1 is stale because Phase 1 mutated it.
+        bool removed = false;
+
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index >= 0)
+            {
+                _entries = _entries.RemoveAt(index);
+                PersistDisabled(_entries);
+                removed = true;
+            }
+        }
+
+        if (removed) { RaiseEntriesChanged(); }
     }
 
     public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
@@ -520,22 +610,43 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
     public void Toggle(string fileName)
     {
-        lock (_mutationLock)
+        // Defense-in-depth: the UI disables toggle while a remove/import/upgrade is in
+        // flight, but a stale click could still reach here. ReserveFileOperation throws
+        // if another op holds the reservation; catch + log so the UI sees a no-op rather
+        // than an unhandled exception.
+        FileOperationReservation reservation;
+
+        try
         {
-            var index = FindEntryIndex(_entries, fileName);
+            reservation = ReserveFileOperation(fileName, nameof(Toggle));
+        }
+        catch (InvalidOperationException ex)
+        {
+            SafeLog(() => _traceLogger.Trace(
+                $"{nameof(DatabaseService)}.{nameof(Toggle)}: skipping toggle of '{fileName}' because another operation is in progress: {ex.Message}"));
 
-            if (index < 0)
+            return;
+        }
+
+        using (reservation)
+        {
+            lock (_mutationLock)
             {
-                throw new InvalidOperationException(
-                    $"{nameof(DatabaseService)}.{nameof(Toggle)}: no entry found with file name '{fileName}'.");
+                var index = FindEntryIndex(_entries, fileName);
+
+                if (index < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"{nameof(DatabaseService)}.{nameof(Toggle)}: no entry found with file name '{fileName}'.");
+                }
+
+                var current = _entries[index];
+                var updated = current with { IsEnabled = !current.IsEnabled };
+                ImmutableList<DatabaseEntry> nextSnapshot = _entries.SetItem(index, updated);
+
+                PersistDisabled(nextSnapshot);
+                _entries = nextSnapshot;
             }
-
-            var current = _entries[index];
-            var updated = current with { IsEnabled = !current.IsEnabled };
-            ImmutableList<DatabaseEntry> nextSnapshot = _entries.SetItem(index, updated);
-
-            PersistDisabled(nextSnapshot);
-            _entries = nextSnapshot;
         }
 
         RaiseEntriesChanged();
@@ -1063,8 +1174,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
     }
 
-    private void RaiseEntriesChanged()
-    {
+    private void RaiseEntriesChanged()    {
         var handler = EntriesChanged;
 
         if (handler is null) { return; }
@@ -1103,6 +1213,31 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
 
         return new FileOperationReservation(this, fileName);
+    }
+
+    private void RestoreEnabledIfChanged(string fileName, bool wasEnabled)
+    {
+        bool changed = false;
+
+        // Re-find by fileName under the lock — the Phase 1 snapshot is stale by now.
+        // Only mutate the IsEnabled field on whatever entry matches; status / backup /
+        // other fields may have been updated by classification or another path.
+        lock (_mutationLock)
+        {
+            var index = FindEntryIndex(_entries, fileName);
+
+            if (index < 0) { return; }
+
+            var current = _entries[index];
+
+            if (current.IsEnabled == wasEnabled) { return; }
+
+            _entries = _entries.SetItem(index, current with { IsEnabled = wasEnabled });
+            PersistDisabled(_entries);
+            changed = true;
+        }
+
+        if (changed) { RaiseEntriesChanged(); }
     }
 
     private bool RestoreFilesCore(DatabaseEntry entry)

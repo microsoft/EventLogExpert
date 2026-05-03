@@ -47,11 +47,14 @@
                 break;
         }
 
-        <button aria-label="@($"Remove database {Entry.FileName}")"
-            class="button button-red db-entry-remove-btn"
-            @onclick="@(() => OnRemove.InvokeAsync())"
-            type="button">
-            <i aria-hidden="true" class="bi bi-trash"></i>
-        </button>
+        @if (CanRemove)
+        {
+            <button aria-label="@($"Remove database {Entry.FileName}")"
+                class="button button-red db-entry-remove-btn"
+                @onclick="@(() => OnRemove.InvokeAsync())"
+                type="button">
+                <i aria-hidden="true" class="bi bi-trash"></i>
+            </button>
+        }
     </div>
 </div>

@@ -29,18 +29,46 @@ public sealed class EventLogEffects(
     IEventXmlResolver xmlResolver,
     IServiceScopeFactory serviceScopeFactory,
     IDatabaseService databaseService,
-    IBannerService bannerService)
+    IBannerService bannerService,
+    IDispatcher dispatcher) : ILogReloadCoordinator
 {
+    /// <summary>Defensive timeout when awaiting a log close — both for the load task to
+    /// unwind (so the LoadLogAsync service scope disposes and releases its event resolver)
+    /// and for the watcher callbacks to drain (so per-event resolver scopes finish releasing
+    /// their pooled SQLite handles). 30 seconds is generous; in practice each completes in
+    /// milliseconds once cancellation is propagated.</summary>
+    public static readonly TimeSpan LogCloseTimeout = TimeSpan.FromSeconds(30);
+
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
 
     private readonly IBannerService _bannerService = bannerService;
     private readonly IDatabaseService _databaseService = databaseService;
+    private readonly IDispatcher _dispatcher = dispatcher;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly Lock _globalCtsLock = new();
+    private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logCloseCompletions = new();
+
+    /// <summary>Serializes <see cref="HandleSetFilters"/>'s XML-reload path with
+    /// <see cref="PrepareForDatabaseRemovalAsync"/>. Both write into <see cref="_logCloseCompletions"/>
+    /// with raw assignment; concurrent overlap on the same log id would orphan the first caller's
+    /// TCS (HandleCloseLog signals whichever is currently in the dict, the orphaned awaiter then
+    /// hits the 30s timeout). The lock ensures only one coordinator pre-registers, dispatches,
+    /// and awaits at a time. <see cref="HandleCloseLog"/> does NOT take this lock — it only
+    /// signals/removes existing entries and would deadlock against a coordinator holding the lock
+    /// and awaiting it.</summary>
+    private readonly SemaphoreSlim _logCloseCoordinatorLock = new(1, 1);
+
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
+
+    /// <summary>Tracks per-log load completion so <see cref="HandleCloseLog"/> can wait for
+    /// the in-flight <see cref="LoadLogAsync"/> service scope to dispose before draining the
+    /// watcher. Without this, cts.Cancel() merely requests cancellation — LoadLogAsync's
+    /// service scope (which owns the IEventResolver and its SQLite handles) only disposes
+    /// once HandleOpenLog's outer using/finally runs.</summary>
+    private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
 
     /// <summary>Tracks which currently-open logs (by <see cref="EventLogData.Id"/>) were loaded
     /// with renderXml=true. A reload-on-transition only re-opens logs that lack XML; logs that
@@ -107,11 +135,11 @@ public sealed class EventLogEffects(
     }
 
     [EffectMethod(typeof(EventLogAction.CloseAll))]
-    public Task HandleCloseAll(IDispatcher dispatcher)
+    public async Task HandleCloseAll(IDispatcher dispatcher)
     {
         CancelAllLoads();
 
-        _logWatcherService.RemoveAll();
+        await _logWatcherService.RemoveAllAsync();
 
         dispatcher.Dispatch(new EventTableAction.CloseAll());
         dispatcher.Dispatch(new StatusBarAction.CloseAll());
@@ -120,35 +148,65 @@ public sealed class EventLogEffects(
         _xmlResolver.ClearAll();
         _logsLoadedWithXml.Clear();
         _pendingSelectionRestore.Clear();
-
-        return Task.CompletedTask;
     }
 
     [EffectMethod]
-    public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
+    public async Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        if (_logCts.TryGetValue(action.LogId, out var cts))
+        try
         {
-            try { cts.Cancel(); }
-            catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
+            if (_logCts.TryGetValue(action.LogId, out var cts))
+            {
+                try { cts.Cancel(); }
+                catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
+            }
+
+            // Wait for the load task to fully unwind. Cancellation only requests stop;
+            // LoadLogAsync's service scope (which owns the IEventResolver and its SQLite
+            // handles) is not disposed until HandleOpenLog's outer using/finally runs.
+            // Defensive timeout so a wedged load can't deadlock close forever.
+            if (_logLoadCompletions.TryGetValue(action.LogId, out var loadCompletion))
+            {
+                try
+                {
+                    await loadCompletion.Task.WaitAsync(LogCloseTimeout);
+                }
+                catch (TimeoutException)
+                {
+                    _logger.Trace($"{nameof(HandleCloseLog)}: load task for '{action.LogName}' did not unwind within {LogCloseTimeout}.");
+                }
+            }
+
+            // Drain watcher callbacks. RemoveLogAsync's Task only completes after
+            // EventLogWatcher.Unsubscribe blocks for all in-flight ProcessNewEvents
+            // callbacks → all per-event resolver scopes disposed → all DbContexts
+            // disposed → connections returned to the SQLite pool.
+            await _logWatcherService.RemoveLogAsync(action.LogName);
+
+            _logsLoadedWithXml.TryRemove(action.LogId, out _);
+            _pendingSelectionRestore.TryRemove(action.LogName, out _);
+
+            // Drop any cached XML for this log; if the same name reopens later (e.g., post-rotation)
+            // a fresh resolve must occur instead of returning stale text from a different file.
+            _xmlResolver.ClearLog(action.LogName);
+
+            dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
+
+            if (_eventLogState.Value.ActiveLogs.IsEmpty)
+            {
+                _resolverCache.ClearAll();
+            }
         }
-
-        _logWatcherService.RemoveLog(action.LogName);
-        _logsLoadedWithXml.TryRemove(action.LogId, out _);
-        _pendingSelectionRestore.TryRemove(action.LogName, out _);
-
-        // Drop any cached XML for this log; if the same name reopens later (e.g., post-rotation)
-        // a fresh resolve must occur instead of returning stale text from a different file.
-        _xmlResolver.ClearLog(action.LogName);
-
-        dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
-
-        if (_eventLogState.Value.ActiveLogs.IsEmpty)
+        finally
         {
-            _resolverCache.ClearAll();
+            // Signal the coordinator (if it pre-registered for this log id) that all close
+            // work — load-await + watcher-drain + side effects — is done. Removing keeps
+            // the dictionary from leaking entries from non-coordinator close paths.
+            if (_logCloseCompletions.TryRemove(action.LogId, out var closeCompletion))
+            {
+                closeCompletion.TrySetResult();
+            }
         }
-
-        return Task.CompletedTask;
     }
 
     [EffectMethod]
@@ -223,6 +281,7 @@ public sealed class EventLogEffects(
         }
 
         _logCts[logData.Id] = perLoadCts;
+        _logLoadCompletions[logData.Id] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         // If CancelAllLoads ran between our generation snapshot and now, we may have
         // linked to the new (uncanceled) global CTS after the swap. CancelAllLoads's
@@ -282,6 +341,15 @@ public sealed class EventLogEffects(
             {
                 removedCts.Dispose();
             }
+
+            // Signal load completion AFTER the using/finally above has disposed the
+            // service scope. HandleCloseLog awaits this TCS so it can guarantee the
+            // resolver and its SQLite handles are released before the watcher is
+            // drained and the file is deleted.
+            if (_logLoadCompletions.TryRemove(logData.Id, out var loadCompletion))
+            {
+                loadCompletion.TrySetResult();
+            }
         }
     }
 
@@ -338,23 +406,71 @@ public sealed class EventLogEffects(
             }
 
             // Close + reopen only the logs that lack XML. Other open logs keep their state.
-            // CloseLog is dispatched first (and clears any prior _pendingSelectionRestore entry
-            // for that log name), then we populate the restore map, then OpenLog kicks off the
-            // new load which will consume the restore entry in HandleLoadEvents.
-            foreach (var (id, name, _) in logsNeedingReload)
-            {
-                dispatcher.Dispatch(new EventLogAction.CloseLog(id, name));
-            }
+            // HandleCloseLog clears _pendingSelectionRestore for the log name as part of its
+            // async cleanup (after awaiting watcher shutdown). Pre-register a close-completion
+            // TCS for each log, dispatch the closes, then AWAIT each completion before
+            // populating the restore map — otherwise an in-flight HandleCloseLog can wipe the
+            // freshly-written entry and silently lose the user's selection.
+            //
+            // The semaphore serializes this path with PrepareForDatabaseRemovalAsync: both
+            // write into _logCloseCompletions with raw assignment, so concurrent overlap on
+            // the same log id would orphan the first caller's TCS (HandleCloseLog signals
+            // whichever entry happens to be in the dict at the time).
+            await _logCloseCoordinatorLock.WaitAsync();
 
-            foreach (var (name, ids) in selectionByLog)
+            try
             {
-                long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
-                _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
-            }
+                var closeWaiters = new List<(EventLogId Id, string Name, Task Task)>(logsNeedingReload.Count);
 
-            foreach (var (_, name, type) in logsNeedingReload)
+                foreach (var (id, name, _) in logsNeedingReload)
+                {
+                    var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _logCloseCompletions[id] = tcs;
+                    closeWaiters.Add((id, name, tcs.Task));
+                }
+
+                foreach (var (id, name, _) in logsNeedingReload)
+                {
+                    dispatcher.Dispatch(new EventLogAction.CloseLog(id, name));
+                }
+
+                var timedOutLogs = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var (id, name, task) in closeWaiters)
+                {
+                    try
+                    {
+                        await task.WaitAsync(LogCloseTimeout);
+                    }
+                    catch (TimeoutException)
+                    {
+                        _logCloseCompletions.TryRemove(id, out _);
+                        timedOutLogs.Add(name);
+                        _logger.Trace($"{nameof(HandleSetFilters)}: close for log '{name}' did not complete within {LogCloseTimeout}; selection will not be restored to avoid race with the delayed close wiping the entry.");
+                    }
+                }
+
+                foreach (var (name, ids) in selectionByLog)
+                {
+                    if (timedOutLogs.Contains(name))
+                    {
+                        // The delayed HandleCloseLog will eventually call _pendingSelectionRestore
+                        // .TryRemove(name) — writing here would be silently wiped. Skip.
+                        continue;
+                    }
+
+                    long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
+                    _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
+                }
+
+                foreach (var (_, name, type) in logsNeedingReload)
+                {
+                    dispatcher.Dispatch(new EventLogAction.OpenLog(name, type));
+                }
+            }
+            finally
             {
-                dispatcher.Dispatch(new EventLogAction.OpenLog(name, type));
+                _logCloseCoordinatorLock.Release();
             }
 
             return;
@@ -432,6 +548,108 @@ public sealed class EventLogEffects(
             {
                 dispatcher.Dispatch(new FilterPaneAction.SetIsLoading(false));
             }
+        }
+    }
+
+    public async Task PrepareForDatabaseRemovalAsync(LogReopenSnapshot snapshot, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        var activeLogs = _eventLogState.Value.ActiveLogs.Values.ToList();
+
+        if (activeLogs.Count == 0) { return; }
+
+        // Serialize with HandleSetFilters' XML-reload path (see _logCloseCoordinatorLock
+        // doc-comment). Without this lock a concurrent reload-on-XML-filter could overwrite
+        // our pre-registered TCSes (or vice versa), orphaning awaiters until they hit the
+        // 30s timeout.
+        await _logCloseCoordinatorLock.WaitAsync(cancellationToken);
+
+        try
+        {
+            // Snapshot selection state BEFORE dispatching any CloseLog action — ReduceCloseLog
+            // synchronously wipes SelectedEvents/SelectedEvent from state, so reading them after
+            // the dispatch loses everything.
+            var reloadNames = activeLogs.Select(l => l.Name).ToHashSet(StringComparer.Ordinal);
+
+            var selectionByLog = _eventLogState.Value.SelectedEvents
+                .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
+                .GroupBy(e => e.OwningLog)
+                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
+
+            var selectedRecordId = _eventLogState.Value.SelectedEvent?.RecordId;
+            var selectedLogName = _eventLogState.Value.SelectedEvent?.OwningLog;
+
+            if (selectedRecordId.HasValue
+                && !string.IsNullOrEmpty(selectedLogName)
+                && reloadNames.Contains(selectedLogName)
+                && !selectionByLog.ContainsKey(selectedLogName))
+            {
+                selectionByLog[selectedLogName] = new HashSet<long>();
+            }
+
+            // Pre-register the close-completion TCSes BEFORE dispatching, so HandleCloseLog
+            // is guaranteed to find an entry to signal (the dispatcher might queue HandleCloseLog
+            // before this method's next statement runs).
+            var waiters = new List<(EventLogId Id, string Name, PathType Type, Task Task)>(activeLogs.Count);
+
+            foreach (var log in activeLogs)
+            {
+                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _logCloseCompletions[log.Id] = tcs;
+                waiters.Add((log.Id, log.Name, log.Type, tcs.Task));
+            }
+
+            foreach (var (id, name, _, _) in waiters)
+            {
+                _dispatcher.Dispatch(new EventLogAction.CloseLog(id, name));
+            }
+
+            // Await completion per-log so we can populate the snapshot incrementally. If a later
+            // log times out or cancels, the caller still gets the prefix that closed cleanly and
+            // can reopen them in the finally block.
+            foreach (var (id, name, type, task) in waiters)
+            {
+                try
+                {
+                    await task.WaitAsync(LogCloseTimeout, cancellationToken);
+
+                    snapshot.Add(new LogReopenInfo(name, type));
+                }
+                catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+                {
+                    // The TCS will never be signaled now (HandleCloseLog already removed itself
+                    // from the dict if it ran, or won't find us if it didn't). Drop the stranded
+                    // entry so the dictionary doesn't leak.
+                    _logCloseCompletions.TryRemove(id, out _);
+                    _logger.Trace($"{nameof(PrepareForDatabaseRemovalAsync)}: close for log '{name}' did not complete: {ex.GetType().Name}");
+
+                    throw;
+                }
+            }
+
+            // NOW write pending selection restores. HandleCloseLog wiped any prior entries
+            // for these log names during its TryRemove(_pendingSelectionRestore) call, so we
+            // know we're not racing with stale state.
+            foreach (var (name, ids) in selectionByLog)
+            {
+                long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
+                _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
+            }
+        }
+        finally
+        {
+            _logCloseCoordinatorLock.Release();
+        }
+    }
+
+    public void ReopenAfterDatabaseRemoval(IReadOnlyList<LogReopenInfo> snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+
+        foreach (var entry in snapshot)
+        {
+            _dispatcher.Dispatch(new EventLogAction.OpenLog(entry.Name, entry.Type));
         }
     }
 

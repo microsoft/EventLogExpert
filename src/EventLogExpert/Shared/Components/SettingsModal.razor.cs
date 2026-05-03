@@ -39,6 +39,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
+    [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
+
     private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
 
     private bool IsAnyUpgradeInFlight => _entriesUpgrading.Count > 0 || BannerService.SettingsProgress is not null;
@@ -304,7 +306,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         var isReadyAndEnabled = entry is { IsEnabled: true, Status: DatabaseStatus.Ready };
 
         var message = isReadyAndEnabled
-            ? $"{fileName} is currently enabled. Removing will affect open log views. Are you sure?"
+            ? $"{fileName} is currently enabled. Removing will close and reopen any affected log views. Are you sure?"
             : $"Are you sure you want to remove {fileName}?";
 
         var confirmed = await AlertDialogService.ShowAlert("Remove Database",
@@ -314,16 +316,40 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         if (!confirmed) { return; }
 
+        // Sink populated incrementally as the coordinator closes each log; the finally
+        // block reopens every log that successfully closed regardless of whether the
+        // delete succeeded or threw downstream.
+        var snapshot = new LogReopenSnapshot();
+
         try
         {
-            DatabaseService.Remove(fileName);
-            _pendingToggles.Remove(fileName);
+            await DatabaseService.RemoveAsync(
+                fileName,
+                prepareForDeletionAsync: ct =>
+                    LogReloadCoordinator.PrepareForDatabaseRemovalAsync(snapshot, ct));
         }
         catch (Exception ex)
         {
             await AlertDialogService.ShowAlert("Failed to Remove Database",
                 $"An exception occurred while removing provider databases: {ex.Message}",
                 "OK");
+        }
+        finally
+        {
+            if (snapshot.Items.Count > 0)
+            {
+                LogReloadCoordinator.ReopenAfterDatabaseRemoval(snapshot.Items);
+
+                // Coordinator just rebuilt the resolver scopes for these logs against the
+                // current enabled-database set, which subsumes any prior dirty state from
+                // earlier modal actions. Suppress the modal-close global reload prompt so
+                // the user isn't asked twice. When no logs were reopened we leave the flag
+                // alone so unrelated prior mutations (e.g., a toggle earlier in the same
+                // modal session) still trigger their pending reload on close.
+                _databaseStateChanged = false;
+            }
+
+            _pendingToggles.Remove(fileName);
         }
     }
 

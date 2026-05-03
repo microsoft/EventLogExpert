@@ -42,6 +42,13 @@ public static class MauiProgram
             options.AddMiddleware<LoggingMiddleware>();
         });
 
+        // EventLogEffects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
+        // by assembly scan; resolve the same instance through the coordinator interface so callers
+        // (SettingsModal) get the single per-app instance with its dictionaries of in-flight loads
+        // and close completions.
+        builder.Services.AddSingleton<ILogReloadCoordinator>(sp =>
+            sp.GetRequiredService<EventLogEffects>());
+
         // Core Services
         builder.Services.AddSingleton<DebugLogService>();
         builder.Services.AddSingleton<ITraceLogger>(sp => sp.GetRequiredService<DebugLogService>());
