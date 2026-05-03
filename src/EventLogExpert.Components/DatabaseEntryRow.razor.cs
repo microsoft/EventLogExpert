@@ -39,6 +39,15 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private string BadgeLabel => DatabaseStatusLabels.GetRowBadgeLabel(Entry);
 
+    /// <summary>Removal is hidden for entries the user must resolve some other way first:
+    /// an in-flight upgrade (would race the per-file reservation), a pending recovery
+    /// (would orphan the .upgrade.bak), or a V3 database awaiting upgrade (steers the user
+    /// to either Upgrade or — once UpgradeFailed — Retry/Remove). UpgradeFailed remains
+    /// removable so a user who has tried and given up can still clean the entry up.</summary>
+    private bool CanRemove => !IsUpgrading
+        && !Entry.BackupExists
+        && Entry.Status != DatabaseStatus.UpgradeRequired;
+
     private ActionKind PrimaryAction
     {
         get
@@ -62,6 +71,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         }
     }
 
-    private bool ShouldShowBadge =>
-        Entry.BackupExists || (!IsUpgrading && Entry.Status != DatabaseStatus.Ready);
+    private bool ShouldShowBadge => Entry.BackupExists ||
+        (!IsUpgrading &&
+            Entry.Status != DatabaseStatus.Ready &&
+            Entry.Status != DatabaseStatus.UpgradeRequired);
 }

@@ -515,11 +515,11 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public async Task BannerHost_OpenSettingsClickedAndSucceeded_InvokesOpenSettings_ThenDismissesAttention()
+    public async Task BannerHost_OpenSettingsClicked_DismissesAttention_BeforeAwaitingOpenSettings()
     {
-        // The dismiss MUST happen AFTER the open returns success — dismissing first would leave the user with
-        // no banner if the open silently failed (which is what `MauiMenuActionService.ShowModalAsync` does
-        // internally for unexpected exceptions).
+        // Clicking the action button is itself the user-acknowledgement that they're acting on the items;
+        // dismissing immediately means the banner doesn't linger while the modal opens (which can take a
+        // perceptible beat). On failure the error banner replaces the attention banner as the visible signal.
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(true));
 
@@ -529,25 +529,25 @@ public sealed class BannerHostTests : BunitContext
         Received.InOrder(
             () =>
             {
-                _ = _menuActionService.OpenSettingsAsync();
                 _bannerService.DismissAttention();
+                _ = _menuActionService.OpenSettingsAsync();
             });
         _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
-    public async Task BannerHost_OpenSettingsReturnsFalse_DoesNotDismissAttention_ReportsRecoverableError()
+    public async Task BannerHost_OpenSettingsReturnsFalse_DismissesAttentionImmediately_AndReportsRecoverableError()
     {
-        // OpenSettingsAsync caught internally and returned false. Attention banner must stay up — the underlying
-        // databases still need attention — and a recoverable Error must surface so the user knows the click was
-        // received but the modal failed to open.
+        // Dismiss-immediately semantics: the attention banner is gone the instant the user clicked, regardless
+        // of outcome. When OpenSettingsAsync returns false (caught internally), surface a recoverable Error so
+        // the user knows the click was received but the modal failed to open.
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
 
-        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.Received(1).DismissAttention();
         _bannerService.Received(1)
             .ReportError("Settings", Arg.Is<string>(s => s.Contains("Failed to open settings")));
         _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
@@ -597,10 +597,11 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public async Task BannerHost_OpenSettingsThrowsJSDisconnected_SwallowedWithoutErrorReport()
+    public async Task BannerHost_OpenSettingsThrowsJSDisconnected_DismissesAttention_NoErrorReport()
     {
         // Per rule 3.9, JSDisconnectedException is expected during teardown and must be caught silently — it
-        // does not warrant ReportError surface (the user closed the circuit themselves).
+        // does not warrant ReportError surface (the user closed the circuit themselves). The dismiss happened
+        // before the await so the attention banner is already gone by the time the throw lands.
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync()
             .Returns(Task.FromException<bool>(new Microsoft.JSInterop.JSDisconnectedException("circuit gone")));
@@ -608,17 +609,17 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
 
-        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.Received(1).DismissAttention();
         _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
         _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
     }
 
     [Fact]
-    public async Task BannerHost_OpenSettingsThrowsUnexpectedly_LogsAndReportsRecoverableError_DoesNotPropagate()
+    public async Task BannerHost_OpenSettingsThrowsUnexpectedly_DismissesAttention_LogsAndReportsRecoverableError()
     {
         // Defensive path: contract says OpenSettingsAsync catches internally, but a synchronous throw before the
         // first await would still bubble. Must not propagate to ErrorBoundary (which would escalate the visible
-        // banner from Attention to Critical). Surface as Error and leave attention up.
+        // banner from Attention to Critical). Surface as Error; attention was already dismissed on click.
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         var openException = new InvalidOperationException("modal boom");
         _menuActionService.OpenSettingsAsync().Returns(Task.FromException<bool>(openException));
@@ -626,7 +627,7 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
 
-        _bannerService.DidNotReceive().DismissAttention();
+        _bannerService.Received(1).DismissAttention();
         _bannerService.Received(1)
             .ReportError("Settings", Arg.Is<string>(s => s.Contains("modal boom")));
         _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());

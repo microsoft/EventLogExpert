@@ -1469,8 +1469,9 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public void Remove_DoesNotTouchUserCreatedDotBakFiles()
+    public async Task RemoveAsync_DoesNotTouchUserCreatedDotBakFiles()
     {
+        // Arrange
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
         CreateDatabaseFile(databasePath, Constants.TestDb1);
@@ -1481,16 +1482,19 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        service.Remove(Constants.TestDb1);
+        // Act
+        await service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken);
 
+        // Assert
         Assert.False(File.Exists(dbPath));
         Assert.True(File.Exists(userBakPath));
         Assert.Equal(userBackupContent, File.ReadAllText(userBakPath));
     }
 
     [Fact]
-    public async Task Remove_DuringInFlightUpgrade_ShouldThrowInvalidOperationException()
+    public async Task RemoveAsync_DuringInFlightUpgrade_ShouldThrowInvalidOperationException()
     {
+        // Arrange
         var databasePath = CreateDatabaseDirectory();
         DatabaseSeedUtils.SeedV3Schema(Path.Combine(databasePath, Constants.TestDb1));
 
@@ -1515,7 +1519,9 @@ public sealed class DatabaseServiceTests : IDisposable
 
         Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        var ex = Assert.Throws<InvalidOperationException>(() => service.Remove(Constants.TestDb1));
+        // Act + Assert
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken));
         Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         release.Set();
@@ -1523,7 +1529,28 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public void Remove_WhenCalled_ShouldDeleteDatabaseAndSidecars()
+    public async Task RemoveAsync_WhenAlreadyCancelledCallerCt_ThrowsOperationCanceled_BeforeAnyPhase()
+    {
+        // Arrange
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        var service = CreateDatabaseService();
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        // Act + Assert
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => service.RemoveAsync(Constants.TestDb1, cancellationToken: cts.Token));
+
+        Assert.True(File.Exists(dbPath));
+        Assert.Single(service.Entries);
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhenCalled_ShouldDeleteDatabaseAndSidecars()
     {
         // Arrange
         var databasePath = CreateDatabaseDirectory();
@@ -1534,7 +1561,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var service = CreateDatabaseService();
 
         // Act
-        service.Remove(Constants.TestDb1);
+        await service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.False(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
@@ -1544,7 +1571,7 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public void Remove_WhenCalled_ShouldRaiseEntriesChanged()
+    public async Task RemoveAsync_WhenCalled_ShouldRaiseEntriesChanged()
     {
         // Arrange
         var databasePath = CreateDatabaseDirectory();
@@ -1555,21 +1582,154 @@ public sealed class DatabaseServiceTests : IDisposable
         service.EntriesChanged += (_, _) => raised = true;
 
         // Act
-        service.Remove(Constants.TestDb1);
+        await service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(raised);
     }
 
     [Fact]
-    public void Remove_WhenFileNameUnknown_ShouldThrow()
+    public async Task RemoveAsync_WhenEntryDisabled_StillInvokesPrepareCallback()
+    {
+        // Arrange — a previously-disabled entry can still be referenced by IEventResolver
+        // instances constructed before the disable (the user disabled it and declined the
+        // modal-close reload prompt). The coordinator must still close any open log views
+        // so SqliteConnection.ClearAllPools + File.Delete don't race with in-flight scopes.
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var prefs = Substitute.For<IPreferencesProvider>();
+        prefs.DisabledDatabasesPreference.Returns([Constants.TestDb1]);
+        var service = CreateDatabaseService(prefs);
+
+        var disabledEntry = Assert.Single(service.Entries);
+        Assert.False(disabledEntry.IsEnabled);
+
+        var prepareInvoked = false;
+        Task PrepareCallback(CancellationToken ct)
+        {
+            prepareInvoked = true;
+            return Task.CompletedTask;
+        }
+
+        // Act
+        await service.RemoveAsync(
+            Constants.TestDb1,
+            prepareForDeletionAsync: PrepareCallback,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(prepareInvoked);
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhenEntryEnabled_AwaitsPrepareCallback_AfterDisable_BeforeFileDelete()
+    {
+        // Arrange — verifies the 4-phase ordering: disable → prepare-callback → file delete.
+        // Track phase order via a shared list. The callback observes IsEnabled (must already
+        // be false) and confirms the file still exists (Phase 3 hasn't run yet).
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var prefs = Substitute.For<IPreferencesProvider>();
+        prefs.DisabledDatabasesPreference.Returns([]);
+        var service = CreateDatabaseService(prefs);
+
+        // Default IsEnabled is true when the file is not in the disabled-preference list,
+        // so the entry is already enabled — no toggle needed.
+        var enabledEntry = Assert.Single(service.Entries);
+        Assert.True(enabledEntry.IsEnabled);
+
+        var observations = new List<(string Phase, bool IsEnabled, bool FileExists)>();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        Task PrepareCallback(CancellationToken ct)
+        {
+            var current = service.Entries.SingleOrDefault(e =>
+                string.Equals(e.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase));
+            observations.Add(("prepare", current?.IsEnabled ?? false, File.Exists(dbPath)));
+            return Task.CompletedTask;
+        }
+
+        // Act
+        await service.RemoveAsync(
+            Constants.TestDb1,
+            prepareForDeletionAsync: PrepareCallback,
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert — prepare callback observed IsEnabled=false (Phase 1 ran first) and the
+        // file still present (Phase 3 had not yet run).
+        var observation = Assert.Single(observations);
+        Assert.False(observation.IsEnabled);
+        Assert.True(observation.FileExists);
+
+        // After RemoveAsync returned, the file is gone and the entry is removed.
+        Assert.False(File.Exists(dbPath));
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhenEntryEnabled_RaisesEntriesChangedTwice_OncePerPhaseMutation()
+    {
+        // Arrange — Phase 1 (disable) and Phase 4 (RemoveAt) should each fire EntriesChanged.
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+        var service = CreateDatabaseService();
+
+        Assert.True(service.Entries.Single().IsEnabled);
+
+        var raiseCount = 0;
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref raiseCount);
+
+        // Act
+        await service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken);
+
+        // Assert — exactly two raises: one for the disable mutation, one for the remove.
+        Assert.Equal(2, raiseCount);
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhenFileNameUnknown_ShouldThrow()
     {
         // Arrange
         CreateDatabaseDirectory();
         var service = CreateDatabaseService();
 
         // Act + Assert
-        Assert.Throws<InvalidOperationException>(() => service.Remove("does-not-exist.db"));
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RemoveAsync("does-not-exist.db", cancellationToken: TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task RemoveAsync_WhenPrepareCallbackThrows_RestoresIsEnabled_AndRethrows()
+    {
+        // Arrange — Phase 2 failure must roll back Phase 1. The entry should remain in
+        // Entries with IsEnabled restored to true so the caller can retry.
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var prefs = Substitute.For<IPreferencesProvider>();
+        prefs.DisabledDatabasesPreference.Returns([]);
+        var service = CreateDatabaseService(prefs);
+
+        Assert.True(service.Entries.Single().IsEnabled);
+
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+
+        // Act
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.RemoveAsync(
+                Constants.TestDb1,
+                prepareForDeletionAsync: _ => throw new InvalidOperationException("prepare boom"),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        // Assert
+        Assert.Equal("prepare boom", ex.Message);
+        Assert.True(File.Exists(dbPath));
+        var rolledBack = Assert.Single(service.Entries);
+        Assert.True(rolledBack.IsEnabled);
     }
 
     [Fact]

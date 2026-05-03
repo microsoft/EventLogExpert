@@ -32,22 +32,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_AllRows_ShowTrashButton()
-    {
-        foreach (var status in Enum.GetValues<DatabaseStatus>())
-        {
-            // Arrange
-            var entry = MakeEntry(status);
-
-            // Act
-            var component = RenderRow(entry);
-
-            // Assert
-            Assert.Single(component.FindAll(".db-entry-remove-btn"));
-        }
-    }
-
-    [Fact]
     public void Render_BackupExistsAndIsUpgrading_StillShowsRecoveryBadge()
     {
         // Arrange
@@ -64,6 +48,10 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".toggle"));
+
+        // BackupExists hides trash so the user is steered to the recovery dialog instead
+        // of triggering a delete that would leave the .upgrade.bak orphaned.
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -79,12 +67,14 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Recovery required", badge.TextContent);
         Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
-    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndOnlyTrash()
+    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndHidesTrash()
     {
-        // Arrange
+        // Arrange — BackupExists routes the user to the recovery dialog, so the row hides
+        // trash to prevent a delete that would orphan the .upgrade.bak file.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
 
         // Act
@@ -99,7 +89,28 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".toggle"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
 
-        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_DisabledEntries_ShowTrashButton()
+    {
+        foreach (var status in Enum.GetValues<DatabaseStatus>())
+        {
+            // UpgradeRequired hides trash to steer the user to Upgrade first; it has its
+            // own dedicated test below.
+            if (status == DatabaseStatus.UpgradeRequired) { continue; }
+
+            // Arrange
+            var entry = MakeEntry(status);
+
+            // Act
+            var component = RenderRow(entry);
+
+            // Assert — non-BackupExists, non-Upgrading entries always render trash
+            // (visibility is governed by CSS hover/focus reveal, not by markup).
+            Assert.Single(component.FindAll(".db-entry-remove-btn"));
+        }
     }
 
     [Fact]
@@ -159,6 +170,24 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-badge"));
+
+        // IsUpgrading hides trash so a delete cannot race with the in-flight upgrade
+        // (which is sitting on a per-file reservation inside DatabaseService).
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_NonReadyEnabledEntry_ShowsTrashButton()
+    {
+        // Arrange — non-Ready entries are not loaded by the resolver regardless of IsEnabled,
+        // so the file is not locked and removal is safe.
+        var entry = MakeEntry(DatabaseStatus.UpgradeFailed, isEnabled: true);
+
+        // Act
+        var component = RenderRow(entry);
+
+        // Assert
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -178,6 +207,35 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Classifying\u2026", badge.TextContent);
         Assert.Equal("NotClassified", badge.GetAttribute("data-badge"));
+    }
+
+    [Fact]
+    public void Render_ReadyEnabledEntry_OptimisticToggleOff_StillRendersTrashButton()
+    {
+        // Arrange — toggle change is optimistic and not yet committed; trash is in the DOM
+        // either way under the new contract.
+        var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
+
+        // Act
+        var component = RenderRow(entry, effectiveEnabled: false);
+
+        // Assert
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_ReadyEnabledEntry_RendersTrashButton()
+    {
+        // Arrange — Ready+Enabled is now safe to delete because RemoveAsync coordinates
+        // closing and reopening any open log views around the file delete. The trash is
+        // rendered (just visually faded by CSS until the row is hovered or focused).
+        var entry = MakeEntry(DatabaseStatus.Ready, isEnabled: true);
+
+        // Act
+        var component = RenderRow(entry, effectiveEnabled: true);
+
+        // Assert
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -267,7 +325,23 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_UpgradeRequiredEntry_ShowsUpgradeButton_AndYellowBadge()
+    public void Render_UpgradeRequiredEntry_HidesTrashButton()
+    {
+        // Arrange — UpgradeRequired hides trash so the user is steered to either Upgrade
+        // (resolving the V3 → V4 transition) or — once they give up and the entry transitions
+        // to UpgradeFailed — Remove. Allowing direct removal of an UpgradeRequired entry would
+        // skip past the explicit upgrade decision the row UI is designed to surface.
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+
+        // Act
+        var component = RenderRow(entry);
+
+        // Assert
+        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_UpgradeRequiredEntry_ShowsUpgradeButton_AndNoBadge()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
@@ -281,10 +355,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.False(button.HasAttribute("disabled"));
         Assert.DoesNotContain("button-red", button.GetAttribute("class") ?? string.Empty);
 
-        var badge = component.Find(".db-entry-badge");
-        Assert.Equal("Upgrade required", badge.TextContent);
-        Assert.Equal("UpgradeRequired", badge.GetAttribute("data-badge"));
-
+        Assert.Empty(component.FindAll(".db-entry-badge"));
         Assert.Empty(component.FindAll(".toggle"));
     }
 

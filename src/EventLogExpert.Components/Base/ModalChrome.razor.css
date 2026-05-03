@@ -8,6 +8,10 @@ dialog {
     background-color: var(--background-dark);
 }
 
+dialog:has(.inline-alert) {
+    overflow: visible;
+}
+
 dialog:not(:modal) {
     position: relative;
 }
@@ -66,10 +70,10 @@ dialog:not(:modal) {
 
     display: flex;
     flex-direction: column;
-    gap: .75rem;
-    min-width: 20rem;
-    max-width: min(36rem, 90%);
-    padding: 1rem 1.25rem;
+    gap: .85rem;
+    min-width: 22rem;
+    max-width: min(40rem, calc(100vw - 2rem));
+    padding: 1.25rem 1.5rem;
 
     color: var(--clr-lightblue);
     background-color: var(--background-dark);
@@ -88,8 +92,9 @@ dialog:not(:modal) {
 .inline-alert-message {
     margin: 0;
 
-    line-height: 1.4;
+    line-height: 1.5;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .inline-alert-input {

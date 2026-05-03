@@ -133,28 +133,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         {
             _previouslyRenderedInlineAlert = InlineAlert;
 
-            if (InlineAlert is not null)
-            {
-                try
-                {
-                    if (InlineAlert.IsPrompt)
-                    {
-                        await _inlineAlertInputRef.FocusAsync(true);
-                    }
-                    else if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
-                    {
-                        await _inlineAlertAcceptButtonRef.FocusAsync(true);
-                    }
-                    else
-                    {
-                        await _inlineAlertCancelButtonRef.FocusAsync(true);
-                    }
-                }
-                catch
-                {
-                    // Best-effort: element may not be in the DOM if the alert was already canceled.
-                }
-            }
+            await FocusInlineAlertElementAsync();
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -162,16 +141,48 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     protected override void OnParametersSet()
     {
-        if (!ReferenceEquals(_inlineAlertInitializedFor, InlineAlert))
-        {
-            _inlineAlertInitializedFor = InlineAlert;
-
-            _inlineAlertPromptValue = InlineAlert is { IsPrompt: true }
-                ? InlineAlert.PromptInitialValue ?? string.Empty
-                : string.Empty;
-        }
+        ResetInlineAlertPromptValueIfChanged();
 
         base.OnParametersSet();
+    }
+
+    private async Task FocusInlineAlertElementAsync()
+    {
+        if (InlineAlert is null) { return; }
+
+        try
+        {
+            if (InlineAlert.IsPrompt)
+            {
+                await _inlineAlertInputRef.FocusAsync(true);
+
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(InlineAlert.AcceptLabel))
+            {
+                await _inlineAlertAcceptButtonRef.FocusAsync(true);
+
+                return;
+            }
+
+            await _inlineAlertCancelButtonRef.FocusAsync(true);
+        }
+        catch
+        {
+            // Best-effort: element may not be in the DOM if the alert was already canceled.
+        }
+    }
+
+    private void ResetInlineAlertPromptValueIfChanged()
+    {
+        if (ReferenceEquals(_inlineAlertInitializedFor, InlineAlert)) { return; }
+
+        _inlineAlertInitializedFor = InlineAlert;
+
+        _inlineAlertPromptValue = InlineAlert is { IsPrompt: true }
+            ? InlineAlert.PromptInitialValue ?? string.Empty
+            : string.Empty;
     }
 
     private Task HandleAcceptAsync() => OnAccept.InvokeAsync();
@@ -185,6 +196,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         if (HasInlineAlert)
         {
             await HandleInlineAlertCancelAsync();
+
             return;
         }
 
@@ -210,6 +222,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
     private Task HandleCloseEventAsync()
     {
         _isClosed = true;
+
         return Task.CompletedTask;
     }
 
@@ -222,6 +235,7 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         if (InlineAlert is null) { return; }
 
         string? promptValue = InlineAlert.IsPrompt ? _inlineAlertPromptValue : null;
+
         await OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(true, promptValue));
     }
 

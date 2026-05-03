@@ -4,40 +4,33 @@
     align-items: center;
     gap: 1rem;
 
-    padding: .35rem .5rem;
-    border-bottom: 1px solid var(--clr-statusbar);
-}
-
-.db-entry-row:last-child {
-    border-bottom: 0;
+    padding: .15rem .5rem;
 }
 
 .db-entry-info {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: .5rem;
     min-width: 0;
 }
 
 .db-entry-name {
+    flex: 1 1 auto;
+    min-width: 0;
+
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .db-entry-badge {
-    align-self: flex-start;
-    margin-top: .15rem;
+    flex: 0 0 auto;
     padding: .1rem .4rem;
 
     font-size: .85em;
     background-color: var(--background-darkgray);
     color: var(--clr-lightblue);
     border-radius: .25rem;
-}
-
-.db-entry-badge[data-badge="UpgradeRequired"] {
-    background-color: var(--clr-yellow);
-    color: var(--clr-on-status-fill);
 }
 
 .db-entry-badge[data-badge="UpgradeFailed"],
@@ -79,6 +72,29 @@
 
 .db-entry-remove-btn {
     flex: 0 0 auto;
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 120ms ease;
+}
+
+.db-entry-row:hover .db-entry-remove-btn,
+.db-entry-row:focus-within .db-entry-remove-btn {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+@media (hover: none) {
+    .db-entry-row .db-entry-remove-btn {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .db-entry-remove-btn {
+        transition: none;
+    }
 }
 
 @keyframes db-entry-spin {

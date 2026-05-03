@@ -54,43 +54,37 @@ public sealed partial class DatabaseRecoveryHost : ComponentBase, IDisposable
 
         if (currentBackupSet.Count == 0)
         {
-            if (_recoveryBannerId is { } activeId)
-            {
-                BannerService.DismissError(activeId);
-                _recoveryBannerId = null;
-            }
-
+            DismissCurrentBannerIfAny();
             _promptedFor.Clear();
-
-            return;
-        }
-
-        if (_recoveryBannerId is { } visibleId)
-        {
-            if (currentBackupSet.SetEquals(_promptedFor)) { return; }
-
-            BannerService.DismissError(visibleId);
-
-            _recoveryBannerId = ReportRecoveryBanner(currentBackupSet.Count);
-            _promptedFor = currentBackupSet;
 
             return;
         }
 
         if (currentBackupSet.SetEquals(_promptedFor)) { return; }
 
+        DismissCurrentBannerIfAny();
+
         _recoveryBannerId = ReportRecoveryBanner(currentBackupSet.Count);
         _promptedFor = currentBackupSet;
+    }
+
+    private void DismissCurrentBannerIfAny()
+    {
+        if (_recoveryBannerId is not { } activeId) { return; }
+
+        BannerService.DismissError(activeId);
+        _recoveryBannerId = null;
     }
 
     private void HandleBannerStateChanged()
     {
         if (_disposed) { return; }
 
-        if (_recoveryBannerId is { } id && BannerService.ErrorBanners.All(banner => banner.Id != id))
-        {
-            _recoveryBannerId = null;
-        }
+        if (_recoveryBannerId is not { } id) { return; }
+
+        if (BannerService.ErrorBanners.Any(banner => banner.Id == id)) { return; }
+
+        _recoveryBannerId = null;
     }
 
     private void OnBannerStateChanged() => _ = InvokeAsync(HandleBannerStateChanged);

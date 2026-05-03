@@ -160,7 +160,8 @@ public sealed class EventLogEffectsTests
             mockXmlResolver,
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>());
+            Substitute.For<IBannerService>(),
+            Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
@@ -181,10 +182,42 @@ public sealed class EventLogEffectsTests
         await effects.HandleCloseAll(mockDispatcher);
 
         // Assert
-        mockLogWatcher.Received(1).RemoveAll();
+        await mockLogWatcher.Received(1).RemoveAllAsync();
         mockResolverCache.Received(1).ClearAll();
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventTableAction.CloseAll>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<StatusBarAction.CloseAll>());
+    }
+
+    [Fact]
+    public async Task HandleCloseLog_AwaitsWatcherShutdown_BeforeSignalingCloseCompletion()
+    {
+        // Arrange — RemoveLogAsync returns a TCS we control; HandleCloseLog must NOT
+        // signal its close-completion TCS until that TCS finishes. Verifies the B2
+        // ordering fix: per-event resolver scopes (and their pooled SQLite handles) must
+        // drain before the coordinator believes the log is closed.
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices();
+
+        var watcherTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherTcs.Task);
+
+        var logId = EventLogId.Create();
+        var action = new EventLogAction.CloseLog(logId, Constants.LogNameTestLog);
+
+        // Act
+        var closeTask = effects.HandleCloseLog(action, mockDispatcher);
+
+        // Give HandleCloseLog a chance to advance to the await.
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        // Assert — close has not completed because the watcher hasn't released yet.
+        Assert.False(closeTask.IsCompleted, "HandleCloseLog should be blocked on RemoveLogAsync.");
+
+        // Now release the watcher; HandleCloseLog should complete promptly.
+        watcherTcs.SetResult();
+
+        await closeTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(closeTask.IsCompletedSuccessfully);
     }
 
     [Fact]
@@ -217,7 +250,8 @@ public sealed class EventLogEffectsTests
             mockXmlResolver,
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>());
+            Substitute.For<IBannerService>(),
+            Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
         var action = new EventLogAction.CloseLog(logId, Constants.LogNameTestLog);
@@ -241,7 +275,7 @@ public sealed class EventLogEffectsTests
         await effects.HandleCloseLog(action, mockDispatcher);
 
         // Assert
-        mockLogWatcher.Received(1).RemoveLog(Constants.LogNameTestLog);
+        await mockLogWatcher.Received(1).RemoveLogAsync(Constants.LogNameTestLog);
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.CloseLog>(a =>
             a.LogId == logId));
@@ -481,7 +515,8 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>());
+            Substitute.For<IBannerService>(),
+            Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
         var action = new EventLogAction.OpenLog(Constants.LogNameApplication, PathType.LogName);
@@ -1027,6 +1062,58 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleSetFilters_WhenFilterRequiresXml_AwaitsCloseCompletionBeforeReturning()
+    {
+        // Arrange — RemoveLogAsync is gated by a controlled TCS so HandleCloseLog cannot
+        // complete until the test signals it. HandleCloseLog clears _pendingSelectionRestore
+        // for the log name AFTER awaiting the watcher, then signals the close-completion
+        // TCS in its finally block. HandleSetFilters must await that close-completion TCS
+        // before populating _pendingSelectionRestore — otherwise the in-flight close wipes
+        // the freshly-written entry. This test pins down the ordering invariant.
+        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+
+        // Capture each routed close so any fault in HandleCloseLog surfaces before the test
+        // ends (the discarded `_ = effects.HandleCloseLog(...)` would otherwise let a fault
+        // be silently observed by the finalizer).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<EventLogAction.CloseLog>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<EventLogAction.CloseLog>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var eventFilter = new EventFilter(null, [xmlFilter]);
+
+        // Act — start HandleSetFilters; it must remain pending until watcherCompletion fires.
+        var setFiltersTask = effects.HandleSetFilters(new EventLogAction.SetFilters(eventFilter), mockDispatcher);
+
+        // Assert — task is blocked because HandleCloseLog can't finish until RemoveLogAsync
+        // returns. Without the close-completion await in HandleSetFilters, the task would
+        // already be completed (it would have written the restore map and returned).
+        Assert.False(setFiltersTask.IsCompleted, "HandleSetFilters must wait for HandleCloseLog before populating the restore map.");
+
+        // Release HandleCloseLog → finally block signals the close-completion TCS.
+        watcherCompletion.SetResult();
+
+        await setFiltersTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // OpenLog should now have been dispatched (only happens after the close await).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.OpenLog>(a =>
+            a.LogName == Constants.LogNameTestLog && a.PathType == PathType.LogName));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
     public async Task HandleSetFilters_WhenFilterRequiresXml_ShouldRestoreSelectionAfterReload()
     {
         // Arrange — active log with one previously-selected event (RecordId=42). After the
@@ -1067,9 +1154,24 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>());
+            Substitute.For<IBannerService>(),
+            Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
+
+        // Route CloseLog dispatches into HandleCloseLog so the close-completion TCSes
+        // get signaled. HandleCloseLog clears _pendingSelectionRestore for the log name as
+        // part of its async cleanup; HandleSetFilters must await the close before writing
+        // the restore map. Without this routing the await would hit LogCloseTimeout (30s).
+        // Capture the routed tasks so any fault in HandleCloseLog surfaces at the end of
+        // the test instead of being swallowed by the discard.
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<EventLogAction.CloseLog>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<EventLogAction.CloseLog>(), mockDispatcher));
+            });
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
         var eventFilter = new EventFilter(null, [xmlFilter]);
@@ -1088,6 +1190,9 @@ public sealed class EventLogEffectsTests
         // Assert — SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
         mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.SetSelectedEvents>(a =>
             a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
@@ -1098,6 +1203,18 @@ public sealed class EventLogEffectsTests
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog → HandleCloseLog so HandleSetFilters' await on the close-completion
+        // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
+        // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
+        // being swallowed by the discard.
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<EventLogAction.CloseLog>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<EventLogAction.CloseLog>(), mockDispatcher));
+            });
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
         var eventFilter = new EventFilter(null, [xmlFilter]);
@@ -1117,6 +1234,115 @@ public sealed class EventLogEffectsTests
 
         // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<EventTableAction.UpdateDisplayedEvents>());
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task PrepareForDatabaseRemovalAsync_DispatchesCloseLogPerActiveLog_PopulatesSnapshotInCloseOrder()
+    {
+        // Arrange — two active logs; route the dispatcher's CloseLog actions back into
+        // HandleCloseLog so the close-completion TCSes get signaled. This proves the sink
+        // pattern (snapshot is populated incrementally) rather than relying on the live
+        // Fluxor pipeline.
+        var log1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var log2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var log1Id = log1.Id;
+        var log2Id = log2.Id;
+
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameLog1, log1)
+            .Add(Constants.LogNameLog2, log2);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog dispatches back into HandleCloseLog so the close-completion TCSes
+        // get signaled. Without this the coordinator would block forever waiting on the TCSes.
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<EventLogAction.CloseLog>()))
+            .Do(callInfo =>
+            {
+                var action = callInfo.Arg<EventLogAction.CloseLog>();
+                _ = effects.HandleCloseLog(action, mockDispatcher);
+            });
+
+        var snapshot = new LogReopenSnapshot();
+        var coordinator = (ILogReloadCoordinator)effects;
+
+        // Act
+        await coordinator.PrepareForDatabaseRemovalAsync(snapshot, TestContext.Current.CancellationToken);
+
+        // Assert — snapshot has both logs (order matches the ActiveLogs iteration).
+        Assert.Equal(2, snapshot.Items.Count);
+        Assert.Contains(snapshot.Items, item => item.Name == Constants.LogNameLog1 && item.Type == PathType.LogName);
+        Assert.Contains(snapshot.Items, item => item.Name == Constants.LogNameLog2 && item.Type == PathType.LogName);
+
+        // Both CloseLog actions should have been dispatched.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.CloseLog>(a => a.LogId == log1Id));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.CloseLog>(a => a.LogId == log2Id));
+    }
+
+    [Fact]
+    public async Task PrepareForDatabaseRemovalAsync_WhenCancellationTokenCancelsBeforeClose_ThrowsAndDoesNotPopulateSnapshot()
+    {
+        // Arrange — one active log, dispatcher does NOT route back. The close-completion
+        // TCS will never be signaled, so the await with a cancelled token should throw and
+        // the sink should remain empty.
+        var log = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameLog1, log);
+
+        var (effects, _, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+        var snapshot = new LogReopenSnapshot();
+        var coordinator = (ILogReloadCoordinator)effects;
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // Act + Assert
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => coordinator.PrepareForDatabaseRemovalAsync(snapshot, cts.Token));
+
+        Assert.Empty(snapshot.Items);
+    }
+
+    [Fact]
+    public async Task PrepareForDatabaseRemovalAsync_WhenNoActiveLogs_ReturnsImmediatelyAndDispatchesNothing()
+    {
+        // Arrange — empty ActiveLogs is the "user removed a disabled entry" path.
+        var (effects, _, _, _, _) = CreateEffectsWithServices();
+        var snapshot = new LogReopenSnapshot();
+
+        var coordinator = (ILogReloadCoordinator)effects;
+
+        // Act
+        await coordinator.PrepareForDatabaseRemovalAsync(snapshot, TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.Empty(snapshot.Items);
+    }
+
+    [Fact]
+    public void ReopenAfterDatabaseRemoval_DispatchesOpenLogPerSnapshotEntry()
+    {
+        // Arrange
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices();
+        var coordinator = (ILogReloadCoordinator)effects;
+
+        var snapshot = new[]
+        {
+            new LogReopenInfo(Constants.LogNameLog1, PathType.LogName),
+            new LogReopenInfo(Constants.LogNameLog2, PathType.FilePath)
+        };
+
+        // Act
+        coordinator.ReopenAfterDatabaseRemoval(snapshot);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.OpenLog>(a =>
+            a.LogName == Constants.LogNameLog1 && a.PathType == PathType.LogName));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventLogAction.OpenLog>(a =>
+            a.LogName == Constants.LogNameLog2 && a.PathType == PathType.FilePath));
     }
 
     private static (EventLogEffects effects, IDispatcher mockDispatcher) CreateEffects(
@@ -1145,6 +1371,8 @@ public sealed class EventLogEffectsTests
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
+        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        mockLogWatcherService.RemoveAllAsync().Returns(Task.CompletedTask);
         var mockResolverCache = Substitute.For<IEventResolverCache>();
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -1171,6 +1399,8 @@ public sealed class EventLogEffectsTests
         var mockDatabaseService = Substitute.For<IDatabaseService>();
         mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
 
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1180,9 +1410,8 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>());
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
+            Substitute.For<IBannerService>(),
+            mockDispatcher);
 
         return (effects, mockDispatcher);
     }
@@ -1266,6 +1495,8 @@ public sealed class EventLogEffectsTests
 
         var mockBannerService = Substitute.For<IBannerService>();
 
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
         var effects = new EventLogEffects(
             mockEventLogState,
             Substitute.For<IFilterService>(),
@@ -1275,9 +1506,8 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            mockBannerService);
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
+            mockBannerService,
+            mockDispatcher);
 
         return (effects, mockDispatcher, mockServiceProvider, mockBannerService, mockDatabaseService);
     }
@@ -1311,6 +1541,8 @@ public sealed class EventLogEffectsTests
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
+        mockLogWatcherService.RemoveLogAsync(Arg.Any<string>()).Returns(Task.CompletedTask);
+        mockLogWatcherService.RemoveAllAsync().Returns(Task.CompletedTask);
         var mockResolverCache = Substitute.For<IEventResolverCache>();
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -1323,6 +1555,8 @@ public sealed class EventLogEffectsTests
         var mockDatabaseService = Substitute.For<IDatabaseService>();
         mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
 
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1332,9 +1566,8 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>());
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
+            Substitute.For<IBannerService>(),
+            mockDispatcher);
 
         return (effects, mockDispatcher, mockLogWatcherService, mockResolverCache, mockFilterService);
     }
