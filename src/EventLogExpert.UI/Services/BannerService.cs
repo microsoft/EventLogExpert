@@ -36,10 +36,6 @@ public sealed class BannerService : IBannerService
         _databaseService.UpgradeBatchProgress += OnUpgradeBatchProgress;
         _databaseService.UpgradeBatchCompleted += OnUpgradeBatchCompleted;
 
-        // Subscribe to EntriesChanged FIRST, then invoke the handler manually for the initial pull.
-        // Pull-then-subscribe leaves a race where an EntriesChanged firing between pull and
-        // subscribe would be missed. Subscribe-then-invoke is idempotent: if a real EntriesChanged
-        // races with the manual call, both serialize on _stateLock and converge to the latest state.
         _databaseService.EntriesChanged += OnEntriesChanged;
         OnEntriesChanged(this, EventArgs.Empty);
     }
@@ -101,9 +97,6 @@ public sealed class BannerService : IBannerService
             if (changed)
             {
                 _attentionDismissed = true;
-                // Snapshot the file names that were in attention at dismissal time. The handler
-                // un-dismisses if any future attention entry has a file name not in this snapshot
-                // (FileName-ratchet) so that newly-introduced problems re-surface the banner.
                 _dismissedAttentionFileNames = _attentionEntries
                     .Select(entry => entry.FileName)
                     .ToImmutableHashSet();
@@ -234,8 +227,6 @@ public sealed class BannerService : IBannerService
 
         lock (_stateLock)
         {
-            // Only clear if the critical exception is still the one we set out to recover. If a newer one
-            // was reported while the callback was running, leave it visible so the user sees the new state.
             if (ReferenceEquals(_currentCritical, snapshotCritical))
             {
                 _currentCritical = null;
@@ -252,7 +243,7 @@ public sealed class BannerService : IBannerService
     private static void SafeLog(Action log)
     {
         try { log(); }
-        catch { /* Ignore */ }
+        catch { /* Logger faults must not propagate from defensive logging sites. */ }
     }
 
     private void AssignProgressSlot(UpgradeProgressScope scope, BannerProgressEntry entry)
@@ -276,13 +267,6 @@ public sealed class BannerService : IBannerService
 
         lock (_stateLock)
         {
-            // Read AND filter under the lock so that two handlers running concurrently can never
-            // produce out-of-order assignments. Without the lock here, an older handler (still
-            // computing newAttention from a stale Entries snapshot) could acquire the lock AFTER
-            // a newer handler had already applied the latest snapshot, overwriting the newer
-            // state with the older one. _databaseService.Entries is an atomic ref read of an
-            // immutable list and the filter is small and cheap (entries count is bounded by the
-            // user's database list), so doing this work under the lock is safe and necessary.
             ImmutableList<DatabaseEntry> newAttention = _databaseService.Entries
                 .Where(entry => entry.Status is DatabaseStatus.UpgradeRequired
                     or DatabaseStatus.UpgradeFailed
@@ -291,8 +275,6 @@ public sealed class BannerService : IBannerService
                     or DatabaseStatus.ClassificationFailed)
                 .ToImmutableList();
 
-            // Always assign the latest list so AttentionEntries never returns stale DatabaseEntry
-            // instances, even when the set composition (by file name) is unchanged.
             stateChanged = !_attentionEntries.SequenceEqual(newAttention);
             _attentionEntries = newAttention;
 
@@ -305,9 +287,6 @@ public sealed class BannerService : IBannerService
                         continue;
                     }
 
-                    // FileName-ratchet: a previously-unseen attention entry means new info
-                    // for the user, so un-dismiss and clear the snapshot. Subsequent
-                    // DismissAttention() calls re-snapshot from the then-current set.
                     _attentionDismissed = false;
                     _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
                     stateChanged = true;
@@ -411,8 +390,6 @@ public sealed class BannerService : IBannerService
 
         if (handler is null) { return; }
 
-        // Iterate the invocation list so one throwing subscriber does not block subsequent ones —
-        // a direct multicast Invoke aborts the chain on first exception.
         foreach (var subscriber in handler.GetInvocationList())
         {
             try

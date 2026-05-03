@@ -136,10 +136,6 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     private void MainWebView_BlazorWebViewInitialized(object? sender, BlazorWebViewInitializedEventArgs e)
     {
-        // Inject the saved theme synchronously into every document the WebView2 creates so the page
-        // renders with the correct palette on first paint (avoids the dark→light flash while
-        // Blazor boots and calls setTheme). Also align WebView2's prefers-color-scheme with the
-        // saved choice so the System theme path lights up the right CSS branch immediately.
         _coreWebView = e.WebView.CoreWebView2;
 
         if (_coreWebView is null) { return; }

@@ -37,8 +37,8 @@ public sealed class KeyboardShortcutService(
             {
                 await _jsRuntime.InvokeVoidAsync("unregisterKeyboardShortcuts");
             }
-            catch (JSDisconnectedException) { }
-            catch (TaskCanceledException) { }
+            catch (JSDisconnectedException) { /* Circuit gone — listener already detached. */ }
+            catch (TaskCanceledException) { /* Teardown cancellation; nothing to do. */ }
         }
 
         _selfRef.Dispose();

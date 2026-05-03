@@ -43,8 +43,6 @@ public sealed class EventProviderDbContext : DbContext
 
     public ProviderDatabaseSchemaState IsUpgradeNeeded()
     {
-        // Inspect the on-disk schema via PRAGMA table_info / index_xinfo so we are robust to
-        // EF / SQLite text variations across versions and across upgrade levels (V1/V2/V3/V4).
         var connection = Database.GetDbConnection();
         Database.OpenConnection();
 
@@ -110,19 +108,10 @@ public sealed class EventProviderDbContext : DbContext
 
             if (!hasAnyColumn)
             {
-                // No ProviderDetails table at all — could be an empty SQLite file or an unrelated
-                // database. Either way it is not one of our recognized schemas. Report Unknown so
-                // PerformUpgradeIfNeeded fails closed instead of pretending to be Current and
-                // letting EventResolver later crash on `ProviderDetails.FirstOrDefault(...)`
-                // with "no such table".
                 currentVersion = ProviderDatabaseSchemaVersion.Unknown;
             }
             else
             {
-                // V1 and V2 stored every payload column as TEXT JSON; V3 and V4 store them all
-                // as compressed BLOB. A mixture of TEXT and BLOB payload columns is not any
-                // recognized schema and is reported as Unknown so the read path can surface a
-                // distinct error instead of crashing on a cast in ReadCompressedRow.
                 var payloadColumnsAllText = IsType(messagesType, "TEXT") &&
                     IsType(eventsType, "TEXT") &&
                     IsType(keywordsType, "TEXT") &&
@@ -148,9 +137,6 @@ public sealed class EventProviderDbContext : DbContext
                             }
                             else
                             {
-                                // Unknown column shape — payload columns are not uniformly TEXT or BLOB, or
-                                // Parameters disagrees with the rest. Report the Unknown sentinel so
-                                // PerformUpgradeIfNeeded can surface a distinct "unrecognized schema" error.
                                 currentVersion = ProviderDatabaseSchemaVersion.Unknown;
                             }
 
@@ -178,12 +164,6 @@ public sealed class EventProviderDbContext : DbContext
 
         if (!state.NeedsUpgrade) { return; }
 
-        // Hard-fail before any destructive step (DROP TABLE) so the on-disk data is preserved
-        // when the upgrade cannot proceed. Two distinct failure modes:
-        //   * Unknown shape — file is not a recognizable ProviderDetails database, possibly
-        //     corrupt or from a future / incompatible version.
-        //   * V1/V2 — pre-V3 legacy schemas are no longer supported by this build; the user
-        //     must upgrade through an older release that supported V3 first, or delete the file.
         if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
         {
             throw new DatabaseUpgradeException(
@@ -226,8 +206,6 @@ public sealed class EventProviderDbContext : DbContext
                 }
             }
 
-            // Pre-DROP merge: detect case-insensitive duplicates and either merge or hard-fail.
-            // Throwing here (before DROP) preserves the original database contents on conflict.
             var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(allProviderDetails, Path);
 
             using (var dropCommand = connection.CreateCommand())
@@ -314,15 +292,6 @@ public sealed class EventProviderDbContext : DbContext
 
     private static bool TryDetectPrimaryKeyNoCaseCollation(DbConnection connection)
     {
-        // SQLite stores per-column collation on each index entry rather than on the column itself.
-        // Find the auto-generated PK index for ProviderDetails, then read the collation for the
-        // ProviderName entry from PRAGMA index_xinfo.
-        //
-        // Returning false on any "could not detect" branch (missing PK index, missing column entry,
-        // null `coll`) is intentional and safe: the caller treats false as "not V4", which triggers
-        // the V3->V4 upgrade path. The upgrade unconditionally DROPs and recreates the table via
-        // EnsureCreated, so a corrupt-or-unrecognized PK index self-heals on the next launch — there
-        // is no infinite-upgrade-loop risk.
         string? pkIndexName = null;
 
         using (var indexListCommand = connection.CreateCommand())
@@ -385,7 +354,6 @@ public sealed class EventProviderDbContext : DbContext
             return reader.IsDBNull(i) ? null : reader.GetString(i);
         }
 
-        // Column not present (V3 schema) — leave null.
         _ = providerName;
 
         return null;

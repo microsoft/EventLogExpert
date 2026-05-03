@@ -127,13 +127,10 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public Task HandleCloseLog(EventLogAction.CloseLog action, IDispatcher dispatcher)
     {
-        // Only cancel — don't remove or dispose. HandleOpenLog's finally block
-        // owns CTS disposal after the load has fully unwound, avoiding a race
-        // where disposal here causes ObjectDisposedException in the running load.
         if (_logCts.TryGetValue(action.LogId, out var cts))
         {
             try { cts.Cancel(); }
-            catch (ObjectDisposedException) { }
+            catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
         }
 
         _logWatcherService.RemoveLog(action.LogName);
@@ -174,10 +171,6 @@ public sealed class EventLogEffects(
             .Where(e => e.RecordId.HasValue && pending.SelectedIds.Contains(e.RecordId.Value))
             .ToList();
 
-        // SelectedEvent (focus cursor) is tracked independently of SelectedEvents,
-        // so resolve the focused row from action.Events directly — it may not be
-        // a member of restored (e.g., user Ctrl+clicked to toggle a row off but
-        // kept it as the focus cursor).
         DisplayEventModel? selectedRestored = pending.SelectedId.HasValue
             ? action.Events.FirstOrDefault(e => e.RecordId == pending.SelectedId.Value)
             : null;
@@ -213,14 +206,8 @@ public sealed class EventLogEffects(
     [EffectMethod]
     public async Task HandleOpenLog(EventLogAction.OpenLog action, IDispatcher dispatcher)
     {
-        // Snapshot the cancel generation FIRST. If CancelAllLoads fires between this
-        // snapshot and the CTS link below — including the new window introduced by
-        // the InitialClassificationTask await — the self-cancel check below will
-        // observe the generation drift and cancel our load.
         long startGeneration = Volatile.Read(ref _cancelGeneration);
 
-        // Cheap exit when the log is no longer in ActiveLogs (caller raced this open
-        // against a CloseLog) — skip scope creation and classification waits entirely.
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
         {
             dispatcher.Dispatch(new StatusBarAction.SetResolverStatus($"Error: Failed to open {action.LogName}"));
@@ -228,10 +215,6 @@ public sealed class EventLogEffects(
             return;
         }
 
-        // Create a per-load CTS linked to the global CTS and the caller's token so that
-        // either individual HandleCloseLog, a global cancel (CloseAll), or the caller can
-        // stop this load. The lock ensures we always link to the current global CTS.
-        // Not using `using` — disposal is handled by the finally block below.
         CancellationTokenSource perLoadCts;
 
         using (_globalCtsLock.EnterScope())
@@ -247,17 +230,13 @@ public sealed class EventLogEffects(
         if (Volatile.Read(ref _cancelGeneration) != startGeneration)
         {
             try { perLoadCts.Cancel(); }
-            catch (ObjectDisposedException) { }
+            catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
         }
 
         var token = perLoadCts.Token;
 
         try
         {
-            // Wait for the initial database classification scan so resolvers are
-            // built against verified-Ready entries (rather than the NotClassified
-            // default). The task is contractually non-faulting per IDatabaseService;
-            // the catch is defense-in-depth so an unexpected fault never poisons opens.
             try
             {
                 await _databaseService.InitialClassificationTask;
@@ -267,18 +246,6 @@ public sealed class EventLogEffects(
                 _logger.Trace($"InitialClassificationTask faulted unexpectedly during HandleOpenLog: {ex}");
             }
 
-            // After the classification await, the user may have closed this log
-            // (HandleCloseLog removes it from ActiveLogs) or all logs (HandleCloseAll
-            // dispatches EventTableAction.CloseAll), or even closed-and-reopened the
-            // same name under a new EventLogId. Bail out without reaching LoadLogAsync —
-            // its AddTable dispatch would otherwise resurrect an entry the user already
-            // dismissed, leaving an orphan in EventTableState.
-            //
-            // We deliberately do NOT bail on token-cancellation alone: a pre-canceled
-            // caller token (or a CancelAllLoads that didn't dispatch CloseAll) leaves the
-            // log in ActiveLogs, so we must still proceed into LoadLogAsync where the
-            // existing OCE handler dispatches the user-visible CloseLog + ClearStatus
-            // cleanup. Identity-based bail covers exactly the orphan-table scenario.
             if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var current)
                 || current.Id != logData.Id)
             {
@@ -295,8 +262,6 @@ public sealed class EventLogEffects(
             }
             catch (Exception ex)
             {
-                // Resolver factory threw during construction — surface as a Reload-tier
-                // banner so the user can recover instead of silently failing the open.
                 _bannerService.ReportCritical(ex);
 
                 return;
@@ -313,9 +278,6 @@ public sealed class EventLogEffects(
         }
         finally
         {
-            // This finally block is the sole owner of per-load CTS removal and
-            // disposal. Cancel/close paths (HandleCloseLog, CancelAllLoads) only
-            // request cancellation — they never remove or dispose entries.
             if (_logCts.TryRemove(logData.Id, out var removedCts))
             {
                 removedCts.Dispose();
@@ -523,7 +485,7 @@ public sealed class EventLogEffects(
     private static async Task StopProducerAsync(Task producerTask)
     {
         try { await producerTask; }
-        catch { /* Intentionally swallowed — caller handles error reporting */ }
+        catch { /* Intentionally swallowed — caller handles error reporting. */ }
     }
 
     private void CancelAllLoads()
@@ -544,21 +506,13 @@ public sealed class EventLogEffects(
 
         oldGlobalCts.Cancel();
 
-        // Don't dispose oldGlobalCts here — per-load linked tokens still
-        // reference it. It will be collected by GC after all linked tokens
-        // are disposed by their HandleOpenLog finally blocks.
 
-        // Cancel per-load tokens for immediate effect (redundant when they are
-        // linked to oldGlobalCts, but ensures cancellation for edge cases).
-        // Don't remove or dispose — HandleOpenLog's finally block owns cleanup
-        // after each load has fully unwound, avoiding a race where disposal
-        // here causes ObjectDisposedException in running async operations.
         foreach (var key in _logCts.Keys)
         {
             if (_logCts.TryGetValue(key, out var cts))
             {
                 try { cts.Cancel(); }
-                catch (ObjectDisposedException) { }
+                catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
             }
         }
     }
@@ -571,8 +525,6 @@ public sealed class EventLogEffects(
         IDispatcher dispatcher,
         CancellationToken token)
     {
-        // Detect locale metadata files for exported logs.
-        // Filesystem probing is best-effort — failures must not abort opening the log.
         if (action.PathType == PathType.FilePath)
         {
             try
@@ -743,8 +695,6 @@ public sealed class EventLogEffects(
 
             _pendingSelectionRestore.TryRemove(logData.Name, out _);
 
-            // Only close the log if it still exists with the same ID —
-            // prevents stale cancellation from closing a newly reopened log.
             if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
                 && currentLog.Id == logData.Id)
             {
@@ -778,8 +728,6 @@ public sealed class EventLogEffects(
 
         events.Sort((a, b) => Comparer<long?>.Default.Compare(b.RecordId, a.RecordId));
 
-        // Re-check cancellation and log identity before committing results —
-        // a close may have arrived after the producer/consumer loop completed.
         token.ThrowIfCancellationRequested();
 
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var activeLog)

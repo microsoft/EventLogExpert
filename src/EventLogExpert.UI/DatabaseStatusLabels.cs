@@ -1,13 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Models;
+
 namespace EventLogExpert.UI;
 
-/// <summary>
-///     Maps a <see cref="DatabaseStatus" /> to the user-facing label shown next to a database entry. Returns a label
-///     for every member (including <see cref="DatabaseStatus.Ready" />); whether to render the badge for a given
-///     status is a per-screen suppression decision left to the caller.
-/// </summary>
 public static class DatabaseStatusLabels
 {
     public static string GetDisplayLabel(DatabaseStatus status) => status switch
@@ -21,4 +18,8 @@ public static class DatabaseStatusLabels
         DatabaseStatus.ClassificationFailed => "Classification failed",
         _ => status.ToString()
     };
+
+    public static string GetRowBadgeLabel(DatabaseEntry entry) => entry.BackupExists
+        ? "Recovery required"
+        : GetDisplayLabel(entry.Status);
 }

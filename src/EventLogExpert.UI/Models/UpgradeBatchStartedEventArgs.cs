@@ -17,12 +17,6 @@ public sealed class UpgradeBatchStartedEventArgs(
 
     public UpgradeProgressScope Scope { get; } = scope;
 
-    /// <summary>
-    ///     Cancels the batch by signaling the underlying <see cref="CancellationTokenSource" />. Safe to call after the
-    ///     batch has completed: the underlying source may already be disposed by the consumer task, in which case the
-    ///     resulting <see cref="ObjectDisposedException" /> is swallowed because cancellation arriving after completion is a
-    ///     no-op.
-    /// </summary>
     public void Cancel()
     {
         try

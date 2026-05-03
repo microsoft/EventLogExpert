@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Shared.Base;
+using EventLogExpert.Components.Base;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Shared.Components;
+namespace EventLogExpert.Components;
 
 public sealed partial class BooleanSelect : InputComponent<bool>
 {

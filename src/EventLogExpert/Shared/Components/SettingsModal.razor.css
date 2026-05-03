@@ -29,32 +29,3 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
-
-.entry-status-badge {
-    display: inline-block;
-    margin-left: .5rem;
-    padding: .1rem .4rem;
-
-    font-size: .85em;
-    background-color: var(--background-darkgray);
-    color: var(--clr-lightblue);
-    border-radius: .25rem;
-    vertical-align: middle;
-}
-
-.entry-status-badge[data-status="UpgradeRequired"] {
-    background-color: var(--clr-yellow);
-    color: var(--clr-on-status-fill);
-}
-
-.entry-status-badge[data-status="UpgradeFailed"],
-.entry-status-badge[data-status="UnrecognizedSchema"],
-.entry-status-badge[data-status="ObsoleteSchema"],
-.entry-status-badge[data-status="ClassificationFailed"] {
-    background-color: var(--clr-red);
-    color: var(--clr-on-status-fill);
-}
-
-.entry-status-badge[data-status="NotClassified"] {
-    font-style: italic;
-}

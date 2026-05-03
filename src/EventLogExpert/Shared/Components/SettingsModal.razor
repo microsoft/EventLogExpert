@@ -51,26 +51,14 @@
                     {
                         @foreach (var entry in DatabaseService.Entries)
                         {
-                            <div class="flex-space-between">
-                                <div>
-                                    <text>@entry.FileName</text>
-
-                                    @if (entry.Status != DatabaseStatus.Ready)
-                                    {
-                                        <span class="entry-status-badge" data-status="@entry.Status">@DatabaseStatusLabels.GetDisplayLabel(entry.Status)</span>
-                                    }
-
-                                    @if (!entry.IsEnabled || entry.Status != DatabaseStatus.Ready)
-                                    {
-                                        <button aria-label="@($"Remove database {entry.FileName}")" class="button button-red"
-                                            @onclick="() => RemoveDatabase(entry.FileName)"
-                                            type="button">
-                                            <i aria-hidden="true" class="bi bi-dash-circle"></i>
-                                        </button>
-                                    }
-                                </div>
-                                <BooleanSelect AriaLabel="@entry.FileName" Disabled="@IsClassificationPending" Value="GetEffectiveEnabled(entry)" ValueChanged="() => ToggleDatabase(entry.FileName)" />
-                            </div>
+                            <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
+                                Entry="@entry"
+                                IsClassificationPending="@IsClassificationPending"
+                                IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !_entriesUpgrading.Contains(entry.FileName))"
+                                IsUpgrading="@_entriesUpgrading.Contains(entry.FileName)"
+                                OnRemove="@(() => RemoveDatabase(entry))"
+                                OnToggle="@(() => ToggleDatabase(entry.FileName))"
+                                OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
                         }
                     }
                     else

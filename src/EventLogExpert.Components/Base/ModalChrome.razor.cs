@@ -7,11 +7,6 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.Components.Base;
 
-/// <summary>
-///     Renders the shared <c>&lt;dialog&gt;</c> chrome (header, body, footer) for a modal. Owned by
-///     <see cref="ModalBase{TResult}" /> via <c>@ref</c>. Esc/native cancel is intercepted with
-///     <c>@oncancel:preventDefault</c> so close ordering is driven from C#.
-/// </summary>
 public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 {
     private readonly string _inlineAlertMessageId = $"modal-inline-alert-message-{Guid.NewGuid():N}";
@@ -30,15 +25,12 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public string AcceptLabel { get; set; } = "OK";
 
-    /// <summary>Fallback accessible name when <see cref="Title" /> is not set.</summary>
     [Parameter] public string? AriaLabel { get; set; }
 
     [Parameter] public string CancelLabel { get; set; } = "Cancel";
 
     [Parameter] public RenderFragment? ChildContent { get; set; }
 
-    /// <summary>Accessible name for the header (X) close button. Independent of <see cref="CloseLabel" /> so
-    /// localized footer labels (e.g. "Exit") don't bleed into the icon button's announcement.</summary>
     [Parameter] public string CloseButtonAriaLabel { get; set; } = "Close";
 
     [Parameter] public string CloseLabel { get; set; } = "Close";
@@ -51,23 +43,16 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public FooterPreset Footer { get; set; } = FooterPreset.CloseOnly;
 
-    /// <summary>When true, all preset footer buttons render disabled. Useful while a long-running
-    /// operation triggered by the modal is in flight so the user can't re-trigger or dismiss
-    /// mid-action. Independent of inline-alert disable semantics.</summary>
     [Parameter] public bool FooterDisabled { get; set; }
 
-    /// <summary>Optional height (e.g. <c>"60%"</c>, <c>"40rem"</c>) exposed as <c>var(--modal-height)</c>.</summary>
     [Parameter] public string? Height { get; set; }
 
     [Parameter] public string ImportLabel { get; set; } = "Import";
 
-    /// <summary>When set, renders as a banner over an inert body/footer and Esc dismisses the alert (not the host modal).</summary>
     [Parameter] public InlineAlertRequest? InlineAlert { get; set; }
 
-    /// <summary>Optional max width exposed as <c>var(--modal-max-width)</c>.</summary>
     [Parameter] public string? MaxWidth { get; set; }
 
-    /// <summary>Optional min width exposed as <c>var(--modal-min-width)</c>.</summary>
     [Parameter] public string? MinWidth { get; set; }
 
     [Parameter] public EventCallback OnAccept { get; set; }
@@ -76,14 +61,12 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public EventCallback OnClose { get; set; }
 
-    /// <summary>Invoked when the dialog is closed by Esc or native cancel (not a footer button).</summary>
     [Parameter] public EventCallback OnDialogClosedByUser { get; set; }
 
     [Parameter] public EventCallback OnExport { get; set; }
 
     [Parameter] public EventCallback OnImport { get; set; }
 
-    /// <summary>Invoked when the user resolves the active <see cref="InlineAlert" />.</summary>
     [Parameter] public EventCallback<InlineAlertResult> OnInlineAlertResolved { get; set; }
 
     [Parameter] public EventCallback OnSave { get; set; }
@@ -114,7 +97,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    /// <summary>Imperatively close the dialog. Idempotent and best-effort.</summary>
     public async Task CloseAsync()
     {
         if (_isClosed) { return; }
@@ -147,7 +129,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
             }
         }
 
-        // Move focus into a newly-appeared inline alert; reference-compare to avoid re-focusing.
         if (!ReferenceEquals(_previouslyRenderedInlineAlert, InlineAlert))
         {
             _previouslyRenderedInlineAlert = InlineAlert;
@@ -181,7 +162,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     protected override void OnParametersSet()
     {
-        // Initialize prompt value before first render so the input paints with the correct value.
         if (!ReferenceEquals(_inlineAlertInitializedFor, InlineAlert))
         {
             _inlineAlertInitializedFor = InlineAlert;
@@ -198,14 +178,10 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     private Task HandleCancelButtonAsync() => OnCancel.InvokeAsync();
 
-    // Esc fires <dialog> 'cancel'. preventDefault keeps close ordering driven from C# so the
-    // parent's OnClosingAsync runs before the dialog is actually closed. _isClosingByCancel
-    // debounces repeated Esc presses while the user callback (which may surface an alert) runs.
     private async Task HandleCancelEventAsync()
     {
         if (_isClosed) { return; }
 
-        // Inline alert intercepts Esc; the host modal stays open.
         if (HasInlineAlert)
         {
             await HandleInlineAlertCancelAsync();
@@ -222,8 +198,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         }
         finally
         {
-            // Only keep the latch while actually closing; allow Esc again if the callback bailed
-            // without closing (e.g. surfaced a confirmation alert).
             if (!_isClosed)
             {
                 _isClosingByCancel = false;

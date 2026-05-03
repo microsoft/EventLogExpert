@@ -116,7 +116,7 @@ public sealed partial class EventTable
             {
                 await JSRuntime.InvokeVoidAsync("disposeTableEvents");
             }
-            catch (JSDisconnectedException) { }
+            catch (JSDisconnectedException) { /* Circuit gone — JS resource already torn down. */ }
 
             _dotNetRef?.Dispose();
         }
@@ -150,7 +150,7 @@ public sealed partial class EventTable
 
                 if (measured > 0) { _pageSize = measured; }
             }
-            catch (JSDisconnectedException) { }
+            catch (JSDisconnectedException) { /* Circuit gone — fall back to default page size. */ }
             catch (Exception e)
             {
                 TraceLogger.Warn($"Failed to measure table page size, using default {DefaultPageSize}: {e}");
@@ -413,7 +413,7 @@ public sealed partial class EventTable
         {
             await JSRuntime.InvokeVoidAsync("focusEventTableRow", index);
         }
-        catch (JSDisconnectedException) { }
+        catch (JSDisconnectedException) { /* Circuit gone — focus best-effort during teardown. */ }
         catch (Exception e)
         {
             TraceLogger.Warn($"Failed to focus active table row: {e}");

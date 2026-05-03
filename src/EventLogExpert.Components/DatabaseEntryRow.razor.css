@@ -1,0 +1,87 @@
+.db-entry-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 1rem;
+
+    padding: .35rem .5rem;
+    border-bottom: 1px solid var(--clr-statusbar);
+}
+
+.db-entry-row:last-child {
+    border-bottom: 0;
+}
+
+.db-entry-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.db-entry-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.db-entry-badge {
+    align-self: flex-start;
+    margin-top: .15rem;
+    padding: .1rem .4rem;
+
+    font-size: .85em;
+    background-color: var(--background-darkgray);
+    color: var(--clr-lightblue);
+    border-radius: .25rem;
+}
+
+.db-entry-badge[data-badge="UpgradeRequired"] {
+    background-color: var(--clr-yellow);
+    color: var(--clr-on-status-fill);
+}
+
+.db-entry-badge[data-badge="UpgradeFailed"],
+.db-entry-badge[data-badge="UnrecognizedSchema"],
+.db-entry-badge[data-badge="ObsoleteSchema"],
+.db-entry-badge[data-badge="ClassificationFailed"],
+.db-entry-badge[data-badge="Recovery"] {
+    background-color: var(--clr-red);
+    color: var(--clr-on-status-fill);
+}
+
+.db-entry-badge[data-badge="NotClassified"] {
+    font-style: italic;
+}
+
+.db-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+}
+
+.db-entry-upgrade-btn {
+    white-space: nowrap;
+}
+
+.db-entry-upgrading {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+
+    color: var(--clr-lightblue);
+    font-style: italic;
+}
+
+.db-entry-spinner {
+    flex: 0 0 auto;
+    animation: db-entry-spin 1.5s linear infinite;
+}
+
+.db-entry-remove-btn {
+    flex: 0 0 auto;
+}
+
+@keyframes db-entry-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

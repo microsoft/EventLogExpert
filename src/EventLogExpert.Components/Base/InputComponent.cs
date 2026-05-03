@@ -4,7 +4,7 @@
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Shared.Base;
+namespace EventLogExpert.Components.Base;
 
 public abstract class InputComponent<T> : ComponentBase
 {
@@ -16,9 +16,9 @@ public abstract class InputComponent<T> : ComponentBase
     public DisplayConverter<T?, string>? DisplayConverter { get; protected set; }
 
     [Parameter]
-#pragma warning disable BL0007 // Component parameters should be auto properties
+#pragma warning disable BL0007
     public Func<T?, string> ToStringFunc
-#pragma warning restore BL0007 // Component parameters should be auto properties
+#pragma warning restore BL0007
     {
         get => _toStringFunc;
         set

@@ -135,8 +135,6 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
 
     protected virtual Task OnSaveAsync() => CompleteAsync(default);
 
-    // When `expected` is non-null, only clears if it matches the active entry — guards against
-    // a cancellation callback clobbering a successor alert.
     private void TryClearInlineAlert(InlineAlertEntry? expected, InlineAlertResult? result, bool cancel)
     {
         InlineAlertEntry? cleared;

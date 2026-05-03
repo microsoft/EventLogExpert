@@ -80,10 +80,6 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
 
-        // Reject pre-V4 target databases up front. Without this gate the merge would happily
-        // run against an obsolete schema and either silently mis-handle case-insensitive PK
-        // matching or fail at the SaveChanges step. The user is expected to run the
-        // `upgrade` command first.
         var schemaState = targetContext.IsUpgradeNeeded();
 
         if (schemaState.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
@@ -111,8 +107,6 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
                 .Take(ProviderSource.MaxInClauseParameters)
                 .ToList();
 
-            // The ProviderName column uses NOCASE collation as of schema v4, so a plain
-            // IN-clause matches case-insensitively while still using the PK index.
             targetMatchingNames.AddRange(
                 targetContext.ProviderDetails
                     .AsNoTracking()
@@ -165,10 +159,6 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         // skip set is passed so all source providers are loaded and re-inserted.
         var skipForLoad = overwriteProviders ? null : providerNamesInTarget;
 
-        // Compute the expected copy set up front from cheap string sets so we can size the log
-        // header BEFORE streaming. This avoids retaining the full ProviderDetails objects in a
-        // summary list — those objects can be sizable for .evtx+MTA sources, defeating the
-        // ChangeTracker.Clear batching below.
         var expectedCopiedNames = skipForLoad is null
             ? sourceNames.ToList()
             : sourceNames.Where(n => !skipForLoad.Contains(n)).ToList();
@@ -186,8 +176,6 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         foreach (var provider in ProviderSource.LoadProviders(source, Logger, filter: null, skipProviderNames: skipForLoad))
         {
-            // ProviderSource yields fresh, non-tracked entities — Add(provider) is safe and avoids
-            // the redundant per-property projection that the previous implementation used.
             targetContext.ProviderDetails.Add(provider);
             pendingBatch.Add(provider);
 
