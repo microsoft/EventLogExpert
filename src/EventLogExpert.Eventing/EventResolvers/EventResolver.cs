@@ -207,7 +207,7 @@ public sealed partial class EventResolver : EventResolverBase, IEventResolver
                 throw new FileNotFoundException(file);
             }
 
-            var providerDb = new EventProviderDbContext(file, true, Logger);
+            var providerDb = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, Logger);
             var state = providerDb.IsUpgradeNeeded();
 
             if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)

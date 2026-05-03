@@ -39,6 +39,24 @@ public sealed class MergeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public void MergeDatabase_WithEmptyTargetFile_LogsUnrecognizedSchemaWithoutCreatingTables()
+    {
+        var source = CreateTempDb();
+        var target = CreateTempDb();
+
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+        File.WriteAllBytes(target, []);
+
+        var logger = Substitute.For<ITraceLogger>();
+
+        new MergeDatabaseCommand(logger).MergeDatabase(source, target, overwriteProviders: false);
+
+        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
+            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
+    }
+
+    [Fact]
     public void MergeDatabase_WithUnknownSchemaTarget_LogsErrorWithoutThrowing()
     {
         var source = CreateTempDb();
