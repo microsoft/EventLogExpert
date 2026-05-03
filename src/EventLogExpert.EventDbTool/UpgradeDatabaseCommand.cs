@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Helpers;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
+using System.Data.Common;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -39,7 +40,7 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         return upgradeDatabaseCommand;
     }
 
-    private void UpgradeDatabase(string file)
+    internal void UpgradeDatabase(string file)
     {
         if (!File.Exists(file))
         {
@@ -47,9 +48,21 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             return;
         }
 
-        using var dbContext = new EventProviderDbContext(file, false, Logger);
+        // Probe the schema in its own scope so a corrupt or non-SQLite file produces a friendly
+        // error instead of a stack trace.
+        ProviderDatabaseSchemaState state;
 
-        var state = dbContext.IsUpgradeNeeded();
+        try
+        {
+            using var probe = new EventProviderDbContext(file, false, Logger);
+            state = probe.IsUpgradeNeeded();
+        }
+        catch (DbException ex)
+        {
+            Logger.Error($"Failed to upgrade database '{file}': {ex.Message}");
+
+            return;
+        }
 
         if (!state.NeedsUpgrade)
         {
@@ -58,6 +71,32 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             return;
         }
 
-        dbContext.PerformUpgradeIfNeeded();
+        if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        {
+            Logger.Error($"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.DefaultLabel, file)}");
+
+            return;
+        }
+
+        if (state.CurrentVersion is 1 or 2)
+        {
+            Logger.Error($"{DatabaseSchemaMessages.UnsupportedV1OrV2Schema(file, state.CurrentVersion)}");
+
+            return;
+        }
+
+        // Destructive ops beyond this point — exceptions propagate so partial-state failures
+        // aren't masked as a benign "upgrade failed". DatabaseUpgradeException only fires from
+        // ProviderDetailsMerger before any DROP TABLE, so it's safe to catch.
+        using var upgradeContext = new EventProviderDbContext(file, false, Logger);
+
+        try
+        {
+            upgradeContext.PerformUpgradeIfNeeded();
+        }
+        catch (DatabaseUpgradeException ex)
+        {
+            Logger.Error($"{ex.Message}");
+        }
     }
 }

@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
+using System.Data.Common;
 
 namespace EventLogExpert.EventDbTool;
 
@@ -57,7 +58,7 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         return mergeDatabaseCommand;
     }
 
-    private void MergeDatabase(string source, string targetFile, bool overwriteProviders)
+    internal void MergeDatabase(string source, string targetFile, bool overwriteProviders)
     {
         if (!ProviderSource.TryValidate(source, Logger)) { return; }
 
@@ -78,21 +79,36 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             return;
         }
 
+        // Probe the target schema in its own scope so a corrupt or non-SQLite file produces a
+        // friendly error instead of a stack trace.
+        ProviderDatabaseSchemaState targetState;
+
+        try
+        {
+            using var probe = new EventProviderDbContext(targetFile, false, Logger);
+            targetState = probe.IsUpgradeNeeded();
+        }
+        catch (DbException ex)
+        {
+            Logger.Error($"Failed to merge into database '{targetFile}': {ex.Message}");
+            return;
+        }
+
+        if (targetState.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        {
+            Logger.Error($"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.TargetLabel, targetFile)}");
+            return;
+        }
+
+        if (targetState.NeedsUpgrade)
+        {
+            Logger.Error($"Target database '{targetFile}' is at schema v{targetState.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command first.");
+            return;
+        }
+
+        // Destructive ops beyond this point (ExecuteDelete commits immediately; SaveChanges writes) —
+        // exceptions propagate so partial-state failures aren't masked as a benign "merge failed".
         using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
-
-        var schemaState = targetContext.IsUpgradeNeeded();
-
-        if (schemaState.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
-        {
-            Logger.Error($"Target database '{targetFile}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
-            return;
-        }
-
-        if (schemaState.NeedsUpgrade)
-        {
-            Logger.Error($"Target database '{targetFile}' is at schema v{schemaState.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command first.");
-            return;
-        }
 
         // Query the overlap in the database by chunking sourceNames into IN-clause batches,
         // rather than pulling every target ProviderName into memory. Same chunk size as the

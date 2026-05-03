@@ -302,7 +302,7 @@ internal static class ProviderSource
         if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
         {
             logger.Error(
-                $"Source database '{file}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
+                $"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.SourceLabel, file)}");
         }
         else
         {
