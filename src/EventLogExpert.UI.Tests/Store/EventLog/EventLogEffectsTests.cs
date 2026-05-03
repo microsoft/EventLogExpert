@@ -552,6 +552,210 @@ public sealed class EventLogEffectsTests
     }
 
     [Fact]
+    public async Task HandleSetFilters_FilterBranch_WhenLogClosedDuringFilter_ShouldOmitStaleSliceFromDispatch()
+    {
+        // Arrange — log closes (ActiveLogs.Remove) while the filter task is running. The
+        // post-filter dispatch must omit the closed log's slice. (The reducer also skips
+        // unknown log ids, but checking at the effect keeps the dispatch minimal.)
+        var snapshotEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new EventFilter(null, [])
+        };
+
+        var postCloseState = snapshotState with
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var filterResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [snapshotData.Id] = snapshotEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .Returns(_ =>
+            {
+                volatileState = postCloseState;
+                return filterResult;
+            });
+
+        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert — dispatched UpdateDisplayedEvents has no entry for the closed log id.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.UpdateDisplayedEvents>(
+            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_FilterBranch_WhenLogEventsChangeDuringFilter_ShouldRefilterFromCurrentState()
+    {
+        // Arrange — single open log; live event arrives during the first filter pass (Events ref
+        // changes). The new filter must be re-applied to the post-mutation rows in a single retry
+        // pass so the user sees the filter applied to the updated row set, not stale rows.
+        var snapshotEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new EventFilter(null, [])
+        };
+
+        var liveTailEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100),
+            EventUtils.CreateTestEvent(101)
+        };
+
+        var postLiveTailState = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = liveTailEvents })
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [snapshotData.Id] = snapshotEvents
+        };
+
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [snapshotData.Id] = liveTailEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .Returns(
+                _ =>
+                {
+                    volatileState = postLiveTailState;
+                    return pass1Result;
+                },
+                _ => pass2Result);
+
+        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert — FilterActiveLogs ran twice; the second call received the post-mutation
+        // EventLogData (proves pass 2 actually re-filtered from current state, not from the
+        // pass-1 snapshot). Dispatch contains the re-filtered slice, not the stale pass-1 result.
+        mockFilterService.Received(2).FilterActiveLogs(
+            Arg.Any<IEnumerable<EventLogData>>(),
+            Arg.Any<EventFilter>());
+
+        mockFilterService.Received(1).FilterActiveLogs(
+            Arg.Is<IEnumerable<EventLogData>>(logs => logs.Any(l => ReferenceEquals(l.Events, liveTailEvents))),
+            Arg.Any<EventFilter>());
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.UpdateDisplayedEvents>(
+            a => a.ActiveLogs.ContainsKey(snapshotData.Id)
+                && ReferenceEquals(a.ActiveLogs[snapshotData.Id], liveTailEvents)));
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_FilterBranch_WhenLogStillStaleAfterRetry_ShouldOmitStaleSliceFromDispatch()
+    {
+        // Arrange — events change during pass 1 AND again during pass 2. Single-retry semantics
+        // mean the pass-2 result is still stale; the slice must be omitted so the reducer's
+        // preserve-omitted fallback keeps the existing rows (avoids losing live events).
+        var snapshotEvents = new List<DisplayEventModel>();
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new EventFilter(null, [])
+        };
+
+        var pass1MutationEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var pass2MutationEvents = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100),
+            EventUtils.CreateTestEvent(101)
+        };
+
+        var afterPass1State = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = pass1MutationEvents })
+        };
+
+        var afterPass2State = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = pass2MutationEvents })
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [snapshotData.Id] = []
+        };
+
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        {
+            [snapshotData.Id] = pass1MutationEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .Returns(
+                _ =>
+                {
+                    volatileState = afterPass1State;
+                    return pass1Result;
+                },
+                _ =>
+                {
+                    volatileState = afterPass2State;
+                    return pass2Result;
+                });
+
+        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var action = new EventLogAction.SetFilters(new EventFilter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert — both filter passes ran; dispatch omits the still-stale log id.
+        mockFilterService.Received(2).FilterActiveLogs(
+            Arg.Any<IEnumerable<EventLogData>>(),
+            Arg.Any<EventFilter>());
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventTableAction.UpdateDisplayedEvents>(
+            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
+    }
+
+    [Fact]
     public async Task HandleSetFilters_FilterBranch_WhenSupersededByNewerFilter_ShouldDropStaleResults()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
@@ -841,6 +1045,46 @@ public sealed class EventLogEffectsTests
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);
+    }
+
+    private static (EventLogEffects effects,
+        IDispatcher mockDispatcher,
+        IFilterService mockFilterService) CreateEffectsWithMutableState(Func<EventLogState> stateProvider)
+    {
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+        mockEventLogState.Value.Returns(_ => stateProvider());
+
+        var mockFilterService = Substitute.For<IFilterService>();
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .Returns(new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>());
+
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+
+        var mockLogger = Substitute.For<ITraceLogger>();
+        var mockLogWatcherService = Substitute.For<ILogWatcherService>();
+        var mockResolverCache = Substitute.For<IEventResolverCache>();
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        var effects = new EventLogEffects(
+            mockEventLogState,
+            mockFilterService,
+            mockLogger,
+            mockLogWatcherService,
+            mockResolverCache,
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        return (effects, mockDispatcher, mockFilterService);
     }
 
     private static (EventLogEffects effects,

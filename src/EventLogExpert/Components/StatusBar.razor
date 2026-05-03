@@ -22,9 +22,13 @@
 
         var totalEvents = activeTable.IsCombined ?
             _eventLogState.ActiveLogs.Sum(l => l.Value.Events.Count) :
-            _eventLogState.ActiveLogs[activeTable.LogName].Events.Count;
+            _eventLogState.ActiveLogs.TryGetValue(activeTable.LogName, out var activeLogData)
+                ? activeLogData.Events.Count
+                : 0;
 
-        var filteredEvents = activeTable.DisplayedEvents.Count;
+        var filteredEvents = activeTable.IsCombined ?
+            _eventTableState.DisplayedEvents.Count :
+            _eventTableState.EventCountByLog.GetValueOrDefault(activeTable.Id, 0);
 
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }

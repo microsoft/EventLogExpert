@@ -359,10 +359,59 @@ public sealed class EventLogEffects(
             var filteredActiveLogs = await Task.Run(
                 () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.EventFilter));
 
-            if (Interlocked.Read(ref _filterGeneration) == generation)
+            if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
+
+            // Pass 1: keep slices whose source Events ref is still current. Logs whose
+            // Events ref changed (live event arrived during the filter run) get re-filtered
+            // once below so the new filter is applied to the post-mutation rows too.
+            var snapshotById = activeLogsSnapshot.ToDictionary(d => d.Id);
+            var currentByName = _eventLogState.Value.ActiveLogs;
+            var fresh = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>(filteredActiveLogs.Count);
+            var staleLogs = new List<EventLogData>();
+
+            foreach (var (logId, filteredEvents) in filteredActiveLogs)
             {
-                dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(filteredActiveLogs));
+                if (!snapshotById.TryGetValue(logId, out var snapshotData)) { continue; }
+
+                if (!currentByName.TryGetValue(snapshotData.Name, out var currentData)) { continue; }
+
+                if (ReferenceEquals(snapshotData.Events, currentData.Events))
+                {
+                    fresh[logId] = filteredEvents;
+                }
+                else
+                {
+                    staleLogs.Add(currentData);
+                }
             }
+
+            // Pass 2: single retry. If a log is still stale after this pass, leave it omitted —
+            // the reducer preserves existing rows so live events are not lost.
+            if (staleLogs.Count > 0)
+            {
+                var refiltered = await Task.Run(
+                    () => _filterService.FilterActiveLogs(staleLogs, action.EventFilter));
+
+                if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
+
+                var pass2InputById = staleLogs.ToDictionary(d => d.Id);
+                currentByName = _eventLogState.Value.ActiveLogs;
+
+                foreach (var (logId, filteredEvents) in refiltered)
+                {
+                    if (!pass2InputById.TryGetValue(logId, out var pass2Input)) { continue; }
+
+                    if (!currentByName.TryGetValue(pass2Input.Name, out var nowCurrent)) { continue; }
+
+                    // pass2Input.Events IS the list ref pass 2 consumed; new ref = stale.
+                    if (ReferenceEquals(pass2Input.Events, nowCurrent.Events))
+                    {
+                        fresh[logId] = filteredEvents;
+                    }
+                }
+            }
+
+            dispatcher.Dispatch(new EventTableAction.UpdateDisplayedEvents(fresh));
         }
         finally
         {
@@ -376,6 +425,8 @@ public sealed class EventLogEffects(
     /// <summary>Adds new events to the currently opened log</summary>
     private static EventLogData AddEventsToOneLog(EventLogData logData, List<DisplayEventModel> eventsToAdd)
     {
+        if (eventsToAdd.Count == 0) { return logData; }
+
         eventsToAdd.AddRange(logData.Events);
 
         return logData with { Events = eventsToAdd.AsReadOnly() };

@@ -36,6 +36,10 @@ public sealed partial class EventTable
 
     private readonly Dictionary<DisplayEventModel, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
 
+    private IReadOnlyList<DisplayEventModel> _activeDisplayedEvents = [];
+    private IReadOnlyList<DisplayEventModel>? _cachedFilteredCanonical;
+    private EventLogId? _cachedFilteredTableId;
+    private IReadOnlyList<DisplayEventModel>? _cachedFilteredView;
     private EventTableModel? _currentTable;
     private DotNetObjectReference<EventTable>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
@@ -43,7 +47,7 @@ public sealed partial class EventTable
     private ImmutableList<FilterModel> _filters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
-    private IReadOnlyList<DisplayEventModel>? _lastDisplayedEvents;
+    private IReadOnlyList<DisplayEventModel>? _lastIndexedDisplayedEvents;
     // View-local cursor: the row that is the moving end of a range selection within the
     // current table. May briefly diverge from _selectedEvent during local keyboard nav
     // (advanced before the dispatch round-trip) and after RebuildRowIndexMap rebinds it
@@ -174,8 +178,10 @@ public sealed partial class EventTable
         SelectedEvents.Select(s => s.SelectedEvents);
 
         SubscribeToAction<EventTableAction.SetActiveTable>(OnSetActiveTable);
-        SubscribeToAction<EventTableAction.UpdateCombinedEvents>(OnUpdateCombinedEvents);
-        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(OnUpdateDisplayedEvents);
+        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(_ => RescrollToSelected());
+        SubscribeToAction<EventTableAction.AppendTableEvents>(_ => RescrollToSelected());
+        SubscribeToAction<EventTableAction.AppendTableEventsBatch>(_ => RescrollToSelected());
+        SubscribeToAction<EventTableAction.UpdateTable>(_ => RescrollToSelected());
 
         _eventTableState = EventTableState.Value;
 
@@ -502,9 +508,9 @@ public sealed partial class EventTable
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
     {
-        var displayedEvents = _currentTable?.DisplayedEvents;
+        var displayedEvents = _activeDisplayedEvents;
 
-        if (displayedEvents is null || displayedEvents.Count == 0) { return; }
+        if (displayedEvents.Count == 0) { return; }
 
         // Ctrl+C copies the active selection regardless of focused row.
         if (args is { CtrlKey: true, Code: "KeyC" })
@@ -642,19 +648,7 @@ public sealed partial class EventTable
         }
     }
 
-    private async void OnUpdateCombinedEvents(EventTableAction.UpdateCombinedEvents action)
-    {
-        try
-        {
-            await InvokeAsync(ScrollToSelectedEvent);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to scroll to selected event: {e}");
-        }
-    }
-
-    private async void OnUpdateDisplayedEvents(EventTableAction.UpdateDisplayedEvents action)
+    private async void RescrollToSelected()
     {
         try
         {
@@ -668,17 +662,18 @@ public sealed partial class EventTable
 
     private void RebuildRowIndexMap()
     {
-        var displayedEvents = _currentTable?.DisplayedEvents;
+        var displayedEvents = ResolveActiveDisplayedEvents();
+        _activeDisplayedEvents = displayedEvents;
 
-        if (ReferenceEquals(displayedEvents, _lastDisplayedEvents)) { return; }
+        if (ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents)) { return; }
 
-        _lastDisplayedEvents = displayedEvents;
-        _rowIndexMap = new(displayedEvents?.Count ?? 0, ReferenceEqualityComparer.Instance);
+        _lastIndexedDisplayedEvents = displayedEvents;
+        _rowIndexMap = new(displayedEvents.Count, ReferenceEqualityComparer.Instance);
         // New event-list reference means stored DisplayEventModel instances
         // are stale; clearing prevents memory growth across log reloads.
         _highlightCache.Clear();
 
-        if (displayedEvents is null)
+        if (displayedEvents.Count == 0)
         {
             _selectionAnchor = null;
             _localCursor = null;
@@ -708,6 +703,45 @@ public sealed partial class EventTable
         }
     }
 
+    private IReadOnlyList<DisplayEventModel> ResolveActiveDisplayedEvents()
+    {
+        if (_currentTable is null) { return []; }
+
+        if (_currentTable.IsCombined) { return _eventTableState.DisplayedEvents; }
+
+        var canonical = _eventTableState.DisplayedEvents;
+
+        if (_cachedFilteredView is not null &&
+            ReferenceEquals(canonical, _cachedFilteredCanonical) &&
+            _cachedFilteredTableId == _currentTable.Id)
+        {
+            return _cachedFilteredView;
+        }
+
+        int expectedCapacity = _eventTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int trackedCount)
+            ? trackedCount
+            : 0;
+
+        var filtered = new List<DisplayEventModel>(expectedCapacity);
+
+        for (int eventIndex = 0; eventIndex < canonical.Count; eventIndex++)
+        {
+            var current = canonical[eventIndex];
+
+            if (string.Equals(current.OwningLog, _currentTable.LogName, StringComparison.Ordinal))
+            {
+                filtered.Add(current);
+            }
+        }
+
+        var result = filtered.AsReadOnly();
+        _cachedFilteredCanonical = canonical;
+        _cachedFilteredTableId = _currentTable.Id;
+        _cachedFilteredView = result;
+
+        return result;
+    }
+
     private void ResortSelectionForCurrentTable()
     {
         // Re-publish the current selection in the new sort order. The dispatch
@@ -726,9 +760,9 @@ public sealed partial class EventTable
 
         if (target is null) { return; }
 
-        var displayedEvents = _currentTable?.DisplayedEvents;
+        var displayedEvents = _activeDisplayedEvents;
 
-        if (displayedEvents is null) { return; }
+        if (displayedEvents.Count == 0) { return; }
 
         // Match on OwningLog (the per-source identifier — file path for
         // exported logs, channel name for live logs) in addition to LogName
@@ -755,11 +789,11 @@ public sealed partial class EventTable
 
     private void SelectEvent(MouseEventArgs args, DisplayEventModel @event)
     {
-        var displayedEvents = _currentTable?.DisplayedEvents;
+        var displayedEvents = _activeDisplayedEvents;
 
         switch (args)
         {
-            case { ShiftKey: true } when displayedEvents is not null:
+            case { ShiftKey: true } when displayedEvents.Count > 0:
                 // Shift+Click: range from anchor to clicked. Anchor stays put.
                 // Without an anchor (first interaction), treat as a plain
                 // click so we have something to extend from on the next click.

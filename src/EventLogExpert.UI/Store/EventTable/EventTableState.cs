@@ -1,6 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
@@ -11,6 +12,11 @@ namespace EventLogExpert.UI.Store.EventTable;
 public sealed record EventTableState
 {
     public ImmutableList<EventTableModel> EventTables { get; init; } = [];
+
+    public IReadOnlyList<DisplayEventModel> DisplayedEvents { get; init; } = [];
+
+    public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
+        ImmutableDictionary<EventLogId, int>.Empty;
 
     public EventLogId? ActiveEventLogId { get; init; }
 

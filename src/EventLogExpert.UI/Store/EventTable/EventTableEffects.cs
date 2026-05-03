@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
@@ -11,38 +11,6 @@ public sealed class EventTableEffects(IPreferencesProvider preferencesProvider, 
 {
     private readonly IState<EventTableState> _eventTableState = eventTableState;
     private readonly IPreferencesProvider _preferencesProvider = preferencesProvider;
-
-    [EffectMethod(typeof(EventTableAction.AppendTableEvents))]
-    public static Task HandleAppendTableEvents(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(EventTableAction.AppendTableEventsBatch))]
-    public static Task HandleAppendTableEventsBatch(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(EventTableAction.UpdateDisplayedEvents))]
-    public static Task HandleUpdateDisplayedEvents(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
-
-        return Task.CompletedTask;
-    }
-
-    [EffectMethod(typeof(EventTableAction.UpdateTable))]
-    public static Task HandleUpdateTable(IDispatcher dispatcher)
-    {
-        dispatcher.Dispatch(new EventTableAction.UpdateCombinedEvents());
-
-        return Task.CompletedTask;
-    }
 
     [EffectMethod(typeof(EventTableAction.LoadColumns))]
     public Task HandleLoadColumns(IDispatcher dispatcher)
