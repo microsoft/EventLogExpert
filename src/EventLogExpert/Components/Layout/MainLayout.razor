@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <a class="skip-link" href="#main-content">Skip to main content</a>
+
+    <ModalHost />
+    <MenuHost />
+
+    <MenuBar />
+
+    <main class="page-content" id="main-content" tabindex="-1">
+        <FilterPane />
+        <EventTable />
+        <DetailsPane />
+    </main>
+
+    <footer>
+        <StatusBar />
+    </footer>
+</div>

@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Components.Modals;
+using EventLogExpert.Components.Modals.Filters;
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
-using EventLogExpert.Shared.Components;
-using EventLogExpert.Shared.Components.Filters;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;

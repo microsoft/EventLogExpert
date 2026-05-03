@@ -1,0 +1,154 @@
+﻿@using EventLogExpert.UI
+@inherits FluxorComponent
+
+<div class="filter-pane">
+    <div class="filter-header">
+        <div>
+            <button class="button" @onclick="AddBasicFilter">
+                <i class="bi bi-plus-circle"></i> Add Basic Filter
+            </button>
+
+            @if (!IsDateFilterVisible)
+            {
+                <button class="button" @onclick="AddDateFilter">
+                    <i class="bi bi-plus-circle"></i> Add Date Filter
+                </button>
+            }
+
+            <button class="button" @onclick="AddAdvancedFilter">
+                <i class="bi bi-plus-circle"></i> Add Advanced Filter
+            </button>
+
+            <button class="button" @onclick="AddCachedFilter">
+                <i class="bi bi-plus-circle"></i> Add Cached Filter
+            </button>
+
+            <button class="button" @onclick="AddExclusion">
+                <i class="bi bi-plus-circle"></i> Add Exclusion
+            </button>
+        </div>
+
+        @if (HasFilters || FilterPaneState.Value.IsLoading)
+        {
+            @if (FilterPaneState.Value.IsLoading)
+            {
+                <div class="text-align-center">
+                    <span>[<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]</span>
+                </div>
+            }
+            else
+            {
+                <div class="text-align-center">
+                    @if (GetActiveFilters() > 0)
+                    {
+                        <span>[Active Filters: @GetActiveFilters()]</span>
+                    }
+                </div>
+            }
+
+            <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")" class="menu-toggle justify-self-right"
+                data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
+                <i class="bi bi-caret-up"></i>
+            </span>
+        }
+    </div>
+
+    <div class="filter-group" data-toggle="@MenuState">
+        @if (IsDateFilterVisible)
+        {
+            <EditForm class="flex-row filter-form" Model="_model">
+                <span>
+                    After:
+                    <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"
+                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                </span>
+                <span>
+                    Before:
+                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="input filter-datetime"
+                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                </span>
+
+                @if (_canEditDate)
+                {
+                    <button class="button button-green" @onclick="ApplyDateFilter">
+                        <i class="bi bi-check-circle"></i> Apply
+                    </button>
+
+                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+                }
+                else
+                {
+                    <button class="button" @onclick="EditDateFilter">
+                        <i class="bi bi-funnel"></i> Edit
+                    </button>
+
+                    <button class="button button-red" @onclick="RemoveDateFilter" type="button">
+                        <i class="bi bi-dash-circle"></i> Remove
+                    </button>
+
+                    @if (FilterPaneState.Value.FilteredDateRange?.IsEnabled is true)
+                    {
+                        <button class="button button-red" @onclick="ToggleDateFilter">
+                            <i class="bi bi-dash-circle"></i> Disable
+                        </button>
+                    }
+                    else
+                    {
+                        <button class="button button-green" @onclick="ToggleDateFilter">
+                            <i class="bi bi-plus-circle"></i> Enable
+                        </button>
+                    }
+                }
+            </EditForm>
+        }
+
+        @foreach (var item in FilterPaneState.Value.Filters)
+        {
+            switch (item.FilterType)
+            {
+                case FilterType.Basic:
+                    <FilterRow @key="item.Id" Value="item" />
+
+                    break;
+                case FilterType.Advanced:
+                    <AdvancedFilterRow @key="item.Id" Value="item" />
+
+                    break;
+                case FilterType.Cached:
+                    <FilterCacheRow @key="item.Id" Value="item" />
+
+                    break;
+            }
+        }
+
+        @foreach (var draft in _pendingDrafts)
+        {
+            switch (draft.FilterType)
+            {
+                case FilterType.Basic:
+                    <FilterRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
+
+                    break;
+                case FilterType.Advanced:
+                    <AdvancedFilterRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
+
+                    break;
+                case FilterType.Cached:
+                    <FilterCacheRow @key="draft.Id"
+                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                        PendingDraft="draft" />
+
+                    break;
+            }
+        }
+    </div>
+</div>

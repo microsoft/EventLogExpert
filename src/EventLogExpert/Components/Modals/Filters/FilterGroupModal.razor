@@ -1,0 +1,38 @@
+@using EventLogExpert.UI.Models
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="Filter Groups"
+    CloseLabel="Exit"
+    Footer="FooterPreset.ImportExportClose"
+    Height="70%"
+    InlineAlert="@CurrentInlineAlert"
+    MinWidth="84rem"
+    OnClose="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnExport="OnExportAsync"
+    OnImport="OnImportAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    @ref="ChromeRef">
+    <ChildContent>
+        <div class="flex-column-scroll">
+            @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups.OrderBy(x => x.Key))
+            {
+                if (!string.IsNullOrEmpty(name))
+                {
+                    <FilterGroupSection Data="data" Name="@name" Parent="this" />
+                }
+                else
+                {
+                    @foreach (var group in data.FilterGroups)
+                    {
+                        <FilterGroup Group="group" Parent="this" />
+                    }
+                }
+            }
+        </div>
+
+        <button class="button" @onclick="CreateGroup" type="button">
+            <i aria-hidden="true" class="bi bi-plus-circle"></i> Create Group
+        </button>
+    </ChildContent>
+</ModalChrome>
