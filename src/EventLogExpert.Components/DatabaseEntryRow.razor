@@ -1,60 +1,60 @@
-<div class="db-entry-row">
-    <div class="db-entry-info">
-        <span class="db-entry-name">@Entry.FileName</span>
-        @if (ShouldShowBadge)
-        {
-            <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
-        }
-    </div>
+<div class="db-entry-row @(_isMouseRevealed ? "db-entry-row--revealed" : null)"
+    @onmouseleave="HandleRowMouseLeave">
+    <button aria-label="@($"Remove database {Entry.FileName}")"
+        class="button button-red db-entry-remove-btn"
+        @onclick="@(() => OnRemove.InvokeAsync())"
+        type="button">
+        <i aria-hidden="true" class="bi bi-trash"></i>
+    </button>
 
-    <div class="db-entry-actions">
-        @switch (PrimaryAction)
-        {
-            case ActionKind.Toggle:
-            case ActionKind.DisabledToggle:
-                <BooleanSelect AriaLabel="@Entry.FileName"
-                    Disabled="@(PrimaryAction == ActionKind.DisabledToggle)"
-                    Value="EffectiveEnabled"
-                    ValueChanged="@(_ => OnToggle.InvokeAsync())" />
+    <div class="db-entry-row-content">
+        <div class="db-entry-info">
+            <button class="db-entry-name" @onclick="HandleNameClick" type="button">@Entry.FileName</button>
+            @if (ShouldShowBadge)
+            {
+                <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
+            }
+        </div>
 
-                break;
+        <div class="db-entry-actions">
+            @switch (PrimaryAction)
+            {
+                case ActionKind.Toggle:
+                case ActionKind.DisabledToggle:
+                    <BooleanSelect AriaLabel="@Entry.FileName"
+                        Disabled="@(PrimaryAction == ActionKind.DisabledToggle)"
+                        Value="EffectiveEnabled"
+                        ValueChanged="@(_ => OnToggle.InvokeAsync())" />
 
-            case ActionKind.Spinner:
-                <span class="db-entry-upgrading" role="status">
-                    <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
-                    <span>Upgrading&hellip;</span>
-                </span>
-                break;
+                    break;
 
-            case ActionKind.Upgrade:
-                <button aria-label="@($"Upgrade database {Entry.FileName}")"
-                    class="button db-entry-upgrade-btn"
-                    disabled="@IsUpgradeBlocked"
-                    @onclick="@(() => OnUpgrade.InvokeAsync())"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-arrow-up-circle"></i> Upgrade
-                </button>
-                break;
+                case ActionKind.Spinner:
+                    <span class="db-entry-upgrading" role="status">
+                        <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
+                        <span>Upgrading&hellip;</span>
+                    </span>
+                    break;
 
-            case ActionKind.Retry:
-                <button aria-label="@($"Retry upgrade of database {Entry.FileName}")"
-                    class="button button-red db-entry-upgrade-btn"
-                    disabled="@IsUpgradeBlocked"
-                    @onclick="@(() => OnUpgrade.InvokeAsync())"
-                    type="button">
-                    <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry Upgrade
-                </button>
-                break;
-        }
+                case ActionKind.Upgrade:
+                    <button aria-label="@($"Upgrade database {Entry.FileName}")"
+                        class="button db-entry-upgrade-btn"
+                        disabled="@IsUpgradeBlocked"
+                        @onclick="@(() => OnUpgrade.InvokeAsync())"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-arrow-up-circle"></i> Upgrade
+                    </button>
+                    break;
 
-        @if (CanRemove)
-        {
-            <button aria-label="@($"Remove database {Entry.FileName}")"
-                class="button button-red db-entry-remove-btn"
-                @onclick="@(() => OnRemove.InvokeAsync())"
-                type="button">
-                <i aria-hidden="true" class="bi bi-trash"></i>
-            </button>
-        }
+                case ActionKind.Retry:
+                    <button aria-label="@($"Retry upgrade of database {Entry.FileName}")"
+                        class="button button-red db-entry-upgrade-btn"
+                        disabled="@IsUpgradeBlocked"
+                        @onclick="@(() => OnUpgrade.InvokeAsync())"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry Upgrade
+                    </button>
+                    break;
+            }
+        </div>
     </div>
 </div>
