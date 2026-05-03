@@ -1445,6 +1445,8 @@ public sealed class EventLogEffectsTests
         var mockDatabaseService = Substitute.For<IDatabaseService>();
         mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
 
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
         var effects = new EventLogEffects(
             mockEventLogState,
             mockFilterService,
@@ -1454,9 +1456,8 @@ public sealed class EventLogEffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>());
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
+            Substitute.For<IBannerService>(),
+            mockDispatcher);
 
         return (effects, mockDispatcher, mockFilterService);
     }

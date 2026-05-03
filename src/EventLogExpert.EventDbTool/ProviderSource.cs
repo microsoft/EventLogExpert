@@ -125,7 +125,7 @@ internal static class ProviderSource
 
             try
             {
-                using var providerContext = new EventProviderDbContext(file, true, logger);
+                using var providerContext = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 if (!IsSourceSchemaCurrent(providerContext, file, logger))
                 {
@@ -203,7 +203,7 @@ internal static class ProviderSource
         {
             try
             {
-                using var context = new EventProviderDbContext(file, true, logger);
+                using var context = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
 
@@ -271,7 +271,7 @@ internal static class ProviderSource
         {
             try
             {
-                using var providerContext = new EventProviderDbContext(file, true, logger);
+                using var providerContext = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 return !IsSourceSchemaCurrent(providerContext, file, logger) ? [] :
                     providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();

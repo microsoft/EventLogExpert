@@ -13,8 +13,10 @@
         @ref="_chrome"
         Title="Database upgrade recovery">
         <p class="recovery-description">
-            The following database(s) had their upgrade interrupted. Restore from backup keeps the V3
-            data; Delete removes both the partial entry and its backup.
+            @(_entries.Count == 1
+                ? "The following database had its upgrade interrupted."
+                : "The following databases had their upgrade interrupted.")
+            Restore from backup keeps the V3 data; Delete removes both the partial entry and its backup.
         </p>
 
         <div class="recovery-batch-actions">

@@ -85,7 +85,7 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         try
         {
-            using var probe = new EventProviderDbContext(targetFile, false, Logger);
+            using var probe = new EventProviderDbContext(targetFile, readOnly: false, ensureCreated: false, Logger);
             targetState = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)

@@ -34,6 +34,23 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public void UpgradeDatabase_WithEmptyFile_LogsUnrecognizedSchemaWithoutCreatingTables()
+    {
+        var dbPath = CreateTempDb();
+        File.WriteAllBytes(dbPath, []);
+        var logger = Substitute.For<ITraceLogger>();
+
+        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+
+        logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
+            handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(dbPath)));
+
+        using var verify = new EventProviderDbContext(dbPath, readOnly: true, ensureCreated: false);
+        var state = verify.IsUpgradeNeeded();
+        Assert.Equal(ProviderDatabaseSchemaVersion.Unknown, state.CurrentVersion);
+    }
+
+    [Fact]
     public void UpgradeDatabase_WithMissingFile_LogsErrorAndReturns()
     {
         var missing = DatabaseTestUtils.CreateTempPath();

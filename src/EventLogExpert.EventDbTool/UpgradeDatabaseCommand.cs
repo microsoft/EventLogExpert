@@ -54,7 +54,7 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         try
         {
-            using var probe = new EventProviderDbContext(file, false, Logger);
+            using var probe = new EventProviderDbContext(file, readOnly: false, ensureCreated: false, Logger);
             state = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)
