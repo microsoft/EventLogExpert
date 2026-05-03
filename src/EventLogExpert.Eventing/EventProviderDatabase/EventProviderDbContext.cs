@@ -168,14 +168,14 @@ public sealed class EventProviderDbContext : DbContext
         {
             throw new DatabaseUpgradeException(
                 Path,
-                $"Database '{Path}' has an unrecognized schema. The file may be corrupt or from a newer or incompatible version of EventLogExpert. Delete or replace the file.");
+                DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.DefaultLabel, Path));
         }
 
         if (state.CurrentVersion is 1 or 2)
         {
             throw new DatabaseUpgradeException(
                 Path,
-                $"Database '{Path}' is at schema v{state.CurrentVersion}; this version is no longer supported. Upgrade through an older EventLogExpert release that supports v3 first, or delete the file.");
+                DatabaseSchemaMessages.UnsupportedV1OrV2Schema(Path, state.CurrentVersion));
         }
 
         var size = new FileInfo(Path).Length;
