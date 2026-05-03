@@ -1,0 +1,43 @@
+@inherits EditableFilterRowBase
+
+<FilterRowChrome ErrorMessage="@ErrorMessage"
+    Filter="Filter"
+    IsPending="IsPending"
+    OnCancel="CancelFilter"
+    OnEdit="EditFilter"
+    OnRemove="RemoveFilter"
+    OnSave="SaveFilter"
+    OnToggleEnabled="ToggleFilter"
+    OnToggleExclusion="ToggleFilterExclusion"
+    Value="Value">
+    <EditingContent>
+        @if (Filter is { } filter)
+        {
+            @if (filter.IsExcluded)
+            {
+                <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
+            }
+            else
+            {
+                <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
+            }
+
+            <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Data="filter.Comparison" Id="@Id" />
+        }
+    </EditingContent>
+    <ExtraEditingButtons>
+        <button class="button" @onclick="AddSubFilter">
+            <i class="bi bi-plus-circle"></i> Add Sub Filter
+        </button>
+    </ExtraEditingButtons>
+</FilterRowChrome>
+
+@if (Filter is not null && Filter.SubFilters.Count > 0)
+{
+    <div class="flex-column">
+        @foreach (var item in Filter.SubFilters)
+        {
+            <SubFilterRow @key="item.Id" OnRemove="RemoveSubFilter" Value="@item" />
+        }
+    </div>
+}

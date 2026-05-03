@@ -1,0 +1,114 @@
+@using EventLogExpert.UI
+@using Microsoft.Extensions.Logging
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="Settings"
+    CancelLabel="Exit"
+    Footer="FooterPreset.SaveCancel"
+    FooterDisabled="@IsCloseBlocked"
+    Height="60%"
+    InlineAlert="@CurrentInlineAlert"
+    OnCancel="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    OnSave="OnSaveAsync"
+    @ref="ChromeRef"
+    SaveLabel="Save">
+    <ChildContent>
+        <div class="settings-form">
+            <div class="flex-column-scroll">
+                <SettingsUpgradeProgressBanner />
+
+                <div class="flex-center-aligned-row tz-row">
+                    <text>Time Zone:</text>
+                    <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
+                        @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
+                        {
+                            <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </div>
+
+                <div class="flex-space-between">
+                    <div>Databases:</div>
+
+                    <button class="button" @onclick="ImportDatabase" type="button">
+                        <i aria-hidden="true" class="bi bi-plus-circle"></i> Import Database
+                    </button>
+                </div>
+
+                @if (IsClassificationPending)
+                {
+                    <div class="classification-pending" role="status">
+                        <i aria-hidden="true" class="bi bi-arrow-repeat banner-spinner"></i>
+                        <span>Classifying databases&hellip;</span>
+                    </div>
+                }
+
+                <div class="flex-column-scroll">
+                    @if (DatabaseService.Entries.Count > 0)
+                    {
+                        @foreach (var entry in DatabaseService.Entries)
+                        {
+                            <DatabaseEntryRow @key="entry.FileName"
+                                EffectiveEnabled="GetEffectiveEnabled(entry)"
+                                Entry="@entry"
+                                IsClassificationPending="@IsClassificationPending"
+                                IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !_entriesUpgrading.Contains(entry.FileName))"
+                                IsUpgrading="@_entriesUpgrading.Contains(entry.FileName)"
+                                OnRemove="@(() => RemoveDatabase(entry))"
+                                OnToggle="@(() => ToggleDatabase(entry.FileName))"
+                                OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
+                        }
+                    }
+                    else
+                    {
+                        <p>None</p>
+                    }
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Expand Display Pane On Selection Change:</text>
+                    <BooleanSelect AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Theme:</text>
+                    <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
+                        @foreach (Theme item in Enum.GetValues(typeof(Theme)))
+                        {
+                            <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
+                        }
+                    </ValueSelect>
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Keyboard Copy Behavior:</text>
+                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyType" CssClass="input filter-dropdown" T="CopyType">
+                        @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))
+                        {
+                            <ValueSelectItem T="CopyType" Value="item" />
+                        }
+                    </ValueSelect>
+                </div>
+
+                <div class="flex-center-aligned-row">
+                    <text>Logging Level:</text>
+                    <ValueSelect AriaLabel="Logging Level" @bind-Value="_logLevel" CssClass="input filter-dropdown" T="LogLevel">
+                        @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
+                        {
+                            <ValueSelectItem T="LogLevel" Value="item" />
+                        }
+                    </ValueSelect>
+                </div>
+            </div>
+        </div>
+    </ChildContent>
+
+    <ExtraFooterContent>
+        <div class="flex-center-aligned-row">
+            <text>Pre-release Builds:</text>
+            <BooleanSelect AriaLabel="Pre-release Builds" @bind-Value="_isPreReleaseEnabled" />
+        </div>
+    </ExtraFooterContent>
+</ModalChrome>
