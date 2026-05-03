@@ -304,8 +304,9 @@ public sealed partial class SettingsModal : ModalBase<bool>
     {
         var fileName = entry.FileName;
         var isReadyAndEnabled = entry is { IsEnabled: true, Status: DatabaseStatus.Ready };
+        var hasOpenLogs = !EventLogState.Value.ActiveLogs.IsEmpty;
 
-        var message = isReadyAndEnabled
+        var message = (isReadyAndEnabled && hasOpenLogs)
             ? $"{fileName} is currently enabled. Removing will close and reopen any affected log views. Are you sure?"
             : $"Are you sure you want to remove {fileName}?";
 

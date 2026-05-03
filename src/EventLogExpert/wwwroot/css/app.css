@@ -24,6 +24,12 @@
     --background-dark:     light-dark(#E0E0E0, #222222);
     --background-darkgray: light-dark(#CECECE, #353535);
 
+    /* Recessed surface used for content wells (e.g. the trash strip exposed
+       behind a database row when it slides aside). Always darker than
+       --background-dark in both schemes so the well reads as cut into the
+       surrounding chrome rather than lifted on top of it. */
+    --surface-inset:       light-dark(#C8C8C8, #161616);
+
     /* Shared menu metrics. The menu bar height drives the MenuHost overlay offset so
        the bar strip stays clickable while a menu is open. */
     --menu-bar-height: 28px;

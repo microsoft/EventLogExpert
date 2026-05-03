@@ -49,9 +49,9 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".toggle"));
 
-        // BackupExists hides trash so the user is steered to the recovery dialog instead
-        // of triggering a delete that would leave the .upgrade.bak orphaned.
-        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+        // Trash is unconditionally rendered now; visibility is governed by the CSS
+        // hover/focus reveal animation, not by markup.
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -67,14 +67,15 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Recovery required", badge.TextContent);
         Assert.Empty(component.FindAll(".toggle"));
-        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
-    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndHidesTrash()
+    public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndShowsTrash()
     {
-        // Arrange — BackupExists routes the user to the recovery dialog, so the row hides
-        // trash to prevent a delete that would orphan the .upgrade.bak file.
+        // Arrange — BackupExists routes the user to the recovery dialog as the primary
+        // action, but the trash is still rendered (revealed by hover/focus) so a user
+        // who wants to abandon the entry entirely can do so.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
 
         // Act
@@ -89,7 +90,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".toggle"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
 
-        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -97,18 +98,14 @@ public sealed class DatabaseEntryRowTests : BunitContext
     {
         foreach (var status in Enum.GetValues<DatabaseStatus>())
         {
-            // UpgradeRequired hides trash to steer the user to Upgrade first; it has its
-            // own dedicated test below.
-            if (status == DatabaseStatus.UpgradeRequired) { continue; }
-
             // Arrange
             var entry = MakeEntry(status);
 
             // Act
             var component = RenderRow(entry);
 
-            // Assert — non-BackupExists, non-Upgrading entries always render trash
-            // (visibility is governed by CSS hover/focus reveal, not by markup).
+            // Assert — every status renders the trash; visibility is governed by the
+            // CSS hover/focus reveal animation, not by markup.
             Assert.Single(component.FindAll(".db-entry-remove-btn"));
         }
     }
@@ -171,9 +168,9 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-badge"));
 
-        // IsUpgrading hides trash so a delete cannot race with the in-flight upgrade
-        // (which is sitting on a per-file reservation inside DatabaseService).
-        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+        // Trash is rendered even during an in-flight upgrade; RemoveAsync coordinates
+        // with the per-file reservation so the user-initiated delete is safe to expose.
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
@@ -325,19 +322,18 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_UpgradeRequiredEntry_HidesTrashButton()
+    public void Render_UpgradeRequiredEntry_ShowsTrashButton()
     {
-        // Arrange — UpgradeRequired hides trash so the user is steered to either Upgrade
-        // (resolving the V3 → V4 transition) or — once they give up and the entry transitions
-        // to UpgradeFailed — Remove. Allowing direct removal of an UpgradeRequired entry would
-        // skip past the explicit upgrade decision the row UI is designed to surface.
+        // Arrange — UpgradeRequired now renders the trash like every other status; the
+        // user is no longer forced to either Upgrade or transition through UpgradeFailed
+        // before being able to remove the entry.
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
 
         // Act
         var component = RenderRow(entry);
 
         // Assert
-        Assert.Empty(component.FindAll(".db-entry-remove-btn"));
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]

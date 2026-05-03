@@ -9,6 +9,14 @@ namespace EventLogExpert.Components;
 
 public sealed partial class DatabaseEntryRow : ComponentBase
 {
+    /// <summary>
+    ///     Click-driven reveal flag for the trash strip on the left of the row. Set true when the
+    ///     name button is clicked, cleared when the cursor leaves the row -- so re-entering the row
+    ///     without re-clicking does not re-open the slide, even though the name button may still
+    ///     hold DOM focus. Keyboard navigation drives the reveal via :focus-visible in CSS instead.
+    /// </summary>
+    private bool _isMouseRevealed;
+
     private enum ActionKind
     {
         None,
@@ -39,15 +47,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private string BadgeLabel => DatabaseStatusLabels.GetRowBadgeLabel(Entry);
 
-    /// <summary>Removal is hidden for entries the user must resolve some other way first:
-    /// an in-flight upgrade (would race the per-file reservation), a pending recovery
-    /// (would orphan the .upgrade.bak), or a V3 database awaiting upgrade (steers the user
-    /// to either Upgrade or — once UpgradeFailed — Retry/Remove). UpgradeFailed remains
-    /// removable so a user who has tried and given up can still clean the entry up.</summary>
-    private bool CanRemove => !IsUpgrading
-        && !Entry.BackupExists
-        && Entry.Status != DatabaseStatus.UpgradeRequired;
-
     private ActionKind PrimaryAction
     {
         get
@@ -75,4 +74,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         (!IsUpgrading &&
             Entry.Status != DatabaseStatus.Ready &&
             Entry.Status != DatabaseStatus.UpgradeRequired);
+
+    private void HandleNameClick() => _isMouseRevealed = true;
+
+    private void HandleRowMouseLeave() => _isMouseRevealed = false;
 }

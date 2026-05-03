@@ -51,7 +51,8 @@
                     {
                         @foreach (var entry in DatabaseService.Entries)
                         {
-                            <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
+                            <DatabaseEntryRow @key="entry.FileName"
+                                EffectiveEnabled="GetEffectiveEnabled(entry)"
                                 Entry="@entry"
                                 IsClassificationPending="@IsClassificationPending"
                                 IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !_entriesUpgrading.Contains(entry.FileName))"

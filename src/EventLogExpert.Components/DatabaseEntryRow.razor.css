@@ -1,10 +1,46 @@
 .db-entry-row {
+    --db-entry-trash-reveal: 2.5rem;
+
+    position: relative;
+    overflow: hidden;
+}
+
+.db-entry-row-content {
+    position: relative;
+
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 1rem;
 
-    padding: .15rem .5rem;
+    /* No left padding: the visible left indent lives on .db-entry-info so the
+       content layer's left edge butts up against the trash strip when slid.
+       Background matches the modal chrome (var(--background-dark)) so rows
+       blend visually but the opaque fill is still required to cover the
+       absolutely-positioned trash button underneath at rest. The trash
+       button is rendered earlier in the DOM than this element, so this
+       element paints above it via source order without needing z-index --
+       which also keeps rows below dialog-level overlays (e.g. inline alerts). */
+    padding: .15rem .5rem .15rem 0;
+    background-color: var(--background-dark);
+
+    transition: transform 200ms ease;
+}
+
+/* Reveal logic:
+   - Mouse: clicking the name button sets the .db-entry-row--revealed flag in
+     code-behind, which keeps the slide open until the cursor leaves the row
+     (@onmouseleave clears the flag). Re-entering the row without re-clicking
+     does NOT re-open the slide, even if the name button still has DOM focus.
+   - Keyboard: :focus-visible on the name button (matched only when focus
+     came from a key press, not a mouse click) opens the slide independently
+     of hover/state, so keyboard users can see what's there.
+   - Trash :focus keeps the strip open during the click (mouse focus or
+     keyboard focus), so the click reliably lands. */
+.db-entry-row.db-entry-row--revealed .db-entry-row-content,
+.db-entry-row:has(.db-entry-name:focus-visible) .db-entry-row-content,
+.db-entry-row:has(.db-entry-remove-btn:focus) .db-entry-row-content {
+    transform: translateX(var(--db-entry-trash-reveal));
 }
 
 .db-entry-info {
@@ -12,11 +48,24 @@
     align-items: center;
     gap: .5rem;
     min-width: 0;
+
+    padding-left: .5rem;
 }
 
 .db-entry-name {
     flex: 1 1 auto;
     min-width: 0;
+
+    /* Reset the <button> chrome so the name reads as plain text on the row,
+       only the cursor and focus outline reveal that it's interactive. */
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
 
     overflow: hidden;
     text-overflow: ellipsis;
@@ -71,28 +120,31 @@
 }
 
 .db-entry-remove-btn {
-    flex: 0 0 auto;
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--db-entry-trash-reveal);
 
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 120ms ease;
-}
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
-.db-entry-row:hover .db-entry-remove-btn,
-.db-entry-row:focus-within .db-entry-remove-btn {
-    opacity: 1;
-    pointer-events: auto;
+    /* Recessed-well treatment: darker fill plus a soft inner shadow makes the
+       exposed trash strip read as a depression cut into the row, rather than
+       a button floating on top. */
+    background-color: var(--surface-inset);
+    box-shadow: inset 0 0 .35rem rgba(0, 0, 0, .55);
 }
 
 @media (hover: none) {
-    .db-entry-row .db-entry-remove-btn {
-        opacity: 1;
-        pointer-events: auto;
+    .db-entry-row-content {
+        transform: translateX(var(--db-entry-trash-reveal));
     }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .db-entry-remove-btn {
+    .db-entry-row-content {
         transition: none;
     }
 }
