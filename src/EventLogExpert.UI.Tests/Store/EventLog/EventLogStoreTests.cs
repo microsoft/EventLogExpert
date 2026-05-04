@@ -187,7 +187,7 @@ public sealed class EventLogStoreTests
         var action = new EventLogAction.SelectEvents(events);
 
         // Assert
-        Assert.Equal(2, action.SelectedEvents.Count());
+        Assert.Equal(2, action.SelectedEvents.Count);
     }
 
     [Fact]

@@ -33,7 +33,7 @@ public sealed record EventLogAction
         bool IsMultiSelect = false,
         bool ShouldStaySelected = false);
 
-    public sealed record SelectEvents(IEnumerable<DisplayEventModel> SelectedEvents);
+    public sealed record SelectEvents(IReadOnlyCollection<DisplayEventModel> SelectedEvents);
 
     /// <summary>
     /// Replaces the entire selection with the supplied events, preserving input order
@@ -47,7 +47,7 @@ public sealed record EventLogAction
     /// <param name="SelectedEvent">The new focused event, or null to clear focus. Does not
     /// need to be a member of <paramref name="SelectedEvents"/>.</param>
     public sealed record SetSelectedEvents(
-        IEnumerable<DisplayEventModel> SelectedEvents,
+        IReadOnlyCollection<DisplayEventModel> SelectedEvents,
         DisplayEventModel? SelectedEvent);
 
     public sealed record SetContinuouslyUpdate(bool ContinuouslyUpdate);
