@@ -6,6 +6,8 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EventLogExpert.UI.Services;
 
@@ -13,7 +15,10 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
+    private static readonly TimeSpan s_interprocessLockTimeout = TimeSpan.FromSeconds(2);
+
     private readonly FileLocationOptions _fileLocationOptions;
+    private readonly Mutex _interprocessMutex;
     private readonly ISettingsService _settings;
     private readonly Lock _writeLock = new();
 
@@ -25,6 +30,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         _fileLocationOptions = fileLocationOptions;
         _settings = settings;
         _cachedLogLevel = _settings.LogLevel;
+        _interprocessMutex = new Mutex(false, DeriveMutexName(_fileLocationOptions.LoggingPath));
 
         InitTracing();
 
@@ -40,7 +46,20 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         using (_writeLock.EnterScope())
         {
             CloseWriter();
-            File.WriteAllText(_fileLocationOptions.LoggingPath, string.Empty);
+
+            WithInterprocessLock(
+                () =>
+                {
+                    // Share with concurrent writers; SetLength(0) truncates without closing them.
+                    using var stream = new FileStream(
+                        _fileLocationOptions.LoggingPath,
+                        FileMode.OpenOrCreate,
+                        FileAccess.Write,
+                        FileShare.ReadWrite | FileShare.Delete);
+
+                    stream.SetLength(0);
+                },
+                throwOnTimeout: true);
         }
 
         return Task.CompletedTask;
@@ -70,6 +89,8 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         {
             CloseWriter();
         }
+
+        _interprocessMutex.Dispose();
     }
 
     public void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler)
@@ -86,12 +107,10 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         WriteTrace(handler.ToStringAndClear(), LogLevel.Information);
     }
 
-    public async IAsyncEnumerable<string> LoadAsync()
+    public async IAsyncEnumerable<string> LoadAsync(
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        // Read directly from the source file. Writers use File.AppendText which opens with
-        // FileShare.Read, allowing concurrent readers. We open with FileShare.ReadWrite | Delete
-        // to allow concurrent writers and log rotation/deletion (e.g., InitTracing deletes oversized logs).
-        // This avoids the overhead of copying to a temp file and eliminates lock contention.
+        // ReadWrite + Delete share: concurrent writers (second app instance) and rotation-driven deletion.
         var options = new FileStreamOptions
         {
             Mode = FileMode.Open,
@@ -109,8 +128,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
-            // The log file doesn't exist yet (fresh install, before first write),
-            // or was deleted between check and open (e.g., InitTracing deletes oversized logs).
+            // Log not yet created (fresh install) or rotation deleted it; treat as empty.
             yield break;
         }
 
@@ -118,7 +136,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         {
             using var reader = new StreamReader(stream);
 
-            while (await reader.ReadLineAsync() is { } line)
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
             {
                 yield return line;
             }
@@ -149,11 +167,12 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
     {
         if (_writer is not null) { return; }
 
+        // OpenOrCreate (not Append) avoids stale-position writes after cross-instance SetLength(0).
         var stream = new FileStream(
             _fileLocationOptions.LoggingPath,
-            FileMode.Append,
+            FileMode.OpenOrCreate,
             FileAccess.Write,
-            FileShare.Read | FileShare.Delete,
+            FileShare.ReadWrite | FileShare.Delete,
             bufferSize: 4096);
 
         _writer = new StreamWriter(stream) { AutoFlush = true };
@@ -181,16 +200,73 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
 
     private void WriteTrace(string message, LogLevel level)
     {
-        string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
-
         using (_writeLock.EnterScope())
         {
+            string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
+
             EnsureWriter();
-            _writer?.WriteLine(output);
-        }
+
+            // Mutex serializes line writes so concurrent instances don't interleave.
+            WithInterprocessLock(
+                () =>
+                {
+                    if (_writer is null) { return; }
+
+                    // Re-seek to EOF: another instance may have written or truncated the file.
+                    _writer.BaseStream.Seek(0, SeekOrigin.End);
+                    _writer.WriteLine(output);
+                },
+                throwOnTimeout: false);
 
 #if DEBUG
-        System.Diagnostics.Debug.WriteLine(output);
+            System.Diagnostics.Debug.WriteLine(output);
 #endif
+        }
+    }
+
+    private static string DeriveMutexName(string path)
+    {
+        // Canonicalize: equivalent paths (relative, separator drift) must hash identically.
+        var canonical = Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var bytes = Encoding.UTF8.GetBytes(canonical.ToUpperInvariant());
+        var hash = SHA256.HashData(bytes);
+        return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
+    }
+
+    private void WithInterprocessLock(Action action, bool throwOnTimeout)
+    {
+        bool acquired;
+
+        try
+        {
+            acquired = _interprocessMutex.WaitOne(s_interprocessLockTimeout);
+        }
+        catch (AbandonedMutexException)
+        {
+            // Prior owner crashed without releasing; we now hold it and proceed.
+            acquired = true;
+        }
+
+        if (!acquired)
+        {
+            if (throwOnTimeout)
+            {
+                throw new TimeoutException(
+                    $"Timed out acquiring debug-log interprocess lock after {s_interprocessLockTimeout.TotalSeconds:F0}s.");
+            }
+
+            // Hot path: drop this trace rather than risk interleaved/corrupted writes.
+            return;
+        }
+
+        try
+        {
+            action();
+        }
+        finally
+        {
+            _interprocessMutex.ReleaseMutex();
+        }
     }
 }

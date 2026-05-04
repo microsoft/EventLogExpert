@@ -7,5 +7,5 @@ public interface IFileLogger
 {
     Task ClearAsync();
 
-    IAsyncEnumerable<string> LoadAsync();
+    IAsyncEnumerable<string> LoadAsync(CancellationToken cancellationToken = default);
 }

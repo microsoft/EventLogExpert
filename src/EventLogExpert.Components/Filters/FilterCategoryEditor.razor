@@ -27,6 +27,7 @@
 else if (Data.Evaluator == FilterEvaluator.MultiSelect)
 {
     <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Data.Values" IsMultiSelect
+        EmptyText="All"
         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
         @foreach (var item in Items)

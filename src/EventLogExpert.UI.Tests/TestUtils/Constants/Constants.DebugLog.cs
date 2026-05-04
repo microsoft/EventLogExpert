@@ -13,7 +13,10 @@ public sealed partial class Constants
     public const string DebugLogLine2 = "Line 2";
     public const string DebugLogLine3 = "Line 3";
     public const string DebugLogNewMessage = "New message";
+    public const string DebugLogOlderTimestamp = "2026-04-29T07:53:19.0000000-04:00";
     public const string DebugLogSecondMessage = "Second message";
     public const string DebugLogTestMessage = "Test message";
+    public const string DebugLogTestTimestamp = "2026-04-29T07:53:20.9321852-04:00";
+    public const int DebugLogTestThreadId = 12;
     public const string DebugLogThirdMessage = "Third message";
 }

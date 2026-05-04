@@ -45,6 +45,14 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     [Parameter]
     public bool IsMultiSelect { get; set; }
 
+    /// <summary>
+    /// Text shown by a multi-select <see cref="ValueSelect{T}"/> when no values are selected.
+    /// Defaults to "Empty"; consumers should override with a domain-appropriate label such as
+    /// "All" when an empty selection means "no filter applied".
+    /// </summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Empty";
+
     private string? DisplayString
     {
         get
@@ -56,7 +64,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
                 return converter is null ? $"{Value}" : converter.Set(Value);
             }
 
-            if (Values.Count <= 0) { return "Empty"; }
+            if (Values.Count <= 0) { return EmptyText; }
 
             return converter is null ?
                 string.Join(", ", Values.Select(x => $"{x}")) :
@@ -104,6 +112,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             // Expected during app shutdown
         }
     }
+
+    public bool HasAnySelection => _selectedValues.Count > 0;
 
     public bool IsItemSelected(T value) => _selectedValues.Contains(value);
 
