@@ -1,35 +1,107 @@
 @inherits ModalBase<bool>
+@using EventLogExpert.UI
+@using Microsoft.Extensions.Logging
 
 <ModalChrome AriaLabel="Debug Log"
     CloseLabel="Exit"
     Footer="FooterPreset.CloseOnly"
     Height="60%"
     InlineAlert="@CurrentInlineAlert"
-    MinWidth="50rem"
+    MaxWidth="100rem"
+    MinWidth="100rem"
     OnClose="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
-        <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" aria-live="polite" class="flex-column-scroll" role="log">
-            @if (_data.Count > 0)
+        <div aria-label="Filters" class="debug-log-filter-bar" role="group">
+            <label>Level</label>
+            <ValueSelect AriaLabel="Level operator"
+                CssClass="input filter-dropdown"
+                T="FilterEvaluator"
+                Value="_levelOperator"
+                ValueChanged="HandleLevelOperatorChanged"
+                ToStringFunc="@(x => x.ToFullString())">
+                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.Equals" />
+                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.NotEqual" />
+                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.MultiSelect" />
+            </ValueSelect>
+            @if (_levelOperator == FilterEvaluator.MultiSelect)
             {
-                @for (var i = _data.Count - 1; i >= 0; i--)
-                {
-                    <text>@_data[i]</text>
-                    <br />
-                }
+                <ValueSelect AriaLabel="Levels"
+                    CssClass="input filter-dropdown debug-log-level-multi"
+                    EmptyText="All"
+                    IsMultiSelect
+                    T="LogLevel"
+                    Values="_multiLevels"
+                    ValuesChanged="HandleMultiLevelsChanged"
+                    ToStringFunc="@(x => x.ToString())">
+                    <ValueSelectItem T="LogLevel" ClearItem>All</ValueSelectItem>
+                    @foreach (var level in s_logLevels)
+                    {
+                        <ValueSelectItem T="LogLevel" Value="level" />
+                    }
+                </ValueSelect>
             }
-            else if (_hasLoaded)
+            else
             {
-                <text>Log is Empty...</text>
+                <ValueSelect AriaLabel="Level"
+                    CssClass="input filter-dropdown"
+                    T="LogLevel?"
+                    Value="_singleLevel"
+                    ValueChanged="HandleSingleLevelChanged"
+                    ToStringFunc="@(x => x?.ToString() ?? "All")">
+                    <ValueSelectItem T="LogLevel?" ClearItem>All</ValueSelectItem>
+                    @foreach (var level in s_logLevels)
+                    {
+                        <ValueSelectItem T="LogLevel?" Value="level" />
+                    }
+                </ValueSelect>
             }
+            <input aria-label="Filter messages"
+                class="input debug-log-text-filter"
+                @oninput="HandleStringFilterInput"
+                placeholder="Filter messages..."
+                type="text"
+                value="@_pendingStringFilter" />
+        </div>
+        <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
+            <Virtualize Items="_displayedView" Context="line" ItemSize="@RowHeightPx" OverscanCount="20">
+                <ItemContent>
+                    <div class="debug-log-row">@line</div>
+                </ItemContent>
+                <EmptyContent>
+                    @if (_hasLoaded)
+                    {
+                        <span>@(_entries.Count == 0 ? "Log is Empty..." : "No entries match filters.")</span>
+                    }
+                </EmptyContent>
+            </Virtualize>
         </div>
     </ChildContent>
     <ExtraFooterContent>
-        <div class="button-group">
-            <button class="button" @onclick="Refresh" type="button">Refresh</button>
-            <button class="button" @onclick="Clear" type="button">Clear</button>
+        <div class="debug-log-footer">
+            <div class="debug-log-footer-actions debug-log-footer-left">
+                <button class="button"
+                    disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
+                    @onclick="HandleExportAsync"
+                    type="button">
+                    Export
+                </button>
+                <button class="button"
+                    disabled="@(!_hasLoaded || _filteredEntryCount == 0)"
+                    @onclick="HandleCopyAsync"
+                    type="button">
+                    Copy
+                </button>
+            </div>
+            <span aria-atomic="true" aria-live="polite" class="debug-log-footer-counter" role="status">
+                @($"{_filteredEntryCount:N0} of {_entries.Count:N0} {(_entries.Count == 1 ? "entry" : "entries")}")
+            </span>
+            <div class="debug-log-footer-actions debug-log-footer-right">
+                <button class="button" @onclick="Refresh" type="button">Refresh</button>
+                <button class="button" @onclick="Clear" type="button">Clear</button>
+            </div>
         </div>
     </ExtraFooterContent>
 </ModalChrome>

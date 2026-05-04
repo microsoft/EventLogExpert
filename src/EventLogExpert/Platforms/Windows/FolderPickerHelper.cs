@@ -9,6 +9,11 @@ namespace EventLogExpert.Platforms.Windows;
 
 public static class FolderPickerHelper
 {
+    /// <summary>
+    ///     Presents the WinUI folder picker. Returns the selected folder's path, or <c>null</c> only when the
+    ///     user cancelled. Throws <see cref="InvalidOperationException"/> when no MAUI host window is available
+    ///     so callers can surface the broken-host condition instead of silently treating it as a cancel.
+    /// </summary>
     public static async Task<string?> PickFolderAsync()
     {
         FolderPicker picker = new()
@@ -17,7 +22,14 @@ public static class FolderPickerHelper
             FileTypeFilter = { "*" } // Add a wildcard to allow folder selection
         };
 
-        if (Application.Current?.Windows[0].Handler?.PlatformView is not MauiWinUIWindow window) { return null; }
+        var current = Application.Current;
+        var hostWindow = current?.Windows.Count > 0 ? current.Windows[0] : null;
+
+        if (hostWindow?.Handler?.PlatformView is not MauiWinUIWindow window)
+        {
+            throw new InvalidOperationException(
+                "No MAUI host window is available to present the folder picker.");
+        }
 
         InitializeWithWindow.Initialize(picker, window.WindowHandle);
 

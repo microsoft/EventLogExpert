@@ -62,6 +62,37 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ClearAsync_WhenSecondInstanceHoldsWriter_ShouldNotThrowFileLockException()
+    {
+        // Arrange
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var firstInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
+        firstInstance.Info($"first instance line");
+
+        using var secondInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
+        secondInstance.Info($"second instance line");
+
+        // Act + Assert - clearing from one instance must not fail because the other holds the writer.
+        var exception = await Record.ExceptionAsync(() => firstInstance.ClearAsync());
+        Assert.Null(exception);
+
+        // Both instances must write cleanly post-clear; no NUL padding from stale positions.
+        secondInstance.Info($"after clear from second");
+        firstInstance.Info($"after clear from first");
+
+        var bytes = ReadLogFileBytes();
+        Assert.DoesNotContain((byte)0, bytes);
+
+        var content = ReadLogFile();
+        var lines = content.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries);
+        Assert.Equal(2, lines.Length);
+        Assert.Contains("after clear from second", lines[0]);
+        Assert.Contains("after clear from first", lines[1]);
+    }
+
+    [Fact]
     public void Constructor_ShouldCreateServiceSuccessfully()
     {
         // Arrange
@@ -191,7 +222,8 @@ public sealed class DebugLogServiceTests : IDisposable
 
         // Act - Start enumeration and delete the file while the reader holds a handle
         await using var enumerator =
-            debugLogService.LoadAsync().GetAsyncEnumerator(TestContext.Current.CancellationToken);
+            debugLogService.LoadAsync(TestContext.Current.CancellationToken)
+                .GetAsyncEnumerator(TestContext.Current.CancellationToken);
 
         // Read first line to ensure the file is open
         Assert.True(await enumerator.MoveNextAsync());
@@ -229,7 +261,8 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
+        var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Empty(lines);
@@ -248,7 +281,8 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
+        var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Equal(3, lines.Count);
@@ -269,7 +303,8 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        var lines = await debugLogService.LoadAsync().ToListAsync(TestContext.Current.CancellationToken);
+        var lines = await debugLogService.LoadAsync(TestContext.Current.CancellationToken)
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         // Assert
         Assert.Empty(lines);
@@ -329,6 +364,80 @@ public sealed class DebugLogServiceTests : IDisposable
         var content = ReadLogFile();
         // Check for ISO 8601 format timestamp pattern [YYYY-MM-DD
         Assert.Matches(@"\[\d{4}-\d{2}-\d{2}", content);
+    }
+
+    [Fact]
+    public async Task Trace_WhenCalledFromMultipleThreadsConcurrently_ShouldProduceOrderedAndCompleteOutput()
+    {
+        // Arrange — exercises the writer's synchronization boundary: timestamp capture, prefix formatting,
+        // and the underlying StreamWriter call all happen INSIDE _writeLock.EnterScope(). A regression that
+        // moves any of those steps back outside the lock will surface as either (a) interleaved/garbled
+        // lines that fail to parse, (b) timestamps that go backwards within the file, or (c) lost or
+        // duplicated payloads.
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+        const int WriterCount = 64;
+        const int WritesPerWriter = 4;
+        const int TotalWrites = WriterCount * WritesPerWriter;
+        var startGate = new TaskCompletionSource();
+
+        // Act
+        using (var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService))
+        {
+            var writers = Enumerable.Range(0, WriterCount)
+                .Select(writerIndex => Task.Run(async () =>
+                {
+                    await startGate.Task;
+
+                    for (var writeIndex = 0; writeIndex < WritesPerWriter; writeIndex++)
+                    {
+                        debugLogService.Info($"writer-{writerIndex}-msg-{writeIndex}");
+                    }
+                }, TestContext.Current.CancellationToken))
+                .ToArray();
+
+            startGate.SetResult();
+            await Task.WhenAll(writers);
+        }
+
+        // Assert
+        var lines = await File.ReadAllLinesAsync(_testLogPath, TestContext.Current.CancellationToken);
+
+        Assert.Equal(TotalWrites, lines.Length);
+
+        var timestamps = new List<DateTimeOffset>(lines.Length);
+        var payloads = new List<string>(lines.Length);
+
+        foreach (var line in lines)
+        {
+            // Use the production parser directly so the test enforces the actual producer/consumer
+            // contract — if the prefix shape changes in DebugLogService.WriteTrace, the parser's
+            // regex changes alongside it, and this assertion follows automatically.
+            Assert.True(
+                DebugLogEntryParser.TryParseLine(line, out var entry),
+                $"Line did not parse via DebugLogEntryParser: {line}");
+
+            timestamps.Add(entry.Timestamp!.Value);
+            payloads.Add(entry.Message);
+        }
+
+        for (var i = 1; i < timestamps.Count; i++)
+        {
+            // <= because DateTime.Now resolution can produce equal timestamps for closely-spaced
+            // captures inside the lock; what we forbid is a regression (later timestamp earlier in file).
+            Assert.True(
+                timestamps[i] >= timestamps[i - 1],
+                $"Timestamp regressed at line {i}: {timestamps[i - 1]:o} -> {timestamps[i]:o}");
+        }
+
+        var expectedPayloads = Enumerable.Range(0, WriterCount)
+            .SelectMany(writerIndex => Enumerable.Range(0, WritesPerWriter)
+                .Select(writeIndex => $"writer-{writerIndex}-msg-{writeIndex}"))
+            .ToHashSet();
+
+        // Equality on HashSet asserts both "no missing payloads" and "no duplicated/extra payloads".
+        Assert.Equal(expectedPayloads, payloads.ToHashSet());
+        Assert.Equal(TotalWrites, payloads.Count);
     }
 
     [Fact]
@@ -505,6 +614,23 @@ public sealed class DebugLogServiceTests : IDisposable
         Assert.Contains("warning message after change", content);
     }
 
+    [Fact]
+    public void WriteTrace_WhenSecondInstanceWritesToSameFile_ShouldNotThrowFileLockException()
+    {
+        // Arrange
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
+
+        using var firstInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
+        firstInstance.Info($"first instance line");
+
+        using var secondInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
+
+        // Act + Assert
+        var exception = Record.Exception(() => secondInstance.Info($"second instance line"));
+        Assert.Null(exception);
+    }
+
     private static ISettingsService CreateMockSettingsService(LogLevel logLevel)
     {
         var mockSettingsService = Substitute.For<ISettingsService>();
@@ -555,5 +681,19 @@ public sealed class DebugLogServiceTests : IDisposable
         using var reader = new StreamReader(stream);
 
         return reader.ReadToEnd();
+    }
+
+    private byte[] ReadLogFileBytes()
+    {
+        using var stream = new FileStream(
+            _testLogPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.ReadWrite | FileShare.Delete);
+
+        using var ms = new MemoryStream();
+        stream.CopyTo(ms);
+
+        return ms.ToArray();
     }
 }

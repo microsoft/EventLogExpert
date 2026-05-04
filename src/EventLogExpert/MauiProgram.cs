@@ -97,6 +97,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
+        builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
         builder.Services.AddSingleton<IFilterService, FilterService>();
         builder.Services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();

@@ -8,8 +8,6 @@ using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
-using Windows.Storage.Pickers;
-using WinRT.Interop;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Modals.Filters;
@@ -20,38 +18,20 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
+
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
     protected override async Task OnExportAsync()
     {
-        FileSavePicker picker = new()
-        {
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-            SuggestedFileName = "Saved Groups"
-        };
-
-        picker.FileTypeChoices.Add("JSON", new List<string> { ".json" });
-
-        if (Application.Current?.Windows[0].Handler?.PlatformView is not MauiWinUIWindow window)
-        {
-            return;
-        }
-
-        InitializeWithWindow.Initialize(picker, window.WindowHandle);
-
-        var result = await picker.PickSaveFileAsync();
-
-        if (result is null) { return; }
+        var snapshot = FilterGroupState.Value.Groups;
 
         try
         {
-            using var stream = new MemoryStream(
-                JsonSerializer.SerializeToUtf8Bytes(
-                    FilterGroupState.Value.Groups));
-
-            await using var fileStream = await result.OpenStreamForWriteAsync();
-
-            await stream.CopyToAsync(fileStream);
+            await FileSaveService.SaveAsync(
+                "Saved Groups",
+                FileSaveServiceFileTypes.Json,
+                stream => JsonSerializer.SerializeAsync(stream, snapshot));
         }
         catch (Exception ex)
         {

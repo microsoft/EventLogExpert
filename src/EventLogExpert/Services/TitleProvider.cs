@@ -9,18 +9,17 @@ public class TitleProvider : ITitleProvider
 {
     public string GetTitle()
     {
-        return Application.Current?.Windows[0].Title ?? "";
+        var current = Application.Current;
+        return (current?.Windows.Count > 0 ? current.Windows[0].Title : null) ?? "";
     }
 
     public void SetTitle(string title)
     {
-        MainThread.InvokeOnMainThreadAsync(() =>
+        MainThread.BeginInvokeOnMainThread(() =>
         {
-            var window = Application.Current?.Windows[0];
-            if (window is not null)
-            {
-                window.Title = title.ToString();
-            }
+            var current = Application.Current;
+            var window = current?.Windows.Count > 0 ? current.Windows[0] : null;
+            window?.Title = title;
         });
     }
 }

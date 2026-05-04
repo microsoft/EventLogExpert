@@ -41,7 +41,7 @@ public sealed partial class ValueSelectItem<T> : IDisposable
 
     private bool IsHighlighted => _parent.HighlightedItem?.Equals(this) ?? false;
 
-    private bool IsSelected => _parent.IsItemSelected(Value);
+    private bool IsSelected => ClearItem ? !_parent.HasAnySelection : _parent.IsItemSelected(Value);
 
     [CascadingParameter]
     private ValueSelect<T> ValueSelect

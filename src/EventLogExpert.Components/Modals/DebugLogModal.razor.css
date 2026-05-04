@@ -1,0 +1,65 @@
+.debug-log-viewport {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+}
+
+.debug-log-row {
+    box-sizing: border-box;
+    height: 18px;
+    padding: 0 0.25rem;
+
+    font-family: monospace;
+    line-height: 18px;
+    white-space: pre;
+}
+
+.debug-log-filter-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    padding: 0 0 0.5rem 0;
+    margin-bottom: 0.5rem;
+}
+
+.debug-log-text-filter {
+    flex: 1 1 auto;
+    min-width: 12rem;
+}
+
+.debug-log-filter-bar ::deep .debug-log-level-multi {
+    min-width: 18rem;
+}
+
+.debug-log-footer {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.debug-log-footer-actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.debug-log-footer-left {
+    justify-self: start;
+}
+
+.debug-log-footer-right {
+    justify-self: end;
+}
+
+.debug-log-footer-counter {
+    justify-self: center;
+
+    font-size: 0.85rem;
+    opacity: 0.85;
+}

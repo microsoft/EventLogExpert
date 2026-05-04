@@ -159,13 +159,35 @@ public sealed class MauiMenuActionService(
 
     public async Task OpenFolderAsync(bool combineLog)
     {
-        string? folderPath = await FolderPickerHelper.PickFolderAsync();
+        string? folderPath;
+
+        try
+        {
+            folderPath = await FolderPickerHelper.PickFolderAsync();
+        }
+        catch (InvalidOperationException ex)
+        {
+            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "OK");
+
+            return;
+        }
 
         if (folderPath is null) { return; }
 
-        var files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly)
-            .Select(file => (file, PathType.FilePath))
-            .ToList();
+        List<(string, PathType)> files;
+
+        try
+        {
+            files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly)
+                .Select(file => (file, PathType.FilePath))
+                .ToList();
+        }
+        catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
+        {
+            await _dialogService.ShowAlert("Open Folder Failed", ex.Message, "OK");
+
+            return;
+        }
 
         if (files.Count == 0) { return; }
 
