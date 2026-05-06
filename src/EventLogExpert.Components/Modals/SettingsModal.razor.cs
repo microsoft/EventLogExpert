@@ -39,6 +39,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
+    [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
+
     [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
     private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
@@ -192,26 +194,13 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     private async Task ImportDatabase()
     {
-        PickOptions options = new()
-        {
-            PickerTitle = "Please select a database file",
-            FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.WinUI, [".db", ".zip"] }
-                })
-        };
-
         try
         {
-            var result = (await FilePicker.Default.PickMultipleAsync(options)).ToArray();
+            var sourcePaths = await FilePickerService.PickMultipleAsync(
+                "Please select database files to import",
+                FilePickerServiceFileTypes.Database);
 
-            if (result.Length <= 0) { return; }
-
-            var sourcePaths = result
-                .Where(item => item is not null && !string.IsNullOrEmpty(item.FullPath))
-                .Select(item => item!.FullPath)
-                .ToList();
+            if (sourcePaths.Count == 0) { return; }
 
             var skipFileNames = await ResolveImportConflictsAsync(sourcePaths, CancellationToken.None);
 
