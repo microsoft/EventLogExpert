@@ -18,6 +18,8 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
+
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
@@ -43,20 +45,15 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
     protected override async Task OnImportAsync()
     {
-        PickOptions options = new()
-        {
-            PickerTitle = "Please select a json file to import",
-            FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>> { { DevicePlatform.WinUI, [".json"] } })
-        };
-
-        var result = await FilePicker.Default.PickAsync(options);
-
-        if (result is null) { return; }
-
         try
         {
-            await using var stream = File.OpenRead(result.FullPath);
+            var path = await FilePickerService.PickAsync(
+                "Please select a json file to import",
+                FilePickerServiceFileTypes.Json);
+
+            if (path is null) { return; }
+
+            await using var stream = File.OpenRead(path);
             var groups = await JsonSerializer.DeserializeAsync<List<FilterGroupModel>>(stream);
 
             if (groups is null) { return; }
