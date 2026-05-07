@@ -11,7 +11,7 @@ public sealed class EventLogInformation
 {
     internal EventLogInformation(EventLogSession session, string logName, PathType pathType)
     {
-        using EvtHandle handle = EventMethods.EvtOpenLog(session.Handle, logName, pathType);
+        using EvtHandle handle = NativeMethods.EvtOpenLog(session.Handle, logName, pathType);
 
         Attributes = (int?)(uint?)GetLogInfo(handle, EvtLogPropertyId.Attributes);
         CreationTime = (DateTime?)GetLogInfo(handle, EvtLogPropertyId.CreationTime);
@@ -45,27 +45,27 @@ public sealed class EventLogInformation
 
         try
         {
-            bool success = EventMethods.EvtGetLogInfo(handle, property, 0, IntPtr.Zero, out int bufferSize);
+            bool success = NativeMethods.EvtGetLogInfo(handle, property, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
             if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferSize);
 
-            success = EventMethods.EvtGetLogInfo(handle, property, bufferSize, buffer, out bufferSize);
+            success = NativeMethods.EvtGetLogInfo(handle, property, bufferSize, buffer, out bufferSize);
             error = Marshal.GetLastWin32Error();
 
             if (!success)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return EventMethods.ConvertVariant(variant);
+            return NativeMethods.ConvertVariant(variant);
         }
         finally
         {

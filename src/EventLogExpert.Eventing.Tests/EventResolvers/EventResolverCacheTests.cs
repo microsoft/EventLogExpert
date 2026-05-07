@@ -114,7 +114,7 @@ public sealed class EventResolverCacheTests
         {
             var description = $"Description{i % 10}";
             var firstOccurrence = results[i];
-            
+
             for (int j = i; j < 100; j += 10)
             {
                 Assert.Same(firstOccurrence, results[j]);
@@ -205,7 +205,7 @@ public sealed class EventResolverCacheTests
         {
             var value = $"Value{i % 10}";
             var firstOccurrence = results[i];
-            
+
             for (int j = i; j < 100; j += 10)
             {
                 Assert.Same(firstOccurrence, results[j]);

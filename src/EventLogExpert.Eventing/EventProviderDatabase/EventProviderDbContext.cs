@@ -297,7 +297,7 @@ public sealed class EventProviderDbContext : DbContext
         using (var indexListCommand = connection.CreateCommand())
         {
             indexListCommand.CommandText = "PRAGMA index_list(\"ProviderDetails\")";
-            
+
             using var indexListReader = indexListCommand.ExecuteReader();
 
             while (indexListReader.Read())

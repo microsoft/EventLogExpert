@@ -92,5 +92,5 @@ public class RegistryProvider(ITraceLogger? logger = null)
         return [];
     }
 
-    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg) {}
+    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg) { /* marker exception — no extra state needed */ }
 }

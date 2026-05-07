@@ -217,7 +217,7 @@ public sealed class EventLogSessionTests
 
         // Assert
         Assert.NotEmpty(logNames);
-        
+
         // Verify the list is sorted
         var sortedNames = logNames.OrderBy(x => x).ToList();
         Assert.Equal(sortedNames, logNames);
@@ -235,7 +235,7 @@ public sealed class EventLogSessionTests
 
         // Assert
         Assert.Equal(logNames1.Count, logNames2.Count);
-        
+
         // All names from first call should be in second call
         foreach (var name in logNames1)
         {
@@ -383,7 +383,7 @@ public sealed class EventLogSessionTests
 
         // Assert
         Assert.Equal(providers1.Count, providers2.Count);
-        
+
         // All providers from first call should be in second call
         foreach (var provider in providers1)
         {

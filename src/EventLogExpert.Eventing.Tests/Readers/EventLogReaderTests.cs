@@ -482,7 +482,7 @@ public sealed class EventLogReaderTests
 
         // Assert
         Assert.True(success);
-        
+
         // Some events might have errors (e.g., corrupt events, missing provider info)
         // Just verify that if Error is set, it's a non-empty string
         foreach (var evt in events)
@@ -594,7 +594,7 @@ public sealed class EventLogReaderTests
         // Assert
         Assert.True(success1);
         Assert.True(success2);
-        
+
         // Both readers should get events from the same log
         if (events1.Length > 0 && events2.Length > 0)
         {

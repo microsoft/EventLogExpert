@@ -1,7 +1,6 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using Microsoft.Win32.SafeHandles;
 
 namespace EventLogExpert.Eventing.Interop;
@@ -25,7 +24,7 @@ internal sealed partial class EvtHandle : SafeHandleZeroOrMinusOneIsInvalid
 
     protected override bool ReleaseHandle()
     {
-        EventMethods.EvtClose(handle);
+        NativeMethods.EvtClose(handle);
         handle = IntPtr.Zero;
 
         return true;

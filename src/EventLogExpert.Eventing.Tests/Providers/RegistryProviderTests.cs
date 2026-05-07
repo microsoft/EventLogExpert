@@ -40,7 +40,7 @@ public sealed class RegistryProviderTests
         // Act
         var allResults = new List<string>();
         var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
-        
+
         foreach (var providerName in commonProviders)
         {
             allResults.AddRange(provider.GetMessageFilesForLegacyProvider(providerName));
@@ -296,9 +296,9 @@ public sealed class RegistryProviderTests
         foreach (var providerName in commonProviders)
         {
             var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
-            
+
             if (result.Count == 0) { continue; }
-            
+
             // Found a provider, verify logging
             mockLogger.Received()
                 .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Found message file for legacy provider")));

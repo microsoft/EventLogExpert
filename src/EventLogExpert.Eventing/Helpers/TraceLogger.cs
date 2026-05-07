@@ -24,13 +24,13 @@ public class TraceLogger(LogLevel loggingLevel) : ITraceLogger
     private static void Write(bool isEnabled, string message, LogLevel level)
     {
         if (!isEnabled) { return; }
-        
+
         switch (level)
         {
             case LogLevel.Trace:
             case LogLevel.Debug:
                 Console.ForegroundColor = ConsoleColor.Cyan;
-                
+
                 Console.WriteLine($"[{level}] {message}");
                 break;
             case LogLevel.Information:
@@ -49,7 +49,7 @@ public class TraceLogger(LogLevel loggingLevel) : ITraceLogger
 
                 break;
         }
-        
+
 
         Console.ResetColor();
     }
