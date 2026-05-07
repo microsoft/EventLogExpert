@@ -10,4 +10,8 @@
     <PackageReference Include="System.Linq.Dynamic.Core" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
+  </ItemGroup>
+
 </Project>
