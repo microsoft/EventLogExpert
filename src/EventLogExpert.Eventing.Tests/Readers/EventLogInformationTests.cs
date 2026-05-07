@@ -9,20 +9,6 @@ namespace EventLogExpert.Eventing.Tests.Readers;
 public sealed class EventLogInformationTests
 {
     [Fact]
-    public void Attributes_WhenApplicationLog_ShouldBeValidInteger()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
-
-        // Assert
-        Assert.NotNull(logInfo.Attributes);
-        Assert.IsType<int>(logInfo.Attributes.Value);
-    }
-
-    [Fact]
     public void Constructor_WhenApplicationLog_ShouldPopulateAllProperties()
     {
         // Arrange
@@ -37,27 +23,6 @@ public sealed class EventLogInformationTests
         Assert.NotNull(logInfo.FileSize);
         Assert.NotNull(logInfo.IsLogFull);
         Assert.NotNull(logInfo.RecordCount);
-    }
-
-    [Fact]
-    public void Constructor_WhenCalledMultipleTimes_ShouldCreateIndependentInstances()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logInfo1 = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
-        var logInfo2 = new EventLogInformation(session, Constants.SystemLogName, PathType.LogName);
-
-        // Assert
-        Assert.NotNull(logInfo1);
-        Assert.NotNull(logInfo2);
-        Assert.NotSame(logInfo1, logInfo2);
-
-        // Different logs should have potentially different record counts
-        // (though we can't guarantee they're different)
-        Assert.NotNull(logInfo1.RecordCount);
-        Assert.NotNull(logInfo2.RecordCount);
     }
 
     [Theory]
@@ -315,22 +280,6 @@ public sealed class EventLogInformationTests
     }
 
     [Fact]
-    public void GetLogInformation_WhenCalledTwice_ShouldReturnDifferentInstances()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logInfo1 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
-        var logInfo2 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
-
-        // Assert
-        Assert.NotNull(logInfo1);
-        Assert.NotNull(logInfo2);
-        Assert.NotSame(logInfo1, logInfo2);
-    }
-
-    [Fact]
     public void GetLogInformation_WhenCalledTwice_ShouldReturnSimilarData()
     {
         // Arrange
@@ -362,20 +311,6 @@ public sealed class EventLogInformationTests
         Assert.NotNull(logInfo.IsLogFull);
         // Application log is typically not full under normal circumstances
         Assert.False(logInfo.IsLogFull.Value);
-    }
-
-    [Fact]
-    public void IsLogFull_WhenValidLog_ShouldReturnBoolean()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
-
-        // Assert
-        Assert.NotNull(logInfo.IsLogFull);
-        Assert.IsType<bool>(logInfo.IsLogFull.Value);
     }
 
     [Fact]

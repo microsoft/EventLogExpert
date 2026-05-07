@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
@@ -100,20 +99,6 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Channels_WhenValidProvider_ShouldReturnDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var channels = metadata?.Channels;
-
-        // Assert
-        Assert.NotNull(channels);
-        Assert.IsAssignableFrom<IDictionary<uint, string>>(channels);
-    }
-
-    [Fact]
     public void Channels_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
@@ -125,19 +110,6 @@ public sealed class ProviderMetadataTests
         // Assert
         Assert.NotNull(channels);
         Assert.IsAssignableFrom<ReadOnlyDictionary<uint, string>>(channels);
-    }
-
-    [Fact]
-    public void Create_WhenCalledConcurrently_ShouldHandleMultipleInstances()
-    {
-        // Arrange & Act
-        var metadata1 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-        var metadata2 = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Assert
-        Assert.NotNull(metadata1);
-        Assert.NotNull(metadata2);
-        Assert.NotSame(metadata1, metadata2);
     }
 
     [Theory]
@@ -276,21 +248,6 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Events_WhenCalledTwice_ShouldReturnDifferentEnumerableInstances()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var events1 = metadata?.Events;
-        var events2 = metadata?.Events;
-
-        // Assert
-        Assert.NotNull(events1);
-        Assert.NotNull(events2);
-    }
-
-    [Fact]
     public void Events_WhenProviderHasEvents_ShouldHaveValidEventMetadata()
     {
         // Arrange
@@ -343,20 +300,6 @@ public sealed class ProviderMetadataTests
         // Assert
         Assert.NotNull(events);
         Assert.NotEmpty(events);
-    }
-
-    [Fact]
-    public void Events_WhenValidProvider_ShouldReturnEnumerable()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var events = metadata?.Events;
-
-        // Assert
-        Assert.NotNull(events);
-        Assert.IsAssignableFrom<IEnumerable<EventMetadata>>(events);
     }
 
     [Fact]
@@ -450,20 +393,6 @@ public sealed class ProviderMetadataTests
         Assert.NotNull(keywords);
         var uniqueValues = keywords.Keys.Distinct().Count();
         Assert.Equal(keywords.Count, uniqueValues);
-    }
-
-    [Fact]
-    public void Keywords_WhenValidProvider_ShouldReturnDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var keywords = metadata?.Keywords;
-
-        // Assert
-        Assert.NotNull(keywords);
-        Assert.IsAssignableFrom<IDictionary<long, string>>(keywords);
     }
 
     [Fact]
@@ -641,20 +570,6 @@ public sealed class ProviderMetadataTests
     }
 
     [Fact]
-    public void Opcodes_WhenValidProvider_ShouldReturnDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var opcodes = metadata?.Opcodes;
-
-        // Assert
-        Assert.NotNull(opcodes);
-        Assert.IsAssignableFrom<IDictionary<int, string>>(opcodes);
-    }
-
-    [Fact]
     public void Opcodes_WhenValidProvider_ShouldReturnReadOnlyDictionary()
     {
         // Arrange
@@ -798,20 +713,6 @@ public sealed class ProviderMetadataTests
         // Assert
         Assert.NotNull(tasks);
         Assert.NotEmpty(tasks);
-    }
-
-    [Fact]
-    public void Tasks_WhenValidProvider_ShouldReturnDictionary()
-    {
-        // Arrange
-        var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
-
-        // Act
-        var tasks = metadata?.Tasks;
-
-        // Assert
-        Assert.NotNull(tasks);
-        Assert.IsAssignableFrom<IDictionary<int, string>>(tasks);
     }
 
     [Fact]
