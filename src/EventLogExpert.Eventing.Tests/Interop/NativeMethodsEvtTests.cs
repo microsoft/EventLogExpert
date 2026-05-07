@@ -5,9 +5,9 @@ using EventLogExpert.Eventing.Interop;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Tests.Helpers;
+namespace EventLogExpert.Eventing.Tests.Interop;
 
-public sealed class EventMethodsTests
+public sealed class NativeMethodsEvtTests
 {
     [Fact]
     public void ConvertVariant_WhenAnsiString_ShouldReturnString()

@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Readers;
 
-namespace EventLogExpert.Eventing.Tests.Helpers;
+namespace EventLogExpert.Eventing.Tests.Readers;
 
 public sealed class LogNamesTests
 {
