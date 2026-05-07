@@ -3,7 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Components.Database;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.DependencyInjection;

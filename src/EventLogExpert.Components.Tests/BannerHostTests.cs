@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;

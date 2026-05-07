@@ -3,7 +3,7 @@
 
 using EventLogExpert.EventDbTool.Tests.TestUtils;
 using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.Tests;

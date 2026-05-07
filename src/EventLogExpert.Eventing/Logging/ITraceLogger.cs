@@ -4,7 +4,7 @@
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Logging;
 
 public interface ITraceLogger
 {

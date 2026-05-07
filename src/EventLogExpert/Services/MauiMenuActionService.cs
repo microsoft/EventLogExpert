@@ -3,7 +3,7 @@
 
 using EventLogExpert.Components.Modals;
 using EventLogExpert.Components.Modals.Filters;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.UI;
