@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Interop;
 using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
@@ -147,7 +147,7 @@ internal static partial class NativeMethods
 
         if (length > 0) { return TrimFormatMessageResult(stackBuffer[..length]); }
 
-        if (Marshal.GetLastWin32Error() != Interop.ERROR_INSUFFICIENT_BUFFER) { return null; }
+        if (Marshal.GetLastWin32Error() != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER) { return null; }
 
         // Retry with progressively larger pooled buffers
         ReadOnlySpan<int> retrySizes = [2048, 8192, 32768];
@@ -162,7 +162,7 @@ internal static partial class NativeMethods
 
                 if (length > 0) { return TrimFormatMessageResult(rented.AsSpan(0, length)); }
 
-                if (Marshal.GetLastWin32Error() != Interop.ERROR_INSUFFICIENT_BUFFER) { return null; }
+                if (Marshal.GetLastWin32Error() != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER) { return null; }
             }
             finally
             {

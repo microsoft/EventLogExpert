@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using System.Collections.ObjectModel;
@@ -336,7 +337,7 @@ internal sealed partial class ProviderMetadata
             bool success = EventMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -369,11 +370,11 @@ internal sealed partial class ProviderMetadata
 
         if (!handle.IsInvalid) { return handle; }
 
-        if (error != Interop.ERROR_NO_MORE_ITEMS)
+        if (error != Win32ErrorCodes.ERROR_NO_MORE_ITEMS)
         {
             EventMethods.ThrowEventLogException(error);
         }
-        
+
         return null;
     }
 
@@ -393,7 +394,7 @@ internal sealed partial class ProviderMetadata
 
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -441,7 +442,7 @@ internal sealed partial class ProviderMetadata
 
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }

@@ -1,8 +1,8 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Interop;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
@@ -48,7 +48,7 @@ public sealed class EventLogInformation
             bool success = EventMethods.EvtGetLogInfo(handle, property, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
-            if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }

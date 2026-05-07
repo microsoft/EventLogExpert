@@ -3,7 +3,7 @@
 
 using System.Runtime.InteropServices;
 
-namespace EventLogExpert.Eventing.Models;
+namespace EventLogExpert.Eventing.Interop;
 
 [StructLayout(LayoutKind.Explicit)]
 internal readonly record struct EvtVariant

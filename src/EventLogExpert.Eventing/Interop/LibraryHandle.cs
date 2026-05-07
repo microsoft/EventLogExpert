@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Helpers;
 using Microsoft.Win32.SafeHandles;
 
-namespace EventLogExpert.Eventing.Models;
+namespace EventLogExpert.Eventing.Interop;
 
 internal sealed partial class LibraryHandle : SafeHandleZeroOrMinusOneIsInvalid
 {

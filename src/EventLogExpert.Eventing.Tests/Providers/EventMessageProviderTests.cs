@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
@@ -442,7 +442,7 @@ public sealed class EventMessageProviderTests
 
         int error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             return false;
         }

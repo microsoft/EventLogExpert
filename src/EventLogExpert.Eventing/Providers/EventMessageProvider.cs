@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using System.Runtime.InteropServices;
@@ -473,7 +474,7 @@ public sealed class EventMessageProvider(
 
             int sizeError = Marshal.GetLastWin32Error();
 
-            if (!success && sizeError != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (!success && sizeError != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 _logger?.Debug(
                     $"{nameof(TryGetChannelOwningPublisher)}: size probe failed for {channelName}. Error: {sizeError}");

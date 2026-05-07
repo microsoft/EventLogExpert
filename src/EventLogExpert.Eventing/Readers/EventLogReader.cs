@@ -1,7 +1,8 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using System.Buffers;
 using System.Runtime.InteropServices;
@@ -66,7 +67,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
             if (!success)
             {
                 var error = Marshal.GetLastWin32Error();
-                LastErrorCode = error != Interop.ERROR_NO_MORE_ITEMS ? error : null;
+                LastErrorCode = error != Win32ErrorCodes.ERROR_NO_MORE_ITEMS ? error : null;
                 events = [];
                 return false;
             }
@@ -142,7 +143,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
         error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             EventMethods.ThrowEventLogException(error);
         }

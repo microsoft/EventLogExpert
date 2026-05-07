@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 // ReSharper disable InconsistentNaming
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Interop;
 
-internal static class Interop
+internal static class Win32ErrorCodes
 {
     internal const int ERROR_FILE_NOT_FOUND = 2;
     internal const int ERROR_PATH_NOT_FOUND = 3;
@@ -12,13 +12,13 @@ internal static class Interop
     internal const int ERROR_INVALID_HANDLE = 6;
     internal const int ERROR_INVALID_DATA = 13;
     internal const int ERROR_INVALID_PARAMETER = 87;
-    
+
     internal const int ERROR_INSUFFICIENT_BUFFER = 122;
     internal const int ERROR_NO_MORE_ITEMS = 259;
 
     internal const int RPC_S_CALL_CANCELED = 1818;
     internal const int ERROR_CANCELLED = 1223;
-    
+
     internal const int ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND = 0x3A9A;
     internal const int ERROR_EVT_INVALID_EVENT_DATA = 0x3A9D;
     internal const int ERROR_EVT_CHANNEL_NOT_FOUND = 0x3A9F;
