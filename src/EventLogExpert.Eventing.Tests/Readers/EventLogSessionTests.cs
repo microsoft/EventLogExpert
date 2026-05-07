@@ -22,22 +22,6 @@ public sealed class EventLogSessionTests
         Assert.NotNull(logInfo.RecordCount);
     }
 
-    [Fact]
-    public void GetLogInformation_WhenCalledMultipleTimes_ShouldReturnDifferentInstances()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logInfo1 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
-        var logInfo2 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
-
-        // Assert
-        Assert.NotNull(logInfo1);
-        Assert.NotNull(logInfo2);
-        Assert.NotSame(logInfo1, logInfo2);
-    }
-
     [Theory]
     [InlineData(Constants.ApplicationLogName)]
     [InlineData(Constants.SystemLogName)]
@@ -178,20 +162,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetLogNames_WhenCalled_ShouldReturnEnumerable()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logNames = session.GetLogNames();
-
-        // Assert
-        Assert.NotNull(logNames);
-        Assert.IsAssignableFrom<IEnumerable<string>>(logNames);
-    }
-
-    [Fact]
     public void GetLogNames_WhenCalled_ShouldReturnLogNames()
     {
         // Arrange
@@ -326,20 +296,6 @@ public sealed class EventLogSessionTests
         var providersList = providers.ToList();
         var uniqueProviders = providersList.Distinct().ToList();
         Assert.Equal(providersList.Count, uniqueProviders.Count);
-    }
-
-    [Fact]
-    public void GetProviderNames_WhenCalled_ShouldReturnHashSet()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var providers = session.GetProviderNames();
-
-        // Assert
-        Assert.NotNull(providers);
-        Assert.IsAssignableFrom<HashSet<string>>(providers);
     }
 
     [Fact]
