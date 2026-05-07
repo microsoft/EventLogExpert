@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Readers;
 
 public enum PathType
 {
