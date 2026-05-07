@@ -1,6 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
@@ -532,11 +533,11 @@ internal static partial class EventMethods
         int error = Marshal.GetLastWin32Error();
 
         if (!success &&
-            error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
-            error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
-            error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
+            error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
+            error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
+            error != Win32ErrorCodes.ERROR_EVT_MAX_INSERTS_REACHED)
         {
-            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 ThrowEventLogException(error);
             }
@@ -564,9 +565,9 @@ internal static partial class EventMethods
             error = Marshal.GetLastWin32Error();
 
             if (!success &&
-                error != Interop.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
-                error != Interop.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
-                error != Interop.ERROR_EVT_MAX_INSERTS_REACHED)
+                error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_VALUE_INSERT &&
+                error != Win32ErrorCodes.ERROR_EVT_UNRESOLVED_PARAMETER_INSERT &&
+                error != Win32ErrorCodes.ERROR_EVT_MAX_INSERTS_REACHED)
             {
                 ThrowEventLogException(error);
             }
@@ -587,7 +588,7 @@ internal static partial class EventMethods
         bool success = EvtGetObjectArrayProperty(array, propertyId, index, 0, 0, IntPtr.Zero, out int bufferUsed);
         int error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             ThrowEventLogException(error);
         }
@@ -664,7 +665,7 @@ internal static partial class EventMethods
 
         int error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             ThrowEventLogException(error);
         }
@@ -726,7 +727,7 @@ internal static partial class EventMethods
 
         int error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             ThrowEventLogException(error);
         }
@@ -799,7 +800,7 @@ internal static partial class EventMethods
 
         int error = Marshal.GetLastWin32Error();
 
-        if (!success && error != Interop.ERROR_INSUFFICIENT_BUFFER)
+        if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
             ThrowEventLogException(error);
         }
@@ -848,21 +849,21 @@ internal static partial class EventMethods
 
         switch (error)
         {
-            case Interop.ERROR_FILE_NOT_FOUND:
-            case Interop.ERROR_PATH_NOT_FOUND:
-            case Interop.ERROR_EVT_CHANNEL_NOT_FOUND:
-            case Interop.ERROR_EVT_MESSAGE_NOT_FOUND:
-            case Interop.ERROR_EVT_MESSAGE_ID_NOT_FOUND:
-            case Interop.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_FILE_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_PATH_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_EVT_CHANNEL_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_EVT_MESSAGE_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_EVT_MESSAGE_ID_NOT_FOUND:
+            case Win32ErrorCodes.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND:
                 throw new FileNotFoundException(message);
-            case Interop.ERROR_INVALID_DATA:
-            case Interop.ERROR_EVT_INVALID_EVENT_DATA:
+            case Win32ErrorCodes.ERROR_INVALID_DATA:
+            case Win32ErrorCodes.ERROR_EVT_INVALID_EVENT_DATA:
                 throw new InvalidDataException(message);
-            case Interop.RPC_S_CALL_CANCELED:
-            case Interop.ERROR_CANCELLED:
+            case Win32ErrorCodes.RPC_S_CALL_CANCELED:
+            case Win32ErrorCodes.ERROR_CANCELLED:
                 throw new OperationCanceledException(message);
-            case Interop.ERROR_ACCESS_DENIED:
-            case Interop.ERROR_INVALID_HANDLE:
+            case Win32ErrorCodes.ERROR_ACCESS_DENIED:
+            case Win32ErrorCodes.ERROR_INVALID_HANDLE:
                 throw new UnauthorizedAccessException();
             default:
                 throw new Exception(message);

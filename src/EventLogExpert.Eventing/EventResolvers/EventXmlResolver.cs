@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 

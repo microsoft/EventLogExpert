@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Interop;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
@@ -750,7 +750,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenAccessDenied_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
-        int error = Interop.ERROR_ACCESS_DENIED;
+        int error = Win32ErrorCodes.ERROR_ACCESS_DENIED;
 
         // Act & Assert
         Assert.Throws<UnauthorizedAccessException>(() => EventMethods.ThrowEventLogException(error));
@@ -760,7 +760,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenCancelled_ShouldThrowOperationCanceledException()
     {
         // Arrange
-        int error = Interop.ERROR_CANCELLED;
+        int error = Win32ErrorCodes.ERROR_CANCELLED;
 
         // Act & Assert
         Assert.Throws<OperationCanceledException>(() => EventMethods.ThrowEventLogException(error));
@@ -770,7 +770,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenChannelNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_EVT_CHANNEL_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_EVT_CHANNEL_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -780,7 +780,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenFileNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_FILE_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_FILE_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -790,7 +790,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenInvalidData_ShouldThrowInvalidDataException()
     {
         // Arrange
-        int error = Interop.ERROR_INVALID_DATA;
+        int error = Win32ErrorCodes.ERROR_INVALID_DATA;
 
         // Act & Assert
         Assert.Throws<InvalidDataException>(() => EventMethods.ThrowEventLogException(error));
@@ -800,7 +800,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenInvalidEventData_ShouldThrowInvalidDataException()
     {
         // Arrange
-        int error = Interop.ERROR_EVT_INVALID_EVENT_DATA;
+        int error = Win32ErrorCodes.ERROR_EVT_INVALID_EVENT_DATA;
 
         // Act & Assert
         Assert.Throws<InvalidDataException>(() => EventMethods.ThrowEventLogException(error));
@@ -810,7 +810,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenInvalidHandle_ShouldThrowUnauthorizedAccessException()
     {
         // Arrange
-        int error = Interop.ERROR_INVALID_HANDLE;
+        int error = Win32ErrorCodes.ERROR_INVALID_HANDLE;
 
         // Act & Assert
         Assert.Throws<UnauthorizedAccessException>(() => EventMethods.ThrowEventLogException(error));
@@ -820,7 +820,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenMessageIdNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_EVT_MESSAGE_ID_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_EVT_MESSAGE_ID_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -830,7 +830,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenMessageNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_EVT_MESSAGE_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_EVT_MESSAGE_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -840,7 +840,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenPathNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_PATH_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_PATH_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -850,7 +850,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenPublisherMetadataNotFound_ShouldThrowFileNotFoundException()
     {
         // Arrange
-        int error = Interop.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND;
+        int error = Win32ErrorCodes.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND;
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
@@ -860,7 +860,7 @@ public sealed class EventMethodsTests
     public void ThrowEventLogException_WhenRpcCallCanceled_ShouldThrowOperationCanceledException()
     {
         // Arrange
-        int error = Interop.RPC_S_CALL_CANCELED;
+        int error = Win32ErrorCodes.RPC_S_CALL_CANCELED;
 
         // Act & Assert
         Assert.Throws<OperationCanceledException>(() => EventMethods.ThrowEventLogException(error));

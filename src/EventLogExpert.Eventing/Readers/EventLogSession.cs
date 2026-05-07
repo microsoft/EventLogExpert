@@ -1,8 +1,8 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Interop;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
@@ -109,14 +109,14 @@ public sealed partial class EventLogSession
 
         if (!success)
         {
-            if (error == Interop.ERROR_NO_MORE_ITEMS)
+            if (error == Win32ErrorCodes.ERROR_NO_MORE_ITEMS)
             {
                 doneReading = true;
 
                 return string.Empty;
             }
 
-            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
@@ -142,14 +142,14 @@ public sealed partial class EventLogSession
 
         if (!success)
         {
-            if (error == Interop.ERROR_NO_MORE_ITEMS)
+            if (error == Win32ErrorCodes.ERROR_NO_MORE_ITEMS)
             {
                 doneReading = true;
 
                 return string.Empty;
             }
 
-            if (error != Interop.ERROR_INSUFFICIENT_BUFFER)
+            if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
                 EventMethods.ThrowEventLogException(error);
             }
