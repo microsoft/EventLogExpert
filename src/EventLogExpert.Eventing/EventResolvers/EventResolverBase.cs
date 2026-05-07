@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Readers;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;

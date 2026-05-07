@@ -18,16 +18,16 @@ public class FilterCacheReducers
     [ReducerMethod]
     public static FilterCacheState ReduceLoadFiltersCompleted(FilterCacheState state,
         FilterCacheAction.LoadFiltersCompleted action) => state with
-    {
-        FavoriteFilters = action.FavoriteFilters,
-        RecentFilters = action.RecentFilters
-    };
+        {
+            FavoriteFilters = action.FavoriteFilters,
+            RecentFilters = action.RecentFilters
+        };
 
     [ReducerMethod]
     public static FilterCacheState ReduceRemoveFavoriteFilterCompleted(FilterCacheState state,
         FilterCacheAction.RemoveFavoriteFilterCompleted action) => state with
-    {
-        FavoriteFilters = action.FavoriteFilters,
-        RecentFilters = action.RecentFilters
-    };
+        {
+            FavoriteFilters = action.FavoriteFilters,
+            RecentFilters = action.RecentFilters
+        };
 }

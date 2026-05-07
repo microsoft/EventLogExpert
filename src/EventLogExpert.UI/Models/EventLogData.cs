@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Readers;
 
 namespace EventLogExpert.UI.Models;
 

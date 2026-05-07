@@ -1174,7 +1174,8 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
     }
 
-    private void RaiseEntriesChanged()    {
+    private void RaiseEntriesChanged()
+    {
         var handler = EntriesChanged;
 
         if (handler is null) { return; }

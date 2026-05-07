@@ -261,14 +261,14 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
                 _displayedIndex = i;
                 _selectedItem = items[i];
-                
+
                 return (_selectedItem, _selectedItem.View);
             }
         }
 
         _displayedIndex = Math.Clamp(_displayedIndex, 0, items.Count - 1);
         _selectedItem = items[_displayedIndex];
-        
+
         return (_selectedItem, _selectedItem.View);
     }
 }

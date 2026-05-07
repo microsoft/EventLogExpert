@@ -66,7 +66,7 @@ public class DeploymentService(
             {
                 switch (result.Status)
                 {
-                    case AsyncStatus.Error :
+                    case AsyncStatus.Error:
                         if (userInitiated)
                         {
                             await _alertDialogService.ShowAlert("Update Failure",
@@ -76,12 +76,12 @@ public class DeploymentService(
 
                         _appTitleService.SetProgressString(null);
                         break;
-                    case AsyncStatus.Completed : 
+                    case AsyncStatus.Completed:
                         _appTitleService.SetProgressString("Relaunch to Apply Update");
                         break;
-                    case AsyncStatus.Canceled :
-                    case AsyncStatus.Started :
-                    default : 
+                    case AsyncStatus.Canceled:
+                    case AsyncStatus.Started:
+                    default:
                         _appTitleService.SetProgressString(null);
                         break;
                 }
