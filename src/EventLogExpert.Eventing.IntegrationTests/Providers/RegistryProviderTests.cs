@@ -3,13 +3,25 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
+using Microsoft.Win32;
 using NSubstitute;
 
 namespace EventLogExpert.Eventing.IntegrationTests.Providers;
 
 public sealed class RegistryProviderTests
 {
+    private static readonly string[] s_commonLegacyProviderNames =
+    [
+        Constants.ApplicationLogName,
+        Constants.SystemLogName,
+        Constants.KernelGeneralLogName,
+        Constants.PowerShellLogName,
+        Constants.SecurityAuditingLogName,
+        Constants.ServiceControlManagerLogName
+    ];
+
     [Fact]
     public void Constructor_WhenCalledWithNullLogger_ShouldNotThrow()
     {
@@ -37,24 +49,22 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act
-        var allResults = new List<string>();
-        var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
-
-        foreach (var providerName in commonProviders)
-        {
-            allResults.AddRange(provider.GetMessageFilesForLegacyProvider(providerName));
-        }
+        // Act — drive the SUT through whichever well-known legacy provider is
+        // present on this host. The original test probed Application+System log
+        // names (which the SUT treats as provider names that produce no EMF on
+        // a standard Windows install); switch to the helper so the .sys filter
+        // is actually exercised against real provider data.
+        var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (allResults.Count != 0)
-        {
-            Assert.All(allResults, path =>
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
             {
                 var extension = Path.GetExtension(path).ToLower();
                 Assert.NotEqual(".sys", extension);
             });
-        }
     }
 
     [Fact]
@@ -70,7 +80,9 @@ public sealed class RegistryProviderTests
 
         // Assert
         mockLogger.Received(1).Debug(
-            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("GetMessageFilesForLegacyProvider called") && h.ToString().Contains(providerName)));
+            Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("GetMessageFilesForLegacyProvider called") &&
+                h.ToString().Contains(providerName)));
     }
 
     [Fact]
@@ -107,11 +119,13 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act
-        var result = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName).ToList();
+        // Act — probe well-known legacy provider names (the original test passed
+        // a log name where the SUT expects a provider name, which produces no
+        // results on a standard Windows install).
+        var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        Assert.NotNull(result);
+        Assert.NotEmpty(result);
     }
 
     [Fact]
@@ -149,50 +163,39 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act - Try to find any legacy provider
+        // Act
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (result.Count != 0)
-        {
-            // Verify paths are expanded (no %SystemRoot% or other variables)
-            Assert.All(result, path =>
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
             {
                 Assert.DoesNotContain("%", path);
             });
-        }
     }
 
-    /// <summary>
-    /// Tests that when a provider has multiple message files (including CategoryMessageFile),
-    /// they are all returned. This test is environment-dependent and will pass vacuously
-    /// if no providers with multiple message files exist on the system.
-    /// </summary>
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenMultipleMessageFilesExist_ShouldReturnAll()
     {
         // Arrange
         var provider = new RegistryProvider();
-        var commonProviders = new[] { Constants.ApplicationLogName, Constants.SystemLogName };
 
-        // Act - Find a provider with multiple message files
-        foreach (var providerName in commonProviders)
+        // Act
+        foreach (var providerName in s_commonLegacyProviderNames)
         {
             var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
-            // Assert - If we found multiple files, verify the collection is valid
             if (result.Count > 1)
             {
-                Assert.NotEmpty(result);
+                // Assert
                 Assert.All(result, file => Assert.False(string.IsNullOrWhiteSpace(file)));
-                return; // Test passed with actual validation
+                return;
             }
         }
 
-        // No providers with multiple message files found on this system.
-        // This is environment-dependent - the test passes vacuously but logs the condition.
-        // To make this test meaningful, run on a system with providers that have
-        // both EventMessageFile and CategoryMessageFile registry entries.
+        Assert.Skip("No common legacy provider on this host has multiple message files registered.");
     }
 
     [Fact]
@@ -212,11 +215,12 @@ public sealed class RegistryProviderTests
         await Task.WhenAll(tasks);
 
         // Assert
-        Assert.All(tasks, task =>
-        {
-            Assert.NotNull(task.Result);
-            Assert.True(task.IsCompletedSuccessfully);
-        });
+        Assert.All(tasks,
+            task =>
+            {
+                Assert.NotNull(task.Result);
+                Assert.True(task.IsCompletedSuccessfully);
+            });
     }
 
     [Fact]
@@ -225,13 +229,20 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act - Try to find any provider with multiple files
-        var result = FindAnyLegacyProviderFiles(provider);
+        // Act - Scan the registry for a legacy provider whose EventMessageFile
+        // value literally contains semicolon-separated paths and yields multiple
+        // .dll/.exe entries through the SUT's split + extension filter.
+        var (providerName, files) = FindLegacyProviderWithSemicolonSplitFiles(provider);
 
-        // Assert
-        // This test verifies the semicolon splitting logic works
-        // Even if we only get one file, the test passes as it shows the method works
-        Assert.NotNull(result);
+        // Assert - genuinely environment-dependent; not every host has a legacy
+        // provider registered with semicolon-separated EventMessageFile entries.
+        Assert.SkipUnless(providerName is not null,
+            "Test requires a legacy provider with semicolon-separated EventMessageFile entries on this host.");
+
+        Assert.True(files.Count > 1,
+            $"Expected multiple files after semicolon split for provider '{providerName}', got {files.Count}.");
+
+        Assert.All(files, file => Assert.False(string.IsNullOrWhiteSpace(file)));
     }
 
     [Fact]
@@ -247,7 +258,9 @@ public sealed class RegistryProviderTests
 
         // Assert
         mockLogger.Received().Debug(
-            Arg.Is<DebugLogHandler>(h => h.ToString().Contains("No legacy EventMessageFile found for provider") && h.ToString().Contains(providerName)));
+            Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("No legacy EventMessageFile found for provider") &&
+                h.ToString().Contains(providerName)));
     }
 
     [Fact]
@@ -280,21 +293,29 @@ public sealed class RegistryProviderTests
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenProviderFound_ShouldLogFoundMessage()
     {
-        // Arrange
+        // Arrange — discover a known-good provider name on this host first so
+        // the mock-logger assertion can be bound to that exact name. Without
+        // this binding, a stray "Found" debug emitted while probing an
+        // unrelated provider could vacuously satisfy the contract.
+        var probe = new RegistryProvider();
+        var providerName = FindAnyLegacyProviderName(probe);
+        Assert.NotNull(providerName);
+
         var mockLogger = Substitute.For<ITraceLogger>();
         var provider = new RegistryProvider(mockLogger);
 
-        // Act — drive the SUT through whichever well-known legacy provider is
-        // present on this host. The helper internally probes a fixed list and
-        // returns the first non-empty match.
-        var foundFiles = FindAnyLegacyProviderFiles(provider);
+        // Act — drive the SUT through the provider name we just confirmed
+        // yields a non-empty result on this host.
+        var foundFiles = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
-        // Assert — skip rather than silently pass when the host has no eligible
-        // legacy providers registered (e.g., a stripped-down container image).
-        Assert.SkipUnless(foundFiles.Count > 0,
-            "Test requires at least one common legacy provider with registered message files on this host.");
+        // Assert — bind the "Found message file" debug emission to the specific
+        // provider name we asked for so a stray emission cannot mask a regression.
+        Assert.NotEmpty(foundFiles);
+
         mockLogger.Received()
-            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Found message file for legacy provider")));
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains("Found message file for legacy provider") &&
+                h.ToString().Contains(providerName)));
     }
 
     [Fact]
@@ -307,14 +328,16 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        Assert.SkipUnless(result.Count > 0,
-            "Test requires at least one common legacy provider with registered message files on this host.");
-        Assert.All(result, path =>
-        {
-            var extension = Path.GetExtension(path).ToLower();
-            Assert.True(extension is ".dll" or ".exe",
-                $"Expected .dll or .exe, but got {extension} for path: {path}");
-        });
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
+            {
+                var extension = Path.GetExtension(path).ToLower();
+
+                Assert.True(extension is ".dll" or ".exe",
+                    $"Expected .dll or .exe, but got {extension} for path: {path}");
+            });
     }
 
     [Fact]
@@ -327,14 +350,15 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        Assert.SkipUnless(result.Count > 0,
-            "Test requires at least one common legacy provider with registered message files on this host.");
-        Assert.All(result, path =>
-        {
-            Assert.True(
-                Path.IsPathFullyQualified(path) || path.StartsWith(@"\\"),
-                $"Expected fully qualified path, but got: {path}");
-        });
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
+            {
+                Assert.True(
+                    Path.IsPathFullyQualified(path) || path.StartsWith(@"\\"),
+                    $"Expected fully qualified path, but got: {path}");
+            });
     }
 
     [Fact]
@@ -347,13 +371,13 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (result.Count != 0)
-        {
-            Assert.All(result, path =>
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
             {
                 Assert.False(string.IsNullOrWhiteSpace(path));
             });
-        }
     }
 
     [Fact]
@@ -366,31 +390,31 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (result.Any())
-        {
-            var uniquePaths = result.Distinct().Count();
-            Assert.Equal(result.Count, uniquePaths);
-        }
+        Assert.NotEmpty(result);
+        var uniquePaths = result.Distinct().Count();
+        Assert.Equal(result.Count, uniquePaths);
     }
 
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenSameProviderMultipleTimes_ShouldReturnConsistentResults()
     {
-        // Arrange
+        // Arrange — probe for a known-good provider name (Application/System are
+        // log names, not provider names — the SUT returns empty for them).
         var provider = new RegistryProvider();
+        var providerName = FindAnyLegacyProviderName(provider);
+        Assert.NotNull(providerName);
 
         // Act
-        var result1 = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName).ToList();
-        var result2 = provider.GetMessageFilesForLegacyProvider(Constants.ApplicationLogName).ToList();
+        var result1 = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
+        var result2 = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
         // Assert
+        Assert.NotEmpty(result1);
         Assert.Equal(result1.Count, result2.Count);
-        if (result1.Any())
+
+        for (int i = 0; i < result1.Count; i++)
         {
-            for (int i = 0; i < result1.Count; i++)
-            {
-                Assert.Equal(result1[i], result2[i]);
-            }
+            Assert.Equal(result1[i], result2[i]);
         }
     }
 
@@ -425,17 +449,7 @@ public sealed class RegistryProviderTests
 
     private static List<string> FindAnyLegacyProviderFiles(RegistryProvider provider)
     {
-        var commonProviders = new[]
-        {
-            Constants.ApplicationLogName,
-            Constants.SystemLogName,
-            Constants.KernelGeneralLogName,
-            Constants.PowerShellLogName,
-            Constants.SecurityAuditingLogName,
-            Constants.ServiceControlManagerLogName
-        };
-
-        foreach (var providerName in commonProviders)
+        foreach (var providerName in s_commonLegacyProviderNames)
         {
             var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
@@ -446,5 +460,82 @@ public sealed class RegistryProviderTests
         }
 
         return [];
+    }
+
+    private static string? FindAnyLegacyProviderName(RegistryProvider provider)
+    {
+        foreach (var providerName in s_commonLegacyProviderNames)
+        {
+            if (provider.GetMessageFilesForLegacyProvider(providerName).Any())
+            {
+                return providerName;
+            }
+        }
+
+        return null;
+    }
+
+    private static (string? Name, List<string> Files) FindLegacyProviderWithSemicolonSplitFiles(
+        RegistryProvider provider)
+    {
+        using var hklm = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default);
+        using var eventLogKey = hklm.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\EventLog");
+
+        if (eventLogKey is null)
+        {
+            return (null, []);
+        }
+
+        // Track provider names whose first non-empty EMF occurrence has already
+        // been evaluated. This mirrors the SUT, which returns from the first
+        // log subtree where a given provider name has a non-empty EMF.
+        var seenWithEmf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var logName in eventLogKey.GetSubKeyNames())
+        {
+            if (LogNames.AdminOnlyLiveLogNames.Contains(logName))
+            {
+                continue;
+            }
+
+            using var logSubKey = eventLogKey.OpenSubKey(logName);
+
+            if (logSubKey is null)
+            {
+                continue;
+            }
+
+            foreach (var providerName in logSubKey.GetSubKeyNames())
+            {
+                using var providerSubKey = logSubKey.OpenSubKey(providerName);
+
+                if (providerSubKey?.GetValue("EventMessageFile") is not string emf || string.IsNullOrEmpty(emf))
+                {
+                    continue;
+                }
+
+                // First non-empty EMF wins. If this occurrence lacks ';', the
+                // SUT will not return semicolon-split content for this name on
+                // this host regardless of any later log subtree.
+                if (!seenWithEmf.Add(providerName))
+                {
+                    continue;
+                }
+
+                if (!emf.Contains(';'))
+                {
+                    continue;
+                }
+
+                var files = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
+
+                if (files.Count > 1)
+                {
+                    return (providerName, files);
+                }
+            }
+        }
+
+        return (null, []);
     }
 }
