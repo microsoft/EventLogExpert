@@ -26,7 +26,7 @@ public sealed class EventMessageProvider(
 
     private RegistryProvider? _registryProvider;
 
-    public static List<MessageModel> GetMessages(
+    internal static List<MessageModel> GetMessages(
         IEnumerable<string> legacyProviderFiles,
         string providerName,
         ITraceLogger? logger = null)

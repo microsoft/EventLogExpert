@@ -7,7 +7,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Eventing.EventProviderDatabase;
 
-public class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => ConvertToCompressedJson(v),
+internal sealed class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => ConvertToCompressedJson(v),
     v => ConvertFromCompressedJson(v))
     where T : class
 {
