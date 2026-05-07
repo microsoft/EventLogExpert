@@ -14,25 +14,36 @@ namespace EventLogExpert.Eventing.EventResolvers;
 ///     per cache entry. Eviction is silent: a request for an evicted key triggers a fresh
 ///     resolve and re-cache.
 /// </summary>
-public class EventXmlResolver : IEventXmlResolver
+public sealed class EventXmlResolver : IEventXmlResolver
 {
     private const int DefaultInitialCapacity = 256;
     private const int DefaultMaxCapacity = 4096;
+
+    private static readonly Func<string, long, PathType, string> s_defaultResolveStrategyFunc = DefaultResolveStrategy;
 
     private readonly Dictionary<XmlCacheKey, LinkedListNode<CacheEntry>> _cache;
     private readonly Lock _cacheLock = new();
     private readonly LinkedList<CacheEntry> _lruOrder = [];
     private readonly int _maxCapacity;
+    private readonly Func<string, long, PathType, string> _resolveStrategy;
 
     private int _capacity;
 
-    public EventXmlResolver() : this(DefaultInitialCapacity, DefaultMaxCapacity) { }
+    public EventXmlResolver() : this(s_defaultResolveStrategyFunc) { }
 
-    protected EventXmlResolver(int initialCapacity, int maxCapacity)
+    internal EventXmlResolver(Func<string, long, PathType, string> resolveStrategy)
+        : this(resolveStrategy, DefaultInitialCapacity, DefaultMaxCapacity) { }
+
+    internal EventXmlResolver(
+        Func<string, long, PathType, string> resolveStrategy,
+        int initialCapacity,
+        int maxCapacity)
     {
+        ArgumentNullException.ThrowIfNull(resolveStrategy);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(initialCapacity);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxCapacity, initialCapacity);
 
+        _resolveStrategy = resolveStrategy;
         _capacity = initialCapacity;
         _maxCapacity = maxCapacity;
         _cache = new Dictionary<XmlCacheKey, LinkedListNode<CacheEntry>>(initialCapacity);
@@ -91,8 +102,20 @@ public class EventXmlResolver : IEventXmlResolver
         return AwaitLazyAsync(lazy, cancellationToken);
     }
 
-    /// <summary>Performs the actual EvtQuery / EvtNext / RenderEventXml work. Virtual for testability.</summary>
-    protected virtual string ResolveXml(string owningLog, long recordId, PathType pathType)
+    private static async ValueTask<string> AwaitLazyAsync(Lazy<Task<string>> lazy, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Caller-side cancel: leave the entry in place so other waiters can observe the result.
+            throw;
+        }
+    }
+
+    private static string DefaultResolveStrategy(string owningLog, long recordId, PathType pathType)
     {
         using EvtHandle handle = NativeMethods.EvtQuery(
             EventLogSession.GlobalSession.Handle,
@@ -114,19 +137,6 @@ public class EventXmlResolver : IEventXmlResolver
         if (eventHandle.IsInvalid) { return string.Empty; }
 
         return NativeMethods.RenderEventXml(eventHandle) ?? string.Empty;
-    }
-
-    private static async ValueTask<string> AwaitLazyAsync(Lazy<Task<string>> lazy, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Caller-side cancel: leave the entry in place so other waiters can observe the result.
-            throw;
-        }
     }
 
     private void EnsureCapacity()
@@ -191,7 +201,7 @@ public class EventXmlResolver : IEventXmlResolver
     {
         try
         {
-            return await Task.Run(() => ResolveXml(key.OwningLog, key.RecordId, key.PathType)).ConfigureAwait(false);
+            return await Task.Run(() => _resolveStrategy(key.OwningLog, key.RecordId, key.PathType)).ConfigureAwait(false);
         }
         catch
         {

@@ -12,22 +12,24 @@ public sealed class EventXmlResolverTests
     [Fact]
     public async Task ClearAll_RemovesEveryEntry()
     {
-        var resolver = new TrackingResolver(_ => "<xml/>");
+        var resolver = CreateTrackingResolver(_ => "<xml/>", out var getResolveCallCount);
 
         var evt = CreateEvent(recordId: 1);
         await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
-        Assert.Equal(1, resolver.ResolveCallCount);
+        Assert.Equal(1, getResolveCallCount());
 
         resolver.ClearAll();
 
         await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
-        Assert.Equal(2, resolver.ResolveCallCount);
+        Assert.Equal(2, getResolveCallCount());
     }
 
     [Fact]
     public async Task ClearLog_RemovesEntriesForThatLogOnly()
     {
-        var resolver = new TrackingResolver(key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>");
+        var resolver = CreateTrackingResolver(
+            key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>",
+            out var getResolveCallCount);
 
         var evtA1 = CreateEvent(recordId: 1, owningLog: "A");
         var evtA2 = CreateEvent(recordId: 2, owningLog: "A");
@@ -36,25 +38,29 @@ public sealed class EventXmlResolverTests
         await resolver.GetXmlAsync(evtA1, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtA2, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtB1, TestContext.Current.CancellationToken);
-        Assert.Equal(3, resolver.ResolveCallCount);
+        Assert.Equal(3, getResolveCallCount());
 
         resolver.ClearLog("A");
 
         // B is untouched.
         await resolver.GetXmlAsync(evtB1, TestContext.Current.CancellationToken);
-        Assert.Equal(3, resolver.ResolveCallCount);
+        Assert.Equal(3, getResolveCallCount());
 
         // A entries were evicted; both are re-resolved.
         await resolver.GetXmlAsync(evtA1, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtA2, TestContext.Current.CancellationToken);
-        Assert.Equal(5, resolver.ResolveCallCount);
+        Assert.Equal(5, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_AtCapacity_EvictsLeastRecentlyUsed()
     {
         // Initial = max = 2, so eviction kicks in once we exceed 2 entries.
-        var resolver = new BoundedTrackingResolver(initialCapacity: 2, maxCapacity: 2);
+        var resolver = CreateBoundedTrackingResolver(
+            key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>",
+            out var getResolveCallCount,
+            initialCapacity: 2,
+            maxCapacity: 2);
 
         var evtA = CreateEvent(recordId: 1, owningLog: "A");
         var evtB = CreateEvent(recordId: 2, owningLog: "B");
@@ -69,23 +75,25 @@ public sealed class EventXmlResolverTests
         // A and C should still be cached (B was evicted as LRU); A re-request must not re-resolve.
         await resolver.GetXmlAsync(evtA, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtC, TestContext.Current.CancellationToken);
-        Assert.Equal(3, resolver.ResolveCallCount);
+        Assert.Equal(3, getResolveCallCount());
 
         // Re-requesting B triggers another resolve since it was evicted.
         await resolver.GetXmlAsync(evtB, TestContext.Current.CancellationToken);
-        Assert.Equal(4, resolver.ResolveCallCount);
+        Assert.Equal(4, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_ConcurrentRequestsForSameKey_ResolveOnce()
     {
         using var gate = new ManualResetEventSlim(initialState: false);
-        var resolver = new TrackingResolver(_ =>
-        {
-            gate.Wait(TimeSpan.FromSeconds(5));
+        var resolver = CreateTrackingResolver(
+            _ =>
+            {
+                gate.Wait(TimeSpan.FromSeconds(5));
 
-            return "<xml/>";
-        });
+                return "<xml/>";
+            },
+            out var getResolveCallCount);
 
         var evt = CreateEvent(recordId: 7);
 
@@ -97,13 +105,15 @@ public sealed class EventXmlResolverTests
         var results = await Task.WhenAll(t1, t2, t3);
 
         Assert.All(results, r => Assert.Equal("<xml/>", r));
-        Assert.Equal(1, resolver.ResolveCallCount);
+        Assert.Equal(1, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_OnCacheMiss_ResolvesAndCachesResult()
     {
-        var resolver = new TrackingResolver(key => $"<xml id='{key.RecordId}'/>");
+        var resolver = CreateTrackingResolver(
+            key => $"<xml id='{key.RecordId}'/>",
+            out var getResolveCallCount);
         var evt = CreateEvent(recordId: 42);
 
         var first = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
@@ -111,55 +121,57 @@ public sealed class EventXmlResolverTests
 
         Assert.Equal("<xml id='42'/>", first);
         Assert.Equal("<xml id='42'/>", second);
-        Assert.Equal(1, resolver.ResolveCallCount);
+        Assert.Equal(1, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_WhenEventHasPreRenderedXml_ReturnsItWithoutResolving()
     {
-        var resolver = new TrackingResolver(_ => "should-not-be-called");
+        var resolver = CreateTrackingResolver(_ => "should-not-be-called", out var getResolveCallCount);
         var evt = CreateEvent(recordId: 1) with { Xml = "<pre-rendered/>" };
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
         Assert.Equal("<pre-rendered/>", result);
-        Assert.Equal(0, resolver.ResolveCallCount);
+        Assert.Equal(0, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_WhenOwningLogIsEmpty_ReturnsEmptyWithoutResolving()
     {
-        var resolver = new TrackingResolver(_ => "x");
+        var resolver = CreateTrackingResolver(_ => "x", out var getResolveCallCount);
         var evt = CreateEvent(recordId: 1, owningLog: string.Empty);
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
         Assert.Equal(string.Empty, result);
-        Assert.Equal(0, resolver.ResolveCallCount);
+        Assert.Equal(0, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_WhenRecordIdIsNull_ReturnsEmptyWithoutResolving()
     {
-        var resolver = new TrackingResolver(_ => "x");
+        var resolver = CreateTrackingResolver(_ => "x", out var getResolveCallCount);
         var evt = CreateEvent(recordId: null);
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
         Assert.Equal(string.Empty, result);
-        Assert.Equal(0, resolver.ResolveCallCount);
+        Assert.Equal(0, getResolveCallCount());
     }
 
     [Fact]
     public async Task GetXmlAsync_WhenResolveThrows_EvictsEntryAndAllowsRetry()
     {
         int callCount = 0;
-        var resolver = new TrackingResolver(_ =>
-        {
-            callCount++;
+        var resolver = CreateTrackingResolver(
+            _ =>
+            {
+                callCount++;
 
-            return callCount == 1 ? throw new InvalidOperationException("boom") : "<xml/>";
-        });
+                return callCount == 1 ? throw new InvalidOperationException("boom") : "<xml/>";
+            },
+            out _);
 
         var evt = CreateEvent(recordId: 99);
 
@@ -171,6 +183,27 @@ public sealed class EventXmlResolverTests
         Assert.Equal(2, callCount);
     }
 
+    private static EventXmlResolver CreateBoundedTrackingResolver(
+        Func<ResolveKey, string> resolve,
+        out Func<int> getResolveCallCount,
+        int initialCapacity,
+        int maxCapacity)
+    {
+        int resolveCount = 0;
+
+        getResolveCallCount = () => Volatile.Read(ref resolveCount);
+
+        return new EventXmlResolver(
+            (owningLog, recordId, pathType) =>
+            {
+                Interlocked.Increment(ref resolveCount);
+
+                return resolve(new ResolveKey(owningLog, recordId, pathType));
+            },
+            initialCapacity,
+            maxCapacity);
+    }
+
     private static DisplayEventModel CreateEvent(long? recordId, string owningLog = "TestLog") =>
         new(owningLog, PathType.LogName)
         {
@@ -178,34 +211,22 @@ public sealed class EventXmlResolverTests
             Xml = string.Empty
         };
 
-    private sealed class BoundedTrackingResolver(int initialCapacity, int maxCapacity)
-        : EventXmlResolver(initialCapacity, maxCapacity)
+    private static EventXmlResolver CreateTrackingResolver(
+        Func<ResolveKey, string> resolve,
+        out Func<int> getResolveCallCount)
     {
-        private int _resolveCallCount;
+        int resolveCount = 0;
 
-        public int ResolveCallCount => Volatile.Read(ref _resolveCallCount);
+        getResolveCallCount = () => Volatile.Read(ref resolveCount);
 
-        protected override string ResolveXml(string owningLog, long recordId, PathType pathType)
-        {
-            Interlocked.Increment(ref _resolveCallCount);
+        return new EventXmlResolver(
+            (owningLog, recordId, pathType) =>
+            {
+                Interlocked.Increment(ref resolveCount);
 
-            return $"<xml log='{owningLog}' id='{recordId}'/>";
-        }
+                return resolve(new ResolveKey(owningLog, recordId, pathType));
+            });
     }
 
-    private class TrackingResolver(Func<ResolveKey, string> resolve) : EventXmlResolver
-    {
-        private int _resolveCallCount;
-
-        public int ResolveCallCount => Volatile.Read(ref _resolveCallCount);
-
-        protected override string ResolveXml(string owningLog, long recordId, PathType pathType)
-        {
-            Interlocked.Increment(ref _resolveCallCount);
-
-            return resolve(new ResolveKey(owningLog, recordId, pathType));
-        }
-    }
-
-    private sealed record ResolveKey(string OwningLog, long RecordId, PathType PathType);
+    private readonly record struct ResolveKey(string OwningLog, long RecordId, PathType PathType);
 }

@@ -7,7 +7,7 @@ using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.Providers;
 
-public class RegistryProvider(ITraceLogger? logger = null)
+internal sealed class RegistryProvider(ITraceLogger? logger = null)
 {
     private readonly ITraceLogger? _logger = logger;
 
