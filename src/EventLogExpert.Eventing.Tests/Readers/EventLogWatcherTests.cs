@@ -133,8 +133,14 @@ public sealed class EventLogWatcherTests
         // Arrange
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         var receivedEvents = new List<EventRecord>();
+        var eventReceived = new ManualResetEventSlim(false);
 
-        watcher.EventRecordWritten += (sender, record) => receivedEvents.Add(record);
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            receivedEvents.Add(record);
+            eventReceived.Set();
+        };
+
         watcher.Enabled = true;
 
         // Act
@@ -144,9 +150,10 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after dispose", EventLogEntryType.Information);
 
-        Thread.Sleep(200); // Wait to ensure event would have been received if subscription was active
+        bool received = eventReceived.Wait(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.False(received, "Should not have received any event after dispose");
         Assert.Empty(receivedEvents);
     }
 
@@ -378,16 +385,27 @@ public sealed class EventLogWatcherTests
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         var receivedEvents = new List<EventRecord>();
+        var eventReceived = new ManualResetEventSlim(false);
 
-        watcher.EventRecordWritten += (sender, record) => receivedEvents.Add(record);
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            receivedEvents.Add(record);
+            eventReceived.Set();
+        };
+
         watcher.Enabled = true;
 
         // Act
         watcher.Enabled = false;
         int countBeforeWait = receivedEvents.Count;
-        Thread.Sleep(100); // Brief wait to ensure no new events arrive
+
+        // Safe: EventLogWatcher.Unsubscribe blocks until in-flight callbacks complete,
+        // so no handler can fire between the count capture and the Reset/Wait below.
+        eventReceived.Reset();
+        bool received = eventReceived.Wait(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.False(received, "Should not have received any event after unsubscribe");
         Assert.Equal(countBeforeWait, receivedEvents.Count);
     }
 
@@ -543,7 +561,7 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void EventRecordWritten_ShouldReceiveEventsInOrder()
+    public async Task EventRecordWritten_ShouldReceiveEventsInOrder()
     {
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
@@ -568,9 +586,9 @@ public sealed class EventLogWatcherTests
 
         var startTime = DateTime.UtcNow;
         eventLog.WriteEntry("Event A", EventLogEntryType.Information);
-        Thread.Sleep(50); // Small delay between events
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
         eventLog.WriteEntry("Event B", EventLogEntryType.Information);
-        Thread.Sleep(50);
+        await Task.Delay(TimeSpan.FromMilliseconds(50), TestContext.Current.CancellationToken);
         eventLog.WriteEntry("Event C", EventLogEntryType.Information);
 
         bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
@@ -658,13 +676,19 @@ public sealed class EventLogWatcherTests
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         var receivedEvents = new List<EventRecord>();
+        var eventReceived = new ManualResetEventSlim(false);
 
-        watcher.EventRecordWritten += (sender, record) => receivedEvents.Add(record);
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            receivedEvents.Add(record);
+            eventReceived.Set();
+        };
 
         // Act
-        Thread.Sleep(100); // Brief wait to ensure no events arrive
+        bool received = eventReceived.Wait(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
 
         // Assert
+        Assert.False(received, "Should not have received any event when not subscribed");
         Assert.Empty(receivedEvents);
     }
 
@@ -843,7 +867,7 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void EventRecordWritten_WithNoSubscribers_ShouldNotThrow()
+    public async Task EventRecordWritten_WithNoSubscribers_ShouldNotThrow()
     {
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
@@ -855,7 +879,7 @@ public sealed class EventLogWatcherTests
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event with no subscribers", EventLogEntryType.Information);
 
-        Thread.Sleep(200); // Wait for event processing
+        await Task.Delay(TimeSpan.FromMilliseconds(200), TestContext.Current.CancellationToken);
 
         // Assert - No exception means success
         Assert.True(watcher.Enabled);
