@@ -3,9 +3,9 @@
 
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Interop;
 
-internal static class Converter
+internal static class HResultConverter
 {
     // Implementation of HRESULT_FROM_WIN32 macro
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
