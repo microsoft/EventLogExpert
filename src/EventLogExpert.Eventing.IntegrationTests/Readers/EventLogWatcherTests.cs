@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using System.Diagnostics;
 
-namespace EventLogExpert.Eventing.Tests.Readers;
+namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
 public sealed class EventLogWatcherTests
 {

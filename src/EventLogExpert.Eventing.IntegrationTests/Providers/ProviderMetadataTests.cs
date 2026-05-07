@@ -7,7 +7,7 @@ using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.ObjectModel;
 
-namespace EventLogExpert.Eventing.Tests.Providers;
+namespace EventLogExpert.Eventing.IntegrationTests.Providers;
 
 public sealed class ProviderMetadataTests
 {

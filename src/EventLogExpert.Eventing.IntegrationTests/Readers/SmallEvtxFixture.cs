@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Readers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Eventing.Tests.Readers;
+namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
 /// <summary>Creates a small temporary .evtx file by exporting a bounded window of events from the live local Application log, anchored on the most recent EventRecordID.</summary>
 internal sealed class SmallEvtxFixture : IDisposable
@@ -137,9 +137,9 @@ internal sealed class SmallEvtxFixture : IDisposable
         // log was just cleared (or where the probed window happened to span gaps) produces
         // a clear fixture-level error instead of cryptic failures (e.g. Assert.True(success)
         // on ERROR_NO_MORE_ITEMS) inside test bodies. We use the project's own
-        // EventLogReader rather than System.Diagnostics.Eventing.Reader because that BCL API
-        // is forbidden in this solution -- the entire EventLogExpert.Eventing project owns
-        // the EVT P/Invoke layer and bypassing it (even in a fixture) would defeat the point.
+        // EventLogReader rather than the BCL event-log reader because the entire
+        // EventLogExpert.Eventing project owns the EVT P/Invoke layer and bypassing it
+        // (even in a fixture) would defeat the point.
         using var reader = new EventLogReader(FilePath, PathType.FilePath);
 
         int total = 0;
