@@ -9,6 +9,7 @@
   </Folder>
   <Project Path="EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
   <Project Path="EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
+  <Project Path="EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
   <Project Path="EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
   <Project Path="EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
   <Project Path="EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />

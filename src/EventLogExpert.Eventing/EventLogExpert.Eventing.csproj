@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.Eventing.IntegrationTests" />
   </ItemGroup>
 
 </Project>

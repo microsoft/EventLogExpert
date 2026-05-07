@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.Eventing.Tests.Readers;
+namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
 public sealed class EventLogInformationTests
 {

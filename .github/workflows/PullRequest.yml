@@ -32,4 +32,6 @@ jobs:
     - name: Build
       run: dotnet build EventLogExpert.slnx --no-restore
     - name: Test
-      run: dotnet test EventLogExpert.slnx --no-build --verbosity normal
+      run: dotnet test EventLogExpert.slnx --no-build --verbosity normal --filter "FullyQualifiedName!~EventLogExpert.Eventing.IntegrationTests"
+    - name: Integration Test
+      run: dotnet test EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj --no-build --verbosity normal
