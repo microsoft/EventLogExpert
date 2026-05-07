@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Readers;
 
 namespace EventLogExpert.UI;
 

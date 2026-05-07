@@ -3,7 +3,7 @@
 
 using EventLogExpert.Components.Modals.Alerts;
 using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;

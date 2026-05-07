@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Tests.TestUtils;

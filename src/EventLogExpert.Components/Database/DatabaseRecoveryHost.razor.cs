@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;

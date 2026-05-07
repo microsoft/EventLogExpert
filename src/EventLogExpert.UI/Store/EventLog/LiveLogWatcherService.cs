@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.EventResolvers;
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;

@@ -3,7 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Logging;
 
 public class TraceLogger(LogLevel loggingLevel) : ITraceLogger
 {
