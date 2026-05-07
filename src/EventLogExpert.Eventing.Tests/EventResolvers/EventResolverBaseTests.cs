@@ -496,10 +496,8 @@ public sealed class EventResolverBaseTests
         // Compare against the locale's system-message text for error 2 so the test
         // catches false matches on non-English Windows too.
         var win32ErrorTwoMessage = NativeMethods.FormatSystemMessage(2);
-        if (!string.IsNullOrWhiteSpace(win32ErrorTwoMessage))
-        {
-            Assert.DoesNotContain(win32ErrorTwoMessage, displayEvent.Description);
-        }
+        Assert.False(string.IsNullOrWhiteSpace(win32ErrorTwoMessage), "FormatSystemMessage(2) must return text on Windows.");
+        Assert.DoesNotContain(win32ErrorTwoMessage!, displayEvent.Description);
         // Property tail is still rendered
         Assert.Contains("The following information was included with the event:", displayEvent.Description);
         Assert.Contains("payload-a", displayEvent.Description);
