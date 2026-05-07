@@ -63,14 +63,16 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetLogInformation_WhenInvalidLogName_ShouldThrowException()
+    public void GetLogInformation_WhenInvalidLogName_ShouldThrowFileNotFoundException()
     {
         // Arrange
         var session = EventLogSession.GlobalSession;
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
+        // Surfaces the real EvtOpenLog error (ERROR_EVT_CHANNEL_NOT_FOUND) instead
+        // of the previous masked UnauthorizedAccessException.
+        Assert.Throws<FileNotFoundException>(() =>
             session.GetLogInformation(invalidLogName, PathType.LogName));
     }
 

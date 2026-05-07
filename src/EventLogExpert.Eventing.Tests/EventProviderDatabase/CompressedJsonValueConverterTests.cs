@@ -35,13 +35,13 @@ public sealed class CompressedJsonValueConverterTests
     }
 
     [Fact]
-    public void ConvertFromCompressedJson_WithInvalidData_ShouldThrowException()
+    public void ConvertFromCompressedJson_WithInvalidData_ShouldThrowInvalidDataException()
     {
         // Arrange
         var invalidData = new byte[] { 0x00, 0x01, 0x02, 0x03 };
 
         // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
+        Assert.Throws<InvalidDataException>(() =>
             CompressedJsonValueConverter<CompressionTestData>.ConvertFromCompressedJson(invalidData));
     }
 

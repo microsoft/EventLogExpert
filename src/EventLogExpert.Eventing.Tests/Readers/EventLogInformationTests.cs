@@ -26,6 +26,20 @@ public sealed class EventLogInformationTests
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void Constructor_WhenBlankLogName_ShouldThrowArgumentException(string logName)
+    {
+        // Arrange
+        var session = EventLogSession.GlobalSession;
+
+        // Act & Assert
+        Assert.Throws<ArgumentException>(() =>
+            new EventLogInformation(session, logName, PathType.LogName));
+    }
+
+    [Theory]
     [InlineData(Constants.ApplicationLogName)]
     [InlineData(Constants.SystemLogName)]
     public void Constructor_WhenCommonLogs_ShouldHaveRecords(string logName)
@@ -81,17 +95,6 @@ public sealed class EventLogInformationTests
     }
 
     [Fact]
-    public void Constructor_WhenEmptyLogName_ShouldThrowException()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
-            new EventLogInformation(session, string.Empty, PathType.LogName));
-    }
-
-    [Fact]
     public void Constructor_WhenGlobalSession_ShouldUseCorrectSession()
     {
         // Arrange & Act
@@ -103,25 +106,28 @@ public sealed class EventLogInformationTests
     }
 
     [Fact]
-    public void Constructor_WhenInvalidLogName_ShouldThrowException()
+    public void Constructor_WhenInvalidLogName_ShouldThrowFileNotFoundException()
     {
         // Arrange
         var session = EventLogSession.GlobalSession;
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
+        // Surfaces the real EvtOpenLog error (ERROR_EVT_CHANNEL_NOT_FOUND) instead
+        // of the previous masked UnauthorizedAccessException from a follow-up
+        // GetLogInfo on an invalid handle.
+        Assert.Throws<FileNotFoundException>(() =>
             new EventLogInformation(session, invalidLogName, PathType.LogName));
     }
 
     [Fact]
-    public void Constructor_WhenNullLogName_ShouldThrowException()
+    public void Constructor_WhenNullLogName_ShouldThrowArgumentNullException()
     {
         // Arrange
         var session = EventLogSession.GlobalSession;
 
         // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
             new EventLogInformation(session, null!, PathType.LogName));
     }
 
@@ -162,15 +168,23 @@ public sealed class EventLogInformationTests
     }
 
     [Fact]
-    public void Constructor_WhenSpecialCharactersInLogName_ShouldThrowException()
+    public void Constructor_WhenSpecialCharactersInLogName_ShouldNotMaskAsUnauthorizedAccessException()
     {
         // Arrange
         var session = EventLogSession.GlobalSession;
         var invalidLogName = "Invalid<>Log|Name";
 
-        // Act & Assert
-        Assert.ThrowsAny<Exception>(() =>
+        // Act
+        var ex = Record.Exception(() =>
             new EventLogInformation(session, invalidLogName, PathType.LogName));
+
+        // Assert
+        // Avoid overfitting the specific Win32 mapping (e.g.
+        // ERROR_EVT_CHANNEL_PATH_INVALID) since it goes through the default switch
+        // case and may shift across Windows versions. Capture the smell-fix
+        // invariant: malformed paths must not be masked as UAE.
+        Assert.NotNull(ex);
+        Assert.IsNotType<UnauthorizedAccessException>(ex);
     }
 
     [Fact]

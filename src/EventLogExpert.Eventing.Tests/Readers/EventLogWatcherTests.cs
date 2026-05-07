@@ -43,13 +43,13 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void Constructor_WithInvalidLogName_ShouldThrowException()
+    public void Constructor_WithInvalidLogName_ShouldThrowFileNotFoundException()
     {
         // Arrange
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act & Assert
-        Assert.ThrowsAny<Exception>(() => new EventLogWatcher(invalidLogName));
+        Assert.Throws<FileNotFoundException>(() => new EventLogWatcher(invalidLogName));
     }
 
     [Fact]
@@ -820,14 +820,22 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void EventRecordWritten_WithInvalidBookmark_ShouldThrowException()
+    public void EventRecordWritten_WithInvalidBookmark_ShouldThrowAndNotMaskAsUnauthorizedAccessException()
     {
         // Arrange
         var invalidBookmark = "InvalidBookmarkString";
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName, invalidBookmark, renderXml: false);
 
-        // Act & Assert
-        Assert.ThrowsAny<Exception>(() => watcher.Enabled = true);
+        // Act
+        var ex = Record.Exception(() => watcher.Enabled = true);
+
+        // Assert
+        // The bookmark XML failure flows through ThrowEventLogException and the
+        // exact Win32 mapping may shift across Windows versions. Capture the
+        // stable invariants instead of pinning the type: bad bookmarks must
+        // surface an exception and must not be masked as UAE.
+        Assert.NotNull(ex);
+        Assert.IsNotType<UnauthorizedAccessException>(ex);
     }
 
     [Fact]
