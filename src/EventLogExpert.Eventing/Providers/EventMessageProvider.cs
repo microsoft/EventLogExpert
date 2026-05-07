@@ -445,7 +445,7 @@ public sealed class EventMessageProvider(
     {
         publisher = null;
 
-        using var channelConfig = EventMethods.EvtOpenChannelConfig(
+        using var channelConfig = NativeMethods.EvtOpenChannelConfig(
             EventLogSession.GlobalSession.Handle,
             channelName,
             0);
@@ -464,7 +464,7 @@ public sealed class EventMessageProvider(
 
         try
         {
-            bool success = EventMethods.EvtGetChannelConfigProperty(
+            bool success = NativeMethods.EvtGetChannelConfigProperty(
                 channelConfig,
                 EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
                 0,
@@ -484,7 +484,7 @@ public sealed class EventMessageProvider(
 
             buffer = Marshal.AllocHGlobal(bufferSize);
 
-            success = EventMethods.EvtGetChannelConfigProperty(
+            success = NativeMethods.EvtGetChannelConfigProperty(
                 channelConfig,
                 EvtChannelConfigPropertyId.EvtChannelConfigOwningPublisher,
                 0,
@@ -503,7 +503,7 @@ public sealed class EventMessageProvider(
             }
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
-            var value = EventMethods.ConvertVariant(variant) as string;
+            var value = NativeMethods.ConvertVariant(variant) as string;
 
             if (string.IsNullOrWhiteSpace(value))
             {

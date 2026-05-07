@@ -568,7 +568,7 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         // Compression should result in file size significantly smaller than uncompressed data
         // Allow for SQLite overhead but verify compression achieved at least 2x reduction
-        Assert.True(fileSize < UncompressedDataSize / 2, 
+        Assert.True(fileSize < UncompressedDataSize / 2,
             $"Expected compressed file size to be less than {UncompressedDataSize / 2} bytes, but was {fileSize} bytes. " +
             $"This suggests compression may not be working effectively.");
 

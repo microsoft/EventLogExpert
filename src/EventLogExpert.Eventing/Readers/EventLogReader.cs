@@ -13,7 +13,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 {
     private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =
-        EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
+        NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, pathType);
 
     private int _disposed;
 
@@ -62,7 +62,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
         try
         {
-            bool success = EventMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
+            bool success = NativeMethods.EvtNext(_handle, batchSize, buffer, 0, 0, ref count);
 
             if (!success)
             {
@@ -87,12 +87,12 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
                 try
                 {
-                    events[i] = EventMethods.RenderEvent(eventHandle);
-                    events[i].Properties = EventMethods.RenderEventProperties(eventHandle);
+                    events[i] = NativeMethods.RenderEvent(eventHandle);
+                    events[i].Properties = NativeMethods.RenderEventProperties(eventHandle);
 
                     if (renderXml)
                     {
-                        events[i].Xml = EventMethods.RenderEventXml(eventHandle);
+                        events[i].Xml = NativeMethods.RenderEventXml(eventHandle);
                     }
                 }
                 catch (Exception ex)
@@ -116,23 +116,23 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
     private static string? CreateBookmark(EvtHandle eventHandle)
     {
-        using EvtHandle handle = EventMethods.EvtCreateBookmark(null);
+        using EvtHandle handle = NativeMethods.EvtCreateBookmark(null);
         int error = Marshal.GetLastWin32Error();
 
         if (handle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
-        bool success = EventMethods.EvtUpdateBookmark(handle, eventHandle);
+        bool success = NativeMethods.EvtUpdateBookmark(handle, eventHandle);
         error = Marshal.GetLastWin32Error();
 
         if (!success)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
-        success = EventMethods.EvtRender(
+        success = NativeMethods.EvtRender(
             EvtHandle.Zero,
             handle,
             EvtRenderFlags.Bookmark,
@@ -145,7 +145,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
         if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         Span<char> buffer = stackalloc char[bufferUsed / sizeof(char)];
@@ -154,7 +154,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
         {
             fixed (char* bufferPtr = buffer)
             {
-                success = EventMethods.EvtRender(
+                success = NativeMethods.EvtRender(
                     EvtHandle.Zero,
                     handle,
                     EvtRenderFlags.Bookmark,
@@ -169,7 +169,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
 
         if (!success)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         return bufferUsed - 1 <= 0 ? null : new string(buffer[..^1]);

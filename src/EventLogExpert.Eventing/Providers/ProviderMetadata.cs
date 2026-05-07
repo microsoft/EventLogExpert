@@ -28,7 +28,7 @@ internal sealed partial class ProviderMetadata
 
     private ProviderMetadata(string providerName, string? metadataPath = null)
     {
-        _publisherMetadataHandle = EventMethods.EvtOpenPublisherMetadata(EventLogSession.GlobalSession.Handle, providerName, metadataPath, 0, 0);
+        _publisherMetadataHandle = NativeMethods.EvtOpenPublisherMetadata(EventLogSession.GlobalSession.Handle, providerName, metadataPath, 0, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (_publisherMetadataHandle.IsInvalid)
@@ -50,18 +50,18 @@ internal sealed partial class ProviderMetadata
                 using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.ChannelReferences);
 
-                int size = EventMethods.GetObjectArraySize(channelRefHandle);
+                int size = NativeMethods.GetObjectArraySize(channelRefHandle);
 
                 Dictionary<uint, string> channels = new(size);
 
                 for (int i = 0; i < size; i++)
                 {
-                    uint channelId = (uint)EventMethods.GetObjectArrayProperty(
+                    uint channelId = (uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.ChannelReferenceID);
 
-                    string channelName = (string)EventMethods.GetObjectArrayProperty(
+                    string channelName = (string)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.ChannelReferencePath);
@@ -86,7 +86,7 @@ internal sealed partial class ProviderMetadata
         {
             List<EventMetadata> events = [];
 
-            using EvtHandle handle = EventMethods.EvtOpenEventMetadataEnum(_publisherMetadataHandle, 0);
+            using EvtHandle handle = NativeMethods.EvtOpenEventMetadataEnum(_publisherMetadataHandle, 0);
             int error = Marshal.GetLastWin32Error();
 
             if (handle.IsInvalid)
@@ -114,7 +114,7 @@ internal sealed partial class ProviderMetadata
 
                 string message = messageId == -1 ?
                     string.Empty :
-                    EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
+                    NativeMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
                 events.Add(new EventMetadata(id, version, channelId, level, opcode, task, keywords, template, message, this));
             }
@@ -136,30 +136,30 @@ internal sealed partial class ProviderMetadata
                 using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Keywords);
 
-                int size = EventMethods.GetObjectArraySize(channelRefHandle);
+                int size = NativeMethods.GetObjectArraySize(channelRefHandle);
 
                 Dictionary<long, string> keywords = new(size);
 
                 for (int i = 0; i < size; i++)
                 {
-                    string name = (string)EventMethods.GetObjectArrayProperty(
+                    string name = (string)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.KeywordName);
 
-                    long value = (long)(ulong)EventMethods.GetObjectArrayProperty(
+                    long value = (long)(ulong)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.KeywordValue);
 
-                    int messageId = (int)(uint)EventMethods.GetObjectArrayProperty(
+                    int messageId = (int)(uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.KeywordMessageID);
 
                     string displayName = messageId == -1 ?
                         name :
-                        EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
+                        NativeMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
                     keywords.TryAdd(value, displayName);
                 }
@@ -190,30 +190,30 @@ internal sealed partial class ProviderMetadata
                 using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Opcodes);
 
-                int size = EventMethods.GetObjectArraySize(channelRefHandle);
+                int size = NativeMethods.GetObjectArraySize(channelRefHandle);
 
                 Dictionary<int, string> opcodes = new(size);
 
                 for (int i = 0; i < size; i++)
                 {
-                    string name = (string)EventMethods.GetObjectArrayProperty(
+                    string name = (string)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.OpcodeName);
 
-                    uint value = (uint)EventMethods.GetObjectArrayProperty(
+                    uint value = (uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.OpcodeValue);
 
-                    int messageId = (int)(uint)EventMethods.GetObjectArrayProperty(
+                    int messageId = (int)(uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.OpcodeMessageID);
 
                     string displayName = messageId == -1 ?
                         name :
-                        EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
+                        NativeMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
                     opcodes.TryAdd((int)(value >> 16), displayName);
                 }
@@ -244,30 +244,30 @@ internal sealed partial class ProviderMetadata
                 using EvtHandle channelRefHandle =
                     GetPublisherMetadataPropertyHandle(EvtPublisherMetadataPropertyId.Tasks);
 
-                int size = EventMethods.GetObjectArraySize(channelRefHandle);
+                int size = NativeMethods.GetObjectArraySize(channelRefHandle);
 
                 Dictionary<int, string> tasks = new(size);
 
                 for (int i = 0; i < size; i++)
                 {
-                    string name = (string)EventMethods.GetObjectArrayProperty(
+                    string name = (string)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.TaskName);
 
-                    int value = (int)(uint)EventMethods.GetObjectArrayProperty(
+                    int value = (int)(uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.TaskValue);
 
-                    int messageId = (int)(uint)EventMethods.GetObjectArrayProperty(
+                    int messageId = (int)(uint)NativeMethods.GetObjectArrayProperty(
                         channelRefHandle,
                         i,
                         EvtPublisherMetadataPropertyId.TaskMessageID);
 
                     string displayName = messageId == -1 ?
                         name :
-                        EventMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
+                        NativeMethods.FormatMessage(_publisherMetadataHandle, (uint)messageId);
 
                     tasks.TryAdd(value, displayName);
                 }
@@ -334,27 +334,27 @@ internal sealed partial class ProviderMetadata
 
         try
         {
-            bool success = EventMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferSize);
+            bool success = NativeMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, 0, IntPtr.Zero, out int bufferSize);
             int error = Marshal.GetLastWin32Error();
 
             if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferSize);
 
-            success = EventMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, bufferSize, buffer, out bufferSize);
+            success = NativeMethods.EvtGetEventMetadataProperty(metadataHandle, propertyId, 0, bufferSize, buffer, out bufferSize);
             error = Marshal.GetLastWin32Error();
 
             if (!success)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return EventMethods.ConvertVariant(variant) ??
+            return NativeMethods.ConvertVariant(variant) ??
                 throw new InvalidDataException($"Invalid Metadata for PropertyId: {propertyId}");
         }
         finally
@@ -365,14 +365,14 @@ internal sealed partial class ProviderMetadata
 
     private static EvtHandle? NextEventMetadata(EvtHandle metadataHandle, int flags)
     {
-        EvtHandle handle = EventMethods.EvtNextEventMetadata(metadataHandle, flags);
+        EvtHandle handle = NativeMethods.EvtNextEventMetadata(metadataHandle, flags);
         int error = Marshal.GetLastWin32Error();
 
         if (!handle.IsInvalid) { return handle; }
 
         if (error != Win32ErrorCodes.ERROR_NO_MORE_ITEMS)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         return null;
@@ -384,7 +384,7 @@ internal sealed partial class ProviderMetadata
 
         try
         {
-            bool success = EventMethods.EvtGetPublisherMetadataProperty(
+            bool success = NativeMethods.EvtGetPublisherMetadataProperty(
                 _publisherMetadataHandle,
                 propertyId,
                 0,
@@ -396,12 +396,12 @@ internal sealed partial class ProviderMetadata
 
             if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
-            success = EventMethods.EvtGetPublisherMetadataProperty(
+            success = NativeMethods.EvtGetPublisherMetadataProperty(
                 _publisherMetadataHandle,
                 propertyId,
                 0,
@@ -413,12 +413,12 @@ internal sealed partial class ProviderMetadata
 
             if (!success)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);
 
-            return (string?)EventMethods.ConvertVariant(variant) ?? string.Empty;
+            return (string?)NativeMethods.ConvertVariant(variant) ?? string.Empty;
         }
         finally
         {
@@ -432,7 +432,7 @@ internal sealed partial class ProviderMetadata
 
         try
         {
-            bool success = EventMethods.EvtGetPublisherMetadataProperty(
+            bool success = NativeMethods.EvtGetPublisherMetadataProperty(
                 _publisherMetadataHandle,
                 propertyId,
                 0,
@@ -444,12 +444,12 @@ internal sealed partial class ProviderMetadata
 
             if (!success && error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             buffer = Marshal.AllocHGlobal(bufferUsed);
 
-            success = EventMethods.EvtGetPublisherMetadataProperty(
+            success = NativeMethods.EvtGetPublisherMetadataProperty(
                 _publisherMetadataHandle,
                 propertyId,
                 0,
@@ -461,7 +461,7 @@ internal sealed partial class ProviderMetadata
 
             if (!success)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
 
             var variant = Marshal.PtrToStructure<EvtVariant>(buffer);

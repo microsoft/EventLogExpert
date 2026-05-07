@@ -111,7 +111,7 @@ public sealed class EventLogWatcherTests
         using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
 
         reader.TryGetEvents(out _, 1);
-        
+
         var bookmark = reader.LastBookmark;
 
         // Act
@@ -140,7 +140,7 @@ public sealed class EventLogWatcherTests
 
         // Act
         watcher.Dispose();
-        
+
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after dispose", EventLogEntryType.Information);
@@ -440,7 +440,7 @@ public sealed class EventLogWatcherTests
 
         // Act
         var beforeWrite = DateTime.UtcNow;
-        
+
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for timestamp", EventLogEntryType.Information);
@@ -579,7 +579,7 @@ public sealed class EventLogWatcherTests
         // Assert
         Assert.True(received, "Did not receive all events within timeout period");
         Assert.True(receivedEvents.Count >= 3);
-        
+
         // Verify events are in chronological order (by TimeCreated)
         for (int i = 1; i < Math.Min(3, receivedEvents.Count); i++)
         {
@@ -942,7 +942,7 @@ public sealed class EventLogWatcherTests
         // Arrange
         using var watcher1 = new EventLogWatcher(Constants.ApplicationLogName);
         using var watcher2 = new EventLogWatcher(Constants.ApplicationLogName);
-        
+
         var receivedEvents1 = new List<EventRecord>();
         var receivedEvents2 = new List<EventRecord>();
         var countdown = new CountdownEvent(2);
@@ -1006,7 +1006,7 @@ public sealed class EventLogWatcherTests
         watcher.Enabled = false;
         watcher.Enabled = false;
         watcher.Enabled = false;
-        
+
         Assert.False(watcher.Enabled);
     }
 

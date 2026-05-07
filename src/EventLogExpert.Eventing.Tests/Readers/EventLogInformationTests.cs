@@ -54,7 +54,7 @@ public sealed class EventLogInformationTests
         Assert.NotNull(logInfo1);
         Assert.NotNull(logInfo2);
         Assert.NotSame(logInfo1, logInfo2);
-        
+
         // Different logs should have potentially different record counts
         // (though we can't guarantee they're different)
         Assert.NotNull(logInfo1.RecordCount);
@@ -345,7 +345,7 @@ public sealed class EventLogInformationTests
         // File size might change slightly, but should be close
         Assert.NotNull(logInfo1.FileSize);
         Assert.NotNull(logInfo2.FileSize);
-        
+
         // Attributes should be identical
         Assert.Equal(logInfo1.Attributes, logInfo2.Attributes);
     }
@@ -450,10 +450,10 @@ public sealed class EventLogInformationTests
 
         Assert.True(attributesProperty.CanRead);
         Assert.False(attributesProperty.CanWrite);
-        
+
         Assert.True(fileSizeProperty.CanRead);
         Assert.False(fileSizeProperty.CanWrite);
-        
+
         Assert.True(recordCountProperty.CanRead);
         Assert.False(recordCountProperty.CanWrite);
     }
@@ -469,7 +469,7 @@ public sealed class EventLogInformationTests
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
-        
+
         if (logInfo is { OldestRecordNumber: not null, RecordCount: > 0 })
         {
             // Oldest record number should be reasonable
@@ -504,7 +504,7 @@ public sealed class EventLogInformationTests
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
-        
+
         if (logInfo.RecordCount.Value == 0)
         {
             // If no records, oldest record number might be null or zero

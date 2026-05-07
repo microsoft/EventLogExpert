@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
@@ -30,13 +30,13 @@ public sealed partial class EventLogWatcher : IDisposable
         _renderXml = renderXml;
 
         // Validate the log exists by attempting to open it
-        _queryHandle = EventMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
+        _queryHandle = NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
         int error = Marshal.GetLastWin32Error();
 
         if (_queryHandle is { IsInvalid: false }) { return; }
 
         _queryHandle.Dispose();
-        EventMethods.ThrowEventLogException(error);
+        NativeMethods.ThrowEventLogException(error);
     }
 
     public EventLogWatcher(string path, bool renderXml = false) : this(path, null, renderXml) { }
@@ -105,7 +105,7 @@ public sealed partial class EventLogWatcher : IDisposable
 
             int count = 0;
 
-            success = EventMethods.EvtNext(_subscriptionHandle, buffer.Length, buffer, 0, 0, ref count);
+            success = NativeMethods.EvtNext(_subscriptionHandle, buffer.Length, buffer, 0, 0, ref count);
 
             if (!success) { return; }
 
@@ -116,12 +116,12 @@ public sealed partial class EventLogWatcher : IDisposable
 
                 try
                 {
-                    @event = EventMethods.RenderEvent(eventHandle);
-                    @event.Properties = EventMethods.RenderEventProperties(eventHandle);
+                    @event = NativeMethods.RenderEvent(eventHandle);
+                    @event.Properties = NativeMethods.RenderEventProperties(eventHandle);
 
                     if (_renderXml)
                     {
-                        @event.Xml = EventMethods.RenderEventXml(eventHandle);
+                        @event.Xml = NativeMethods.RenderEventXml(eventHandle);
                     }
                 }
                 catch (Exception ex)
@@ -146,16 +146,16 @@ public sealed partial class EventLogWatcher : IDisposable
 
         EvtHandle bookmarkHandle = string.IsNullOrEmpty(_bookmark) ?
             EvtHandle.Zero :
-            EventMethods.EvtCreateBookmark(_bookmark);
+            NativeMethods.EvtCreateBookmark(_bookmark);
 
         if (!string.IsNullOrEmpty(_bookmark) && bookmarkHandle.IsInvalid)
         {
             int error = Marshal.GetLastWin32Error();
             bookmarkHandle.Dispose();
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
-        _subscriptionHandle = EventMethods.EvtSubscribe(
+        _subscriptionHandle = NativeMethods.EvtSubscribe(
             EventLogSession.GlobalSession.Handle,
             _newEvents.SafeWaitHandle,
             _path,
@@ -174,7 +174,7 @@ public sealed partial class EventLogWatcher : IDisposable
 
         if (_subscriptionHandle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(subscriptionError);
+            NativeMethods.ThrowEventLogException(subscriptionError);
         }
 
         _isSubscribed = true;

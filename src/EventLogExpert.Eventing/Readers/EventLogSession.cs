@@ -35,12 +35,12 @@ public sealed partial class EventLogSession
     {
         List<string> paths = [];
 
-        using EvtHandle channelHandle = EventMethods.EvtOpenChannelEnum(Handle, 0);
+        using EvtHandle channelHandle = NativeMethods.EvtOpenChannelEnum(Handle, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (channelHandle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         bool doneReading = false;
@@ -63,12 +63,12 @@ public sealed partial class EventLogSession
     {
         HashSet<string> providers = [];
 
-        using EvtHandle providerHandle = EventMethods.EvtOpenPublisherEnum(Handle, 0);
+        using EvtHandle providerHandle = NativeMethods.EvtOpenPublisherEnum(Handle, 0);
         int error = Marshal.GetLastWin32Error();
 
         if (providerHandle.IsInvalid)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         bool doneReading = false;
@@ -89,14 +89,14 @@ public sealed partial class EventLogSession
 
     private static EvtHandle CreateRenderContext(EvtRenderContextFlags renderContextFlags)
     {
-        EvtHandle renderContextHandle = EventMethods.EvtCreateRenderContext(0, null, renderContextFlags);
+        EvtHandle renderContextHandle = NativeMethods.EvtCreateRenderContext(0, null, renderContextFlags);
         int error = Marshal.GetLastWin32Error();
 
         if (renderContextHandle.IsInvalid)
         {
             renderContextHandle.Dispose();
 
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         return renderContextHandle;
@@ -104,7 +104,7 @@ public sealed partial class EventLogSession
 
     private static string NextChannelPath(EvtHandle channelHandle, ref bool doneReading)
     {
-        bool success = EventMethods.EvtNextChannelPath(channelHandle, 0, null, out int bufferSize);
+        bool success = NativeMethods.EvtNextChannelPath(channelHandle, 0, null, out int bufferSize);
         int error = Marshal.GetLastWin32Error();
 
         if (!success)
@@ -118,18 +118,18 @@ public sealed partial class EventLogSession
 
             if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
         }
 
         Span<char> buffer = stackalloc char[bufferSize];
 
-        success = EventMethods.EvtNextChannelPath(channelHandle, bufferSize, buffer, out bufferSize);
+        success = NativeMethods.EvtNextChannelPath(channelHandle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
 
         if (!success)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);
@@ -137,7 +137,7 @@ public sealed partial class EventLogSession
 
     private static string NextPublisherId(EvtHandle publisherHandle, ref bool doneReading)
     {
-        bool success = EventMethods.EvtNextPublisherId(publisherHandle, 0, null, out int bufferSize);
+        bool success = NativeMethods.EvtNextPublisherId(publisherHandle, 0, null, out int bufferSize);
         int error = Marshal.GetLastWin32Error();
 
         if (!success)
@@ -151,18 +151,18 @@ public sealed partial class EventLogSession
 
             if (error != Win32ErrorCodes.ERROR_INSUFFICIENT_BUFFER)
             {
-                EventMethods.ThrowEventLogException(error);
+                NativeMethods.ThrowEventLogException(error);
             }
         }
 
         Span<char> buffer = stackalloc char[bufferSize];
 
-        success = EventMethods.EvtNextPublisherId(publisherHandle, bufferSize, buffer, out bufferSize);
+        success = NativeMethods.EvtNextPublisherId(publisherHandle, bufferSize, buffer, out bufferSize);
         error = Marshal.GetLastWin32Error();
 
         if (!success)
         {
-            EventMethods.ThrowEventLogException(error);
+            NativeMethods.ThrowEventLogException(error);
         }
 
         return bufferSize - 1 <= 0 ? string.Empty : new string(buffer[..(bufferSize - 1)]);

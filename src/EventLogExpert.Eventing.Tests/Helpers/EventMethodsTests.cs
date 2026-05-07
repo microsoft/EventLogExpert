@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
 using EventLogExpert.Eventing.Interop;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -22,7 +21,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariant(EvtVariantType.AnsiString, stringPtr);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -49,7 +48,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.Binary, binaryPtr, (uint)expectedBytes.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -69,7 +68,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Boolean, 0u);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -84,7 +83,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Boolean, 1u);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -100,7 +99,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Byte, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -122,7 +121,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.ByteArray, arrayPtr, (uint)expectedBytes.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -142,7 +141,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(EvtVariantType.ByteArray, IntPtr.Zero, 0);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -164,7 +163,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(type, IntPtr.Zero, uint.MaxValue);
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidDataException>(() => EventMethods.ConvertVariant(variant));
+        var ex = Assert.Throws<InvalidDataException>(() => NativeMethods.ConvertVariant(variant));
         Assert.Contains(type.ToString(), ex.Message);
         Assert.Contains(uint.MaxValue.ToString(), ex.Message);
         Assert.IsType<OverflowException>(ex.InnerException);
@@ -178,7 +177,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Double, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -196,7 +195,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.FileTime, fileTime);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -218,7 +217,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariant(EvtVariantType.Guid, guidPtr);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -239,7 +238,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.HexInt32, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -265,7 +264,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.HexInt32Array, arrayPtr, (uint)expectedValues.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -285,7 +284,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(EvtVariantType.HexInt32Array, IntPtr.Zero, 0);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -301,7 +300,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.HexInt64, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -317,7 +316,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Int16, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -333,7 +332,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Int32, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -349,7 +348,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Int64, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -365,7 +364,7 @@ public sealed class EventMethodsTests
 
         // Act & Assert
         var exception = Assert.Throws<InvalidDataException>(
-            () => EventMethods.ConvertVariant(variant));
+            () => NativeMethods.ConvertVariant(variant));
 
         Assert.Contains(nameof(EvtVariantType), exception.Message);
         Assert.Contains("9999", exception.Message);
@@ -385,7 +384,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(type, IntPtr.Zero, 5);
 
         // Act & Assert
-        var ex = Assert.Throws<InvalidDataException>(() => EventMethods.ConvertVariant(variant));
+        var ex = Assert.Throws<InvalidDataException>(() => NativeMethods.ConvertVariant(variant));
         Assert.Contains(type.ToString(), ex.Message);
     }
 
@@ -396,7 +395,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Null);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.Null(result);
@@ -410,7 +409,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.SByte, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -425,7 +424,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Sid, IntPtr.Zero);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.Null(result);
@@ -439,7 +438,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.Single, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -455,7 +454,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.SizeT, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -475,7 +474,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariant(EvtVariantType.String, stringPtr);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -507,7 +506,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.StringArray, arrayPtr, (uint)expectedStrings.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -535,7 +534,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(EvtVariantType.StringArray, IntPtr.Zero, 0);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -568,7 +567,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariant(EvtVariantType.SysTime, sysTimePtr);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -589,7 +588,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.UInt16, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -615,7 +614,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.UInt16Array, arrayPtr, (uint)expectedValues.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -635,7 +634,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(EvtVariantType.UInt16Array, IntPtr.Zero, 0);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -651,7 +650,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.UInt32, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -677,7 +676,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, arrayPtr, (uint)expectedValues.Length);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -697,7 +696,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, IntPtr.Zero, 0);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -713,7 +712,7 @@ public sealed class EventMethodsTests
         var variant = CreateVariant(EvtVariantType.UInt64, expectedValue);
 
         // Act
-        var result = EventMethods.ConvertVariant(variant);
+        var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
@@ -733,7 +732,7 @@ public sealed class EventMethodsTests
             var variant = CreateVariant(EvtVariantType.Xml, xmlPtr);
 
             // Act
-            var result = EventMethods.ConvertVariant(variant);
+            var result = NativeMethods.ConvertVariant(variant);
 
             // Assert
             Assert.NotNull(result);
@@ -753,7 +752,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_ACCESS_DENIED;
 
         // Act & Assert
-        Assert.Throws<UnauthorizedAccessException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<UnauthorizedAccessException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -763,7 +762,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_CANCELLED;
 
         // Act & Assert
-        Assert.Throws<OperationCanceledException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<OperationCanceledException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -773,7 +772,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_EVT_CHANNEL_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -783,7 +782,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_FILE_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -793,7 +792,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_INVALID_DATA;
 
         // Act & Assert
-        Assert.Throws<InvalidDataException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<InvalidDataException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -803,7 +802,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_EVT_INVALID_EVENT_DATA;
 
         // Act & Assert
-        Assert.Throws<InvalidDataException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<InvalidDataException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -813,7 +812,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_INVALID_HANDLE;
 
         // Act & Assert
-        Assert.Throws<UnauthorizedAccessException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<UnauthorizedAccessException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -823,7 +822,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_EVT_MESSAGE_ID_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -833,7 +832,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_EVT_MESSAGE_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -843,7 +842,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_PATH_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -853,7 +852,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.ERROR_EVT_PUBLISHER_METADATA_NOT_FOUND;
 
         // Act & Assert
-        Assert.Throws<FileNotFoundException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<FileNotFoundException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -863,7 +862,7 @@ public sealed class EventMethodsTests
         int error = Win32ErrorCodes.RPC_S_CALL_CANCELED;
 
         // Act & Assert
-        Assert.Throws<OperationCanceledException>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<OperationCanceledException>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     [Fact]
@@ -873,7 +872,7 @@ public sealed class EventMethodsTests
         int error = 9999; // Unknown error code
 
         // Act & Assert
-        Assert.Throws<Exception>(() => EventMethods.ThrowEventLogException(error));
+        Assert.Throws<Exception>(() => NativeMethods.ThrowEventLogException(error));
     }
 
     // Helper methods to create EvtVariant instances

@@ -95,7 +95,7 @@ public class EventXmlResolver : IEventXmlResolver
     /// <summary>Performs the actual EvtQuery / EvtNext / RenderEventXml work. Virtual for testability.</summary>
     protected virtual string ResolveXml(string owningLog, long recordId, PathType pathType)
     {
-        using EvtHandle handle = EventMethods.EvtQuery(
+        using EvtHandle handle = NativeMethods.EvtQuery(
             EventLogSession.GlobalSession.Handle,
             owningLog,
             $"*[System[EventRecordID='{recordId}']]",
@@ -106,7 +106,7 @@ public class EventXmlResolver : IEventXmlResolver
         var buffer = new IntPtr[1];
         int count = 0;
 
-        bool success = EventMethods.EvtNext(handle, buffer.Length, buffer, 0, 0, ref count);
+        bool success = NativeMethods.EvtNext(handle, buffer.Length, buffer, 0, 0, ref count);
 
         if (!success || count == 0) { return string.Empty; }
 
@@ -114,7 +114,7 @@ public class EventXmlResolver : IEventXmlResolver
 
         if (eventHandle.IsInvalid) { return string.Empty; }
 
-        return EventMethods.RenderEventXml(eventHandle) ?? string.Empty;
+        return NativeMethods.RenderEventXml(eventHandle) ?? string.Empty;
     }
 
     private static async ValueTask<string> AwaitLazyAsync(Lazy<Task<string>> lazy, CancellationToken cancellationToken)
