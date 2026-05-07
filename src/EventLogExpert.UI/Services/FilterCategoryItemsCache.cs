@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI.Models;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
