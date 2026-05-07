@@ -10,7 +10,20 @@ public sealed class EventLogInformation
 {
     internal EventLogInformation(EventLogSession session, string logName, PathType pathType)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(logName);
+
         using EvtHandle handle = NativeMethods.EvtOpenLog(session.Handle, logName, pathType);
+
+        int error = Marshal.GetLastWin32Error();
+
+        // Surface the real EvtOpenLog failure (e.g., FileNotFoundException for a
+        // missing channel). Without this check, the constructor would call
+        // GetLogInfo on a NULL handle and the secondary ERROR_INVALID_HANDLE would
+        // mask the original error as UnauthorizedAccessException.
+        if (handle.IsInvalid)
+        {
+            NativeMethods.ThrowEventLogException(error);
+        }
 
         Attributes = (int?)(uint?)GetLogInfo(handle, EvtLogPropertyId.Attributes);
         CreationTime = (DateTime?)GetLogInfo(handle, EvtLogPropertyId.CreationTime);
