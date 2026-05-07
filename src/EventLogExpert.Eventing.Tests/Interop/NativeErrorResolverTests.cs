@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Interop;
 
-namespace EventLogExpert.Eventing.Tests.Helpers;
+namespace EventLogExpert.Eventing.Tests.Interop;
 
 public sealed class NativeErrorResolverTests
 {
