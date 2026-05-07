@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Helpers;
+using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
 using System.Buffers;
@@ -172,18 +173,18 @@ public partial class EventResolverBase : IDisposable
             switch (unformattedString[i])
             {
                 case '%' when i + 1 < unformattedString.Length:
-                        switch (unformattedString[i + 1])
-                        {
-                            case 'n':
-                                if (i + 2 >= unformattedString.Length || unformattedString[i + 2] != '\r')
-                                {
-                                    buffer[bufferIndex++] = '\r';
-                                    buffer[bufferIndex++] = '\n';
-                                }
+                    switch (unformattedString[i + 1])
+                    {
+                        case 'n':
+                            if (i + 2 >= unformattedString.Length || unformattedString[i + 2] != '\r')
+                            {
+                                buffer[bufferIndex++] = '\r';
+                                buffer[bufferIndex++] = '\n';
+                            }
 
-                                i++;
+                            i++;
 
-                                break;
+                            break;
                         case 't':
                             buffer[bufferIndex++] = '\t';
                             i++;
@@ -784,7 +785,7 @@ public partial class EventResolverBase : IDisposable
                     }
                     else if (string.Equals(outType, "win:HResult", StringComparison.OrdinalIgnoreCase) && property is int hResult)
                     {
-                        formattedValues.Add(ResolverMethods.GetErrorMessage((uint)hResult));
+                        formattedValues.Add(NativeErrorResolver.GetErrorMessage((uint)hResult));
                     }
                     else if (string.Equals(outType, "win:NTStatus", StringComparison.OrdinalIgnoreCase))
                     {
@@ -801,7 +802,7 @@ public partial class EventResolverBase : IDisposable
                         };
 
                         formattedValues.Add(property is uint or int or ulong or long or ushort or short or byte
-                            ? ResolverMethods.GetNtStatusMessage(statusCode)
+                            ? NativeErrorResolver.GetNtStatusMessage(statusCode)
                             : $"{property}");
                     }
                     else

@@ -845,7 +845,7 @@ internal static partial class EventMethods
 
     internal static void ThrowEventLogException(int error)
     {
-        var message = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
+        var message = NativeErrorResolver.GetErrorMessage((uint)HResultConverter.HResultFromWin32(error));
 
         switch (error)
         {

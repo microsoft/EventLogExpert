@@ -33,7 +33,7 @@ internal sealed partial class ProviderMetadata
 
         if (_publisherMetadataHandle.IsInvalid)
         {
-            Error = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
+            Error = NativeErrorResolver.GetErrorMessage((uint)HResultConverter.HResultFromWin32(error));
         }
     }
 
@@ -91,7 +91,7 @@ internal sealed partial class ProviderMetadata
 
             if (handle.IsInvalid)
             {
-                Error = ResolverMethods.GetErrorMessage((uint)Converter.HResultFromWin32(error));
+                Error = NativeErrorResolver.GetErrorMessage((uint)HResultConverter.HResultFromWin32(error));
 
                 return events.AsReadOnly();
             }

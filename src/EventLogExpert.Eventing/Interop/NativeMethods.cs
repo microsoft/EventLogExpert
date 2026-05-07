@@ -1,14 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Interop;
 using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
 // We are defining some win32 types in this file, so we
 // are not following the usual C# naming conventions.
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Interop;
 
 [Flags]
 internal enum LoadLibraryFlags : uint

@@ -3,9 +3,9 @@
 
 using System.Collections.Concurrent;
 
-namespace EventLogExpert.Eventing.Helpers;
+namespace EventLogExpert.Eventing.Interop;
 
-internal static class ResolverMethods
+internal static class NativeErrorResolver
 {
     internal const int MaxCacheSize = 4096;
 
