@@ -146,28 +146,6 @@ public sealed class EventLogInformationTests
     }
 
     [Fact]
-    public void Constructor_WhenSecurityLog_MayRequireElevation()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act & Assert
-        // Security log typically requires administrator privileges
-        // This test documents expected behavior rather than testing functionality
-        try
-        {
-            var logInfo = new EventLogInformation(session, Constants.SecurityLogName, PathType.LogName);
-            // If we can access it (running as admin), verify it works
-            Assert.NotNull(logInfo);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            // Expected when not running as administrator
-            Assert.IsType<UnauthorizedAccessException>(ex);
-        }
-    }
-
-    [Fact]
     public void Constructor_WhenSpecialCharactersInLogName_ShouldNotMaskAsUnauthorizedAccessException()
     {
         // Arrange

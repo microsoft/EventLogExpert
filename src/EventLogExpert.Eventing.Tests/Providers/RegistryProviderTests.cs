@@ -284,29 +284,17 @@ public sealed class RegistryProviderTests
         var mockLogger = Substitute.For<ITraceLogger>();
         var provider = new RegistryProvider(mockLogger);
 
-        // Act - Try common providers until we find one
-        var commonProviders = new[]
-        {
-            Constants.ApplicationLogName,
-            Constants.SystemLogName,
-            Constants.KernelGeneralLogName,
-            Constants.PowerShellLogName
-        };
+        // Act — drive the SUT through whichever well-known legacy provider is
+        // present on this host. The helper internally probes a fixed list and
+        // returns the first non-empty match.
+        var foundFiles = FindAnyLegacyProviderFiles(provider);
 
-        foreach (var providerName in commonProviders)
-        {
-            var result = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
-
-            if (result.Count == 0) { continue; }
-
-            // Found a provider, verify logging
-            mockLogger.Received()
-                .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Found message file for legacy provider")));
-
-            return;
-        }
-
-        // If no providers found, skip assertion
+        // Assert — skip rather than silently pass when the host has no eligible
+        // legacy providers registered (e.g., a stripped-down container image).
+        Assert.SkipUnless(foundFiles.Count > 0,
+            "Test requires at least one common legacy provider with registered message files on this host.");
+        mockLogger.Received()
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Found message file for legacy provider")));
     }
 
     [Fact]
@@ -319,15 +307,14 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (result.Count != 0)
+        Assert.SkipUnless(result.Count > 0,
+            "Test requires at least one common legacy provider with registered message files on this host.");
+        Assert.All(result, path =>
         {
-            Assert.All(result, path =>
-            {
-                var extension = Path.GetExtension(path).ToLower();
-                Assert.True(extension is ".dll" or ".exe",
-                    $"Expected .dll or .exe, but got {extension} for path: {path}");
-            });
-        }
+            var extension = Path.GetExtension(path).ToLower();
+            Assert.True(extension is ".dll" or ".exe",
+                $"Expected .dll or .exe, but got {extension} for path: {path}");
+        });
     }
 
     [Fact]
@@ -340,16 +327,14 @@ public sealed class RegistryProviderTests
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
-        if (result.Count != 0)
+        Assert.SkipUnless(result.Count > 0,
+            "Test requires at least one common legacy provider with registered message files on this host.");
+        Assert.All(result, path =>
         {
-            Assert.All(result, path =>
-            {
-                // Full paths should either start with drive letter or UNC path
-                Assert.True(
-                    Path.IsPathFullyQualified(path) || path.StartsWith(@"\\"),
-                    $"Expected fully qualified path, but got: {path}");
-            });
-        }
+            Assert.True(
+                Path.IsPathFullyQualified(path) || path.StartsWith(@"\\"),
+                $"Expected fully qualified path, but got: {path}");
+        });
     }
 
     [Fact]
@@ -438,10 +423,6 @@ public sealed class RegistryProviderTests
         Assert.Empty(result);
     }
 
-    /// <summary>
-    /// Helper method to find any legacy provider files on the system.
-    /// Tries common providers and returns the first non-empty result.
-    /// </summary>
     private static List<string> FindAnyLegacyProviderFiles(RegistryProvider provider)
     {
         var commonProviders = new[]

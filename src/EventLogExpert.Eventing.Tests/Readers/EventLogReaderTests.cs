@@ -224,18 +224,20 @@ public sealed class EventLogReaderTests
     [Fact]
     public void LastBookmark_AfterTryGetEvents_ShouldBeSet()
     {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        // Use SmallEvtxFixture so the read is deterministic — the live Application
+        // log may be empty on minimal hosts, which used to silently skip the
+        // assertions behind an `if (success && events.Length > 0)` guard.
+        using var fixture = new SmallEvtxFixture();
+        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
 
         // Assert
-        if (success && events.Length > 0)
-        {
-            Assert.NotNull(reader.LastBookmark);
-            Assert.NotEmpty(reader.LastBookmark);
-        }
+        Assert.True(success);
+        Assert.NotEmpty(events);
+        Assert.NotNull(reader.LastBookmark);
+        Assert.NotEmpty(reader.LastBookmark);
     }
 
     [Fact]
@@ -251,8 +253,10 @@ public sealed class EventLogReaderTests
     [Fact]
     public void LastBookmark_WhenMultipleBatches_ShouldUpdateWithEachBatch()
     {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        // Use SmallEvtxFixture (5 events) with batchSize: 1 so two consecutive
+        // reads are guaranteed to produce two distinct events on every host.
+        using var fixture = new SmallEvtxFixture();
+        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
 
         // Act
         bool success1 = reader.TryGetEvents(out var events1, batchSize: 1);
@@ -262,20 +266,15 @@ public sealed class EventLogReaderTests
         string? bookmark2 = reader.LastBookmark;
 
         // Assert
-        if (success1 && events1.Length > 0)
-        {
-            Assert.NotNull(bookmark1);
-        }
+        Assert.True(success1);
+        Assert.Single(events1);
+        Assert.NotNull(bookmark1);
 
-        if (!success2 || events2.Length == 0) { return; }
-
+        Assert.True(success2);
+        Assert.Single(events2);
         Assert.NotNull(bookmark2);
 
-        // Bookmarks should be different if we read different events
-        if (bookmark1 != null && events1.Length > 0 && events2.Length > 0)
-        {
-            Assert.NotEqual(bookmark1, bookmark2);
-        }
+        Assert.NotEqual(bookmark1, bookmark2);
     }
 
     [Fact]
@@ -468,29 +467,6 @@ public sealed class EventLogReaderTests
         Assert.True(success);
         Assert.NotNull(events);
         Assert.True(events.Length <= 30);
-    }
-
-    [Fact]
-    public void TryGetEvents_WhenEventHasError_ShouldSetErrorProperty()
-    {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
-
-        // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 100);
-
-        // Assert
-        Assert.True(success);
-
-        // Some events might have errors (e.g., corrupt events, missing provider info)
-        // Just verify that if Error is set, it's a non-empty string
-        foreach (var evt in events)
-        {
-            if (!string.IsNullOrEmpty(evt.Error))
-            {
-                Assert.NotEmpty(evt.Error);
-            }
-        }
     }
 
     [Fact]
