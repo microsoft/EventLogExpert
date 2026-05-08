@@ -679,7 +679,7 @@ internal static partial class NativeMethods
                 throw new OperationCanceledException(message);
             case Win32ErrorCodes.ERROR_ACCESS_DENIED:
             case Win32ErrorCodes.ERROR_INVALID_HANDLE:
-                throw new UnauthorizedAccessException();
+                throw new UnauthorizedAccessException(message);
             default:
                 throw new Exception(message);
         }
