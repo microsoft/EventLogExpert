@@ -115,6 +115,16 @@ public sealed class EventLogWatcher : IDisposable
             // After Unsubscribe — in-flight callbacks hold _newEvents.SafeWaitHandle.
             _newEvents.Dispose();
         }
+        else
+        {
+            // Finalizer path: release native resources without locks or blocking signals.
+            _waitHandle?.Unregister(null);
+
+            if (!_subscriptionHandle.IsClosed)
+            {
+                _subscriptionHandle.Dispose();
+            }
+        }
 
         if (_queryHandle is { IsInvalid: false })
         {
