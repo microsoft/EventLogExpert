@@ -7,11 +7,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="..\EventLogExpert.Eventing.Tests\TestUtils\Constants\Constants.Provider.cs" Link="TestUtils\Constants\Constants.Provider.cs" />
+    <Compile Include="..\..\Unit\EventLogExpert.Eventing.Tests\TestUtils\Constants\Constants.Provider.cs" Link="TestUtils\Constants\Constants.Provider.cs" />
   </ItemGroup>
 
 </Project>
