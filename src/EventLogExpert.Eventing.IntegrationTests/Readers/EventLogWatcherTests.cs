@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using System.Reflection;
 
 namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
@@ -178,6 +179,42 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
+    public void Dispose_ShouldReleaseUnderlyingWaitHandle()
+    {
+        // Arrange
+        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Enabled = true;
+
+        // Reach into the private AutoResetEvent the watcher owns so we can
+        // assert the kernel handle is released — the leak this test guards
+        // against (per Copilot review on PR #516) was discovered precisely
+        // because there was no externally-observable signal of disposal.
+        var newEventsField = typeof(EventLogWatcher).GetField(
+            "_newEvents",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.True(
+            newEventsField is not null,
+            "Private field _newEvents not found on EventLogWatcher — was it renamed? Update Dispose_ShouldReleaseUnderlyingWaitHandle.");
+
+        var newEvents = (AutoResetEvent?)newEventsField.GetValue(watcher);
+        Assert.NotNull(newEvents);
+
+        // Act
+        watcher.Dispose();
+
+        // Assert
+        Assert.True(
+            newEvents.SafeWaitHandle.IsClosed,
+            "AutoResetEvent.SafeWaitHandle.IsClosed should be true after Dispose; otherwise the OS event handle leaks across watcher lifetimes.");
+
+        // Idempotency: the field-level Dispose unconditionally calls
+        // _newEvents.Dispose(), so a second top-level Dispose() must be
+        // gated by the _disposed fast-path to avoid a second call.
+        watcher.Dispose();
+        Assert.True(newEvents.SafeWaitHandle.IsClosed);
+    }
+
+    [Fact]
     public void Dispose_WhenCalled_ShouldUnsubscribe()
     {
         // Arrange
@@ -189,6 +226,54 @@ public sealed class EventLogWatcherTests
 
         // Assert
         Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
+    public void Dispose_WhenCalledFromHandler_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        Exception? observed = null;
+        var observedSet = new ManualResetEventSlim(false);
+
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            // Capture the exception inside the handler — the SUT isolates
+            // subscriber exceptions per its public contract, so an uncaught
+            // throw here would be silently swallowed and the test would hang.
+            try
+            {
+                ((EventLogWatcher)sender!).Dispose();
+            }
+            catch (Exception ex)
+            {
+                Volatile.Write(ref observed, ex);
+            }
+            finally
+            {
+                observedSet.Set();
+            }
+        };
+
+        watcher.Enabled = true;
+
+        // Act
+        using var eventLog = new EventLog(Constants.ApplicationLogName);
+        eventLog.Source = Constants.ApplicationLogName;
+        eventLog.WriteEntry("Test event for reentrant Dispose", EventLogEntryType.Information);
+
+        bool received = observedSet.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(received, "Handler was never invoked, so reentrancy was not exercised");
+        var captured = Volatile.Read(ref observed);
+        Assert.NotNull(captured);
+        var ex = Assert.IsType<InvalidOperationException>(captured);
+        Assert.Contains("cannot be stopped from within", ex.Message);
+
+        // Cleanup happens via `using var watcher` from the test thread, which
+        // is not the ThreadPool callback thread, so the reentrancy guard does
+        // not trigger and Dispose completes normally.
     }
 
     [Fact]
@@ -257,6 +342,45 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
+    public async Task Enabled_WhenRacingFromMultipleThreads_ShouldNotHangOrCorruptState()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+
+        // Act: race many Subscribe/Unsubscribe pairs to maximize the window
+        // for Subscribe to mutate _subscriptionHandle/_waitHandle while
+        // another thread is in Unsubscribe. Without the lifecycle lock, two
+        // Enabled=false callers can both pass the _waitHandle null check and
+        // both call RegisteredWaitHandle.Unregister; the second call returns
+        // false (already unregistered) and does NOT signal its wait object,
+        // so its WaitOne blocks indefinitely. Separately, an Enabled=true
+        // racing with Enabled=false can leave _subscriptionHandle disposed
+        // mid-Subscribe, making the next ProcessNewEvents invocation crash
+        // on a closed native handle.
+        var tasks = new List<Task>(capacity: 100);
+        var ct = TestContext.Current.CancellationToken;
+
+        for (int i = 0; i < 50; i++)
+        {
+            tasks.Add(Task.Run(() =>
+            {
+                try { watcher.Enabled = true; }
+                catch (InvalidOperationException) { /* loser of a Subscribe race — expected */ }
+            }, ct));
+            tasks.Add(Task.Run(() => watcher.Enabled = false, ct));
+        }
+
+        var allDone = Task.WhenAll(tasks);
+
+        // Assert: 30s budget far exceeds any legitimate Subscribe/Unsubscribe
+        // drain across 100 toggles. A TimeoutException here means the
+        // RegisteredWaitHandle race regression has returned. Any other
+        // exception (e.g., ObjectDisposedException from a torn-down handle)
+        // surfaces via the await.
+        await allDone.WaitAsync(TimeSpan.FromSeconds(30), ct);
+    }
+
+    [Fact]
     public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
     {
         // Arrange
@@ -268,6 +392,50 @@ public sealed class EventLogWatcherTests
 
         // Assert
         Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
+    public void Enabled_WhenSetToFalseFromHandler_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        Exception? observed = null;
+        var observedSet = new ManualResetEventSlim(false);
+
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            // Same reentrancy contract as Dispose: Enabled = false also calls
+            // Unsubscribe, which blocks waiting for in-flight callbacks. Calling
+            // it from a callback would self-deadlock, so the SUT throws.
+            try
+            {
+                ((EventLogWatcher)sender!).Enabled = false;
+            }
+            catch (Exception ex)
+            {
+                Volatile.Write(ref observed, ex);
+            }
+            finally
+            {
+                observedSet.Set();
+            }
+        };
+
+        watcher.Enabled = true;
+
+        // Act
+        using var eventLog = new EventLog(Constants.ApplicationLogName);
+        eventLog.Source = Constants.ApplicationLogName;
+        eventLog.WriteEntry("Test event for reentrant Enabled=false", EventLogEntryType.Information);
+
+        bool received = observedSet.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(received, "Handler was never invoked, so reentrancy was not exercised");
+        var captured = Volatile.Read(ref observed);
+        Assert.NotNull(captured);
+        var ex = Assert.IsType<InvalidOperationException>(captured);
+        Assert.Contains("cannot be stopped from within", ex.Message);
     }
 
     [Fact]
@@ -306,6 +474,21 @@ public sealed class EventLogWatcherTests
 
         // Assert
         Assert.True(watcher.Enabled);
+    }
+
+    [Fact]
+    public void Enabled_WhenSetToTrueAfterDispose_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Dispose();
+
+        // Act & Assert: post-dispose Subscribe is gated by an explicit
+        // _disposed check inside the lifecycle lock so callers see a clean
+        // ObjectDisposedException instead of a confusing native-handle
+        // failure (e.g., from _newEvents.SafeWaitHandle access after
+        // _newEvents has itself been disposed).
+        Assert.Throws<ObjectDisposedException>(() => watcher.Enabled = true);
     }
 
     [Fact]
@@ -431,6 +614,48 @@ public sealed class EventLogWatcherTests
         int actual = Volatile.Read(ref eventCount);
         Assert.False(fired, "Should not have received any event after unsubscribe");
         Assert.Equal(countBefore, actual);
+    }
+
+    [Fact]
+    public void EventRecordWritten_ForNormalEvent_ShouldHaveNullError()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        var receivedEvents = new ConcurrentQueue<EventRecord>();
+        var eventReceived = new ManualResetEventSlim(false);
+
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            receivedEvents.Enqueue(record);
+
+            if (!eventReceived.IsSet)
+            {
+                eventReceived.Set();
+            }
+        };
+
+        watcher.Enabled = true;
+
+        // Act — Write a normal event. EventRecord.Error is populated by
+        // ProcessNewEvents only when EvtRender throws, which is not reachable
+        // through the public API for a well-formed log entry. This test pins
+        // the happy-path invariant (Error is null on a normal event); see
+        // WithInvalidBookmark_ShouldThrowAndNotMaskAsUnauthorizedAccessException
+        // for an exercise of the failure path.
+        using var eventLog = new EventLog(Constants.ApplicationLogName);
+        eventLog.Source = Constants.ApplicationLogName;
+        eventLog.WriteEntry("Test event for normal-path null Error invariant", EventLogEntryType.Information);
+
+        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        var snapshot = receivedEvents.ToArray();
+        Assert.True(received, "Did not receive event within timeout period");
+        Assert.NotEmpty(snapshot);
+        // Assert only the first signaled record (the stimulus). Late ambient
+        // callbacks queued before ToArray could otherwise broaden the check
+        // beyond what the test stimulus controls.
+        Assert.Null(snapshot[0].Error);
     }
 
     [Fact]
@@ -651,40 +876,53 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void EventRecordWritten_WhenErrorOccurs_ShouldReceiveEventRecordWithError()
+    public void EventRecordWritten_WhenHandlerThrows_ShouldStillDeliverFutureEvents()
     {
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        var receivedEvents = new ConcurrentQueue<EventRecord>();
-        var eventReceived = new ManualResetEventSlim(false);
+        int attempts = 0;
+        var firstObserved = new ManualResetEventSlim(false);
+        var laterObserved = new ManualResetEventSlim(false);
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            receivedEvents.Enqueue(record);
+            // Signal "first invocation observed" BEFORE throwing so the
+            // stimulus thread can release the second write only after the
+            // throw has happened. Per-subscriber isolation in the SUT
+            // (introduced alongside this test) is what lets later invocations
+            // fire at all — without it the throw would short-circuit the
+            // multicast invoke and bubble into the ThreadPool worker.
+            int n = Interlocked.Increment(ref attempts);
 
-            if (!eventReceived.IsSet)
+            if (n == 1)
             {
-                eventReceived.Set();
+                firstObserved.Set();
+                throw new InvalidOperationException("simulated handler failure");
             }
+
+            laterObserved.Set();
         };
 
         watcher.Enabled = true;
 
-        // Act - Write a normal event (error handling is internal, hard to trigger externally)
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
-        eventLog.WriteEntry("Test event for error case", EventLogEntryType.Information);
 
-        bool received = eventReceived.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        // Act — write the stimulus, wait for the first (throwing) invocation,
+        // then write a second event to prove the watcher still delivers.
+        eventLog.WriteEntry("Test event 1 (handler throws on first invocation)", EventLogEntryType.Information);
+        bool firstReceived = firstObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.True(firstReceived, "First handler invocation was not observed");
+
+        eventLog.WriteEntry("Test event 2 (handler should still fire)", EventLogEntryType.Information);
+        bool laterReceived = laterObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
 
         // Assert
-        var snapshot = receivedEvents.ToArray();
-        Assert.True(received, "Did not receive event within timeout period");
-        Assert.NotEmpty(snapshot);
-        // Assert only the first signaled record (the stimulus). Late ambient
-        // callbacks queued before ToArray could otherwise broaden the check
-        // beyond what the test stimulus controls.
-        Assert.Null(snapshot[0].Error);
+        int actual = Volatile.Read(ref attempts);
+        Assert.True(laterReceived,
+            $"Handler did not fire again after throwing on first invocation; attempts={actual}");
+        Assert.True(actual >= 2,
+            $"Expected at least 2 handler invocations after recovery, got {actual}");
     }
 
     [Fact]
@@ -756,6 +994,48 @@ public sealed class EventLogWatcherTests
         int actual = Volatile.Read(ref eventCount);
         Assert.False(received, "Should not have received any event when watcher is not Enabled");
         Assert.Equal(0, actual);
+    }
+
+    [Fact]
+    public void EventRecordWritten_WhenOneOfMultipleHandlersThrows_ShouldStillNotifyOthers()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        int failingCount = 0;
+        int succeedingCount = 0;
+        var succeedingObserved = new ManualResetEventSlim(false);
+
+        // First subscriber always throws — simulates a poorly written consumer.
+        // Per-subscriber isolation must prevent it from blocking the second.
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            Interlocked.Increment(ref failingCount);
+            throw new InvalidOperationException("subscriber A always fails");
+        };
+
+        // Second subscriber must still be invoked despite the first throwing.
+        watcher.EventRecordWritten += (sender, record) =>
+        {
+            Interlocked.Increment(ref succeedingCount);
+            succeedingObserved.Set();
+        };
+
+        watcher.Enabled = true;
+
+        // Act
+        using var eventLog = new EventLog(Constants.ApplicationLogName);
+        eventLog.Source = Constants.ApplicationLogName;
+        eventLog.WriteEntry("Test event for multi-subscriber isolation", EventLogEntryType.Information);
+
+        bool received = succeedingObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert
+        int failed = Volatile.Read(ref failingCount);
+        int succeeded = Volatile.Read(ref succeedingCount);
+        Assert.True(received,
+            $"Second subscriber was never invoked despite first subscriber throwing; failed={failed}, succeeded={succeeded}");
+        Assert.True(failed >= 1, $"Expected first (throwing) subscriber to be invoked at least once, got {failed}");
+        Assert.True(succeeded >= 1, $"Expected second (succeeding) subscriber to be invoked at least once, got {succeeded}");
     }
 
     [Fact]
