@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.UI\EventLogExpert.UI.csproj" />
   </ItemGroup>
 
 </Project>

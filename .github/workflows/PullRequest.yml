@@ -15,10 +15,6 @@ jobs:
 
     runs-on: windows-2022
 
-    defaults:
-      run:
-        working-directory: src
-
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -30,8 +26,26 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore EventLogExpert.slnx
     - name: Build
-      run: dotnet build EventLogExpert.slnx --no-restore
-    - name: Test
-      run: dotnet test EventLogExpert.slnx --no-build --verbosity normal --filter "FullyQualifiedName!~EventLogExpert.Eventing.IntegrationTests"
-    - name: Integration Test
-      run: dotnet test EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj --no-build --verbosity normal
+      run: dotnet build EventLogExpert.slnx --no-restore -c Release -p:PublishReadyToRun=false
+    - name: Test (unit)
+      shell: pwsh
+      run: |
+        $projects = @(Get-ChildItem tests/Unit -Filter *.csproj -Recurse)
+        if ($projects.Count -eq 0) { throw 'No unit test projects found under tests/Unit.' }
+        $failed = $false
+        foreach ($project in $projects) {
+          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal
+          if ($LASTEXITCODE -ne 0) { $failed = $true }
+        }
+        if ($failed) { throw 'One or more unit test projects failed.' }
+    - name: Test (integration)
+      shell: pwsh
+      run: |
+        $projects = @(Get-ChildItem tests/Integration -Filter *.csproj -Recurse)
+        if ($projects.Count -eq 0) { throw 'No integration test projects found under tests/Integration.' }
+        $failed = $false
+        foreach ($project in $projects) {
+          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal
+          if ($LASTEXITCODE -ne 0) { $failed = $true }
+        }
+        if ($failed) { throw 'One or more integration test projects failed.' }

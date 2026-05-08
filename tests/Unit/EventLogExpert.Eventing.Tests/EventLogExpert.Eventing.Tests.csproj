@@ -3,14 +3,11 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="bunit" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.Components\EventLogExpert.Components.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 
 </Project>
