@@ -31,6 +31,8 @@ public sealed class EventMessageProvider(
         string providerName,
         ITraceLogger? logger = null)
     {
+        ArgumentNullException.ThrowIfNull(legacyProviderFiles);
+
         List<MessageModel> messages = [];
 
         foreach (var file in legacyProviderFiles)

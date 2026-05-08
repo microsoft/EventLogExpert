@@ -58,13 +58,13 @@ public sealed class EventMessageProviderTests
     }
 
     [Fact]
-    public void GetMessages_WhenFileListIsNull_ShouldThrowNullReferenceException()
+    public void GetMessages_WhenFileListIsNull_ShouldThrowArgumentNullException()
     {
         // Arrange
         var mockLogger = Substitute.For<ITraceLogger>();
 
         // Act & Assert
-        Assert.Throws<NullReferenceException>(() =>
+        Assert.Throws<ArgumentNullException>(() =>
             EventMessageProvider.GetMessages(null!, Constants.TestProviderName, mockLogger));
     }
 
