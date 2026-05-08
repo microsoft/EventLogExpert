@@ -85,4 +85,3 @@ public static partial class ReleaseNotesNormalizer
     private static partial Regex SummaryTagRegex();
 }
 
-

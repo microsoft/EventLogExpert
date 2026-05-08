@@ -216,6 +216,7 @@ internal static class ProviderSource
                     .Where(name =>
                     {
                         if (seen.Contains(name)) { return false; }
+
                         if (regex is not null && !regex.IsMatch(name)) { return false; }
 
                         return skipProviderNames is null || !skipProviderNames.Contains(name);

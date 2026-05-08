@@ -206,6 +206,7 @@ public sealed partial class MenuRenderer
             case " ":
                 // Block auto-repeat on activation keys; navigation keys above intentionally allow it.
                 if (args.Repeat) { return; }
+
                 if (_focusedIndex >= 0) { await OnItemActivate(Items[_focusedIndex], _focusedIndex); }
 
                 return;

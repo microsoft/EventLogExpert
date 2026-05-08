@@ -866,6 +866,7 @@ public partial class EventResolverBase : IDisposable
             foreach (var (bit, name) in supplemental.Keywords)
             {
                 if ((providerBits & bit) != bit) { continue; }
+
                 if ((matchedBits & bit) == bit) { continue; }
 
                 var keyword = name.TrimEnd('\0');

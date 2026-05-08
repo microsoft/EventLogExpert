@@ -724,7 +724,6 @@ public sealed class EventLogEffects(
 
         oldGlobalCts.Cancel();
 
-
         foreach (var key in _logCts.Keys)
         {
             if (_logCts.TryGetValue(key, out var cts))

@@ -183,6 +183,7 @@ internal static class MtaProviderSource
         foreach (var providerName in providerNames)
         {
             if (skipProviderNames is not null && skipProviderNames.Contains(providerName)) { continue; }
+
             if (seen is not null && seen.Contains(providerName)) { continue; }
 
             var details = new EventMessageProvider(providerName, mtaFiles, logger).LoadProviderDetails();
