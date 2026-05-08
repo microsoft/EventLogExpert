@@ -62,16 +62,16 @@ public sealed class EventLogWatcher : IDisposable
     {
         get
         {
-            return _isSubscribed;
+            return Volatile.Read(ref _isSubscribed);
         }
         set
         {
             switch (value)
             {
-                case true when !_isSubscribed:
+                case true when !Volatile.Read(ref _isSubscribed):
                     Subscribe();
                     break;
-                case false when _isSubscribed:
+                case false when Volatile.Read(ref _isSubscribed):
                     ThrowIfCurrentCallbackWouldDeadlock();
                     Unsubscribe();
                     break;
@@ -135,7 +135,7 @@ public sealed class EventLogWatcher : IDisposable
 
             do
             {
-                if (_isSubscribed is false) { break; }
+                if (Volatile.Read(ref _isSubscribed) is false) { break; }
 
                 int count = 0;
 
@@ -205,7 +205,7 @@ public sealed class EventLogWatcher : IDisposable
         {
             ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
 
-            if (_isSubscribed) { throw new InvalidOperationException("Already subscribed."); }
+            if (Volatile.Read(ref _isSubscribed)) { throw new InvalidOperationException("Already subscribed."); }
 
             EvtSubscribeFlags flag = string.IsNullOrEmpty(_bookmark) ?
                 EvtSubscribeFlags.ToFutureEvents :
@@ -244,20 +244,28 @@ public sealed class EventLogWatcher : IDisposable
                 NativeMethods.ThrowEventLogException(subscriptionError);
             }
 
-            _isSubscribed = true;
+            Volatile.Write(ref _isSubscribed, true);
+        }
+
+        // Drain backlog before TP wait registration to prevent concurrent EvtNext.
+        ProcessNewEvents(null, false);
+
+        lock (_lifecycleLock)
+        {
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+
+            // Concurrent Unsubscribe may have torn down the subscription during the drain.
+            if (!Volatile.Read(ref _isSubscribed)) { return; }
 
             _waitHandle = ThreadPool.RegisterWaitForSingleObject(_newEvents, ProcessNewEvents, null, -1, false);
         }
-
-        // Drain initial backlog outside the lock so handlers never run under _lifecycleLock.
-        ProcessNewEvents(null, false);
     }
 
     private void Unsubscribe()
     {
         lock (_lifecycleLock)
         {
-            _isSubscribed = false;
+            Volatile.Write(ref _isSubscribed, false);
 
             if (_waitHandle is not null)
             {
