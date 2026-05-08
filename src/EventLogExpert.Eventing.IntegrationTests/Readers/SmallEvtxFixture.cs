@@ -23,13 +23,10 @@ internal sealed class SmallEvtxFixture : IDisposable
     {
         FilePath = Path.Combine(Path.GetTempPath(), $"elx-tests-{Guid.NewGuid():N}.evtx");
 
-        // Use the absolute path to wevtutil.exe rather than relying on PATH so the fixture is
-        // robust on machines where %PATH% has been customized.
+        // Use the absolute path to wevtutil.exe so customized %PATH% does not break the fixture.
         var wevtutilPath = Path.Combine(Environment.SystemDirectory, "wevtutil.exe");
 
-        // Probe the live Application log for its most recent EventRecordID. Hard-coding
-        // the legacy [1, 5] window only works on hosts where the log has not rolled past
-        // record 5 -- not the case on long-running dev boxes or persistent CI agents.
+        // Probe the live Application log — hard-coding [1, 5] fails once the log rolls past 5.
         long latestId = ProbeLatestRecordId(wevtutilPath);
         long oldestId = Math.Max(1, latestId - (RequestedEvents - 1));
 
@@ -53,9 +50,7 @@ internal sealed class SmallEvtxFixture : IDisposable
 
     private static long ProbeLatestRecordId(string wevtutilPath)
     {
-        // qe = query events; /c:1 limits to one event; /rd:true reads in reverse-chronological
-        // order (newest first); /f:RenderedXml ensures EventRecordID is rendered as an XML
-        // element we can parse without depending on locale-formatted text output.
+        // qe = query events, /c:1 limits to one, /rd:true reads newest-first, /f:RenderedXml gives parseable output.
         var (stdout, _) = RunWevtutil(
             wevtutilPath,
             ["qe", "Application", "/c:1", "/rd:true", "/f:RenderedXml"],
@@ -133,13 +128,7 @@ internal sealed class SmallEvtxFixture : IDisposable
 
     private void VerifyMinimumEvents()
     {
-        // Open the freshly-exported file and count records so a host where the Application
-        // log was just cleared (or where the probed window happened to span gaps) produces
-        // a clear fixture-level error instead of cryptic failures (e.g. Assert.True(success)
-        // on ERROR_NO_MORE_ITEMS) inside test bodies. We use the project's own
-        // EventLogReader rather than the BCL event-log reader because the entire
-        // EventLogExpert.Eventing project owns the EVT P/Invoke layer and bypassing it
-        // (even in a fixture) would defeat the point.
+        // Count records so an empty/gappy export produces a clear fixture-level error instead of cryptic test failures.
         using var reader = new EventLogReader(FilePath, PathType.FilePath);
 
         int total = 0;

@@ -165,12 +165,7 @@ public sealed class EventLogReaderTests
     [Fact]
     public void EndOfResults_AfterExhaustion_ShouldKeepBookmarkAndNotSetLastErrorCode()
     {
-        // Use a small bounded .evtx fixture (max 5 events exported via wevtutil) so the
-        // exhaustion loop completes quickly regardless of the host machine's Application log
-        // size. Reading the live Application log here previously made the test runtime
-        // unbounded and CI-flaky.
-
-        // Arrange
+        // Arrange — bounded fixture keeps the exhaustion loop fast on any host.
         using var fixture = new SmallEvtxFixture();
         using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
 
@@ -179,11 +174,10 @@ public sealed class EventLogReaderTests
 
         string? bookmarkAfterExhaustion = reader.LastBookmark;
 
-        // One additional read past end-of-results
         reader.TryGetEvents(out _);
         string? bookmarkAfterExtraRead = reader.LastBookmark;
 
-        // Assert — bookmark is stable past EOF, and normal end-of-results does NOT set LastErrorCode
+        // Assert — bookmark stable past EOF, normal end-of-results does not set LastErrorCode.
         Assert.Equal(bookmarkAfterExhaustion, bookmarkAfterExtraRead);
         Assert.Null(reader.LastErrorCode);
     }
@@ -224,9 +218,7 @@ public sealed class EventLogReaderTests
     [Fact]
     public void LastBookmark_AfterTryGetEvents_ShouldBeSet()
     {
-        // Use SmallEvtxFixture so the read is deterministic — the live Application
-        // log may be empty on minimal hosts, which used to silently skip the
-        // assertions behind an `if (success && events.Length > 0)` guard.
+        // Arrange — fixture keeps the read deterministic on minimal hosts.
         using var fixture = new SmallEvtxFixture();
         using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
 

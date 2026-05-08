@@ -17,11 +17,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void GetMessages_WhenBinaryUsesMuiSatellite_ShouldLoadMessagesFromMuiFile()
     {
-        // wevtsvc.dll on Windows keeps its message table in <locale>\wevtsvc.dll.mui rather
-        // than in the binary itself. The previous load path used LOAD_LIBRARY_AS_DATAFILE
-        // with only the leaf filename and therefore failed with ERROR_RESOURCE_TYPE_NOT_FOUND
-        // (1813) for binaries like this — including the WMIRegistrationService.exe scenario
-        // that motivated this fix. The MUI-aware load path should resolve them.
+        // wevtsvc.dll keeps its message table in the .mui satellite — the loader must follow MUI fallback.
         var systemDirectory = Environment.SystemDirectory;
         var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
@@ -41,12 +37,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void GetMessages_WhenFilePathContainsEnvironmentVariable_ShouldHandleCorrectly()
     {
-        // LoadLibraryEx does not expand environment variables. Channel-named providers like
-        // Microsoft-Windows-AppXDeploymentServer/Operational supply paths such as
-        // "%SystemRoot%\system32\AppXDeploymentServer.dll" through the publisher manifest;
-        // EventMessageProvider must expand them defensively before calling LoadLibraryEx,
-        // otherwise the load fails with ERROR_FILE_NOT_FOUND. We exercise the same path
-        // here with wevtsvc.dll, which is present on every Windows host.
+        // LoadLibraryEx does not expand env vars; provider must expand %SystemRoot% before loading.
         var systemDirectory = Environment.SystemDirectory;
         var muiBinary = Path.Combine(systemDirectory, "wevtsvc.dll");
 
@@ -129,9 +120,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenChannelOwningPublisherUnknown_ShouldReturnEmptyDetailsWithoutFallback()
     {
-        // A made-up provider name that is neither a registered publisher nor a registered channel.
-        // The owning-publisher probe must return false and the resolver must end up with an empty
-        // ProviderDetails instead of recursing or throwing.
+        // Arrange — name is neither a registered publisher nor a channel.
         const string MadeUpName = "NonExistent-Publisher-And-Channel/Bogus";
 
         EventMessageProvider provider = new(MadeUpName);
@@ -162,9 +151,7 @@ public sealed class EventMessageProviderIntegrationTests
     [Fact]
     public void LoadProviderDetails_WhenProviderNameIsActuallyAChannelPath_ShouldFallBackToOwningPublisher()
     {
-        // Some events arrive with a channel path in the ProviderName slot rather than the real
-        // publisher name (the AppXDeploymentServer/Operational case). We expect the fallback to
-        // resolve via EvtChannelConfigOwningPublisher and load the real publisher's metadata.
+        // Channel paths in the ProviderName slot must resolve via EvtChannelConfigOwningPublisher.
         Assert.SkipUnless(
             TryFindChannelWithDistinctOwningPublisher(out var channelName, out var owningPublisher),
             "Test requires a registered channel whose owning publisher differs from the channel path itself.");
@@ -239,11 +226,7 @@ public sealed class EventMessageProviderIntegrationTests
     {
         var muiFileName = binaryName + ".mui";
 
-        // Only probe locales the Win32 MUI loader will actually consult: the current UI culture,
-        // its parents, and "en-US" as the well-known system fallback that ships with every Windows
-        // SKU. A satellite present in some other locale subfolder would pass a broad existence
-        // check but the loader would never select it, so the test could still fail after skipping.
-        // The loop terminates naturally when culture.Name becomes empty (the invariant culture).
+        // Probe only locales the Win32 MUI loader actually consults: current UI culture chain + en-US fallback.
         var probeOrder = new List<string>();
 
         for (var culture = CultureInfo.CurrentUICulture; !string.IsNullOrEmpty(culture.Name); culture = culture.Parent)

@@ -2616,21 +2616,8 @@ public sealed class EventResolverBaseTests
     [Fact]
     public void ResolveEvent_WithPrimaryAndSupplementalDetailsButUnmappedEventId_ShouldReturnNoMatchingMessage()
     {
-        // Arrange — both primary and supplemental have populated metadata with mapped
-        // legacy messages, but neither has a message matching the requested EventId.
-        // This exercises the fallback path where supplemental IS loaded (because
-        // primary's GetMessagesByShortId count == 0 for this Id) and supplemental
-        // also fails to match — descriptionDetails stays on primary, supplemental
-        // is forwarded into CreateEventModel as a present-but-unhelpful argument.
-        // Distinct from WithPopulatedProviderButUnknownEvent... which uses
-        // TestEventResolver (supplemental is always null).
-        //
-        // To prove supplemental was actually loaded AND forwarded into CreateEventModel
-        // (rather than the test passing trivially via the primary-only no-match path),
-        // we seed a task ONLY in supplemental and set eventRecord.Task to match. The
-        // ResolveTaskName fallback only consults supplemental when primary has no entry;
-        // observing the supplemental task name in displayEvent.TaskCategory therefore
-        // requires both supplemental lookup and supplemental forwarding into the model.
+        // Arrange — supplemental loads (primary has no match for Id) and is forwarded into
+        // CreateEventModel; a task seeded only in supplemental proves the forwarding.
         const string SupplementalOnlyTaskName = "SupplementalOnlyTask";
         const int SharedTaskId = 42;
 
@@ -2680,12 +2667,8 @@ public sealed class EventResolverBaseTests
         Assert.Contains("No matching message", displayEvent.Description);
         Assert.DoesNotContain("No matching provider", displayEvent.Description);
         Assert.DoesNotContain("Failed to resolve", displayEvent.Description);
-        // Neither primary nor supplemental message text should leak into the description.
         Assert.DoesNotContain("Primary event 100", displayEvent.Description);
         Assert.DoesNotContain("Supplemental event 200", displayEvent.Description);
-        // Proves supplemental was loaded AND forwarded into CreateEventModel: the
-        // supplemental-only task name only appears via the supplemental fallback in
-        // ResolveTaskName.
         Assert.Equal(SupplementalOnlyTaskName, displayEvent.TaskCategory);
     }
 
