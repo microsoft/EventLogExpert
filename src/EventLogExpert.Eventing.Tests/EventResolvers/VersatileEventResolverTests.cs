@@ -345,32 +345,94 @@ public sealed class EventResolverTests
     }
 
     [Fact]
-    public void ResolveEvent_WithMultipleProviders_ShouldResolveAll()
+    public void ResolveEvent_WithMixedDbAndUnknownProviders_ShouldOnlyApplyDatabaseTextToDbProvider()
     {
-        // Arrange
-        using var resolver = new EventResolver();
+        // Documents that a single resolver instance cleanly handles both DB-resolved
+        // and locally-resolved providers. The DB-loaded provider's seeded message text
+        // must not leak into the description for an unrelated unknown provider —
+        // that would indicate a per-provider cache-isolation bug in EventResolver.
+        const string DBProviderName = "MixedScenarioDbProvider";
+        const string DBMessageText = "Resolved from test database for mixed scenario";
+        const ushort EventId = 1000;
 
-        var providers = new[]
-        {
-            Constants.ApplicationLogName,
-            Constants.SystemLogName,
-            Constants.TestProviderName
-        };
+        string unknownProviderName = $"NotInDb-{Guid.NewGuid()}";
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
 
-        // Act & Assert
-        foreach (var provider in providers)
+        try
         {
-            var eventRecord = new EventRecord
+            using (var context = new EventProviderDbContext(dbPath, false))
             {
-                ProviderName = provider,
-                Id = 1000,
-                ComputerName = "TestComputer",
-                LogName = Constants.ApplicationLogName
-            };
+                context.ProviderDetails.Add(new ProviderDetails
+                {
+                    ProviderName = DBProviderName,
+                    Messages =
+                    [
+                        new MessageModel
+                        {
+                            ProviderName = DBProviderName,
+                            ShortId = (short)EventId,
+                            Text = DBMessageText
+                        }
+                    ]
+                });
 
-            var displayEvent = resolver.ResolveEvent(eventRecord);
-            Assert.NotNull(displayEvent);
-            Assert.Equal(provider, displayEvent.Source);
+                context.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IDatabaseCollectionProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+
+            DisplayEventModel dbDisplayEvent;
+            DisplayEventModel unknownDisplayEvent;
+
+            using (var resolver = new EventResolver(dbCollection))
+            {
+                var dbEventRecord = new EventRecord
+                {
+                    ProviderName = DBProviderName,
+                    Id = EventId,
+                    ComputerName = "TestComputer",
+                    LogName = Constants.ApplicationLogName
+                };
+
+                var unknownEventRecord = new EventRecord
+                {
+                    ProviderName = unknownProviderName,
+                    Id = EventId,
+                    ComputerName = "TestComputer",
+                    LogName = Constants.ApplicationLogName
+                };
+
+                // Act — same resolver instance resolves both. The DB-known provider
+                // hits TryResolveFromDatabase; the unknown provider falls through to
+                // ResolveFromLocalProvider.
+                dbDisplayEvent = resolver.ResolveEvent(dbEventRecord);
+                unknownDisplayEvent = resolver.ResolveEvent(unknownEventRecord);
+            }
+
+            // Assert
+            Assert.NotNull(dbDisplayEvent);
+            Assert.Equal(DBProviderName, dbDisplayEvent.Source);
+            Assert.Contains(DBMessageText, dbDisplayEvent.Description);
+
+            Assert.NotNull(unknownDisplayEvent);
+            Assert.Equal(unknownProviderName, unknownDisplayEvent.Source);
+            Assert.DoesNotContain(DBMessageText, unknownDisplayEvent.Description);
+            // Unknown provider must hit a fallback "No matching ..." path (provider-level
+            // or message-level) rather than the "Failed to resolve" exception path or
+            // accidentally inheriting the DB-known provider's description.
+            Assert.Contains("No matching", unknownDisplayEvent.Description);
+            Assert.DoesNotContain("Failed to resolve", unknownDisplayEvent.Description);
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
         }
     }
 
@@ -394,6 +456,40 @@ public sealed class EventResolverTests
         // Assert
         Assert.NotNull(displayEvent);
         Assert.Contains("No matching", displayEvent.Description);
+    }
+
+    [Theory]
+    [InlineData(Constants.ApplicationLogName)]
+    [InlineData(Constants.SystemLogName)]
+    [InlineData(Constants.TestProviderName)]
+    public void ResolveEvent_WithProvider_ShouldReturnDisplayEventWithMatchingFields(string providerName)
+    {
+        // Verifies model-construction round-trip: per-record fields (Id, ComputerName)
+        // and the requested ProviderName flow through CreateEventModel into the
+        // DisplayEventModel for representative provider names. This is intentionally
+        // a model-propagation test, not a provider-resolution-behavior test — none of
+        // the provider names are seeded with metadata, so each row exercises the same
+        // local-fallback path. The Theory shape over a foreach loop gives per-case
+        // diagnostics if one provider name regresses while others continue to pass.
+        // Arrange
+        using var resolver = new EventResolver();
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = providerName,
+            Id = 1000,
+            ComputerName = "TestComputer",
+            LogName = Constants.ApplicationLogName
+        };
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(providerName, displayEvent.Source);
+        Assert.Equal(eventRecord.Id, displayEvent.Id);
+        Assert.Equal(eventRecord.ComputerName, displayEvent.ComputerName);
     }
 
     [Fact]
