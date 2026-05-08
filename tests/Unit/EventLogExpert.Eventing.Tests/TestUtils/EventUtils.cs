@@ -51,6 +51,23 @@ public static class EventUtils
         }
     ];
 
+    public static EventModel CreateEventModel(
+        int id,
+        string? description = null,
+        byte version = 0,
+        string? logName = null,
+        IReadOnlyList<long>? keywords = null,
+        string? template = null) =>
+        new()
+        {
+            Id = id,
+            Version = version,
+            LogName = logName,
+            Keywords = keywords?.ToArray() ?? [],
+            Description = description,
+            Template = template
+        };
+
     // This event has a message in the legacy provider, but a task in the modern provider.
     public static EventRecord CreateExchangeEventRecord() =>
         new()
@@ -99,6 +116,25 @@ public static class EventUtils
             }
         };
 
+    public static MessageModel CreateMessageModel(
+        string providerName,
+        long rawId,
+        string text,
+        short? shortId = null,
+        string? logLink = null,
+        string? tag = null,
+        string? template = null) =>
+        new()
+        {
+            LogLink = logLink,
+            ProviderName = providerName,
+            RawId = rawId,
+            ShortId = shortId ?? 0,
+            Tag = tag,
+            Template = template,
+            Text = text
+        };
+
     /// <summary>Creates a modern event with a template and description for property resolution tests.</summary>
     public static (ProviderDetails Details, EventRecord Record) CreateModernEvent(
         string description,
@@ -136,4 +172,24 @@ public static class EventUtils
             Properties = properties
         }
     );
+
+    public static ProviderDetails CreateProvider(
+        string name,
+        IReadOnlyList<MessageModel>? messages = null,
+        IReadOnlyList<EventModel>? events = null,
+        IDictionary<long, string>? keywords = null,
+        IDictionary<int, string>? opcodes = null,
+        IDictionary<int, string>? tasks = null,
+        string? resolvedFromOwningPublisher = null) =>
+        new()
+        {
+            ProviderName = name,
+            Messages = messages ?? [],
+            Parameters = [],
+            Events = events ?? [],
+            Keywords = keywords ?? new Dictionary<long, string>(),
+            Opcodes = opcodes ?? new Dictionary<int, string>(),
+            Tasks = tasks ?? new Dictionary<int, string>(),
+            ResolvedFromOwningPublisher = resolvedFromOwningPublisher
+        };
 }

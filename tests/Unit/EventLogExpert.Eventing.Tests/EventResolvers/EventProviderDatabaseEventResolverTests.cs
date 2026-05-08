@@ -136,7 +136,7 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context = new EventProviderDbContext(dbPath, false))
             {
-                context.ProviderDetails.Add(new ProviderDetails { ProviderName = Constants.TestProviderName });
+                context.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
                 context.SaveChanges();
             }
 
@@ -181,11 +181,7 @@ public sealed class EventResolverDatabaseTests
             {
                 for (int i = 0; i < 100; i++)
                 {
-                    context.ProviderDetails.Add(new ProviderDetails
-                    {
-                        ProviderName = $"Provider{i}",
-                        Messages = new List<MessageModel>()
-                    });
+                    context.ProviderDetails.Add(EventUtils.CreateProvider($"Provider{i}"));
                 }
 
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -333,11 +329,7 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context = new EventProviderDbContext(dbPath, false))
             {
-                context.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>()
-                });
+                context.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context.SaveChanges();
             }
@@ -380,11 +372,7 @@ public sealed class EventResolverDatabaseTests
             {
                 for (int i = 0; i < 10; i++)
                 {
-                    context.ProviderDetails.Add(new ProviderDetails
-                    {
-                        ProviderName = $"Provider{i}",
-                        Messages = new List<MessageModel>()
-                    });
+                    context.ProviderDetails.Add(EventUtils.CreateProvider($"Provider{i}"));
                 }
 
                 context.SaveChanges();
@@ -430,11 +418,7 @@ public sealed class EventResolverDatabaseTests
             {
                 for (int i = 0; i < 5; i++)
                 {
-                    context1.ProviderDetails.Add(new ProviderDetails
-                    {
-                        ProviderName = $"DB1Provider{i}",
-                        Messages = new List<MessageModel>()
-                    });
+                    context1.ProviderDetails.Add(EventUtils.CreateProvider($"DB1Provider{i}"));
                 }
 
                 context1.SaveChanges();
@@ -444,11 +428,7 @@ public sealed class EventResolverDatabaseTests
             {
                 for (int i = 0; i < 5; i++)
                 {
-                    context2.ProviderDetails.Add(new ProviderDetails
-                    {
-                        ProviderName = $"DB2Provider{i}",
-                        Messages = new List<MessageModel>()
-                    });
+                    context2.ProviderDetails.Add(EventUtils.CreateProvider($"DB2Provider{i}"));
                 }
 
                 context2.SaveChanges();
@@ -495,11 +475,7 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context = new EventProviderDbContext(dbPath, false))
             {
-                context.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>()
-                });
+                context.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context.SaveChanges();
             }
@@ -540,22 +516,14 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
-                context1.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>()
-                });
+                context1.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context1.SaveChanges();
             }
 
             using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
-                context2.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>()
-                });
+                context2.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context2.SaveChanges();
             }
@@ -599,12 +567,7 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context = new EventProviderDbContext(dbPath, false))
             {
-                context.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>(),
-                    Events = new List<EventModel>()
-                });
+                context.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context.SaveChanges();
             }
@@ -647,22 +610,14 @@ public sealed class EventResolverDatabaseTests
         {
             using (var context1 = new EventProviderDbContext(dbPath1, false))
             {
-                context1.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = "Provider1",
-                    Messages = new List<MessageModel>()
-                });
+                context1.ProviderDetails.Add(EventUtils.CreateProvider("Provider1"));
 
                 context1.SaveChanges();
             }
 
             using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
-                context2.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = "Provider2",
-                    Messages = new List<MessageModel>()
-                });
+                context2.ProviderDetails.Add(EventUtils.CreateProvider("Provider2"));
 
                 context2.SaveChanges();
             }
@@ -709,11 +664,7 @@ public sealed class EventResolverDatabaseTests
 
             using (var context2 = new EventProviderDbContext(dbPath2, false))
             {
-                context2.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = Constants.TestProviderName,
-                    Messages = new List<MessageModel>()
-                });
+                context2.ProviderDetails.Add(EventUtils.CreateProvider(Constants.TestProviderName));
 
                 context2.SaveChanges();
             }
