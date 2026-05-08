@@ -108,7 +108,6 @@ public sealed class EventLogWatcherTests
     public void Constructor_WithValidBookmark_ShouldCreateWatcher()
     {
         // Arrange
-        // Get a valid bookmark from EventLogReader
         using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
 
         reader.TryGetEvents(out _, 1);
@@ -145,12 +144,7 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act — dispose, then write a stimulus event to prove the handler is
-        // no longer wired up. EventLogWatcher.Dispose drains in-flight
-        // callbacks before returning. Snapshot the count and reset the signal
-        // *after* the drain so any ambient callbacks delivered during the
-        // live subscription window (between Enabled=true and Dispose) cannot
-        // bleed into the post-stimulus assertion.
+        // Act
         watcher.Dispose();
         int countBefore = Volatile.Read(ref eventCount);
         eventReceived.Reset();
@@ -185,16 +179,10 @@ public sealed class EventLogWatcherTests
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Enabled = true;
 
-        // Reach into the private AutoResetEvent the watcher owns so we can
-        // assert the kernel handle is released — the leak this test guards
-        // against (per Copilot review on PR #516) was discovered precisely
-        // because there was no externally-observable signal of disposal.
         var newEventsField = typeof(EventLogWatcher).GetField(
             "_newEvents",
             BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.True(
-            newEventsField is not null,
-            "Private field _newEvents not found on EventLogWatcher — was it renamed? Update Dispose_ShouldReleaseUnderlyingWaitHandle.");
+        Assert.True(newEventsField is not null, "_newEvents field missing — was it renamed?");
 
         var newEvents = (AutoResetEvent?)newEventsField.GetValue(watcher);
         Assert.NotNull(newEvents);
@@ -203,13 +191,8 @@ public sealed class EventLogWatcherTests
         watcher.Dispose();
 
         // Assert
-        Assert.True(
-            newEvents.SafeWaitHandle.IsClosed,
-            "AutoResetEvent.SafeWaitHandle.IsClosed should be true after Dispose; otherwise the OS event handle leaks across watcher lifetimes.");
+        Assert.True(newEvents.SafeWaitHandle.IsClosed, "AutoResetEvent kernel handle leaked after Dispose.");
 
-        // Idempotency: the field-level Dispose unconditionally calls
-        // _newEvents.Dispose(), so a second top-level Dispose() must be
-        // gated by the _disposed fast-path to avoid a second call.
         watcher.Dispose();
         Assert.True(newEvents.SafeWaitHandle.IsClosed);
     }
@@ -238,9 +221,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Capture the exception inside the handler — the SUT isolates
-            // subscriber exceptions per its public contract, so an uncaught
-            // throw here would be silently swallowed and the test would hang.
             try
             {
                 ((EventLogWatcher)sender!).Dispose();
@@ -270,10 +250,6 @@ public sealed class EventLogWatcherTests
         Assert.NotNull(captured);
         var ex = Assert.IsType<InvalidOperationException>(captured);
         Assert.Contains("cannot be stopped from within", ex.Message);
-
-        // Cleanup happens via `using var watcher` from the test thread, which
-        // is not the ThreadPool callback thread, so the reentrancy guard does
-        // not trigger and Dispose completes normally.
     }
 
     [Fact]
@@ -347,16 +323,7 @@ public sealed class EventLogWatcherTests
         // Arrange
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
-        // Act: race many Subscribe/Unsubscribe pairs to maximize the window
-        // for Subscribe to mutate _subscriptionHandle/_waitHandle while
-        // another thread is in Unsubscribe. Without the lifecycle lock, two
-        // Enabled=false callers can both pass the _waitHandle null check and
-        // both call RegisteredWaitHandle.Unregister; the second call returns
-        // false (already unregistered) and does NOT signal its wait object,
-        // so its WaitOne blocks indefinitely. Separately, an Enabled=true
-        // racing with Enabled=false can leave _subscriptionHandle disposed
-        // mid-Subscribe, making the next ProcessNewEvents invocation crash
-        // on a closed native handle.
+        // Act
         var tasks = new List<Task>(capacity: 100);
         var ct = TestContext.Current.CancellationToken;
 
@@ -365,18 +332,14 @@ public sealed class EventLogWatcherTests
             tasks.Add(Task.Run(() =>
             {
                 try { watcher.Enabled = true; }
-                catch (InvalidOperationException) { /* loser of a Subscribe race — expected */ }
+                catch (InvalidOperationException) { }
             }, ct));
             tasks.Add(Task.Run(() => watcher.Enabled = false, ct));
         }
 
         var allDone = Task.WhenAll(tasks);
 
-        // Assert: 30s budget far exceeds any legitimate Subscribe/Unsubscribe
-        // drain across 100 toggles. A TimeoutException here means the
-        // RegisteredWaitHandle race regression has returned. Any other
-        // exception (e.g., ObjectDisposedException from a torn-down handle)
-        // surfaces via the await.
+        // Assert: timeout regression-tests the RegisteredWaitHandle race.
         await allDone.WaitAsync(TimeSpan.FromSeconds(30), ct);
     }
 
@@ -404,9 +367,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Same reentrancy contract as Dispose: Enabled = false also calls
-            // Unsubscribe, which blocks waiting for in-flight callbacks. Calling
-            // it from a callback would self-deadlock, so the SUT throws.
             try
             {
                 ((EventLogWatcher)sender!).Enabled = false;
@@ -483,11 +443,7 @@ public sealed class EventLogWatcherTests
         var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         watcher.Dispose();
 
-        // Act & Assert: post-dispose Subscribe is gated by an explicit
-        // _disposed check inside the lifecycle lock so callers see a clean
-        // ObjectDisposedException instead of a confusing native-handle
-        // failure (e.g., from _newEvents.SafeWaitHandle access after
-        // _newEvents has itself been disposed).
+        // Act & Assert
         Assert.Throws<ObjectDisposedException>(() => watcher.Enabled = true);
     }
 
@@ -552,10 +508,7 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act — toggle the watcher off then on. Safe to reset the counter
-        // and signal between Disable and the second Enable: Unsubscribe
-        // blocks until in-flight callbacks complete, so no handler can fire
-        // between the count clear and the Reset below.
+        // Act
         watcher.Enabled = true;
         watcher.Enabled = false;
         Interlocked.Exchange(ref eventCount, 0);
@@ -591,19 +544,12 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act — disable the watcher, then snapshot the post-action count and
-        // clear the signal accumulated during the populate phase. Safe:
-        // EventLogWatcher.Unsubscribe blocks until in-flight callbacks
-        // complete, so no handler can fire between the count capture and the
-        // Reset below.
+        // Act
         watcher.Enabled = false;
         int countBefore = Volatile.Read(ref eventCount);
         eventReceived.Reset();
 
-        // The stimulus that proves Disable worked: write an event AFTER
-        // Disable and verify the handler does not fire. Without the stimulus
-        // the test would vacuously pass because no event would arrive in the
-        // wait window regardless of whether Disable did anything.
+        // Stimulus event written AFTER Disable so the test isn't vacuous.
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after unsubscribe", EventLogEntryType.Information);
@@ -636,12 +582,7 @@ public sealed class EventLogWatcherTests
 
         watcher.Enabled = true;
 
-        // Act — Write a normal event. EventRecord.Error is populated by
-        // ProcessNewEvents only when EvtRender throws, which is not reachable
-        // through the public API for a well-formed log entry. This test pins
-        // the happy-path invariant (Error is null on a normal event); see
-        // WithInvalidBookmark_ShouldThrowAndNotMaskAsUnauthorizedAccessException
-        // for an exercise of the failure path.
+        // Act
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for normal-path null Error invariant", EventLogEntryType.Information);
@@ -652,9 +593,6 @@ public sealed class EventLogWatcherTests
         var snapshot = receivedEvents.ToArray();
         Assert.True(received, "Did not receive event within timeout period");
         Assert.NotEmpty(snapshot);
-        // Assert only the first signaled record (the stimulus). Late ambient
-        // callbacks queued before ToArray could otherwise broaden the check
-        // beyond what the test stimulus controls.
         Assert.Null(snapshot[0].Error);
     }
 
@@ -668,12 +606,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Volatile.Write provides cross-thread visibility for the
-            // reference assignment; the test thread reads via Volatile.Read
-            // after the signal Wait. Last-event-wins semantics: a later
-            // ambient callback may overwrite this value before the test
-            // reads it, which is acceptable here because the assertion is
-            // an "any watcher event has this invariant" check.
             Volatile.Write(ref capturedEvent, record);
             eventReceived.Set();
         };
@@ -834,9 +766,7 @@ public sealed class EventLogWatcherTests
         {
             receivedEvents.Enqueue(record);
 
-            // Guard CountdownEvent.Signal: ambient callbacks past the
-            // expected count would throw InvalidOperationException on the
-            // callback thread.
+            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref signalCount);
 
             if (count <= expectedCount)
@@ -860,14 +790,10 @@ public sealed class EventLogWatcherTests
         bool received = countdown.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken);
 
         // Assert
-        // Snapshot the queue: ConcurrentQueue.ToArray returns a moment-in-
-        // time copy in enqueue order. Late ambient callbacks may continue
-        // to enqueue after this point, but they will not affect the snapshot.
         var snapshot = receivedEvents.ToArray();
         Assert.True(received, "Did not receive all events within timeout period");
         Assert.True(snapshot.Length >= expectedCount, $"Expected at least {expectedCount} events in snapshot, but got {snapshot.Length}.");
 
-        // Verify events are in chronological order (by TimeCreated)
         for (int i = 1; i < Math.Min(expectedCount, snapshot.Length); i++)
         {
             Assert.True(snapshot[i].TimeCreated >= snapshot[i - 1].TimeCreated,
@@ -886,12 +812,7 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Signal "first invocation observed" BEFORE throwing so the
-            // stimulus thread can release the second write only after the
-            // throw has happened. Per-subscriber isolation in the SUT
-            // (introduced alongside this test) is what lets later invocations
-            // fire at all — without it the throw would short-circuit the
-            // multicast invoke and bubble into the ThreadPool worker.
+            // Signal "first observed" before the throw so the stimulus thread can release the second write.
             int n = Interlocked.Increment(ref attempts);
 
             if (n == 1)
@@ -908,8 +829,7 @@ public sealed class EventLogWatcherTests
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
 
-        // Act — write the stimulus, wait for the first (throwing) invocation,
-        // then write a second event to prove the watcher still delivers.
+        // Act
         eventLog.WriteEntry("Test event 1 (handler throws on first invocation)", EventLogEntryType.Information);
         bool firstReceived = firstObserved.Wait(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
         Assert.True(firstReceived, "First handler invocation was not observed");
@@ -936,9 +856,7 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Guard CountdownEvent.Signal: the shared Application log can
-            // produce ambient callbacks that, if signaled past zero, throw
-            // InvalidOperationException on the callback thread.
+            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref eventCount);
 
             if (count <= expectedCount)
@@ -968,8 +886,7 @@ public sealed class EventLogWatcherTests
     [Fact]
     public void EventRecordWritten_WhenNotSubscribed_ShouldNotReceiveEvents()
     {
-        // Arrange — handler is attached via += but watcher.Enabled is never
-        // set to true, so no native subscription should be active.
+        // Arrange — handler attached but Enabled is never set to true.
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
@@ -980,10 +897,7 @@ public sealed class EventLogWatcherTests
             eventReceived.Set();
         };
 
-        // Act — write an event to prove the negative case. Without this
-        // stimulus the test would vacuously pass because no event would
-        // arrive in the wait window regardless of whether the watcher was
-        // actually subscribed.
+        // Act — stimulus event so the negative case isn't vacuous.
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event with watcher not enabled", EventLogEntryType.Information);
@@ -1005,15 +919,14 @@ public sealed class EventLogWatcherTests
         int succeedingCount = 0;
         var succeedingObserved = new ManualResetEventSlim(false);
 
-        // First subscriber always throws — simulates a poorly written consumer.
-        // Per-subscriber isolation must prevent it from blocking the second.
+        // First subscriber always throws.
         watcher.EventRecordWritten += (sender, record) =>
         {
             Interlocked.Increment(ref failingCount);
             throw new InvalidOperationException("subscriber A always fails");
         };
 
-        // Second subscriber must still be invoked despite the first throwing.
+        // Second subscriber must still fire despite the first throwing.
         watcher.EventRecordWritten += (sender, record) =>
         {
             Interlocked.Increment(ref succeedingCount);
@@ -1049,9 +962,6 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Capture the latest record for the per-record non-null
-            // invariant. Volatile.Write pairs with Volatile.Read in the
-            // assertion to guarantee cross-thread visibility.
             Volatile.Write(ref capturedEvent, record);
             Interlocked.Increment(ref eventCount);
             eventReceived.Set();
@@ -1060,7 +970,6 @@ public sealed class EventLogWatcherTests
         // Act
         watcher.Enabled = true;
 
-        // Write a test event to Application log
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event for EventLogWatcher", EventLogEntryType.Information);
@@ -1079,7 +988,6 @@ public sealed class EventLogWatcherTests
     public void EventRecordWritten_WithBookmark_ShouldReceiveNewEvents()
     {
         // Arrange
-        // Get a bookmark from current position
         using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
         reader.TryGetEvents(out _, 1);
         var bookmark = reader.LastBookmark;
@@ -1097,7 +1005,6 @@ public sealed class EventLogWatcherTests
         // Act
         watcher.Enabled = true;
 
-        // Write a new event
         using var eventLog = new EventLog(Constants.ApplicationLogName);
         eventLog.Source = Constants.ApplicationLogName;
         eventLog.WriteEntry("Test event after bookmark", EventLogEntryType.Information);
@@ -1121,9 +1028,7 @@ public sealed class EventLogWatcherTests
 
         watcher.EventRecordWritten += (sender, record) =>
         {
-            // Guard CountdownEvent.Signal: ambient callbacks past the
-            // expected count would throw InvalidOperationException on the
-            // callback thread.
+            // Bound Signal — ambient callbacks past expectedCount would throw.
             int count = Interlocked.Increment(ref eventCount);
 
             if (count <= expectedCount)
@@ -1188,11 +1093,7 @@ public sealed class EventLogWatcherTests
         // Act
         var ex = Record.Exception(() => watcher.Enabled = true);
 
-        // Assert
-        // The bookmark XML failure flows through ThrowEventLogException and the
-        // exact Win32 mapping may shift across Windows versions. Capture the
-        // stable invariants instead of pinning the type: bad bookmarks must
-        // surface an exception and must not be masked as UAE.
+        // Assert — bad bookmark must surface an exception that is not masked as UAE.
         Assert.NotNull(ex);
         Assert.IsNotType<UnauthorizedAccessException>(ex);
     }

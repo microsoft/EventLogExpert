@@ -49,11 +49,7 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act — drive the SUT through whichever well-known legacy provider is
-        // present on this host. The original test probed Application+System log
-        // names (which the SUT treats as provider names that produce no EMF on
-        // a standard Windows install); switch to the helper so the .sys filter
-        // is actually exercised against real provider data.
+        // Act
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
@@ -119,9 +115,7 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act — probe well-known legacy provider names (the original test passed
-        // a log name where the SUT expects a provider name, which produces no
-        // results on a standard Windows install).
+        // Act
         var result = FindAnyLegacyProviderFiles(provider);
 
         // Assert
@@ -229,13 +223,10 @@ public sealed class RegistryProviderTests
         // Arrange
         var provider = new RegistryProvider();
 
-        // Act - Scan the registry for a legacy provider whose EventMessageFile
-        // value literally contains semicolon-separated paths and yields multiple
-        // .dll/.exe entries through the SUT's split + extension filter.
+        // Act
         var (providerName, files) = FindLegacyProviderWithSemicolonSplitFiles(provider);
 
-        // Assert - genuinely environment-dependent; not every host has a legacy
-        // provider registered with semicolon-separated EventMessageFile entries.
+        // Assert — environment-dependent; not every host registers such a provider.
         Assert.SkipUnless(providerName is not null,
             "Test requires a legacy provider with semicolon-separated EventMessageFile entries on this host.");
 
@@ -293,10 +284,7 @@ public sealed class RegistryProviderTests
     [Fact]
     public void GetMessageFilesForLegacyProvider_WhenProviderFound_ShouldLogFoundMessage()
     {
-        // Arrange — discover a known-good provider name on this host first so
-        // the mock-logger assertion can be bound to that exact name. Without
-        // this binding, a stray "Found" debug emitted while probing an
-        // unrelated provider could vacuously satisfy the contract.
+        // Arrange — discover a known-good provider name first so the mock-logger assertion binds to it.
         var probe = new RegistryProvider();
         var providerName = FindAnyLegacyProviderName(probe);
         Assert.NotNull(providerName);
@@ -304,8 +292,7 @@ public sealed class RegistryProviderTests
         var mockLogger = Substitute.For<ITraceLogger>();
         var provider = new RegistryProvider(mockLogger);
 
-        // Act — drive the SUT through the provider name we just confirmed
-        // yields a non-empty result on this host.
+        // Act
         var foundFiles = provider.GetMessageFilesForLegacyProvider(providerName).ToList();
 
         // Assert — bind the "Found message file" debug emission to the specific
@@ -486,9 +473,7 @@ public sealed class RegistryProviderTests
             return (null, []);
         }
 
-        // Track provider names whose first non-empty EMF occurrence has already
-        // been evaluated. This mirrors the SUT, which returns from the first
-        // log subtree where a given provider name has a non-empty EMF.
+        // Mirrors SUT: returns from the first log subtree where a provider has a non-empty EMF.
         var seenWithEmf = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var logName in eventLogKey.GetSubKeyNames())
@@ -514,9 +499,7 @@ public sealed class RegistryProviderTests
                     continue;
                 }
 
-                // First non-empty EMF wins. If this occurrence lacks ';', the
-                // SUT will not return semicolon-split content for this name on
-                // this host regardless of any later log subtree.
+                // First non-empty EMF wins per provider name across log subtrees.
                 if (!seenWithEmf.Add(providerName))
                 {
                     continue;

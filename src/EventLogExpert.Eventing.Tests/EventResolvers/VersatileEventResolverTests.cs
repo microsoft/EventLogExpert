@@ -347,10 +347,6 @@ public sealed class EventResolverTests
     [Fact]
     public void ResolveEvent_WithMixedDbAndUnknownProviders_ShouldOnlyApplyDatabaseTextToDbProvider()
     {
-        // Documents that a single resolver instance cleanly handles both DB-resolved
-        // and locally-resolved providers. The DB-loaded provider's seeded message text
-        // must not leak into the description for an unrelated unknown provider —
-        // that would indicate a per-provider cache-isolation bug in EventResolver.
         const string DBProviderName = "MixedScenarioDbProvider";
         const string DBMessageText = "Resolved from test database for mixed scenario";
         const ushort EventId = 1000;
@@ -403,9 +399,7 @@ public sealed class EventResolverTests
                     LogName = Constants.ApplicationLogName
                 };
 
-                // Act — same resolver instance resolves both. The DB-known provider
-                // hits TryResolveFromDatabase; the unknown provider falls through to
-                // ResolveFromLocalProvider.
+                // Act
                 dbDisplayEvent = resolver.ResolveEvent(dbEventRecord);
                 unknownDisplayEvent = resolver.ResolveEvent(unknownEventRecord);
             }
@@ -418,9 +412,6 @@ public sealed class EventResolverTests
             Assert.NotNull(unknownDisplayEvent);
             Assert.Equal(unknownProviderName, unknownDisplayEvent.Source);
             Assert.DoesNotContain(DBMessageText, unknownDisplayEvent.Description);
-            // Unknown provider must hit a fallback "No matching ..." path (provider-level
-            // or message-level) rather than the "Failed to resolve" exception path or
-            // accidentally inheriting the DB-known provider's description.
             Assert.Contains("No matching", unknownDisplayEvent.Description);
             Assert.DoesNotContain("Failed to resolve", unknownDisplayEvent.Description);
         }
@@ -464,13 +455,7 @@ public sealed class EventResolverTests
     [InlineData(Constants.TestProviderName)]
     public void ResolveEvent_WithProvider_ShouldReturnDisplayEventWithMatchingFields(string providerName)
     {
-        // Verifies model-construction round-trip: per-record fields (Id, ComputerName)
-        // and the requested ProviderName flow through CreateEventModel into the
-        // DisplayEventModel for representative provider names. This is intentionally
-        // a model-propagation test, not a provider-resolution-behavior test — none of
-        // the provider names are seeded with metadata, so each row exercises the same
-        // local-fallback path. The Theory shape over a foreach loop gives per-case
-        // diagnostics if one provider name regresses while others continue to pass.
+        // Theory verifies CreateEventModel propagates per-record fields and ProviderName.
         // Arrange
         using var resolver = new EventResolver();
 

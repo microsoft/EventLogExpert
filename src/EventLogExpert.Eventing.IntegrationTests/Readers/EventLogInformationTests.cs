@@ -113,9 +113,6 @@ public sealed class EventLogInformationTests
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act & Assert
-        // Surfaces the real EvtOpenLog error (ERROR_EVT_CHANNEL_NOT_FOUND) instead
-        // of the previous masked UnauthorizedAccessException from a follow-up
-        // GetLogInfo on an invalid handle.
         Assert.Throws<FileNotFoundException>(() =>
             new EventLogInformation(session, invalidLogName, PathType.LogName));
     }
@@ -156,11 +153,7 @@ public sealed class EventLogInformationTests
         var ex = Record.Exception(() =>
             new EventLogInformation(session, invalidLogName, PathType.LogName));
 
-        // Assert
-        // Avoid overfitting the specific Win32 mapping (e.g.
-        // ERROR_EVT_CHANNEL_PATH_INVALID) since it goes through the default switch
-        // case and may shift across Windows versions. Capture the smell-fix
-        // invariant: malformed paths must not be masked as UAE.
+        // Assert — malformed paths must not be masked as UAE.
         Assert.NotNull(ex);
         Assert.IsNotType<UnauthorizedAccessException>(ex);
     }
