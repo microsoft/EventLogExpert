@@ -144,6 +144,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
                     count++;
 
                     if (count % batchSize != 0) { continue; }
+
                     dbContext.SaveChanges();
                     dbContext.ChangeTracker.Clear();
                 }

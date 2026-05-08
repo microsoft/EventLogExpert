@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.ObjectModel;
 

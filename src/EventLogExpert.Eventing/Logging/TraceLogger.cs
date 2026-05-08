@@ -50,7 +50,6 @@ public class TraceLogger(LogLevel loggingLevel) : ITraceLogger
                 break;
         }
 
-
         Console.ResetColor();
     }
 }

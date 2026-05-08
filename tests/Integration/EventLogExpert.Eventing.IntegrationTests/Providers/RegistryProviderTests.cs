@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
 using Microsoft.Win32;
 using NSubstitute;
 

@@ -50,7 +50,9 @@ internal struct LogHandlerCore
     internal void AppendFormatted<T>(T value, string? format)
     {
         if (format is null) { _builder!.Append(value); return; }
+
         if (value is IFormattable formattable) { _builder!.Append(formattable.ToString(format, null)); return; }
+
         _builder!.Append(value);
     }
 
