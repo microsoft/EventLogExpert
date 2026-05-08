@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Tests.TestUtils;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
@@ -89,7 +90,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         Assert.NotNull(readOnlyContext.ProviderDetails);
 
         var exception = Record.Exception(() =>
-            readOnlyContext.ProviderDetails.Add(new ProviderDetails { ProviderName = "Test" }));
+            readOnlyContext.ProviderDetails.Add(EventUtils.CreateProvider("Test")));
 
         Assert.Null(exception);
 
@@ -107,16 +108,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         {
             for (int i = 0; i < 10; i++)
             {
-                context.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = $"Provider{i}",
-                    Messages = [],
-                    Parameters = [],
-                    Events = [],
-                    Keywords = new Dictionary<long, string>(),
-                    Opcodes = new Dictionary<int, string>(),
-                    Tasks = new Dictionary<int, string>()
-                });
+                context.ProviderDetails.Add(EventUtils.CreateProvider($"Provider{i}"));
             }
 
             context.SaveChanges();
@@ -489,16 +481,7 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         using (var context = new EventProviderDbContext(dbPath, false))
         {
-            context.ProviderDetails.Add(new ProviderDetails
-            {
-                ProviderName = providerName,
-                Messages = [],
-                Parameters = [],
-                Events = [],
-                Keywords = new Dictionary<long, string>(),
-                Opcodes = new Dictionary<int, string>(),
-                Tasks = new Dictionary<int, string>()
-            });
+            context.ProviderDetails.Add(EventUtils.CreateProvider(providerName));
 
             context.SaveChanges();
         }
@@ -539,19 +522,10 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
 
         var largeMessages = Enumerable.Range(1, 100)
-            .Select(i => new MessageModel { ProviderName = "LargeProvider", RawId = i, Text = new string('A', 1000) })
+            .Select(i => EventUtils.CreateMessageModel("LargeProvider", i, new string('A', 1000)))
             .ToList();
 
-        var provider = new ProviderDetails
-        {
-            ProviderName = "LargeProvider",
-            Messages = largeMessages,
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var provider = EventUtils.CreateProvider("LargeProvider", messages: largeMessages);
 
         // Calculate uncompressed data size: 100 messages * 1000 chars = ~100KB of text data
         const int UncompressedDataSize = 100 * 1000;
@@ -589,16 +563,9 @@ public sealed class EventProviderDbContextTests : IDisposable
 
         using (var context = new EventProviderDbContext(dbPath, false))
         {
-            context.ProviderDetails.Add(new ProviderDetails
-            {
-                ProviderName = providerName,
-                Messages = [new MessageModel { ProviderName = providerName, RawId = 1, Text = "Original" }],
-                Parameters = [],
-                Events = [],
-                Keywords = new Dictionary<long, string>(),
-                Opcodes = new Dictionary<int, string>(),
-                Tasks = new Dictionary<int, string>()
-            });
+            context.ProviderDetails.Add(EventUtils.CreateProvider(
+                providerName,
+                messages: [EventUtils.CreateMessageModel(providerName, 1, "Original")]));
 
             context.SaveChanges();
         }
@@ -607,7 +574,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         using (var context = new EventProviderDbContext(dbPath, false))
         {
             var provider = context.ProviderDetails.First(p => p.ProviderName == providerName);
-            provider.Messages = [new MessageModel { ProviderName = providerName, RawId = 1, Text = "Updated" }];
+            provider.Messages = [EventUtils.CreateMessageModel(providerName, 1, "Updated")];
             context.SaveChanges();
         }
 
@@ -630,19 +597,19 @@ public sealed class EventProviderDbContextTests : IDisposable
             ProviderName = "ComplexProvider",
             Messages =
             [
-                new MessageModel { ProviderName = "ComplexProvider", RawId = 1, Text = "Message1" },
-                new MessageModel { ProviderName = "ComplexProvider", RawId = 2, Text = "Message2" },
-                new MessageModel { ProviderName = "ComplexProvider", RawId = 3, Text = "Message3" }
+                EventUtils.CreateMessageModel("ComplexProvider", 1, "Message1"),
+                EventUtils.CreateMessageModel("ComplexProvider", 2, "Message2"),
+                EventUtils.CreateMessageModel("ComplexProvider", 3, "Message3")
             ],
             Parameters =
             [
-                new MessageModel { ProviderName = "ComplexProvider", RawId = 10, Text = "Param1" },
-                new MessageModel { ProviderName = "ComplexProvider", RawId = 11, Text = "Param2" }
+                EventUtils.CreateMessageModel("ComplexProvider", 10, "Param1"),
+                EventUtils.CreateMessageModel("ComplexProvider", 11, "Param2")
             ],
             Events =
             [
-                new EventModel { Id = 100, Keywords = [], Description = "Event1" },
-                new EventModel { Id = 101, Keywords = [], Description = "Event2" }
+                EventUtils.CreateEventModel(100, description: "Event1"),
+                EventUtils.CreateEventModel(101, description: "Event2")
             ],
             Keywords = new Dictionary<long, string>
             {
@@ -695,16 +662,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         // Arrange
         var dbPath = CreateTempDatabasePath();
 
-        var provider = new ProviderDetails
-        {
-            ProviderName = "EmptyProvider",
-            Messages = [],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var provider = EventUtils.CreateProvider("EmptyProvider");
 
         // Act
         using (var context = new EventProviderDbContext(dbPath, false))
@@ -734,16 +692,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
 
         var providers = Enumerable.Range(1, 5)
-            .Select(i => new ProviderDetails
-            {
-                ProviderName = $"Provider{i}",
-                Messages = [],
-                Parameters = [],
-                Events = [],
-                Keywords = new Dictionary<long, string>(),
-                Opcodes = new Dictionary<int, string>(),
-                Tasks = new Dictionary<int, string>()
-            })
+            .Select(i => EventUtils.CreateProvider($"Provider{i}"))
             .ToList();
 
         // Act
@@ -770,16 +719,9 @@ public sealed class EventProviderDbContextTests : IDisposable
         // Arrange
         var dbPath = CreateTempDatabasePath();
 
-        var provider = new ProviderDetails
-        {
-            ProviderName = "Special\"Provider'With<>Chars",
-            Messages = [new MessageModel { ProviderName = "Special\"Provider'With<>Chars", RawId = 1, Text = "Message with \"quotes\" and 'apostrophes'" }],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var provider = EventUtils.CreateProvider(
+            "Special\"Provider'With<>Chars",
+            messages: [EventUtils.CreateMessageModel("Special\"Provider'With<>Chars", 1, "Message with \"quotes\" and 'apostrophes'")]);
 
         // Act
         using (var context = new EventProviderDbContext(dbPath, false))
@@ -807,16 +749,7 @@ public sealed class EventProviderDbContextTests : IDisposable
         {
             for (var i = 0; i < 5; i++)
             {
-                context.ProviderDetails.Add(new ProviderDetails
-                {
-                    ProviderName = $"Provider-{i}",
-                    Messages = [],
-                    Parameters = [],
-                    Events = [],
-                    Keywords = new Dictionary<long, string>(),
-                    Opcodes = new Dictionary<int, string>(),
-                    Tasks = new Dictionary<int, string>()
-                });
+                context.ProviderDetails.Add(EventUtils.CreateProvider($"Provider-{i}"));
             }
 
             context.SaveChanges();
@@ -856,17 +789,9 @@ public sealed class EventProviderDbContextTests : IDisposable
     {
         // Arrange
         var dbPath = CreateTempDatabasePath();
-        var provider = new ProviderDetails
-        {
-            ProviderName = "ResolvedRoundTrip",
-            Messages = [],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string>(),
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>(),
-            ResolvedFromOwningPublisher = "Owning-Publisher-Name"
-        };
+        var provider = EventUtils.CreateProvider(
+            "ResolvedRoundTrip",
+            resolvedFromOwningPublisher: "Owning-Publisher-Name");
 
         // Act
         using (var context = new EventProviderDbContext(dbPath, false))
@@ -906,16 +831,10 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         SeedV3Schema(dbPath);
 
-        var seeded = new ProviderDetails
-        {
-            ProviderName = "V3-Provider",
-            Messages = [new MessageModel { ProviderName = "V3-Provider", RawId = 1, Text = "from-v3" }],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string> { { 1L, "kw" } },
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var seeded = EventUtils.CreateProvider(
+            "V3-Provider",
+            messages: [EventUtils.CreateMessageModel("V3-Provider", 1, "from-v3")],
+            keywords: new Dictionary<long, string> { { 1L, "kw" } });
         InsertV3Row(dbPath, seeded);
 
         // Act
@@ -947,27 +866,17 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         SeedV3Schema(dbPath);
 
-        var first = new ProviderDetails
-        {
-            ProviderName = "Microsoft-Foo",
-            Messages = [new MessageModel { ProviderName = "Microsoft-Foo", RawId = 1, Text = "shared-text" }],
-            Parameters = [],
-            Events = [new EventModel { Id = 100, Keywords = [], Description = "shared-event" }],
-            Keywords = new Dictionary<long, string> { { 1L, "alpha" } },
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var first = EventUtils.CreateProvider(
+            "Microsoft-Foo",
+            messages: [EventUtils.CreateMessageModel("Microsoft-Foo", 1, "shared-text")],
+            events: [EventUtils.CreateEventModel(100, description: "shared-event")],
+            keywords: new Dictionary<long, string> { { 1L, "alpha" } });
 
-        var second = new ProviderDetails
-        {
-            ProviderName = "microsoft-foo",
-            Messages = [new MessageModel { ProviderName = "microsoft-foo", RawId = 1, Text = "shared-text" }],
-            Parameters = [],
-            Events = [new EventModel { Id = 100, Keywords = [], Description = "shared-event" }],
-            Keywords = new Dictionary<long, string> { { 2L, "beta" } },
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        };
+        var second = EventUtils.CreateProvider(
+            "microsoft-foo",
+            messages: [EventUtils.CreateMessageModel("microsoft-foo", 1, "shared-text")],
+            events: [EventUtils.CreateEventModel(100, description: "shared-event")],
+            keywords: new Dictionary<long, string> { { 2L, "beta" } });
 
         InsertV3Row(dbPath, first);
         InsertV3Row(dbPath, second);
@@ -1005,7 +914,7 @@ public sealed class EventProviderDbContextTests : IDisposable
             Messages = [],
             Parameters =
             [
-                new MessageModel { ProviderName = "Microsoft-Foo", RawId = 1, ShortId = 1, Text = "shared-param" }
+                EventUtils.CreateMessageModel("Microsoft-Foo", 1, "shared-param", shortId: 1)
             ],
             Events = [],
             Keywords = new Dictionary<long, string>(),
@@ -1019,8 +928,8 @@ public sealed class EventProviderDbContextTests : IDisposable
             Messages = [],
             Parameters =
             [
-                new MessageModel { ProviderName = "microsoft-foo", RawId = 1, ShortId = 1, Text = "shared-param" },
-                new MessageModel { ProviderName = "microsoft-foo", RawId = 2, ShortId = 2, Text = "second-only" }
+                EventUtils.CreateMessageModel("microsoft-foo", 1, "shared-param", shortId: 1),
+                EventUtils.CreateMessageModel("microsoft-foo", 2, "second-only", shortId: 2)
             ],
             Events = [],
             Keywords = new Dictionary<long, string>(),
@@ -1055,27 +964,17 @@ public sealed class EventProviderDbContextTests : IDisposable
         var dbPath = CreateTempDatabasePath();
         SeedV3Schema(dbPath);
 
-        InsertV3Row(dbPath, new ProviderDetails
-        {
-            ProviderName = "Conflict-Provider",
-            Messages = [],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string> { { 1L, "first" } },
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        });
+        InsertV3Row(
+            dbPath,
+            EventUtils.CreateProvider(
+                "Conflict-Provider",
+                keywords: new Dictionary<long, string> { { 1L, "first" } }));
 
-        InsertV3Row(dbPath, new ProviderDetails
-        {
-            ProviderName = "conflict-provider",
-            Messages = [],
-            Parameters = [],
-            Events = [],
-            Keywords = new Dictionary<long, string> { { 1L, "second" } },
-            Opcodes = new Dictionary<int, string>(),
-            Tasks = new Dictionary<int, string>()
-        });
+        InsertV3Row(
+            dbPath,
+            EventUtils.CreateProvider(
+                "conflict-provider",
+                keywords: new Dictionary<long, string> { { 1L, "second" } }));
 
         // Act + Assert — upgrade fails fast and the V3 table is not dropped.
         using (var context = new EventProviderDbContext(dbPath, false))
@@ -1106,8 +1005,8 @@ public sealed class EventProviderDbContextTests : IDisposable
             Messages = [],
             Parameters =
             [
-                new MessageModel { ProviderName = "V3-WithParams", RawId = 100, ShortId = 100, Text = "param-one" },
-                new MessageModel { ProviderName = "V3-WithParams", RawId = 200, ShortId = 200, Text = "param-two" }
+                EventUtils.CreateMessageModel("V3-WithParams", 100, "param-one", shortId: 100),
+                EventUtils.CreateMessageModel("V3-WithParams", 200, "param-two", shortId: 200)
             ],
             Events = [],
             Keywords = new Dictionary<long, string>(),

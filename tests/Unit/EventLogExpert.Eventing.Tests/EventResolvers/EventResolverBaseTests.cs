@@ -2090,6 +2090,7 @@ public sealed class EventResolverBaseTests
         {
             Assert.DoesNotContain(win32SuccessMessage, displayEvent.Description);
         }
+
         Assert.Contains("The following information was included with the event:", displayEvent.Description);
         Assert.Contains("payload-a", displayEvent.Description);
     }
