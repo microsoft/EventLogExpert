@@ -60,8 +60,18 @@ internal struct LogHandlerCore
 
     internal void AppendFormatted(ReadOnlySpan<char> value) => _builder!.Append(value);
 
-    internal void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null) =>
-        _builder!.Append(value);
+    internal void AppendFormatted(ReadOnlySpan<char> value, int alignment = 0, string? format = null)
+    {
+        if (alignment == 0) { _builder!.Append(value); return; }
+
+        int width = alignment == int.MinValue ? int.MaxValue : Math.Abs(alignment);
+        int padding = width - value.Length;
+
+        if (padding <= 0) { _builder!.Append(value); return; }
+
+        if (alignment >= 0) { _builder!.Append(' ', padding).Append(value); }
+        else { _builder!.Append(value).Append(' ', padding); }
+    }
 
     public override readonly string ToString() => _builder?.ToString() ?? string.Empty;
 

@@ -246,10 +246,11 @@ public sealed class EventLogWatcher : IDisposable
 
             _isSubscribed = true;
 
-            ProcessNewEvents(null, false);
-
             _waitHandle = ThreadPool.RegisterWaitForSingleObject(_newEvents, ProcessNewEvents, null, -1, false);
         }
+
+        // Drain initial backlog outside the lock so handlers never run under _lifecycleLock.
+        ProcessNewEvents(null, false);
     }
 
     private void Unsubscribe()
