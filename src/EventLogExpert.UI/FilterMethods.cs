@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
@@ -8,47 +8,47 @@ namespace EventLogExpert.UI;
 
 public static class FilterMethods
 {
-    private static readonly Comparison<DisplayEventModel> s_ascByLevel =
+    private static readonly Comparison<ResolvedEvent> s_ascByLevel =
         (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByDateAndTime =
+    private static readonly Comparison<ResolvedEvent> s_ascByDateAndTime =
         (a, b) => WithTieBreaker(a.TimeCreated.CompareTo(b.TimeCreated), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByActivityId =
+    private static readonly Comparison<ResolvedEvent> s_ascByActivityId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ActivityId, b.ActivityId), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByLog =
+    private static readonly Comparison<ResolvedEvent> s_ascByLog =
         (a, b) => WithTieBreaker(string.Compare(a.LogName, b.LogName, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByComputerName =
+    private static readonly Comparison<ResolvedEvent> s_ascByComputerName =
         (a, b) => WithTieBreaker(string.Compare(a.ComputerName, b.ComputerName, StringComparison.Ordinal), a, b);
 
-    private static readonly Comparison<DisplayEventModel> s_ascBySource =
+    private static readonly Comparison<ResolvedEvent> s_ascBySource =
         (a, b) => WithTieBreaker(string.Compare(a.Source, b.Source, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByEventId =
+    private static readonly Comparison<ResolvedEvent> s_ascByEventId =
         (a, b) => WithTieBreaker(a.Id.CompareTo(b.Id), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByTaskCategory =
+    private static readonly Comparison<ResolvedEvent> s_ascByTaskCategory =
         (a, b) => WithTieBreaker(string.Compare(a.TaskCategory, b.TaskCategory, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByKeywords =
+    private static readonly Comparison<ResolvedEvent> s_ascByKeywords =
         (a, b) => WithTieBreaker(string.Compare(a.KeywordsDisplayName, b.KeywordsDisplayName, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByProcessId =
+    private static readonly Comparison<ResolvedEvent> s_ascByProcessId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ProcessId, b.ProcessId), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByThreadId =
+    private static readonly Comparison<ResolvedEvent> s_ascByThreadId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ThreadId, b.ThreadId), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByUser =
+    private static readonly Comparison<ResolvedEvent> s_ascByUser =
         (a, b) => WithTieBreaker(string.Compare(a.UserId?.Value, b.UserId?.Value, StringComparison.Ordinal), a, b);
-    private static readonly Comparison<DisplayEventModel> s_ascByDefault =
+    private static readonly Comparison<ResolvedEvent> s_ascByDefault =
         (a, b) => FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
 
-    private static readonly Comparison<DisplayEventModel> s_descByActivityId = (a, b) => s_ascByActivityId(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByComputerName = (a, b) => s_ascByComputerName(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByDateAndTime = (a, b) => s_ascByDateAndTime(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByDefault = (a, b) => s_ascByDefault(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByEventId = (a, b) => s_ascByEventId(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByKeywords = (a, b) => s_ascByKeywords(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByLevel = (a, b) => s_ascByLevel(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByLog = (a, b) => s_ascByLog(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByProcessId = (a, b) => s_ascByProcessId(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descBySource = (a, b) => s_ascBySource(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByTaskCategory = (a, b) => s_ascByTaskCategory(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
-    private static readonly Comparison<DisplayEventModel> s_descByUser = (a, b) => s_ascByUser(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByActivityId = (a, b) => s_ascByActivityId(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByComputerName = (a, b) => s_ascByComputerName(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByDateAndTime = (a, b) => s_ascByDateAndTime(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByDefault = (a, b) => s_ascByDefault(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByEventId = (a, b) => s_ascByEventId(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByKeywords = (a, b) => s_ascByKeywords(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByLevel = (a, b) => s_ascByLevel(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByLog = (a, b) => s_ascByLog(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByProcessId = (a, b) => s_ascByProcessId(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descBySource = (a, b) => s_ascBySource(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByTaskCategory = (a, b) => s_ascByTaskCategory(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
+    private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
 
     public static Dictionary<string, FilterGroupData> AddFilterGroup(
         this Dictionary<string, FilterGroupData> group,
@@ -126,18 +126,18 @@ public static class FilterMethods
         eventFilter.Filters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified. Always returns a new list.</summary>
-    public static IReadOnlyList<DisplayEventModel> SortEvents(
-        this IEnumerable<DisplayEventModel> events,
+    public static IReadOnlyList<ResolvedEvent> SortEvents(
+        this IEnumerable<ResolvedEvent> events,
         ColumnName? orderBy = null,
         bool isDescending = false)
     {
-        var sorted = new List<DisplayEventModel>(events);
+        var sorted = new List<ResolvedEvent>(events);
         sorted.Sort(GetComparer(orderBy, isDescending));
 
         return sorted.AsReadOnly();
     }
 
-    internal static Comparison<DisplayEventModel> GetComparer(ColumnName? orderBy, bool isDescending) =>
+    internal static Comparison<ResolvedEvent> GetComparer(ColumnName? orderBy, bool isDescending) =>
         isDescending
             ? orderBy switch
             {
@@ -172,8 +172,8 @@ public static class FilterMethods
                 _ => s_ascByDefault
             };
 
-    internal static IReadOnlyList<DisplayEventModel> MergeSorted(
-        IReadOnlyList<IReadOnlyList<DisplayEventModel>> sortedLists,
+    internal static IReadOnlyList<ResolvedEvent> MergeSorted(
+        IReadOnlyList<IReadOnlyList<ResolvedEvent>> sortedLists,
         ColumnName orderBy,
         bool isDescending)
     {
@@ -190,10 +190,10 @@ public static class FilterMethods
         if (totalCount == 0) { return []; }
 
         var comparer = GetComparer(orderBy, isDescending);
-        var result = new List<DisplayEventModel>(totalCount);
-        var heap = new PriorityQueue<int, DisplayEventModel>(
+        var result = new List<ResolvedEvent>(totalCount);
+        var heap = new PriorityQueue<int, ResolvedEvent>(
             sortedLists.Count,
-            Comparer<DisplayEventModel>.Create(comparer));
+            Comparer<ResolvedEvent>.Create(comparer));
         var positions = new int[sortedLists.Count];
 
         for (int listIndex = 0; listIndex < sortedLists.Count; listIndex++)
@@ -204,7 +204,7 @@ public static class FilterMethods
             positions[listIndex] = 1;
         }
 
-        while (heap.TryDequeue(out int sourceListIndex, out DisplayEventModel? currentEvent))
+        while (heap.TryDequeue(out int sourceListIndex, out ResolvedEvent? currentEvent))
         {
             result.Add(currentEvent);
 
@@ -219,9 +219,9 @@ public static class FilterMethods
         return result.AsReadOnly();
     }
 
-    internal static IReadOnlyList<DisplayEventModel> MergeSorted(
-        IReadOnlyList<DisplayEventModel> existing,
-        IReadOnlyList<DisplayEventModel> batch,
+    internal static IReadOnlyList<ResolvedEvent> MergeSorted(
+        IReadOnlyList<ResolvedEvent> existing,
+        IReadOnlyList<ResolvedEvent> batch,
         ColumnName? orderBy,
         bool isDescending)
     {
@@ -231,10 +231,10 @@ public static class FilterMethods
 
         var comparer = GetComparer(orderBy, isDescending);
 
-        var sortedBatch = new List<DisplayEventModel>(batch);
+        var sortedBatch = new List<ResolvedEvent>(batch);
         sortedBatch.Sort(comparer);
 
-        var result = new List<DisplayEventModel>(existing.Count + sortedBatch.Count);
+        var result = new List<ResolvedEvent>(existing.Count + sortedBatch.Count);
         int i = 0, j = 0;
 
         while (i < existing.Count && j < sortedBatch.Count)
@@ -250,13 +250,13 @@ public static class FilterMethods
     }
 
     /// <summary>Falls back to RecordId, then OwningLog (for combined logs) to guarantee a total order for List.Sort stability.</summary>
-    private static int FallbackTieBreaker(int recordIdResult, DisplayEventModel a, DisplayEventModel b) =>
+    private static int FallbackTieBreaker(int recordIdResult, ResolvedEvent a, ResolvedEvent b) =>
         recordIdResult != 0 ? recordIdResult : string.Compare(a.OwningLog, b.OwningLog, StringComparison.Ordinal);
 
-    private static int WithTieBreaker(int primaryResult, DisplayEventModel a, DisplayEventModel b) =>
+    private static int WithTieBreaker(int primaryResult, ResolvedEvent a, ResolvedEvent b) =>
         primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
 
-    extension(DisplayEventModel? @event)
+    extension(ResolvedEvent? @event)
     {
         public bool Filter(IEnumerable<FilterModel> filters)
         {
@@ -279,7 +279,7 @@ public static class FilterMethods
             return isEmpty || isFiltered;
         }
 
-        public DisplayEventModel? FilterByDate(FilterDateModel? dateFilter)
+        public ResolvedEvent? FilterByDate(FilterDateModel? dateFilter)
         {
             if (@event is null) { return null; }
 

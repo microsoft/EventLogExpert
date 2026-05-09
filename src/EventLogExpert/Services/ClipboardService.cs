@@ -18,16 +18,16 @@ namespace EventLogExpert.Services;
 public sealed class ClipboardService : IClipboardService
 {
     private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
-    private readonly IStateSelection<EventLogState, DisplayEventModel?> _selectedEvent;
-    private readonly IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> _selectedEvents;
+    private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent;
+    private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents;
     private readonly ISettingsService _settings;
     private readonly ITraceLogger _traceLogger;
     private readonly IEventXmlResolver _xmlResolver;
 
     public ClipboardService(
         IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
-        IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> selectedEvents,
-        IStateSelection<EventLogState, DisplayEventModel?> selectedEvent,
+        IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> selectedEvents,
+        IStateSelection<EventLogState, ResolvedEvent?> selectedEvent,
         ISettingsService settings,
         IEventXmlResolver xmlResolver,
         ITraceLogger traceLogger)
@@ -93,7 +93,7 @@ public sealed class ClipboardService : IClipboardService
     private void AppendFormattedEvent(
         StringBuilder builder,
         CopyType copyType,
-        DisplayEventModel @event,
+        ResolvedEvent @event,
         string xml)
     {
         switch (copyType)
@@ -179,7 +179,7 @@ public sealed class ClipboardService : IClipboardService
         }
     }
 
-    private string FormatEventForCopy(CopyType copyType, DisplayEventModel @event, string xml)
+    private string FormatEventForCopy(CopyType copyType, ResolvedEvent @event, string xml)
     {
         if (copyType == CopyType.Xml)
         {
@@ -266,7 +266,7 @@ public sealed class ClipboardService : IClipboardService
         return stringToCopy.ToString();
     }
 
-    private async Task<string> ResolveXmlAsync(DisplayEventModel evt, SemaphoreSlim resolverLock)
+    private async Task<string> ResolveXmlAsync(ResolvedEvent evt, SemaphoreSlim resolverLock)
     {
         await resolverLock.WaitAsync().ConfigureAwait(false);
 

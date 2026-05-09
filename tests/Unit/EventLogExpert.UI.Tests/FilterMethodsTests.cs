@@ -187,7 +187,7 @@ public sealed class FilterMethodsTests
     public void FilterByDate_WhenEventIsNull_ShouldReturnNull()
     {
         // Arrange
-        DisplayEventModel? @event = null;
+        ResolvedEvent? @event = null;
 
         var dateFilter = new FilterDateModel
         {
@@ -226,7 +226,7 @@ public sealed class FilterMethodsTests
     public void Filter_WhenEventIsNull_ShouldReturnFalse()
     {
         // Arrange
-        DisplayEventModel? @event = null;
+        ResolvedEvent? @event = null;
         var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
@@ -749,7 +749,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenDescendingTrue_ShouldSortInDescendingOrder()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(300),
@@ -769,7 +769,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenEmptyCollection_ShouldReturnEmptyList()
     {
         // Arrange
-        var events = new List<DisplayEventModel>();
+        var events = new List<ResolvedEvent>();
 
         // Act
         var result = events.SortEvents(ColumnName.EventId);
@@ -782,7 +782,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenNoOrderSpecifiedDescending_ShouldSortByRecordIdDescending()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(recordId: 1),
             EventUtils.CreateTestEvent(recordId: 3),
@@ -802,7 +802,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenNoOrderSpecified_ShouldSortByRecordIdAscending()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(recordId: 3),
             EventUtils.CreateTestEvent(recordId: 1),
@@ -826,7 +826,7 @@ public sealed class FilterMethodsTests
         var guid2 = Guid.Parse("00000000-0000-0000-0000-000000000002");
         var guid3 = Guid.Parse("00000000-0000-0000-0000-000000000003");
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(activityId: guid3),
             EventUtils.CreateTestEvent(activityId: guid1),
@@ -846,7 +846,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByComputerName_ShouldSortByComputerName()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(computerName: "Server03"),
             EventUtils.CreateTestEvent(computerName: "Server01"),
@@ -868,7 +868,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var baseTime = DateTime.Now;
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(timeCreated: baseTime.AddHours(2)),
             EventUtils.CreateTestEvent(timeCreated: baseTime),
@@ -888,7 +888,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByEventId_ShouldSortById()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(300),
             EventUtils.CreateTestEvent(100),
@@ -908,7 +908,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByKeywords_ShouldSortByKeywordsDisplayName()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(keywords: ["Zebra"]),
             EventUtils.CreateTestEvent(keywords: ["Apple"]),
@@ -928,7 +928,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByLevel_ShouldSortByLevel()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(level: "Warning"),
             EventUtils.CreateTestEvent(level: "Error"),
@@ -948,7 +948,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByLog_ShouldSortByLogName()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(logName: "System"),
             EventUtils.CreateTestEvent(logName: "Application"),
@@ -968,7 +968,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByProcessId_ShouldSortByProcessId()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(processId: 300),
             EventUtils.CreateTestEvent(processId: 100),
@@ -988,7 +988,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderBySource_ShouldSortBySource()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(source: "ZSource"),
             EventUtils.CreateTestEvent(source: "ASource"),
@@ -1008,7 +1008,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByTaskCategory_ShouldSortByTaskCategory()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(taskCategory: "ZCategory"),
             EventUtils.CreateTestEvent(taskCategory: "ACategory"),
@@ -1028,7 +1028,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenOrderByThreadId_ShouldSortByThreadId()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(threadId: 30),
             EventUtils.CreateTestEvent(threadId: 10),
@@ -1048,7 +1048,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenSingleItem_ShouldReturnSingleItem()
     {
         // Arrange
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
 
         // Act
         var result = events.SortEvents(ColumnName.EventId);
@@ -1062,7 +1062,7 @@ public sealed class FilterMethodsTests
     public void SortEvents_WhenTiedOnPrimaryKeyDescending_ShouldBreakTieByRecordIdDescending()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, recordId: 1),
             EventUtils.CreateTestEvent(100, recordId: 3),
@@ -1084,7 +1084,7 @@ public sealed class FilterMethodsTests
         // Arrange - all events have the same TimeCreated but different RecordIds
         var baseTime = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 3),
             EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 1),

@@ -55,9 +55,12 @@ public sealed partial class SplitLogTabPane
     {
         if (table.IsCombined) { return string.Empty; }
 
-        return $"{(table.LogPathType == LogPathType.File ? "Log File: " : "Live Log: ")} {table.FileName}\n" +
-            $"Log Name: {table.LogName}\n" +
-            $"Computer Name: {table.ComputerName}";
+        return table.LogPathType == LogPathType.File
+            ? $"Log File: {table.FileName}\n" +
+                $"Log Name: {table.LogName}\n" +
+                $"Computer Name: {table.ComputerName}"
+            : $"Live Log: {table.LogName}\n" +
+                $"Computer Name: {table.ComputerName}";
     }
 
     private void CloseLog(EventTableModel table) =>

@@ -92,7 +92,7 @@ public sealed class EventTableReducers
 
         // Skip batches for closed logs: avoid resurrecting events and stale counts.
         int totalNew = 0;
-        var combinedBatch = new List<DisplayEventModel>();
+        var combinedBatch = new List<ResolvedEvent>();
         var counts = state.EventCountByLog;
         var updatedTables = state.EventTables;
 
@@ -313,7 +313,7 @@ public sealed class EventTableReducers
             if (tablesById.ContainsKey(logId)) { totalCount += events.Count; }
         }
 
-        var concatenated = new List<DisplayEventModel>(totalCount);
+        var concatenated = new List<ResolvedEvent>(totalCount);
 
         for (int eventIndex = 0; eventIndex < state.DisplayedEvents.Count; eventIndex++)
         {
@@ -386,11 +386,11 @@ public sealed class EventTableReducers
         };
     }
 
-    private static IReadOnlyList<DisplayEventModel> FilterByOwningLog(
-        IReadOnlyList<DisplayEventModel> events,
+    private static IReadOnlyList<ResolvedEvent> FilterByOwningLog(
+        IReadOnlyList<ResolvedEvent> events,
         string owningLog)
     {
-        var filtered = new List<DisplayEventModel>(events.Count);
+        var filtered = new List<ResolvedEvent>(events.Count);
 
         for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
         {
@@ -405,11 +405,11 @@ public sealed class EventTableReducers
         return filtered.AsReadOnly();
     }
 
-    private static IReadOnlyList<DisplayEventModel> FilterOutOwningLog(
-        IReadOnlyList<DisplayEventModel> events,
+    private static IReadOnlyList<ResolvedEvent> FilterOutOwningLog(
+        IReadOnlyList<ResolvedEvent> events,
         string owningLog)
     {
-        var filtered = new List<DisplayEventModel>(events.Count);
+        var filtered = new List<ResolvedEvent>(events.Count);
 
         for (int eventIndex = 0; eventIndex < events.Count; eventIndex++)
         {
@@ -436,7 +436,7 @@ public sealed class EventTableReducers
         return counts.SetItem(logId, current + delta);
     }
 
-    private static EventTableModel SetComputerNameIfFirstEvent(EventTableModel table, IReadOnlyList<DisplayEventModel> newEvents)
+    private static EventTableModel SetComputerNameIfFirstEvent(EventTableModel table, IReadOnlyList<ResolvedEvent> newEvents)
     {
         if (!string.IsNullOrEmpty(table.ComputerName) || newEvents.Count == 0) { return table; }
 

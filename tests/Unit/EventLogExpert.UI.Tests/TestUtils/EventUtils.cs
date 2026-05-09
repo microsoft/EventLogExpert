@@ -8,7 +8,7 @@ namespace EventLogExpert.UI.Tests.TestUtils;
 
 internal static class EventUtils
 {
-    internal static DisplayEventModel CreateTestEvent(
+    internal static ResolvedEvent CreateTestEvent(
         int id = 1,
         string source = "TestSource",
         string level = "Information",

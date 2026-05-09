@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
@@ -11,7 +11,7 @@ public interface IEventResolver : IDisposable
 {
     void LoadProviderDetails(EventRecord eventRecord);
 
-    DisplayEventModel ResolveEvent(EventRecord eventRecord);
+    ResolvedEvent ResolveEvent(EventRecord eventRecord);
 
     void SetMetadataPaths(IReadOnlyList<string> metadataPaths);
 }

@@ -76,7 +76,7 @@ public partial class EventResolverBase : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    public virtual DisplayEventModel ResolveEvent(EventRecord eventRecord)
+    public virtual ResolvedEvent ResolveEvent(EventRecord eventRecord)
     {
         ObjectDisposedException.ThrowIf(IsDisposed, this);
 
@@ -467,7 +467,7 @@ public partial class EventResolverBase : IDisposable
         return visibleCount;
     }
 
-    private DisplayEventModel CreateEventModel(
+    private ResolvedEvent CreateEventModel(
         EventRecord eventRecord,
         EventModel? modernEvent,
         ProviderDetails? details,

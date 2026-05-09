@@ -25,7 +25,7 @@ public sealed partial class DetailsPane
     /// (show "Resolving XML..."); empty string means resolved-with-no-content (e.g. live-watcher event
     /// without a record id, or render failure); any other value is the rendered XML.</summary>
     private string? _resolvedXml;
-    private DisplayEventModel? _selectedEvent;
+    private ResolvedEvent? _selectedEvent;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>
     private CancellationTokenSource? _xmlResolveCts;
 
@@ -37,7 +37,7 @@ public sealed partial class DetailsPane
 
     [Inject] private IPreferencesProvider PreferencesProvider { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEvent { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ResolvedEvent?> SelectedEvent { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -142,7 +142,7 @@ public sealed partial class DetailsPane
         }
     }
 
-    private async void OnSelectedEventChanged(object? sender, DisplayEventModel? selectedEvent)
+    private async void OnSelectedEventChanged(object? sender, ResolvedEvent? selectedEvent)
     {
         try
         {

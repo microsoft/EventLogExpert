@@ -111,8 +111,10 @@ public enum FilterType
 
 public enum OpenLogStatus
 {
-    Loaded,
-    Empty
+    Opened,
+    Empty,
+    Skipped,
+    Failed
 }
 
 public enum Theme

@@ -1,4 +1,4 @@
-﻿@using EventLogExpert.Eventing.Common.Events
+@using EventLogExpert.Eventing.Common.Events
 @inherits FluxorComponent
 
 <SplitLogTabPane />
@@ -47,7 +47,7 @@
         <tbody @oncontextmenu="InvokeContextMenu" @oncontextmenu:preventDefault="true" @oncontextmenu:stopPropagation="true">
         @if (_currentTable is not null)
         {
-            <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<DisplayEventModel> ?? [])">
+            <Virtualize Context="evt" Items="@(_activeDisplayedEvents as ICollection<ResolvedEvent> ?? [])">
                 <tr aria-rowindex="@GetRowIndex(evt)"
                     aria-selected="@(_selectedSet.Contains(evt).ToString().ToLower())"
                     class="@GetCss(evt)"

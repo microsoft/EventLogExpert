@@ -174,6 +174,7 @@ public sealed class EventLogWatcher : IDisposable
                     }
 
                     @event.PathName = _path;
+                    @event.LogPathType = LogPathType.Channel;
 
                     var subscribers = EventRecordWritten;
 

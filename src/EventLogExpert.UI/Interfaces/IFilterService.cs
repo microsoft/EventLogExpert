@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
@@ -8,11 +8,11 @@ namespace EventLogExpert.UI.Interfaces;
 
 public interface IFilterService
 {
-    IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> FilterActiveLogs(
+    IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
         EventFilter eventFilter);
 
-    IReadOnlyList<DisplayEventModel> GetFilteredEvents(IEnumerable<DisplayEventModel> events, EventFilter eventFilter);
+    IReadOnlyList<ResolvedEvent> GetFilteredEvents(IEnumerable<ResolvedEvent> events, EventFilter eventFilter);
 
     bool TryParse(BasicFilter basicFilter, out string comparison);
 

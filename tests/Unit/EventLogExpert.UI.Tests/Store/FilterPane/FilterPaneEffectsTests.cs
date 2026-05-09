@@ -226,7 +226,7 @@ public sealed class FilterPaneEffectsTests
         var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
         var unrelatedBefore = new DateTime(2024, 1, 1, 23, 0, 0, DateTimeKind.Utc);
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(timeCreated: newest),
             EventUtils.CreateTestEvent(timeCreated: oldest)
@@ -257,7 +257,7 @@ public sealed class FilterPaneEffectsTests
         var newest = new DateTime(2024, 1, 1, 14, 15, 0, DateTimeKind.Utc);
         var unrelatedAfter = new DateTime(2023, 12, 1, 0, 0, 0, DateTimeKind.Utc);
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(timeCreated: newest),
             EventUtils.CreateTestEvent(timeCreated: oldest)

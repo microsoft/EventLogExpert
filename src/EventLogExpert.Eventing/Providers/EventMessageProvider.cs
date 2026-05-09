@@ -319,7 +319,7 @@ public sealed class EventMessageProvider(
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
-        if (legacyProviderFiles.Any() &&
+        if (legacyProviderFiles.Count > 0 &&
             TryLoadMessages(legacyProviderFiles, out var legacyMessages) &&
             legacyMessages.Count > 0)
         {
@@ -327,11 +327,23 @@ public sealed class EventMessageProvider(
         }
         else if (!string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
         {
-            _logger?.Debug(
-                $"No legacy messages loaded for provider {_providerName}. Using message file from modern provider.");
+            if (TryLoadMessages([providerMetadata.MessageFilePath], out var modernMessages) && modernMessages.Count > 0)
+            {
+                _logger?.Debug(
+                    $"No legacy messages loaded for provider {_providerName}. Using message file from modern provider.");
 
-            _ = TryLoadMessages([providerMetadata.MessageFilePath], out var modernMessages);
-            provider.Messages = modernMessages;
+                provider.Messages = modernMessages;
+            }
+            else
+            {
+                _logger?.Debug(
+                    $"No legacy messages loaded for provider {_providerName} and modern message file fallback produced no messages. Returning empty provider details.");
+            }
+        }
+        else if (legacyProviderFiles.Count > 0)
+        {
+            _logger?.Debug(
+                $"Legacy message files for provider {_providerName} produced no messages and no modern fallback is available. Returning empty provider details.");
         }
         else
         {
@@ -340,8 +352,15 @@ public sealed class EventMessageProvider(
 
         if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath))
         {
-            _ = TryLoadMessages([providerMetadata.ParameterFilePath], out var parameterMessages);
-            provider.Parameters = parameterMessages;
+            if (TryLoadMessages([providerMetadata.ParameterFilePath], out var parameterMessages) && parameterMessages.Count > 0)
+            {
+                provider.Parameters = parameterMessages;
+            }
+            else
+            {
+                _logger?.Debug(
+                    $"Parameter file fallback for provider {_providerName} produced no messages.");
+            }
         }
 
         if (provider.IsEmpty)
@@ -503,11 +522,6 @@ public sealed class EventMessageProvider(
         }
     }
 
-    /// <summary>
-    ///     Tries to load messages for a legacy provider from the registry-specified files
-    ///     (HKLM\SYSTEM\CurrentControlSet\Services\EventLog). Returns false on any failure so the caller can fall back to
-    ///     modern provider data instead of bubbling the exception.
-    /// </summary>
     private bool TryLoadMessages(IEnumerable<string> messageFilePaths, out List<MessageModel> messages)
     {
         _logger?.Debug($"{nameof(TryLoadMessages)} called for files {string.Join(", ", messageFilePaths)}");
@@ -522,7 +536,7 @@ public sealed class EventMessageProvider(
         }
         catch (Exception ex)
         {
-            _logger?.Debug($"Failed to load legacy provider data for {_providerName}.\n{ex}");
+            _logger?.Debug($"Failed to load provider data for {_providerName}.\n{ex}");
 
             messages = [];
 

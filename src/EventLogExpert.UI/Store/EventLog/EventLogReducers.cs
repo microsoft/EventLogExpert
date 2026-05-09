@@ -83,7 +83,7 @@ public sealed class EventLogReducers
             return state;
         }
 
-        var merged = new List<DisplayEventModel>(existingLog.Events.Count + action.Events.Count);
+        var merged = new List<ResolvedEvent>(existingLog.Events.Count + action.Events.Count);
         merged.AddRange(existingLog.Events);
         merged.AddRange(action.Events);
 
@@ -114,7 +114,7 @@ public sealed class EventLogReducers
     {
         // Reference equality keeps selection consistent with EventTable's
         // ReferenceEqualityComparer-based selection set. Value equality on
-        // DisplayEventModel (a record) would treat distinct-but-value-equal
+        // ResolvedEvent (a record) would treat distinct-but-value-equal
         // instances as the same — e.g., after a log reload, SelectedEvents
         // may still hold stale references that are value-equal to new ones.
         bool alreadySelected = ContainsReference(state.SelectedEvents, action.SelectedEvent);
@@ -158,8 +158,8 @@ public sealed class EventLogReducers
         // (for example, stale vs. fresh events after a reload) to coexist
         // so a stale reference in SelectedEvents isn't silently collapsed
         // with a freshly loaded copy.
-        var existing = new HashSet<DisplayEventModel>(state.SelectedEvents, ReferenceEqualityComparer.Instance);
-        List<DisplayEventModel> eventsToAdd = [];
+        var existing = new HashSet<ResolvedEvent>(state.SelectedEvents, ReferenceEqualityComparer.Instance);
+        List<ResolvedEvent> eventsToAdd = [];
 
         foreach (var selectedEvent in action.SelectedEvents)
         {
@@ -179,7 +179,7 @@ public sealed class EventLogReducers
         // same reference; fall back to a value-equal instance when only a
         // replacement reference is present. If neither is found, focus the
         // last incoming event so the restore path leaves something focused.
-        DisplayEventModel newSelectedEvent = eventsToAdd[^1];
+        ResolvedEvent newSelectedEvent = eventsToAdd[^1];
 
         if (state.SelectedEvent is null)
         {
@@ -190,7 +190,7 @@ public sealed class EventLogReducers
             };
         }
 
-        DisplayEventModel? valueEqualMatch = null;
+        ResolvedEvent? valueEqualMatch = null;
 
         foreach (var selectedEvent in newSelection)
         {
@@ -242,8 +242,8 @@ public sealed class EventLogReducers
         // Order-preserving distinct by reference identity. The caller (typically
         // EventTable) is responsible for ordering events according to the current
         // sort column; the reducer honors whatever order it receives.
-        var seen = new HashSet<DisplayEventModel>(ReferenceEqualityComparer.Instance);
-        var builder = ImmutableList.CreateBuilder<DisplayEventModel>();
+        var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
+        var builder = ImmutableList.CreateBuilder<ResolvedEvent>();
 
         foreach (var selectedEvent in action.SelectedEvents)
         {
@@ -274,7 +274,7 @@ public sealed class EventLogReducers
         };
     }
 
-    private static bool ContainsReference(ImmutableList<DisplayEventModel> list, DisplayEventModel target)
+    private static bool ContainsReference(ImmutableList<ResolvedEvent> list, ResolvedEvent target)
     {
         foreach (var item in list)
         {
@@ -285,11 +285,11 @@ public sealed class EventLogReducers
     }
 
     private static EventLogData GetEmptyLogData(string logName, LogPathType pathType) =>
-        new(logName, pathType, new List<DisplayEventModel>().AsReadOnly());
+        new(logName, pathType, new List<ResolvedEvent>().AsReadOnly());
 
-    private static ImmutableList<DisplayEventModel> RemoveByReference(
-        ImmutableList<DisplayEventModel> list,
-        DisplayEventModel target)
+    private static ImmutableList<ResolvedEvent> RemoveByReference(
+        ImmutableList<ResolvedEvent> list,
+        ResolvedEvent target)
     {
         for (int i = 0; i < list.Count; i++)
         {
@@ -303,8 +303,8 @@ public sealed class EventLogReducers
     }
 
     private static bool SelectionsEqualByReference(
-        ImmutableList<DisplayEventModel> left,
-        ImmutableList<DisplayEventModel> right)
+        ImmutableList<ResolvedEvent> left,
+        ImmutableList<ResolvedEvent> right)
     {
         if (ReferenceEquals(left, right)) { return true; }
 
@@ -321,7 +321,7 @@ public sealed class EventLogReducers
     private static EventLogState UpdateActiveLog(
         EventLogState state,
         EventLogData logData,
-        IReadOnlyList<DisplayEventModel> events) =>
+        IReadOnlyList<ResolvedEvent> events) =>
         state with
         {
             ActiveLogs = state.ActiveLogs
