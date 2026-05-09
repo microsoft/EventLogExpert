@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;
@@ -125,7 +125,7 @@ internal static class ProviderSource
 
             try
             {
-                using var providerContext = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
+                using var providerContext = new ProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 if (!IsSourceSchemaCurrent(providerContext, file, logger))
                 {
@@ -190,6 +190,26 @@ internal static class ProviderSource
         foreach (var f in evtxFiles) { yield return f; }
     }
 
+    private static bool IsSourceSchemaCurrent(ProviderDbContext context, string file, ITraceLogger logger)
+    {
+        var state = context.IsUpgradeNeeded();
+
+        if (!state.NeedsUpgrade) { return true; }
+
+        if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        {
+            logger.Error(
+                $"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.SourceLabel, file)}");
+        }
+        else
+        {
+            logger.Error(
+                $"Source database '{file}' is at schema v{state.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command on the source first.");
+        }
+
+        return false;
+    }
+
     private static IEnumerable<ProviderDetails> LoadDetailsFromFile(
         string file,
         ITraceLogger logger,
@@ -203,7 +223,7 @@ internal static class ProviderSource
         {
             try
             {
-                using var context = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
+                using var context = new ProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 if (!IsSourceSchemaCurrent(context, file, logger)) { return []; }
 
@@ -249,7 +269,8 @@ internal static class ProviderSource
             }
             catch (Exception ex) when (ex is DbException or JsonException or InvalidDataException)
             {
-                logger.Warn($"Skipping invalid database file '{file}': {ex.Message}");
+                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+
                 return [];
             }
         }
@@ -259,7 +280,7 @@ internal static class ProviderSource
             return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen);
         }
 
-        logger.Warn($"Skipping unsupported source file: {file}");
+        logger.Warning($"Skipping unsupported source file: {file}");
 
         return [];
     }
@@ -272,14 +293,15 @@ internal static class ProviderSource
         {
             try
             {
-                using var providerContext = new EventProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
+                using var providerContext = new ProviderDbContext(file, readOnly: true, ensureCreated: false, logger);
 
                 return !IsSourceSchemaCurrent(providerContext, file, logger) ? [] :
                     providerContext.ProviderDetails.AsNoTracking().Select(p => p.ProviderName).ToList();
             }
             catch (DbException ex)
             {
-                logger.Warn($"Skipping invalid database file '{file}': {ex.Message}");
+                logger.Warning($"Skipping invalid database file '{file}': {ex.Message}");
+
                 return [];
             }
         }
@@ -289,29 +311,9 @@ internal static class ProviderSource
             return MtaProviderSource.DiscoverProviderNames(file, logger);
         }
 
-        logger.Warn($"Skipping unsupported source file: {file}");
+        logger.Warning($"Skipping unsupported source file: {file}");
 
         return [];
-    }
-
-    private static bool IsSourceSchemaCurrent(EventProviderDbContext context, string file, ITraceLogger logger)
-    {
-        var state = context.IsUpgradeNeeded();
-
-        if (!state.NeedsUpgrade) { return true; }
-
-        if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
-        {
-            logger.Error(
-                $"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.SourceLabel, file)}");
-        }
-        else
-        {
-            logger.Error(
-                $"Source database '{file}' is at schema v{state.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command on the source first.");
-        }
-
-        return false;
     }
 
     private static IEnumerable<ProviderDetails> LoadProvidersIterator(

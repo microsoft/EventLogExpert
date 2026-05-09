@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Tests.TestUtils;
 
@@ -15,7 +15,7 @@ public sealed class DateRangeDefaultsTests
     [Fact]
     public void ComputeFromActiveLogs_WhenAllLogsEmpty_ReturnsRoundedFallback()
     {
-        var emptyLog = new EventLogData("Empty", PathType.LogName, []);
+        var emptyLog = new EventLogData("Empty", LogPathType.Channel, []);
 
         var (after, before) = DateRangeDefaults.ComputeFromActiveLogs([emptyLog], s_fallbackNow);
 
@@ -26,7 +26,7 @@ public sealed class DateRangeDefaultsTests
     [Fact]
     public void ComputeFromActiveLogs_WhenMixedEmptyAndPopulatedLogs_UsesPopulatedDataOnly()
     {
-        var emptyLog = new EventLogData("Empty", PathType.LogName, []);
+        var emptyLog = new EventLogData("Empty", LogPathType.Channel, []);
         var populated = CreateLog(
             "Populated",
             new DateTime(2024, 3, 10, 16, 20, 0, DateTimeKind.Utc),
@@ -135,6 +135,6 @@ public sealed class DateRangeDefaultsTests
             EventUtils.CreateTestEvent(timeCreated: oldest)
         };
 
-        return new EventLogData(name, PathType.LogName, events);
+        return new EventLogData(name, LogPathType.Channel, events);
     }
 }

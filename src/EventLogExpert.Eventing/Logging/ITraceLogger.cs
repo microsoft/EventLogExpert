@@ -10,15 +10,15 @@ public interface ITraceLogger
 {
     LogLevel MinimumLevel { get; }
 
-    void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler);
+    void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler);
 
     void Debug([InterpolatedStringHandlerArgument("")] DebugLogHandler handler);
 
-    void Info([InterpolatedStringHandlerArgument("")] InfoLogHandler handler);
-
-    void Warn([InterpolatedStringHandlerArgument("")] WarnLogHandler handler);
-
     void Error([InterpolatedStringHandlerArgument("")] ErrorLogHandler handler);
 
-    void Critical([InterpolatedStringHandlerArgument("")] CriticalLogHandler handler);
+    void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler);
+
+    void Trace([InterpolatedStringHandlerArgument("")] TraceLogHandler handler);
+
+    void Warning([InterpolatedStringHandlerArgument("")] WarningLogHandler handler);
 }

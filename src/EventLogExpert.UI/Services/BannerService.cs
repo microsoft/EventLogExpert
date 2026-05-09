@@ -398,7 +398,7 @@ public sealed class BannerService : IBannerService
             }
             catch (Exception ex)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(BannerService)}.{nameof(StateChanged)}: subscriber threw: {ex}"));
             }
         }

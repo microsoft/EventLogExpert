@@ -1,4 +1,5 @@
-﻿@using EventLogExpert.UI
+﻿@using EventLogExpert.Eventing.Common.Channels
+@using EventLogExpert.UI
 @inherits FluxorComponent
 
 <div aria-atomic="true" aria-live="polite" class="status-bar" role="status">
@@ -33,7 +34,7 @@
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }
 
-    @if (_eventLogState.ActiveLogs.Values.Any(l => l.Type == PathType.LogName))
+    @if (_eventLogState.ActiveLogs.Values.Any(l => l.Type == LogPathType.Channel))
     {
         @if (_eventLogState.ContinuouslyUpdate)
         {

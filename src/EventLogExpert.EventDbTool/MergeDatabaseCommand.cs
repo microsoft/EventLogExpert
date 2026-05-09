@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -75,7 +75,8 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         if (sourceNames.Count == 0)
         {
-            Logger.Warn($"No providers were discovered in the source.");
+            Logger.Warning($"No providers were discovered in the source.");
+
             return;
         }
 
@@ -85,30 +86,33 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         try
         {
-            using var probe = new EventProviderDbContext(targetFile, readOnly: false, ensureCreated: false, Logger);
+            using var probe = new ProviderDbContext(targetFile, readOnly: false, ensureCreated: false, Logger);
             targetState = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)
         {
             Logger.Error($"Failed to merge into database '{targetFile}': {ex.Message}");
+
             return;
         }
 
         if (targetState.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
         {
-            Logger.Error($"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.TargetLabel, targetFile)}");
+            Logger.Error($"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.TargetLabel, targetFile)}");
+
             return;
         }
 
         if (targetState.NeedsUpgrade)
         {
             Logger.Error($"Target database '{targetFile}' is at schema v{targetState.CurrentVersion} but v{ProviderDatabaseSchemaVersion.Current} is required. Run the 'upgrade' command first.");
+
             return;
         }
 
         // Destructive ops beyond this point (ExecuteDelete commits immediately; SaveChanges writes) —
         // exceptions propagate so partial-state failures aren't masked as a benign "merge failed".
-        using var targetContext = new EventProviderDbContext(targetFile, false, Logger);
+        using var targetContext = new ProviderDbContext(targetFile, false, Logger);
 
         // Query the overlap in the database by chunking sourceNames into IN-clause batches,
         // rather than pulling every target ProviderName into memory. Same chunk size as the
@@ -137,11 +141,11 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         if (targetMatchingNames.Count > 0)
         {
-            Logger.Info($"The target database contains {targetMatchingNames.Count} provider row(s) matching {providerNamesInTarget.Count} provider name(s) in the source.");
+            Logger.Information($"The target database contains {targetMatchingNames.Count} provider row(s) matching {providerNamesInTarget.Count} provider name(s) in the source.");
 
             if (overwriteProviders)
             {
-                Logger.Info($"Removing these providers from the target database...");
+                Logger.Information($"Removing these providers from the target database...");
 
                 // Chunk the IN-clause to stay below SQLite's parameter limit (default 999). Without
                 // chunking, an --overwrite of a large overlap could throw at runtime.
@@ -160,15 +164,15 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
                         .ExecuteDelete();
                 }
 
-                Logger.Info($"Removal of {removed} provider row(s) completed.");
+                Logger.Information($"Removal of {removed} provider row(s) completed.");
             }
             else
             {
-                Logger.Info($"These providers will not be copied from the source.");
+                Logger.Information($"These providers will not be copied from the source.");
             }
         }
 
-        Logger.Info($"Copying providers from the source...");
+        Logger.Information($"Copying providers from the source...");
 
         // When not overwriting, pass the overlap as the skip set so providers that already exist
         // in the target are never resolved from the source's metadata path. When overwriting, no
@@ -179,23 +183,23 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             ? sourceNames.ToList()
             : sourceNames.Where(n => !skipForLoad.Contains(n)).ToList();
 
-        Logger.Info($"");
+        Logger.Information($"");
         LogProviderDetailHeader(expectedCopiedNames);
 
         // Stream details into the DbContext with periodic SaveChanges. The pending batch list is
         // bounded by batchSize so memory stays flat regardless of source size; details are logged
         // AFTER each successful SaveChanges so the printed rows reflect what actually persisted
         // (a SaveChanges failure won't cause the log to overstate progress).
-        const int batchSize = 100;
+        const int BatchSize = 100;
         var copiedCount = 0;
-        var pendingBatch = new List<ProviderDetails>(batchSize);
+        var pendingBatch = new List<ProviderDetails>(BatchSize);
 
         foreach (var provider in ProviderSource.LoadProviders(source, Logger, filter: null, skipProviderNames: skipForLoad))
         {
             targetContext.ProviderDetails.Add(provider);
             pendingBatch.Add(provider);
 
-            if (pendingBatch.Count < batchSize) { continue; }
+            if (pendingBatch.Count < BatchSize) { continue; }
 
             FlushBatch(targetContext, pendingBatch, ref copiedCount);
         }
@@ -205,11 +209,11 @@ public class MergeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
             FlushBatch(targetContext, pendingBatch, ref copiedCount);
         }
 
-        Logger.Info($"");
-        Logger.Info($"Copied {copiedCount} provider(s).");
+        Logger.Information($"");
+        Logger.Information($"Copied {copiedCount} provider(s).");
     }
 
-    private void FlushBatch(EventProviderDbContext context, List<ProviderDetails> batch, ref int copiedCount)
+    private void FlushBatch(ProviderDbContext context, List<ProviderDetails> batch, ref int copiedCount)
     {
         context.SaveChanges();
 

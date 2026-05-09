@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Readers;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.StatusBar;
@@ -29,7 +28,7 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
                 _debugLogger.Debug($"Action: {action.GetType()} with {addEventAction.NewEvent.Source} event ID {addEventAction.NewEvent.Id}.");
                 break;
             case EventLogAction.OpenLog openLogAction:
-                _debugLogger.Info($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.PathType}.");
+                _debugLogger.Information($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogPathType}.");
                 break;
             case EventLogAction.SelectEvent selectEventAction:
                 _debugLogger.Debug($"Action: {nameof(EventLogAction.SelectEvent)} selected {selectEventAction.SelectedEvent.Source} event ID {selectEventAction.SelectedEvent.Id}.");

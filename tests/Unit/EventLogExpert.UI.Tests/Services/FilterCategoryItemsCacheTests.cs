@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -16,6 +16,24 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
     public FilterCategoryItemsCacheTests() => FilterCategoryItemsCache.Clear();
 
     public void Dispose() => FilterCategoryItemsCache.Clear();
+
+    [Fact]
+    public void GetItems_DifferentSnapshot_RecomputesValues()
+    {
+        var snapshotA = ImmutableDictionary<string, EventLogData>.Empty.Add(
+            Constants.LogNameTestLog,
+            new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent(id: 100)]));
+
+        var snapshotB = snapshotA.Add(
+            Constants.LogNameLog2,
+            new EventLogData(Constants.LogNameLog2, LogPathType.Channel, [EventUtils.CreateTestEvent(id: 200)]));
+
+        var idsA = FilterCategoryItemsCache.GetItems(snapshotA, FilterCategory.Id);
+        var idsB = FilterCategoryItemsCache.GetItems(snapshotB, FilterCategory.Id);
+
+        Assert.Equal(["100"], idsA);
+        Assert.Equal(["100", "200"], idsB);
+    }
 
     [Fact]
     public void GetItems_LevelCategory_ReturnsAllSeverityLevelNames()
@@ -38,7 +56,7 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
             EventUtils.CreateTestEvent(id: 300, source: "Charlie")
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var ids = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Id);
@@ -53,7 +71,7 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
     {
         var logData = new EventLogData(
             Constants.LogNameTestLog,
-            PathType.LogName,
+            LogPathType.Channel,
             [EventUtils.CreateTestEvent(id: 100)]);
 
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -65,29 +83,11 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_DifferentSnapshot_RecomputesValues()
-    {
-        var snapshotA = ImmutableDictionary<string, EventLogData>.Empty.Add(
-            Constants.LogNameTestLog,
-            new EventLogData(Constants.LogNameTestLog, PathType.LogName, [EventUtils.CreateTestEvent(id: 100)]));
-
-        var snapshotB = snapshotA.Add(
-            Constants.LogNameLog2,
-            new EventLogData(Constants.LogNameLog2, PathType.LogName, [EventUtils.CreateTestEvent(id: 200)]));
-
-        var idsA = FilterCategoryItemsCache.GetItems(snapshotA, FilterCategory.Id);
-        var idsB = FilterCategoryItemsCache.GetItems(snapshotB, FilterCategory.Id);
-
-        Assert.Equal(["100"], idsA);
-        Assert.Equal(["100", "200"], idsB);
-    }
-
-    [Fact]
     public void GetItems_UnsupportedCategory_ReturnsEmpty()
     {
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(
             Constants.LogNameTestLog,
-            new EventLogData(Constants.LogNameTestLog, PathType.LogName, [EventUtils.CreateTestEvent()]));
+            new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent()]));
 
         var items = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Description);
 

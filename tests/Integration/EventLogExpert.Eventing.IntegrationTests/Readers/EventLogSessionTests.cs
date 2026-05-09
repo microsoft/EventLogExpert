@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
 
@@ -15,7 +16,7 @@ public sealed class EventLogSessionTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -31,7 +32,7 @@ public sealed class EventLogSessionTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = session.GetLogInformation(logName, PathType.LogName);
+        var logInfo = session.GetLogInformation(logName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -47,9 +48,9 @@ public sealed class EventLogSessionTests
         // Act
         var tasks = new[]
         {
-            Task.Run(() => session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName)),
-            Task.Run(() => session.GetLogInformation(Constants.SystemLogName, PathType.LogName)),
-            Task.Run(() => session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName))
+            Task.Run(() => session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel)),
+            Task.Run(() => session.GetLogInformation(Constants.SystemLogName, LogPathType.Channel)),
+            Task.Run(() => session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel))
         };
 
         await Task.WhenAll(tasks);
@@ -73,7 +74,7 @@ public sealed class EventLogSessionTests
         // Surfaces the real EvtOpenLog error (ERROR_EVT_CHANNEL_NOT_FOUND) instead
         // of the previous masked UnauthorizedAccessException.
         Assert.Throws<FileNotFoundException>(() =>
-            session.GetLogInformation(invalidLogName, PathType.LogName));
+            session.GetLogInformation(invalidLogName, LogPathType.Channel));
     }
 
     [Fact]
@@ -89,6 +90,26 @@ public sealed class EventLogSessionTests
         // Assert
         Assert.NotEmpty(providers);
         Assert.NotEmpty(logNames);
+    }
+
+    [Fact]
+    public void GetLogNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        var session = EventLogSession.GlobalSession;
+
+        // Act
+        var logNames1 = session.GetLogNames().ToList();
+        var logNames2 = session.GetLogNames().ToList();
+
+        // Assert
+        Assert.Equal(logNames1.Count, logNames2.Count);
+
+        // All names from first call should be in second call
+        foreach (var name in logNames1)
+        {
+            Assert.Contains(name, logNames2);
+        }
     }
 
     [Fact]
@@ -195,26 +216,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetLogNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logNames1 = session.GetLogNames().ToList();
-        var logNames2 = session.GetLogNames().ToList();
-
-        // Assert
-        Assert.Equal(logNames1.Count, logNames2.Count);
-
-        // All names from first call should be in second call
-        foreach (var name in logNames1)
-        {
-            Assert.Contains(name, logNames2);
-        }
-    }
-
-    [Fact]
     public async Task GetLogNames_WhenConcurrentAccess_ShouldHandleMultipleThreads()
     {
         // Arrange
@@ -251,6 +252,26 @@ public sealed class EventLogSessionTests
         // Assert
         Assert.NotEmpty(logNames);
         Assert.NotEmpty(providers);
+    }
+
+    [Fact]
+    public void GetProviderNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        var session = EventLogSession.GlobalSession;
+
+        // Act
+        var providers1 = session.GetProviderNames();
+        var providers2 = session.GetProviderNames();
+
+        // Assert
+        Assert.Equal(providers1.Count, providers2.Count);
+
+        // All providers from first call should be in second call
+        foreach (var provider in providers1)
+        {
+            Assert.Contains(provider, providers2);
+        }
     }
 
     [Fact]
@@ -329,26 +350,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetProviderNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var providers1 = session.GetProviderNames();
-        var providers2 = session.GetProviderNames();
-
-        // Assert
-        Assert.Equal(providers1.Count, providers2.Count);
-
-        // All providers from first call should be in second call
-        foreach (var provider in providers1)
-        {
-            Assert.Contains(provider, providers2);
-        }
-    }
-
-    [Fact]
     public async Task GetProviderNames_WhenConcurrentAccess_ShouldHandleMultipleThreads()
     {
         // Arrange
@@ -373,16 +374,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GlobalSession_WhenAccessed_ShouldNotBeNull()
-    {
-        // Arrange & Act
-        var session = EventLogSession.GlobalSession;
-
-        // Assert
-        Assert.NotNull(session);
-    }
-
-    [Fact]
     public void GlobalSession_WhenAccessedMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange & Act
@@ -396,6 +387,16 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
+    public void GlobalSession_WhenAccessed_ShouldNotBeNull()
+    {
+        // Arrange & Act
+        var session = EventLogSession.GlobalSession;
+
+        // Assert
+        Assert.NotNull(session);
+    }
+
+    [Fact]
     public void GlobalSession_WhenUsedByMultipleMethods_ShouldWorkCorrectly()
     {
         // Arrange
@@ -404,7 +405,7 @@ public sealed class EventLogSessionTests
         // Act
         var logNames = session.GetLogNames().ToList();
         var providers = session.GetProviderNames();
-        var logInfo = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotEmpty(logNames);

@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
-using EventLogExpert.Eventing.Models;
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
@@ -31,7 +31,7 @@ public sealed class EventLogWatcher : IDisposable
         _bookmark = bookmark;
         _renderXml = renderXml;
 
-        _queryHandle = NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, PathType.LogName);
+        _queryHandle = NativeMethods.EvtQuery(EventLogSession.GlobalSession.Handle, path, null, LogPathType.Channel);
         int error = Marshal.GetLastWin32Error();
 
         if (_queryHandle is { IsInvalid: false }) { return; }
@@ -132,7 +132,7 @@ public sealed class EventLogWatcher : IDisposable
         }
     }
 
-    private void ProcessNewEvents(object? state, bool timedOut)
+    private void ReadAndRaiseEvents(object? state, bool timedOut)
     {
         int threadId = Environment.CurrentManagedThreadId;
 
@@ -200,15 +200,6 @@ public sealed class EventLogWatcher : IDisposable
         }
     }
 
-    private void ThrowIfCurrentCallbackWouldDeadlock()
-    {
-        if (_callbackThreadIds.ContainsKey(Environment.CurrentManagedThreadId))
-        {
-            throw new InvalidOperationException(
-                "EventLogWatcher cannot be stopped from within an EventRecordWritten handler.");
-        }
-    }
-
     private void Subscribe()
     {
         lock (_lifecycleLock)
@@ -258,7 +249,7 @@ public sealed class EventLogWatcher : IDisposable
         }
 
         // Drain backlog before TP wait registration to prevent concurrent EvtNext.
-        ProcessNewEvents(null, false);
+        ReadAndRaiseEvents(null, false);
 
         lock (_lifecycleLock)
         {
@@ -267,7 +258,16 @@ public sealed class EventLogWatcher : IDisposable
             // Concurrent Unsubscribe may have torn down the subscription during the drain.
             if (!Volatile.Read(ref _isSubscribed)) { return; }
 
-            _waitHandle = ThreadPool.RegisterWaitForSingleObject(_newEvents, ProcessNewEvents, null, -1, false);
+            _waitHandle = ThreadPool.RegisterWaitForSingleObject(_newEvents, ReadAndRaiseEvents, null, -1, false);
+        }
+    }
+
+    private void ThrowIfCurrentCallbackWouldDeadlock()
+    {
+        if (_callbackThreadIds.ContainsKey(Environment.CurrentManagedThreadId))
+        {
+            throw new InvalidOperationException(
+                "EventLogWatcher cannot be stopped from within an EventRecordWritten handler.");
         }
     }
 

@@ -25,7 +25,7 @@ public readonly record struct EventFilter
     /// <summary>Construction-time snapshot used by <see cref="FilterMethods.HasFilteringChanged" />.</summary>
     public ImmutableArray<FilterSnapshot> Snapshots { get; }
 
-    /// <summary>True when any filter or sub-filter references <see cref="Eventing.Models.DisplayEventModel.Xml" />.</summary>
+    /// <summary>True when any filter or sub-filter references <see cref="Eventing.Resolvers.DisplayEventModel.Xml" />.</summary>
     public bool RequiresXml { get; }
 
     private static bool ComputeRequiresXml(ImmutableList<FilterModel> filters)

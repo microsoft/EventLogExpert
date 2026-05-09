@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
@@ -129,7 +130,7 @@ internal sealed class SmallEvtxFixture : IDisposable
     private void VerifyMinimumEvents()
     {
         // Count records so an empty/gappy export produces a clear fixture-level error instead of cryptic test failures.
-        using var reader = new EventLogReader(FilePath, PathType.FilePath);
+        using var reader = new EventLogReader(FilePath, LogPathType.File);
 
         int total = 0;
 

@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI;
@@ -14,7 +14,6 @@ public static class FilterMethods
         (a, b) => WithTieBreaker(a.TimeCreated.CompareTo(b.TimeCreated), a, b);
     private static readonly Comparison<DisplayEventModel> s_ascByActivityId =
         (a, b) => WithTieBreaker(Nullable.Compare(a.ActivityId, b.ActivityId), a, b);
-
     private static readonly Comparison<DisplayEventModel> s_ascByLog =
         (a, b) => WithTieBreaker(string.Compare(a.LogName, b.LogName, StringComparison.Ordinal), a, b);
     private static readonly Comparison<DisplayEventModel> s_ascByComputerName =

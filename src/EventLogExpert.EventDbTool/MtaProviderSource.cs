@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
@@ -25,59 +26,6 @@ internal static class MtaProviderSource
         string? filter = null) =>
         !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : DiscoverProviderNamesCore(evtxPath, logger, regex);
 
-    private static IReadOnlyList<string> DiscoverProviderNamesCore(
-        string evtxPath,
-        ITraceLogger logger,
-        Regex? regex)
-    {
-        if (!File.Exists(evtxPath))
-        {
-            logger.Error($"Evtx file not found: {evtxPath}");
-            return [];
-        }
-
-        var providerNames = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        try
-        {
-            using var reader = new EventLogReader(evtxPath, PathType.FilePath);
-
-            if (!reader.IsValid)
-            {
-                logger.Error($"Failed to open {evtxPath} for reading. The file may be missing, corrupt, or inaccessible.");
-                return [];
-            }
-
-            // TryGetEvents returns false both for normal end-of-results (ERROR_NO_MORE_ITEMS) and
-            // for read errors (corruption, access denied, etc.). Check LastErrorCode to surface
-            // non-terminal failures so users can distinguish "0 events" from "could not read the log".
-            while (reader.TryGetEvents(out var batch))
-            {
-                foreach (var record in batch)
-                {
-                    if (!string.IsNullOrEmpty(record.ProviderName))
-                    {
-                        providerNames.Add(record.ProviderName);
-                    }
-                }
-            }
-
-            if (reader.LastErrorCode is not null)
-            {
-                logger.Warn(
-                    $"Reading {evtxPath} may be incomplete. " +
-                    $"EvtNext failed with Win32 error code {reader.LastErrorCode}.");
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.Error($"Failed to read events from {evtxPath}: {ex.Message}");
-            return [];
-        }
-
-        return regex is null ? providerNames.ToList() : providerNames.Where(n => regex.IsMatch(n)).ToList();
-    }
-
     /// <summary>
     ///     Returns the sibling LocaleMetaData/*.MTA files for <paramref name="evtxPath" />, or an empty
     ///     array if none are present. Logs an error in the empty case to surface the misconfiguration
@@ -90,6 +38,7 @@ internal static class MtaProviderSource
         if (logDir is null)
         {
             logger.Error($"Could not determine directory for {evtxPath}.");
+
             return [];
         }
 
@@ -113,6 +62,7 @@ internal static class MtaProviderSource
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
         {
             logger.Error($"Cannot read LocaleMetaData folder '{localeDir}': {ex.Message}");
+
             return [];
         }
 
@@ -121,10 +71,11 @@ internal static class MtaProviderSource
         if (mtaFiles.Length == 0)
         {
             logger.Error($"LocaleMetaData folder at {localeDir} contains no MTA files.");
+
             return [];
         }
 
-        logger.Info($"Using {mtaFiles.Length} locale metadata file(s) from {localeDir}.");
+        logger.Information($"Using {mtaFiles.Length} locale metadata file(s) from {localeDir}.");
 
         return mtaFiles;
     }
@@ -154,6 +105,62 @@ internal static class MtaProviderSource
         IReadOnlySet<string>? skipProviderNames,
         HashSet<string>? seen) =>
         LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen);
+
+    private static IReadOnlyList<string> DiscoverProviderNamesCore(
+        string evtxPath,
+        ITraceLogger logger,
+        Regex? regex)
+    {
+        if (!File.Exists(evtxPath))
+        {
+            logger.Error($"Evtx file not found: {evtxPath}");
+
+            return [];
+        }
+
+        var providerNames = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            using var reader = new EventLogReader(evtxPath, LogPathType.File);
+
+            if (!reader.IsValid)
+            {
+                logger.Error($"Failed to open {evtxPath} for reading. The file may be missing, corrupt, or inaccessible.");
+
+                return [];
+            }
+
+            // TryGetEvents returns false both for normal end-of-results (ERROR_NO_MORE_ITEMS) and
+            // for read errors (corruption, access denied, etc.). Check LastErrorCode to surface
+            // non-terminal failures so users can distinguish "0 events" from "could not read the log".
+            while (reader.TryGetEvents(out var batch))
+            {
+                foreach (var record in batch)
+                {
+                    if (!string.IsNullOrEmpty(record.ProviderName))
+                    {
+                        providerNames.Add(record.ProviderName);
+                    }
+                }
+            }
+
+            if (reader.LastErrorCode is not null)
+            {
+                logger.Warning(
+                    $"Reading {evtxPath} may be incomplete. " +
+                    $"EvtNext failed with Win32 error code {reader.LastErrorCode}.");
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.Error($"Failed to read events from {evtxPath}: {ex.Message}");
+
+            return [];
+        }
+
+        return regex is null ? providerNames.ToList() : providerNames.Where(n => regex.IsMatch(n)).ToList();
+    }
 
     private static bool IsEmpty(ProviderDetails details) =>
         details.Events.Count == 0 &&
@@ -190,7 +197,8 @@ internal static class MtaProviderSource
 
             if (IsEmpty(details))
             {
-                logger.Warn($"Skipping {providerName}: not found in any MTA file next to {evtxPath}.");
+                logger.Warning($"Skipping {providerName}: not found in any MTA file next to {evtxPath}.");
+
                 continue;
             }
 

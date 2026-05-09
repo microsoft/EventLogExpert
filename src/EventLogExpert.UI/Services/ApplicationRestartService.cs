@@ -26,7 +26,7 @@ public sealed class ApplicationRestartService(ITraceLogger traceLogger) : IAppli
 
             if (reason == AppRestartFailureReason.RestartPending)
             {
-                _traceLogger.Info($"{nameof(ApplicationRestartService)}.{nameof(TryRestartAsync)}: restart already pending");
+                _traceLogger.Information($"{nameof(ApplicationRestartService)}.{nameof(TryRestartAsync)}: restart already pending");
                 return true;
             }
 

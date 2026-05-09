@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -11,8 +11,8 @@ namespace EventLogExpert.UI.Services;
 
 /// <summary>
 /// Caches the distinct, sorted list of category values across all active logs, keyed by the
-/// <see cref="ImmutableDictionary{TKey, TValue}"/> snapshot reference. Each snapshot change
-/// produces a new key, so cache entries auto-evict via <see cref="ConditionalWeakTable{TKey, TValue}"/>.
+/// <see cref="ImmutableDictionary{TKey,TValue}"/> snapshot reference. Each snapshot change
+/// produces a new key, so cache entries auto-evict via <see cref="ConditionalWeakTable{TKey,TValue}"/>.
 /// </summary>
 public static class FilterCategoryItemsCache
 {

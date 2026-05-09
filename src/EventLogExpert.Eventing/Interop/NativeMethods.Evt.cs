@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32.SafeHandles;
 using System.Buffers;
@@ -272,7 +272,7 @@ internal static partial class NativeMethods
     internal static partial EvtHandle EvtOpenLog(
         EvtHandle session,
         [MarshalAs(UnmanagedType.LPWStr)] string path,
-        PathType flags);
+        LogPathType flags);
 
     /// <summary>Gets a handle that you can use to enumerate the list of registered providers on the computer</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]
@@ -293,7 +293,7 @@ internal static partial class NativeMethods
         EvtHandle session,
         [MarshalAs(UnmanagedType.LPWStr)] string path,
         [MarshalAs(UnmanagedType.LPWStr)] string? query,
-        PathType flags);
+        LogPathType flags);
 
     /// <summary>Renders an XML fragment base on the render context that you specify</summary>
     [LibraryImport(EventLogApi, SetLastError = true)]

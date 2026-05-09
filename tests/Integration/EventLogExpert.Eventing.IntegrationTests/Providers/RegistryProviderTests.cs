@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32;
 using NSubstitute;
 
@@ -44,26 +44,6 @@ public sealed class RegistryProviderTests
     }
 
     [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
-    {
-        // Arrange
-        var provider = new RegistryProvider();
-
-        // Act
-        var result = FindAnyLegacyProviderFiles(provider);
-
-        // Assert
-        Assert.NotEmpty(result);
-
-        Assert.All(result,
-            path =>
-            {
-                var extension = Path.GetExtension(path).ToLower();
-                Assert.NotEqual(".sys", extension);
-            });
-    }
-
-    [Fact]
     public void GetMessageFilesForLegacyProvider_WhenCalledWithLogger_ShouldLogTrace()
     {
         // Arrange
@@ -92,6 +72,26 @@ public sealed class RegistryProviderTests
 
         // Assert
         Assert.NotNull(result);
+    }
+
+    [Fact]
+    public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
+    {
+        // Arrange
+        var provider = new RegistryProvider();
+
+        // Act
+        var result = FindAnyLegacyProviderFiles(provider);
+
+        // Assert
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
+            {
+                var extension = Path.GetExtension(path).ToLower();
+                Assert.NotEqual(".sys", extension);
+            });
     }
 
     [Theory]
@@ -478,7 +478,7 @@ public sealed class RegistryProviderTests
 
         foreach (var logName in eventLogKey.GetSubKeyNames())
         {
-            if (LogNames.AdminOnlyLiveLogNames.Contains(logName))
+            if (LogChannelNames.AdminOnlyLiveChannels.Contains(logName))
             {
                 continue;
             }

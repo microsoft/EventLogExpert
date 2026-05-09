@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Readers;
 using Microsoft.Win32;
 
 namespace EventLogExpert.Eventing.Providers;
@@ -35,7 +35,7 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null)
         foreach (var logSubKeyName in eventLogKey.GetSubKeyNames())
         {
             // Skip Security and State since it requires elevation
-            if (LogNames.AdminOnlyLiveLogNames.Contains(logSubKeyName))
+            if (LogChannelNames.AdminOnlyLiveChannels.Contains(logSubKeyName))
             {
                 continue;
             }
@@ -93,5 +93,8 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null)
         return [];
     }
 
-    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg) { /* marker exception — no extra state needed */ }
+    private class OpenEventLogRegistryKeyFailedException(string msg) : Exception(msg)
+    {
+        /* marker exception — no extra state needed */
+    }
 }

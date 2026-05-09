@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.EventDbTool.Tests.TestUtils;
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.Tests;
@@ -45,7 +45,7 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(dbPath)));
 
-        using var verify = new EventProviderDbContext(dbPath, readOnly: true, ensureCreated: false);
+        using var verify = new ProviderDbContext(dbPath, readOnly: true, ensureCreated: false);
         var state = verify.IsUpgradeNeeded();
         Assert.Equal(ProviderDatabaseSchemaVersion.Unknown, state.CurrentVersion);
     }
@@ -84,7 +84,7 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
 
         new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
 
-        using var verify = new EventProviderDbContext(dbPath, true);
+        using var verify = new ProviderDbContext(dbPath, true);
         var schemaState = verify.IsUpgradeNeeded();
         Assert.False(schemaState.NeedsUpgrade);
         Assert.Equal(ProviderDatabaseSchemaVersion.Current, schemaState.CurrentVersion);
@@ -99,7 +99,7 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
 
         new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
 
-        logger.Received().Info(Arg.Is<InfoLogHandler>(handler =>
+        logger.Received().Information(Arg.Is<InformationLogHandler>(handler =>
             handler.ToString().Contains("does not need to be upgraded")));
     }
 

@@ -1,14 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
-using EventLogExpert.Eventing.Models;
 using System.Buffers;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogReader(string path, PathType pathType, bool renderXml = false) : IDisposable
+public sealed partial class EventLogReader(string path, LogPathType pathType, bool renderXml = false) : IDisposable
 {
     private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =
@@ -101,7 +101,7 @@ public sealed partial class EventLogReader(string path, PathType pathType, bool 
                 finally
                 {
                     events[i].PathName = path;
-                    events[i].PathType = pathType;
+                    events[i].LogPathType = pathType;
                 }
             }
 

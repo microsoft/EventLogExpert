@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Interop;
 using System.Runtime.InteropServices;
 
@@ -27,7 +28,7 @@ public sealed partial class EventLogSession
 
     internal EvtHandle UserRenderContext { get; } = CreateRenderContext(EvtRenderContextFlags.User);
 
-    public EventLogInformation GetLogInformation(string logName, PathType pathType) => new(this, logName, pathType);
+    public EventLogInformation GetLogInformation(string logName, LogPathType pathType) => new(this, logName, pathType);
 
     /// <summary>Gets an ordered list of all the log names on the system.</summary>
     public IEnumerable<string> GetLogNames()

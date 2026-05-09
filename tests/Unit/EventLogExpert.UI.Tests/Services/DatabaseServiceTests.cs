@@ -174,7 +174,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var lockedPath = Path.Combine(databasePath, "locked.db");
         DatabaseSeedUtils.SeedV3Schema(lockedPath);
 
-        // Hold an exclusive lock on the second file so EventProviderDbContext cannot open it.
+        // Hold an exclusive lock on the second file so ProviderDbContext cannot open it.
         // The classification pass must mark the locked entry as ClassificationFailed so the
         // resolver pipeline cannot consume it later (a Ready status would crash IEventResolver
         // when it tried to open the same locked file).
@@ -258,22 +258,6 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV3Schema(dbPath);
-
-        var service = CreateDatabaseService();
-
-        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
-
-        var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
-        Assert.False(entry.BackupExists);
-    }
-
-    [Fact]
     public async Task ClassifyEntriesAsync_WhenV3SchemaWithUpgradeBak_ShouldDetectAsUpgradeRequiredAndBackupExistsTrue()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -294,18 +278,18 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
+    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV4Schema(dbPath);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
 
         var service = CreateDatabaseService();
 
         await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
         Assert.False(entry.BackupExists);
     }
 
@@ -327,6 +311,22 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
         Assert.False(File.Exists(bakPath), "Stale .upgrade.bak must be cleaned up once the main file reaches V4.");
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.False(entry.BackupExists);
     }
 
     [Fact]
@@ -648,6 +648,25 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        service.Toggle(Constants.TestDb1);
+
+        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(1, secondSubscriberInvocations);
+    }
+
+    [Fact]
     public void Entries_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
     {
         // Arrange
@@ -705,25 +724,6 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
         Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
         Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
-    }
-
-    [Fact]
-    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        CreateDatabaseFile(databasePath, Constants.TestDb1);
-
-        var service = CreateDatabaseService();
-
-        var secondSubscriberInvocations = 0;
-
-        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
-        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
-
-        service.Toggle(Constants.TestDb1);
-
-        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
-        Assert.Equal(1, secondSubscriberInvocations);
     }
 
     [Fact]
@@ -1207,7 +1207,7 @@ public sealed class DatabaseServiceTests : IDisposable
         DatabaseSeedUtils.SeedV3Schema(db1Path);
         DatabaseSeedUtils.SeedV3Schema(db2Path);
 
-        // Hold exclusive locks on every DB file so EventProviderDbContext cannot open any of them.
+        // Hold exclusive locks on every DB file so ProviderDbContext cannot open any of them.
         // The per-entry catch must turn each failure into ClassificationFailed and the outer
         // wrapper must keep the exposed task in RanToCompletion.
         using var handle1 = new FileStream(db1Path, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
@@ -1256,7 +1256,7 @@ public sealed class DatabaseServiceTests : IDisposable
         // Logger throws on every Warn — simulates debug.log being locked. Without SafeLog the
         // per-entry catch would propagate, faulting the worker before statuses are applied.
         var throwingLogger = Substitute.For<ITraceLogger>();
-        throwingLogger.When(logger => logger.Warn(Arg.Any<WarnLogHandler>()))
+        throwingLogger.When(logger => logger.Warning(Arg.Any<WarningLogHandler>()))
             .Do(_ => throw new IOException("simulated log file lock"));
 
         var service = CreateDatabaseService(traceLogger: throwingLogger);
@@ -1283,7 +1283,7 @@ public sealed class DatabaseServiceTests : IDisposable
         using var subscriberAttached = new ManualResetEventSlim(false);
 
         var throwingLogger = Substitute.For<ITraceLogger>();
-        throwingLogger.When(logger => logger.Warn(Arg.Any<WarnLogHandler>()))
+        throwingLogger.When(logger => logger.Warning(Arg.Any<WarningLogHandler>()))
             .Do(_ =>
             {
                 // Worker blocks here until subscriberAttached.Set() below; ensures the
@@ -1306,7 +1306,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(TaskStatus.RanToCompletion, service.InitialClassificationTask.Status);
         // Per-entry SafeLog (ClassificationFailed) plus wrapper SafeLog (subscriber fault) — both
         // fired and both throws were swallowed for the task to RanToCompletion.
-        throwingLogger.Received(2).Warn(Arg.Any<WarnLogHandler>());
+        throwingLogger.Received(2).Warning(Arg.Any<WarningLogHandler>());
     }
 
     [Fact]

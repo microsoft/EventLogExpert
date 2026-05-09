@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.UI;
+using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;

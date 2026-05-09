@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
 
@@ -22,7 +22,7 @@ internal static class EventUtils
         int? processId = null,
         int? threadId = null,
         IReadOnlyList<string>? keywords = null) =>
-        new("TestLog", PathType.LogName)
+        new("TestLog", LogPathType.Channel)
         {
             Id = id,
             Source = source,

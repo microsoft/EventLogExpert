@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 using System.Data.Common;
@@ -54,7 +54,7 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         try
         {
-            using var probe = new EventProviderDbContext(file, readOnly: false, ensureCreated: false, Logger);
+            using var probe = new ProviderDbContext(file, readOnly: false, ensureCreated: false, Logger);
             state = probe.IsUpgradeNeeded();
         }
         catch (DbException ex)
@@ -66,21 +66,21 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
         if (!state.NeedsUpgrade)
         {
-            Logger.Info($"This database does not need to be upgraded.");
+            Logger.Information($"This database does not need to be upgraded.");
 
             return;
         }
 
         if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
         {
-            Logger.Error($"{DatabaseSchemaMessages.UnrecognizedSchema(DatabaseSchemaMessages.DefaultLabel, file)}");
+            Logger.Error($"{SchemaStateMessages.UnrecognizedSchema(SchemaStateMessages.DefaultLabel, file)}");
 
             return;
         }
 
         if (state.CurrentVersion is 1 or 2)
         {
-            Logger.Error($"{DatabaseSchemaMessages.UnsupportedV1OrV2Schema(file, state.CurrentVersion)}");
+            Logger.Error($"{SchemaStateMessages.UnsupportedV1OrV2Schema(file, state.CurrentVersion)}");
 
             return;
         }
@@ -88,7 +88,7 @@ public class UpgradeDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         // Destructive ops beyond this point — exceptions propagate so partial-state failures
         // aren't masked as a benign "upgrade failed". DatabaseUpgradeException only fires from
         // ProviderDetailsMerger before any DROP TABLE, so it's safe to catch.
-        using var upgradeContext = new EventProviderDbContext(file, false, Logger);
+        using var upgradeContext = new ProviderDbContext(file, false, Logger);
 
         try
         {

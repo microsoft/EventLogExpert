@@ -76,7 +76,8 @@ public class ShowCommand(ITraceLogger logger) : DbToolCommand(logger)
 
             if (providerNames.Count == 0)
             {
-                Logger.Warn($"No providers found.");
+                Logger.Warning($"No providers found.");
+
                 return;
             }
 

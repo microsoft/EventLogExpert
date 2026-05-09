@@ -1,21 +1,20 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
-using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Options;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
 using System.IO.Compression;
-using System.Text.RegularExpressions;
 using System.Threading.Channels;
 
 namespace EventLogExpert.UI.Services;
 
-public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollectionProvider
+public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProvider
 {
     public const string UpgradeBackupSuffix = ".upgrade.bak";
 
@@ -99,7 +98,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                             continue;
                         }
 
-                        using var context = new EventProviderDbContext(
+                        using var context = new ProviderDbContext(
                             entry.FullPath,
                             readOnly: false,
                             ensureCreated: false,
@@ -115,7 +114,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     {
                         perFile[entry.FileName] = (DatabaseStatus.ClassificationFailed, false);
 
-                        SafeLog(() => _traceLogger.Warn(
+                        SafeLog(() => _traceLogger.Warning(
                             $"{nameof(DatabaseService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}"));
                     }
                 }
@@ -200,7 +199,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(DisposeAsync)}: cancellation source faulted: {ex}"));
         }
 
@@ -214,7 +213,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(DisposeAsync)}: consumer task faulted: {ex}"));
         }
 
@@ -235,7 +234,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _traceLogger.Warn(
+            _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(EnumerateZipDbEntryNamesAsync)} failed to open '{sourceZipPath}': {ex}");
 
             return [];
@@ -341,7 +340,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 {
                     failures.Add(new ImportFailure(fileName, ex.Message));
 
-                    _traceLogger.Warn(
+                    _traceLogger.Warning(
                         $"{nameof(DatabaseService)}.{nameof(ImportAsync)} failed to copy '{fileName}': {ex}");
                 }
             }
@@ -381,7 +380,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            _traceLogger.Warn(
+            _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(ImportAsync)} post-import classification failed: {ex}");
         }
 
@@ -446,7 +445,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 StringComparer.OrdinalIgnoreCase);
 
             var fileNames = EnumerateDatabaseFileNames();
-            var sortedFileNames = SortDatabases(fileNames);
+            var sortedFileNames = DatabasePathSorter.Sort(fileNames);
 
             ImmutableList<DatabaseEntry> nextSnapshot = sortedFileNames
                 .Select(fileName =>
@@ -535,7 +534,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: prepare-for-deletion callback failed: {ex}"));
 
                 RestoreEnabledIfChanged(fileName, wasEnabled);
@@ -556,7 +555,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(RemoveAsync)}: deleting files for '{fileName}' failed: {ex}"));
 
             RestoreEnabledIfChanged(fileName, wasEnabled);
@@ -601,7 +600,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
         }
 
@@ -785,52 +784,6 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         catch { /* Logger faults must not propagate from defensive logging sites. */ }
     }
 
-    private static IEnumerable<string> SortDatabases(IEnumerable<string> databases)
-    {
-        if (!databases.Any()) { return []; }
-
-        var splitter = SplitFileName();
-
-        return databases
-            .Select(name =>
-            {
-                var nameWithoutExt = Path.GetFileNameWithoutExtension(name);
-                var match = splitter.Match(nameWithoutExt);
-
-                if (match.Success)
-                {
-                    var versionString = match.Groups[2].Value;
-
-                    // Try to parse the version as a number for proper numeric ordering.
-                    // This ensures "10" sorts after "2" rather than before it (lexicographic).
-                    int? numericVersion = int.TryParse(versionString, out var parsed) ? parsed : null;
-
-                    return new
-                    {
-                        OriginalName = name,
-                        FirstPart = match.Groups[1].Value + " ",
-                        SecondPart = versionString,
-                        NumericVersion = numericVersion
-                    };
-                }
-
-                return new
-                {
-                    OriginalName = name,
-                    FirstPart = nameWithoutExt,
-                    SecondPart = "",
-                    NumericVersion = (int?)null
-                };
-            })
-            .OrderBy(name => name.FirstPart)
-            .ThenByDescending(name => name.NumericVersion ?? int.MinValue)
-            .ThenByDescending(name => name.SecondPart)
-            .Select(name => name.OriginalName);
-    }
-
-    [GeneratedRegex("^(.+) (\\S+)$")]
-    private static partial Regex SplitFileName();
-
     private static void WalCheckpoint(string dbPath)
     {
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
@@ -861,7 +814,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(ConsumeUpgradeQueueAsync)}: consumer faulted: {ex}"));
         }
         finally
@@ -927,7 +880,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            _traceLogger.Warn($"{nameof(DatabaseService)}.{nameof(EnumerateDatabaseFileNames)} failed: {ex}");
+            _traceLogger.Warning($"{nameof(DatabaseService)}.{nameof(EnumerateDatabaseFileNames)} failed: {ex}");
             return [];
         }
     }
@@ -953,7 +906,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         {
             failures.Add(new ImportFailure(zipFileName, $"Could not open archive: {ex.Message}"));
 
-            _traceLogger.Warn(
+            _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to open '{zipFileName}': {ex}");
 
             return (imported, failures, importedNames);
@@ -993,7 +946,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                 {
                     failures.Add(new ImportFailure(entry.Name, ex.Message));
 
-                    _traceLogger.Warn(
+                    _traceLogger.Warning(
                         $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to extract '{entry.Name}' from '{zipFileName}': {ex}");
 
                     try
@@ -1005,7 +958,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     }
                     catch (Exception cleanupEx)
                     {
-                        _traceLogger.Warn(
+                        _traceLogger.Warning(
                             $"{nameof(DatabaseService)}.{nameof(ImportZipAsync)} failed to clean up partial extract '{destinationPath}': {cleanupEx}");
                     }
                 }
@@ -1049,7 +1002,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} probe failed for '{entry.FileName}': {ex}"));
 
                 return true;
@@ -1064,7 +1017,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseService)}.{nameof(ProbeOrCleanupBackup)} stale .upgrade.bak cleanup failed for '{entry.FileName}': {ex}"));
             }
         }
@@ -1146,7 +1099,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
                     var message = ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message;
                     failed.Add(new UpgradeFailure(entry.FileName, message));
 
-                    SafeLog(() => _traceLogger.Warn(
+                    SafeLog(() => _traceLogger.Warning(
                         $"{nameof(DatabaseService)}.{nameof(ProcessBatchAsync)}: '{entry.FileName}' upgrade threw: {ex}"));
                 }
             }
@@ -1162,7 +1115,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(ProcessBatchAsync)}: unhandled batch error: {ex}"));
 
             batch.Tcs.TrySetException(ex);
@@ -1188,7 +1141,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseService)}.{nameof(RaiseEntriesChanged)}: subscriber threw: {ex}"));
             }
         }
@@ -1248,7 +1201,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
         if (!File.Exists(backupPath))
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)}: '{backupPath}' missing; nothing to restore."));
 
             return false;
@@ -1266,7 +1219,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(RestoreFromBackupAsync)}: copy from '{backupPath}' to '{mainPath}' failed: {ex}"));
 
             return false;
@@ -1288,7 +1241,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
             }
             catch (Exception ex)
             {
-                SafeLog(() => _traceLogger.Warn(
+                SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseService)}.{eventName}: subscriber threw: {ex}"));
             }
         }
@@ -1302,7 +1255,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
         }
     }
@@ -1318,7 +1271,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             SafeLog(() =>
-                _traceLogger.Warn($"{nameof(DatabaseService)}.{callerName}: delete failed for '{path}': {ex}"));
+                _traceLogger.Warning($"{nameof(DatabaseService)}.{callerName}: delete failed for '{path}': {ex}"));
 
             return false;
         }
@@ -1417,7 +1370,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
 
                     migrationStarted = true;
 
-                    using (var context = new EventProviderDbContext(
+                    using (var context = new ProviderDbContext(
                         entry.FullPath,
                         readOnly: false,
                         ensureCreated: false,
@@ -1512,7 +1465,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
     {
         try
         {
-            using var context = new EventProviderDbContext(
+            using var context = new ProviderDbContext(
                 fullPath,
                 readOnly: true,
                 ensureCreated: false,
@@ -1522,7 +1475,7 @@ public sealed partial class DatabaseService : IDatabaseService, IDatabaseCollect
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            SafeLog(() => _traceLogger.Warn(
+            SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseService)}.{nameof(VerifyEntryReady)}: '{fullPath}' verification threw: {ex}"));
 
             return false;

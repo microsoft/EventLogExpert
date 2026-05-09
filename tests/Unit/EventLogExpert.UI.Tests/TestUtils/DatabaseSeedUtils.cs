@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -76,7 +76,7 @@ internal static class DatabaseSeedUtils
 
     internal static void SeedV4Schema(string dbPath, ITraceLogger? logger = null)
     {
-        using (var context = new EventProviderDbContext(dbPath, readOnly: false, ensureCreated: true, logger))
+        using (var context = new ProviderDbContext(dbPath, readOnly: false, ensureCreated: true, logger))
         {
             context.Database.EnsureCreated();
         }
