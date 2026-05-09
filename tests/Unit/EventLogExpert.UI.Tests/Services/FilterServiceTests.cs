@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -59,8 +59,8 @@ public sealed class FilterServiceTests
 
         var logData = new List<EventLogData>
         {
-            new("Log1", PathType.LogName, log1Events),
-            new("Log2", PathType.LogName, log2Events)
+            new("Log1", LogPathType.Channel, log1Events),
+            new("Log2", LogPathType.Channel, log2Events)
         };
 
         var expectedLog1 = log1Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
@@ -75,6 +75,32 @@ public sealed class FilterServiceTests
         Assert.Equal(expectedLog2.Count, result[logData[1].Id].Count);
         Assert.Equal(expectedLog1.Select(e => e.RecordId), result[logData[0].Id].Select(e => e.RecordId));
         Assert.Equal(expectedLog2.Select(e => e.RecordId), result[logData[1].Id].Select(e => e.RecordId));
+    }
+
+    [Fact]
+    public void FilterActiveLogs_WhenMultipleLogsButFilteringDisabled_ShouldReturnAllEventsPerLog()
+    {
+        // Arrange — IsFilteringEnabled short-circuit must stay engaged even with many logs to
+        // avoid spinning up parallel work for a no-op filter.
+        var filterService = CreateFilterService();
+
+        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+
+        var logData = new List<EventLogData>
+        {
+            new("Log1", LogPathType.Channel, log1Events),
+            new("Log2", LogPathType.Channel, log2Events)
+        };
+
+        var eventFilter = new EventFilter(null, []);
+
+        // Act
+        var result = filterService.FilterActiveLogs(logData, eventFilter);
+
+        // Assert
+        Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
+        Assert.Equal(log2Events.Count, result[logData[1].Id].Count);
     }
 
     [Fact]
@@ -97,8 +123,8 @@ public sealed class FilterServiceTests
 
         var logData = new List<EventLogData>
         {
-            new("Log1", PathType.LogName, log1Events),
-            new("Log2", PathType.LogName, log2Events)
+            new("Log1", LogPathType.Channel, log1Events),
+            new("Log2", LogPathType.Channel, log2Events)
         };
 
         var eventFilter = new EventFilter(null, []);
@@ -108,32 +134,6 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Equal(2, result.Count);
-    }
-
-    [Fact]
-    public void FilterActiveLogs_WhenMultipleLogsButFilteringDisabled_ShouldReturnAllEventsPerLog()
-    {
-        // Arrange — IsFilteringEnabled short-circuit must stay engaged even with many logs to
-        // avoid spinning up parallel work for a no-op filter.
-        var filterService = CreateFilterService();
-
-        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
-        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
-
-        var logData = new List<EventLogData>
-        {
-            new("Log1", PathType.LogName, log1Events),
-            new("Log2", PathType.LogName, log2Events)
-        };
-
-        var eventFilter = new EventFilter(null, []);
-
-        // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
-
-        // Assert
-        Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
-        Assert.Equal(log2Events.Count, result[logData[1].Id].Count);
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class FilterServiceTests
 
         var logData = new List<EventLogData>
         {
-            new("TestLog", PathType.LogName, events)
+            new("TestLog", LogPathType.Channel, events)
         };
 
         var eventFilter = new EventFilter(null, []);
@@ -249,6 +249,94 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Equal(3, result.Count);
+    }
+
+    [Theory]
+    [InlineData("Id == 100")]
+    [InlineData("Level == \"Error\"")]
+    [InlineData("Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
+    [InlineData("Id > 100 && Level == \"Error\"")]
+    [InlineData("Id == 100 || Id == 200")]
+    public void TryParseExpression_WhenCommonExpressions_ShouldReturnTrue(string expression)
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression(expression, out var error);
+
+        // Assert
+        Assert.True(result);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void TryParseExpression_WhenEmptyExpression_ShouldReturnFalse()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression(string.Empty, out var error);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void TryParseExpression_WhenInvalidExpression_ShouldReturnFalseWithError()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression(Constants.FilterInvalidProperty, out var error);
+
+        // Assert
+        Assert.False(result);
+        Assert.NotEmpty(error);
+    }
+
+    [Fact]
+    public void TryParseExpression_WhenNullExpression_ShouldReturnFalse()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression(null, out var error);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void TryParseExpression_WhenValidExpression_ShouldReturnTrue()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression(Constants.FilterIdEquals100, out var error);
+
+        // Assert
+        Assert.True(result);
+        Assert.Empty(error);
+    }
+
+    [Fact]
+    public void TryParseExpression_WhenXmlExpression_ShouldReturnTrue()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+
+        // Act
+        var result = filterService.TryParseExpression("Xml.Contains(\"test\", StringComparison.OrdinalIgnoreCase)",
+            out var error);
+
+        // Assert
+        Assert.True(result);
+        Assert.Empty(error);
     }
 
     [Fact]
@@ -461,28 +549,6 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-        var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
-            [
-                new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
-                    JoinWithAny: false)
-            ]);
-
-        // Act
-        var result = filterService.TryParse(source, out var comparison);
-
-        // Assert
-        Assert.True(result);
-        Assert.Contains("Id == \"100\"", comparison);
-        Assert.Contains("Level == \"Error\"", comparison);
-    }
-
-    [Fact]
     public void TryParse_WhenSubFilterWithCompareAny_ShouldUseOrOperator()
     {
         // Arrange
@@ -522,6 +588,28 @@ public sealed class FilterServiceTests
         // Assert
         Assert.True(result);
         Assert.Contains(" && ", comparison);
+    }
+
+    [Fact]
+    public void TryParse_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilter(
+            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            [
+                new SubFilter(
+                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    JoinWithAny: false)
+            ]);
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.True(result);
+        Assert.Contains("Id == \"100\"", comparison);
+        Assert.Contains("Level == \"Error\"", comparison);
     }
 
     [Fact]
@@ -720,94 +808,6 @@ public sealed class FilterServiceTests
         // Assert
         Assert.True(result);
         Assert.Equal(expected, comparison);
-    }
-
-    [Theory]
-    [InlineData("Id == 100")]
-    [InlineData("Level == \"Error\"")]
-    [InlineData("Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
-    [InlineData("Id > 100 && Level == \"Error\"")]
-    [InlineData("Id == 100 || Id == 200")]
-    public void TryParseExpression_WhenCommonExpressions_ShouldReturnTrue(string expression)
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression(expression, out var error);
-
-        // Assert
-        Assert.True(result);
-        Assert.Empty(error);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenEmptyExpression_ShouldReturnFalse()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression(string.Empty, out var error);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenInvalidExpression_ShouldReturnFalseWithError()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression(Constants.FilterInvalidProperty, out var error);
-
-        // Assert
-        Assert.False(result);
-        Assert.NotEmpty(error);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenNullExpression_ShouldReturnFalse()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression(null, out var error);
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenValidExpression_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression(Constants.FilterIdEquals100, out var error);
-
-        // Assert
-        Assert.True(result);
-        Assert.Empty(error);
-    }
-
-    [Fact]
-    public void TryParseExpression_WhenXmlExpression_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-
-        // Act
-        var result = filterService.TryParseExpression("Xml.Contains(\"test\", StringComparison.OrdinalIgnoreCase)",
-            out var error);
-
-        // Assert
-        Assert.True(result);
-        Assert.Empty(error);
     }
 
     private static BasicFilter CreateBasicFilter(

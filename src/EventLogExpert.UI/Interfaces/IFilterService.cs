@@ -1,7 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Interfaces;

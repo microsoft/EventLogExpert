@@ -9,17 +9,17 @@ public class TraceLogger(LogLevel loggingLevel) : ITraceLogger
 {
     public LogLevel MinimumLevel => loggingLevel;
 
-    public void Trace(TraceLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Trace);
+    public void Critical(CriticalLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Critical);
 
     public void Debug(DebugLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Debug);
 
-    public void Info(InfoLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Information);
-
-    public void Warn(WarnLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Warning);
-
     public void Error(ErrorLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Error);
 
-    public void Critical(CriticalLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Critical);
+    public void Information(InformationLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Information);
+
+    public void Trace(TraceLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Trace);
+
+    public void Warning(WarningLogHandler handler) => Write(handler.IsEnabled, handler.ToStringAndClear(), LogLevel.Warning);
 
     private static void Write(bool isEnabled, string message, LogLevel level)
     {

@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
@@ -16,9 +16,9 @@ public sealed class EventTableReducers
     {
         var newTable = new EventTableModel(action.LogData.Id)
         {
-            FileName = action.LogData.Type == PathType.LogName ? null : action.LogData.Name,
+            FileName = action.LogData.Type == LogPathType.Channel ? null : action.LogData.Name,
             LogName = action.LogData.Name,
-            PathType = action.LogData.Type,
+            LogPathType = action.LogData.Type,
             IsLoading = true
         };
 

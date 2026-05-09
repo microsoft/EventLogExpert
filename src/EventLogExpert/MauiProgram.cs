@@ -1,9 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Modals.Alerts;
-using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
@@ -53,7 +54,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<DebugLogService>();
         builder.Services.AddSingleton<ITraceLogger>(sp => sp.GetRequiredService<DebugLogService>());
         builder.Services.AddSingleton<IFileLogger>(sp => sp.GetRequiredService<DebugLogService>());
-        builder.Services.AddSingleton<ILogWatcherService, LiveLogWatcherService>();
+        builder.Services.AddSingleton<ILogWatcherService, LogWatcherService>();
 
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
         builder.Services.AddSingleton(fileLocationOptions);
@@ -83,7 +84,7 @@ public static class MauiProgram
             provider.GetRequiredService<DatabaseService>());
 
         // Provider Services
-        builder.Services.AddSingleton<IDatabaseCollectionProvider>(static provider =>
+        builder.Services.AddSingleton<IActiveDatabasePathsProvider>(static provider =>
             provider.GetRequiredService<DatabaseService>());
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();

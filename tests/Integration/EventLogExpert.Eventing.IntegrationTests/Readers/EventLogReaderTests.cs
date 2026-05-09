@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
 
@@ -12,7 +13,7 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenApplicationLog_ShouldNotThrow()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(reader);
@@ -22,7 +23,7 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenEmptyLogName_ShouldFailToReadEvents()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(string.Empty, PathType.LogName);
+        using var reader = new EventLogReader(string.Empty, LogPathType.Channel);
 
         // Assert - TryGetEvents must fail
         bool success = reader.TryGetEvents(out var events);
@@ -39,7 +40,7 @@ public sealed class EventLogReaderTests
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act
-        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
 
         // Assert - TryGetEvents must fail
         bool success = reader.TryGetEvents(out var events);
@@ -53,8 +54,8 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenMultipleInstances_ShouldCreateIndependentReaders()
     {
         // Arrange & Act
-        using var reader1 = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
-        using var reader2 = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader1 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
+        using var reader2 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(reader1);
@@ -66,7 +67,7 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenNullLogName_ShouldFailToReadEvents()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(null!, PathType.LogName);
+        using var reader = new EventLogReader(null!, LogPathType.Channel);
 
         // Assert - TryGetEvents must fail
         bool success = reader.TryGetEvents(out var events);
@@ -80,21 +81,21 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenPathTypeLogName_ShouldQueryByLogName()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
 
         // Assert
         Assert.True(success);
-        Assert.All(events, evt => Assert.Equal(PathType.LogName, evt.PathType));
+        Assert.All(events, evt => Assert.Equal(LogPathType.Channel, evt.LogPathType));
     }
 
     [Fact]
     public void Constructor_WhenRenderXmlFalse_ShouldNotThrow()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName, renderXml: false);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: false);
 
         // Assert
         Assert.NotNull(reader);
@@ -104,7 +105,7 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenRenderXmlTrue_ShouldNotThrow()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
 
         // Assert
         Assert.NotNull(reader);
@@ -117,7 +118,7 @@ public sealed class EventLogReaderTests
         var invalidLogName = "Invalid<>Log|Name";
 
         // Act
-        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
 
         // Assert - TryGetEvents must fail
         bool success = reader.TryGetEvents(out var events);
@@ -131,7 +132,7 @@ public sealed class EventLogReaderTests
     public void Dispose_AfterDispose_TryGetEventsShouldThrow()
     {
         // Arrange
-        var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         reader.Dispose();
@@ -141,24 +142,24 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void Dispose_WhenCalled_ShouldNotThrow()
+    public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
     {
         // Arrange
-        var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act & Assert
+        reader.Dispose();
+        reader.Dispose();
         reader.Dispose();
     }
 
     [Fact]
-    public void Dispose_WhenCalledMultipleTimes_ShouldNotThrow()
+    public void Dispose_WhenCalled_ShouldNotThrow()
     {
         // Arrange
-        var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act & Assert
-        reader.Dispose();
-        reader.Dispose();
         reader.Dispose();
     }
 
@@ -167,7 +168,7 @@ public sealed class EventLogReaderTests
     {
         // Arrange — bounded fixture keeps the exhaustion loop fast on any host.
         using var fixture = new SmallEvtxFixture();
-        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
+        using var reader = new EventLogReader(fixture.FilePath, LogPathType.File);
 
         // Act — exhaust the reader so TryGetEvents returns false with ERROR_NO_MORE_ITEMS
         while (reader.TryGetEvents(out _)) { }
@@ -186,7 +187,7 @@ public sealed class EventLogReaderTests
     public void IsValid_WhenApplicationLog_ShouldBeTrue()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.True(reader.IsValid);
@@ -196,7 +197,7 @@ public sealed class EventLogReaderTests
     public void IsValid_WhenEmptyLogName_ShouldBeFalse()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(string.Empty, PathType.LogName);
+        using var reader = new EventLogReader(string.Empty, LogPathType.Channel);
 
         // Assert
         Assert.False(reader.IsValid);
@@ -209,7 +210,7 @@ public sealed class EventLogReaderTests
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
 
         // Act
-        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
 
         // Assert
         Assert.False(reader.IsValid);
@@ -220,7 +221,7 @@ public sealed class EventLogReaderTests
     {
         // Arrange — fixture keeps the read deterministic on minimal hosts.
         using var fixture = new SmallEvtxFixture();
-        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
+        using var reader = new EventLogReader(fixture.FilePath, LogPathType.File);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -236,7 +237,7 @@ public sealed class EventLogReaderTests
     public void LastBookmark_WhenInitialized_ShouldBeNull()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.Null(reader.LastBookmark);
@@ -248,7 +249,7 @@ public sealed class EventLogReaderTests
         // Use SmallEvtxFixture (5 events) with batchSize: 1 so two consecutive
         // reads are guaranteed to produce two distinct events on every host.
         using var fixture = new SmallEvtxFixture();
-        using var reader = new EventLogReader(fixture.FilePath, PathType.FilePath);
+        using var reader = new EventLogReader(fixture.FilePath, LogPathType.File);
 
         // Act
         bool success1 = reader.TryGetEvents(out var events1, batchSize: 1);
@@ -273,7 +274,7 @@ public sealed class EventLogReaderTests
     public void LastErrorCode_WhenInitialized_ShouldBeNull()
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.Null(reader.LastErrorCode);
@@ -284,7 +285,7 @@ public sealed class EventLogReaderTests
     {
         // Arrange — opening a non-existent log produces an invalid handle
         var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
-        using var reader = new EventLogReader(invalidLogName, PathType.LogName);
+        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
 
         // Act
         reader.TryGetEvents(out _);
@@ -297,7 +298,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenApplicationLog_ShouldReturnEvents()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -312,7 +313,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenApplicationLog_ShouldReturnValidEventRecords()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -323,15 +324,30 @@ public sealed class EventLogReaderTests
         {
             Assert.NotNull(evt);
             Assert.Equal(Constants.ApplicationLogName, evt.PathName);
-            Assert.Equal(PathType.LogName, evt.PathType);
+            Assert.Equal(LogPathType.Channel, evt.LogPathType);
         });
+    }
+
+    [Fact]
+    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
+    {
+        // Arrange
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
+
+        // Act
+        bool success = reader.TryGetEvents(out var events, batchSize: 10);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(events);
+        Assert.True(events.Length <= 10);
     }
 
     [Fact]
     public void TryGetEvents_WhenBatchSize1_ShouldReturn1Event()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events, batchSize: 1);
@@ -344,25 +360,10 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
-    {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
-
-        // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 10);
-
-        // Assert
-        Assert.True(success);
-        Assert.NotNull(events);
-        Assert.True(events.Length <= 10);
-    }
-
-    [Fact]
     public void TryGetEvents_WhenBatchSize30_ShouldReturnUpTo30Events()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events, batchSize: 30);
@@ -377,7 +378,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenCalledMultipleTimes_ShouldReturnDifferentEvents()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success1 = reader.TryGetEvents(out var events1, batchSize: 5);
@@ -402,7 +403,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenCommonLogs_ShouldReturnEvents(string logName)
     {
         // Arrange
-        using var reader = new EventLogReader(logName, PathType.LogName);
+        using var reader = new EventLogReader(logName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -421,17 +422,17 @@ public sealed class EventLogReaderTests
         {
             Task.Run(() =>
             {
-                using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+                using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
                 return reader.TryGetEvents(out _);
             }),
             Task.Run(() =>
             {
-                using var reader = new EventLogReader(Constants.SystemLogName, PathType.LogName);
+                using var reader = new EventLogReader(Constants.SystemLogName, LogPathType.Channel);
                 return reader.TryGetEvents(out _);
             }),
             Task.Run(() =>
             {
-                using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+                using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
                 return reader.TryGetEvents(out _);
             })
         };
@@ -450,7 +451,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenDefaultBatchSize_ShouldReturn30OrLess()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -465,7 +466,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenEventsReturned_ShouldHavePathNameSet()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -483,7 +484,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenEventsReturned_ShouldHavePathTypeSet()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -493,7 +494,7 @@ public sealed class EventLogReaderTests
 
         Assert.All(events, evt =>
         {
-            Assert.Equal(PathType.LogName, evt.PathType);
+            Assert.Equal(LogPathType.Channel, evt.LogPathType);
         });
     }
 
@@ -501,7 +502,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenEventsReturned_ShouldHaveProperties()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events, batchSize: 1);
@@ -521,12 +522,12 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenLargeLogWithManyReads_ShouldEventuallyReturnFalse()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         var logInfo = new EventLogInformation(
             EventLogSession.GlobalSession,
             Constants.ApplicationLogName,
-            PathType.LogName);
+            LogPathType.Channel);
 
         // Derive iteration limit from actual log size (batch size defaults to 30)
         long maxIterations = (logInfo.RecordCount ?? 0) / 30 + 100;
@@ -551,8 +552,8 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenMultipleReaders_ShouldReadIndependently()
     {
         // Arrange
-        using var reader1 = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
-        using var reader2 = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader1 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
+        using var reader2 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success1 = reader1.TryGetEvents(out var events1, batchSize: 5);
@@ -574,7 +575,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenNoMoreEvents_ShouldReturnFalse()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act - Read all events
         bool success;
@@ -596,7 +597,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlFalse_ShouldNotIncludeXml()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName, renderXml: false);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: false);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -617,7 +618,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlTrue_ShouldIncludeXml()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -636,7 +637,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlTrue_XmlShouldBeValidFormat()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
 
         // Act
         bool success = reader.TryGetEvents(out var events, batchSize: 1);
@@ -657,7 +658,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenZeroBatchSize_ShouldHandleGracefully()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, PathType.LogName);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events, batchSize: 0);

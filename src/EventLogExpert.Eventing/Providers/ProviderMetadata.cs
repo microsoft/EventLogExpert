@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using System.Collections.ObjectModel;
 using System.Runtime.InteropServices;

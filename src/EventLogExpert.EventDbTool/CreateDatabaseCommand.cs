@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -101,7 +101,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
                     skipProviderNames.Add(name);
                 }
 
-                Logger.Info($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
+                Logger.Information($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
             }
 
             // Stream details directly into the DbContext. For .evtx sources, scanning the file
@@ -109,15 +109,15 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
             // log header — that would cause a second full pass over the .evtx. Instead we
             // buffer the first batch of resolved details, derive the header column width from
             // those names, then log the header + buffered rows and continue streaming.
-            const int batchSize = 100;
+            const int BatchSize = 100;
             var count = 0;
             var headerLogged = false;
-            var pendingForHeader = new List<ProviderDetails>(batchSize);
+            var pendingForHeader = new List<ProviderDetails>(BatchSize);
 
             // Defer creating the DbContext (and therefore the .db file on disk) until we have
             // at least one provider to persist. This prevents leaving an empty database behind
             // when no provider details could be resolved (e.g., .evtx without LocaleMetaData).
-            EventProviderDbContext? dbContext = null;
+            ProviderDbContext? dbContext = null;
 
             try
             {
@@ -131,19 +131,19 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
                     {
                         pendingForHeader.Add(details);
 
-                        if (pendingForHeader.Count < batchSize) { continue; }
+                        if (pendingForHeader.Count < BatchSize) { continue; }
 
                         FlushHeaderAndBuffer(ref dbContext, path, pendingForHeader, ref count);
                         headerLogged = true;
                         continue;
                     }
 
-                    dbContext ??= new EventProviderDbContext(path, false, Logger);
+                    dbContext ??= new ProviderDbContext(path, false, Logger);
                     dbContext.ProviderDetails.Add(details);
                     LogProviderDetails(details);
                     count++;
 
-                    if (count % batchSize != 0) { continue; }
+                    if (count % BatchSize != 0) { continue; }
 
                     dbContext.SaveChanges();
                     dbContext.ChangeTracker.Clear();
@@ -157,17 +157,17 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
 
                 if (dbContext is null)
                 {
-                    Logger.Warn($"No provider details could be resolved from the source. Database was not created.");
+                    Logger.Warning($"No provider details could be resolved from the source. Database was not created.");
 
                     return;
                 }
 
-                Logger.Info($"");
-                Logger.Info($"Saving database. Please wait...");
+                Logger.Information($"");
+                Logger.Information($"Saving database. Please wait...");
 
                 dbContext.SaveChanges();
 
-                Logger.Info($"Done!");
+                Logger.Information($"Done!");
             }
             finally
             {
@@ -181,14 +181,14 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
     }
 
     private void FlushHeaderAndBuffer(
-        ref EventProviderDbContext? dbContext,
+        ref ProviderDbContext? dbContext,
         string path,
         List<ProviderDetails> buffer,
         ref int count)
     {
         LogProviderDetailHeader(buffer.Select(p => p.ProviderName));
 
-        dbContext ??= new EventProviderDbContext(path, false, Logger);
+        dbContext ??= new ProviderDbContext(path, false, Logger);
 
         foreach (var details in buffer)
         {

@@ -69,18 +69,18 @@ public sealed class DebugLogServiceTests : IDisposable
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
         using var firstInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
-        firstInstance.Info($"first instance line");
+        firstInstance.Information($"first instance line");
 
         using var secondInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
-        secondInstance.Info($"second instance line");
+        secondInstance.Information($"second instance line");
 
         // Act + Assert - clearing from one instance must not fail because the other holds the writer.
         var exception = await Record.ExceptionAsync(() => firstInstance.ClearAsync());
         Assert.Null(exception);
 
         // Both instances must write cleanly post-clear; no NUL padding from stale positions.
-        secondInstance.Info($"after clear from second");
-        firstInstance.Info($"after clear from first");
+        secondInstance.Information($"after clear from second");
+        firstInstance.Information($"after clear from first");
 
         var bytes = ReadLogFileBytes();
         Assert.DoesNotContain((byte)0, bytes);
@@ -139,7 +139,7 @@ public sealed class DebugLogServiceTests : IDisposable
 
         // Act
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
-        debugLogService.Info($"{Constants.DebugLogNewMessage}");
+        debugLogService.Information($"{Constants.DebugLogNewMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -331,6 +331,37 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
+    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
+    {
+        // Arrange
+        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
+
+        using var debugLogService = new DebugLogService(
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
+
+        // Act - write at Debug (should succeed)
+        debugLogService.Debug($"debug message before change");
+        var contentBefore = ReadLogFile();
+        Assert.Contains("debug message before change", contentBefore);
+
+        // Change level to Warning
+        setLogLevel(LogLevel.Warning);
+
+        // Write at Debug (should be filtered by handler)
+        debugLogService.Debug($"debug message after change");
+
+        // Write at Warning (should succeed)
+        debugLogService.Warning($"warning message after change");
+
+        // Assert
+        var content = ReadLogFile();
+        Assert.Contains("debug message before change", content);
+        Assert.DoesNotContain("debug message after change", content);
+        Assert.Contains("warning message after change", content);
+    }
+
+    [Fact]
     public void Trace_ShouldIncludeThreadId()
     {
         // Arrange
@@ -340,7 +371,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogTestMessage}");
+        debugLogService.Information($"{Constants.DebugLogTestMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -358,7 +389,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogTestMessage}");
+        debugLogService.Information($"{Constants.DebugLogTestMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -391,7 +422,7 @@ public sealed class DebugLogServiceTests : IDisposable
 
                     for (var writeIndex = 0; writeIndex < WritesPerWriter; writeIndex++)
                     {
-                        debugLogService.Info($"writer-{writerIndex}-msg-{writeIndex}");
+                        debugLogService.Information($"writer-{writerIndex}-msg-{writeIndex}");
                     }
                 }, TestContext.Current.CancellationToken))
                 .ToArray();
@@ -450,9 +481,9 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogFirstMessage}");
-        debugLogService.Info($"{Constants.DebugLogSecondMessage}");
-        debugLogService.Info($"{Constants.DebugLogThirdMessage}");
+        debugLogService.Information($"{Constants.DebugLogFirstMessage}");
+        debugLogService.Information($"{Constants.DebugLogSecondMessage}");
+        debugLogService.Information($"{Constants.DebugLogThirdMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -472,16 +503,16 @@ public sealed class DebugLogServiceTests : IDisposable
             mockSettingsService);
 
         // Act - write at Information (should succeed)
-        debugLogService.Info($"{Constants.DebugLogFirstMessage}");
+        debugLogService.Information($"{Constants.DebugLogFirstMessage}");
 
         // Change level to Warning at runtime
         setLogLevel(LogLevel.Warning);
 
         // Write at Information (should be filtered now)
-        debugLogService.Info($"{Constants.DebugLogSecondMessage}");
+        debugLogService.Information($"{Constants.DebugLogSecondMessage}");
 
         // Write at Warning (should succeed)
-        debugLogService.Warn($"{Constants.DebugLogThirdMessage}");
+        debugLogService.Warning($"{Constants.DebugLogThirdMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -541,7 +572,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogTestMessage}");
+        debugLogService.Information($"{Constants.DebugLogTestMessage}");
 
         // Assert
         Assert.False(File.Exists(_testLogPath) && ReadLogFile().Contains(Constants.DebugLogTestMessage));
@@ -557,7 +588,7 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogTestMessage}");
+        debugLogService.Information($"{Constants.DebugLogTestMessage}");
 
         // Assert
         var content = ReadLogFile();
@@ -575,43 +606,12 @@ public sealed class DebugLogServiceTests : IDisposable
         using var debugLogService = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act
-        debugLogService.Info($"{Constants.DebugLogDefaultLevelMessage}");
+        debugLogService.Information($"{Constants.DebugLogDefaultLevelMessage}");
 
         // Assert
         var content = ReadLogFile();
         Assert.Contains("[Information]", content);
         Assert.Contains(Constants.DebugLogDefaultLevelMessage, content);
-    }
-
-    [Fact]
-    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
-    {
-        // Arrange
-        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
-
-        using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory),
-            mockSettingsService);
-
-        // Act - write at Debug (should succeed)
-        debugLogService.Debug($"debug message before change");
-        var contentBefore = ReadLogFile();
-        Assert.Contains("debug message before change", contentBefore);
-
-        // Change level to Warning
-        setLogLevel(LogLevel.Warning);
-
-        // Write at Debug (should be filtered by handler)
-        debugLogService.Debug($"debug message after change");
-
-        // Write at Warning (should succeed)
-        debugLogService.Warn($"warning message after change");
-
-        // Assert
-        var content = ReadLogFile();
-        Assert.Contains("debug message before change", content);
-        Assert.DoesNotContain("debug message after change", content);
-        Assert.Contains("warning message after change", content);
     }
 
     [Fact]
@@ -622,12 +622,12 @@ public sealed class DebugLogServiceTests : IDisposable
         var mockSettingsService = CreateMockSettingsService(LogLevel.Information);
 
         using var firstInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
-        firstInstance.Info($"first instance line");
+        firstInstance.Information($"first instance line");
 
         using var secondInstance = new DebugLogService(fileLocationOptions, mockSettingsService);
 
         // Act + Assert
-        var exception = Record.Exception(() => secondInstance.Info($"second instance line"));
+        var exception = Record.Exception(() => secondInstance.Information($"second instance line"));
         Assert.Null(exception);
     }
 
@@ -662,8 +662,8 @@ public sealed class DebugLogServiceTests : IDisposable
         {
             case LogLevel.Trace: service.Trace($"{message}"); break;
             case LogLevel.Debug: service.Debug($"{message}"); break;
-            case LogLevel.Information: service.Info($"{message}"); break;
-            case LogLevel.Warning: service.Warn($"{message}"); break;
+            case LogLevel.Information: service.Information($"{message}"); break;
+            case LogLevel.Warning: service.Warning($"{message}"); break;
             case LogLevel.Error: service.Error($"{message}"); break;
             case LogLevel.Critical: service.Critical($"{message}"); break;
             default: throw new ArgumentOutOfRangeException(nameof(level));

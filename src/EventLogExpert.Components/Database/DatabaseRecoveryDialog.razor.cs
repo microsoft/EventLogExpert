@@ -106,7 +106,7 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
                 }
                 catch (InvalidOperationException invalidOperation)
                 {
-                    TraceLogger.Warn(
+                    TraceLogger.Warning(
                         $"DatabaseRecoveryDialog: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
                     continue;
                 }

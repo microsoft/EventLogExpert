@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -88,6 +88,138 @@ public sealed class FilterMethodsTests
         // Assert
         Assert.True(dictionary.ContainsKey(string.Empty));
         Assert.Single(dictionary[string.Empty].FilterGroups);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenDateFilterIsNull_ShouldReturnEvent()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(100);
+
+        // Act
+        var result = @event.FilterByDate(null);
+
+        // Assert
+        Assert.Same(@event, result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventAfterRange_ShouldReturnNull()
+    {
+        // Arrange
+        var eventTime = DateTime.Now.AddDays(2);
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+
+        var dateFilter = new FilterDateModel
+        {
+            After = DateTime.Now.AddDays(-1),
+            Before = DateTime.Now.AddDays(1)
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventBeforeRange_ShouldReturnNull()
+    {
+        // Arrange
+        var eventTime = DateTime.Now.AddDays(-2);
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+
+        var dateFilter = new FilterDateModel
+        {
+            After = DateTime.Now.AddDays(-1),
+            Before = DateTime.Now.AddDays(1)
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventExactlyAtAfter_ShouldReturnEvent()
+    {
+        // Arrange
+        var boundaryTime = DateTime.Now;
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
+
+        var dateFilter = new FilterDateModel
+        {
+            After = boundaryTime,
+            Before = boundaryTime.AddHours(1)
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Same(@event, result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventExactlyAtBefore_ShouldReturnEvent()
+    {
+        // Arrange
+        var boundaryTime = DateTime.Now;
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
+
+        var dateFilter = new FilterDateModel
+        {
+            After = boundaryTime.AddHours(-1),
+            Before = boundaryTime
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Same(@event, result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventIsNull_ShouldReturnNull()
+    {
+        // Arrange
+        DisplayEventModel? @event = null;
+
+        var dateFilter = new FilterDateModel
+        {
+            After = DateTime.Now.AddDays(-1),
+            Before = DateTime.Now.AddDays(1)
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FilterByDate_WhenEventWithinRange_ShouldReturnEvent()
+    {
+        // Arrange
+        var eventTime = DateTime.Now;
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+
+        var dateFilter = new FilterDateModel
+        {
+            After = eventTime.AddHours(-1),
+            Before = eventTime.AddHours(1)
+        };
+
+        // Act
+        var result = @event.FilterByDate(dateFilter);
+
+        // Assert
+        Assert.Same(@event, result);
     }
 
     [Fact]
@@ -257,138 +389,6 @@ public sealed class FilterMethodsTests
 
         // Assert
         Assert.False(result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenDateFilterIsNull_ShouldReturnEvent()
-    {
-        // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
-
-        // Act
-        var result = @event.FilterByDate(null);
-
-        // Assert
-        Assert.Same(@event, result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventAfterRange_ShouldReturnNull()
-    {
-        // Arrange
-        var eventTime = DateTime.Now.AddDays(2);
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
-
-        var dateFilter = new FilterDateModel
-        {
-            After = DateTime.Now.AddDays(-1),
-            Before = DateTime.Now.AddDays(1)
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventBeforeRange_ShouldReturnNull()
-    {
-        // Arrange
-        var eventTime = DateTime.Now.AddDays(-2);
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
-
-        var dateFilter = new FilterDateModel
-        {
-            After = DateTime.Now.AddDays(-1),
-            Before = DateTime.Now.AddDays(1)
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventExactlyAtAfter_ShouldReturnEvent()
-    {
-        // Arrange
-        var boundaryTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
-
-        var dateFilter = new FilterDateModel
-        {
-            After = boundaryTime,
-            Before = boundaryTime.AddHours(1)
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Same(@event, result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventExactlyAtBefore_ShouldReturnEvent()
-    {
-        // Arrange
-        var boundaryTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
-
-        var dateFilter = new FilterDateModel
-        {
-            After = boundaryTime.AddHours(-1),
-            Before = boundaryTime
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Same(@event, result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventIsNull_ShouldReturnNull()
-    {
-        // Arrange
-        DisplayEventModel? @event = null;
-
-        var dateFilter = new FilterDateModel
-        {
-            After = DateTime.Now.AddDays(-1),
-            Before = DateTime.Now.AddDays(1)
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Null(result);
-    }
-
-    [Fact]
-    public void FilterByDate_WhenEventWithinRange_ShouldReturnEvent()
-    {
-        // Arrange
-        var eventTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
-
-        var dateFilter = new FilterDateModel
-        {
-            After = eventTime.AddHours(-1),
-            Before = eventTime.AddHours(1)
-        };
-
-        // Act
-        var result = @event.FilterByDate(dateFilter);
-
-        // Assert
-        Assert.Same(@event, result);
     }
 
     [Fact]
@@ -779,26 +779,6 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
-    public void SortEvents_WhenNoOrderSpecified_ShouldSortByRecordIdAscending()
-    {
-        // Arrange
-        var events = new List<DisplayEventModel>
-        {
-            EventUtils.CreateTestEvent(recordId: 3),
-            EventUtils.CreateTestEvent(recordId: 1),
-            EventUtils.CreateTestEvent(recordId: 2)
-        };
-
-        // Act
-        var result = events.SortEvents();
-
-        // Assert
-        Assert.Equal(1L, result[0].RecordId);
-        Assert.Equal(2L, result[1].RecordId);
-        Assert.Equal(3L, result[2].RecordId);
-    }
-
-    [Fact]
     public void SortEvents_WhenNoOrderSpecifiedDescending_ShouldSortByRecordIdDescending()
     {
         // Arrange
@@ -816,6 +796,26 @@ public sealed class FilterMethodsTests
         Assert.Equal(3L, result[0].RecordId);
         Assert.Equal(2L, result[1].RecordId);
         Assert.Equal(1L, result[2].RecordId);
+    }
+
+    [Fact]
+    public void SortEvents_WhenNoOrderSpecified_ShouldSortByRecordIdAscending()
+    {
+        // Arrange
+        var events = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(recordId: 3),
+            EventUtils.CreateTestEvent(recordId: 1),
+            EventUtils.CreateTestEvent(recordId: 2)
+        };
+
+        // Act
+        var result = events.SortEvents();
+
+        // Assert
+        Assert.Equal(1L, result[0].RecordId);
+        Assert.Equal(2L, result[1].RecordId);
+        Assert.Equal(3L, result[2].RecordId);
     }
 
     [Fact]
@@ -1059,6 +1059,26 @@ public sealed class FilterMethodsTests
     }
 
     [Fact]
+    public void SortEvents_WhenTiedOnPrimaryKeyDescending_ShouldBreakTieByRecordIdDescending()
+    {
+        // Arrange
+        var events = new List<DisplayEventModel>
+        {
+            EventUtils.CreateTestEvent(100, recordId: 1),
+            EventUtils.CreateTestEvent(100, recordId: 3),
+            EventUtils.CreateTestEvent(100, recordId: 2)
+        };
+
+        // Act
+        var result = events.SortEvents(ColumnName.EventId, true);
+
+        // Assert - tied on Id, should fall back to RecordId descending
+        Assert.Equal(3L, result[0].RecordId);
+        Assert.Equal(2L, result[1].RecordId);
+        Assert.Equal(1L, result[2].RecordId);
+    }
+
+    [Fact]
     public void SortEvents_WhenTiedOnPrimaryKey_ShouldBreakTieByRecordId()
     {
         // Arrange - all events have the same TimeCreated but different RecordIds
@@ -1078,26 +1098,6 @@ public sealed class FilterMethodsTests
         Assert.Equal(1L, result[0].RecordId);
         Assert.Equal(2L, result[1].RecordId);
         Assert.Equal(3L, result[2].RecordId);
-    }
-
-    [Fact]
-    public void SortEvents_WhenTiedOnPrimaryKeyDescending_ShouldBreakTieByRecordIdDescending()
-    {
-        // Arrange
-        var events = new List<DisplayEventModel>
-        {
-            EventUtils.CreateTestEvent(100, recordId: 1),
-            EventUtils.CreateTestEvent(100, recordId: 3),
-            EventUtils.CreateTestEvent(100, recordId: 2)
-        };
-
-        // Act
-        var result = events.SortEvents(ColumnName.EventId, true);
-
-        // Assert - tied on Id, should fall back to RecordId descending
-        Assert.Equal(3L, result[0].RecordId);
-        Assert.Equal(2L, result[1].RecordId);
-        Assert.Equal(1L, result[2].RecordId);
     }
 
     private static FilterModel CreateFilter(string expression, bool isExcluded = false) =>

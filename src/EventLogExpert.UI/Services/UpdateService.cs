@@ -129,7 +129,7 @@ public sealed class UpdateService(
 
             if (string.IsNullOrEmpty(downloadPath))
             {
-                traceLogger.Warn($"{nameof(CheckForUpdates)} Could not get asset download path.");
+                traceLogger.Warning($"{nameof(CheckForUpdates)} Could not get asset download path.");
 
                 return;
             }

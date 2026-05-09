@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Modals;
 using EventLogExpert.Components.Modals.Filters;
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
@@ -54,7 +55,8 @@ public sealed class MauiMenuActionService(
     {
         if (!_currentVersionProvider.IsSupportedOS(DeviceInfo.Version))
         {
-            _traceLogger.Warn($"Update API does not work on versions older than 10.0.19041.0");
+            _traceLogger.Warning($"Update API does not work on versions older than 10.0.19041.0");
+
             return;
         }
 
@@ -115,7 +117,7 @@ public sealed class MauiMenuActionService(
 
             _cachedLogNames = await Task.Run<IReadOnlyList<string>>(() =>
                 EventLogSession.GlobalSession.GetLogNames()
-                    .Where(name => !LogNameMethods.HardCodedLiveLogNames.Contains(name))
+                    .Where(name => !LogChannelMethods.HardCodedLiveChannels.Contains(name))
                     .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .ToList());
 
@@ -151,7 +153,7 @@ public sealed class MauiMenuActionService(
 
         var paths = files
             .Where(file => file is not null && !string.IsNullOrEmpty(file.FullPath))
-            .Select(file => (file!.FullPath, PathType.FilePath))
+            .Select(file => (file!.FullPath, LogPathType.File))
             .ToList();
 
         await OpenLogsBatchAsync(paths, combineLog: true);
@@ -174,12 +176,12 @@ public sealed class MauiMenuActionService(
 
         if (folderPath is null) { return; }
 
-        List<(string, PathType)> files;
+        List<(string, LogPathType)> files;
 
         try
         {
             files = Directory.EnumerateFiles(folderPath, "*.evtx", SearchOption.TopDirectoryOnly)
-                .Select(file => (file, PathType.FilePath))
+                .Select(file => (file, LogPathType.File))
                 .ToList();
         }
         catch (Exception ex) when (ex is UnauthorizedAccessException or IOException)
@@ -202,9 +204,9 @@ public sealed class MauiMenuActionService(
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
 
     public Task OpenLiveLogAsync(string logName, bool combineLog) =>
-        OpenLogsBatchAsync([(logName, PathType.LogName)], combineLog);
+        OpenLogsBatchAsync([(logName, LogPathType.Channel)], combineLog);
 
-    public async Task<OpenLogStatus> OpenLogAsync(string logPath, PathType pathType, bool combineLog = false)
+    public async Task<OpenLogStatus> OpenLogAsync(string logPath, LogPathType pathType, bool combineLog = false)
     {
         if (string.IsNullOrWhiteSpace(logPath) ||
             (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath))) { return OpenLogStatus.Loaded; }
@@ -257,7 +259,7 @@ public sealed class MauiMenuActionService(
     ///     gesture (multi-file picker, folder open, drag-drop, command line) so the user sees one batched alert instead
     ///     of one popup per empty file.
     /// </summary>
-    public async Task OpenLogsBatchAsync(IEnumerable<(string Path, PathType Type)> logs, bool combineLog)
+    public async Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog)
     {
         ArgumentNullException.ThrowIfNull(logs);
 
@@ -323,9 +325,9 @@ public sealed class MauiMenuActionService(
 
     public void ToggleShowAllEvents() => _dispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
 
-    private static string GetEmptyLogDisplayName(string path, PathType type)
+    private static string GetEmptyLogDisplayName(string path, LogPathType type)
     {
-        if (type != PathType.FilePath) { return path; }
+        if (type != LogPathType.File) { return path; }
 
         var fileName = Path.GetFileName(path);
 

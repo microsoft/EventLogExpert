@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -153,7 +153,7 @@ public sealed partial class EventTable
             catch (JSDisconnectedException) { /* Circuit gone — fall back to default page size. */ }
             catch (Exception e)
             {
-                TraceLogger.Warn($"Failed to measure table page size, using default {DefaultPageSize}: {e}");
+                TraceLogger.Warning($"Failed to measure table page size, using default {DefaultPageSize}: {e}");
             }
         }
 
@@ -416,7 +416,7 @@ public sealed partial class EventTable
         catch (JSDisconnectedException) { /* Circuit gone — focus best-effort during teardown. */ }
         catch (Exception e)
         {
-            TraceLogger.Warn($"Failed to focus active table row: {e}");
+            TraceLogger.Warning($"Failed to focus active table row: {e}");
         }
     }
 
@@ -648,18 +648,6 @@ public sealed partial class EventTable
         }
     }
 
-    private async void RescrollToSelected()
-    {
-        try
-        {
-            await InvokeAsync(ScrollToSelectedEvent);
-        }
-        catch (Exception e)
-        {
-            TraceLogger.Error($"Failed to scroll to selected event: {e}");
-        }
-    }
-
     private void RebuildRowIndexMap()
     {
         var displayedEvents = ResolveActiveDisplayedEvents();
@@ -700,6 +688,18 @@ public sealed partial class EventTable
         if (IsSelectionOutOfSortOrder(_selectedEvents))
         {
             _resortSelectionOnNextRender = true;
+        }
+    }
+
+    private async void RescrollToSelected()
+    {
+        try
+        {
+            await InvokeAsync(ScrollToSelectedEvent);
+        }
+        catch (Exception e)
+        {
+            TraceLogger.Error($"Failed to scroll to selected event: {e}");
         }
     }
 
@@ -965,7 +965,7 @@ public sealed partial class EventTable
         catch (JSDisconnectedException) { return 0; }
         catch (Exception e)
         {
-            TraceLogger.Warn($"Failed to refresh table page size: {e}");
+            TraceLogger.Warning($"Failed to refresh table page size: {e}");
 
             return 0;
         }
@@ -987,7 +987,7 @@ public sealed partial class EventTable
 
             if (shouldWarn)
             {
-                TraceLogger.Warn(
+                TraceLogger.Warning(
                     $"Unknown HighlightColor value {rawValue} found in filter set; affected filters will be skipped for highlight resolution.");
             }
         }

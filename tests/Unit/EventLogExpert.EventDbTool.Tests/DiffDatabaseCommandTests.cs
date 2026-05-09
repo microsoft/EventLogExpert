@@ -3,8 +3,8 @@
 
 using EventLogExpert.EventDbTool.Tests.TestUtils;
 using EventLogExpert.EventDbTool.Tests.TestUtils.Constants;
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.Tests;
@@ -41,7 +41,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
         // Assert
         Assert.True(File.Exists(output), "Diff should have created the output database.");
 
-        using var verify = new EventProviderDbContext(output, true);
+        using var verify = new ProviderDbContext(output, true);
         var rows = verify.ProviderDetails.ToList();
         var copied = Assert.Single(rows);
         Assert.Equal(Constants.SecondProviderName, copied.ProviderName);

@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.Readers;
 using static EventLogExpert.Eventing.Tests.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.Eventing.Tests.TestUtils;

@@ -3,15 +3,14 @@
 
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
 using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Providers;
 
 /// <summary>
-///     Represents an event provider on the local machine. EventLogExpert is a local-only tool;
-///     remote-machine resolution is intentionally not supported.
+///     Represents an event provider on the local machine. EventLogExpert is a local-only tool; remote-machine
+///     resolution is intentionally not supported.
 /// </summary>
 public sealed class EventMessageProvider(
     string providerName,
@@ -19,14 +18,16 @@ public sealed class EventMessageProvider(
     ITraceLogger? logger = null)
 {
     private static readonly HashSet<string> s_allProviderNames = EventLogSession.GlobalSession.GetProviderNames();
-    private readonly ITraceLogger? _logger = logger;
 
+    private readonly ITraceLogger? _logger = logger;
     private readonly IReadOnlyList<string>? _metadataPaths = metadataPaths;
     private readonly string _providerName = providerName;
 
     private RegistryProvider? _registryProvider;
 
-    internal static List<MessageModel> GetMessages(
+    public ProviderDetails LoadProviderDetails() => LoadProviderDetailsCore(visited: null);
+
+    internal static List<MessageModel> LoadMessagesFromFiles(
         IEnumerable<string> legacyProviderFiles,
         string providerName,
         ITraceLogger? logger = null)
@@ -124,23 +125,18 @@ public sealed class EventMessageProvider(
         return messages;
     }
 
-    public ProviderDetails LoadProviderDetails() => LoadProviderDetailsCore(visited: null);
-
     /// <summary>
-    ///     Loads a message-resource module using flags that honor MUI satellite resolution, with
-    ///     fallbacks for older binaries and unresolved paths. Returns an invalid handle on failure
-    ///     (the caller is expected to skip).
+    ///     Loads a message-resource module using flags that honor MUI satellite resolution, with fallbacks for older
+    ///     binaries and unresolved paths. Returns an invalid handle on failure (the caller is expected to skip).
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         <c>LOAD_LIBRARY_AS_DATAFILE</c> alone does NOT trigger MUI satellite loading. Modern
-    ///         Windows binaries (e.g., DriverStore-installed services, in-box system EXEs/DLLs)
-    ///         keep their <c>RT_MESSAGETABLE</c> resources in <c>&lt;binary&gt;.mui</c> files under
-    ///         language subfolders rather than in the binary itself. <c>FindResource</c> on a
-    ///         module loaded with only <c>LOAD_LIBRARY_AS_DATAFILE</c> then returns 1813
-    ///         (<c>ERROR_RESOURCE_TYPE_NOT_FOUND</c>). Combining
-    ///         <c>LOAD_LIBRARY_AS_IMAGE_RESOURCE</c> with <c>LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE</c>
-    ///         causes the loader to follow the MUI fallback chain — the same path
+    ///         <c>LOAD_LIBRARY_AS_DATAFILE</c> alone does NOT trigger MUI satellite loading. Modern Windows binaries (e.g.,
+    ///         DriverStore-installed services, in-box system EXEs/DLLs) keep their <c>RT_MESSAGETABLE</c> resources in
+    ///         <c>&lt;binary&gt;.mui</c> files under language subfolders rather than in the binary itself. <c>FindResource</c>
+    ///         on a module loaded with only <c>LOAD_LIBRARY_AS_DATAFILE</c> then returns 1813 (
+    ///         <c>ERROR_RESOURCE_TYPE_NOT_FOUND</c>). Combining <c>LOAD_LIBRARY_AS_IMAGE_RESOURCE</c> with
+    ///         <c>LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE</c> causes the loader to follow the MUI fallback chain — the same path
     ///         <c>EvtFormatMessage</c> (and Event Viewer MMC) uses.
     ///     </para>
     /// </remarks>
@@ -152,11 +148,11 @@ public sealed class EventMessageProvider(
         file = Environment.ExpandEnvironmentVariables(file);
 
         // Primary attempt: MUI-aware load using the path as given. Mirrors EvtFormatMessage behavior.
-        const LoadLibraryFlags muiAwareFlags =
+        const LoadLibraryFlags MuiAwareFlags =
             LoadLibraryFlags.LOAD_LIBRARY_AS_IMAGE_RESOURCE |
             LoadLibraryFlags.LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE;
 
-        var hModule = NativeMethods.LoadLibraryExW(file, IntPtr.Zero, muiAwareFlags);
+        var hModule = NativeMethods.LoadLibraryExW(file, IntPtr.Zero, MuiAwareFlags);
         int error = Marshal.GetLastWin32Error();
 
         if (!hModule.IsInvalid)
@@ -215,7 +211,7 @@ public sealed class EventMessageProvider(
         logger?.Debug(
             $"{primaryFailureMessage} Falling back to leaf-name resolution against the system directory: {systemPath}.");
 
-        hModule = NativeMethods.LoadLibraryExW(systemPath, IntPtr.Zero, muiAwareFlags);
+        hModule = NativeMethods.LoadLibraryExW(systemPath, IntPtr.Zero, MuiAwareFlags);
 
         error = Marshal.GetLastWin32Error();
 
@@ -233,33 +229,6 @@ public sealed class EventMessageProvider(
             $"LoadLibraryEx failed for {systemPath} (leaf-name fallback) with flags LOAD_LIBRARY_AS_IMAGE_RESOURCE | LOAD_LIBRARY_AS_DATAFILE_EXCLUSIVE. Error: {error} ({NativeMethods.FormatSystemMessage((uint)error) ?? "unknown"}). Original requested file was: {file}.");
 
         return LibraryHandle.Zero;
-    }
-
-    /// <summary>
-    ///     Loads the messages for a legacy provider from the files specified in the registry. This information is stored
-    ///     at HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\EventLog
-    /// </summary>
-    /// <returns></returns>
-    private List<MessageModel> LoadMessagesFromDlls(IEnumerable<string> messageFilePaths)
-    {
-        _logger?.Debug($"{nameof(LoadMessagesFromDlls)} called for files {string.Join(", ", messageFilePaths)}");
-
-        try
-        {
-            var messages = GetMessages(messageFilePaths, _providerName, _logger);
-
-            _logger?.Debug($"Returning {messages.Count} messages for provider {_providerName}");
-
-            return messages;
-        }
-        catch (Exception ex)
-        {
-            // Hide the failure. We want to allow the results from the modern provider
-            // to return even if we failed to load the legacy provider.
-            _logger?.Debug($"Failed to load legacy provider data for {_providerName}.\n{ex}");
-        }
-
-        return [];
     }
 
     /// <summary>
@@ -350,28 +319,29 @@ public sealed class EventMessageProvider(
 
         var legacyProviderFiles = _registryProvider.GetMessageFilesForLegacyProvider(_providerName);
 
-        if (legacyProviderFiles.Any())
+        if (legacyProviderFiles.Any() &&
+            TryLoadMessages(legacyProviderFiles, out var legacyMessages) &&
+            legacyMessages.Count > 0)
         {
-            provider.Messages = LoadMessagesFromDlls(legacyProviderFiles);
+            provider.Messages = legacyMessages;
+        }
+        else if (!string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
+        {
+            _logger?.Debug(
+                $"No legacy messages loaded for provider {_providerName}. Using message file from modern provider.");
+
+            _ = TryLoadMessages([providerMetadata.MessageFilePath], out var modernMessages);
+            provider.Messages = modernMessages;
         }
         else
         {
-            if (string.IsNullOrEmpty(providerMetadata?.MessageFilePath))
-            {
-                _logger?.Debug($"No message files found for provider {_providerName}. Returning empty provider details.");
-            }
-            else
-            {
-                _logger?.Debug(
-                    $"No message files found for provider {_providerName}. Using message file from modern provider.");
-
-                provider.Messages = LoadMessagesFromDlls([providerMetadata.MessageFilePath]);
-            }
+            _logger?.Debug($"No message files found for provider {_providerName}. Returning empty provider details.");
         }
 
         if (!string.IsNullOrEmpty(providerMetadata?.ParameterFilePath))
         {
-            provider.Parameters = LoadMessagesFromDlls([providerMetadata.ParameterFilePath]);
+            _ = TryLoadMessages([providerMetadata.ParameterFilePath], out var parameterMessages);
+            provider.Parameters = parameterMessages;
         }
 
         if (provider.IsEmpty)
@@ -383,11 +353,11 @@ public sealed class EventMessageProvider(
     }
 
     /// <summary>
-    ///     Final fallback when neither modern publisher metadata nor a legacy registry entry exists
-    ///     for the configured provider name. Some events (notably modern channel-named providers
-    ///     like "Microsoft-Windows-AppXDeploymentServer/Operational") carry a channel path in the
-    ///     ProviderName slot; the real publisher must be looked up through the channel config's
-    ///     OwningPublisher property and resolved separately. Produces no result on failure.
+    ///     Final fallback when neither modern publisher metadata nor a legacy registry entry exists for the configured
+    ///     provider name. Some events (notably modern channel-named providers like
+    ///     "Microsoft-Windows-AppXDeploymentServer/Operational") carry a channel path in the ProviderName slot; the real
+    ///     publisher must be looked up through the channel config's OwningPublisher property and resolved separately. Produces
+    ///     no result on failure.
     /// </summary>
     private void TryFallbackToOwningPublisher(ProviderDetails target, HashSet<string>? visited)
     {
@@ -530,6 +500,33 @@ public sealed class EventMessageProvider(
             {
                 Marshal.FreeHGlobal(buffer);
             }
+        }
+    }
+
+    /// <summary>
+    ///     Tries to load messages for a legacy provider from the registry-specified files
+    ///     (HKLM\SYSTEM\CurrentControlSet\Services\EventLog). Returns false on any failure so the caller can fall back to
+    ///     modern provider data instead of bubbling the exception.
+    /// </summary>
+    private bool TryLoadMessages(IEnumerable<string> messageFilePaths, out List<MessageModel> messages)
+    {
+        _logger?.Debug($"{nameof(TryLoadMessages)} called for files {string.Join(", ", messageFilePaths)}");
+
+        try
+        {
+            messages = LoadMessagesFromFiles(messageFilePaths, _providerName, _logger);
+
+            _logger?.Debug($"Returning {messages.Count} messages for provider {_providerName}");
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger?.Debug($"Failed to load legacy provider data for {_providerName}.\n{ex}");
+
+            messages = [];
+
+            return false;
         }
     }
 }

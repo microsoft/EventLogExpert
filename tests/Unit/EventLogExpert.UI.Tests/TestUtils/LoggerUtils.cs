@@ -30,10 +30,10 @@ internal static class LoggerUtils
 
         public void Error(ErrorLogHandler handler) => ErrorMessages.Add(handler.ToStringAndClear());
 
-        public void Info(InfoLogHandler handler) => InfoMessages.Add(handler.ToStringAndClear());
+        public void Information(InformationLogHandler handler) => InfoMessages.Add(handler.ToStringAndClear());
 
         public void Trace(TraceLogHandler handler) => TraceMessages.Add(handler.ToStringAndClear());
 
-        public void Warn(WarnLogHandler handler) => WarnMessages.Add(handler.ToStringAndClear());
+        public void Warning(WarningLogHandler handler) => WarnMessages.Add(handler.ToStringAndClear());
     }
 }

@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
@@ -127,7 +127,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
         var droppedFilePaths = items.OfType<StorageFile>()
             .Where(file => !string.IsNullOrEmpty(file.Path))
-            .Select(file => (file.Path, PathType.FilePath))
+            .Select(file => (file.Path, LogPathType.File))
             .ToList();
 
         if (droppedFilePaths.Count == 0) { return; }
@@ -183,7 +183,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         {
             var evtxArgs = Environment.GetCommandLineArgs()
                 .Where(arg => arg.EndsWith(".evtx", StringComparison.OrdinalIgnoreCase))
-                .Select(arg => (arg, PathType.FilePath))
+                .Select(arg => (arg, LogPathType.File))
                 .ToList();
 
             if (evtxArgs.Count == 0) { return; }

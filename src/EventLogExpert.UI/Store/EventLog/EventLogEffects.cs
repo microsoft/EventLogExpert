@@ -1,10 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventResolvers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Models;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventTable;
@@ -61,7 +62,6 @@ public sealed class EventLogEffects(
     private readonly SemaphoreSlim _logCloseCoordinatorLock = new(1, 1);
 
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
-    private readonly ITraceLogger _logger = logger;
 
     /// <summary>Tracks per-log load completion so <see cref="HandleCloseLog"/> can wait for
     /// the in-flight <see cref="LoadLogAsync"/> service scope to dispose before draining the
@@ -69,13 +69,14 @@ public sealed class EventLogEffects(
     /// service scope (which owns the IEventResolver and its SQLite handles) only disposes
     /// once HandleOpenLog's outer using/finally runs.</summary>
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
+    private readonly ILogWatcherService _logWatcherService = logWatcherService;
+    private readonly ITraceLogger _logger = logger;
 
     /// <summary>Tracks which currently-open logs (by <see cref="EventLogData.Id"/>) were loaded
     /// with renderXml=true. A reload-on-transition only re-opens logs that lack XML; logs that
     /// already have it are left alone. Removing or disabling an XML filter never triggers a
     /// reload because the XML data is already in memory and harmless to keep.</summary>
     private readonly ConcurrentDictionary<EventLogId, byte> _logsLoadedWithXml = new();
-    private readonly ILogWatcherService _logWatcherService = logWatcherService;
 
     /// <summary>Pending selection restore per log name, populated when a filter transition forces
     /// a reload. Consumed by <see cref="HandleLoadEvents"/> when the reloaded log finishes loading.
@@ -178,7 +179,7 @@ public sealed class EventLogEffects(
             }
 
             // Drain watcher callbacks. RemoveLogAsync's Task only completes after
-            // EventLogWatcher.Unsubscribe blocks for all in-flight ProcessNewEvents
+            // EventLogWatcher.Unsubscribe blocks for all in-flight ReadAndRaiseEvents
             // callbacks → all per-event resolver scopes disposed → all DbContexts
             // disposed → connections returned to the SQLite pool.
             await _logWatcherService.RemoveLogAsync(action.LogName);
@@ -188,7 +189,7 @@ public sealed class EventLogEffects(
 
             // Drop any cached XML for this log; if the same name reopens later (e.g., post-rotation)
             // a fresh resolve must occur instead of returning stale text from a different file.
-            _xmlResolver.ClearLog(action.LogName);
+            _xmlResolver.ClearXmlCacheForLog(action.LogName);
 
             dispatcher.Dispatch(new EventTableAction.CloseLog(action.LogId));
 
@@ -591,7 +592,7 @@ public sealed class EventLogEffects(
             // Pre-register the close-completion TCSes BEFORE dispatching, so HandleCloseLog
             // is guaranteed to find an entry to signal (the dispatcher might queue HandleCloseLog
             // before this method's next statement runs).
-            var waiters = new List<(EventLogId Id, string Name, PathType Type, Task Task)>(activeLogs.Count);
+            var waiters = new List<(EventLogId Id, string Name, LogPathType Type, Task Task)>(activeLogs.Count);
 
             foreach (var log in activeLogs)
             {
@@ -742,7 +743,7 @@ public sealed class EventLogEffects(
         IDispatcher dispatcher,
         CancellationToken token)
     {
-        if (action.PathType == PathType.FilePath)
+        if (action.LogPathType == LogPathType.File)
         {
             try
             {
@@ -760,7 +761,7 @@ public sealed class EventLogEffects(
                         {
                             Array.Sort(mtaFiles, StringComparer.Ordinal);
                             eventResolver.SetMetadataPaths(mtaFiles);
-                            _logger?.Info($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
+                            _logger?.Information($"Using locale metadata from: {localeDir} ({mtaFiles.Length} file(s))");
                         }
                     }
                 }
@@ -768,7 +769,7 @@ public sealed class EventLogEffects(
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException
                 or SecurityException or ArgumentException or NotSupportedException)
             {
-                _logger?.Warn($"Failed to probe locale metadata for {action.LogName}: {ex.Message}");
+                _logger?.Warning($"Failed to probe locale metadata for {action.LogName}: {ex.Message}");
             }
         }
 
@@ -818,7 +819,7 @@ public sealed class EventLogEffects(
 
         bool renderXml = _eventLogState.Value.AppliedFilter.RequiresXml;
 
-        using var reader = new EventLogReader(action.LogName, action.PathType, renderXml);
+        using var reader = new EventLogReader(action.LogName, action.LogPathType, renderXml);
 
         // Producer: single thread reads batches from EventLogReader
         var producerTask = Task.Run(async () =>
@@ -875,7 +876,7 @@ public sealed class EventLogEffects(
                                 {
                                     Interlocked.Increment(ref failed);
 
-                                    _logger?.Warn($"{@event.PathName}: Bad Event: {@event.Error}");
+                                    _logger?.Warning($"{@event.PathName}: Bad Event: {@event.Error}");
 
                                     continue;
                                 }
@@ -885,7 +886,7 @@ public sealed class EventLogEffects(
                             }
                             catch (Exception ex)
                             {
-                                _logger?.Warn($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
+                                _logger?.Warning($"Failed to resolve RecordId: {@event.RecordId}, {ex.Message}");
                             }
                         }
 
@@ -964,7 +965,7 @@ public sealed class EventLogEffects(
 
         dispatcher.Dispatch(new StatusBarAction.SetEventsLoading(activityId, 0, 0));
 
-        if (action.PathType == PathType.LogName)
+        if (action.LogPathType == LogPathType.Channel)
         {
             _logWatcherService.AddLog(action.LogName, lastEvent, renderXml);
         }

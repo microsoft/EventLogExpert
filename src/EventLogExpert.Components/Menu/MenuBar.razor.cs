@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -129,9 +129,9 @@ public sealed partial class MenuBar : IDisposable
             MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog)),
             MenuItem.SubMenu("Live",
             [
-                MenuItem.Item(LogNames.ApplicationLog, () => Actions.OpenLiveLogAsync(LogNames.ApplicationLog, combineLog)),
-                MenuItem.Item(LogNames.SystemLog, () => Actions.OpenLiveLogAsync(LogNames.SystemLog, combineLog)),
-                MenuItem.Item(LogNames.SecurityLog, () => Actions.OpenLiveLogAsync(LogNames.SecurityLog, combineLog), isEnabled: isAdmin),
+                MenuItem.Item(LogChannelNames.ApplicationLog, () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog)),
+                MenuItem.Item(LogChannelNames.SystemLog, () => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, combineLog)),
+                MenuItem.Item(LogChannelNames.SecurityLog, () => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, combineLog), isEnabled: isAdmin),
                 MenuItem.AsyncSubMenu(
                     "Other Logs",
                     async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), combineLog, isAdmin)),
@@ -146,12 +146,12 @@ public sealed partial class MenuBar : IDisposable
 
         foreach (var logName in logNames)
         {
-            var path = LogNameMethods.GetMenuPath(logName);
+            var path = LogChannelMethods.GetMenuPath(logName);
 
             if (path.Count == 0) { continue; }
 
             var log = path[^1];
-            var logIsEnabled = isAdmin || !LogNames.AdminOnlyLiveLogNames.Contains(logName);
+            var logIsEnabled = isAdmin || !LogChannelNames.AdminOnlyLiveChannels.Contains(logName);
             var logMenuItem = MenuItem.Item(log, () => Actions.OpenLiveLogAsync(logName, combineLog), isEnabled: logIsEnabled);
 
             if (path.Count == 1)

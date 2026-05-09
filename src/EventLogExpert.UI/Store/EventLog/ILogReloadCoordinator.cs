@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
@@ -18,7 +18,7 @@ public interface ILogReloadCoordinator
     void ReopenAfterDatabaseRemoval(IReadOnlyList<LogReopenInfo> snapshot);
 }
 
-public sealed record LogReopenInfo(string Name, PathType Type);
+public sealed record LogReopenInfo(string Name, LogPathType Type);
 
 /// <summary>
 ///     Mutable container that the coordinator populates as each active log finishes closing. Callers pass an empty

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Data.Sqlite;
 
@@ -67,7 +67,7 @@ internal static class DatabaseTestUtils
 
     public static void CreateV4Database(string dbPath, params ProviderDetails[] providers)
     {
-        using var context = new EventProviderDbContext(dbPath, false);
+        using var context = new ProviderDbContext(dbPath, false);
 
         foreach (var provider in providers)
         {

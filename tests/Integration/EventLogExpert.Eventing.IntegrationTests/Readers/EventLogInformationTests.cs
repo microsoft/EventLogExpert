@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
 
@@ -15,7 +16,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -36,7 +37,7 @@ public sealed class EventLogInformationTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            new EventLogInformation(session, logName, PathType.LogName));
+            new EventLogInformation(session, logName, LogPathType.Channel));
     }
 
     [Theory]
@@ -48,7 +49,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, logName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, logName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
@@ -65,7 +66,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, logName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, logName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -80,7 +81,7 @@ public sealed class EventLogInformationTests
 
         // Act
         var tasks = logNames.Select(logName =>
-            Task.Run(() => new EventLogInformation(session, logName, PathType.LogName))
+            Task.Run(() => new EventLogInformation(session, logName, LogPathType.Channel))
         ).ToArray();
 
         await Task.WhenAll(tasks);
@@ -98,7 +99,7 @@ public sealed class EventLogInformationTests
     public void Constructor_WhenGlobalSession_ShouldUseCorrectSession()
     {
         // Arrange & Act
-        var logInfo = EventLogSession.GlobalSession.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = EventLogSession.GlobalSession.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -114,7 +115,7 @@ public sealed class EventLogInformationTests
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() =>
-            new EventLogInformation(session, invalidLogName, PathType.LogName));
+            new EventLogInformation(session, invalidLogName, LogPathType.Channel));
     }
 
     [Fact]
@@ -125,7 +126,7 @@ public sealed class EventLogInformationTests
 
         // Act & Assert
         Assert.Throws<ArgumentNullException>(() =>
-            new EventLogInformation(session, null!, PathType.LogName));
+            new EventLogInformation(session, null!, LogPathType.Channel));
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo);
@@ -151,7 +152,7 @@ public sealed class EventLogInformationTests
 
         // Act
         var ex = Record.Exception(() =>
-            new EventLogInformation(session, invalidLogName, PathType.LogName));
+            new EventLogInformation(session, invalidLogName, LogPathType.Channel));
 
         // Assert — malformed paths must not be masked as UAE.
         Assert.NotNull(ex);
@@ -165,7 +166,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert - Verify we can access all properties without exceptions
         var attributes = logInfo.Attributes;
@@ -191,7 +192,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
@@ -205,7 +206,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.FileSize);
@@ -219,7 +220,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         if (logInfo.CreationTime.HasValue)
@@ -236,7 +237,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.FileSize);
@@ -253,8 +254,8 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var appLogInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
-        var sysLogInfo = new EventLogInformation(session, Constants.SystemLogName, PathType.LogName);
+        var appLogInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
+        var sysLogInfo = new EventLogInformation(session, Constants.SystemLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(appLogInfo.FileSize);
@@ -271,8 +272,8 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo1 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
-        var logInfo2 = session.GetLogInformation(Constants.ApplicationLogName, PathType.LogName);
+        var logInfo1 = session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel);
+        var logInfo2 = session.GetLogInformation(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         // File size might change slightly, but should be close
@@ -290,7 +291,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.IsLogFull);
@@ -305,7 +306,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         if (logInfo.LastAccessTime.HasValue)
@@ -322,7 +323,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         if (logInfo.LastWriteTime.HasValue)
@@ -339,7 +340,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         if (logInfo.OldestRecordNumber.HasValue)
@@ -355,7 +356,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         // Properties should be read-only (init-only or get-only)
@@ -384,7 +385,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
@@ -404,7 +405,7 @@ public sealed class EventLogInformationTests
 
         // Act - Try to find a log that might be empty
         // Most logs will have records, but this tests that zero is a valid value
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);
@@ -419,7 +420,7 @@ public sealed class EventLogInformationTests
         var session = EventLogSession.GlobalSession;
 
         // Act
-        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, PathType.LogName);
+        var logInfo = new EventLogInformation(session, Constants.ApplicationLogName, LogPathType.Channel);
 
         // Assert
         Assert.NotNull(logInfo.RecordCount);

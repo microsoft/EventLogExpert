@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -40,19 +40,6 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void EventLogAction_AddEvent_ShouldStoreNewEvent()
-    {
-        // Arrange
-        var newEvent = EventUtils.CreateTestEvent(100);
-
-        // Act
-        var action = new EventLogAction.AddEvent(newEvent);
-
-        // Assert
-        Assert.Equal(newEvent, action.NewEvent);
-    }
-
-    [Fact]
     public void EventLogAction_AddEventBuffered_ShouldStoreBufferAndFullFlag()
     {
         // Arrange
@@ -74,7 +61,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_AddEventSuccess_ShouldStoreActiveLogs()
     {
         // Arrange
-        var logData = new EventLogData("TestLog", PathType.LogName, []);
+        var logData = new EventLogData("TestLog", LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         // Act
@@ -83,6 +70,19 @@ public sealed class EventLogStoreTests
         // Assert
         Assert.Single(action.ActiveLogs);
         Assert.True(action.ActiveLogs.ContainsKey(Constants.LogNameTestLog));
+    }
+
+    [Fact]
+    public void EventLogAction_AddEvent_ShouldStoreNewEvent()
+    {
+        // Arrange
+        var newEvent = EventUtils.CreateTestEvent(100);
+
+        // Act
+        var action = new EventLogAction.AddEvent(newEvent);
+
+        // Assert
+        Assert.Equal(newEvent, action.NewEvent);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_LoadEvents_ShouldStoreLogDataAndEvents()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
 
@@ -121,14 +121,14 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var logName = Constants.LogNameApplication;
-        var pathType = PathType.LogName;
+        var pathType = LogPathType.Channel;
 
         // Act
         var action = new EventLogAction.OpenLog(logName, pathType);
 
         // Assert
         Assert.Equal(logName, action.LogName);
-        Assert.Equal(pathType, action.PathType);
+        Assert.Equal(pathType, action.LogPathType);
     }
 
     [Fact]
@@ -138,7 +138,7 @@ public sealed class EventLogStoreTests
         var cts = new CancellationTokenSource();
 
         // Act
-        var action = new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.FilePath, cts.Token);
+        var action = new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.File, cts.Token);
 
         // Assert
         Assert.Equal(cts.Token, action.Token);
@@ -220,7 +220,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var name = Constants.LogNameTestLog;
-        var type = PathType.LogName;
+        var type = LogPathType.Channel;
         var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
 
         // Act
@@ -243,7 +243,7 @@ public sealed class EventLogStoreTests
             EventUtils.CreateTestEvent(200)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
 
         // Act
         var values = logData.GetCategoryValues(FilterCategory.Id).ToList();
@@ -258,7 +258,7 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetCategoryValues_ForLevel_ShouldReturnAllSeverityLevels()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         // Act
         var values = logData.GetCategoryValues(FilterCategory.Level).ToList();
@@ -278,7 +278,7 @@ public sealed class EventLogStoreTests
             EventUtils.CreateTestEvent(300, Constants.EventSourceOtherSource)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
 
         // Act
         var values = logData.GetCategoryValues(FilterCategory.Source).ToList();
@@ -291,7 +291,7 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetCategoryValues_ForUnknownCategory_ShouldReturnEmpty()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, [EventUtils.CreateTestEvent(100)]);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent(100)]);
 
         // Act
         var values = logData.GetCategoryValues((FilterCategory)999).ToList();
@@ -304,8 +304,8 @@ public sealed class EventLogStoreTests
     public void EventLogData_Id_ShouldBeUnique()
     {
         // Arrange & Act
-        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
 
         // Assert
         Assert.NotEqual(logData1.Id, logData2.Id);
@@ -344,7 +344,7 @@ public sealed class EventLogStoreTests
         var state = new EventLogState();
 
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
 
         var logData = state.ActiveLogs[Constants.LogNameTestLog];
 
@@ -376,13 +376,13 @@ public sealed class EventLogStoreTests
 
         // Act - Open multiple logs
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameLog1, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameLog1, LogPathType.Channel));
 
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameLog2, PathType.FilePath));
+            new EventLogAction.OpenLog(Constants.LogNameLog2, LogPathType.File));
 
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameLog3, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameLog3, LogPathType.Channel));
 
         // Assert
         Assert.Equal(3, state.ActiveLogs.Count);
@@ -405,7 +405,7 @@ public sealed class EventLogStoreTests
         var state = new EventLogState();
 
         // Act - Open log
-        var openAction = new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName);
+        var openAction = new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel);
         state = EventLogReducers.ReduceOpenLog(state, openAction);
 
         Assert.Single(state.ActiveLogs);
@@ -461,7 +461,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var state = new EventLogState();
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
         var action = new EventLogAction.AddEventSuccess(activeLogs);
 
@@ -477,7 +477,7 @@ public sealed class EventLogStoreTests
     public void ReduceCloseAll_ShouldClearAllState()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         var state = new EventLogState
         {
@@ -515,21 +515,21 @@ public sealed class EventLogStoreTests
     public void ReduceCloseLog_ShouldFilterNewEventBuffer()
     {
         // Arrange
-        var eventForLog1 = new DisplayEventModel(Constants.LogNameLog1, PathType.LogName)
+        var eventForLog1 = new DisplayEventModel(Constants.LogNameLog1, LogPathType.Channel)
         {
             Id = 100,
             Source = Constants.EventSourceTestSource,
             Level = Constants.EventLevelInformation
         };
 
-        var eventForLog2 = new DisplayEventModel(Constants.LogNameLog2, PathType.LogName)
+        var eventForLog2 = new DisplayEventModel(Constants.LogNameLog2, LogPathType.Channel)
         {
             Id = 200,
             Source = Constants.EventSourceTestSource,
             Level = Constants.EventLevelInformation
         };
 
-        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
 
         var state = new EventLogState
         {
@@ -551,8 +551,8 @@ public sealed class EventLogStoreTests
     public void ReduceCloseLog_ShouldRemoveSpecifiedLog()
     {
         // Arrange
-        var logData1 = new EventLogData(Constants.LogNameLog1, PathType.LogName, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, PathType.LogName, []);
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
 
         var state = new EventLogState
         {
@@ -573,10 +573,49 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
+    {
+        // Arrange
+        var state = new EventLogState();
+
+        state = EventLogReducers.ReduceOpenLog(state,
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
+
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act — stale partial with mismatched ID
+        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
+            new EventLogAction.LoadEventsPartial(staleLogData, events));
+
+        // Assert — state unchanged, original log preserved with its ID
+        var originalId = state.ActiveLogs[Constants.LogNameTestLog].Id;
+        Assert.NotEqual(originalId, staleLogData.Id);
+        Assert.Equal(originalId, newState.ActiveLogs[Constants.LogNameTestLog].Id);
+        Assert.Empty(newState.ActiveLogs[Constants.LogNameTestLog].Events);
+    }
+
+    [Fact]
+    public void ReduceLoadEventsPartial_WhenLogNotInActiveLogs_ShouldReturnStateUnchanged()
+    {
+        // Arrange — no logs open
+        var state = new EventLogState();
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+
+        // Act
+        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
+            new EventLogAction.LoadEventsPartial(logData, events));
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
     public void ReduceLoadEvents_ShouldIsolateStateFromOriginalList()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         var state = new EventLogState
         {
@@ -602,7 +641,7 @@ public sealed class EventLogStoreTests
     public void ReduceLoadEvents_ShouldUpdateLogWithEvents()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         var state = new EventLogState
         {
@@ -627,10 +666,10 @@ public sealed class EventLogStoreTests
         var state = new EventLogState();
 
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
 
         // Create stale logData with a new ID (simulating a previous load instance)
-        var staleLogData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
 
         // Act — stale LoadEvents with mismatched ID
@@ -650,7 +689,7 @@ public sealed class EventLogStoreTests
         var state = new EventLogState();
 
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
 
         var logData = state.ActiveLogs[Constants.LogNameTestLog];
         var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
@@ -667,7 +706,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange — no logs open
         var state = new EventLogState();
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
 
         // Act — stale LoadEvents arrives for a closed log
@@ -679,50 +718,11 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceLoadEventsPartial_WhenLogIdDoesNotMatch_ShouldReturnStateUnchanged()
-    {
-        // Arrange
-        var state = new EventLogState();
-
-        state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
-
-        var staleLogData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
-
-        // Act — stale partial with mismatched ID
-        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
-            new EventLogAction.LoadEventsPartial(staleLogData, events));
-
-        // Assert — state unchanged, original log preserved with its ID
-        var originalId = state.ActiveLogs[Constants.LogNameTestLog].Id;
-        Assert.NotEqual(originalId, staleLogData.Id);
-        Assert.Equal(originalId, newState.ActiveLogs[Constants.LogNameTestLog].Id);
-        Assert.Empty(newState.ActiveLogs[Constants.LogNameTestLog].Events);
-    }
-
-    [Fact]
-    public void ReduceLoadEventsPartial_WhenLogNotInActiveLogs_ShouldReturnStateUnchanged()
-    {
-        // Arrange — no logs open
-        var state = new EventLogState();
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
-
-        // Act
-        var newState = EventLogReducers.ReduceLoadEventsPartial(state,
-            new EventLogAction.LoadEventsPartial(logData, events));
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
     public void ReduceOpenLog_ShouldAddEmptyLogData()
     {
         // Arrange
         var state = new EventLogState();
-        var action = new EventLogAction.OpenLog(Constants.LogNameNewLog, PathType.LogName);
+        var action = new EventLogAction.OpenLog(Constants.LogNameNewLog, LogPathType.Channel);
 
         // Act
         var newState = EventLogReducers.ReduceOpenLog(state, action);
@@ -741,13 +741,13 @@ public sealed class EventLogStoreTests
         // (which would invalidate ongoing loads and reset the user's events).
         var state = new EventLogState();
         state = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
 
         var existingLogData = state.ActiveLogs[Constants.LogNameTestLog];
 
         // Act — dispatch the same OpenLog a second time.
         var newState = EventLogReducers.ReduceOpenLog(state,
-            new EventLogAction.OpenLog(Constants.LogNameTestLog, PathType.LogName));
+            new EventLogAction.OpenLog(Constants.LogNameTestLog, LogPathType.Channel));
 
         // Assert — same state reference, same EventLogData reference (no replacement).
         Assert.Same(state, newState);
@@ -760,13 +760,13 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var state = new EventLogState();
-        var action = new EventLogAction.OpenLog(Constants.FilePathTestEvtx, PathType.FilePath);
+        var action = new EventLogAction.OpenLog(Constants.FilePathTestEvtx, LogPathType.File);
 
         // Act
         var newState = EventLogReducers.ReduceOpenLog(state, action);
 
         // Assert
-        Assert.Equal(PathType.FilePath, newState.ActiveLogs[Constants.FilePathTestEvtx].Type);
+        Assert.Equal(LogPathType.File, newState.ActiveLogs[Constants.FilePathTestEvtx].Type);
     }
 
     [Fact]
@@ -820,6 +820,21 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void ReduceSelectEvent_WhenMultiSelectAndEventAlreadySelected_ShouldRemoveEvent()
+    {
+        // Arrange
+        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var state = new EventLogState { SelectedEvents = [selectedEvent] };
+        var action = new EventLogAction.SelectEvent(selectedEvent, true);
+
+        // Act
+        var newState = EventLogReducers.ReduceSelectEvent(state, action);
+
+        // Assert
+        Assert.Empty(newState.SelectedEvents);
+    }
+
+    [Fact]
     public void ReduceSelectEvent_WhenMultiSelect_ShouldAddToExisting()
     {
         // Arrange
@@ -835,21 +850,6 @@ public sealed class EventLogStoreTests
         Assert.Equal(2, newState.SelectedEvents.Count);
         Assert.Contains(existingEvent, newState.SelectedEvents);
         Assert.Contains(newEvent, newState.SelectedEvents);
-    }
-
-    [Fact]
-    public void ReduceSelectEvent_WhenMultiSelectAndEventAlreadySelected_ShouldRemoveEvent()
-    {
-        // Arrange
-        var selectedEvent = EventUtils.CreateTestEvent(100);
-        var state = new EventLogState { SelectedEvents = [selectedEvent] };
-        var action = new EventLogAction.SelectEvent(selectedEvent, true);
-
-        // Act
-        var newState = EventLogReducers.ReduceSelectEvent(state, action);
-
-        // Assert
-        Assert.Empty(newState.SelectedEvents);
     }
 
     [Fact]

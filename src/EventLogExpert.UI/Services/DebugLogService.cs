@@ -100,7 +100,7 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         WriteTrace(handler.ToStringAndClear(), LogLevel.Error);
     }
 
-    public void Info([InterpolatedStringHandlerArgument("")] InfoLogHandler handler)
+    public void Information([InterpolatedStringHandlerArgument("")] InformationLogHandler handler)
     {
         if (!handler.IsEnabled) { return; }
 
@@ -150,11 +150,21 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         WriteTrace(handler.ToStringAndClear(), LogLevel.Trace);
     }
 
-    public void Warn([InterpolatedStringHandlerArgument("")] WarnLogHandler handler)
+    public void Warning([InterpolatedStringHandlerArgument("")] WarningLogHandler handler)
     {
         if (!handler.IsEnabled) { return; }
 
         WriteTrace(handler.ToStringAndClear(), LogLevel.Warning);
+    }
+
+    private static string DeriveMutexName(string path)
+    {
+        // Canonicalize: equivalent paths (relative, separator drift) must hash identically.
+        var canonical = Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var bytes = Encoding.UTF8.GetBytes(canonical.ToUpperInvariant());
+        var hash = SHA256.HashData(bytes);
+        return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
     }
 
     private void CloseWriter()
@@ -198,42 +208,6 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         WriteTrace($"Unhandled Exception: {e.ExceptionObject}", LogLevel.Critical);
     }
 
-    private void WriteTrace(string message, LogLevel level)
-    {
-        using (_writeLock.EnterScope())
-        {
-            string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
-
-            EnsureWriter();
-
-            // Mutex serializes line writes so concurrent instances don't interleave.
-            WithInterprocessLock(
-                () =>
-                {
-                    if (_writer is null) { return; }
-
-                    // Re-seek to EOF: another instance may have written or truncated the file.
-                    _writer.BaseStream.Seek(0, SeekOrigin.End);
-                    _writer.WriteLine(output);
-                },
-                throwOnTimeout: false);
-
-#if DEBUG
-            System.Diagnostics.Debug.WriteLine(output);
-#endif
-        }
-    }
-
-    private static string DeriveMutexName(string path)
-    {
-        // Canonicalize: equivalent paths (relative, separator drift) must hash identically.
-        var canonical = Path.GetFullPath(path)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var bytes = Encoding.UTF8.GetBytes(canonical.ToUpperInvariant());
-        var hash = SHA256.HashData(bytes);
-        return $"Local\\EventLogExpert.DebugLog.{Convert.ToHexString(hash, 0, 8)}";
-    }
-
     private void WithInterprocessLock(Action action, bool throwOnTimeout)
     {
         bool acquired;
@@ -267,6 +241,32 @@ public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDispos
         finally
         {
             _interprocessMutex.ReleaseMutex();
+        }
+    }
+
+    private void WriteTrace(string message, LogLevel level)
+    {
+        using (_writeLock.EnterScope())
+        {
+            string output = $"[{DateTime.Now:o}] [{Environment.CurrentManagedThreadId}] [{level}] {message}";
+
+            EnsureWriter();
+
+            // Mutex serializes line writes so concurrent instances don't interleave.
+            WithInterprocessLock(
+                () =>
+                {
+                    if (_writer is null) { return; }
+
+                    // Re-seek to EOF: another instance may have written or truncated the file.
+                    _writer.BaseStream.Seek(0, SeekOrigin.End);
+                    _writer.WriteLine(output);
+                },
+                throwOnTimeout: false);
+
+#if DEBUG
+            System.Diagnostics.Debug.WriteLine(output);
+#endif
         }
     }
 }

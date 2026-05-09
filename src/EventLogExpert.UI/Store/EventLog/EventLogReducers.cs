@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
@@ -106,7 +106,7 @@ public sealed class EventLogReducers
             ? state
             : state with
             {
-                ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.PathType))
+                ActiveLogs = state.ActiveLogs.Add(action.LogName, GetEmptyLogData(action.LogName, action.LogPathType))
             };
 
     [ReducerMethod]
@@ -220,6 +220,23 @@ public sealed class EventLogReducers
     }
 
     [ReducerMethod]
+    public static EventLogState ReduceSetContinuouslyUpdate(
+        EventLogState state,
+        EventLogAction.SetContinuouslyUpdate action) =>
+        state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
+
+    [ReducerMethod]
+    public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
+    {
+        if (!FilterMethods.HasFilteringChanged(action.EventFilter, state.AppliedFilter))
+        {
+            return state;
+        }
+
+        return state with { AppliedFilter = action.EventFilter };
+    }
+
+    [ReducerMethod]
     public static EventLogState ReduceSetSelectedEvents(EventLogState state, EventLogAction.SetSelectedEvents action)
     {
         // Order-preserving distinct by reference identity. The caller (typically
@@ -267,6 +284,9 @@ public sealed class EventLogReducers
         return false;
     }
 
+    private static EventLogData GetEmptyLogData(string logName, LogPathType pathType) =>
+        new(logName, pathType, new List<DisplayEventModel>().AsReadOnly());
+
     private static ImmutableList<DisplayEventModel> RemoveByReference(
         ImmutableList<DisplayEventModel> list,
         DisplayEventModel target)
@@ -297,26 +317,6 @@ public sealed class EventLogReducers
 
         return true;
     }
-
-    [ReducerMethod]
-    public static EventLogState ReduceSetContinuouslyUpdate(
-        EventLogState state,
-        EventLogAction.SetContinuouslyUpdate action) =>
-        state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
-
-    [ReducerMethod]
-    public static EventLogState ReduceSetFilters(EventLogState state, EventLogAction.SetFilters action)
-    {
-        if (!FilterMethods.HasFilteringChanged(action.EventFilter, state.AppliedFilter))
-        {
-            return state;
-        }
-
-        return state with { AppliedFilter = action.EventFilter };
-    }
-
-    private static EventLogData GetEmptyLogData(string logName, PathType pathType) =>
-        new(logName, pathType, new List<DisplayEventModel>().AsReadOnly());
 
     private static EventLogState UpdateActiveLog(
         EventLogState state,

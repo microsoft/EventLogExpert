@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Models;
-using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
@@ -200,52 +200,22 @@ public sealed class FilterPaneEffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
+    public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
-
-        var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
-        var action = new FilterPaneAction.SetFilter(filterModel);
+        var (effects, mockDispatcher) = CreateEffects(
+            isEnabled: true,
+            filteredDateRange: new FilterDateModel
+            {
+                After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
+            });
 
         // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
+        await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
-    }
-
-    [Fact]
-    public async Task HandleSetFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
-    {
-        // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
-
-        var (effects, mockDispatcher) = CreateEffects();
-        var action = new FilterPaneAction.SetFilter(filterModel);
-
-        // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterCacheAction.AddRecentFilter>());
-    }
-
-    [Fact]
-    public async Task HandleSetFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
-    {
-        // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
-
-        var (effects, mockDispatcher) = CreateEffects();
-        var action = new FilterPaneAction.SetFilter(filterModel);
-
-        // Act
-        await effects.HandleSetFilter(action, mockDispatcher);
-
-        // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterCacheAction.AddRecentFilter>(x =>
-            x.Filter == Constants.FilterIdEquals100));
     }
 
     [Fact]
@@ -262,7 +232,7 @@ public sealed class FilterPaneEffectsTests
             EventUtils.CreateTestEvent(timeCreated: oldest)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
@@ -293,7 +263,7 @@ public sealed class FilterPaneEffectsTests
             EventUtils.CreateTestEvent(timeCreated: oldest)
         };
 
-        var logData = new EventLogData(Constants.LogNameTestLog, PathType.LogName, events);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
@@ -322,11 +292,11 @@ public sealed class FilterPaneEffectsTests
 
         var logA = new EventLogData(
             "LogA",
-            PathType.LogName,
+            LogPathType.Channel,
             [EventUtils.CreateTestEvent(timeCreated: logANewest), EventUtils.CreateTestEvent(timeCreated: logAOldest)]);
         var logB = new EventLogData(
             "LogB",
-            PathType.LogName,
+            LogPathType.Channel,
             [EventUtils.CreateTestEvent(timeCreated: logBNewest), EventUtils.CreateTestEvent(timeCreated: logBOldest)]);
 
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
@@ -426,22 +396,52 @@ public sealed class FilterPaneEffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
+    public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
-            filteredDateRange: new FilterDateModel
-            {
-                After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
-                Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
-            });
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+
+        var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
+        var action = new FilterPaneAction.SetFilter(filterModel);
 
         // Act
-        await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
+        await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<EventLogAction.SetFilters>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
+    {
+        // Arrange
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
+
+        var (effects, mockDispatcher) = CreateEffects();
+        var action = new FilterPaneAction.SetFilter(filterModel);
+
+        // Act
+        await effects.HandleSetFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<FilterCacheAction.AddRecentFilter>());
+    }
+
+    [Fact]
+    public async Task HandleSetFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
+    {
+        // Arrange
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
+
+        var (effects, mockDispatcher) = CreateEffects();
+        var action = new FilterPaneAction.SetFilter(filterModel);
+
+        // Act
+        await effects.HandleSetFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<FilterCacheAction.AddRecentFilter>(x =>
+            x.Filter == Constants.FilterIdEquals100));
     }
 
     [Fact]

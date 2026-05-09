@@ -444,7 +444,7 @@ public sealed class BannerServiceTests
 
         // Assert
         Assert.True(secondCalled);
-        traceLogger.Received(1).Warn(Arg.Any<WarnLogHandler>());
+        traceLogger.Received(1).Warning(Arg.Any<WarningLogHandler>());
     }
 
     [Fact]

@@ -54,7 +54,7 @@ public class DbToolCommand(ITraceLogger logger)
         _providerDetailFormat = "{0, -" + maxNameLength + "} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
         var header = string.Format(_providerDetailFormat, "Provider Name", "Events", "Parameters", "Keywords", "Opcodes", "Tasks", "Messages");
-        Logger.Info($"{header}");
+        Logger.Information($"{header}");
     }
 
     protected void LogProviderDetails(ProviderDetails details)
@@ -69,6 +69,6 @@ public class DbToolCommand(ITraceLogger logger)
             details.Tasks.Count,
             details.Messages.Count);
 
-        Logger.Info($"{line}");
+        Logger.Information($"{line}");
     }
 }

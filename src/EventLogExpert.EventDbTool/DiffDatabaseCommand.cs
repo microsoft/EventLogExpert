@@ -1,8 +1,8 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.EventProviderDatabase;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
@@ -69,12 +69,14 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         if (File.Exists(newDb))
         {
             Logger.Error($"File already exists: {newDb}");
+
             return;
         }
 
         if (!string.Equals(Path.GetExtension(newDb), ".db", StringComparison.OrdinalIgnoreCase))
         {
             Logger.Error($"New db path must have a .db extension.");
+
             return;
         }
 
@@ -87,20 +89,20 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         // Pass firstProviderNames as the skip set so providers present in the first source are
         // never resolved from the second source's metadata path. This is especially important when
         // the second source is .evtx+MTA, where each provider triggers an expensive load.
-        Logger.Info($"Skipping up to {firstProviderNames.Count} provider name(s) from the second source that also appear in the first source.");
+        Logger.Information($"Skipping up to {firstProviderNames.Count} provider name(s) from the second source that also appear in the first source.");
 
         // Defer creating the DbContext (and therefore the .db file on disk) until at least one
         // provider is actually about to be persisted. This prevents leaving an empty database
         // behind when the second source yields no new providers.
-        EventProviderDbContext? newDbContext = null;
+        ProviderDbContext? newDbContext = null;
 
         try
         {
             foreach (var details in ProviderSource.LoadProviders(secondSource, Logger, filter: null, skipProviderNames: firstProviderNames))
             {
-                Logger.Info($"Copying {details.ProviderName} because it is present in second source but not first.");
+                Logger.Information($"Copying {details.ProviderName} because it is present in second source but not first.");
 
-                newDbContext ??= new EventProviderDbContext(newDb, false, Logger);
+                newDbContext ??= new ProviderDbContext(newDb, false, Logger);
 
                 newDbContext.ProviderDetails.Add(details);
 
@@ -109,14 +111,14 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
 
             if (newDbContext is null)
             {
-                Logger.Warn($"No providers in the second source are missing from the first. Database was not created.");
+                Logger.Warning($"No providers in the second source are missing from the first. Database was not created.");
                 return;
             }
 
             newDbContext.SaveChanges();
 
-            Logger.Info($"Providers copied to new database:");
-            Logger.Info($"");
+            Logger.Information($"Providers copied to new database:");
+            Logger.Information($"");
             LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
 
             foreach (var provider in providersCopied)
