@@ -6,7 +6,7 @@ using System.Security.Principal;
 
 namespace EventLogExpert.Eventing.Common.Events;
 
-public sealed record DisplayEventModel(
+public sealed record ResolvedEvent(
     string OwningLog /*This is the name of the log file or the live log, which we use internally*/,
     LogPathType LogPathType)
 {
@@ -45,7 +45,7 @@ public sealed record DisplayEventModel(
     ///     Pre-rendered XML for the event. Populated by <c>EventLogReader</c> only when the
     ///     log is opened with <c>renderXml: true</c> (currently driven by the presence of an
     ///     applied filter that references this property). When empty, callers should use
-    ///     <see cref="IEventXmlResolver" /> to fetch the XML on demand.
+    ///     <see cref="EventLogExpert.Eventing.Resolvers.IEventXmlResolver" /> to fetch the XML on demand.
     /// </summary>
     public string Xml { get; init; } = string.Empty;
 }

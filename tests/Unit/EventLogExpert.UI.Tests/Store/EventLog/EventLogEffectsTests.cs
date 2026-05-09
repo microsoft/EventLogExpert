@@ -80,8 +80,8 @@ public sealed class EventLogEffectsTests
             CreateEffectsWithServices(true, activeLogs);
 
         // Mock the filter to drop everything (simulate "no events match the active filter").
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(new List<DisplayEventModel>());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(new List<ResolvedEvent>());
 
         var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new EventLogAction.AddEvent(newEvent);
@@ -343,7 +343,7 @@ public sealed class EventLogEffectsTests
     public async Task HandleLoadNewEvents_ShouldProcessBufferAndDispatchActions()
     {
         // Arrange
-        var bufferedEvents = new List<DisplayEventModel>
+        var bufferedEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog),
             EventUtils.CreateTestEvent(200, logName: Constants.LogNameTestLog)
@@ -375,7 +375,7 @@ public sealed class EventLogEffectsTests
     public async Task HandleLoadNewEvents_WhenAllEventsFiltered_ShouldNotDispatchAppendBatch()
     {
         // Arrange
-        var bufferedEvents = new List<DisplayEventModel>
+        var bufferedEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
@@ -386,8 +386,8 @@ public sealed class EventLogEffectsTests
         var (effects, mockDispatcher, _, _, mockFilterService) =
             CreateEffectsWithServices(activeLogs: activeLogs, newEventBuffer: bufferedEvents);
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(new List<DisplayEventModel>());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(new List<ResolvedEvent>());
 
         // Act
         await effects.HandleLoadNewEvents(mockDispatcher);
@@ -404,7 +404,7 @@ public sealed class EventLogEffectsTests
     {
         // Arrange
         // EventUtils.CreateTestEvent always sets OwningLog="TestLog"; override via `with` to span 2 logs.
-        var bufferedEvents = new List<DisplayEventModel>
+        var bufferedEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100) with { OwningLog = Constants.LogNameApplication },
             EventUtils.CreateTestEvent(200) with { OwningLog = Constants.LogNameTestLog },
@@ -634,7 +634,7 @@ public sealed class EventLogEffectsTests
     public async Task HandleSetContinuouslyUpdate_WhenFalse_ShouldNotProcessBuffer()
     {
         // Arrange
-        var bufferedEvents = new List<DisplayEventModel>
+        var bufferedEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
@@ -653,7 +653,7 @@ public sealed class EventLogEffectsTests
     public async Task HandleSetContinuouslyUpdate_WhenTrue_ShouldProcessBuffer()
     {
         // Arrange
-        var bufferedEvents = new List<DisplayEventModel>
+        var bufferedEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
@@ -727,7 +727,7 @@ public sealed class EventLogEffectsTests
         // Arrange — log closes (ActiveLogs.Remove) while the filter task is running. The
         // post-filter dispatch must omit the closed log's slice. (The reducer also skips
         // unknown log ids, but checking at the effect keeps the dispatch minimal.)
-        var snapshotEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var snapshotEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
 
         var snapshotState = new EventLogState
@@ -745,7 +745,7 @@ public sealed class EventLogEffectsTests
 
         EventLogState volatileState = snapshotState;
 
-        var filterResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var filterResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [snapshotData.Id] = snapshotEvents
         };
@@ -776,7 +776,7 @@ public sealed class EventLogEffectsTests
         // Arrange — single open log; live event arrives during the first filter pass (Events ref
         // changes). The new filter must be re-applied to the post-mutation rows in a single retry
         // pass so the user sees the filter applied to the updated row set, not stale rows.
-        var snapshotEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var snapshotEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
 
         var snapshotState = new EventLogState
@@ -787,7 +787,7 @@ public sealed class EventLogEffectsTests
             AppliedFilter = new EventFilter(null, [])
         };
 
-        var liveTailEvents = new List<DisplayEventModel>
+        var liveTailEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(101)
@@ -802,12 +802,12 @@ public sealed class EventLogEffectsTests
 
         EventLogState volatileState = snapshotState;
 
-        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [snapshotData.Id] = snapshotEvents
         };
 
-        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [snapshotData.Id] = liveTailEvents
         };
@@ -851,7 +851,7 @@ public sealed class EventLogEffectsTests
         // Arrange — events change during pass 1 AND again during pass 2. Single-retry semantics
         // mean the pass-2 result is still stale; the slice must be omitted so the reducer's
         // preserve-omitted fallback keeps the existing rows (avoids losing live events).
-        var snapshotEvents = new List<DisplayEventModel>();
+        var snapshotEvents = new List<ResolvedEvent>();
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
 
         var snapshotState = new EventLogState
@@ -862,8 +862,8 @@ public sealed class EventLogEffectsTests
             AppliedFilter = new EventFilter(null, [])
         };
 
-        var pass1MutationEvents = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
-        var pass2MutationEvents = new List<DisplayEventModel>
+        var pass1MutationEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var pass2MutationEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(101)
@@ -885,12 +885,12 @@ public sealed class EventLogEffectsTests
 
         EventLogState volatileState = snapshotState;
 
-        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [snapshotData.Id] = []
         };
 
-        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [snapshotData.Id] = pass1MutationEvents
         };
@@ -934,14 +934,14 @@ public sealed class EventLogEffectsTests
         var (effects, mockDispatcher, _, _, mockFilterService) =
             CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var staleResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            [logData.Id] = new List<DisplayEventModel> { EventUtils.CreateTestEvent(999) }
+            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(999) }
         };
 
-        var freshResult = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var freshResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            [logData.Id] = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) }
+            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) }
         };
 
         var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1014,7 +1014,7 @@ public sealed class EventLogEffectsTests
     public async Task HandleSetFilters_ShouldFilterAndDispatchUpdate()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
             EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
@@ -1181,8 +1181,8 @@ public sealed class EventLogEffectsTests
 
         var mockFilterService = Substitute.For<IFilterService>();
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
         var mockServiceScope = Substitute.For<IServiceScope>();
@@ -1350,7 +1350,7 @@ public sealed class EventLogEffectsTests
     private static (EventLogEffects effects, IDispatcher mockDispatcher) CreateEffects(
         bool continuouslyUpdate = false,
         ImmutableDictionary<string, EventLogData>? activeLogs = null,
-        List<DisplayEventModel>? newEventBuffer = null,
+        List<ResolvedEvent>? newEventBuffer = null,
         bool hasEventResolver = false)
     {
         var mockEventLogState = Substitute.For<IState<EventLogState>>();
@@ -1366,10 +1366,10 @@ public sealed class EventLogEffectsTests
         var mockFilterService = Substitute.For<IFilterService>();
 
         mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
-            .Returns(new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>());
+            .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
@@ -1479,10 +1479,10 @@ public sealed class EventLogEffectsTests
         var mockFilterService = Substitute.For<IFilterService>();
 
         mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
-            .Returns(new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>());
+            .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();
@@ -1522,7 +1522,7 @@ public sealed class EventLogEffectsTests
         IFilterService mockFilterService) CreateEffectsWithServices(
             bool continuouslyUpdate = false,
             ImmutableDictionary<string, EventLogData>? activeLogs = null,
-            List<DisplayEventModel>? newEventBuffer = null)
+            List<ResolvedEvent>? newEventBuffer = null)
     {
         var mockEventLogState = Substitute.For<IState<EventLogState>>();
 
@@ -1537,10 +1537,10 @@ public sealed class EventLogEffectsTests
         var mockFilterService = Substitute.For<IFilterService>();
 
         mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
-            .Returns(new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>());
+            .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<DisplayEventModel>>(), Arg.Any<EventFilter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<DisplayEventModel>>().ToList());
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
         var mockLogWatcherService = Substitute.For<ILogWatcherService>();

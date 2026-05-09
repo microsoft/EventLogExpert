@@ -308,7 +308,7 @@ public sealed class EventResolverTests
             };
 
             // Act
-            DisplayEventModel displayEvent;
+            ResolvedEvent displayEvent;
             using (var resolver = new EventResolver(dbCollection))
             {
                 displayEvent = resolver.ResolveEvent(eventRecord);
@@ -380,8 +380,8 @@ public sealed class EventResolverTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            DisplayEventModel dbDisplayEvent;
-            DisplayEventModel unknownDisplayEvent;
+            ResolvedEvent dbDisplayEvent;
+            ResolvedEvent unknownDisplayEvent;
 
             using (var resolver = new EventResolver(dbCollection))
             {
@@ -611,8 +611,8 @@ public sealed class EventResolverTests
             var eventRecord = EventUtils.CreateBasicEvent();
 
             // Act
-            DisplayEventModel localEvent;
-            DisplayEventModel databaseEvent;
+            ResolvedEvent localEvent;
+            ResolvedEvent databaseEvent;
 
             using (var localResolver = new EventResolver())
             {

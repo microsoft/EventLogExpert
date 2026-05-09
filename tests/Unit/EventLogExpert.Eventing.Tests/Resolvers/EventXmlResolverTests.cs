@@ -194,17 +194,17 @@ public sealed class EventXmlResolverTests
         getResolveCallCount = () => Volatile.Read(ref resolveCount);
 
         return new EventXmlResolver(
-            (owningLog, recordId, LogPathType) =>
+            (owningLog, recordId, logPathType) =>
             {
                 Interlocked.Increment(ref resolveCount);
 
-                return resolve(new ResolveKey(owningLog, recordId, LogPathType));
+                return resolve(new ResolveKey(owningLog, recordId, logPathType));
             },
             initialCapacity,
             maxCapacity);
     }
 
-    private static DisplayEventModel CreateEvent(long? recordId, string owningLog = "TestLog") =>
+    private static ResolvedEvent CreateEvent(long? recordId, string owningLog = "TestLog") =>
         new(owningLog, LogPathType.Channel)
         {
             RecordId = recordId,
@@ -220,11 +220,11 @@ public sealed class EventXmlResolverTests
         getResolveCallCount = () => Volatile.Read(ref resolveCount);
 
         return new EventXmlResolver(
-            (owningLog, recordId, LogPathType) =>
+            (owningLog, recordId, logPathType) =>
             {
                 Interlocked.Increment(ref resolveCount);
 
-                return resolve(new ResolveKey(owningLog, recordId, LogPathType));
+                return resolve(new ResolveKey(owningLog, recordId, logPathType));
             });
     }
 

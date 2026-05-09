@@ -21,11 +21,11 @@ public sealed record EventLogState
 
     public bool ContinuouslyUpdate { get; init; } = false;
 
-    public IReadOnlyList<DisplayEventModel> NewEventBuffer { get; init; } = [];
+    public IReadOnlyList<ResolvedEvent> NewEventBuffer { get; init; } = [];
 
     public bool NewEventBufferIsFull { get; init; }
 
-    public DisplayEventModel? SelectedEvent { get; init; }
+    public ResolvedEvent? SelectedEvent { get; init; }
 
-    public ImmutableList<DisplayEventModel> SelectedEvents { get; init; } = [];
+    public ImmutableList<ResolvedEvent> SelectedEvents { get; init; } = [];
 }

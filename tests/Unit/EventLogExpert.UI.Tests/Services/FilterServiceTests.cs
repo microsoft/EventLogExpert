@@ -109,13 +109,13 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
 
-        var log1Events = new List<DisplayEventModel>
+        var log1Events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
             EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
         };
 
-        var log2Events = new List<DisplayEventModel>
+        var log2Events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
             EventUtils.CreateTestEvent(300, level: Constants.EventLevelError)
@@ -142,7 +142,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -235,7 +235,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200),

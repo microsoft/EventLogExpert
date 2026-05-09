@@ -34,12 +34,12 @@ public sealed partial class EventTable
     // effects on background threads.
     private static readonly HashSet<int> s_warnedUnknownColors = [];
 
-    private readonly Dictionary<DisplayEventModel, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
+    private readonly Dictionary<ResolvedEvent, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
 
-    private IReadOnlyList<DisplayEventModel> _activeDisplayedEvents = [];
-    private IReadOnlyList<DisplayEventModel>? _cachedFilteredCanonical;
+    private IReadOnlyList<ResolvedEvent> _activeDisplayedEvents = [];
+    private IReadOnlyList<ResolvedEvent>? _cachedFilteredCanonical;
     private EventLogId? _cachedFilteredTableId;
-    private IReadOnlyList<DisplayEventModel>? _cachedFilteredView;
+    private IReadOnlyList<ResolvedEvent>? _cachedFilteredView;
     private EventTableModel? _currentTable;
     private DotNetObjectReference<EventTable>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
@@ -47,24 +47,24 @@ public sealed partial class EventTable
     private ImmutableList<FilterModel> _filters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
-    private IReadOnlyList<DisplayEventModel>? _lastIndexedDisplayedEvents;
+    private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
     // View-local cursor: the row that is the moving end of a range selection within the
     // current table. May briefly diverge from _selectedEvent during local keyboard nav
     // (advanced before the dispatch round-trip) and after RebuildRowIndexMap rebinds it
     // to the equivalent row in a freshly built DisplayedEvents list. Defaults to the
     // same row as _selectionAnchor for single-row selections.
-    private DisplayEventModel? _localCursor;
+    private ResolvedEvent? _localCursor;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
     private bool _resortSelectionOnNextRender;
-    private Dictionary<DisplayEventModel, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
-    private DisplayEventModel? _selectedEvent;
-    private ImmutableList<DisplayEventModel> _selectedEvents = [];
-    private HashSet<DisplayEventModel> _selectedSet = new(ReferenceEqualityComparer.Instance);
+    private Dictionary<ResolvedEvent, int> _rowIndexMap = new(ReferenceEqualityComparer.Instance);
+    private ResolvedEvent? _selectedEvent;
+    private ImmutableList<ResolvedEvent> _selectedEvents = [];
+    private HashSet<ResolvedEvent> _selectedSet = new(ReferenceEqualityComparer.Instance);
     // The fixed end of a range selection — set on plain click, Ctrl+Click,
     // and any keyboard nav that establishes a single selection. Reused for
     // Shift+Click and Shift+Arrow to compute the range.
-    private DisplayEventModel? _selectionAnchor;
+    private ResolvedEvent? _selectionAnchor;
     private TimeZoneInfo _timeZoneSettings = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
@@ -81,9 +81,9 @@ public sealed partial class EventTable
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, DisplayEventModel?> SelectedEvent { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ResolvedEvent?> SelectedEvent { get; init; } = null!;
 
-    [Inject] private IStateSelection<EventLogState, ImmutableList<DisplayEventModel>> SelectedEvents { get; init; } = null!;
+    [Inject] private IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> SelectedEvents { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -190,7 +190,7 @@ public sealed partial class EventTable
         _selectedEvent = SelectedEvent.Value;
         _localCursor = _selectedEvent;
         _selectedEvents = SelectedEvents.Value;
-        _selectedSet = new HashSet<DisplayEventModel>(_selectedEvents, ReferenceEqualityComparer.Instance);
+        _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         _filters = FilterPaneState.Value.Filters;
         _timeZoneSettings = Settings.TimeZoneInfo;
 
@@ -225,13 +225,13 @@ public sealed partial class EventTable
         if (selectionChanged)
         {
             _selectedEvents = SelectedEvents.Value;
-            // Reference equality is intentional. Even though DisplayEventModel is
+            // Reference equality is intentional. Even though ResolvedEvent is
             // now a fully immutable record (no mutating ResolveXml() workaround),
             // value-equality requires hashing every string field on every selection
             // mutation. Reference equality keeps selection bookkeeping O(1) and
             // also avoids any chance that two distinct event instances that happen
             // to be value-equal would collapse into a single selected row.
-            _selectedSet = new HashSet<DisplayEventModel>(_selectedEvents, ReferenceEqualityComparer.Instance);
+            _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         }
 
         if (selectedEventChanged)
@@ -269,9 +269,9 @@ public sealed partial class EventTable
     private static string GetLogShortName(string owningLog) =>
         owningLog[(owningLog.LastIndexOf('\\') + 1)..];
 
-    private static DisplayEventModel? ResolveByKey(
-        IReadOnlyList<DisplayEventModel> displayedEvents,
-        DisplayEventModel? candidate)
+    private static ResolvedEvent? ResolveByKey(
+        IReadOnlyList<ResolvedEvent> displayedEvents,
+        ResolvedEvent? candidate)
     {
         if (candidate is null) { return null; }
 
@@ -295,7 +295,7 @@ public sealed partial class EventTable
         return null;
     }
 
-    private void ApplySelectedFilter(DisplayEventModel selectedEvent, FilterCategory category, bool exclude)
+    private void ApplySelectedFilter(ResolvedEvent selectedEvent, FilterCategory category, bool exclude)
     {
         string filterValue = category switch
         {
@@ -331,10 +331,10 @@ public sealed partial class EventTable
         Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
     }
 
-    private IReadOnlyList<DisplayEventModel> BuildRange(
-        IReadOnlyList<DisplayEventModel> displayedEvents,
-        DisplayEventModel anchor,
-        DisplayEventModel selected)
+    private IReadOnlyList<ResolvedEvent> BuildRange(
+        IReadOnlyList<ResolvedEvent> displayedEvents,
+        ResolvedEvent anchor,
+        ResolvedEvent selected)
     {
         // O(1) lookups via _rowIndexMap; fall back to a linear scan only if
         // the map is stale (e.g., during a render between table rebuilds).
@@ -358,7 +358,7 @@ public sealed partial class EventTable
 
         int start = Math.Min(anchorIndex, activeIndex);
         int end = Math.Max(anchorIndex, activeIndex);
-        var range = new DisplayEventModel[end - start + 1];
+        var range = new ResolvedEvent[end - start + 1];
 
         for (int i = 0; i < range.Length; i++)
         {
@@ -368,15 +368,15 @@ public sealed partial class EventTable
         return range;
     }
 
-    private void DispatchSetSelection(IReadOnlyList<DisplayEventModel> events, DisplayEventModel? selected)
+    private void DispatchSetSelection(IReadOnlyList<ResolvedEvent> events, ResolvedEvent? selected)
     {
         // Sort the selection by current row-index for events in this table; events
         // belonging to other open logs (not in _rowIndexMap) preserve their existing
         // relative order at the tail. De-dupe by reference identity throughout so
         // SetSelectedEvents never has to re-process duplicates.
-        var seen = new HashSet<DisplayEventModel>(ReferenceEqualityComparer.Instance);
-        List<(DisplayEventModel Event, int Index)> inTable = new(events.Count);
-        List<DisplayEventModel> outOfTable = [];
+        var seen = new HashSet<ResolvedEvent>(ReferenceEqualityComparer.Instance);
+        List<(ResolvedEvent Event, int Index)> inTable = new(events.Count);
+        List<ResolvedEvent> outOfTable = [];
 
         foreach (var selectedEvent in events)
         {
@@ -394,7 +394,7 @@ public sealed partial class EventTable
 
         inTable.Sort(static (left, right) => left.Index.CompareTo(right.Index));
 
-        var ordered = new List<DisplayEventModel>(inTable.Count + outOfTable.Count);
+        var ordered = new List<ResolvedEvent>(inTable.Count + outOfTable.Count);
 
         foreach (var entry in inTable) { ordered.Add(entry.Event); }
 
@@ -420,7 +420,7 @@ public sealed partial class EventTable
         }
     }
 
-    private int GetActiveIndex(IReadOnlyList<DisplayEventModel> displayedEvents)
+    private int GetActiveIndex(IReadOnlyList<ResolvedEvent> displayedEvents)
     {
         if (_localCursor is not null && _rowIndexMap.TryGetValue(_localCursor, out int idx))
         {
@@ -442,7 +442,7 @@ public sealed partial class EventTable
     private int GetColumnWidth(ColumnName column) =>
         _eventTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
 
-    private string GetCss(DisplayEventModel @event) =>
+    private string GetCss(ResolvedEvent @event) =>
         _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
 
     private string GetDateColumnHeader() =>
@@ -450,7 +450,7 @@ public sealed partial class EventTable
             "Date and Time" :
             $"Date and Time {Settings.TimeZoneInfo.DisplayName.Split(" ").First()}";
 
-    private string? GetHighlight(DisplayEventModel @event)
+    private string? GetHighlight(ResolvedEvent @event)
     {
         // Selected rows show selection styling (.selected wins via !important);
         // skip cache writes so deselecting doesn't require a refill.
@@ -503,7 +503,7 @@ public sealed partial class EventTable
             .ToArray();
     }
 
-    private int GetRowIndex(DisplayEventModel evt) =>
+    private int GetRowIndex(ResolvedEvent evt) =>
         _rowIndexMap.TryGetValue(evt, out int index) ? index + 2 : 2;
 
     private async Task HandleKeyDown(KeyboardEventArgs args)
@@ -620,7 +620,7 @@ public sealed partial class EventTable
     private void InvokeTableColumnMenu(MouseEventArgs args) =>
         MenuService.OpenAt(args.ClientX, args.ClientY, ShowColumnMenuItems());
 
-    private bool IsSelectionOutOfSortOrder(IReadOnlyList<DisplayEventModel> selection)
+    private bool IsSelectionOutOfSortOrder(IReadOnlyList<ResolvedEvent> selection)
     {
         int lastIndex = -1;
 
@@ -657,7 +657,7 @@ public sealed partial class EventTable
 
         _lastIndexedDisplayedEvents = displayedEvents;
         _rowIndexMap = new(displayedEvents.Count, ReferenceEqualityComparer.Instance);
-        // New event-list reference means stored DisplayEventModel instances
+        // New event-list reference means stored ResolvedEvent instances
         // are stale; clearing prevents memory growth across log reloads.
         _highlightCache.Clear();
 
@@ -703,7 +703,7 @@ public sealed partial class EventTable
         }
     }
 
-    private IReadOnlyList<DisplayEventModel> ResolveActiveDisplayedEvents()
+    private IReadOnlyList<ResolvedEvent> ResolveActiveDisplayedEvents()
     {
         if (_currentTable is null) { return []; }
 
@@ -722,7 +722,7 @@ public sealed partial class EventTable
             ? trackedCount
             : 0;
 
-        var filtered = new List<DisplayEventModel>(expectedCapacity);
+        var filtered = new List<ResolvedEvent>(expectedCapacity);
 
         for (int eventIndex = 0; eventIndex < canonical.Count; eventIndex++)
         {
@@ -787,7 +787,7 @@ public sealed partial class EventTable
         }
     }
 
-    private void SelectEvent(MouseEventArgs args, DisplayEventModel @event)
+    private void SelectEvent(MouseEventArgs args, ResolvedEvent @event)
     {
         var displayedEvents = _activeDisplayedEvents;
 
@@ -814,7 +814,7 @@ public sealed partial class EventTable
                     // Ctrl+Shift+Click: additive range. Merge existing
                     // selection with the new range. Dedupe by reference is
                     // handled centrally inside DispatchSetSelection.
-                    var merged = new List<DisplayEventModel>(_selectedEvents.Count + range.Count);
+                    var merged = new List<ResolvedEvent>(_selectedEvents.Count + range.Count);
                     merged.AddRange(_selectedEvents);
                     merged.AddRange(range);
                     DispatchSetSelection(merged, @event);
@@ -835,7 +835,7 @@ public sealed partial class EventTable
 
                 if (_selectedSet.Contains(@event))
                 {
-                    var remaining = new List<DisplayEventModel>(_selectedEvents.Count);
+                    var remaining = new List<ResolvedEvent>(_selectedEvents.Count);
 
                     foreach (var existingEvent in _selectedEvents)
                     {
@@ -846,7 +846,7 @@ public sealed partial class EventTable
                 }
                 else
                 {
-                    var combined = new List<DisplayEventModel>(_selectedEvents.Count + 1);
+                    var combined = new List<ResolvedEvent>(_selectedEvents.Count + 1);
                     combined.AddRange(_selectedEvents);
                     combined.Add(@event);
                     DispatchSetSelection(combined, @event);
@@ -912,7 +912,7 @@ public sealed partial class EventTable
         return items;
     }
 
-    private IReadOnlyList<MenuItem> ShowContextMenuItems(DisplayEventModel selectedEvent)
+    private IReadOnlyList<MenuItem> ShowContextMenuItems(ResolvedEvent selectedEvent)
     {
         return
         [
@@ -933,7 +933,7 @@ public sealed partial class EventTable
         ];
     }
 
-    private IReadOnlyList<MenuItem> ShowFilterCategoryItems(DisplayEventModel selectedEvent, bool exclude)
+    private IReadOnlyList<MenuItem> ShowFilterCategoryItems(ResolvedEvent selectedEvent, bool exclude)
     {
         var items = new List<MenuItem>();
 

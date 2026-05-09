@@ -13,7 +13,7 @@ public sealed record EventTableState
 {
     public ImmutableList<EventTableModel> EventTables { get; init; } = [];
 
-    public IReadOnlyList<DisplayEventModel> DisplayedEvents { get; init; } = [];
+    public IReadOnlyList<ResolvedEvent> DisplayedEvents { get; init; } = [];
 
     public ImmutableDictionary<EventLogId, int> EventCountByLog { get; init; } =
         ImmutableDictionary<EventLogId, int>.Empty;

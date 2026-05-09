@@ -44,7 +44,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
 
     public void LoadProviderDetails(EventRecord eventRecord)
     {
-        ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventResolver));
+        ObjectDisposedException.ThrowIf(IsDisposed, this);
 
         var providerName = eventRecord.ProviderName;
 
@@ -80,7 +80,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         }
     }
 
-    public override DisplayEventModel ResolveEvent(EventRecord eventRecord)
+    public override ResolvedEvent ResolveEvent(EventRecord eventRecord)
     {
         LoadProviderDetails(eventRecord);
 
@@ -246,7 +246,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
     {
         using (_databaseAccessLock.EnterScope())
         {
-            ObjectDisposedException.ThrowIf(IsDisposed, nameof(EventResolver));
+            ObjectDisposedException.ThrowIf(IsDisposed, this);
 
             foreach (var dbContext in _dbContexts)
             {

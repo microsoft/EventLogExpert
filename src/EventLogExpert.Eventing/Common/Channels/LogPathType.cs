@@ -6,5 +6,5 @@ namespace EventLogExpert.Eventing.Common.Channels;
 public enum LogPathType
 {
     Channel = 1,
-    File
+    File = 2
 }

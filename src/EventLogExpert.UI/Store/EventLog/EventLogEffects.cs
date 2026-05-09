@@ -120,7 +120,7 @@ public sealed class EventLogEffects(
         }
         else
         {
-            var updatedBuffer = new List<DisplayEventModel>(_eventLogState.Value.NewEventBuffer.Count + 1)
+            var updatedBuffer = new List<ResolvedEvent>(_eventLogState.Value.NewEventBuffer.Count + 1)
             {
                 action.NewEvent
             };
@@ -230,7 +230,7 @@ public sealed class EventLogEffects(
             .Where(e => e.RecordId.HasValue && pending.SelectedIds.Contains(e.RecordId.Value))
             .ToList();
 
-        DisplayEventModel? selectedRestored = pending.SelectedId.HasValue
+        ResolvedEvent? selectedRestored = pending.SelectedId.HasValue
             ? action.Events.FirstOrDefault(e => e.RecordId == pending.SelectedId.Value)
             : null;
 
@@ -496,7 +496,7 @@ public sealed class EventLogEffects(
             // once below so the new filter is applied to the post-mutation rows too.
             var snapshotById = activeLogsSnapshot.ToDictionary(d => d.Id);
             var currentByName = _eventLogState.Value.ActiveLogs;
-            var fresh = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>(filteredActiveLogs.Count);
+            var fresh = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(filteredActiveLogs.Count);
             var staleLogs = new List<EventLogData>();
 
             foreach (var (logId, filteredEvents) in filteredActiveLogs)
@@ -655,7 +655,7 @@ public sealed class EventLogEffects(
     }
 
     /// <summary>Adds new events to the currently opened log</summary>
-    private static EventLogData AddEventsToOneLog(EventLogData logData, List<DisplayEventModel> eventsToAdd)
+    private static EventLogData AddEventsToOneLog(EventLogData logData, List<ResolvedEvent> eventsToAdd)
     {
         if (eventsToAdd.Count == 0) { return logData; }
 
@@ -666,10 +666,10 @@ public sealed class EventLogEffects(
 
     private static ImmutableDictionary<string, EventLogData> DistributeEventsToManyLogs(
         ImmutableDictionary<string, EventLogData> logsToUpdate,
-        IEnumerable<DisplayEventModel> eventsToDistribute)
+        IEnumerable<ResolvedEvent> eventsToDistribute)
     {
         // Group events by owning log once to avoid repeated enumeration
-        var eventsByLog = new Dictionary<string, List<DisplayEventModel>>();
+        var eventsByLog = new Dictionary<string, List<ResolvedEvent>>();
 
         foreach (var e in eventsToDistribute)
         {
@@ -788,7 +788,7 @@ public sealed class EventLogEffects(
             FullMode = BoundedChannelFullMode.Wait
         });
 
-        List<DisplayEventModel> events = [];
+        List<ResolvedEvent> events = [];
 
         await using var timer = new Timer(
             _ =>
@@ -799,7 +799,7 @@ public sealed class EventLogEffects(
                 // is dispatched after ~3 seconds of loading.
                 if (Interlocked.Increment(ref timerTick) <= 1) { return; }
 
-                List<DisplayEventModel> delta;
+                List<ResolvedEvent> delta;
 
                 lock (events)
                 {
@@ -863,7 +863,7 @@ public sealed class EventLogEffects(
 
                     try
                     {
-                        List<DisplayEventModel> localBatch = new(batch.Length);
+                        List<ResolvedEvent> localBatch = new(batch.Length);
                         int localResolved = 0;
 
                         foreach (var @event in batch)
@@ -981,8 +981,8 @@ public sealed class EventLogEffects(
 
         // Group the buffered events by owning log id, filter each group, and dispatch
         // a single batched append so the combined-view reducer only fires once.
-        var batched = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>();
-        var grouped = new Dictionary<EventLogId, List<DisplayEventModel>>();
+        var batched = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>();
+        var grouped = new Dictionary<EventLogId, List<ResolvedEvent>>();
 
         foreach (var bufferedEvent in state.NewEventBuffer)
         {

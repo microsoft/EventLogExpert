@@ -81,7 +81,7 @@ public sealed class EventXmlResolver : IEventXmlResolver
         }
     }
 
-    public ValueTask<string> GetXmlAsync(DisplayEventModel evt, CancellationToken cancellationToken = default)
+    public ValueTask<string> GetXmlAsync(ResolvedEvent evt, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(evt);
 

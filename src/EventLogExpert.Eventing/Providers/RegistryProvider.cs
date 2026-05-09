@@ -18,7 +18,7 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null)
     ///     registry entry exists) is local-only, and silently mixing local and remote sources
     ///     produced wrong message text. Callers must already be operating in a local context.
     /// </remarks>
-    public IEnumerable<string> GetMessageFilesForLegacyProvider(string providerName)
+    public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName)
     {
         _logger?.Debug($"{nameof(GetMessageFilesForLegacyProvider)} called for provider {providerName}");
 

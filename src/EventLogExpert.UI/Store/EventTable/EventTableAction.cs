@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
@@ -11,9 +11,9 @@ public sealed record EventTableAction
 {
     public sealed record AddTable(EventLogData LogData);
 
-    public sealed record AppendTableEvents(EventLogId LogId, IReadOnlyList<DisplayEventModel> Events);
+    public sealed record AppendTableEvents(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events);
 
-    public sealed record AppendTableEventsBatch(IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> EventsByLog);
+    public sealed record AppendTableEventsBatch(IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> EventsByLog);
 
     public sealed record CloseAll;
 
@@ -43,7 +43,7 @@ public sealed record EventTableAction
     public sealed record ToggleSorting;
 
     public sealed record UpdateDisplayedEvents(
-        IReadOnlyDictionary<EventLogId, IReadOnlyList<DisplayEventModel>> ActiveLogs);
+        IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> ActiveLogs);
 
-    public sealed record UpdateTable(EventLogId LogId, IReadOnlyList<DisplayEventModel> Events);
+    public sealed record UpdateTable(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events);
 }

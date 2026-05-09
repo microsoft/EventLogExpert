@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Common.Events;
 namespace EventLogExpert.Eventing.Resolvers;
 
 /// <summary>
-///     Resolves the raw XML for a <see cref="DisplayEventModel" /> on demand and caches the result. Implementations
+///     Resolves the raw XML for a <see cref="ResolvedEvent" /> on demand and caches the result. Implementations
 ///     must be thread-safe and must coalesce concurrent requests for the same event into a single underlying
 ///     <c>EvtQuery</c> / <c>RenderEventXml</c> call.
 /// </summary>
@@ -19,10 +19,10 @@ public interface IEventXmlResolver
     void ClearXmlCacheForLog(string owningLog);
 
     /// <summary>
-    ///     Returns the XML for <paramref name="evt" />. If <see cref="DisplayEventModel.Xml" /> is already populated
+    ///     Returns the XML for <paramref name="evt" />. If <see cref="ResolvedEvent.Xml" /> is already populated
     ///     (because the log was opened with <c>renderXml: true</c>), the pre-rendered value is returned immediately; otherwise
     ///     the resolver re-opens the source log via <c>EvtQuery</c>, locates the record by
-    ///     <see cref="DisplayEventModel.RecordId" />, and renders the XML.
+    ///     <see cref="ResolvedEvent.RecordId" />, and renders the XML.
     /// </summary>
     /// <param name="evt">The event to resolve XML for.</param>
     /// <param name="cancellationToken">
@@ -30,5 +30,5 @@ public interface IEventXmlResolver
     ///     in-flight resolution; concurrent callers waiting on the same cache entry continue to observe the result.
     /// </param>
     /// <returns>The XML string, or <see cref="string.Empty" /> if the record cannot be located or rendering fails.</returns>
-    ValueTask<string> GetXmlAsync(DisplayEventModel evt, CancellationToken cancellationToken = default);
+    ValueTask<string> GetXmlAsync(ResolvedEvent evt, CancellationToken cancellationToken = default);
 }

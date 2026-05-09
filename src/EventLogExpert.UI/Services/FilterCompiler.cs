@@ -45,7 +45,7 @@ public static class FilterCompiler
         try
         {
             var lambda = DynamicExpressionParser
-                .ParseLambda<DisplayEventModel, bool>(s_parsingConfig, false, expression);
+                .ParseLambda<ResolvedEvent, bool>(s_parsingConfig, false, expression);
 
             compiled = new CompiledFilter(lambda.Compile(), ContainsXmlMemberAccess(lambda));
 
@@ -74,8 +74,8 @@ public static class FilterCompiler
         protected override Expression VisitMember(MemberExpression node)
         {
             if (!Found &&
-                node.Member.Name == nameof(DisplayEventModel.Xml) &&
-                node.Member.DeclaringType == typeof(DisplayEventModel))
+                node.Member.Name == nameof(ResolvedEvent.Xml) &&
+                node.Member.DeclaringType == typeof(ResolvedEvent))
             {
                 Found = true;
             }

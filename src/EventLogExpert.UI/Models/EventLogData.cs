@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
@@ -9,7 +9,7 @@ namespace EventLogExpert.UI.Models;
 public sealed record EventLogData(
     string Name,
     LogPathType Type,
-    IReadOnlyList<DisplayEventModel> Events)
+    IReadOnlyList<ResolvedEvent> Events)
 {
     public EventLogId Id { get; } = EventLogId.Create();
 

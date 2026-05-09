@@ -10,9 +10,9 @@ namespace EventLogExpert.UI.Store.EventLog;
 
 public sealed record EventLogAction
 {
-    public sealed record AddEvent(DisplayEventModel NewEvent);
+    public sealed record AddEvent(ResolvedEvent NewEvent);
 
-    public sealed record AddEventBuffered(IReadOnlyList<DisplayEventModel> UpdatedBuffer, bool IsFull);
+    public sealed record AddEventBuffered(IReadOnlyList<ResolvedEvent> UpdatedBuffer, bool IsFull);
 
     public sealed record AddEventSuccess(ImmutableDictionary<string, EventLogData> ActiveLogs);
 
@@ -20,20 +20,20 @@ public sealed record EventLogAction
 
     public sealed record CloseLog(EventLogId LogId, string LogName);
 
-    public sealed record LoadEvents(EventLogData LogData, IReadOnlyList<DisplayEventModel> Events);
+    public sealed record LoadEvents(EventLogData LogData, IReadOnlyList<ResolvedEvent> Events);
 
-    public sealed record LoadEventsPartial(EventLogData LogData, IReadOnlyList<DisplayEventModel> Events);
+    public sealed record LoadEventsPartial(EventLogData LogData, IReadOnlyList<ResolvedEvent> Events);
 
     public sealed record LoadNewEvents;
 
     public sealed record OpenLog(string LogName, LogPathType LogPathType, CancellationToken Token = default);
 
     public sealed record SelectEvent(
-        DisplayEventModel SelectedEvent,
+        ResolvedEvent SelectedEvent,
         bool IsMultiSelect = false,
         bool ShouldStaySelected = false);
 
-    public sealed record SelectEvents(IReadOnlyCollection<DisplayEventModel> SelectedEvents);
+    public sealed record SelectEvents(IReadOnlyCollection<ResolvedEvent> SelectedEvents);
 
     /// <summary>
     /// Replaces the entire selection with the supplied events, preserving input order
@@ -47,8 +47,8 @@ public sealed record EventLogAction
     /// <param name="SelectedEvent">The new focused event, or null to clear focus. Does not
     /// need to be a member of <paramref name="SelectedEvents"/>.</param>
     public sealed record SetSelectedEvents(
-        IReadOnlyCollection<DisplayEventModel> SelectedEvents,
-        DisplayEventModel? SelectedEvent);
+        IReadOnlyCollection<ResolvedEvent> SelectedEvents,
+        ResolvedEvent? SelectedEvent);
 
     public sealed record SetContinuouslyUpdate(bool ContinuouslyUpdate);
 

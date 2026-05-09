@@ -129,7 +129,7 @@ public sealed class DateRangeDefaultsTests
     private static EventLogData CreateLog(string name, DateTime newest, DateTime oldest)
     {
         // Events are stored newest-first (sorted by RecordId descending in production).
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(timeCreated: newest),
             EventUtils.CreateTestEvent(timeCreated: oldest)

@@ -127,9 +127,9 @@ public sealed class EventTableStoreTests
     {
         // Arrange
         var logId = EventLogId.Create();
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
 
-        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { logId, events }
         };
@@ -148,7 +148,7 @@ public sealed class EventTableStoreTests
         // Arrange
         var logId = EventLogId.Create();
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -170,7 +170,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var firstBatch = new List<DisplayEventModel>
+        var firstBatch = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = Constants.EventComputerServer01 }
         };
@@ -179,7 +179,7 @@ public sealed class EventTableStoreTests
             state,
             new EventTableAction.AppendTableEvents(logData.Id, firstBatch));
 
-        var secondBatch = new List<DisplayEventModel>
+        var secondBatch = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer02 }
         };
@@ -202,7 +202,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var batch = new List<DisplayEventModel>
+        var batch = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = string.Empty },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer01 }
@@ -294,7 +294,7 @@ public sealed class EventTableStoreTests
         Assert.True(state.EventTables.First().IsLoading);
 
         // Act - Update table with events
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -468,7 +468,7 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(openLog));
 
         var staleLogId = EventLogId.Create();
-        var batches = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var batches = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { openLog.Id, [new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 }] },
             { staleLogId, [new("ClosedLog", LogPathType.Channel) { Id = 99, RecordId = 99 }] }
@@ -494,7 +494,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var initialEvents = new List<DisplayEventModel>
+        var initialEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, recordId: 1),
             EventUtils.CreateTestEvent(200, recordId: 2)
@@ -504,7 +504,7 @@ public sealed class EventTableStoreTests
             state,
             new EventTableAction.AppendTableEvents(logData.Id, initialEvents));
 
-        var deltaEvents = new List<DisplayEventModel>
+        var deltaEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(300, recordId: 3),
             EventUtils.CreateTestEvent(400, recordId: 4)
@@ -534,7 +534,7 @@ public sealed class EventTableStoreTests
 
         var action = new EventTableAction.AppendTableEvents(
             logData.Id,
-            new List<DisplayEventModel> { EventUtils.CreateTestEvent(100, recordId: 1) });
+            new List<ResolvedEvent> { EventUtils.CreateTestEvent(100, recordId: 1) });
 
         // Act
         var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
@@ -553,7 +553,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var initialEvents = new List<DisplayEventModel>
+        var initialEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100, recordId: 10),
             EventUtils.CreateTestEvent(200, recordId: 20)
@@ -564,7 +564,7 @@ public sealed class EventTableStoreTests
             new EventTableAction.AppendTableEvents(logData.Id, initialEvents));
 
         // Append events with record IDs that should sort between and after existing
-        var deltaEvents = new List<DisplayEventModel>
+        var deltaEvents = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(300, recordId: 5),
             EventUtils.CreateTestEvent(400, recordId: 15)
@@ -596,7 +596,7 @@ public sealed class EventTableStoreTests
 
         var action = new EventTableAction.AppendTableEvents(
             unknownLogId,
-            new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) });
+            new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) });
 
         // Act
         var newState = EventTableReducers.ReduceAppendTableEvents(state, action);
@@ -634,18 +634,18 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData3));
 
-        var log1Events = new List<DisplayEventModel>
+        var log1Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 100, RecordId = 1 }
         };
 
-        var log2Events = new List<DisplayEventModel>
+        var log2Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 200, RecordId = 1 },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 201, RecordId = 2 }
         };
 
-        var log3Events = new List<DisplayEventModel>
+        var log3Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog3, LogPathType.Channel) { Id = 300, RecordId = 1 }
         };
@@ -677,12 +677,12 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var log1Events = new List<DisplayEventModel>
+        var log1Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 100, RecordId = 1 }
         };
 
-        var log2Events = new List<DisplayEventModel>
+        var log2Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 200, RecordId = 1 },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 201, RecordId = 2 }
@@ -1003,7 +1003,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState { OrderBy = ColumnName.Level, IsDescending = false };
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
@@ -1111,7 +1111,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState { OrderBy = null, IsDescending = false };
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
@@ -1141,17 +1141,17 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var log1Events = new List<DisplayEventModel>
+        var log1Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 }
         };
 
-        var log2Events = new List<DisplayEventModel>
+        var log2Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 20, RecordId = 2 }
         };
 
-        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { logData1.Id, log1Events },
             { logData2.Id, log2Events }
@@ -1177,17 +1177,17 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(openLog));
 
         var staleLogId = EventLogId.Create();
-        var openLogEvents = new List<DisplayEventModel>
+        var openLogEvents = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 }
         };
 
-        var staleEvents = new List<DisplayEventModel>
+        var staleEvents = new List<ResolvedEvent>
         {
             new("ClosedLog", LogPathType.Channel) { Id = 99, RecordId = 99 }
         };
 
-        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { openLog.Id, openLogEvents },
             { staleLogId, staleEvents }
@@ -1215,7 +1215,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var loadedEvents = new List<DisplayEventModel>
+        var loadedEvents = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
@@ -1223,7 +1223,7 @@ public sealed class EventTableStoreTests
 
         state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData.Id, loadedEvents));
 
-        var emptyActiveLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>();
+        var emptyActiveLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>();
         var action = new EventTableAction.UpdateDisplayedEvents(emptyActiveLogs);
 
         // Act
@@ -1247,13 +1247,13 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var log1Loaded = new List<DisplayEventModel>
+        var log1Loaded = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 100, RecordId = 1 },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 101, RecordId = 2 }
         };
 
-        var log2Loaded = new List<DisplayEventModel>
+        var log2Loaded = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 200, RecordId = 1 },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 201, RecordId = 2 },
@@ -1263,12 +1263,12 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData1.Id, log1Loaded));
         state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData2.Id, log2Loaded));
 
-        var log1Filtered = new List<DisplayEventModel>
+        var log1Filtered = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 100, RecordId = 1 }
         };
 
-        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { logData1.Id, log1Filtered }
         };
@@ -1294,13 +1294,13 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var revealedEvents = new List<DisplayEventModel>
+        var revealedEvents = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = string.Empty },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer01 }
         };
 
-        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<DisplayEventModel>>
+        var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             { logData.Id, revealedEvents }
         };
@@ -1323,7 +1323,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState { IsDescending = false };
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var partial1 = new List<DisplayEventModel>
+        var partial1 = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
@@ -1333,7 +1333,7 @@ public sealed class EventTableStoreTests
             state,
             new EventTableAction.AppendTableEvents(logData.Id, partial1));
 
-        var partial2 = new List<DisplayEventModel>
+        var partial2 = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 12, RecordId = 3 }
         };
@@ -1344,7 +1344,7 @@ public sealed class EventTableStoreTests
 
         Assert.Equal(3, state.DisplayedEvents.Count);
 
-        var fullLoad = new List<DisplayEventModel>
+        var fullLoad = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 20, RecordId = 1 },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 21, RecordId = 2 },
@@ -1371,7 +1371,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState();
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -1397,7 +1397,7 @@ public sealed class EventTableStoreTests
         var state = new EventTableState { IsDescending = false };
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData));
 
-        var firstLoad = new List<DisplayEventModel>
+        var firstLoad = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1 },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2 }
@@ -1406,7 +1406,7 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceUpdateTable(state, new EventTableAction.UpdateTable(logData.Id, firstLoad));
         Assert.Equal(2, state.DisplayedEvents.Count);
 
-        var secondLoad = new List<DisplayEventModel>
+        var secondLoad = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 12, RecordId = 3 },
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 13, RecordId = 4 },
@@ -1432,13 +1432,13 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var eventsLog1 = new List<DisplayEventModel>
+        var eventsLog1 = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 3 }
         };
 
-        var eventsLog2 = new List<DisplayEventModel>
+        var eventsLog2 = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 20, RecordId = 2 },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 21, RecordId = 4 }
@@ -1466,7 +1466,7 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var eventsLog1 = new List<DisplayEventModel>
+        var eventsLog1 = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 5 },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 7 }
@@ -1492,13 +1492,13 @@ public sealed class EventTableStoreTests
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData1));
         state = EventTableReducers.ReduceAddTable(state, new EventTableAction.AddTable(logData2));
 
-        var eventsLog1 = new List<DisplayEventModel>
+        var eventsLog1 = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 3 }
         };
 
-        var eventsLog2 = new List<DisplayEventModel>
+        var eventsLog2 = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 20, RecordId = 2 },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 21, RecordId = 4 }
@@ -1524,7 +1524,7 @@ public sealed class EventTableStoreTests
         // Arrange — empty state, no tables
         var state = new EventTableState();
         var staleLogId = EventLogId.Create();
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
         var action = new EventTableAction.UpdateTable(staleLogId, events);
 
         // Act — stale UpdateTable for a non-existent table
@@ -1540,13 +1540,13 @@ public sealed class EventTableStoreTests
         // Arrange — RecordIds ascending but TimeCreated descending: verifies sort is by timestamp
         var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
-        var log1Events = new List<DisplayEventModel>
+        var log1Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1, TimeCreated = baseTime.AddSeconds(40) },
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 2, TimeCreated = baseTime.AddSeconds(20) }
         };
 
-        var log2Events = new List<DisplayEventModel>
+        var log2Events = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 20, RecordId = 1, TimeCreated = baseTime.AddSeconds(30) },
             new(Constants.LogNameLog2, LogPathType.Channel) { Id = 21, RecordId = 2, TimeCreated = baseTime.AddSeconds(10) }

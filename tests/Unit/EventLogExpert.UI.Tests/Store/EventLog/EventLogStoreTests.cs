@@ -19,7 +19,7 @@ public sealed class EventLogStoreTests
         // Arrange
         var state = new EventLogState { ContinuouslyUpdate = false };
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -43,7 +43,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_AddEventBuffered_ShouldStoreBufferAndFullFlag()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -177,7 +177,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_SelectEvents_ShouldStoreMultipleEvents()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -221,7 +221,7 @@ public sealed class EventLogStoreTests
         // Arrange
         var name = Constants.LogNameTestLog;
         var type = LogPathType.Channel;
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
 
         // Act
         var logData = new EventLogData(name, type, events);
@@ -236,7 +236,7 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetCategoryValues_ForId_ShouldReturnDistinctIds()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(100),
@@ -271,7 +271,7 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetCategoryValues_ForSource_ShouldReturnDistinctSources()
     {
         // Arrange
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200),
@@ -425,7 +425,7 @@ public sealed class EventLogStoreTests
         // Arrange
         var state = new EventLogState();
 
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(100),
             EventUtils.CreateTestEvent(200)
@@ -446,7 +446,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var state = new EventLogState { NewEventBufferIsFull = true };
-        var events = new List<DisplayEventModel> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
         var action = new EventLogAction.AddEventBuffered(events, false);
 
         // Act
@@ -515,14 +515,14 @@ public sealed class EventLogStoreTests
     public void ReduceCloseLog_ShouldFilterNewEventBuffer()
     {
         // Arrange
-        var eventForLog1 = new DisplayEventModel(Constants.LogNameLog1, LogPathType.Channel)
+        var eventForLog1 = new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel)
         {
             Id = 100,
             Source = Constants.EventSourceTestSource,
             Level = Constants.EventLevelInformation
         };
 
-        var eventForLog2 = new DisplayEventModel(Constants.LogNameLog2, LogPathType.Channel)
+        var eventForLog2 = new ResolvedEvent(Constants.LogNameLog2, LogPathType.Channel)
         {
             Id = 200,
             Source = Constants.EventSourceTestSource,
@@ -914,7 +914,7 @@ public sealed class EventLogStoreTests
         var existingEvent = EventUtils.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
 
-        var newEvents = new List<DisplayEventModel>
+        var newEvents = new List<ResolvedEvent>
         {
             existingEvent,                  // Already selected
             EventUtils.CreateTestEvent(200) // New

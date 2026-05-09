@@ -146,17 +146,12 @@ public sealed class MauiMenuActionService(
 
         if (!files.Any()) { return; }
 
-        if (!combineLog)
-        {
-            await CloseAllLogsAsync();
-        }
-
         var paths = files
             .Where(file => file is not null && !string.IsNullOrEmpty(file.FullPath))
             .Select(file => (file!.FullPath, LogPathType.File))
             .ToList();
 
-        await OpenLogsBatchAsync(paths, combineLog: true);
+        await OpenLogsBatchAsync(paths, combineLog);
     }
 
     public async Task OpenFolderAsync(bool combineLog)
@@ -193,12 +188,7 @@ public sealed class MauiMenuActionService(
 
         if (files.Count == 0) { return; }
 
-        if (!combineLog)
-        {
-            await CloseAllLogsAsync();
-        }
-
-        await OpenLogsBatchAsync(files, combineLog: true);
+        await OpenLogsBatchAsync(files, combineLog);
     }
 
     public Task OpenIssueAsync() => OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/issues/new");
@@ -209,7 +199,7 @@ public sealed class MauiMenuActionService(
     public async Task<OpenLogStatus> OpenLogAsync(string logPath, LogPathType pathType, bool combineLog = false)
     {
         if (string.IsNullOrWhiteSpace(logPath) ||
-            (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath))) { return OpenLogStatus.Loaded; }
+            (combineLog && _eventLogState.Value.ActiveLogs.ContainsKey(logPath))) { return OpenLogStatus.Skipped; }
 
         EventLogInformation? eventLogInformation;
 
@@ -224,13 +214,13 @@ public sealed class MauiMenuActionService(
                 "Please relaunch with \"Run as Administrator\" to open this log",
                 "Ok");
 
-            return OpenLogStatus.Loaded;
+            return OpenLogStatus.Failed;
         }
         catch (Exception ex)
         {
             await _dialogService.ShowAlert("Failed to open Log", $"Exception: {ex.Message}", "Ok");
 
-            return OpenLogStatus.Loaded;
+            return OpenLogStatus.Failed;
         }
 
         if (eventLogInformation.RecordCount is null or <= 0)
@@ -250,26 +240,35 @@ public sealed class MauiMenuActionService(
         }
 
         _dispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
-        return OpenLogStatus.Loaded;
+        return OpenLogStatus.Opened;
     }
 
     /// <summary>
     ///     Opens each log in <paramref name="logs" /> sequentially and surfaces a single banner alert at the end naming
-    ///     every log that contained zero events. Use this from any call site that may open multiple logs in one user
-    ///     gesture (multi-file picker, folder open, drag-drop, command line) so the user sees one batched alert instead
-    ///     of one popup per empty file.
+    ///     every log that contained zero events. <paramref name="combineLog" /> controls whether the first successful
+    ///     open closes existing logs first; subsequent opens within the batch always coalesce with the new state. Use
+    ///     this from any call site that may open multiple logs in one user gesture (multi-file picker, folder open,
+    ///     drag-drop, command line) so the user sees one batched alert instead of one popup per empty file.
     /// </summary>
     public async Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog)
     {
         ArgumentNullException.ThrowIfNull(logs);
 
         List<string>? emptyDisplayNames = null;
+        var combineForCall = combineLog;
 
         foreach (var (path, type) in logs)
         {
-            if (await OpenLogAsync(path, type, combineLog) == OpenLogStatus.Empty)
+            // Only Opened consumed the close-existing semantics; Skipped/Failed/Empty did not,
+            // so combineForCall must NOT flip until a real open happens.
+            switch (await OpenLogAsync(path, type, combineForCall))
             {
-                (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
+                case OpenLogStatus.Opened:
+                    combineForCall = true;
+                    break;
+                case OpenLogStatus.Empty:
+                    (emptyDisplayNames ??= []).Add(GetEmptyLogDisplayName(path, type));
+                    break;
             }
         }
 

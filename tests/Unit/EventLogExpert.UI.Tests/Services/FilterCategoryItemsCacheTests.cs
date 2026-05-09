@@ -48,7 +48,7 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
     [Fact]
     public void GetItems_LogDerivedCategory_ReturnsDistinctSortedValues()
     {
-        var events = new List<DisplayEventModel>
+        var events = new List<ResolvedEvent>
         {
             EventUtils.CreateTestEvent(id: 200, source: "Bravo"),
             EventUtils.CreateTestEvent(id: 100, source: "Alpha"),
