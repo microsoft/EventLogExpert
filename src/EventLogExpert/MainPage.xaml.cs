@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;

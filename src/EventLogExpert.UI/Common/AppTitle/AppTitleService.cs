@@ -2,10 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.Interfaces;
 using System.Text;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.AppTitle;
 
 public sealed class AppTitleService(
     ICurrentVersionProvider versionProvider,
