@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;

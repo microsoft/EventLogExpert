@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Interfaces;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Versioning;
 
 public sealed class CurrentVersionProvider(
     IPackageVersionProvider packageVersionProvider,
