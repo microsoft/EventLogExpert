@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Common.AppTitle;
+using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using System.Reflection;
