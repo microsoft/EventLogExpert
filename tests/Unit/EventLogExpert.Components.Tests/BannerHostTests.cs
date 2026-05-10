@@ -4,6 +4,7 @@
 using Bunit;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components.Web;

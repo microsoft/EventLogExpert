@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using Microsoft.Extensions.Logging;
 
@@ -10,32 +11,32 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
 {
     private readonly IPreferencesProvider _preferences = preferences;
 
-    private CopyType? _copyType;
+    private EventCopyFormat? _copyFormat;
     private bool? _isPreReleaseEnabled;
     private LogLevel? _logLevel;
     private bool? _showDisplayPaneOnSelectionChange;
     private Theme? _theme;
     private string? _timeZoneId;
 
-    public CopyType CopyType
+    public EventCopyFormat CopyFormat
     {
         get
         {
-            _copyType ??= _preferences.KeyboardCopyTypePreference;
+            _copyFormat ??= _preferences.KeyboardCopyFormatPreference;
 
-            return _copyType ?? CopyType.Default;
+            return _copyFormat ?? EventCopyFormat.Default;
         }
         set
         {
-            if (_copyType == value) { return; }
+            if (_copyFormat == value) { return; }
 
-            _copyType = value;
-            _preferences.KeyboardCopyTypePreference = value;
-            CopyTypeChanged?.Invoke();
+            _copyFormat = value;
+            _preferences.KeyboardCopyFormatPreference = value;
+            CopyFormatChanged?.Invoke();
         }
     }
 
-    public Action? CopyTypeChanged { get; set; }
+    public Action? CopyFormatChanged { get; set; }
 
     public bool IsPreReleaseEnabled
     {

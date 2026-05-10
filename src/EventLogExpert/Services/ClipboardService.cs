@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
@@ -45,14 +46,14 @@ public sealed class ClipboardService : IClipboardService
         _selectedEvent.Select(s => s.SelectedEvent);
     }
 
-    public async Task CopySelectedEvent(CopyType? copyType = null)
+    public async Task CopySelectedEvent(EventCopyFormat? format = null)
     {
         // Copy is best-effort: most callers are Blazor event handlers that don't catch, so any
         // failure (clipboard unavailable, XML parse, resolver fault) would surface as an
         // unhandled UI exception. Log and swallow to preserve previous fire-and-forget behavior.
         try
         {
-            string stringToCopy = await GetFormattedEvent(copyType).ConfigureAwait(false);
+            string stringToCopy = await GetFormattedEvent(format).ConfigureAwait(false);
 
             await Clipboard.SetTextAsync(stringToCopy).ConfigureAwait(false);
         }
@@ -93,13 +94,13 @@ public sealed class ClipboardService : IClipboardService
 
     private void AppendFormattedEvent(
         StringBuilder builder,
-        CopyType copyType,
+        EventCopyFormat format,
         ResolvedEvent @event,
         string xml)
     {
-        switch (copyType)
+        switch (format)
         {
-            case CopyType.Default:
+            case EventCopyFormat.Default:
                 foreach ((ColumnName column, _) in _eventTableColumns.Value.Where(x => x.Value))
                 {
                     switch (column)
@@ -145,18 +146,18 @@ public sealed class ClipboardService : IClipboardService
 
                 builder.Append($"\"{@event.Description}\"");
                 break;
-            case CopyType.Simple:
+            case EventCopyFormat.Simple:
                 builder.Append($"\"{@event.Level}\" ");
                 builder.Append($"\"{@event.TimeCreated.ConvertTimeZone(_settings.TimeZoneInfo)}\" ");
                 builder.Append($"\"{@event.Source}\" ");
                 builder.Append($"\"{@event.Id}\" ");
                 builder.Append($"\"{@event.Description}\"");
                 break;
-            case CopyType.Xml:
+            case EventCopyFormat.Xml:
                 if (!string.IsNullOrEmpty(xml)) { builder.Append(FormatXmlForCopy(xml)); }
 
                 break;
-            case CopyType.Full:
+            case EventCopyFormat.Full:
             default:
                 builder.AppendLine($"Log Name: {@event.LogName}");
                 builder.AppendLine($"Source: {@event.Source}");
@@ -180,21 +181,21 @@ public sealed class ClipboardService : IClipboardService
         }
     }
 
-    private string FormatEventForCopy(CopyType copyType, ResolvedEvent @event, string xml)
+    private string FormatEventForCopy(EventCopyFormat format, ResolvedEvent @event, string xml)
     {
-        if (copyType == CopyType.Xml)
+        if (format == EventCopyFormat.Xml)
         {
             return string.IsNullOrEmpty(xml) ? string.Empty : FormatXmlForCopy(xml);
         }
 
         StringBuilder builder = new();
 
-        AppendFormattedEvent(builder, copyType, @event, xml);
+        AppendFormattedEvent(builder, format, @event, xml);
 
         return builder.ToString();
     }
 
-    private async Task<string> GetFormattedEvent(CopyType? copyType)
+    private async Task<string> GetFormattedEvent(EventCopyFormat? format)
     {
         // Snapshot the selection once. Re-reading _selectedEvents.Value across awaits could see
         // a different (or empty) list if selection changes mid-resolve, leading to copying the
@@ -202,8 +203,8 @@ public sealed class ClipboardService : IClipboardService
         var events = _selectedEvents.Value;
         var selected = _selectedEvent.Value;
 
-        var resolvedType = copyType ?? _settings.CopyType;
-        bool needsXml = resolvedType is CopyType.Xml or CopyType.Full;
+        var resolvedFormat = format ?? _settings.CopyFormat;
+        bool needsXml = resolvedFormat is EventCopyFormat.Xml or EventCopyFormat.Full;
 
         // Single-event copy: prefer the selected (focused) row so right-click → copy
         // targets the focused event. Fall back to the only selected event when selected
@@ -215,7 +216,7 @@ public sealed class ClipboardService : IClipboardService
 
             string xml = needsXml ? await _xmlResolver.GetXmlAsync(selected) : string.Empty;
 
-            return FormatEventForCopy(resolvedType, selected, xml);
+            return FormatEventForCopy(resolvedFormat, selected, xml);
         }
 
         if (events.Count == 1)
@@ -228,7 +229,7 @@ public sealed class ClipboardService : IClipboardService
             // copies the focused row in that path.
             string xml = needsXml ? await _xmlResolver.GetXmlAsync(events[0]) : string.Empty;
 
-            return FormatEventForCopy(resolvedType, events[0], xml);
+            return FormatEventForCopy(resolvedFormat, events[0], xml);
         }
 
         string[] xmlByIndex;
@@ -260,7 +261,7 @@ public sealed class ClipboardService : IClipboardService
         {
             string xml = needsXml ? xmlByIndex[i] : string.Empty;
 
-            AppendFormattedEvent(stringToCopy, resolvedType, events[i], xml);
+            AppendFormattedEvent(stringToCopy, resolvedFormat, events[i], xml);
             stringToCopy.AppendLine();
         }
 

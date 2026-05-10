@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Components.Modals;
 using EventLogExpert.Components.Tests.TestUtils;
 using EventLogExpert.Components.Tests.TestUtils.Constants;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using Fluxor;

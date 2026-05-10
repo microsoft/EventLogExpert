@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Clipboard;
+
 namespace EventLogExpert.UI.Interfaces;
 
 public interface IMenuActionService
@@ -11,7 +13,7 @@ public interface IMenuActionService
 
     Task CloseAllLogsAsync();
 
-    Task CopySelectedAsync(CopyType? copyType);
+    Task CopySelectedAsync(EventCopyFormat? format);
 
     void Exit();
 

@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
@@ -71,7 +72,7 @@ public sealed class MauiMenuActionService(
         _dispatcher.Dispatch(new CloseAllAction());
     }
 
-    public async Task CopySelectedAsync(CopyType? copyType) => await _clipboardService.CopySelectedEvent(copyType);
+    public async Task CopySelectedAsync(EventCopyFormat? format) => await _clipboardService.CopySelectedEvent(format);
 
     public void Dispose()
     {

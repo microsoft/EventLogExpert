@@ -1,4 +1,5 @@
 @using EventLogExpert.UI
+@using EventLogExpert.UI.Common.Clipboard
 @using Microsoft.Extensions.Logging
 @inherits ModalBase<bool>
 
@@ -84,10 +85,10 @@
 
                 <div class="flex-center-aligned-row">
                     <text>Keyboard Copy Behavior:</text>
-                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyType" CssClass="input filter-dropdown" T="CopyType">
-                        @foreach (CopyType item in Enum.GetValues(typeof(CopyType)))
+                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyFormat" CssClass="input filter-dropdown" T="EventCopyFormat">
+                        @foreach (EventCopyFormat item in Enum.GetValues(typeof(EventCopyFormat)))
                         {
-                            <ValueSelectItem T="CopyType" Value="item" />
+                            <ValueSelectItem T="EventCopyFormat" Value="item" />
                         }
                     </ValueSelect>
                 </div>

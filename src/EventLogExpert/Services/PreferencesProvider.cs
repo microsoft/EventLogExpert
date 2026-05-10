@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
@@ -18,7 +19,7 @@ public sealed class PreferencesProvider : IPreferencesProvider
     private const string DisplaySelectionEnabled = "display-selection-enabled";
     private const string EnabledEventTableColumns = "enabled-event-table-columns";
     private const string FavoriteFilters = "favorite-filters";
-    private const string KeyboardCopyType = "keyboard-copy-type";
+    private const string KeyboardCopyFormat = "keyboard-copy-format";
     private const string LoggingLevel = "logging-level";
     private const string PreReleaseEnabled = "prerelease-enabled";
     private const string RecentFilters = "recent-filters";
@@ -73,12 +74,12 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(FavoriteFilters, JsonSerializer.Serialize(value));
     }
 
-    public CopyType KeyboardCopyTypePreference
+    public EventCopyFormat KeyboardCopyFormatPreference
     {
-        get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyType, nameof(CopyType.Full)),
-            out CopyType value) ?
-            value : CopyType.Full;
-        set => Preferences.Default.Set(KeyboardCopyType, value.ToString());
+        get => Enum.TryParse(Preferences.Default.Get(KeyboardCopyFormat, nameof(EventCopyFormat.Full)),
+            out EventCopyFormat value) ?
+            value : EventCopyFormat.Full;
+        set => Preferences.Default.Set(KeyboardCopyFormat, value.ToString());
     }
 
     public LogLevel LogLevelPreference

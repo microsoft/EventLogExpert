@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -22,41 +23,41 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void CopyType_WhenAccessedMultipleTimes_ShouldCacheValue()
+    public void CopyFormat_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.KeyboardCopyTypePreference.Returns(CopyType.Full);
+        mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Full);
 
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
-        _ = settingsService.CopyType;
-        _ = settingsService.CopyType;
-        _ = settingsService.CopyType;
+        _ = settingsService.CopyFormat;
+        _ = settingsService.CopyFormat;
+        _ = settingsService.CopyFormat;
 
         // Assert
-        _ = mockPreferences.Received(1).KeyboardCopyTypePreference;
+        _ = mockPreferences.Received(1).KeyboardCopyFormatPreference;
     }
 
     [Fact]
-    public void CopyType_WhenFirstAccessed_ShouldReturnFromPreferences()
+    public void CopyFormat_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.KeyboardCopyTypePreference.Returns(CopyType.Xml);
+        mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
-        var result = settingsService.CopyType;
+        var result = settingsService.CopyFormat;
 
         // Assert
-        Assert.Equal(CopyType.Xml, result);
+        Assert.Equal(EventCopyFormat.Xml, result);
     }
 
     [Fact]
-    public void CopyType_WhenPreferenceIsNull_ShouldReturnDefault()
+    public void CopyFormat_WhenPreferenceIsNull_ShouldReturnDefault()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
@@ -64,85 +65,99 @@ public sealed class SettingsServiceTests
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
-        var result = settingsService.CopyType;
+        var result = settingsService.CopyFormat;
 
         // Assert
-        Assert.Equal(CopyType.Default, result);
+        Assert.Equal(EventCopyFormat.Default, result);
     }
 
     [Fact]
-    public void CopyType_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
+    public void CopyFormat_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         var eventInvoked = false;
-        settingsService.CopyTypeChanged = () => eventInvoked = true;
+        settingsService.CopyFormatChanged = () => eventInvoked = true;
 
         // Act
-        settingsService.CopyType = CopyType.Simple;
+        settingsService.CopyFormat = EventCopyFormat.Simple;
 
         // Assert
         Assert.True(eventInvoked);
     }
 
     [Theory]
-    [InlineData(CopyType.Default)]
-    [InlineData(CopyType.Simple)]
-    [InlineData(CopyType.Xml)]
-    [InlineData(CopyType.Full)]
-    public void CopyType_WhenSetToEachValue_ShouldPersistCorrectly(CopyType copyType)
+    [InlineData(EventCopyFormat.Default)]
+    [InlineData(EventCopyFormat.Simple)]
+    [InlineData(EventCopyFormat.Xml)]
+    [InlineData(EventCopyFormat.Full)]
+    public void CopyFormat_WhenSetToEachValue_ShouldPersistCorrectly(EventCopyFormat copyFormat)
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
-        settingsService.CopyType = copyType;
+        settingsService.CopyFormat = copyFormat;
 
         // Assert
-        mockPreferences.Received(1).KeyboardCopyTypePreference = copyType;
+        mockPreferences.Received(1).KeyboardCopyFormatPreference = copyFormat;
     }
 
     [Fact]
-    public void CopyType_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
+    public void CopyFormat_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.KeyboardCopyTypePreference.Returns(CopyType.Xml);
+        mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
-        _ = settingsService.CopyType; // Cache the value
+        _ = settingsService.CopyFormat; // Cache the value
 
         var eventInvoked = false;
-        settingsService.CopyTypeChanged = () => eventInvoked = true;
+        settingsService.CopyFormatChanged = () => eventInvoked = true;
 
         // Act
-        settingsService.CopyType = CopyType.Xml;
+        settingsService.CopyFormat = EventCopyFormat.Xml;
 
         // Assert
         Assert.False(eventInvoked);
     }
 
     [Fact]
-    public void CopyType_WhenSetToSameValue_ShouldNotUpdatePreferences()
+    public void CopyFormat_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
         var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.KeyboardCopyTypePreference.Returns(CopyType.Xml);
+        mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
 
         // First access caches the value
-        _ = settingsService.CopyType;
+        _ = settingsService.CopyFormat;
         mockPreferences.ClearReceivedCalls();
 
         // Act
-        settingsService.CopyType = CopyType.Xml;
+        settingsService.CopyFormat = EventCopyFormat.Xml;
 
         // Assert
-        mockPreferences.DidNotReceive().KeyboardCopyTypePreference = Arg.Any<CopyType>();
+        mockPreferences.DidNotReceive().KeyboardCopyFormatPreference = Arg.Any<EventCopyFormat>();
+    }
+
+    [Fact]
+    public void CopyFormat_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.CopyFormat = EventCopyFormat.Full;
+
+        // Assert
+        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
     }
 
     [Fact]
@@ -153,10 +168,10 @@ public sealed class SettingsServiceTests
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
-        settingsService.CopyType = CopyType.Full;
+        settingsService.CopyFormat = EventCopyFormat.Full;
 
         // Assert
-        mockPreferences.Received(1).KeyboardCopyTypePreference = CopyType.Full;
+        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
     }
 
     [Fact]
