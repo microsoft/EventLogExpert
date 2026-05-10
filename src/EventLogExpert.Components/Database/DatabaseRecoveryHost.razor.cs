@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Database;
@@ -43,6 +42,14 @@ public sealed partial class DatabaseRecoveryHost : ComponentBase, IDisposable
         EvaluateState();
     }
 
+    private void DismissCurrentBannerIfAny()
+    {
+        if (_recoveryBannerId is not { } activeId) { return; }
+
+        BannerService.DismissError(activeId);
+        _recoveryBannerId = null;
+    }
+
     private void EvaluateState()
     {
         if (_disposed) { return; }
@@ -66,14 +73,6 @@ public sealed partial class DatabaseRecoveryHost : ComponentBase, IDisposable
 
         _recoveryBannerId = ReportRecoveryBanner(currentBackupSet.Count);
         _promptedFor = currentBackupSet;
-    }
-
-    private void DismissCurrentBannerIfAny()
-    {
-        if (_recoveryBannerId is not { } activeId) { return; }
-
-        BannerService.DismissError(activeId);
-        _recoveryBannerId = null;
     }
 
     private void HandleBannerStateChanged()

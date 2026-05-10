@@ -13,10 +13,9 @@ internal static class NativeErrorResolver
     private static ConcurrentDictionary<uint, string> s_ntStatusCache = new();
 
     /// <summary>
-    ///     Resolves an HRESULT or Win32 error code to a human-readable string.
-    ///     Uses the system message table via FormatMessage, falling back to ntdll.dll's message table
-    ///     for codes not found in the system table (e.g., NTSTATUS codes).
-    ///     Results are cached to avoid repeated P/Invoke calls.
+    ///     Resolves an HRESULT or Win32 error code to a human-readable string. Uses the system message table via
+    ///     FormatMessage, falling back to ntdll.dll's message table for codes not found in the system table (e.g., NTSTATUS
+    ///     codes). Results are cached to avoid repeated P/Invoke calls.
     /// </summary>
     internal static string GetErrorMessage(uint hResult) =>
         GetOrAddBounded(ref s_hResultCache, hResult, static code =>
@@ -32,10 +31,9 @@ internal static class NativeErrorResolver
             $"0x{status:X8}");
 
     /// <summary>
-    ///     Bounded cache lookup with atomic swap eviction. On a cache hit the entry is returned
-    ///     immediately regardless of cache size. On a miss, if the cache has reached
-    ///     <see cref="MaxCacheSize"/> the entire dictionary is atomically swapped with a fresh
-    ///     instance (only one thread performs the swap) before inserting the new entry.
+    ///     Bounded cache lookup with atomic swap eviction. On a cache hit the entry is returned immediately regardless of
+    ///     cache size. On a miss, if the cache has reached <see cref="MaxCacheSize" /> the entire dictionary is atomically
+    ///     swapped with a fresh instance (only one thread performs the swap) before inserting the new entry.
     /// </summary>
     private static string GetOrAddBounded(
         ref ConcurrentDictionary<uint, string> cache,

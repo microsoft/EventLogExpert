@@ -8,7 +8,10 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
-/// <summary>Creates a small temporary .evtx file by exporting a bounded window of events from the live local Application log, anchored on the most recent EventRecordID.</summary>
+/// <summary>
+///     Creates a small temporary .evtx file by exporting a bounded window of events from the live local Application
+///     log, anchored on the most recent EventRecordID.
+/// </summary>
 internal sealed class SmallEvtxFixture : IDisposable
 {
     private const int MinimumExpectedEvents = 2;

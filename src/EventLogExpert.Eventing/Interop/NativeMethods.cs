@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Buffers;
 using System.Runtime.InteropServices;
 
 // ReSharper disable InconsistentNaming
@@ -20,10 +21,9 @@ internal static partial class NativeMethods
     private const string Kernel32Api = "kernel32.dll";
 
     /// <summary>
-    ///     Detects unresolved FormatMessage insert placeholders in the result. Catches positional
-    ///     inserts (%1 through %99, including forms like %1!s!) and common printf-style specifiers
-    ///     (%s, %d, %p, etc.) that appear in some message tables. Skips escaped percent signs (%%).
-    ///     Does not detect compound printf forms like %lu or %I64u.
+    ///     Detects unresolved FormatMessage insert placeholders in the result. Catches positional inserts (%1 through
+    ///     %99, including forms like %1!s!) and common printf-style specifiers (%s, %d, %p, etc.) that appear in some message
+    ///     tables. Skips escaped percent signs (%%). Does not detect compound printf forms like %lu or %I64u.
     /// </summary>
     internal static bool ContainsFormatInsert(ReadOnlySpan<char> text)
     {
@@ -136,7 +136,7 @@ internal static partial class NativeMethods
 
         foreach (int size in retrySizes)
         {
-            char[] rented = System.Buffers.ArrayPool<char>.Shared.Rent(size);
+            char[] rented = ArrayPool<char>.Shared.Rent(size);
 
             try
             {
@@ -148,7 +148,7 @@ internal static partial class NativeMethods
             }
             finally
             {
-                System.Buffers.ArrayPool<char>.Shared.Return(rented);
+                ArrayPool<char>.Shared.Return(rented);
             }
         }
 

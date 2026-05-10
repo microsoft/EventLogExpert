@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
@@ -34,7 +35,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
         {
             await FileSaveService.SaveAsync(
                 "Saved Filters",
-                FileSaveServiceFileTypes.Json,
+                FileSaveFileTypes.Json,
                 stream => JsonSerializer.SerializeAsync(stream, snapshot));
         }
         catch (Exception ex)
@@ -51,7 +52,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
         {
             var path = await FilePickerService.PickAsync(
                 "Please select a json file to import",
-                FilePickerServiceFileTypes.Json);
+                FilePickerFileTypes.Json);
 
             if (path is null) { return; }
 
@@ -60,7 +61,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 
             if (filters is null) { return; }
 
-            Dispatcher.Dispatch(new FilterCacheAction.ImportFavorites(filters));
+            Dispatcher.Dispatch(new ImportFavoritesAction(filters));
         }
         catch (Exception ex)
         {
@@ -70,7 +71,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
         }
     }
 
-    private void AddFavorite(string filter) => Dispatcher.Dispatch(new FilterCacheAction.AddFavoriteFilter(filter));
+    private void AddFavorite(string filter) => Dispatcher.Dispatch(new AddFavoriteFilterAction(filter));
 
     private async Task AddFilter(string filter)
     {
@@ -85,11 +86,11 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
             return;
         }
 
-        Dispatcher.Dispatch(new FilterPaneAction.AddFilter(model));
+        Dispatcher.Dispatch(new AddFilterAction(model));
 
         await CloseAsync();
     }
 
     private void RemoveFavorite(string filter) =>
-        Dispatcher.Dispatch(new FilterCacheAction.RemoveFavoriteFilter(filter));
+        Dispatcher.Dispatch(new RemoveFavoriteFilterAction(filter));
 }

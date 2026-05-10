@@ -13,10 +13,9 @@ internal sealed class RegistryProvider(ITraceLogger? logger = null)
 
     /// <summary>Returns the file paths for the message files for this provider on the local machine.</summary>
     /// <remarks>
-    ///     EventLogExpert is a local-only tool. Remote-machine resolution is intentionally not
-    ///     supported because the modern provider metadata path (used as a fallback when no legacy
-    ///     registry entry exists) is local-only, and silently mixing local and remote sources
-    ///     produced wrong message text. Callers must already be operating in a local context.
+    ///     EventLogExpert is a local-only tool. Remote-machine resolution is intentionally not supported because the
+    ///     modern provider metadata path (used as a fallback when no legacy registry entry exists) is local-only, and silently
+    ///     mixing local and remote sources produced wrong message text. Callers must already be operating in a local context.
     /// </remarks>
     public IReadOnlyList<string> GetMessageFilesForLegacyProvider(string providerName)
     {

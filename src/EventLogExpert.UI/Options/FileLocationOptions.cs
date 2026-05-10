@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Options;
 
-public class FileLocationOptions(string basePath)
+public sealed class FileLocationOptions(string basePath)
 {
     private readonly string _basePath = basePath;
 

@@ -95,7 +95,7 @@ public sealed partial class EventTable
         if (Enum.TryParse<ColumnName>(columnName, out var column) &&
             Enum.TryParse<ColumnName>(targetColumn, out var target))
         {
-            Dispatcher.Dispatch(new EventTableAction.ReorderColumn(column, target, insertAfter));
+            Dispatcher.Dispatch(new ReorderColumnAction(column, target, insertAfter));
         }
     }
 
@@ -104,7 +104,7 @@ public sealed partial class EventTable
     {
         if (Enum.TryParse<ColumnName>(columnName, out var column))
         {
-            Dispatcher.Dispatch(new EventTableAction.SetColumnWidth(column, width));
+            Dispatcher.Dispatch(new SetColumnWidthAction(column, width));
         }
     }
 
@@ -177,11 +177,11 @@ public sealed partial class EventTable
         SelectedEvent.Select(s => s.SelectedEvent);
         SelectedEvents.Select(s => s.SelectedEvents);
 
-        SubscribeToAction<EventTableAction.SetActiveTable>(OnSetActiveTable);
-        SubscribeToAction<EventTableAction.UpdateDisplayedEvents>(_ => RescrollToSelected());
-        SubscribeToAction<EventTableAction.AppendTableEvents>(_ => RescrollToSelected());
-        SubscribeToAction<EventTableAction.AppendTableEventsBatch>(_ => RescrollToSelected());
-        SubscribeToAction<EventTableAction.UpdateTable>(_ => RescrollToSelected());
+        SubscribeToAction<SetActiveTableAction>(OnSetActiveTable);
+        SubscribeToAction<UpdateDisplayedEventsAction>(_ => RescrollToSelected());
+        SubscribeToAction<AppendTableEventsAction>(_ => RescrollToSelected());
+        SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
+        SubscribeToAction<UpdateTableAction>(_ => RescrollToSelected());
 
         _eventTableState = EventTableState.Value;
 
@@ -328,7 +328,7 @@ public sealed partial class EventTable
 
         if (filter is null) { return; }
 
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
+        Dispatcher.Dispatch(new SetFilterAction(filter));
     }
 
     private IReadOnlyList<ResolvedEvent> BuildRange(
@@ -400,7 +400,7 @@ public sealed partial class EventTable
 
         ordered.AddRange(outOfTable);
 
-        Dispatcher.Dispatch(new EventLogAction.SetSelectedEvents(ordered, selected));
+        Dispatcher.Dispatch(new SetSelectedEventsAction(ordered, selected));
     }
 
     private async Task FocusActiveRow()
@@ -636,7 +636,7 @@ public sealed partial class EventTable
         return false;
     }
 
-    private async void OnSetActiveTable(EventTableAction.SetActiveTable action)
+    private async void OnSetActiveTable(SetActiveTableAction action)
     {
         try
         {
@@ -656,7 +656,7 @@ public sealed partial class EventTable
         if (ReferenceEquals(displayedEvents, _lastIndexedDisplayedEvents)) { return; }
 
         _lastIndexedDisplayedEvents = displayedEvents;
-        _rowIndexMap = new(displayedEvents.Count, ReferenceEqualityComparer.Instance);
+        _rowIndexMap = new Dictionary<ResolvedEvent, int>(displayedEvents.Count, ReferenceEqualityComparer.Instance);
         // New event-list reference means stored ResolvedEvent instances
         // are stale; clearing prevents memory growth across log reloads.
         _highlightCache.Clear();
@@ -887,7 +887,7 @@ public sealed partial class EventTable
             var capturedColumn = column;
             items.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => Dispatcher.Dispatch(new EventTableAction.ToggleColumn(capturedColumn)),
+                () => Dispatcher.Dispatch(new ToggleColumnAction(capturedColumn)),
                 isChecked: isVisible));
         }
 
@@ -899,7 +899,7 @@ public sealed partial class EventTable
             var capturedColumn = column;
             orderItems.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => Dispatcher.Dispatch(new EventTableAction.SetOrderBy(capturedColumn)),
+                () => Dispatcher.Dispatch(new SetOrderByAction(capturedColumn)),
                 isChecked: state.OrderBy.Equals(capturedColumn)));
         }
 
@@ -907,7 +907,7 @@ public sealed partial class EventTable
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item(
             "Reset Column Defaults",
-            () => Dispatcher.Dispatch(new EventTableAction.ResetColumnDefaults())));
+            () => Dispatcher.Dispatch(new ResetColumnDefaultsAction())));
 
         return items;
     }
@@ -922,10 +922,10 @@ public sealed partial class EventTable
             MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(CopyType.Full)),
             MenuItem.Separator(),
             MenuItem.Item("Exclude Events Before", () =>
-                Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(
+                Dispatcher.Dispatch(new SetFilterDateRangeAction(
                     new FilterDateModel { Before = selectedEvent.TimeCreated }))),
             MenuItem.Item("Exclude Events After", () =>
-                Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(
+                Dispatcher.Dispatch(new SetFilterDateRangeAction(
                     new FilterDateModel { After = selectedEvent.TimeCreated }))),
             MenuItem.Separator(),
             MenuItem.SubMenu("Include", ShowFilterCategoryItems(selectedEvent, exclude: false)),
@@ -950,7 +950,7 @@ public sealed partial class EventTable
         return items;
     }
 
-    private void ToggleSorting() => Dispatcher.Dispatch(new EventTableAction.ToggleSorting());
+    private void ToggleSorting() => Dispatcher.Dispatch(new ToggleSortingAction());
 
     private async Task<int> TryRefreshPageSize()
     {

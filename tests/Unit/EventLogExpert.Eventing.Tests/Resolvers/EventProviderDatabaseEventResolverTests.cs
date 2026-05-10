@@ -262,6 +262,27 @@ public sealed class EventResolverDatabaseTests
     }
 
     [Fact]
+    public void Dispose_ThenLoadProviderDetails_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        var resolver = new EventResolver(dbCollection);
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000
+        };
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.LoadProviderDetails(eventRecord));
+    }
+
+    [Fact]
     public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
     {
         // Arrange
@@ -296,27 +317,6 @@ public sealed class EventResolverDatabaseTests
 
         // Assert
         Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
-    public void Dispose_ThenLoadProviderDetails_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection);
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1000
-        };
-
-        // Act
-        resolver.Dispose();
-
-        // Assert
-        Assert.Throws<ObjectDisposedException>(() => resolver.LoadProviderDetails(eventRecord));
     }
 
     [Fact]

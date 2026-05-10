@@ -6,6 +6,7 @@ using EventLogExpert.Components.Database;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -49,7 +50,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
-        await component.Find("aside.settings-upgrade-banner button.banner-action").ClickAsync(new());
+        await component.Find("aside.settings-upgrade-banner button.banner-action").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Equal(1, cancelInvocationCount);
@@ -64,7 +65,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
-        await component.Find("aside.settings-upgrade-banner button.banner-action").ClickAsync(new());
+        await component.Find("aside.settings-upgrade-banner button.banner-action").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Single(component.FindAll("aside.settings-upgrade-banner"));

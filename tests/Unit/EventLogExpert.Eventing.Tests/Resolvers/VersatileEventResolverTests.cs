@@ -116,57 +116,6 @@ public sealed class EventResolverTests
     }
 
     [Fact]
-    public void Dispose_ThenResolveEvent_WithDatabaseResolver_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
-
-        try
-        {
-            using (var context = new ProviderDbContext(dbPath, false))
-            {
-                context.SaveChanges();
-            }
-
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
-
-            var resolver = new EventResolver(dbCollection);
-            var eventRecord = EventUtils.CreateBasicEvent();
-
-            // Act
-            resolver.Dispose();
-
-            // Assert
-            Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
-        }
-        finally
-        {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
-        }
-    }
-
-    [Fact]
-    public void Dispose_ThenResolveEvent_WithLocalResolver_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var resolver = new EventResolver(); // Uses local resolver
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver.Dispose();
-
-        // Assert - Should throw even though local resolver doesn't hold resources
-        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
     public void Dispose_ThenLoadProviderDetails_WithDatabaseResolver_ShouldThrowObjectDisposedException()
     {
         // Arrange
@@ -223,6 +172,170 @@ public sealed class EventResolverTests
 
         // Assert - Should throw even though local resolver doesn't hold resources
         Assert.Throws<ObjectDisposedException>(() => resolver.LoadProviderDetails(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_WithDatabaseResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
+
+        try
+        {
+            using (var context = new ProviderDbContext(dbPath, false))
+            {
+                context.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+
+            var resolver = new EventResolver(dbCollection);
+            var eventRecord = EventUtils.CreateBasicEvent();
+
+            // Act
+            resolver.Dispose();
+
+            // Assert
+            Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_WithLocalResolver_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var resolver = new EventResolver(); // Uses local resolver
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert - Should throw even though local resolver doesn't hold resources
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void LoadProviderDetails_CalledTwice_ShouldHandleCorrectly()
+    {
+        // Arrange
+        using var resolver = new EventResolver();
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000
+        };
+
+        // Act
+        resolver.LoadProviderDetails(eventRecord);
+        var exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
+
+        // Assert
+        Assert.Null(exception);
+    }
+
+    [Fact]
+    public void LoadProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        using var resolver = new EventResolver();
+        var exceptions = new Exception?[50];
+
+        // Act
+        Parallel.For(0, 50, i =>
+            {
+                try
+                {
+                    var eventRecord = new EventRecord
+                    {
+                        ProviderName = $"Provider{i % 10}",
+                        Id = (ushort)(1000 + i)
+                    };
+
+                    resolver.LoadProviderDetails(eventRecord);
+                }
+                catch (Exception ex)
+                {
+                    exceptions[i] = ex;
+                }
+            });
+
+        // Assert
+        Assert.All(exceptions, ex => Assert.Null(ex));
+    }
+
+    [Fact]
+    public void LoadProviderDetails_WithDatabaseResolver_ShouldResolve()
+    {
+        // Arrange
+        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
+
+        try
+        {
+            using (var context = new ProviderDbContext(dbPath, false))
+            {
+                context.SaveChanges();
+            }
+
+            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
+            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+
+            var eventRecord = new EventRecord
+            {
+                ProviderName = "TestProvider",
+                Id = 1000
+            };
+
+            // Act
+            Exception? exception;
+            using (var resolver = new EventResolver(dbCollection))
+            {
+                exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
+            }
+
+            // Assert
+            Assert.Null(exception);
+        }
+        finally
+        {
+            if (File.Exists(dbPath))
+            {
+                SqliteConnection.ClearAllPools();
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                File.Delete(dbPath);
+            }
+        }
+    }
+
+    [Fact]
+    public void LoadProviderDetails_WithLocalResolver_ShouldResolve()
+    {
+        // Arrange
+        using var resolver = new EventResolver();
+
+        var eventRecord = new EventRecord
+        {
+            ProviderName = Constants.TestProviderName,
+            Id = 1000
+        };
+
+        // Act
+        var exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
+
+        // Assert
+        Assert.Null(exception);
     }
 
     [Fact]
@@ -477,119 +590,6 @@ public sealed class EventResolverTests
         Assert.Equal(providerName, displayEvent.Source);
         Assert.Equal(eventRecord.Id, displayEvent.Id);
         Assert.Equal(eventRecord.ComputerName, displayEvent.ComputerName);
-    }
-
-    [Fact]
-    public void LoadProviderDetails_CalledTwice_ShouldHandleCorrectly()
-    {
-        // Arrange
-        using var resolver = new EventResolver();
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1000
-        };
-
-        // Act
-        resolver.LoadProviderDetails(eventRecord);
-        var exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
-
-        // Assert
-        Assert.Null(exception);
-    }
-
-    [Fact]
-    public void LoadProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
-    {
-        // Arrange
-        using var resolver = new EventResolver();
-        var exceptions = new Exception?[50];
-
-        // Act
-        Parallel.For(0, 50, i =>
-            {
-                try
-                {
-                    var eventRecord = new EventRecord
-                    {
-                        ProviderName = $"Provider{i % 10}",
-                        Id = (ushort)(1000 + i)
-                    };
-
-                    resolver.LoadProviderDetails(eventRecord);
-                }
-                catch (Exception ex)
-                {
-                    exceptions[i] = ex;
-                }
-            });
-
-        // Assert
-        Assert.All(exceptions, ex => Assert.Null(ex));
-    }
-
-    [Fact]
-    public void LoadProviderDetails_WithDatabaseResolver_ShouldResolve()
-    {
-        // Arrange
-        string dbPath = Path.Combine(Path.GetTempPath(), $"Test_{Guid.NewGuid()}.db");
-
-        try
-        {
-            using (var context = new ProviderDbContext(dbPath, false))
-            {
-                context.SaveChanges();
-            }
-
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
-
-            var eventRecord = new EventRecord
-            {
-                ProviderName = "TestProvider",
-                Id = 1000
-            };
-
-            // Act
-            Exception? exception;
-            using (var resolver = new EventResolver(dbCollection))
-            {
-                exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
-            }
-
-            // Assert
-            Assert.Null(exception);
-        }
-        finally
-        {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
-        }
-    }
-
-    [Fact]
-    public void LoadProviderDetails_WithLocalResolver_ShouldResolve()
-    {
-        // Arrange
-        using var resolver = new EventResolver();
-
-        var eventRecord = new EventRecord
-        {
-            ProviderName = Constants.TestProviderName,
-            Id = 1000
-        };
-
-        // Act
-        var exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
-
-        // Assert
-        Assert.Null(exception);
     }
 
     [Fact]

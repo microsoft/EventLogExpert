@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
@@ -43,12 +44,12 @@ public static class MauiProgram
             options.AddMiddleware<LoggingMiddleware>();
         });
 
-        // EventLogEffects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
+        // Effects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
         // by assembly scan; resolve the same instance through the coordinator interface so callers
         // (SettingsModal) get the single per-app instance with its dictionaries of in-flight loads
         // and close completions.
         builder.Services.AddSingleton<ILogReloadCoordinator>(sp =>
-            sp.GetRequiredService<EventLogEffects>());
+            sp.GetRequiredService<Effects>());
 
         // Core Services
         builder.Services.AddSingleton<DebugLogService>();
@@ -60,7 +61,7 @@ public static class MauiProgram
         builder.Services.AddSingleton(fileLocationOptions);
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
 
-        builder.Services.AddSingleton<HttpClient>(_ =>
+        builder.Services.AddSingleton(_ =>
         {
             HttpClient client = new() { BaseAddress = new Uri("https://api.github.com/") };
 
@@ -75,7 +76,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
         builder.Services.AddSingleton<IUpdateService, UpdateService>();
         builder.Services.AddSingleton<IGitHubService, GitHubService>();
-        builder.Services.AddSingleton<IApplicationRestartService, ApplicationRestartService>();
+        builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
         builder.Services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
         builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
         builder.Services.AddSingleton<ISettingsService, SettingsService>();
@@ -91,9 +92,7 @@ public static class MauiProgram
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
         // UI Services
-        builder.Services.AddSingleton<IMainThreadService>(new MainThreadService(
-            mainThreadInvoker: action => MainThread.InvokeOnMainThreadAsync(action),
-            mainThreadAsyncInvoker: taskFactory => MainThread.InvokeOnMainThreadAsync(taskFactory)));
+        builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
@@ -104,6 +103,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
         builder.Services.AddSingleton<IModalService, ModalService>();
+        builder.Services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
         builder.Services.AddSingleton<IMenuService, MenuService>();
         builder.Services.AddSingleton<MauiMenuActionService>();
         builder.Services.AddSingleton<IMenuActionService>(static provider =>
@@ -115,11 +115,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {
             var modalService = provider.GetRequiredService<IModalService>();
+            var inlineAlertHostBroker = provider.GetRequiredService<IInlineAlertHostBroker>();
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
             var bannerService = provider.GetRequiredService<IBannerService>();
 
             return new ModalAlertDialogService(
-                modalService,
+                inlineAlertHostBroker,
                 mainThreadService,
                 bannerService,
                 parameters => modalService.Show<AlertModal, bool>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)),

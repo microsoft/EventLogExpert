@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Tests.TestUtils;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
+using System.Text;
 
 namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
 
@@ -763,7 +764,7 @@ public sealed class ProviderDbContextTests : IDisposable
         cmd.CommandText = "EXPLAIN QUERY PLAN SELECT * FROM \"ProviderDetails\" WHERE \"ProviderName\" = 'provider-2'";
         using var reader = cmd.ExecuteReader();
 
-        var planText = new System.Text.StringBuilder();
+        var planText = new StringBuilder();
         while (reader.Read())
         {
             planText.AppendLine(reader["detail"]?.ToString());

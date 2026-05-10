@@ -10,15 +10,15 @@ using System.Text.RegularExpressions;
 namespace EventLogExpert.EventDbTool;
 
 /// <summary>
-///     Loads <see cref="ProviderDetails" /> from an exported .evtx log paired with its sibling
-///     LocaleMetaData/*.MTA files. Provider names are discovered by reading the .evtx events,
-///     and the MTA files are used as the only metadata source (no registry/DLL fallback).
+///     Loads <see cref="ProviderDetails" /> from an exported .evtx log paired with its sibling LocaleMetaData/*.MTA
+///     files. Provider names are discovered by reading the .evtx events, and the MTA files are used as the only metadata
+///     source (no registry/DLL fallback).
 /// </summary>
 internal static class MtaProviderSource
 {
     /// <summary>
-    ///     Reads <paramref name="evtxPath" /> and returns the distinct provider names referenced by its
-    ///     event records. Does NOT require sibling LocaleMetaData/*.MTA files.
+    ///     Reads <paramref name="evtxPath" /> and returns the distinct provider names referenced by its event records.
+    ///     Does NOT require sibling LocaleMetaData/*.MTA files.
     /// </summary>
     public static IReadOnlyList<string> DiscoverProviderNames(
         string evtxPath,
@@ -27,9 +27,8 @@ internal static class MtaProviderSource
         !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : DiscoverProviderNamesCore(evtxPath, logger, regex);
 
     /// <summary>
-    ///     Returns the sibling LocaleMetaData/*.MTA files for <paramref name="evtxPath" />, or an empty
-    ///     array if none are present. Logs an error in the empty case to surface the misconfiguration
-    ///     without throwing.
+    ///     Returns the sibling LocaleMetaData/*.MTA files for <paramref name="evtxPath" />, or an empty array if none are
+    ///     present. Logs an error in the empty case to surface the misconfiguration without throwing.
     /// </summary>
     public static IReadOnlyList<string> FindMtaFiles(string evtxPath, ITraceLogger logger)
     {
@@ -81,11 +80,10 @@ internal static class MtaProviderSource
     }
 
     /// <summary>
-    ///     Discovers provider names from <paramref name="evtxPath" /> and yields a
-    ///     <see cref="ProviderDetails" /> for each that can be resolved exclusively from the sibling
-    ///     LocaleMetaData/*.MTA files. Providers that cannot be resolved from any MTA file are
-    ///     skipped with a warning so callers never persist empty placeholder providers (which would
-    ///     defeat the "no local fallback" guarantee when the resulting database is consumed later).
+    ///     Discovers provider names from <paramref name="evtxPath" /> and yields a <see cref="ProviderDetails" /> for
+    ///     each that can be resolved exclusively from the sibling LocaleMetaData/*.MTA files. Providers that cannot be
+    ///     resolved from any MTA file are skipped with a warning so callers never persist empty placeholder providers (which
+    ///     would defeat the "no local fallback" guarantee when the resulting database is consumed later).
     /// </summary>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string evtxPath,
@@ -95,8 +93,8 @@ internal static class MtaProviderSource
             LoadProvidersCore(evtxPath, logger, regex, null, null);
 
     /// <summary>
-    ///     Internal overload used by <see cref="ProviderSource" /> so name-based filtering and the de-dup
-    ///     <c>seen</c> set are applied BEFORE the expensive MTA resolution per provider.
+    ///     Internal overload used by <see cref="ProviderSource" /> so name-based filtering and the de-dup <c>seen</c> set
+    ///     are applied BEFORE the expensive MTA resolution per provider.
     /// </summary>
     internal static IEnumerable<ProviderDetails> LoadProviders(
         string evtxPath,

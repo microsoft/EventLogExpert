@@ -21,9 +21,11 @@ public sealed partial class DetailsPane
     private bool _hasOpened;
     private bool _isVisible;
     private bool _isXmlVisible;
-    /// <summary>Resolved XML for the currently selected event. <c>null</c> means a fetch is in flight
-    /// (show "Resolving XML..."); empty string means resolved-with-no-content (e.g. live-watcher event
-    /// without a record id, or render failure); any other value is the rendered XML.</summary>
+    /// <summary>
+    ///     Resolved XML for the currently selected event. <c>null</c> means a fetch is in flight (show "Resolving
+    ///     XML..."); empty string means resolved-with-no-content (e.g. live-watcher event without a record id, or render
+    ///     failure); any other value is the rendered XML.
+    /// </summary>
     private string? _resolvedXml;
     private ResolvedEvent? _selectedEvent;
     /// <summary>Cancels any in-flight XML resolution when the selection changes again before completion.</summary>

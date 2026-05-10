@@ -7,7 +7,10 @@ public static class LogChannelMethods
 {
     private const string MicrosoftWindowsPrefix = "Microsoft-Windows-";
 
-    /// <summary>Live event log channels hard-coded in MenuBar's File menu — filter these from dynamic log enumeration to avoid duplicates.</summary>
+    /// <summary>
+    ///     Live event log channels hard-coded in MenuBar's File menu — filter these from dynamic log enumeration to avoid
+    ///     duplicates.
+    /// </summary>
     public static IReadOnlySet<string> HardCodedLiveChannels { get; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
         LogChannelNames.ApplicationLog,

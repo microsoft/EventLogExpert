@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
@@ -9,6 +10,7 @@ using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
+using SetFilterAction = EventLogExpert.UI.Store.FilterGroup.SetFilterAction;
 
 namespace EventLogExpert.Components.Modals.Filters;
 
@@ -65,11 +67,11 @@ public sealed partial class FilterGroup
 
     private async Task ApplyFilters()
     {
-        Dispatcher.Dispatch(new FilterPaneAction.ApplyFilterGroup(Group));
+        Dispatcher.Dispatch(new ApplyFilterGroupAction(Group));
         await Parent.CloseAsync();
     }
 
-    private void CancelGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
+    private void CancelGroup() => Dispatcher.Dispatch(new ToggleGroupAction(Group.Id));
 
     private async Task CopyGroup()
     {
@@ -90,7 +92,7 @@ public sealed partial class FilterGroup
         {
             await FileSaveService.SaveAsync(
                 snapshot.DisplayName,
-                FileSaveServiceFileTypes.Json,
+                FileSaveFileTypes.Json,
                 stream => JsonSerializer.SerializeAsync(stream, snapshot));
         }
         catch (Exception ex)
@@ -107,7 +109,7 @@ public sealed partial class FilterGroup
     {
         _pendingDrafts.Remove(draft);
 
-        Dispatcher.Dispatch(new FilterGroupAction.SetFilter(Group.Id, filter));
+        Dispatcher.Dispatch(new SetFilterAction(Group.Id, filter));
     }
 
     private async Task ImportGroup()
@@ -116,7 +118,7 @@ public sealed partial class FilterGroup
         {
             var path = await FilePickerService.PickAsync(
                 "Please select a json file to import",
-                FilePickerServiceFileTypes.Json);
+                FilePickerFileTypes.Json);
 
             if (path is null) { return; }
 
@@ -131,7 +133,7 @@ public sealed partial class FilterGroup
                 Filters = group.Filters
             };
 
-            Dispatcher.Dispatch(new FilterGroupAction.SetGroup(updatedGroup));
+            Dispatcher.Dispatch(new SetGroupAction(updatedGroup));
         }
         catch (Exception ex)
         {
@@ -153,7 +155,7 @@ public sealed partial class FilterGroup
         }
     }
 
-    private void RemoveGroup() => Dispatcher.Dispatch(new FilterGroupAction.RemoveGroup(Group.Id));
+    private void RemoveGroup() => Dispatcher.Dispatch(new RemoveGroupAction(Group.Id));
 
     private async Task RenameGroup()
     {
@@ -174,7 +176,7 @@ public sealed partial class FilterGroup
             return;
         }
 
-        Dispatcher.Dispatch(new FilterGroupAction.SetGroup(Group with { Name = newName }));
+        Dispatcher.Dispatch(new SetGroupAction(Group with { Name = newName }));
     }
 
     private void SaveGroup()
@@ -184,8 +186,8 @@ public sealed partial class FilterGroup
 
         if (_pendingDrafts.Count > 0) { return; }
 
-        Dispatcher.Dispatch(new FilterGroupAction.SetGroup(Group));
+        Dispatcher.Dispatch(new SetGroupAction(Group));
     }
 
-    private void ToggleGroup() => Dispatcher.Dispatch(new FilterGroupAction.ToggleGroup(Group.Id));
+    private void ToggleGroup() => Dispatcher.Dispatch(new ToggleGroupAction(Group.Id));
 }

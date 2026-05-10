@@ -17,19 +17,18 @@ public sealed partial class EventLogReader(string path, LogPathType pathType, bo
     private int _disposed;
 
     /// <summary>
-    ///     <see langword="true" /> when the underlying <c>EvtQuery</c> handle was opened successfully.
-    ///     When <see langword="false" />, the path could not be opened (invalid log name, missing or
-    ///     corrupt .evtx file, access denied, etc.) and <see cref="TryGetEvents" /> will not return events.
+    ///     <see langword="true" /> when the underlying <c>EvtQuery</c> handle was opened successfully. When
+    ///     <see langword="false" />, the path could not be opened (invalid log name, missing or corrupt .evtx file, access
+    ///     denied, etc.) and <see cref="TryGetEvents" /> will not return events.
     /// </summary>
     public bool IsValid => _handle is { IsInvalid: false };
 
     public string? LastBookmark { get; private set; }
 
     /// <summary>
-    ///     When <see cref="TryGetEvents" /> returns <see langword="false" /> due to a Win32 error other
-    ///     than <c>ERROR_NO_MORE_ITEMS</c>, this property contains the Win32 error code. A value of
-    ///     <see langword="null" /> means either no error occurred or the last failure was a normal
-    ///     end-of-results condition.
+    ///     When <see cref="TryGetEvents" /> returns <see langword="false" /> due to a Win32 error other than
+    ///     <c>ERROR_NO_MORE_ITEMS</c>, this property contains the Win32 error code. A value of <see langword="null" /> means
+    ///     either no error occurred or the last failure was a normal end-of-results condition.
     /// </summary>
     public int? LastErrorCode { get; private set; }
 

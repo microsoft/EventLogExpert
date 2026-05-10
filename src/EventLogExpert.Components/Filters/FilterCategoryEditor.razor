@@ -1,5 +1,4 @@
 @using EventLogExpert.UI
-
 <ValueSelect AriaLabel="@(CategoryAriaLabelledBy is null ? "Category" : null)" AriaLabelledBy="@CategoryAriaLabelledBy" CssClass="input filter-dropdown" T="FilterCategory" @bind-Value="CategoryBinding" ToStringFunc="x => x.ToFullString()">
     @foreach (FilterCategory item in Enum.GetValues(typeof(FilterCategory)))
     {

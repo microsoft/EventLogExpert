@@ -6,6 +6,7 @@
         <UseMaui>true</UseMaui>
         <SingleProject>true</SingleProject>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
+        <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 
         <GenerateAppInstallerFile>True</GenerateAppInstallerFile>
         <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>

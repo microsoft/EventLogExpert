@@ -17,14 +17,14 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase
     {
         if (Value is not { } savedFilter) { return; }
 
-        Dispatcher.Dispatch(new FilterGroupAction.RemoveFilter(ParentId, savedFilter.Id));
+        Dispatcher.Dispatch(new RemoveFilterAction(ParentId, savedFilter.Id));
     }
 
     protected override void DispatchSetFilter(FilterModel filter) =>
-        Dispatcher.Dispatch(new FilterGroupAction.SetFilter(ParentId, filter));
+        Dispatcher.Dispatch(new SetFilterAction(ParentId, filter));
 
     protected override void DispatchToggleExclusion(FilterId id) =>
-        Dispatcher.Dispatch(new FilterGroupAction.ToggleFilterExcluded(ParentId, id));
+        Dispatcher.Dispatch(new ToggleFilterExcludedAction(ParentId, id));
 
     protected override async ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
     {

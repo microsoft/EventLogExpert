@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Common.Files;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Provider;

@@ -174,17 +174,6 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         }
     }
 
-    private void ResetInlineAlertPromptValueIfChanged()
-    {
-        if (ReferenceEquals(_inlineAlertInitializedFor, InlineAlert)) { return; }
-
-        _inlineAlertInitializedFor = InlineAlert;
-
-        _inlineAlertPromptValue = InlineAlert is { IsPrompt: true }
-            ? InlineAlert.PromptInitialValue ?? string.Empty
-            : string.Empty;
-    }
-
     private Task HandleAcceptAsync() => OnAccept.InvokeAsync();
 
     private Task HandleCancelButtonAsync() => OnCancel.InvokeAsync();
@@ -243,4 +232,15 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         OnInlineAlertResolved.InvokeAsync(new InlineAlertResult(false, null));
 
     private Task HandleSaveAsync() => OnSave.InvokeAsync();
+
+    private void ResetInlineAlertPromptValueIfChanged()
+    {
+        if (ReferenceEquals(_inlineAlertInitializedFor, InlineAlert)) { return; }
+
+        _inlineAlertInitializedFor = InlineAlert;
+
+        _inlineAlertPromptValue = InlineAlert is { IsPrompt: true }
+            ? InlineAlert.PromptInitialValue ?? string.Empty
+            : string.Empty;
+    }
 }

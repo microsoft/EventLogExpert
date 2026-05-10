@@ -14,10 +14,8 @@ using System.Collections.Immutable;
 namespace EventLogExpert.Eventing.Resolvers;
 
 /// <summary>
-///     Unified event resolver that implements a fallback chain:
-///     1. MTA locale metadata files (primary, for exported logs)
-///     2. SQLite provider databases (secondary)
-///     3. Local provider registry (fallback)
+///     Unified event resolver that implements a fallback chain: 1. MTA locale metadata files (primary, for exported
+///     logs) 2. SQLite provider databases (secondary) 3. Local provider registry (fallback)
 /// </summary>
 public sealed class EventResolver : EventResolverBase, IEventResolver
 {

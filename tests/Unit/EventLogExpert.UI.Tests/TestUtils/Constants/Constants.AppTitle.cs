@@ -1,4 +1,7 @@
-﻿namespace EventLogExpert.UI.Tests.TestUtils.Constants;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.UI.Tests.TestUtils.Constants;
 
 public sealed partial class Constants
 {

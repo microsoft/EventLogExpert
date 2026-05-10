@@ -52,12 +52,10 @@ public sealed class EventLogWatcher : IDisposable
 
     /// <summary>Gets or sets whether the watcher is actively subscribed.</summary>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when set to <c>false</c> from inside an <see cref="EventRecordWritten" /> handler
-    ///     while the watcher is still subscribed.
+    ///     Thrown when set to <c>false</c> from inside an
+    ///     <see cref="EventRecordWritten" /> handler while the watcher is still subscribed.
     /// </exception>
-    /// <exception cref="ObjectDisposedException">
-    ///     Thrown when set to <c>true</c> after the watcher has been disposed.
-    /// </exception>
+    /// <exception cref="ObjectDisposedException">Thrown when set to <c>true</c> after the watcher has been disposed.</exception>
     public bool Enabled
     {
         get
@@ -81,8 +79,8 @@ public sealed class EventLogWatcher : IDisposable
 
     /// <summary>Releases the native subscription and query handles; idempotent.</summary>
     /// <exception cref="InvalidOperationException">
-    ///     Thrown when invoked from inside an <see cref="EventRecordWritten" /> handler unless
-    ///     the watcher has already been disposed.
+    ///     Thrown when invoked from inside an <see cref="EventRecordWritten" />
+    ///     handler unless the watcher has already been disposed.
     /// </exception>
     public void Dispose()
     {

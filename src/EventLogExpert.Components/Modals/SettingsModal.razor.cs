@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
@@ -16,8 +17,8 @@ namespace EventLogExpert.Components.Modals;
 
 public sealed partial class SettingsModal : ModalBase<bool>
 {
-    private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> _entriesUpgrading = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
 
     private CancellationTokenSource? _classificationCts;
     private CopyType _copyType;
@@ -41,13 +42,13 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
-    [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
+    private bool IsAnyUpgradeInFlight => _entriesUpgrading.Count > 0 || BannerService.SettingsProgress is not null;
 
     private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
 
-    private bool IsAnyUpgradeInFlight => _entriesUpgrading.Count > 0 || BannerService.SettingsProgress is not null;
-
     private bool IsCloseBlocked => IsAnyUpgradeInFlight;
+
+    [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -56,7 +57,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         if (disposing)
         {
             _disposed = true;
-            _classificationCts?.Cancel();
+            _classificationCts?.CancelAsync();
             _classificationCts?.Dispose();
             _classificationCts = null;
             DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
@@ -198,7 +199,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         {
             var sourcePaths = await FilePickerService.PickMultipleAsync(
                 "Please select database files to import",
-                FilePickerServiceFileTypes.Database);
+                FilePickerFileTypes.Database);
 
             if (sourcePaths.Count == 0) { return; }
 
@@ -281,11 +282,11 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         var logsToReopen = EventLogState.Value.ActiveLogs.Values;
 
-        Dispatcher.Dispatch(new EventLogAction.CloseAll());
+        Dispatcher.Dispatch(new CloseAllAction());
 
         foreach (var log in logsToReopen)
         {
-            Dispatcher.Dispatch(new EventLogAction.OpenLog(log.Name, log.Type));
+            Dispatcher.Dispatch(new OpenLogAction(log.Name, log.Type));
         }
     }
 
