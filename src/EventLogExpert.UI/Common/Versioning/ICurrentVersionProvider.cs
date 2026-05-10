@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Versioning;
 
 public interface ICurrentVersionProvider
 {

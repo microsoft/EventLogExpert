@@ -9,6 +9,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;

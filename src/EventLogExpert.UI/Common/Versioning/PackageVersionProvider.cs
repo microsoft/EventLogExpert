@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
 using Windows.ApplicationModel;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Versioning;
 
 public sealed class PackageVersionProvider : IPackageVersionProvider
 {
