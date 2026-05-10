@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
@@ -49,7 +49,7 @@ public sealed partial class MenuBar : IDisposable
     {
         InvalidatePendingOpen();
 
-        Settings.CopyTypeChanged -= OnSettingsChanged;
+        Settings.CopyFormatChanged -= OnSettingsChanged;
         MenuService.StateChanged -= OnMenuServiceStateChanged;
         MenuService.NavigateBarRequested -= OnNavigateBarRequested;
     }
@@ -60,7 +60,7 @@ public sealed partial class MenuBar : IDisposable
         FilterPaneIsEnabled.Select(state => state.IsEnabled);
         HasActiveLogs.Select(state => !state.ActiveLogs.IsEmpty);
 
-        Settings.CopyTypeChanged += OnSettingsChanged;
+        Settings.CopyFormatChanged += OnSettingsChanged;
         MenuService.StateChanged += OnMenuServiceStateChanged;
         MenuService.NavigateBarRequested += OnNavigateBarRequested;
 
@@ -74,22 +74,22 @@ public sealed partial class MenuBar : IDisposable
 
     private IReadOnlyList<MenuItem> BuildEdit()
     {
-        var copyShortcut = Settings.CopyType;
+        var defaultCopyFormat = Settings.CopyFormat;
 
         return
         [
             MenuItem.Item("Copy Selected",
-                () => Actions.CopySelectedAsync(CopyType.Default),
-                copyShortcut == CopyType.Default ? "Ctrl+C" : null),
+                () => Actions.CopySelectedAsync(EventCopyFormat.Default),
+                defaultCopyFormat == EventCopyFormat.Default ? "Ctrl+C" : null),
             MenuItem.Item("Copy Selected (Simple)",
-                () => Actions.CopySelectedAsync(CopyType.Simple),
-                copyShortcut == CopyType.Simple ? "Ctrl+C" : null),
+                () => Actions.CopySelectedAsync(EventCopyFormat.Simple),
+                defaultCopyFormat == EventCopyFormat.Simple ? "Ctrl+C" : null),
             MenuItem.Item("Copy Selected (XML)",
-                () => Actions.CopySelectedAsync(CopyType.Xml),
-                copyShortcut == CopyType.Xml ? "Ctrl+C" : null),
+                () => Actions.CopySelectedAsync(EventCopyFormat.Xml),
+                defaultCopyFormat == EventCopyFormat.Xml ? "Ctrl+C" : null),
             MenuItem.Item("Copy Selected (Full)",
-                () => Actions.CopySelectedAsync(CopyType.Full),
-                copyShortcut == CopyType.Full ? "Ctrl+C" : null),
+                () => Actions.CopySelectedAsync(EventCopyFormat.Full),
+                defaultCopyFormat == EventCopyFormat.Full ? "Ctrl+C" : null),
             MenuItem.Separator(),
             MenuItem.Item("Save All Filters", () => Actions.SaveAllFiltersAsync()),
             MenuItem.Item("Clear All Filters", Actions.ClearAllFilters),

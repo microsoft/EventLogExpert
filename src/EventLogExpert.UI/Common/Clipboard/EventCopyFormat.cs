@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.Common.Clipboard;
 
-public enum CopyType
+public enum EventCopyFormat
 {
     Default,
     Simple,

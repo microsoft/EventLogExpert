@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
@@ -916,10 +917,10 @@ public sealed partial class EventTable
     {
         return
         [
-            MenuItem.Item("Copy Selected", () => ClipboardService.CopySelectedEvent(CopyType.Default)),
-            MenuItem.Item("Copy Selected (Simple)", () => ClipboardService.CopySelectedEvent(CopyType.Simple)),
-            MenuItem.Item("Copy Selected (XML)", () => ClipboardService.CopySelectedEvent(CopyType.Xml)),
-            MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(CopyType.Full)),
+            MenuItem.Item("Copy Selected", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Default)),
+            MenuItem.Item("Copy Selected (Simple)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Simple)),
+            MenuItem.Item("Copy Selected (XML)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Xml)),
+            MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Full)),
             MenuItem.Separator(),
             MenuItem.Item("Exclude Events Before", () =>
                 Dispatcher.Dispatch(new SetFilterDateRangeAction(

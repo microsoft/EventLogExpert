@@ -1,15 +1,16 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Clipboard;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Interfaces;
 
 public interface ISettingsService
 {
-    CopyType CopyType { get; set; }
+    EventCopyFormat CopyFormat { get; set; }
 
-    Action? CopyTypeChanged { get; set; }
+    Action? CopyFormatChanged { get; set; }
 
     bool IsPreReleaseEnabled { get; set; }
 

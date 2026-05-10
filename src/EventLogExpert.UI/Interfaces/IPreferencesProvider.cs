@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 
@@ -22,7 +23,7 @@ public interface IPreferencesProvider
 
     IEnumerable<string> FavoriteFiltersPreference { get; set; }
 
-    CopyType KeyboardCopyTypePreference { get; set; }
+    EventCopyFormat KeyboardCopyFormatPreference { get; set; }
 
     LogLevel LogLevelPreference { get; set; }
 

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
@@ -21,7 +22,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
 
     private CancellationTokenSource? _classificationCts;
-    private CopyType _copyType;
+    private EventCopyFormat _copyFormat;
     private bool _databaseStateChanged;
     private volatile bool _disposed;
     private bool _isPreReleaseEnabled;
@@ -104,7 +105,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         await ApplyPendingToggles();
 
-        Settings.CopyType = _copyType;
+        Settings.CopyFormat = _copyFormat;
         Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
         Settings.LogLevel = _logLevel;
         Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
@@ -225,7 +226,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     private void LoadFromSettings()
     {
-        _copyType = Settings.CopyType;
+        _copyFormat = Settings.CopyFormat;
         _isPreReleaseEnabled = Settings.IsPreReleaseEnabled;
         _logLevel = Settings.LogLevel;
         _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;

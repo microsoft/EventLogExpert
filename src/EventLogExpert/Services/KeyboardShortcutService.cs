@@ -86,7 +86,7 @@ public sealed class KeyboardShortcutService(
                 return;
 
             case "KeyC":
-                await _actions.CopySelectedAsync(_settings.CopyType);
+                await _actions.CopySelectedAsync(_settings.CopyFormat);
                 return;
         }
     }
