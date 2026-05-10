@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
+using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Preferences;

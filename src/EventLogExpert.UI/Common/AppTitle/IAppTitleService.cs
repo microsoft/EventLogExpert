@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Common.AppTitle;
 
 public interface IAppTitleService
 {
