@@ -1,9 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 
 namespace EventLogExpert.UI.Store.FilterGroup;

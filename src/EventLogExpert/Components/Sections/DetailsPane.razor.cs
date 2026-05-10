@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
