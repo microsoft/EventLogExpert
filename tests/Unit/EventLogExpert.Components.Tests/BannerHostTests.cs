@@ -6,7 +6,9 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.JSInterop;
 using NSubstitute;
 
 namespace EventLogExpert.Components.Tests;
@@ -44,7 +46,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-attention button.banner-dismiss").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissAttention();
     }
@@ -61,6 +63,18 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
+    {
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-attention");
+        Assert.Contains("1 database need", banner.TextContent);
+        Assert.DoesNotContain("databases need", banner.TextContent);
+    }
+
+    [Fact]
     public void BannerHost_AttentionEntries_RendersAttentionBannerWithOpenSettingsAndDismiss()
     {
         _bannerService.AttentionEntries.Returns(
@@ -72,18 +86,6 @@ public sealed class BannerHostTests : BunitContext
         Assert.Contains("2 databases need attention", banner.TextContent);
         Assert.Equal("Open Settings", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention button.banner-dismiss"));
-    }
-
-    [Fact]
-    public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
-    {
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
-
-        var component = Render<BannerHost>();
-
-        var banner = component.Find("aside.banner-attention");
-        Assert.Contains("1 database need", banner.TextContent);
-        Assert.DoesNotContain("databases need", banner.TextContent);
     }
 
     [Fact]
@@ -170,7 +172,7 @@ public sealed class BannerHostTests : BunitContext
                 Cancel: () => cancelInvocationCount++));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new MouseEventArgs());
 
         Assert.Equal(1, cancelInvocationCount);
     }
@@ -190,7 +192,7 @@ public sealed class BannerHostTests : BunitContext
                 Cancel: () => throw new InvalidOperationException("cts disposed")));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new MouseEventArgs());
 
         Assert.Single(component.FindAll("aside.banner-upgrade-progress"));
         _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
@@ -295,12 +297,12 @@ public sealed class BannerHostTests : BunitContext
 
         var component = Render<BannerHost>();
         // Advance to last item (index 1).
-        await component.Find("button.banner-cycle-next").ClickAsync(new());
+        await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         var next = component.Find("button.banner-cycle-next");
         Assert.True(next.HasAttribute("disabled"));
 
-        await next.ClickAsync(new());
+        await next.ClickAsync(new MouseEventArgs());
 
         // Index stays at 1.
         Assert.Equal("2 of 2", component.Find(".banner-pagination").TextContent.Trim());
@@ -315,7 +317,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
-        await component.Find("button.banner-cycle-next").ClickAsync(new());
+        await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
 
         var pagination = component.Find(".banner-pagination");
         Assert.Equal("2 of 2", pagination.TextContent.Trim());
@@ -334,7 +336,7 @@ public sealed class BannerHostTests : BunitContext
         var prev = component.Find("button.banner-cycle-prev");
         Assert.True(prev.HasAttribute("disabled"));
 
-        await prev.ClickAsync(new());
+        await prev.ClickAsync(new MouseEventArgs());
 
         // Index stays at 0 — first error still rendered.
         Assert.Equal("1 of 2", component.Find(".banner-pagination").TextContent.Trim());
@@ -355,7 +357,7 @@ public sealed class BannerHostTests : BunitContext
 
         var component = Render<BannerHost>();
         // Advance to e1.
-        await component.Find("button.banner-cycle-next").ClickAsync(new());
+        await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
         Assert.Contains("Second: second message", component.Find("aside.banner-error").TextContent);
         Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
 
@@ -383,7 +385,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error button.banner-dismiss").ClickAsync(new());
+        await component.Find("aside.banner-error button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissError(entry.Id);
     }
@@ -395,7 +397,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-info button.banner-dismiss").ClickAsync(new());
+        await component.Find("aside.banner-info button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissInfoBanner(info.Id);
     }
@@ -414,7 +416,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-error button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-error button.banner-action").ClickAsync(new MouseEventArgs());
 
         Assert.Equal(1, actionInvocationCount);
     }
@@ -438,7 +440,7 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
 
         // Act
-        await component.Find("aside.banner-error button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-error button.banner-action").ClickAsync(new MouseEventArgs());
 
         // Assert — banner stays visible, the critical slot was not populated, and the exception was logged.
         Assert.Single(component.FindAll("aside.banner-error"));
@@ -524,7 +526,7 @@ public sealed class BannerHostTests : BunitContext
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(true));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
         Received.InOrder(
             () =>
@@ -545,7 +547,7 @@ public sealed class BannerHostTests : BunitContext
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissAttention();
         _bannerService.Received(1)
@@ -583,7 +585,7 @@ public sealed class BannerHostTests : BunitContext
         var component = Render<BannerHost>();
         Assert.Single(component.FindAll("aside.banner-attention"));
 
-        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
         // Real BannerService raises StateChanged from inside ReportError; the mock does not, so raise it here
         // to drive the re-render that proves _selectedItem was steered to the new error.
         _bannerService.StateChanged += Raise.Event<Action>();
@@ -604,10 +606,10 @@ public sealed class BannerHostTests : BunitContext
         // before the await so the attention banner is already gone by the time the throw lands.
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync()
-            .Returns(Task.FromException<bool>(new Microsoft.JSInterop.JSDisconnectedException("circuit gone")));
+            .Returns(Task.FromException<bool>(new JSDisconnectedException("circuit gone")));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissAttention();
         _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
@@ -625,7 +627,7 @@ public sealed class BannerHostTests : BunitContext
         _menuActionService.OpenSettingsAsync().Returns(Task.FromException<bool>(openException));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new());
+        await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
         _bannerService.Received(1).DismissAttention();
         _bannerService.Received(1)
@@ -642,7 +644,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.TryRecoverAsync().Returns(Task.FromException(new InvalidOperationException("recovery failed")));
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new MouseEventArgs());
 
         var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
         Assert.Contains("Recovery failed", subtitle.TextContent);
@@ -656,7 +658,7 @@ public sealed class BannerHostTests : BunitContext
         _applicationRestartService.TryRestartAsync().Returns(true);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new MouseEventArgs());
 
         await _applicationRestartService.Received(1).TryRestartAsync();
     }
@@ -668,7 +670,7 @@ public sealed class BannerHostTests : BunitContext
         _applicationRestartService.TryRestartAsync().Returns(false);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(2)").ClickAsync(new MouseEventArgs());
 
         var subtitle = component.Find("aside.banner-critical .banner-feedback .banner-subtitle");
         Assert.Contains("Restart failed", subtitle.TextContent);
@@ -681,7 +683,7 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.TryRecoverAsync().Returns(Task.CompletedTask);
 
         var component = Render<BannerHost>();
-        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new());
+        await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new MouseEventArgs());
 
         await _bannerService.Received(1).TryRecoverAsync();
     }

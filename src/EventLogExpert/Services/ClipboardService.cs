@@ -11,6 +11,7 @@ using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Text;
+using System.Xml;
 using System.Xml.Linq;
 
 namespace EventLogExpert.Services;
@@ -81,7 +82,7 @@ public sealed class ClipboardService : IClipboardService
         {
             return XElement.Parse(xml).ToString();
         }
-        catch (System.Xml.XmlException)
+        catch (XmlException)
         {
             return xml;
         }

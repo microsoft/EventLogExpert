@@ -12,16 +12,16 @@ using System.Text.RegularExpressions;
 namespace EventLogExpert.EventDbTool;
 
 /// <summary>
-///     Loads <see cref="ProviderDetails" /> from a path that may be a .db file, an exported .evtx file, or a
-///     folder. When the path is a folder, all top-level *.db files are processed first (sorted), followed by
-///     all top-level *.evtx files (sorted). Subdirectories are not searched.
+///     Loads <see cref="ProviderDetails" /> from a path that may be a .db file, an exported .evtx file, or a folder.
+///     When the path is a folder, all top-level *.db files are processed first (sorted), followed by all top-level *.evtx
+///     files (sorted). Subdirectories are not searched.
 /// </summary>
 internal static class ProviderSource
 {
     /// <summary>
-    ///     Conservative cap on the number of parameters in a single <c>Where(... Contains)</c> SQL IN
-    ///     clause. SQLite's default limit is 999 parameters; we stay well under that so the same code
-    ///     works on older SQLite builds too. Larger requests are split into multiple round-trips.
+    ///     Conservative cap on the number of parameters in a single <c>Where(... Contains)</c> SQL IN clause. SQLite's
+    ///     default limit is 999 parameters; we stay well under that so the same code works on older SQLite builds too. Larger
+    ///     requests are split into multiple round-trips.
     /// </summary>
     internal const int MaxInClauseParameters = 500;
 
@@ -35,7 +35,7 @@ internal static class ProviderSource
     public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, string? filter = null) =>
         !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : LoadProviderNames(path, logger, regex);
 
-    /// <inheritdoc cref="LoadProviderNames(string, ITraceLogger, string?)"/>
+    /// <inheritdoc cref="LoadProviderNames(string, ITraceLogger, string?)" />
     public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -52,11 +52,11 @@ internal static class ProviderSource
     }
 
     /// <summary>
-    ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional
-    ///     case-insensitive regex <paramref name="filter" /> to provider names. When the same provider name
-    ///     appears in multiple source files, the first occurrence wins (.db files are processed before .evtx).
-    ///     Provider names contained in <paramref name="skipProviderNames" /> are excluded BEFORE details are
-    ///     resolved, so callers using the skip set never pay the cost of loading metadata for excluded providers.
+    ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional case-insensitive
+    ///     regex <paramref name="filter" /> to provider names. When the same provider name appears in multiple source files,
+    ///     the first occurrence wins (.db files are processed before .evtx). Provider names contained in
+    ///     <paramref name="skipProviderNames" /> are excluded BEFORE details are resolved, so callers using the skip set never
+    ///     pay the cost of loading metadata for excluded providers.
     /// </summary>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string path,
@@ -66,7 +66,7 @@ internal static class ProviderSource
         !RegexHelper.TryCreate(filter, logger, out var regex) ? [] :
             LoadProvidersIterator(path, logger, regex, skipProviderNames);
 
-    /// <inheritdoc cref="LoadProviders(string, ITraceLogger, string?, IReadOnlySet{string}?)"/>
+    /// <inheritdoc cref="LoadProviders(string, ITraceLogger, string?, IReadOnlySet{string}?)" />
     public static IEnumerable<ProviderDetails> LoadProviders(
         string path,
         ITraceLogger logger,
@@ -143,9 +143,8 @@ internal static class ProviderSource
     }
 
     /// <summary>
-    ///     Expands <paramref name="path" /> into the ordered list of source files: a single .db or .evtx
-    ///     when given a file; or all *.db files (sorted) followed by all *.evtx files (sorted) when given a
-    ///     folder.
+    ///     Expands <paramref name="path" /> into the ordered list of source files: a single .db or .evtx when given a
+    ///     file; or all *.db files (sorted) followed by all *.evtx files (sorted) when given a folder.
     /// </summary>
     private static IEnumerable<string> EnumerateSourceFiles(string path, ITraceLogger logger)
     {
@@ -176,14 +175,14 @@ internal static class ProviderSource
         // way TryValidate accepts them. Files are bucketed (.db first, then .evtx) and sorted
         // OrdinalIgnoreCase within each bucket so first-occurrence-wins ordering is stable.
         var dbFiles = allFiles
-            .Where(f => string.Equals(System.IO.Path.GetExtension(f), DbExtension, StringComparison.OrdinalIgnoreCase))
+            .Where(f => string.Equals(Path.GetExtension(f), DbExtension, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         Array.Sort(dbFiles, StringComparer.OrdinalIgnoreCase);
 
         foreach (var f in dbFiles) { yield return f; }
 
         var evtxFiles = allFiles
-            .Where(f => string.Equals(System.IO.Path.GetExtension(f), EvtxExtension, StringComparison.OrdinalIgnoreCase))
+            .Where(f => string.Equals(Path.GetExtension(f), EvtxExtension, StringComparison.OrdinalIgnoreCase))
             .ToArray();
         Array.Sort(evtxFiles, StringComparer.OrdinalIgnoreCase);
 

@@ -22,8 +22,8 @@ namespace EventLogExpert.Services;
 /// <summary>
 ///     MAUI implementation of <see cref="IMenuActionService" />. Owns the cancellation token that gates background
 ///     log loads (replaces the legacy field on MainPage). Exposes <see cref="OpenLogsBatchAsync" /> publicly so the
-///     page-level drag/drop and command-line handlers can batch multiple opens through the same cancellation lifecycle
-///     and surface one banner alert per gesture for empty logs.
+///     page-level drag/drop and command-line handlers can batch multiple opens through the same cancellation lifecycle and
+///     surface one banner alert per gesture for empty logs.
 /// </summary>
 public sealed class MauiMenuActionService(
     IDispatcher dispatcher,
@@ -63,12 +63,12 @@ public sealed class MauiMenuActionService(
         await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, userInitiated: true);
     }
 
-    public void ClearAllFilters() => _dispatcher.Dispatch(new FilterPaneAction.ClearAllFilters());
+    public void ClearAllFilters() => _dispatcher.Dispatch(new ClearAllFiltersAction());
 
     public async Task CloseAllLogsAsync()
     {
         await _cancellationTokenSource.CancelAsync();
-        _dispatcher.Dispatch(new EventLogAction.CloseAll());
+        _dispatcher.Dispatch(new CloseAllAction());
     }
 
     public async Task CopySelectedAsync(CopyType? copyType) => await _clipboardService.CopySelectedEvent(copyType);
@@ -129,7 +129,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public void LoadNewEvents() => _dispatcher.Dispatch(new EventLogAction.LoadNewEvents());
+    public void LoadNewEvents() => _dispatcher.Dispatch(new LoadNewEventsAction());
 
     public Task OpenDocsAsync() =>
         OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
@@ -231,7 +231,7 @@ public sealed class MauiMenuActionService(
         if (!combineLog)
         {
             await _cancellationTokenSource.CancelAsync();
-            _dispatcher.Dispatch(new EventLogAction.CloseAll());
+            _dispatcher.Dispatch(new CloseAllAction());
         }
 
         if (_cancellationTokenSource.IsCancellationRequested)
@@ -239,16 +239,16 @@ public sealed class MauiMenuActionService(
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        _dispatcher.Dispatch(new EventLogAction.OpenLog(logPath, pathType, _cancellationTokenSource.Token));
+        _dispatcher.Dispatch(new OpenLogAction(logPath, pathType, _cancellationTokenSource.Token));
         return OpenLogStatus.Opened;
     }
 
     /// <summary>
     ///     Opens each log in <paramref name="logs" /> sequentially and surfaces a single banner alert at the end naming
-    ///     every log that contained zero events. <paramref name="combineLog" /> controls whether the first successful
-    ///     open closes existing logs first; subsequent opens within the batch always coalesce with the new state. Use
-    ///     this from any call site that may open multiple logs in one user gesture (multi-file picker, folder open,
-    ///     drag-drop, command line) so the user sees one batched alert instead of one popup per empty file.
+    ///     every log that contained zero events. <paramref name="combineLog" /> controls whether the first successful open
+    ///     closes existing logs first; subsequent opens within the batch always coalesce with the new state. Use this from any
+    ///     call site that may open multiple logs in one user gesture (multi-file picker, folder open, drag-drop, command line)
+    ///     so the user sees one batched alert instead of one popup per empty file.
     /// </summary>
     public async Task OpenLogsBatchAsync(IEnumerable<(string Path, LogPathType Type)> logs, bool combineLog)
     {
@@ -293,11 +293,11 @@ public sealed class MauiMenuActionService(
 
         if (string.IsNullOrEmpty(groupName)) { return; }
 
-        _dispatcher.Dispatch(new FilterPaneAction.SaveFilterGroup(groupName));
+        _dispatcher.Dispatch(new SaveFilterGroupAction(groupName));
     }
 
     public void SetContinuouslyUpdate(bool value) =>
-        _dispatcher.Dispatch(new EventLogAction.SetContinuouslyUpdate(value));
+        _dispatcher.Dispatch(new SetContinuouslyUpdateAction(value));
 
     public Task ShowDebugLogsAsync() => ShowModalAsync<DebugLogModal>("debug logs");
 
@@ -322,7 +322,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public void ToggleShowAllEvents() => _dispatcher.Dispatch(new FilterPaneAction.ToggleIsEnabled());
+    public void ToggleShowAllEvents() => _dispatcher.Dispatch(new ToggleIsEnabledAction());
 
     private static string GetEmptyLogDisplayName(string path, LogPathType type)
     {

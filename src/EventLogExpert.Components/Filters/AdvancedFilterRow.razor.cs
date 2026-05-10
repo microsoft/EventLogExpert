@@ -13,15 +13,15 @@ public sealed partial class AdvancedFilterRow : EditableFilterRowBase
     {
         if (Value is not { } savedFilter) { return; }
 
-        Dispatcher.Dispatch(new FilterPaneAction.RemoveFilter(savedFilter.Id));
+        Dispatcher.Dispatch(new RemoveFilterAction(savedFilter.Id));
     }
 
     protected override void DispatchSetFilter(FilterModel filter) =>
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
+        Dispatcher.Dispatch(new SetFilterAction(filter));
 
     protected override void DispatchToggleEnabled(FilterId id) =>
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterEnabled(id));
+        Dispatcher.Dispatch(new ToggleFilterEnabledAction(id));
 
     protected override void DispatchToggleExclusion(FilterId id) =>
-        Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterExcluded(id));
+        Dispatcher.Dispatch(new ToggleFilterExcludedAction(id));
 }

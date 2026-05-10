@@ -173,9 +173,9 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     }
 
     /// <summary>
-    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch.
-    ///     Returning <see langword="null" /> aborts the save (subclass surfaces the error). Default
-    ///     enforces non-empty text and compiles via <see cref="FilterCompiler.TryCompile" />.
+    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch. Returning
+    ///     <see langword="null" /> aborts the save (subclass surfaces the error). Default enforces non-empty text and compiles
+    ///     via <see cref="FilterCompiler.TryCompile" />.
     /// </summary>
     protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
     {

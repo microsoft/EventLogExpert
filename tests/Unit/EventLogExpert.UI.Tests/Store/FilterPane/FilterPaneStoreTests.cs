@@ -58,7 +58,7 @@ public sealed class FilterPaneActionTests
     public void AddFilterAction_WithFilter_ShouldCreateAction()
     {
         var filter = FilterUtils.CreateTestFilter();
-        var action = new FilterPaneAction.AddFilter(filter);
+        var action = new AddFilterAction(filter);
 
         Assert.Equal(filter, action.FilterModel);
     }
@@ -67,7 +67,7 @@ public sealed class FilterPaneActionTests
     public void ApplyFilterGroupAction_ShouldCreateAction()
     {
         var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
         Assert.Equal(filterGroup, action.FilterGroup);
     }
@@ -75,7 +75,7 @@ public sealed class FilterPaneActionTests
     [Fact]
     public void ClearAllFiltersAction_ShouldCreateAction()
     {
-        var action = new FilterPaneAction.ClearAllFilters();
+        var action = new ClearAllFiltersAction();
 
         Assert.NotNull(action);
     }
@@ -84,7 +84,7 @@ public sealed class FilterPaneActionTests
     public void RemoveFilterAction_ShouldCreateAction()
     {
         var filterId = FilterId.Create();
-        var action = new FilterPaneAction.RemoveFilter(filterId);
+        var action = new RemoveFilterAction(filterId);
 
         Assert.Equal(filterId, action.Id);
     }
@@ -92,7 +92,7 @@ public sealed class FilterPaneActionTests
     [Fact]
     public void SaveFilterGroupAction_ShouldCreateAction()
     {
-        var action = new FilterPaneAction.SaveFilterGroup(Constants.FilterGroupName);
+        var action = new SaveFilterGroupAction(Constants.FilterGroupName);
 
         Assert.Equal(Constants.FilterGroupName, action.Name);
     }
@@ -101,7 +101,7 @@ public sealed class FilterPaneActionTests
     public void SetFilterAction_ShouldCreateAction()
     {
         var filter = FilterUtils.CreateTestFilter();
-        var action = new FilterPaneAction.SetFilter(filter);
+        var action = new SetFilterAction(filter);
 
         Assert.Equal(filter, action.FilterModel);
     }
@@ -110,7 +110,7 @@ public sealed class FilterPaneActionTests
     public void SetFilterDateRangeAction_ShouldCreateAction()
     {
         var dateModel = new FilterDateModel { After = DateTime.UtcNow };
-        var action = new FilterPaneAction.SetFilterDateRange(dateModel);
+        var action = new SetFilterDateRangeAction(dateModel);
 
         Assert.Equal(dateModel, action.FilterDateModel);
     }
@@ -119,7 +119,7 @@ public sealed class FilterPaneActionTests
     public void SetFilterDateRangeSuccessAction_ShouldCreateAction()
     {
         var dateModel = new FilterDateModel { Before = DateTime.UtcNow };
-        var action = new FilterPaneAction.SetFilterDateRangeSuccess(dateModel);
+        var action = new SetFilterDateRangeSuccessAction(dateModel);
 
         Assert.Equal(dateModel, action.FilterDateModel);
     }
@@ -127,7 +127,7 @@ public sealed class FilterPaneActionTests
     [Fact]
     public void SetIsLoadingAction_ShouldCreateAction()
     {
-        var action = new FilterPaneAction.SetIsLoading(true);
+        var action = new SetIsLoadingAction(true);
 
         Assert.NotNull(action);
         Assert.True(action.IsLoading);
@@ -136,7 +136,7 @@ public sealed class FilterPaneActionTests
     [Fact]
     public void ToggleFilterDateAction_ShouldCreateAction()
     {
-        var action = new FilterPaneAction.ToggleFilterDate();
+        var action = new ToggleFilterDateAction();
 
         Assert.NotNull(action);
     }
@@ -145,7 +145,7 @@ public sealed class FilterPaneActionTests
     public void ToggleFilterEnabledAction_ShouldCreateAction()
     {
         var filterId = FilterId.Create();
-        var action = new FilterPaneAction.ToggleFilterEnabled(filterId);
+        var action = new ToggleFilterEnabledAction(filterId);
 
         Assert.Equal(filterId, action.Id);
     }
@@ -154,7 +154,7 @@ public sealed class FilterPaneActionTests
     public void ToggleFilterExcludedAction_ShouldCreateAction()
     {
         var filterId = FilterId.Create();
-        var action = new FilterPaneAction.ToggleFilterExcluded(filterId);
+        var action = new ToggleFilterExcludedAction(filterId);
 
         Assert.Equal(filterId, action.Id);
     }
@@ -162,7 +162,7 @@ public sealed class FilterPaneActionTests
     [Fact]
     public void ToggleIsEnabledAction_ShouldCreateAction()
     {
-        var action = new FilterPaneAction.ToggleIsEnabled();
+        var action = new ToggleIsEnabledAction();
 
         Assert.NotNull(action);
     }
@@ -175,9 +175,9 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState();
         var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
-        var action = new FilterPaneAction.AddFilter(filter);
+        var action = new AddFilterAction(filter);
 
-        FilterPaneReducers.ReduceAddFilter(state, action);
+        Reducers.ReduceAddFilter(state, action);
 
         Assert.Empty(state.Filters);
     }
@@ -187,9 +187,9 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState();
         var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
-        var action = new FilterPaneAction.AddFilter(filter);
+        var action = new AddFilterAction(filter);
 
-        var result = FilterPaneReducers.ReduceAddFilter(state, action);
+        var result = Reducers.ReduceAddFilter(state, action);
 
         Assert.Single(result.Filters);
         Assert.Equal(filter, result.Filters[0]);
@@ -222,9 +222,9 @@ public sealed class FilterPaneReducerTests
             ]
         };
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(
+        var result = Reducers.ReduceApplyFilterGroup(
             state,
-            new FilterPaneAction.ApplyFilterGroup(filterGroup));
+            new ApplyFilterGroupAction(filterGroup));
 
         Assert.Single(result.Filters);
         Assert.Equal(FilterType.Basic, result.Filters[0].FilterType);
@@ -246,9 +246,9 @@ public sealed class FilterPaneReducerTests
             ]
         };
 
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+        var result = Reducers.ReduceApplyFilterGroup(state, action);
 
         Assert.Single(result.Filters);
         Assert.True(result.Filters[0].IsExcluded);
@@ -267,9 +267,9 @@ public sealed class FilterPaneReducerTests
             Filters = [FilterUtils.CreateTestFilter(Constants.FilterIdEquals100)]
         };
 
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+        var result = Reducers.ReduceApplyFilterGroup(state, action);
 
         Assert.Single(result.Filters);
     }
@@ -279,9 +279,9 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState();
         var filterGroup = new FilterGroupModel { Filters = [] };
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+        var result = Reducers.ReduceApplyFilterGroup(state, action);
 
         Assert.Equal(state, result);
     }
@@ -299,9 +299,9 @@ public sealed class FilterPaneReducerTests
             ]
         };
 
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+        var result = Reducers.ReduceApplyFilterGroup(state, action);
 
         Assert.Single(result.Filters);
         Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
@@ -325,9 +325,9 @@ public sealed class FilterPaneReducerTests
             ]
         };
 
-        var action = new FilterPaneAction.ApplyFilterGroup(filterGroup);
+        var action = new ApplyFilterGroupAction(filterGroup);
 
-        var result = FilterPaneReducers.ReduceApplyFilterGroup(state, action);
+        var result = Reducers.ReduceApplyFilterGroup(state, action);
 
         Assert.Equal(2, result.Filters.Count);
         Assert.False(result.Filters[0].IsExcluded);
@@ -343,7 +343,7 @@ public sealed class FilterPaneReducerTests
             IsEnabled = false
         };
 
-        var result = FilterPaneReducers.ReduceClearFilters(state);
+        var result = Reducers.ReduceClearFilters(state);
 
         Assert.Empty(result.Filters);
         Assert.False(result.IsEnabled);
@@ -353,9 +353,9 @@ public sealed class FilterPaneReducerTests
     public void ReduceRemoveFilter_WithInvalidFilter_ShouldReturnOriginalState()
     {
         var state = new FilterPaneState { Filters = [FilterUtils.CreateTestFilter()] };
-        var action = new FilterPaneAction.RemoveFilter(FilterId.Create());
+        var action = new RemoveFilterAction(FilterId.Create());
 
-        var result = FilterPaneReducers.ReduceRemoveFilter(state, action);
+        var result = Reducers.ReduceRemoveFilter(state, action);
 
         Assert.Equal(state, result);
     }
@@ -365,11 +365,45 @@ public sealed class FilterPaneReducerTests
     {
         var filter = FilterUtils.CreateTestFilter();
         var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.RemoveFilter(filter.Id);
+        var action = new RemoveFilterAction(filter.Id);
 
-        var result = FilterPaneReducers.ReduceRemoveFilter(state, action);
+        var result = Reducers.ReduceRemoveFilter(state, action);
 
         Assert.Empty(result.Filters);
+    }
+
+    [Fact]
+    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
+    {
+        var state = new FilterPaneState();
+
+        var dateModel = new FilterDateModel
+        {
+            After = DateTime.UtcNow.AddDays(-1),
+            Before = DateTime.UtcNow
+        };
+
+        var action = new SetFilterDateRangeSuccessAction(dateModel);
+
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.Equal(dateModel, result.FilteredDateRange);
+    }
+
+    [Fact]
+    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
+    {
+        var state = new FilterPaneState
+        {
+            FilteredDateRange = new FilterDateModel { After = DateTime.UtcNow }
+        };
+
+        var action = new SetFilterDateRangeSuccessAction(null);
+
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        Assert.Null(result.FilteredDateRange);
     }
 
     [Fact]
@@ -381,9 +415,9 @@ public sealed class FilterPaneReducerTests
 
         var updatedFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200, id: originalFilter.Id);
 
-        var action = new FilterPaneAction.SetFilter(updatedFilter);
+        var action = new SetFilterAction(updatedFilter);
 
-        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+        var result = Reducers.ReduceSetFilter(state, action);
 
         Assert.Single(result.Filters);
         Assert.Equal(Constants.FilterIdEquals200, result.Filters[0].ComparisonText);
@@ -397,9 +431,9 @@ public sealed class FilterPaneReducerTests
 
         var replacement = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200, id: existing.Id);
 
-        var action = new FilterPaneAction.SetFilter(replacement);
+        var action = new SetFilterAction(replacement);
 
-        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+        var result = Reducers.ReduceSetFilter(state, action);
 
         Assert.Single(result.Filters);
         Assert.Equal(existing.Id, result.Filters[0].Id);
@@ -418,9 +452,9 @@ public sealed class FilterPaneReducerTests
 
         var replacement = FilterUtils.CreateTestFilter(Constants.FilterIdGreaterThan100, id: middle.Id);
 
-        var action = new FilterPaneAction.SetFilter(replacement);
+        var action = new SetFilterAction(replacement);
 
-        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+        var result = Reducers.ReduceSetFilter(state, action);
 
         Assert.Equal(3, result.Filters.Count);
         Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
@@ -436,9 +470,9 @@ public sealed class FilterPaneReducerTests
         var state = new FilterPaneState { Filters = [existing] };
 
         var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
-        var action = new FilterPaneAction.SetFilter(newFilter);
+        var action = new SetFilterAction(newFilter);
 
-        var result = FilterPaneReducers.ReduceSetFilter(state, action);
+        var result = Reducers.ReduceSetFilter(state, action);
 
         Assert.Equal(2, result.Filters.Count);
         Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
@@ -446,45 +480,11 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
-    {
-        var state = new FilterPaneState();
-
-        var dateModel = new FilterDateModel
-        {
-            After = DateTime.UtcNow.AddDays(-1),
-            Before = DateTime.UtcNow
-        };
-
-        var action = new FilterPaneAction.SetFilterDateRangeSuccess(dateModel);
-
-        var result = FilterPaneReducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        Assert.NotNull(result.FilteredDateRange);
-        Assert.Equal(dateModel, result.FilteredDateRange);
-    }
-
-    [Fact]
-    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
-    {
-        var state = new FilterPaneState
-        {
-            FilteredDateRange = new FilterDateModel { After = DateTime.UtcNow }
-        };
-
-        var action = new FilterPaneAction.SetFilterDateRangeSuccess(null);
-
-        var result = FilterPaneReducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        Assert.Null(result.FilteredDateRange);
-    }
-
-    [Fact]
     public void ReduceSetIsLoading_ShouldSetValue()
     {
         var state = new FilterPaneState { IsLoading = false };
 
-        var result = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
+        var result = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
 
         Assert.True(result.IsLoading);
     }
@@ -494,7 +494,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState { IsLoading = true };
 
-        var result = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
+        var result = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
 
         Assert.Same(state, result);
     }
@@ -507,7 +507,7 @@ public sealed class FilterPaneReducerTests
             FilteredDateRange = new FilterDateModel { IsEnabled = false }
         };
 
-        var result = FilterPaneReducers.ReduceToggleFilterDate(state);
+        var result = Reducers.ReduceToggleFilterDate(state);
 
         Assert.NotNull(result.FilteredDateRange);
         Assert.True(result.FilteredDateRange.IsEnabled);
@@ -518,7 +518,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState { FilteredDateRange = null };
 
-        var result = FilterPaneReducers.ReduceToggleFilterDate(state);
+        var result = Reducers.ReduceToggleFilterDate(state);
 
         Assert.Equal(state, result);
     }
@@ -528,9 +528,9 @@ public sealed class FilterPaneReducerTests
     {
         var filter = FilterUtils.CreateTestFilter(isEnabled: false);
         var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterEnabled(filter.Id);
+        var action = new ToggleFilterEnabledAction(filter.Id);
 
-        var result = FilterPaneReducers.ReduceToggleFilterEnabled(state, action);
+        var result = Reducers.ReduceToggleFilterEnabled(state, action);
 
         Assert.True(result.Filters[0].IsEnabled);
     }
@@ -540,9 +540,9 @@ public sealed class FilterPaneReducerTests
     {
         var filter = FilterUtils.CreateTestFilter(isEnabled: true);
         var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterEnabled(FilterId.Create());
+        var action = new ToggleFilterEnabledAction(FilterId.Create());
 
-        var result = FilterPaneReducers.ReduceToggleFilterEnabled(state, action);
+        var result = Reducers.ReduceToggleFilterEnabled(state, action);
 
         Assert.True(result.Filters[0].IsEnabled);
     }
@@ -552,9 +552,9 @@ public sealed class FilterPaneReducerTests
     {
         var filter = FilterUtils.CreateTestFilter(isExcluded: false);
         var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterExcluded(filter.Id);
+        var action = new ToggleFilterExcludedAction(filter.Id);
 
-        var result = FilterPaneReducers.ReduceToggleFilterExcluded(state, action);
+        var result = Reducers.ReduceToggleFilterExcluded(state, action);
 
         Assert.True(result.Filters[0].IsExcluded);
     }
@@ -564,9 +564,9 @@ public sealed class FilterPaneReducerTests
     {
         var filter = FilterUtils.CreateTestFilter(isExcluded: false);
         var state = new FilterPaneState { Filters = [filter] };
-        var action = new FilterPaneAction.ToggleFilterExcluded(FilterId.Create());
+        var action = new ToggleFilterExcludedAction(FilterId.Create());
 
-        var result = FilterPaneReducers.ReduceToggleFilterExcluded(state, action);
+        var result = Reducers.ReduceToggleFilterExcluded(state, action);
 
         Assert.False(result.Filters[0].IsExcluded);
     }
@@ -576,7 +576,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState { IsEnabled = false };
 
-        var result = FilterPaneReducers.ReduceToggleIsEnabled(state);
+        var result = Reducers.ReduceToggleIsEnabled(state);
 
         Assert.True(result.IsEnabled);
     }
@@ -599,7 +599,7 @@ public sealed class FilterPaneIntegrationTests
             IsLoading = true
         };
 
-        state = FilterPaneReducers.ReduceClearFilters(state);
+        state = Reducers.ReduceClearFilters(state);
 
         Assert.Empty(state.Filters);
         Assert.Null(state.FilteredDateRange);
@@ -613,22 +613,22 @@ public sealed class FilterPaneIntegrationTests
         var state = new FilterPaneState();
 
         var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
-        state = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(filter));
+        state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter));
         Assert.Single(state.Filters);
 
-        state = FilterPaneReducers.ReduceToggleFilterEnabled(
+        state = Reducers.ReduceToggleFilterEnabled(
             state,
-            new FilterPaneAction.ToggleFilterEnabled(filter.Id));
+            new ToggleFilterEnabledAction(filter.Id));
 
         Assert.True(state.Filters[0].IsEnabled);
 
-        state = FilterPaneReducers.ReduceToggleFilterExcluded(
+        state = Reducers.ReduceToggleFilterExcluded(
             state,
-            new FilterPaneAction.ToggleFilterExcluded(filter.Id));
+            new ToggleFilterExcludedAction(filter.Id));
 
         Assert.True(state.Filters[0].IsExcluded);
 
-        state = FilterPaneReducers.ReduceRemoveFilter(state, new FilterPaneAction.RemoveFilter(filter.Id));
+        state = Reducers.ReduceRemoveFilter(state, new RemoveFilterAction(filter.Id));
         Assert.Empty(state.Filters);
     }
 
@@ -644,20 +644,20 @@ public sealed class FilterPaneIntegrationTests
             IsEnabled = true
         };
 
-        state = FilterPaneReducers.ReduceSetFilterDateRangeSuccess(
+        state = Reducers.ReduceSetFilterDateRangeSuccess(
             state,
-            new FilterPaneAction.SetFilterDateRangeSuccess(dateModel));
+            new SetFilterDateRangeSuccessAction(dateModel));
 
         Assert.NotNull(state.FilteredDateRange);
         Assert.True(state.FilteredDateRange.IsEnabled);
 
-        state = FilterPaneReducers.ReduceToggleFilterDate(state);
+        state = Reducers.ReduceToggleFilterDate(state);
         Assert.NotNull(state.FilteredDateRange);
         Assert.False(state.FilteredDateRange.IsEnabled);
 
-        state = FilterPaneReducers.ReduceSetFilterDateRangeSuccess(
+        state = Reducers.ReduceSetFilterDateRangeSuccess(
             state,
-            new FilterPaneAction.SetFilterDateRangeSuccess(null));
+            new SetFilterDateRangeSuccessAction(null));
 
         Assert.Null(state.FilteredDateRange);
     }
@@ -678,9 +678,9 @@ public sealed class FilterPaneIntegrationTests
             ]
         };
 
-        state = FilterPaneReducers.ReduceApplyFilterGroup(
+        state = Reducers.ReduceApplyFilterGroup(
             state,
-            new FilterPaneAction.ApplyFilterGroup(filterGroup));
+            new ApplyFilterGroupAction(filterGroup));
 
         Assert.Equal(3, state.Filters.Count);
         Assert.All(state.Filters, filter => Assert.True(filter.IsEnabled));
@@ -694,7 +694,7 @@ public sealed class FilterPaneIntegrationTests
         var state = new FilterPaneState { Filters = originalFilters };
 
         var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
-        var newState = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(newFilter));
+        var newState = Reducers.ReduceAddFilter(state, new AddFilterAction(newFilter));
 
         Assert.Single(state.Filters);
         Assert.Equal(2, newState.Filters.Count);
@@ -711,13 +711,13 @@ public sealed class FilterPaneIntegrationTests
 
         var filter3 = FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError);
 
-        state = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(filter1));
-        state = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(filter2));
-        state = FilterPaneReducers.ReduceAddFilter(state, new FilterPaneAction.AddFilter(filter3));
+        state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter1));
+        state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter2));
+        state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter3));
 
-        state = FilterPaneReducers.ReduceToggleFilterEnabled(
+        state = Reducers.ReduceToggleFilterEnabled(
             state,
-            new FilterPaneAction.ToggleFilterEnabled(filter2.Id));
+            new ToggleFilterEnabledAction(filter2.Id));
 
         Assert.False(state.Filters[0].IsEnabled);
         Assert.True(state.Filters[1].IsEnabled);
@@ -735,7 +735,7 @@ public sealed class FilterPaneIntegrationTests
             isEnabled: false,
             id: filter.Id);
 
-        state = FilterPaneReducers.ReduceSetFilter(state, new FilterPaneAction.SetFilter(updatedFilter));
+        state = Reducers.ReduceSetFilter(state, new SetFilterAction(updatedFilter));
 
         Assert.Single(state.Filters);
         Assert.Equal(Constants.FilterIdEquals200, state.Filters[0].ComparisonText);
@@ -751,11 +751,11 @@ public sealed class FilterPaneIntegrationTests
             IsLoading = false
         };
 
-        state = FilterPaneReducers.ReduceToggleIsEnabled(state);
+        state = Reducers.ReduceToggleIsEnabled(state);
         Assert.True(state.IsEnabled);
         Assert.False(state.IsLoading);
 
-        state = FilterPaneReducers.ReduceSetIsLoading(state, new FilterPaneAction.SetIsLoading(true));
+        state = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
         Assert.True(state.IsEnabled);
         Assert.True(state.IsLoading);
     }

@@ -10,26 +10,13 @@ namespace EventLogExpert.UI.Tests.Store.FilterCache;
 public sealed class FilterCacheStoreTests
 {
     [Fact]
-    public void FilterCacheAction_AddFavoriteFilter_ShouldStoreFilter()
-    {
-        // Arrange
-        var filter = Constants.FilterIdEquals100;
-
-        // Act
-        var action = new FilterCacheAction.AddFavoriteFilter(filter);
-
-        // Assert
-        Assert.Equal(filter, action.Filter);
-    }
-
-    [Fact]
     public void FilterCacheAction_AddFavoriteFilterCompleted_ShouldStoreFilters()
     {
         // Arrange
         var filters = ImmutableList.Create(Constants.FilterIdEquals100, Constants.FilterIdEquals200);
 
         // Act
-        var action = new FilterCacheAction.AddFavoriteFilterCompleted(filters);
+        var action = new AddFavoriteFilterCompletedAction(filters);
 
         // Assert
         Assert.Equal(2, action.Filters.Count);
@@ -38,13 +25,13 @@ public sealed class FilterCacheStoreTests
     }
 
     [Fact]
-    public void FilterCacheAction_AddRecentFilter_ShouldStoreFilter()
+    public void FilterCacheAction_AddFavoriteFilter_ShouldStoreFilter()
     {
         // Arrange
-        var filter = Constants.FilterLevelEqualsError;
+        var filter = Constants.FilterIdEquals100;
 
         // Act
-        var action = new FilterCacheAction.AddRecentFilter(filter);
+        var action = new AddFavoriteFilterAction(filter);
 
         // Assert
         Assert.Equal(filter, action.Filter);
@@ -57,10 +44,23 @@ public sealed class FilterCacheStoreTests
         var filters = ImmutableQueue.Create(Constants.FilterIdEquals100, Constants.FilterIdEquals200);
 
         // Act
-        var action = new FilterCacheAction.AddRecentFilterCompleted(filters);
+        var action = new AddRecentFilterCompletedAction(filters);
 
         // Assert
         Assert.Equal(2, action.Filters.Count());
+    }
+
+    [Fact]
+    public void FilterCacheAction_AddRecentFilter_ShouldStoreFilter()
+    {
+        // Arrange
+        var filter = Constants.FilterLevelEqualsError;
+
+        // Act
+        var action = new AddRecentFilterAction(filter);
+
+        // Assert
+        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]
@@ -70,7 +70,7 @@ public sealed class FilterCacheStoreTests
         var filters = new List<string> { Constants.FilterIdEquals100, Constants.FilterIdEquals200 };
 
         // Act
-        var action = new FilterCacheAction.ImportFavorites(filters);
+        var action = new ImportFavoritesAction(filters);
 
         // Assert
         Assert.Equal(2, action.Filters.Count);
@@ -84,7 +84,22 @@ public sealed class FilterCacheStoreTests
         var recent = ImmutableQueue.Create(Constants.FilterIdEquals200);
 
         // Act
-        var action = new FilterCacheAction.LoadFiltersCompleted(favorites, recent);
+        var action = new LoadFiltersCompletedAction(favorites, recent);
+
+        // Assert
+        Assert.Single(action.FavoriteFilters);
+        Assert.Single(action.RecentFilters);
+    }
+
+    [Fact]
+    public void FilterCacheAction_RemoveFavoriteFilterCompleted_ShouldStoreBothFilters()
+    {
+        // Arrange
+        var favorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var recent = ImmutableQueue.Create(Constants.FilterIdEquals200);
+
+        // Act
+        var action = new RemoveFavoriteFilterCompletedAction(favorites, recent);
 
         // Assert
         Assert.Single(action.FavoriteFilters);
@@ -98,25 +113,10 @@ public sealed class FilterCacheStoreTests
         var filter = Constants.FilterIdEquals100;
 
         // Act
-        var action = new FilterCacheAction.RemoveFavoriteFilter(filter);
+        var action = new RemoveFavoriteFilterAction(filter);
 
         // Assert
         Assert.Equal(filter, action.Filter);
-    }
-
-    [Fact]
-    public void FilterCacheAction_RemoveFavoriteFilterCompleted_ShouldStoreBothFilters()
-    {
-        // Arrange
-        var favorites = ImmutableList.Create(Constants.FilterIdEquals100);
-        var recent = ImmutableQueue.Create(Constants.FilterIdEquals200);
-
-        // Act
-        var action = new FilterCacheAction.RemoveFavoriteFilterCompleted(favorites, recent);
-
-        // Assert
-        Assert.Single(action.FavoriteFilters);
-        Assert.Single(action.RecentFilters);
     }
 
     [Fact]
@@ -139,9 +139,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add first favorite
         var favorites1 = ImmutableList.Create(Constants.FilterIdEquals100);
 
-        state = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(
+        state = Reducers.ReduceAddFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.AddFavoriteFilterCompleted(favorites1));
+            new AddFavoriteFilterCompletedAction(favorites1));
 
         // Assert
         Assert.Single(state.FavoriteFilters);
@@ -149,9 +149,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add second favorite
         var favorites2 = favorites1.Add(Constants.FilterIdEquals200);
 
-        state = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(
+        state = Reducers.ReduceAddFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.AddFavoriteFilterCompleted(favorites2));
+            new AddFavoriteFilterCompletedAction(favorites2));
 
         // Assert
         Assert.Equal(2, state.FavoriteFilters.Count);
@@ -168,9 +168,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add first recent
         var recent1 = ImmutableQueue.Create(Constants.FilterIdEquals100);
 
-        state = FilterCacheReducers.ReduceAddRecentFilterCompleted(
+        state = Reducers.ReduceAddRecentFilterCompleted(
             state,
-            new FilterCacheAction.AddRecentFilterCompleted(recent1));
+            new AddRecentFilterCompletedAction(recent1));
 
         // Assert
         Assert.Single(state.RecentFilters);
@@ -178,9 +178,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add second recent
         var recent2 = recent1.Enqueue(Constants.FilterIdEquals200);
 
-        state = FilterCacheReducers.ReduceAddRecentFilterCompleted(
+        state = Reducers.ReduceAddRecentFilterCompleted(
             state,
-            new FilterCacheAction.AddRecentFilterCompleted(recent2));
+            new AddRecentFilterCompletedAction(recent2));
 
         // Assert
         Assert.Equal(2, state.RecentFilters.Count());
@@ -200,9 +200,9 @@ public sealed class FilterCacheStoreTests
 
         var initialRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
 
-        state = FilterCacheReducers.ReduceLoadFiltersCompleted(
+        state = Reducers.ReduceLoadFiltersCompleted(
             state,
-            new FilterCacheAction.LoadFiltersCompleted(initialFavorites, initialRecent));
+            new LoadFiltersCompletedAction(initialFavorites, initialRecent));
 
         // Assert initial state
         Assert.Equal(2, state.FavoriteFilters.Count);
@@ -211,9 +211,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add new favorite
         var updatedFavorites = state.FavoriteFilters.Add(Constants.FilterIdGreaterThan100);
 
-        state = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(
+        state = Reducers.ReduceAddFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.AddFavoriteFilterCompleted(updatedFavorites));
+            new AddFavoriteFilterCompletedAction(updatedFavorites));
 
         // Assert
         Assert.Equal(3, state.FavoriteFilters.Count);
@@ -221,9 +221,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add new recent
         var updatedRecent = state.RecentFilters.Enqueue(Constants.FilterSourceContainsTest);
 
-        state = FilterCacheReducers.ReduceAddRecentFilterCompleted(
+        state = Reducers.ReduceAddRecentFilterCompleted(
             state,
-            new FilterCacheAction.AddRecentFilterCompleted(updatedRecent));
+            new AddRecentFilterCompletedAction(updatedRecent));
 
         // Assert
         Assert.Equal(2, state.RecentFilters.Count());
@@ -232,9 +232,9 @@ public sealed class FilterCacheStoreTests
         var finalFavorites = state.FavoriteFilters.Remove(Constants.FilterIdEquals100);
         var finalRecent = state.RecentFilters.Enqueue(Constants.FilterIdEquals100);
 
-        state = FilterCacheReducers.ReduceRemoveFavoriteFilterCompleted(
+        state = Reducers.ReduceRemoveFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.RemoveFavoriteFilterCompleted(finalFavorites, finalRecent));
+            new RemoveFavoriteFilterCompletedAction(finalFavorites, finalRecent));
 
         // Assert final state
         Assert.Equal(2, state.FavoriteFilters.Count);
@@ -253,9 +253,9 @@ public sealed class FilterCacheStoreTests
         var initialFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
         var initialRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
 
-        state = FilterCacheReducers.ReduceLoadFiltersCompleted(
+        state = Reducers.ReduceLoadFiltersCompleted(
             state,
-            new FilterCacheAction.LoadFiltersCompleted(initialFavorites, initialRecent));
+            new LoadFiltersCompletedAction(initialFavorites, initialRecent));
 
         // Assert
         Assert.Single(state.FavoriteFilters);
@@ -264,9 +264,9 @@ public sealed class FilterCacheStoreTests
         // Act - Add new favorite
         var updatedFavorites = state.FavoriteFilters.Add(Constants.FilterIdEquals200);
 
-        state = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(
+        state = Reducers.ReduceAddFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.AddFavoriteFilterCompleted(updatedFavorites));
+            new AddFavoriteFilterCompletedAction(updatedFavorites));
 
         // Assert
         Assert.Equal(2, state.FavoriteFilters.Count);
@@ -290,9 +290,9 @@ public sealed class FilterCacheStoreTests
         var updatedFavorites = state.FavoriteFilters.Remove(Constants.FilterIdEquals100);
         var updatedRecent = state.RecentFilters.Enqueue(Constants.FilterIdEquals100);
 
-        state = FilterCacheReducers.ReduceRemoveFavoriteFilterCompleted(
+        state = Reducers.ReduceRemoveFavoriteFilterCompleted(
             state,
-            new FilterCacheAction.RemoveFavoriteFilterCompleted(updatedFavorites, updatedRecent));
+            new RemoveFavoriteFilterCompletedAction(updatedFavorites, updatedRecent));
 
         // Assert
         Assert.Single(state.FavoriteFilters);
@@ -309,10 +309,10 @@ public sealed class FilterCacheStoreTests
         var existingRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
         var state = new FilterCacheState { RecentFilters = existingRecent };
         var favorites = ImmutableList.Create(Constants.FilterIdEquals100);
-        var action = new FilterCacheAction.AddFavoriteFilterCompleted(favorites);
+        var action = new AddFavoriteFilterCompletedAction(favorites);
 
         // Act
-        var newState = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(state, action);
+        var newState = Reducers.ReduceAddFavoriteFilterCompleted(state, action);
 
         // Assert
         Assert.Single(newState.FavoriteFilters);
@@ -326,10 +326,10 @@ public sealed class FilterCacheStoreTests
         // Arrange
         var state = new FilterCacheState();
         var filters = ImmutableList.Create(Constants.FilterIdEquals100, Constants.FilterIdEquals200);
-        var action = new FilterCacheAction.AddFavoriteFilterCompleted(filters);
+        var action = new AddFavoriteFilterCompletedAction(filters);
 
         // Act
-        var newState = FilterCacheReducers.ReduceAddFavoriteFilterCompleted(state, action);
+        var newState = Reducers.ReduceAddFavoriteFilterCompleted(state, action);
 
         // Assert
         Assert.Equal(2, newState.FavoriteFilters.Count);
@@ -344,10 +344,10 @@ public sealed class FilterCacheStoreTests
         var existingFavorites = ImmutableList.Create(Constants.FilterLevelEqualsError);
         var state = new FilterCacheState { FavoriteFilters = existingFavorites };
         var recent = ImmutableQueue.Create(Constants.FilterIdEquals100);
-        var action = new FilterCacheAction.AddRecentFilterCompleted(recent);
+        var action = new AddRecentFilterCompletedAction(recent);
 
         // Act
-        var newState = FilterCacheReducers.ReduceAddRecentFilterCompleted(state, action);
+        var newState = Reducers.ReduceAddRecentFilterCompleted(state, action);
 
         // Assert
         Assert.Single(newState.RecentFilters);
@@ -361,10 +361,10 @@ public sealed class FilterCacheStoreTests
         // Arrange
         var state = new FilterCacheState();
         var filters = ImmutableQueue.Create(Constants.FilterIdEquals100, Constants.FilterIdEquals200);
-        var action = new FilterCacheAction.AddRecentFilterCompleted(filters);
+        var action = new AddRecentFilterCompletedAction(filters);
 
         // Act
-        var newState = FilterCacheReducers.ReduceAddRecentFilterCompleted(state, action);
+        var newState = Reducers.ReduceAddRecentFilterCompleted(state, action);
 
         // Assert
         Assert.Equal(2, newState.RecentFilters.Count());
@@ -385,10 +385,10 @@ public sealed class FilterCacheStoreTests
 
         var newFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
         var newRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
-        var action = new FilterCacheAction.LoadFiltersCompleted(newFavorites, newRecent);
+        var action = new LoadFiltersCompletedAction(newFavorites, newRecent);
 
         // Act
-        var newState = FilterCacheReducers.ReduceLoadFiltersCompleted(state, action);
+        var newState = Reducers.ReduceLoadFiltersCompleted(state, action);
 
         // Assert
         Assert.Single(newState.FavoriteFilters);
@@ -404,10 +404,10 @@ public sealed class FilterCacheStoreTests
         var state = new FilterCacheState();
         var favorites = ImmutableList.Create(Constants.FilterIdEquals100, Constants.FilterIdEquals200);
         var recent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
-        var action = new FilterCacheAction.LoadFiltersCompleted(favorites, recent);
+        var action = new LoadFiltersCompletedAction(favorites, recent);
 
         // Act
-        var newState = FilterCacheReducers.ReduceLoadFiltersCompleted(state, action);
+        var newState = Reducers.ReduceLoadFiltersCompleted(state, action);
 
         // Assert
         Assert.Equal(2, newState.FavoriteFilters.Count);
@@ -429,10 +429,10 @@ public sealed class FilterCacheStoreTests
 
         var updatedFavorites = ImmutableList.Create(Constants.FilterIdEquals200);
         var updatedRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError, Constants.FilterIdEquals100);
-        var action = new FilterCacheAction.RemoveFavoriteFilterCompleted(updatedFavorites, updatedRecent);
+        var action = new RemoveFavoriteFilterCompletedAction(updatedFavorites, updatedRecent);
 
         // Act
-        var newState = FilterCacheReducers.ReduceRemoveFavoriteFilterCompleted(state, action);
+        var newState = Reducers.ReduceRemoveFavoriteFilterCompleted(state, action);
 
         // Assert
         Assert.Single(newState.FavoriteFilters);
@@ -447,12 +447,12 @@ public sealed class FilterCacheStoreTests
         var favorites = ImmutableList.Create(Constants.FilterIdEquals100);
         var state = new FilterCacheState { FavoriteFilters = favorites };
 
-        var action = new FilterCacheAction.RemoveFavoriteFilterCompleted(
+        var action = new RemoveFavoriteFilterCompletedAction(
             ImmutableList<string>.Empty,
             ImmutableQueue.Create(Constants.FilterIdEquals100));
 
         // Act
-        var newState = FilterCacheReducers.ReduceRemoveFavoriteFilterCompleted(state, action);
+        var newState = Reducers.ReduceRemoveFavoriteFilterCompleted(state, action);
 
         // Assert
         Assert.Empty(newState.FavoriteFilters);

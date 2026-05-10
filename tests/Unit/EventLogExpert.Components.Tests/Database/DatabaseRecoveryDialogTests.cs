@@ -1,12 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using AngleSharp.Dom;
+using AngleSharp.Html.Dom;
 using Bunit;
 using EventLogExpert.Components.Database;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -50,7 +54,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .Add(p => p.OnDismissed, () => Interlocked.Increment(ref _onDismissedCallCount)));
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         _databaseService.Entries.Returns([]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
@@ -73,8 +77,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .Add(p => p.OnDismissed, () => Interlocked.Increment(ref _onDismissedCallCount)));
 
         // Act
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new());
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         _bannerService.Received(1).ReportError(
@@ -98,17 +102,17 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        var applyClick = component.Find("button:contains('Apply')").ClickAsync(new());
+        var applyClick = component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        Assert.True(((AngleSharp.Html.Dom.IHtmlButtonElement)component.Find("button:contains('Apply')")).IsDisabled);
-        Assert.True(((AngleSharp.Html.Dom.IHtmlButtonElement)component.Find("button:contains('Cancel')")).IsDisabled);
-        Assert.True(((AngleSharp.Html.Dom.IHtmlButtonElement)component.Find("button.button:contains('Restore all')")).IsDisabled);
-        Assert.True(((AngleSharp.Html.Dom.IHtmlButtonElement)component.Find("button.button:contains('Delete all')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('Apply')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button:contains('Cancel')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('Restore all')")).IsDisabled);
+        Assert.True(((IHtmlButtonElement)component.Find("button.button:contains('Delete all')")).IsDisabled);
 
         foreach (var radio in component.FindAll("li.recovery-row input[type=radio]"))
         {
-            Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radio).IsDisabled);
+            Assert.True(((IHtmlInputElement)radio).IsDisabled);
         }
 
         pendingRestore.SetResult(true);
@@ -131,9 +135,9 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         // Act
         var bRow = component.FindAll("li.recovery-row")[1];
         var bDeleteRadio = bRow.QuerySelectorAll("input[type=radio]")[1];
-        await bDeleteRadio.ChangeAsync(new() { Value = "on" });
+        await bDeleteRadio.ChangeAsync(new ChangeEventArgs { Value = "on" });
 
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
@@ -154,7 +158,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .Add(p => p.OnDismissed, () => Interlocked.Increment(ref _onDismissedCallCount)));
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         _bannerService.Received(1).ReportError(
@@ -177,7 +181,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         _bannerService.DidNotReceive().ReportError(
@@ -201,7 +205,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         _bannerService.Received(1).ReportError(
@@ -223,8 +227,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new());
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         await _databaseService.Received(1).DeleteEntryWithBackupAsync(
@@ -246,7 +250,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         await _databaseService.Received(1).RestoreFromBackupAsync(
@@ -267,7 +271,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .Add(p => p.OnDismissed, () => Interlocked.Increment(ref _onDismissedCallCount)));
 
         // Act
-        await component.Find("button:contains('Cancel')").ClickAsync(new());
+        await component.Find("button:contains('Cancel')").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Equal(1, _onDismissedCallCount);
@@ -294,8 +298,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         {
             var radios = row.QuerySelectorAll("input[type=radio]");
             Assert.Equal(2, radios.Length);
-            Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radios[0]).IsChecked);
-            Assert.False(((AngleSharp.Html.Dom.IHtmlInputElement)radios[1]).IsChecked);
+            Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+            Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
         }
     }
 
@@ -309,14 +313,14 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         var component = Render<DatabaseRecoveryDialog>();
 
         // Act
-        await component.Find("button.button:contains('Delete all')").ClickAsync(new());
+        await component.Find("button.button:contains('Delete all')").ClickAsync(new MouseEventArgs());
 
         // Assert
         foreach (var row in component.FindAll("li.recovery-row"))
         {
             var radios = row.QuerySelectorAll("input[type=radio]");
-            Assert.False(((AngleSharp.Html.Dom.IHtmlInputElement)radios[0]).IsChecked);
-            Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radios[1]).IsChecked);
+            Assert.False(((IHtmlInputElement)radios[0]).IsChecked);
+            Assert.True(((IHtmlInputElement)radios[1]).IsChecked);
         }
     }
 
@@ -357,8 +361,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         Assert.Contains("b.db", newRow.TextContent);
 
         var radios = newRow.QuerySelectorAll("input[type=radio]");
-        Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radios[0]).IsChecked);
-        Assert.False(((AngleSharp.Html.Dom.IHtmlInputElement)radios[1]).IsChecked);
+        Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+        Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
 
         await Task.CompletedTask;
     }
@@ -375,7 +379,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
 
         var bRow = component.FindAll("li.recovery-row")[1];
         var bDeleteRadio = bRow.QuerySelectorAll("input[type=radio]")[1];
-        await bDeleteRadio.ChangeAsync(new() { Value = "on" });
+        await bDeleteRadio.ChangeAsync(new ChangeEventArgs { Value = "on" });
 
         // Act
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
@@ -388,8 +392,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         Assert.Contains("a.db", remainingRow.TextContent);
 
         var radios = remainingRow.QuerySelectorAll("input[type=radio]");
-        Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radios[0]).IsChecked);
-        Assert.False(((AngleSharp.Html.Dom.IHtmlInputElement)radios[1]).IsChecked);
+        Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+        Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
         Assert.Equal(0, _onDismissedCallCount);
     }
 
@@ -406,7 +410,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .Add(p => p.OnDismissed, () => Interlocked.Increment(ref _onDismissedCallCount)));
 
         // Act
-        var applyTask = component.Find("button:contains('Apply')").ClickAsync(new());
+        var applyTask = component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         await component.Find("dialog").TriggerEventAsync("oncancel", EventArgs.Empty);
 
@@ -430,7 +434,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
 
         var component = Render<DatabaseRecoveryDialog>();
 
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         Assert.Contains(
             "recovery-row-failed",
@@ -443,7 +447,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(true));
 
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.DoesNotContain(
@@ -503,18 +507,18 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         {
             var deleteRadio = component.FindAll("li.recovery-row")[rowIndex]
                 .QuerySelectorAll("input[type=radio]")[1];
-            await deleteRadio.ChangeAsync(new() { Value = "on" });
+            await deleteRadio.ChangeAsync(new ChangeEventArgs { Value = "on" });
         }
 
         // Act
-        await component.Find("button.button:contains('Restore all')").ClickAsync(new());
+        await component.Find("button.button:contains('Restore all')").ClickAsync(new MouseEventArgs());
 
         // Assert
         foreach (var row in component.FindAll("li.recovery-row"))
         {
             var radios = row.QuerySelectorAll("input[type=radio]");
-            Assert.True(((AngleSharp.Html.Dom.IHtmlInputElement)radios[0]).IsChecked);
-            Assert.False(((AngleSharp.Html.Dom.IHtmlInputElement)radios[1]).IsChecked);
+            Assert.True(((IHtmlInputElement)radios[0]).IsChecked);
+            Assert.False(((IHtmlInputElement)radios[1]).IsChecked);
         }
     }
 
@@ -543,7 +547,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         _databaseService.Entries.Returns(entriesAfter);
 
         // Act
-        await component.Find("button:contains('Apply')").ClickAsync(new());
+        await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
@@ -563,7 +567,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             DatabaseStatus.UpgradeRequired,
             BackupExists: backupExists);
 
-    private static AngleSharp.Dom.IElement FindRowByFileName(
+    private static IElement FindRowByFileName(
         IRenderedComponent<DatabaseRecoveryDialog> component,
         string fileName)
     {

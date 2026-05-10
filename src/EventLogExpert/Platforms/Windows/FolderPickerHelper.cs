@@ -10,9 +10,9 @@ namespace EventLogExpert.Platforms.Windows;
 public static class FolderPickerHelper
 {
     /// <summary>
-    ///     Presents the WinUI folder picker. Returns the selected folder's path, or <c>null</c> only when the
-    ///     user cancelled. Throws <see cref="InvalidOperationException"/> when no MAUI host window is available
-    ///     so callers can surface the broken-host condition instead of silently treating it as a cancel.
+    ///     Presents the WinUI folder picker. Returns the selected folder's path, or <c>null</c> only when the user
+    ///     cancelled. Throws <see cref="InvalidOperationException" /> when no MAUI host window is available so callers can
+    ///     surface the broken-host condition instead of silently treating it as a cancel.
     /// </summary>
     public static async Task<string?> PickFolderAsync()
     {

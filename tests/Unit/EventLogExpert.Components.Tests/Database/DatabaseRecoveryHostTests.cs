@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -115,7 +116,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         await component.InvokeAsync(() => _capturedRecoveryAction!());
 
         // Act
-        await component.Find("button:contains('Cancel')").ClickAsync(new());
+        await component.Find("button:contains('Cancel')").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Empty(component.FindAll("dialog"));

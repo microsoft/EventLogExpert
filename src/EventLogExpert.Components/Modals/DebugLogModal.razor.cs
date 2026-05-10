@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
@@ -165,7 +166,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
 
         try
         {
-            await FileSaveService.SaveAsync(suggestedFileName, FileSaveServiceFileTypes.Log, async stream =>
+            await FileSaveService.SaveAsync(suggestedFileName, FileSaveFileTypes.Log, async stream =>
             {
                 await using var writer = new StreamWriter(stream, leaveOpen: true);
 

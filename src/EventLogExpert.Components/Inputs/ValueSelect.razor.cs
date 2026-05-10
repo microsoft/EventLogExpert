@@ -27,6 +27,16 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     [Parameter] public string? DataHighlight { get; set; }
 
+    /// <summary>
+    ///     Text shown by a multi-select <see cref="ValueSelect{T}" /> when no values are selected. Defaults to "Empty";
+    ///     consumers should override with a domain-appropriate label such as "All" when an empty selection means "no filter
+    ///     applied".
+    /// </summary>
+    [Parameter]
+    public string EmptyText { get; set; } = "Empty";
+
+    public bool HasAnySelection => _selectedValues.Count > 0;
+
     public ValueSelectItem<T>? HighlightedItem
     {
         get => _highlightedItem;
@@ -44,14 +54,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     [Parameter]
     public bool IsMultiSelect { get; set; }
-
-    /// <summary>
-    /// Text shown by a multi-select <see cref="ValueSelect{T}"/> when no values are selected.
-    /// Defaults to "Empty"; consumers should override with a domain-appropriate label such as
-    /// "All" when an empty selection means "no filter applied".
-    /// </summary>
-    [Parameter]
-    public string EmptyText { get; set; } = "Empty";
 
     private string? DisplayString
     {
@@ -112,8 +114,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             // Expected during app shutdown
         }
     }
-
-    public bool HasAnySelection => _selectedValues.Count > 0;
 
     public bool IsItemSelected(T value) => _selectedValues.Contains(value);
 

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
@@ -32,7 +33,7 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
         {
             await FileSaveService.SaveAsync(
                 "Saved Groups",
-                FileSaveServiceFileTypes.Json,
+                FileSaveFileTypes.Json,
                 stream => JsonSerializer.SerializeAsync(stream, snapshot));
         }
         catch (Exception ex)
@@ -49,7 +50,7 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
         {
             var path = await FilePickerService.PickAsync(
                 "Please select a json file to import",
-                FilePickerServiceFileTypes.Json);
+                FilePickerFileTypes.Json);
 
             if (path is null) { return; }
 
@@ -58,7 +59,7 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
             if (groups is null) { return; }
 
-            Dispatcher.Dispatch(new FilterGroupAction.ImportGroups(groups));
+            Dispatcher.Dispatch(new ImportGroupsAction(groups));
         }
         catch (Exception ex)
         {
@@ -69,5 +70,5 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
     }
 
     private void CreateGroup() =>
-        Dispatcher.Dispatch(new FilterGroupAction.AddGroup(new FilterGroupModel { IsEditing = true }));
+        Dispatcher.Dispatch(new AddGroupAction(new FilterGroupModel { IsEditing = true }));
 }

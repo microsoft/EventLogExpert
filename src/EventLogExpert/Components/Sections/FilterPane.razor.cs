@@ -29,8 +29,6 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
-    [Inject] private IModalService ModalService { get; init; } = null!;
-
     private bool HasFilters =>
         IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
@@ -38,19 +36,21 @@ public sealed partial class FilterPane : IDisposable
 
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
+    [Inject] private IModalService ModalService { get; init; } = null!;
+
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     public void Dispose() => Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
 
     protected override void OnInitialized()
     {
-        SubscribeToAction<FilterPaneAction.ClearAllFilters>(action =>
+        SubscribeToAction<ClearAllFiltersAction>(action =>
         {
             _canEditDate = false;
             _pendingDrafts.Clear();
         });
 
-        SubscribeToAction<FilterPaneAction.SetFilterDateRangeSuccess>(action =>
+        SubscribeToAction<SetFilterDateRangeSuccessAction>(action =>
         {
             UpdateFilterDate(action.FilterDateModel);
         });
@@ -98,7 +98,7 @@ public sealed partial class FilterPane : IDisposable
     private void ApplyDateFilter()
     {
         Dispatcher.Dispatch(
-            new FilterPaneAction.SetFilterDateRange(
+            new SetFilterDateRangeAction(
                 new FilterDateModel
                 {
                     After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
@@ -133,16 +133,16 @@ public sealed partial class FilterPane : IDisposable
     private void HandlePendingSave(FilterDraftModel draft, FilterModel filter)
     {
         _pendingDrafts.Remove(draft);
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilter(filter));
+        Dispatcher.Dispatch(new SetFilterAction(filter));
     }
 
     private void RemoveDateFilter()
     {
         _canEditDate = false;
-        Dispatcher.Dispatch(new FilterPaneAction.SetFilterDateRange(null));
+        Dispatcher.Dispatch(new SetFilterDateRangeAction(null));
     }
 
-    private void ToggleDateFilter() => Dispatcher.Dispatch(new FilterPaneAction.ToggleFilterDate());
+    private void ToggleDateFilter() => Dispatcher.Dispatch(new ToggleFilterDateAction());
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 

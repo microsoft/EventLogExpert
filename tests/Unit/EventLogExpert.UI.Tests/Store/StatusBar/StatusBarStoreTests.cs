@@ -31,7 +31,7 @@ public sealed class StatusBarActionTests
     public void ClearStatusAction_ShouldCreateAction()
     {
         var activityId = Guid.NewGuid();
-        var action = new StatusBarAction.ClearStatus(activityId);
+        var action = new ClearStatusAction(activityId);
 
         Assert.Equal(activityId, action.ActivityId);
     }
@@ -39,7 +39,7 @@ public sealed class StatusBarActionTests
     [Fact]
     public void CloseAllAction_ShouldCreateAction()
     {
-        var action = new StatusBarAction.CloseAll();
+        var action = new CloseAllAction();
 
         Assert.NotNull(action);
     }
@@ -50,7 +50,7 @@ public sealed class StatusBarActionTests
         var activityId = Guid.NewGuid();
         var count = 100;
         var failedCount = 5;
-        var action = new StatusBarAction.SetEventsLoading(activityId, count, failedCount);
+        var action = new SetEventsLoadingAction(activityId, count, failedCount);
 
         Assert.Equal(activityId, action.ActivityId);
         Assert.Equal(count, action.Count);
@@ -61,7 +61,7 @@ public sealed class StatusBarActionTests
     public void SetResolverStatusAction_ShouldCreateAction()
     {
         var status = "Resolving events...";
-        var action = new StatusBarAction.SetResolverStatus(status);
+        var action = new SetResolverStatusAction(status);
 
         Assert.Equal(status, action.ResolverStatus);
     }
@@ -73,9 +73,9 @@ public sealed class StatusBarReducerTests
     public void ReduceClearStatus_WithEmptyState_ShouldReturnEmptyState()
     {
         var state = new StatusBarState();
-        var action = new StatusBarAction.ClearStatus(Guid.NewGuid());
+        var action = new ClearStatusAction(Guid.NewGuid());
 
-        var result = StatusBarReducers.ReduceClearStatus(state, action);
+        var result = Reducers.ReduceClearStatus(state, action);
 
         Assert.Empty(result.EventsLoading);
     }
@@ -90,9 +90,9 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
-        var action = new StatusBarAction.ClearStatus(activityId);
+        var action = new ClearStatusAction(activityId);
 
-        var result = StatusBarReducers.ReduceClearStatus(state, action);
+        var result = Reducers.ReduceClearStatus(state, action);
 
         Assert.Empty(result.EventsLoading);
     }
@@ -108,9 +108,9 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(existingActivityId, (100, 5))
         };
 
-        var action = new StatusBarAction.ClearStatus(nonExistingActivityId);
+        var action = new ClearStatusAction(nonExistingActivityId);
 
-        var result = StatusBarReducers.ReduceClearStatus(state, action);
+        var result = Reducers.ReduceClearStatus(state, action);
 
         Assert.Single(result.EventsLoading);
         Assert.True(result.EventsLoading.ContainsKey(existingActivityId));
@@ -127,7 +127,7 @@ public sealed class StatusBarReducerTests
             ResolverStatus = "Processing..."
         };
 
-        var result = StatusBarReducers.ReduceCloseAll(state);
+        var result = Reducers.ReduceCloseAll(state);
 
         Assert.Empty(result.EventsLoading);
         Assert.Equal(string.Empty, result.ResolverStatus);
@@ -143,9 +143,9 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (50, 2))
         };
 
-        var action = new StatusBarAction.SetEventsLoading(activityId, 100, 5);
+        var action = new SetEventsLoadingAction(activityId, 100, 5);
 
-        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+        var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Single(result.EventsLoading);
         Assert.Equal((100, 5), result.EventsLoading[activityId]);
@@ -165,9 +165,9 @@ public sealed class StatusBarReducerTests
                 .Add(activityId2, (200, 10))
         };
 
-        var action = new StatusBarAction.SetEventsLoading(activityId3, 300, 15);
+        var action = new SetEventsLoadingAction(activityId3, 300, 15);
 
-        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+        var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Equal(3, result.EventsLoading.Count);
         Assert.True(result.EventsLoading.ContainsKey(activityId1));
@@ -180,9 +180,9 @@ public sealed class StatusBarReducerTests
     {
         var state = new StatusBarState();
         var activityId = Guid.NewGuid();
-        var action = new StatusBarAction.SetEventsLoading(activityId, 100, 5);
+        var action = new SetEventsLoadingAction(activityId, 100, 5);
 
-        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+        var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Single(result.EventsLoading);
         Assert.True(result.EventsLoading.ContainsKey(activityId));
@@ -199,9 +199,9 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
-        var action = new StatusBarAction.SetEventsLoading(activityId, 100, 5);
+        var action = new SetEventsLoadingAction(activityId, 100, 5);
 
-        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+        var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Same(state, result);
     }
@@ -216,9 +216,9 @@ public sealed class StatusBarReducerTests
             EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
-        var action = new StatusBarAction.SetEventsLoading(activityId, 0, 0);
+        var action = new SetEventsLoadingAction(activityId, 0, 0);
 
-        var result = StatusBarReducers.ReduceSetEventsLoading(state, action);
+        var result = Reducers.ReduceSetEventsLoading(state, action);
 
         Assert.Empty(result.EventsLoading);
     }
@@ -228,9 +228,9 @@ public sealed class StatusBarReducerTests
     {
         var state = new StatusBarState { ResolverStatus = "Old status" };
         var newStatus = "New status";
-        var action = new StatusBarAction.SetResolverStatus(newStatus);
+        var action = new SetResolverStatusAction(newStatus);
 
-        var result = StatusBarReducers.ReduceSetResolverStatus(state, action);
+        var result = Reducers.ReduceSetResolverStatus(state, action);
 
         Assert.Equal(newStatus, result.ResolverStatus);
     }
@@ -240,9 +240,9 @@ public sealed class StatusBarReducerTests
     {
         var state = new StatusBarState();
         var status = "Resolving 50 events...";
-        var action = new StatusBarAction.SetResolverStatus(status);
+        var action = new SetResolverStatusAction(status);
 
-        var result = StatusBarReducers.ReduceSetResolverStatus(state, action);
+        var result = Reducers.ReduceSetResolverStatus(state, action);
 
         Assert.Equal(status, result.ResolverStatus);
     }
@@ -251,9 +251,9 @@ public sealed class StatusBarReducerTests
     public void ReduceSetResolverStatus_WithEmptyString_ShouldClearStatus()
     {
         var state = new StatusBarState { ResolverStatus = "Processing..." };
-        var action = new StatusBarAction.SetResolverStatus(string.Empty);
+        var action = new SetResolverStatusAction(string.Empty);
 
-        var result = StatusBarReducers.ReduceSetResolverStatus(state, action);
+        var result = Reducers.ReduceSetResolverStatus(state, action);
 
         Assert.Equal(string.Empty, result.ResolverStatus);
     }
@@ -267,30 +267,30 @@ public sealed class StatusBarIntegrationTests
         var state = new StatusBarState();
         var activityId = Guid.NewGuid();
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 100, 0));
+            new SetEventsLoadingAction(activityId, 100, 0));
 
         Assert.Single(state.EventsLoading);
         Assert.Equal((100, 0), state.EventsLoading[activityId]);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 75, 2));
+            new SetEventsLoadingAction(activityId, 75, 2));
 
         Assert.Single(state.EventsLoading);
         Assert.Equal((75, 2), state.EventsLoading[activityId]);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 50, 5));
+            new SetEventsLoadingAction(activityId, 50, 5));
 
         Assert.Single(state.EventsLoading);
         Assert.Equal((50, 5), state.EventsLoading[activityId]);
 
-        state = StatusBarReducers.ReduceClearStatus(
+        state = Reducers.ReduceClearStatus(
             state,
-            new StatusBarAction.ClearStatus(activityId));
+            new ClearStatusAction(activityId));
 
         Assert.Empty(state.EventsLoading);
     }
@@ -309,7 +309,7 @@ public sealed class StatusBarIntegrationTests
                 .Add(activity2, (200, 10))
         };
 
-        state = StatusBarReducers.ReduceClearStatus(state, new StatusBarAction.ClearStatus(nonExisting));
+        state = Reducers.ReduceClearStatus(state, new ClearStatusAction(nonExisting));
 
         Assert.Equal(2, state.EventsLoading.Count);
         Assert.True(state.EventsLoading.ContainsKey(activity1));
@@ -328,7 +328,7 @@ public sealed class StatusBarIntegrationTests
             ResolverStatus = "Processing multiple activities..."
         };
 
-        state = StatusBarReducers.ReduceCloseAll(state);
+        state = Reducers.ReduceCloseAll(state);
 
         Assert.Empty(state.EventsLoading);
         Assert.Equal(string.Empty, state.ResolverStatus);
@@ -340,22 +340,22 @@ public sealed class StatusBarIntegrationTests
         var state = new StatusBarState();
         var activityId = Guid.NewGuid();
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 100, 0));
+            new SetEventsLoadingAction(activityId, 100, 0));
 
         Assert.Single(state.EventsLoading);
 
-        state = StatusBarReducers.ReduceSetResolverStatus(
+        state = Reducers.ReduceSetResolverStatus(
             state,
-            new StatusBarAction.SetResolverStatus("Resolving events..."));
+            new SetResolverStatusAction("Resolving events..."));
 
         Assert.Equal("Resolving events...", state.ResolverStatus);
         Assert.Empty(state.EventsLoading);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 0, 0));
+            new SetEventsLoadingAction(activityId, 0, 0));
 
         Assert.Empty(state.EventsLoading);
         Assert.Equal("Resolving events...", state.ResolverStatus);
@@ -368,26 +368,26 @@ public sealed class StatusBarIntegrationTests
         var activity1 = Guid.NewGuid();
         var activity2 = Guid.NewGuid();
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity1, 100, 0));
+            new SetEventsLoadingAction(activity1, 100, 0));
 
         Assert.Single(state.EventsLoading);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity2, 200, 5));
+            new SetEventsLoadingAction(activity2, 200, 5));
 
         Assert.Equal(2, state.EventsLoading.Count);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity1, 50, 0));
+            new SetEventsLoadingAction(activity1, 50, 0));
 
         Assert.Equal(2, state.EventsLoading.Count);
         Assert.Equal((50, 0), state.EventsLoading[activity1]);
 
-        state = StatusBarReducers.ReduceClearStatus(state, new StatusBarAction.ClearStatus(activity1));
+        state = Reducers.ReduceClearStatus(state, new ClearStatusAction(activity1));
         Assert.Single(state.EventsLoading);
         Assert.True(state.EventsLoading.ContainsKey(activity2));
     }
@@ -400,17 +400,17 @@ public sealed class StatusBarIntegrationTests
         var activity2 = Guid.NewGuid();
         var activity3 = Guid.NewGuid();
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity1, 100, 0));
+            new SetEventsLoadingAction(activity1, 100, 0));
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity2, 200, 10));
+            new SetEventsLoadingAction(activity2, 200, 10));
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activity3, 150, 5));
+            new SetEventsLoadingAction(activity3, 150, 5));
 
         Assert.Equal(3, state.EventsLoading.Count);
         Assert.Equal((100, 0), state.EventsLoading[activity1]);
@@ -424,23 +424,23 @@ public sealed class StatusBarIntegrationTests
         var state = new StatusBarState();
         var activityId = Guid.NewGuid();
 
-        state = StatusBarReducers.ReduceSetResolverStatus(
+        state = Reducers.ReduceSetResolverStatus(
             state,
-            new StatusBarAction.SetResolverStatus("Starting resolution..."));
+            new SetResolverStatusAction("Starting resolution..."));
 
         Assert.Equal("Starting resolution...", state.ResolverStatus);
         Assert.Empty(state.EventsLoading);
 
-        state = StatusBarReducers.ReduceSetEventsLoading(
+        state = Reducers.ReduceSetEventsLoading(
             state,
-            new StatusBarAction.SetEventsLoading(activityId, 100, 0));
+            new SetEventsLoadingAction(activityId, 100, 0));
 
         Assert.Equal("Starting resolution...", state.ResolverStatus);
         Assert.Single(state.EventsLoading);
 
-        state = StatusBarReducers.ReduceSetResolverStatus(
+        state = Reducers.ReduceSetResolverStatus(
             state,
-            new StatusBarAction.SetResolverStatus("Resolution in progress..."));
+            new SetResolverStatusAction("Resolution in progress..."));
 
         Assert.Equal("Resolution in progress...", state.ResolverStatus);
         Assert.Empty(state.EventsLoading);

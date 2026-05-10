@@ -144,9 +144,8 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Override in derived classes to provide a supplemental ProviderDetails
-    ///     when the primary source (MTA/DB) has partial coverage for a provider.
-    ///     Called only when the primary provider exists but couldn't match the event.
+    ///     Override in derived classes to provide a supplemental ProviderDetails when the primary source (MTA/DB) has
+    ///     partial coverage for a provider. Called only when the primary provider exists but couldn't match the event.
     /// </summary>
     protected virtual ProviderDetails? TryGetSupplementalDetails(EventRecord eventRecord) => null;
 
@@ -249,9 +248,8 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Disambiguate multiple legacy messages for the same event ID. Tries Qualifier match
-    ///     (high 16 bits of RawId), then LogLink, then severity. Returns null when the set is
-    ///     empty or remains ambiguous after all checks.
+    ///     Disambiguate multiple legacy messages for the same event ID. Tries Qualifier match (high 16 bits of RawId),
+    ///     then LogLink, then severity. Returns null when the set is empty or remains ambiguous after all checks.
     /// </summary>
     private static MessageModel? TryDisambiguateLegacyMessage(EventRecord eventRecord, IReadOnlyList<MessageModel> legacyMessages)
     {
@@ -374,10 +372,9 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Counts the number of "visible" template properties by excluding length-prefixed
-    ///     binary data length fields. When a &lt;data&gt; element has a <c>length</c> attribute
-    ///     referencing another &lt;data&gt; element's <c>name</c>, Windows consumes the referenced
-    ///     length field internally and does not surface it as a user property via EvtRender.
+    ///     Counts the number of "visible" template properties by excluding length-prefixed binary data length fields.
+    ///     When a &lt;data&gt; element has a <c>length</c> attribute referencing another &lt;data&gt; element's <c>name</c>,
+    ///     Windows consumes the referenced length field internally and does not surface it as a user property via EvtRender.
     /// </summary>
     private int CountVisibleTemplateProperties(ReadOnlySpan<char> template)
     {
@@ -494,10 +491,9 @@ public partial class EventResolverBase : IDisposable
         };
 
     /// <summary>
-    ///     Relaxed template match for exact Id+Version+LogName matches only.
-    ///     Allows the template to have exactly 1 more data node than the event
-    ///     has properties, which handles version mismatches where the manifest
-    ///     added an optional field in a newer version.
+    ///     Relaxed template match for exact Id+Version+LogName matches only. Allows the template to have exactly 1 more
+    ///     data node than the event has properties, which handles version mismatches where the manifest added an optional
+    ///     field in a newer version.
     /// </summary>
     private bool DoesTemplateApproximatelyMatchPropertyCount(ReadOnlySpan<char> template, int eventPropertyCount)
     {
@@ -1107,10 +1103,9 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Picks the parameter table for %%n substitutions, biased toward whichever provider
-    ///     supplied the description text. When <paramref name="descriptionFromSupplemental"/>
-    ///     is true, prefer supplemental's parameters and fall back to primary; otherwise prefer
-    ///     primary and fall back to supplemental (lazily loading it when not yet available).
+    ///     Picks the parameter table for %%n substitutions, biased toward whichever provider supplied the description
+    ///     text. When <paramref name="descriptionFromSupplemental" /> is true, prefer supplemental's parameters and fall back
+    ///     to primary; otherwise prefer primary and fall back to supplemental (lazily loading it when not yet available).
     /// </summary>
     private IEnumerable<MessageModel> GetParametersForDescription(
         ProviderDetails? primary,
@@ -1134,9 +1129,9 @@ public partial class EventResolverBase : IDisposable
     }
 
     /// <summary>
-    ///     Returns the outType values for only visible template properties, excluding hidden
-    ///     length-provider fields that Windows consumes internally. This ensures the outType
-    ///     array aligns correctly with the properties surfaced by EvtRender.
+    ///     Returns the outType values for only visible template properties, excluding hidden length-provider fields that
+    ///     Windows consumes internally. This ensures the outType array aligns correctly with the properties surfaced by
+    ///     EvtRender.
     /// </summary>
     private string[] GetVisibleTemplateOutTypes(ReadOnlySpan<char> template)
     {

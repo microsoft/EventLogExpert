@@ -62,9 +62,10 @@ public class ProviderDetails
         return _eventsByIdLookup.TryGetValue(id, out var list) ? list : [];
     }
 
-    /// <summary>Gets messages matching the given ShortId using a pre-built lookup dictionary.
-    /// The lookup uses int keys derived from unsigned reinterpretation of ShortId,
-    /// matching the implicit ushort-to-int promotion used by callers.</summary>
+    /// <summary>
+    ///     Gets messages matching the given ShortId using a pre-built lookup dictionary. The lookup uses int keys derived
+    ///     from unsigned reinterpretation of ShortId, matching the implicit ushort-to-int promotion used by callers.
+    /// </summary>
     internal IReadOnlyList<MessageModel> GetMessagesByShortId(int shortId)
     {
         _messagesByShortIdLookup ??= BuildMessagesByShortIdLookup();

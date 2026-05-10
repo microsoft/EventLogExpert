@@ -13,4 +13,9 @@
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert" />
+    <InternalsVisibleTo Include="EventLogExpert.UI.Tests" />
+  </ItemGroup>
+
 </Project>

@@ -110,20 +110,6 @@ public sealed class EventResolverLocalProviderTests
     }
 
     [Fact]
-    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var resolver = new EventResolver();
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver.Dispose();
-
-        // Assert
-        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
     public void Dispose_ThenLoadProviderDetails_ShouldThrowObjectDisposedException()
     {
         // Arrange
@@ -138,88 +124,17 @@ public sealed class EventResolverLocalProviderTests
     }
 
     [Fact]
-    public void MultipleResolvers_WithDifferentInstances_ShouldResolveSeparately()
-    {
-        // Arrange
-        var resolver1 = new EventResolver();
-        var resolver2 = new EventResolver();
-
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver1.LoadProviderDetails(eventRecord);
-        resolver2.LoadProviderDetails(eventRecord);
-        var displayEvent1 = resolver1.ResolveEvent(eventRecord);
-        var displayEvent2 = resolver2.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent1);
-        Assert.NotNull(displayEvent2);
-        Assert.Equal(displayEvent1.Source, displayEvent2.Source);
-    }
-
-    [Fact]
-    public void MultipleResolvers_WithSharedCache_ShouldShareCachedStrings()
-    {
-        // Arrange
-        var sharedCache = new EventResolverCache();
-        var resolver1 = new EventResolver(cache: sharedCache);
-        var resolver2 = new EventResolver(cache: sharedCache);
-
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver1.LoadProviderDetails(eventRecord);
-        var displayEvent1 = resolver1.ResolveEvent(eventRecord);
-
-        resolver2.LoadProviderDetails(eventRecord);
-        var displayEvent2 = resolver2.ResolveEvent(eventRecord);
-
-        // Assert
-        Assert.NotNull(displayEvent1);
-        Assert.NotNull(displayEvent2);
-        // With shared cache, string values should be the same reference
-        Assert.Same(displayEvent1.ComputerName, displayEvent2.ComputerName);
-        Assert.Same(displayEvent1.LogName, displayEvent2.LogName);
-        Assert.Same(displayEvent1.Source, displayEvent2.Source);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithMultipleProviders_ShouldResolveEachCorrectly()
-    {
-        // Arrange
-        var resolver = new EventResolver();
-        var eventRecords = EventUtils.CreateDifferentEvents().ToList();
-
-        // Act
-        resolver.LoadProviderDetails(eventRecords[0]);
-        resolver.LoadProviderDetails(eventRecords[1]);
-        var displayEvent1 = resolver.ResolveEvent(eventRecords[0]);
-        var displayEvent2 = resolver.ResolveEvent(eventRecords[1]);
-
-        // Assert
-        Assert.NotNull(displayEvent1);
-        Assert.NotNull(displayEvent2);
-        Assert.Equal(Constants.ApplicationLogName, displayEvent1.LogName);
-        Assert.Equal(Constants.SystemLogName, displayEvent2.LogName);
-        Assert.NotEqual(displayEvent1.ComputerName, displayEvent2.ComputerName);
-    }
-
-    [Fact]
-    public void ResolveEvent_WithoutCallingLoadProviderDetails_ShouldStillResolve()
+    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
     {
         // Arrange
         var resolver = new EventResolver();
         var eventRecord = EventUtils.CreateBasicEvent();
 
         // Act
-        var displayEvent = resolver.ResolveEvent(eventRecord);
+        resolver.Dispose();
 
         // Assert
-        Assert.NotNull(displayEvent);
-        Assert.Equal(eventRecord.Id, displayEvent.Id);
-        Assert.Equal(eventRecord.ComputerName, displayEvent.ComputerName);
-        Assert.NotNull(displayEvent.Description);
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
     }
 
     [Fact]
@@ -455,5 +370,90 @@ public sealed class EventResolverLocalProviderTests
         Assert.NotNull(displayEvent.Description);
         // Non-existent providers should get a default description
         Assert.Contains("No matching", displayEvent.Description);
+    }
+
+    [Fact]
+    public void MultipleResolvers_WithDifferentInstances_ShouldResolveSeparately()
+    {
+        // Arrange
+        var resolver1 = new EventResolver();
+        var resolver2 = new EventResolver();
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver1.LoadProviderDetails(eventRecord);
+        resolver2.LoadProviderDetails(eventRecord);
+        var displayEvent1 = resolver1.ResolveEvent(eventRecord);
+        var displayEvent2 = resolver2.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent1);
+        Assert.NotNull(displayEvent2);
+        Assert.Equal(displayEvent1.Source, displayEvent2.Source);
+    }
+
+    [Fact]
+    public void MultipleResolvers_WithSharedCache_ShouldShareCachedStrings()
+    {
+        // Arrange
+        var sharedCache = new EventResolverCache();
+        var resolver1 = new EventResolver(cache: sharedCache);
+        var resolver2 = new EventResolver(cache: sharedCache);
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver1.LoadProviderDetails(eventRecord);
+        var displayEvent1 = resolver1.ResolveEvent(eventRecord);
+
+        resolver2.LoadProviderDetails(eventRecord);
+        var displayEvent2 = resolver2.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent1);
+        Assert.NotNull(displayEvent2);
+        // With shared cache, string values should be the same reference
+        Assert.Same(displayEvent1.ComputerName, displayEvent2.ComputerName);
+        Assert.Same(displayEvent1.LogName, displayEvent2.LogName);
+        Assert.Same(displayEvent1.Source, displayEvent2.Source);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithMultipleProviders_ShouldResolveEachCorrectly()
+    {
+        // Arrange
+        var resolver = new EventResolver();
+        var eventRecords = EventUtils.CreateDifferentEvents().ToList();
+
+        // Act
+        resolver.LoadProviderDetails(eventRecords[0]);
+        resolver.LoadProviderDetails(eventRecords[1]);
+        var displayEvent1 = resolver.ResolveEvent(eventRecords[0]);
+        var displayEvent2 = resolver.ResolveEvent(eventRecords[1]);
+
+        // Assert
+        Assert.NotNull(displayEvent1);
+        Assert.NotNull(displayEvent2);
+        Assert.Equal(Constants.ApplicationLogName, displayEvent1.LogName);
+        Assert.Equal(Constants.SystemLogName, displayEvent2.LogName);
+        Assert.NotEqual(displayEvent1.ComputerName, displayEvent2.ComputerName);
+    }
+
+    [Fact]
+    public void ResolveEvent_WithoutCallingLoadProviderDetails_ShouldStillResolve()
+    {
+        // Arrange
+        var resolver = new EventResolver();
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        var displayEvent = resolver.ResolveEvent(eventRecord);
+
+        // Assert
+        Assert.NotNull(displayEvent);
+        Assert.Equal(eventRecord.Id, displayEvent.Id);
+        Assert.Equal(eventRecord.ComputerName, displayEvent.ComputerName);
+        Assert.NotNull(displayEvent.Description);
     }
 }

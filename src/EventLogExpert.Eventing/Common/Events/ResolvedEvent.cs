@@ -42,10 +42,10 @@ public sealed record ResolvedEvent(
     public SecurityIdentifier? UserId { get; init; }
 
     /// <summary>
-    ///     Pre-rendered XML for the event. Populated by <c>EventLogReader</c> only when the
-    ///     log is opened with <c>renderXml: true</c> (currently driven by the presence of an
-    ///     applied filter that references this property). When empty, callers should use
-    ///     <see cref="EventLogExpert.Eventing.Resolvers.IEventXmlResolver" /> to fetch the XML on demand.
+    ///     Pre-rendered XML for the event. Populated by <c>EventLogReader</c> only when the log is opened with
+    ///     <c>renderXml: true</c> (currently driven by the presence of an applied filter that references this property). When
+    ///     empty, callers should use <see cref="EventLogExpert.Eventing.Resolvers.IEventXmlResolver" /> to fetch the XML on
+    ///     demand.
     /// </summary>
     public string Xml { get; init; } = string.Empty;
 }

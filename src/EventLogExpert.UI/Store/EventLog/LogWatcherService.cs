@@ -9,15 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.Store.EventLog;
 
-public interface ILogWatcherService
-{
-    void AddLog(string logName, string? bookmark, bool renderXml = false);
-
-    Task RemoveAllAsync();
-
-    Task RemoveLogAsync(string logName);
-}
-
 public sealed class LogWatcherService : ILogWatcherService
 {
     private readonly Dictionary<string, string?> _bookmarks = [];
@@ -190,7 +181,7 @@ public sealed class LogWatcherService : ILogWatcherService
                 return;
             }
 
-            _dispatcher.Dispatch(new EventLogAction.AddEvent(eventResolver.ResolveEvent(eventArgs)));
+            _dispatcher.Dispatch(new AddEventAction(eventResolver.ResolveEvent(eventArgs)));
         };
 
         // When the watcher is enabled, it reads all the events since the

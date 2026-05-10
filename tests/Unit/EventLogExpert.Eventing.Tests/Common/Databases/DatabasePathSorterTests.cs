@@ -50,6 +50,19 @@ public sealed class DatabasePathSorterTests
     }
 
     [Fact]
+    public void Sort_WithFileNamesOnly_PreservesNames()
+    {
+        var fileNames = new[] { "Exchange 2019.db", "Exchange 2016.db", "Windows 2019.db" };
+
+        var sorted = DatabasePathSorter.Sort(fileNames);
+
+        Assert.Equal(3, sorted.Count);
+        Assert.Equal("Exchange 2019.db", sorted[0]);
+        Assert.Equal("Exchange 2016.db", sorted[1]);
+        Assert.Equal("Windows 2019.db", sorted[2]);
+    }
+
+    [Fact]
     public void Sort_WithMixedVersionsAndNoVersions_ShouldSortCorrectly()
     {
         var databases = new[]
@@ -134,18 +147,5 @@ public sealed class DatabasePathSorterTests
 
         Assert.Single(sorted);
         Assert.Equal(@"C:\Test\Windows 2019.db", sorted[0]);
-    }
-
-    [Fact]
-    public void Sort_WithFileNamesOnly_PreservesNames()
-    {
-        var fileNames = new[] { "Exchange 2019.db", "Exchange 2016.db", "Windows 2019.db" };
-
-        var sorted = DatabasePathSorter.Sort(fileNames);
-
-        Assert.Equal(3, sorted.Count);
-        Assert.Equal("Exchange 2019.db", sorted[0]);
-        Assert.Equal("Exchange 2016.db", sorted[1]);
-        Assert.Equal("Windows 2019.db", sorted[2]);
     }
 }

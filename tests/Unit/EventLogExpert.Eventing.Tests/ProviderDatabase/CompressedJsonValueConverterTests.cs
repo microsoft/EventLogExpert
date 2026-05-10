@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Tests.TestUtils;
+using System.Text;
 using System.Text.Json;
 
 namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
@@ -66,7 +67,7 @@ public sealed class CompressedJsonValueConverterTests
         var largeData = CompressionTestUtils.CreateLargeTestData();
 
         var uncompressedJson = JsonSerializer.Serialize(largeData);
-        var uncompressedBytes = System.Text.Encoding.UTF8.GetBytes(uncompressedJson);
+        var uncompressedBytes = Encoding.UTF8.GetBytes(uncompressedJson);
 
         // Act
         var compressed = CompressedJsonValueConverter<CompressionTestData>.ConvertToCompressedJson(largeData);

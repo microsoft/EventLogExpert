@@ -7,7 +7,6 @@ using EventLogExpert.Services;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterCache;
@@ -56,9 +55,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _activeLogs.SelectedValueChanged += OnActiveLogsChanged;
         _settings.ThemeChanged += OnThemeChanged;
 
-        fluxorDispatcher.Dispatch(new EventTableAction.LoadColumns());
-        fluxorDispatcher.Dispatch(new FilterCacheAction.LoadFilters());
-        fluxorDispatcher.Dispatch(new FilterGroupAction.LoadGroups());
+        fluxorDispatcher.Dispatch(new LoadColumnsAction());
+        fluxorDispatcher.Dispatch(new LoadFiltersAction());
+        fluxorDispatcher.Dispatch(new LoadGroupsAction());
 
         _ = ProcessCommandLine();
     }

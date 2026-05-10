@@ -18,6 +18,8 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     private InlineAlertEntry? _activeInlineAlert;
     private long _modalId;
 
+    [Inject] internal IInlineAlertHostBroker InlineAlertHostBroker { get; init; } = null!;
+
     [Inject] internal IModalService ModalService { get; init; } = null!;
 
     /// <summary>Bound by concrete modals via <c>@ref</c> on their <see cref="ModalChrome" />.</summary>
@@ -66,17 +68,6 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         return tcs.Task;
     }
 
-    // Route Esc/native-close through OnCancelAsync so all close paths share the same pipeline.
-    // Protected so derived modals' .razor markup can wire OnDialogClosedByUser="HandleDialogClosedByUserAsync"
-    // even when the derived class lives in a different assembly than ModalBase.
-    protected Task HandleDialogClosedByUserAsync() => OnCancelAsync();
-
-    protected Task HandleInlineAlertResolvedAsync(InlineAlertResult result)
-    {
-        TryClearInlineAlert(null, result, false);
-        return Task.CompletedTask;
-    }
-
     protected async Task CompleteAsync(TResult? result)
     {
         await OnClosingAsync();
@@ -105,7 +96,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
             pending?.CancellationRegistration.Dispose();
             pending?.Tcs.TrySetCanceled();
 
-            ModalService.UnregisterActiveAlertHost(_modalId);
+            InlineAlertHostBroker.Unregister(_modalId);
 
             // Defensive: complete the task if we were torn down without an explicit close path.
             // Stale ids are ignored, so this is a no-op when Complete already ran.
@@ -113,6 +104,18 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         }
 
         await base.DisposeAsyncCore(disposing);
+    }
+
+    // Route Esc/native-close through OnCancelAsync so all close paths share the same pipeline.
+    // Protected so derived modals' .razor markup can wire OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    // even when the derived class lives in a different assembly than ModalBase.
+    protected Task HandleDialogClosedByUserAsync() => OnCancelAsync();
+
+    protected Task HandleInlineAlertResolvedAsync(InlineAlertResult result)
+    {
+        TryClearInlineAlert(null, result, false);
+
+        return Task.CompletedTask;
     }
 
     protected virtual Task OnAcceptAsync() => CompleteAsync(default);
@@ -130,7 +133,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     {
         // Capture the active id so a stale modal can never complete a successor's task.
         _modalId = ModalService.ActiveModalId;
-        ModalService.RegisterActiveAlertHost(_modalId, this);
+        InlineAlertHostBroker.Register(_modalId, this);
         base.OnInitialized();
     }
 

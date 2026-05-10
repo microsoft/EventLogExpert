@@ -16,9 +16,9 @@ public sealed partial class MenuRenderer
 
     // Type-ahead matches reset after this idle window (WAI-ARIA Authoring Practices guidance).
     private static readonly TimeSpan s_typeAheadResetWindow = TimeSpan.FromMilliseconds(500);
+    private bool _focusOnNextRender;
 
     private int _focusedIndex = -1;
-    private bool _focusOnNextRender;
     private ElementReference[] _itemElements = [];
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;
@@ -47,16 +47,16 @@ public sealed partial class MenuRenderer
     [Parameter] public EventCallback OnCloseSubmenu { get; set; }
 
     /// <summary>
-    ///     Raised when the top-level menu wants the menubar to switch to the previous (-1) or next (+1) bar item.
-    ///     Hosts that don't sit on a menubar can ignore this.
+    ///     Raised when the top-level menu wants the menubar to switch to the previous (-1) or next (+1) bar item. Hosts
+    ///     that don't sit on a menubar can ignore this.
     /// </summary>
     [Parameter] public EventCallback<int> OnNavigateBar { get; set; }
 
     /// <summary>
-    ///     When true, the renderer will not set <c>_focusedIndex</c> from <see cref="InitialFocusIndex" /> on
-    ///     parameter changes and will not auto-focus the first enabled item on first render. Used for hover-opened
-    ///     submenus so keyboard focus stays on the parent item per WAI-ARIA menu guidance — focus only enters the
-    ///     submenu when the user explicitly opens it via Enter/Space/ArrowRight.
+    ///     When true, the renderer will not set <c>_focusedIndex</c> from <see cref="InitialFocusIndex" /> on parameter
+    ///     changes and will not auto-focus the first enabled item on first render. Used for hover-opened submenus so keyboard
+    ///     focus stays on the parent item per WAI-ARIA menu guidance — focus only enters the submenu when the user explicitly
+    ///     opens it via Enter/Space/ArrowRight.
     /// </summary>
     [Parameter] public bool SuppressInitialFocus { get; set; }
 

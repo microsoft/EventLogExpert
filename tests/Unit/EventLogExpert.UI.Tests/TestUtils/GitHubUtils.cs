@@ -1,4 +1,7 @@
-﻿using EventLogExpert.UI.Models;
+﻿// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.UI.Models;
 using static EventLogExpert.UI.Tests.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
@@ -7,7 +10,7 @@ public static class GitHubUtils
 {
     public static IEnumerable<GitReleaseModel> CreateGitReleaseModels() =>
     [
-        new GitReleaseModel
+        new()
         {
             Version = GitHubPrereleaseVersion,
             IsPreRelease = true,
@@ -22,7 +25,7 @@ public static class GitHubUtils
             ],
             RawChanges = GitHubReleaseNotes
         },
-        new GitReleaseModel
+        new()
         {
             Version = GitHubLatestVersion,
             IsPreRelease = false,

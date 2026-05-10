@@ -6,9 +6,9 @@ using EventLogExpert.Eventing.Common.Events;
 namespace EventLogExpert.Eventing.Resolvers;
 
 /// <summary>
-///     Resolves the raw XML for a <see cref="ResolvedEvent" /> on demand and caches the result. Implementations
-///     must be thread-safe and must coalesce concurrent requests for the same event into a single underlying
-///     <c>EvtQuery</c> / <c>RenderEventXml</c> call.
+///     Resolves the raw XML for a <see cref="ResolvedEvent" /> on demand and caches the result. Implementations must
+///     be thread-safe and must coalesce concurrent requests for the same event into a single underlying <c>EvtQuery</c> /
+///     <c>RenderEventXml</c> call.
 /// </summary>
 public interface IEventXmlResolver
 {
@@ -19,10 +19,10 @@ public interface IEventXmlResolver
     void ClearXmlCacheForLog(string owningLog);
 
     /// <summary>
-    ///     Returns the XML for <paramref name="evt" />. If <see cref="ResolvedEvent.Xml" /> is already populated
-    ///     (because the log was opened with <c>renderXml: true</c>), the pre-rendered value is returned immediately; otherwise
-    ///     the resolver re-opens the source log via <c>EvtQuery</c>, locates the record by
-    ///     <see cref="ResolvedEvent.RecordId" />, and renders the XML.
+    ///     Returns the XML for <paramref name="evt" />. If <see cref="ResolvedEvent.Xml" /> is already populated (because
+    ///     the log was opened with <c>renderXml: true</c>), the pre-rendered value is returned immediately; otherwise the
+    ///     resolver re-opens the source log via <c>EvtQuery</c>, locates the record by <see cref="ResolvedEvent.RecordId" />,
+    ///     and renders the XML.
     /// </summary>
     /// <param name="evt">The event to resolve XML for.</param>
     /// <param name="cancellationToken">

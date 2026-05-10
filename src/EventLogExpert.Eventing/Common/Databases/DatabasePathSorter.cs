@@ -4,22 +4,20 @@
 namespace EventLogExpert.Eventing.Common.Databases;
 
 /// <summary>
-///     Sorts provider-database identifiers (full paths or bare file names) into resolver
-///     load-priority order, so that load-priority cascading works the same regardless of
-///     which layer is invoking it.
+///     Sorts provider-database identifiers (full paths or bare file names) into resolver load-priority order, so that
+///     load-priority cascading works the same regardless of which layer is invoking it.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Order is: ascending by product name, then descending by version (numeric where the
-///         version token parses as an integer so "10" sorts after "2"), then descending by raw
-///         version string for tie-breaks. Inputs whose extensionless file name does not end in
-///         a space-delimited version token are sorted by their full extensionless name with
-///         no version key.
+///         Order is: ascending by product name, then descending by version (numeric where the version token parses as an
+///         integer so "10" sorts after "2"), then descending by raw version string for tie-breaks. Inputs whose
+///         extensionless file name does not end in a space-delimited version token are sorted by their full extensionless
+///         name with no version key.
 ///     </para>
 ///     <para>
-///         Returned strings are the originals — directory and extension are used only for key
-///         extraction, never for reconstruction. A caller passing full paths gets full paths
-///         back; a caller passing bare file names gets bare file names back.
+///         Returned strings are the originals — directory and extension are used only for key extraction, never for
+///         reconstruction. A caller passing full paths gets full paths back; a caller passing bare file names gets bare
+///         file names back.
 ///     </para>
 /// </remarks>
 public static class DatabasePathSorter

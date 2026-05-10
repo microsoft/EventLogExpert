@@ -18,35 +18,35 @@ public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
     {
         switch (action)
         {
-            case EventLogAction.LoadEvents loadEventsAction:
+            case LoadEventsAction loadEventsAction:
                 _debugLogger.Debug($"Action: {action.GetType()} with {loadEventsAction.Events.Count} events.");
                 break;
-            case EventLogAction.LoadEventsPartial loadEventsPartialAction:
+            case LoadEventsPartialAction loadEventsPartialAction:
                 _debugLogger.Debug($"Action: {action.GetType()} with {loadEventsPartialAction.Events.Count} events.");
                 break;
-            case EventLogAction.AddEvent addEventAction:
+            case AddEventAction addEventAction:
                 _debugLogger.Debug($"Action: {action.GetType()} with {addEventAction.NewEvent.Source} event ID {addEventAction.NewEvent.Id}.");
                 break;
-            case EventLogAction.OpenLog openLogAction:
+            case OpenLogAction openLogAction:
                 _debugLogger.Information($"Action: {action.GetType()} with {openLogAction.LogName} log type {openLogAction.LogPathType}.");
                 break;
-            case EventLogAction.SelectEvent selectEventAction:
-                _debugLogger.Debug($"Action: {nameof(EventLogAction.SelectEvent)} selected {selectEventAction.SelectedEvent.Source} event ID {selectEventAction.SelectedEvent.Id}.");
+            case SelectEventAction selectEventAction:
+                _debugLogger.Debug($"Action: {nameof(SelectEventAction)} selected {selectEventAction.SelectedEvent.Source} event ID {selectEventAction.SelectedEvent.Id}.");
                 break;
-            case EventLogAction.SelectEvents selectEventsAction:
-                _debugLogger.Debug($"Action: {nameof(EventLogAction.SelectEvents)} selected {selectEventsAction.SelectedEvents.Count} events.");
+            case SelectEventsAction selectEventsAction:
+                _debugLogger.Debug($"Action: {nameof(SelectEventsAction)} selected {selectEventsAction.SelectedEvents.Count} events.");
                 break;
-            case EventLogAction.SetSelectedEvents setSelectedEventsAction:
-                _debugLogger.Debug($"Action: {nameof(EventLogAction.SetSelectedEvents)} set {setSelectedEventsAction.SelectedEvents.Count} events.");
+            case SetSelectedEventsAction setSelectedEventsAction:
+                _debugLogger.Debug($"Action: {nameof(SetSelectedEventsAction)} set {setSelectedEventsAction.SelectedEvents.Count} events.");
                 break;
-            case EventTableAction.AppendTableEvents appendTableEventsAction:
+            case AppendTableEventsAction appendTableEventsAction:
                 _debugLogger.Debug($"Action: {action.GetType()} with {appendTableEventsAction.Events.Count} events for log {appendTableEventsAction.LogId}.");
                 break;
-            case EventTableAction.AppendTableEventsBatch appendTableEventsBatchAction:
+            case AppendTableEventsBatchAction appendTableEventsBatchAction:
                 var totalAppendEvents = appendTableEventsBatchAction.EventsByLog.Values.Sum(eventsForLog => eventsForLog.Count);
                 _debugLogger.Debug($"Action: {action.GetType()} with {totalAppendEvents} events across {appendTableEventsBatchAction.EventsByLog.Count} logs.");
                 break;
-            case StatusBarAction.SetEventsLoading:
+            case SetEventsLoadingAction:
                 _debugLogger.Debug($"Action: {action.GetType()} {JsonSerializer.Serialize(action)}");
                 break;
             default:
