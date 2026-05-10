@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using NSubstitute;

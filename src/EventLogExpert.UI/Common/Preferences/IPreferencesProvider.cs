@@ -1,11 +1,11 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Common.Preferences;
 
 public interface IPreferencesProvider
 {
