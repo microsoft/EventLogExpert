@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
 
-namespace EventLogExpert.UI.Tests.Defaults;
+namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseStatusLabelsTests
 {

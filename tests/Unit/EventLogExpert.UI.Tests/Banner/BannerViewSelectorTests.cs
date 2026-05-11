@@ -2,7 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 
 namespace EventLogExpert.UI.Tests.Banner;
 

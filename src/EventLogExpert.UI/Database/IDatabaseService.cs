@@ -1,9 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database.Upgrade;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Database;
 
 public interface IDatabaseService : IAsyncDisposable
 {

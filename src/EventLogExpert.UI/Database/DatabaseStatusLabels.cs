@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
-
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.Database;
 
 public static class DatabaseStatusLabels
 {

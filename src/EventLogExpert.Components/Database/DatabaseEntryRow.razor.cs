@@ -1,8 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Database;

@@ -5,15 +5,14 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.Options;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
 using System.IO.Compression;
 using System.Threading.Channels;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Database;
 
 public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProvider
 {

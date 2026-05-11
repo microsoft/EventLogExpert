@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Banner;
