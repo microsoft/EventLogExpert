@@ -30,7 +30,7 @@ public sealed class StatusBarActionTests
     [Fact]
     public void ClearStatusAction_ShouldCreateAction()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
         var action = new ClearStatusAction(activityId);
 
         Assert.Equal(activityId, action.ActivityId);
@@ -47,7 +47,7 @@ public sealed class StatusBarActionTests
     [Fact]
     public void SetEventsLoadingAction_ShouldCreateAction()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
         var count = 100;
         var failedCount = 5;
         var action = new SetEventsLoadingAction(activityId, count, failedCount);
@@ -73,7 +73,7 @@ public sealed class StatusBarReducerTests
     public void ReduceClearStatus_WithEmptyState_ShouldReturnEmptyState()
     {
         var state = new StatusBarState();
-        var action = new ClearStatusAction(Guid.NewGuid());
+        var action = new ClearStatusAction(StatusActivityId.Create());
 
         var result = Reducers.ReduceClearStatus(state, action);
 
@@ -83,11 +83,11 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceClearStatus_WithExistingActivity_ShouldRemoveActivity()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
         var action = new ClearStatusAction(activityId);
@@ -100,12 +100,12 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceClearStatus_WithNonExistingActivity_ShouldReturnStateWithoutChange()
     {
-        var existingActivityId = Guid.NewGuid();
-        var nonExistingActivityId = Guid.NewGuid();
+        var existingActivityId = StatusActivityId.Create();
+        var nonExistingActivityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(existingActivityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(existingActivityId, (100, 5))
         };
 
         var action = new ClearStatusAction(nonExistingActivityId);
@@ -121,9 +121,9 @@ public sealed class StatusBarReducerTests
     {
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty
-                .Add(Guid.NewGuid(), (100, 5))
-                .Add(Guid.NewGuid(), (200, 10)),
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
+                .Add(StatusActivityId.Create(), (100, 5))
+                .Add(StatusActivityId.Create(), (200, 10)),
             ResolverStatus = "Processing..."
         };
 
@@ -136,11 +136,11 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceSetEventsLoading_WithExistingActivity_ShouldUpdateActivity()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (50, 2))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (50, 2))
         };
 
         var action = new SetEventsLoadingAction(activityId, 100, 5);
@@ -154,13 +154,13 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceSetEventsLoading_WithMultipleActivities_ShouldMaintainOthers()
     {
-        var activityId1 = Guid.NewGuid();
-        var activityId2 = Guid.NewGuid();
-        var activityId3 = Guid.NewGuid();
+        var activityId1 = StatusActivityId.Create();
+        var activityId2 = StatusActivityId.Create();
+        var activityId3 = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
                 .Add(activityId1, (100, 5))
                 .Add(activityId2, (200, 10))
         };
@@ -179,7 +179,7 @@ public sealed class StatusBarReducerTests
     public void ReduceSetEventsLoading_WithNewActivity_ShouldAddActivity()
     {
         var state = new StatusBarState();
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
         var action = new SetEventsLoadingAction(activityId, 100, 5);
 
         var result = Reducers.ReduceSetEventsLoading(state, action);
@@ -192,11 +192,11 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceSetEventsLoading_WithUnchangedValues_ShouldReturnSameState()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
         var action = new SetEventsLoadingAction(activityId, 100, 5);
@@ -209,11 +209,11 @@ public sealed class StatusBarReducerTests
     [Fact]
     public void ReduceSetEventsLoading_WithZeroCount_ShouldRemoveActivity()
     {
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty.Add(activityId, (100, 5))
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty.Add(activityId, (100, 5))
         };
 
         var action = new SetEventsLoadingAction(activityId, 0, 0);
@@ -265,7 +265,7 @@ public sealed class StatusBarIntegrationTests
     public void ActivityLifecycle_ShouldHandleAddUpdateRemove()
     {
         var state = new StatusBarState();
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         state = Reducers.ReduceSetEventsLoading(
             state,
@@ -298,13 +298,13 @@ public sealed class StatusBarIntegrationTests
     [Fact]
     public void ClearNonExistingActivities_ShouldNotAffectOthers()
     {
-        var activity1 = Guid.NewGuid();
-        var activity2 = Guid.NewGuid();
-        var nonExisting = Guid.NewGuid();
+        var activity1 = StatusActivityId.Create();
+        var activity2 = StatusActivityId.Create();
+        var nonExisting = StatusActivityId.Create();
 
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
                 .Add(activity1, (100, 5))
                 .Add(activity2, (200, 10))
         };
@@ -321,10 +321,10 @@ public sealed class StatusBarIntegrationTests
     {
         var state = new StatusBarState
         {
-            EventsLoading = ImmutableDictionary<Guid, (int, int)>.Empty
-                .Add(Guid.NewGuid(), (100, 5))
-                .Add(Guid.NewGuid(), (200, 10))
-                .Add(Guid.NewGuid(), (300, 15)),
+            EventsLoading = ImmutableDictionary<StatusActivityId, (int, int)>.Empty
+                .Add(StatusActivityId.Create(), (100, 5))
+                .Add(StatusActivityId.Create(), (200, 10))
+                .Add(StatusActivityId.Create(), (300, 15)),
             ResolverStatus = "Processing multiple activities..."
         };
 
@@ -338,7 +338,7 @@ public sealed class StatusBarIntegrationTests
     public void CompleteWorkflow_ShouldHandleLoadingAndResolution()
     {
         var state = new StatusBarState();
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         state = Reducers.ReduceSetEventsLoading(
             state,
@@ -365,8 +365,8 @@ public sealed class StatusBarIntegrationTests
     public void LoadingProgress_ShouldTrackMultipleActivities()
     {
         var state = new StatusBarState();
-        var activity1 = Guid.NewGuid();
-        var activity2 = Guid.NewGuid();
+        var activity1 = StatusActivityId.Create();
+        var activity2 = StatusActivityId.Create();
 
         state = Reducers.ReduceSetEventsLoading(
             state,
@@ -396,9 +396,9 @@ public sealed class StatusBarIntegrationTests
     public void MultipleActivitiesWithFailures_ShouldTrackIndependently()
     {
         var state = new StatusBarState();
-        var activity1 = Guid.NewGuid();
-        var activity2 = Guid.NewGuid();
-        var activity3 = Guid.NewGuid();
+        var activity1 = StatusActivityId.Create();
+        var activity2 = StatusActivityId.Create();
+        var activity3 = StatusActivityId.Create();
 
         state = Reducers.ReduceSetEventsLoading(
             state,
@@ -422,7 +422,7 @@ public sealed class StatusBarIntegrationTests
     public void ResolverStatus_ShouldUpdateIndependentlyOfLoading()
     {
         var state = new StatusBarState();
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
 
         state = Reducers.ReduceSetResolverStatus(
             state,

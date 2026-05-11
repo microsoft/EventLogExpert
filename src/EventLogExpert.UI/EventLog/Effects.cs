@@ -778,7 +778,7 @@ public sealed class Effects(
             }
         }
 
-        var activityId = Guid.NewGuid();
+        var activityId = StatusActivityId.Create();
         string? lastEvent;
         int failed = 0;
         int resolved = 0;

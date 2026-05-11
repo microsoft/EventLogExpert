@@ -9,4 +9,4 @@ namespace EventLogExpert.UI.StatusBar;
 ///     Application will be common and many file names will be the same.
 /// </param>
 /// <param name="Count"></param>
-public sealed record SetEventsLoadingAction(Guid ActivityId, int Count, int FailedCount);
+public sealed record SetEventsLoadingAction(StatusActivityId ActivityId, int Count, int FailedCount);

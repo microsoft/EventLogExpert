@@ -9,7 +9,7 @@ namespace EventLogExpert.UI.StatusBar;
 [FeatureState(MaximumStateChangedNotificationsPerSecond = 1)]
 public sealed record StatusBarState
 {
-    public ImmutableDictionary<Guid, (int, int)> EventsLoading { get; init; } = ImmutableDictionary<Guid, (int, int)>.Empty;
+    public ImmutableDictionary<StatusActivityId, (int, int)> EventsLoading { get; init; } = ImmutableDictionary<StatusActivityId, (int, int)>.Empty;
 
     public string ResolverStatus { get; init; } = string.Empty;
 }
