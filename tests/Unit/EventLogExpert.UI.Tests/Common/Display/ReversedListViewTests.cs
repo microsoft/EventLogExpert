@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Common.Display;
 
-namespace EventLogExpert.UI.Tests.Services.Display;
+namespace EventLogExpert.UI.Tests.Common.Display;
 
 public sealed class ReversedListViewTests
 {

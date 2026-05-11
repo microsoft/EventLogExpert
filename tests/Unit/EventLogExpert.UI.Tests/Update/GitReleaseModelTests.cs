@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Tests.TestUtils;
 
-namespace EventLogExpert.UI.Tests.Models.Update;
+namespace EventLogExpert.UI.Tests.Update;
 
 public sealed class GitReleaseModelTests
 {

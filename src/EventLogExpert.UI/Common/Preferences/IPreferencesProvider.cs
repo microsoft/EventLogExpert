@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 

@@ -23,7 +23,6 @@ using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
-using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
 using EventLogExpert.UI.Update.Deployment;

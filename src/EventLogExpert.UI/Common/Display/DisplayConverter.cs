@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.Common.Display;
 
 public sealed class DisplayConverter<T, U>
 {

@@ -3,7 +3,7 @@
 
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.LogTable;
 
 public enum ColumnName
 {

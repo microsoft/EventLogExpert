@@ -4,7 +4,7 @@
 using System.Collections.Frozen;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.LogTable;
 
 internal static class ColumnDefaults
 {
