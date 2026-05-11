@@ -3,9 +3,9 @@
 
 namespace EventLogExpert.UI.Database.Upgrade;
 
-public sealed class UpgradeBatchCompletedEventArgs(Guid batchId, UpgradeBatchResult result, bool wasCancelled) : EventArgs
+public sealed class UpgradeBatchCompletedEventArgs(UpgradeBatchId batchId, UpgradeBatchResult result, bool wasCancelled) : EventArgs
 {
-    public Guid BatchId { get; } = batchId;
+    public UpgradeBatchId BatchId { get; } = batchId;
 
     public UpgradeBatchResult Result { get; } = result;
 

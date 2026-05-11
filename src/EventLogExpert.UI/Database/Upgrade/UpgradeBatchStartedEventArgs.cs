@@ -4,14 +4,14 @@
 namespace EventLogExpert.UI.Database.Upgrade;
 
 public sealed class UpgradeBatchStartedEventArgs(
-    Guid batchId,
+    UpgradeBatchId batchId,
     UpgradeProgressScope scope,
     int batchSize,
     CancellationTokenSource cts) : EventArgs
 {
     private readonly CancellationTokenSource _cts = cts;
 
-    public Guid BatchId { get; } = batchId;
+    public UpgradeBatchId BatchId { get; } = batchId;
 
     public int BatchSize { get; } = batchSize;
 

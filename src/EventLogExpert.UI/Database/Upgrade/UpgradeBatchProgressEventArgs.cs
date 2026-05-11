@@ -3,9 +3,9 @@
 
 namespace EventLogExpert.UI.Database.Upgrade;
 
-public sealed class UpgradeBatchProgressEventArgs(Guid batchId, int position, string fileName, UpgradePhase phase) : EventArgs
+public sealed class UpgradeBatchProgressEventArgs(UpgradeBatchId batchId, int position, string fileName, UpgradePhase phase) : EventArgs
 {
-    public Guid BatchId { get; } = batchId;
+    public UpgradeBatchId BatchId { get; } = batchId;
 
     public string FileName { get; } = fileName;
 
