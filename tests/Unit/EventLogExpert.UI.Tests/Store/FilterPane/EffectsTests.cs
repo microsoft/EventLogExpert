@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
@@ -42,7 +42,7 @@ public sealed class EffectsTests
     {
         // Arrange — empty comparison cannot compile, so the placeholder filter has no Compiled artifact
         // and the effect must skip dispatching SetFilters.
-        var filterModel = new FilterModel
+        var filterModel = new SavedFilter
         {
             ComparisonText = string.Empty,
             Compiled = null
@@ -235,7 +235,7 @@ public sealed class EffectsTests
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
-        var action = new SetFilterDateRangeAction(new FilterDateModel { Before = unrelatedBefore });
+        var action = new SetFilterDateRangeAction(new DateFilter { Before = unrelatedBefore });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
@@ -243,9 +243,9 @@ public sealed class EffectsTests
         // Assert
         var expectedAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == expectedAfter &&
-            x.FilterDateModel.Before == unrelatedBefore));
+            x.DateFilter != null &&
+            x.DateFilter.After == expectedAfter &&
+            x.DateFilter.Before == unrelatedBefore));
     }
 
     [Fact]
@@ -266,7 +266,7 @@ public sealed class EffectsTests
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
-        var action = new SetFilterDateRangeAction(new FilterDateModel { After = unrelatedAfter });
+        var action = new SetFilterDateRangeAction(new DateFilter { After = unrelatedAfter });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
@@ -274,9 +274,9 @@ public sealed class EffectsTests
         // Assert
         var expectedBefore = new DateTime(2024, 1, 1, 15, 0, 0, DateTimeKind.Utc);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == unrelatedAfter &&
-            x.FilterDateModel.Before == expectedBefore));
+            x.DateFilter != null &&
+            x.DateFilter.After == unrelatedAfter &&
+            x.DateFilter.Before == expectedBefore));
     }
 
     [Fact]
@@ -303,16 +303,16 @@ public sealed class EffectsTests
             .Add("LogB", logB);
 
         var (effects, mockDispatcher) = CreateEffects(activeLogs: activeLogs);
-        var action = new SetFilterDateRangeAction(new FilterDateModel());
+        var action = new SetFilterDateRangeAction(new DateFilter());
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
-            x.FilterDateModel.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
+            x.DateFilter != null &&
+            x.DateFilter.After == new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc) &&
+            x.DateFilter.Before == new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc)));
     }
 
     [Fact]
@@ -323,16 +323,16 @@ public sealed class EffectsTests
         var before = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
 
         var (effects, mockDispatcher) = CreateEffects();
-        var action = new SetFilterDateRangeAction(new FilterDateModel { After = after, Before = before });
+        var action = new SetFilterDateRangeAction(new DateFilter { After = after, Before = before });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == after &&
-            x.FilterDateModel.Before == before));
+            x.DateFilter != null &&
+            x.DateFilter.After == after &&
+            x.DateFilter.Before == before));
     }
 
     [Fact]
@@ -343,18 +343,18 @@ public sealed class EffectsTests
         var newBefore = new DateTime(2024, 1, 1, 16, 0, 0, DateTimeKind.Utc);
 
         var (effects, mockDispatcher) = CreateEffects(
-            filteredDateRange: new FilterDateModel { After = existingAfter });
+            filteredDateRange: new DateFilter { After = existingAfter });
 
-        var action = new SetFilterDateRangeAction(new FilterDateModel { Before = newBefore });
+        var action = new SetFilterDateRangeAction(new DateFilter { Before = newBefore });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == existingAfter &&
-            x.FilterDateModel.Before == newBefore));
+            x.DateFilter != null &&
+            x.DateFilter.After == existingAfter &&
+            x.DateFilter.Before == newBefore));
     }
 
     [Fact]
@@ -365,18 +365,18 @@ public sealed class EffectsTests
         var newAfter = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
 
         var (effects, mockDispatcher) = CreateEffects(
-            filteredDateRange: new FilterDateModel { Before = existingBefore });
+            filteredDateRange: new DateFilter { Before = existingBefore });
 
-        var action = new SetFilterDateRangeAction(new FilterDateModel { After = newAfter });
+        var action = new SetFilterDateRangeAction(new DateFilter { After = newAfter });
 
         // Act
         await effects.HandleSetFilterDateRange(action, mockDispatcher);
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel != null &&
-            x.FilterDateModel.After == newAfter &&
-            x.FilterDateModel.Before == existingBefore));
+            x.DateFilter != null &&
+            x.DateFilter.After == newAfter &&
+            x.DateFilter.Before == existingBefore));
     }
 
     [Fact]
@@ -391,7 +391,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterDateRangeSuccessAction>(x =>
-            x.FilterDateModel == null));
+            x.DateFilter == null));
     }
 
     [Fact]
@@ -449,7 +449,7 @@ public sealed class EffectsTests
         // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             isEnabled: true,
-            filteredDateRange: new FilterDateModel
+            filteredDateRange: new DateFilter
             {
                 After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 Before = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc)
@@ -599,8 +599,8 @@ public sealed class EffectsTests
 
     private static (Effects effects, IDispatcher mockDispatcher) CreateEffects(
         bool isEnabled = false,
-        ImmutableList<FilterModel>? filters = null,
-        FilterDateModel? filteredDateRange = null,
+        ImmutableList<SavedFilter>? filters = null,
+        DateFilter? filteredDateRange = null,
         ImmutableDictionary<string, EventLogData>? activeLogs = null,
         EventFilter? appliedFilter = null)
     {
@@ -609,7 +609,7 @@ public sealed class EffectsTests
         mockFilterPaneState.Value.Returns(new FilterPaneState
         {
             IsEnabled = isEnabled,
-            Filters = filters ?? ImmutableList<FilterModel>.Empty,
+            Filters = filters ?? ImmutableList<SavedFilter>.Empty,
             FilteredDateRange = filteredDateRange
         });
 
@@ -627,7 +627,7 @@ public sealed class EffectsTests
         return (effects, mockDispatcher);
     }
 
-    private static ImmutableList<FilterModel> CreateSingleEnabledFilters() =>
+    private static ImmutableList<SavedFilter> CreateSingleEnabledFilters() =>
         ImmutableList.Create(
             FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true));
 }

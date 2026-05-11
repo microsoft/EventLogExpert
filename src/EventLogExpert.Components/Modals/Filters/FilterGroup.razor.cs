@@ -1,11 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
@@ -18,11 +17,11 @@ namespace EventLogExpert.Components.Modals.Filters;
 public sealed partial class FilterGroup
 {
     private readonly HashSet<FilterId> _editingFilters = [];
-    private readonly List<FilterDraftModel> _pendingDrafts = [];
+    private readonly List<FilterDraft> _pendingDrafts = [];
 
     private FilterGroupId? _trackedGroupId;
 
-    [Parameter] public FilterGroupModel Group { get; set; } = null!;
+    [Parameter] public SavedFilterGroup Group { get; set; } = null!;
 
     [Parameter] public FilterGroupModal Parent { get; set; } = null!;
 
@@ -64,7 +63,7 @@ public sealed partial class FilterGroup
         base.OnParametersSet();
     }
 
-    private void AddFilter() => _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Advanced });
+    private void AddFilter() => _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Advanced });
 
     private async Task ApplyFilters()
     {
@@ -104,9 +103,9 @@ public sealed partial class FilterGroup
         }
     }
 
-    private void HandlePendingDiscard(FilterDraftModel draft) => _pendingDrafts.Remove(draft);
+    private void HandlePendingDiscard(FilterDraft draft) => _pendingDrafts.Remove(draft);
 
-    private void HandlePendingSave(FilterDraftModel draft, FilterModel filter)
+    private void HandlePendingSave(FilterDraft draft, SavedFilter filter)
     {
         _pendingDrafts.Remove(draft);
 
@@ -124,7 +123,7 @@ public sealed partial class FilterGroup
             if (path is null) { return; }
 
             await using var stream = File.OpenRead(path);
-            var group = await JsonSerializer.DeserializeAsync<FilterGroupModel>(stream);
+            var group = await JsonSerializer.DeserializeAsync<SavedFilterGroup>(stream);
 
             if (group is null) { return; }
 

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -14,7 +14,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_AddGroup_WithGroup_ShouldStoreGroup()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
 
         // Act
         var action = new AddGroupAction(group);
@@ -38,7 +38,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_ImportGroups_ShouldStoreGroups()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -55,7 +55,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_LoadGroupsSuccess_ShouldStoreGroups()
     {
         // Arrange
-        var groups = new List<FilterGroupModel> { new() { Name = Constants.FilterGroupName } };
+        var groups = new List<SavedFilterGroup> { new() { Name = Constants.FilterGroupName } };
 
         // Act
         var action = new LoadGroupsSuccessAction(groups);
@@ -111,7 +111,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_SetGroup_ShouldStoreGroup()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
 
         // Act
         var action = new SetGroupAction(group);
@@ -163,7 +163,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupModel_DisplayName_ShouldReturnLastSegment()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
 
         // Act
         var displayName = group.DisplayName;
@@ -176,8 +176,8 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupModel_Id_ShouldBeUnique()
     {
         // Arrange & Act
-        var group1 = new FilterGroupModel();
-        var group2 = new FilterGroupModel();
+        var group1 = new SavedFilterGroup();
+        var group2 = new SavedFilterGroup();
 
         // Assert
         Assert.NotEqual(group1.Id, group2.Id);
@@ -201,7 +201,7 @@ public sealed class FilterGroupStoreTests
         var state = new FilterGroupState();
 
         // Act - Add group
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         state = Reducers.ReducerAddGroup(state, new AddGroupAction(group));
 
         // Assert
@@ -224,7 +224,7 @@ public sealed class FilterGroupStoreTests
         var state = new FilterGroupState();
 
         // Act - Add group
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         state = Reducers.ReducerAddGroup(state, new AddGroupAction(group));
         var groupId = state.Groups.First().Id;
 
@@ -257,7 +257,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var state = new FilterGroupState();
 
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested },
@@ -283,7 +283,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var filter = FilterUtils.CreateTestFilter();
 
-        var group = new FilterGroupModel
+        var group = new SavedFilterGroup
         {
             Name = Constants.FilterGroupName,
             Filters = [filter]
@@ -319,7 +319,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var state = new FilterGroupState();
 
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -349,7 +349,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var action = new AddGroupAction(group);
 
         // Act
@@ -366,7 +366,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var action = new AddGroupAction(group);
 
         // Act
@@ -395,10 +395,10 @@ public sealed class FilterGroupStoreTests
     public void ReducerImportGroups_ShouldAddMultipleGroups()
     {
         // Arrange
-        var existingGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var existingGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [existingGroup] };
 
-        var newGroups = new List<FilterGroupModel>
+        var newGroups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupNameNested },
             new() { Name = "Another\\Group" }
@@ -419,7 +419,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var state = new FilterGroupState();
 
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -439,10 +439,10 @@ public sealed class FilterGroupStoreTests
     public void ReducerLoadGroupsSuccess_ShouldReplaceAllGroups()
     {
         // Arrange
-        var existingGroup = new FilterGroupModel { Name = "Old\\Group" };
+        var existingGroup = new SavedFilterGroup { Name = "Old\\Group" };
         var state = new FilterGroupState { Groups = [existingGroup] };
 
-        var newGroups = new List<FilterGroupModel>
+        var newGroups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -478,7 +478,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var filter = FilterUtils.CreateTestFilter();
 
-        var group = new FilterGroupModel
+        var group = new SavedFilterGroup
         {
             Name = Constants.FilterGroupName,
             Filters = [filter]
@@ -499,7 +499,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveFilter_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var action = new RemoveFilterAction(group.Id, FilterId.Create());
 
@@ -528,7 +528,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroup_ShouldRebuildDisplayGroupsAtomically()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = Reducers.ReducerAddGroup(
             new FilterGroupState(),
             new AddGroupAction(group));
@@ -545,8 +545,8 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroup_ShouldRemoveGroup()
     {
         // Arrange
-        var group1 = new FilterGroupModel { Name = Constants.FilterGroupName };
-        var group2 = new FilterGroupModel { Name = Constants.FilterGroupNameNested };
+        var group1 = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group2 = new SavedFilterGroup { Name = Constants.FilterGroupNameNested };
         var state = new FilterGroupState { Groups = [group1, group2] };
         var action = new RemoveGroupAction(group1.Id);
 
@@ -578,7 +578,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var filter = FilterUtils.CreateTestFilter();
 
-        var group = new FilterGroupModel
+        var group = new SavedFilterGroup
         {
             Name = Constants.FilterGroupName,
             Filters = [filter]
@@ -607,7 +607,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
         // Pending-draft commit path: SetFilter for an Id that was never in state.
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Yellow);
         var action = new SetFilterAction(group.Id, newFilter);
@@ -641,7 +641,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetGroup_ShouldUpdateGroup()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = "OldName", IsEditing = true };
+        var group = new SavedFilterGroup { Name = "OldName", IsEditing = true };
         var state = new FilterGroupState { Groups = [group] };
 
         var updatedGroup = group with
@@ -667,7 +667,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new SetGroupAction(new FilterGroupModel());
+        var action = new SetGroupAction(new SavedFilterGroup());
 
         // Act
         var newState = Reducers.ReducerSetGroup(state, action);
@@ -682,7 +682,7 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var filter = FilterUtils.CreateTestFilter(isExcluded: false);
 
-        var group = new FilterGroupModel
+        var group = new SavedFilterGroup
         {
             Name = Constants.FilterGroupName,
             Filters = [filter]
@@ -703,7 +703,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleFilterExcluded_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var action = new ToggleFilterExcludedAction(group.Id, FilterId.Create());
 
@@ -732,7 +732,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleGroup_ShouldToggleIsEditing()
     {
         // Arrange
-        var group = new FilterGroupModel { Name = Constants.FilterGroupName, IsEditing = false };
+        var group = new SavedFilterGroup { Name = Constants.FilterGroupName, IsEditing = false };
         var state = new FilterGroupState { Groups = [group] };
         var action = new ToggleGroupAction(group.Id);
 

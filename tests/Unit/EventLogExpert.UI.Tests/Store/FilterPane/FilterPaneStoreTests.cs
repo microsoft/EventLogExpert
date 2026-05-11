@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -60,13 +60,13 @@ public sealed class FilterPaneActionTests
         var filter = FilterUtils.CreateTestFilter();
         var action = new AddFilterAction(filter);
 
-        Assert.Equal(filter, action.FilterModel);
+        Assert.Equal(filter, action.SavedFilter);
     }
 
     [Fact]
     public void ApplyFilterGroupAction_ShouldCreateAction()
     {
-        var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var action = new ApplyFilterGroupAction(filterGroup);
 
         Assert.Equal(filterGroup, action.FilterGroup);
@@ -103,25 +103,25 @@ public sealed class FilterPaneActionTests
         var filter = FilterUtils.CreateTestFilter();
         var action = new SetFilterAction(filter);
 
-        Assert.Equal(filter, action.FilterModel);
+        Assert.Equal(filter, action.SavedFilter);
     }
 
     [Fact]
     public void SetFilterDateRangeAction_ShouldCreateAction()
     {
-        var dateModel = new FilterDateModel { After = DateTime.UtcNow };
+        var dateModel = new DateFilter { After = DateTime.UtcNow };
         var action = new SetFilterDateRangeAction(dateModel);
 
-        Assert.Equal(dateModel, action.FilterDateModel);
+        Assert.Equal(dateModel, action.DateFilter);
     }
 
     [Fact]
     public void SetFilterDateRangeSuccessAction_ShouldCreateAction()
     {
-        var dateModel = new FilterDateModel { Before = DateTime.UtcNow };
+        var dateModel = new DateFilter { Before = DateTime.UtcNow };
         var action = new SetFilterDateRangeSuccessAction(dateModel);
 
-        Assert.Equal(dateModel, action.FilterDateModel);
+        Assert.Equal(dateModel, action.DateFilter);
     }
 
     [Fact]
@@ -211,7 +211,7 @@ public sealed class FilterPaneReducerTests
 
         var state = new FilterPaneState();
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Filters =
             [
@@ -238,7 +238,7 @@ public sealed class FilterPaneReducerTests
         // Regression: IsExcluded was previously dropped when copying grouped filters into the pane.
         var state = new FilterPaneState();
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Filters =
             [
@@ -262,7 +262,7 @@ public sealed class FilterPaneReducerTests
 
         var state = new FilterPaneState { Filters = [existingFilter] };
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Filters = [FilterUtils.CreateTestFilter(Constants.FilterIdEquals100)]
         };
@@ -278,7 +278,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceApplyFilterGroup_WithEmptyFilters_ShouldReturnOriginalState()
     {
         var state = new FilterPaneState();
-        var filterGroup = new FilterGroupModel { Filters = [] };
+        var filterGroup = new SavedFilterGroup { Filters = [] };
         var action = new ApplyFilterGroupAction(filterGroup);
 
         var result = Reducers.ReduceApplyFilterGroup(state, action);
@@ -291,7 +291,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState();
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Filters =
             [
@@ -317,7 +317,7 @@ public sealed class FilterPaneReducerTests
 
         var state = new FilterPaneState { Filters = [existingInclude] };
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Filters =
             [
@@ -377,7 +377,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState();
 
-        var dateModel = new FilterDateModel
+        var dateModel = new DateFilter
         {
             After = DateTime.UtcNow.AddDays(-1),
             Before = DateTime.UtcNow
@@ -396,7 +396,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState
         {
-            FilteredDateRange = new FilterDateModel { After = DateTime.UtcNow }
+            FilteredDateRange = new DateFilter { After = DateTime.UtcNow }
         };
 
         var action = new SetFilterDateRangeSuccessAction(null);
@@ -504,7 +504,7 @@ public sealed class FilterPaneReducerTests
     {
         var state = new FilterPaneState
         {
-            FilteredDateRange = new FilterDateModel { IsEnabled = false }
+            FilteredDateRange = new DateFilter { IsEnabled = false }
         };
 
         var result = Reducers.ReduceToggleFilterDate(state);
@@ -594,7 +594,7 @@ public sealed class FilterPaneIntegrationTests
                 FilterUtils.CreateTestFilter(Constants.FilterIdEquals100),
                 FilterUtils.CreateTestFilter(Constants.FilterIdEquals200)
             ],
-            FilteredDateRange = new FilterDateModel { After = DateTime.UtcNow },
+            FilteredDateRange = new DateFilter { After = DateTime.UtcNow },
             IsEnabled = false,
             IsLoading = true
         };
@@ -637,7 +637,7 @@ public sealed class FilterPaneIntegrationTests
     {
         var state = new FilterPaneState();
 
-        var dateModel = new FilterDateModel
+        var dateModel = new DateFilter
         {
             After = DateTime.UtcNow.AddDays(-7),
             Before = DateTime.UtcNow,
@@ -667,7 +667,7 @@ public sealed class FilterPaneIntegrationTests
     {
         var state = new FilterPaneState();
 
-        var filterGroup = new FilterGroupModel
+        var filterGroup = new SavedFilterGroup
         {
             Name = Constants.FilterGroupName,
             Filters =
@@ -690,7 +690,7 @@ public sealed class FilterPaneIntegrationTests
     public void ImmutableCollections_ShouldPreserveImmutability()
     {
         var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
-        var originalFilters = ImmutableList<FilterModel>.Empty.Add(filter);
+        var originalFilters = ImmutableList<SavedFilter>.Empty.Add(filter);
         var state = new FilterPaneState { Filters = originalFilters };
 
         var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);

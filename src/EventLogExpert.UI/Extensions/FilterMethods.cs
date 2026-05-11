@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 
 namespace EventLogExpert.UI;
 
@@ -53,7 +53,7 @@ internal static class FilterMethods
     public static Dictionary<string, FilterGroupData> AddFilterGroup(
         this Dictionary<string, FilterGroupData> group,
         string[] groupNames,
-        FilterGroupModel data)
+        SavedFilterGroup data)
     {
         var root = groupNames.Length <= 1 ? string.Empty : groupNames.First();
         groupNames = groupNames.Skip(1).ToArray();
@@ -258,7 +258,7 @@ internal static class FilterMethods
 
     extension(ResolvedEvent? @event)
     {
-        public bool Filter(IEnumerable<FilterModel> filters)
+        public bool Filter(IEnumerable<SavedFilter> filters)
         {
             if (@event is null) { return false; }
 
@@ -279,7 +279,7 @@ internal static class FilterMethods
             return isEmpty || isFiltered;
         }
 
-        public ResolvedEvent? FilterByDate(FilterDateModel? dateFilter)
+        public ResolvedEvent? FilterByDate(DateFilter? dateFilter)
         {
             if (@event is null) { return null; }
 

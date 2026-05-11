@@ -4,7 +4,7 @@
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -103,9 +103,9 @@ public sealed class PreferencesProvider : IPreferencesProvider
         set => Preferences.Default.Set(RecentFilters, JsonSerializer.Serialize(value));
     }
 
-    public IEnumerable<FilterGroupModel> SavedFiltersPreference
+    public IEnumerable<SavedFilterGroup> SavedFiltersPreference
     {
-        get => JsonSerializer.Deserialize<List<FilterGroupModel>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
+        get => JsonSerializer.Deserialize<List<SavedFilterGroup>>(Preferences.Default.Get(SavedFilters, "[]")) ?? [];
         set => Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value));
     }
 

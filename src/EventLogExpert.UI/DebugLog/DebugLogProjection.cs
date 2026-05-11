@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Filter;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.DebugLog;

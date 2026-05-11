@@ -7,10 +7,9 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
-using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -47,7 +46,7 @@ public sealed partial class LogTablePane
     private LogView? _currentTable;
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
-    private ImmutableList<FilterModel> _filters = [];
+    private ImmutableList<SavedFilter> _filters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
@@ -323,7 +322,7 @@ public sealed partial class LogTablePane
 
         if (!FilterService.TryParse(basicFilter, out var comparisonString)) { return; }
 
-        var filter = FilterModel.TryCreate(
+        var filter = SavedFilter.TryCreate(
             comparisonString,
             FilterType.Basic,
             basicFilter,
@@ -927,10 +926,10 @@ public sealed partial class LogTablePane
             MenuItem.Separator(),
             MenuItem.Item("Exclude Events Before", () =>
                 Dispatcher.Dispatch(new SetFilterDateRangeAction(
-                    new FilterDateModel { Before = selectedEvent.TimeCreated }))),
+                    new DateFilter { Before = selectedEvent.TimeCreated }))),
             MenuItem.Item("Exclude Events After", () =>
                 Dispatcher.Dispatch(new SetFilterDateRangeAction(
-                    new FilterDateModel { After = selectedEvent.TimeCreated }))),
+                    new DateFilter { After = selectedEvent.TimeCreated }))),
             MenuItem.Separator(),
             MenuItem.SubMenu("Include", ShowFilterCategoryItems(selectedEvent, exclude: false)),
             MenuItem.SubMenu("Exclude", ShowFilterCategoryItems(selectedEvent, exclude: true)),
@@ -975,7 +974,7 @@ public sealed partial class LogTablePane
         }
     }
 
-    private void WarnOnUnknownFilterColors(IEnumerable<FilterModel> filters)
+    private void WarnOnUnknownFilterColors(IEnumerable<SavedFilter> filters)
     {
         foreach (var filter in filters)
         {

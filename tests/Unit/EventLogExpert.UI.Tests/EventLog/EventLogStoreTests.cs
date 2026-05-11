@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
@@ -907,7 +907,7 @@ public sealed class EventLogStoreTests
 
         var after = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var before = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
-        var newFilter = new EventFilter(new FilterDateModel { After = after, Before = before }, []);
+        var newFilter = new EventFilter(new DateFilter { After = after, Before = before }, []);
 
         var action = new SetFiltersAction(newFilter);
 

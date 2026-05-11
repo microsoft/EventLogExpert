@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Filters.Base;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterPane;
 
 namespace EventLogExpert.Components.Filters;
@@ -16,7 +16,7 @@ public sealed partial class AdvancedFilterRow : EditableFilterRowBase
         Dispatcher.Dispatch(new RemoveFilterAction(savedFilter.Id));
     }
 
-    protected override void DispatchSetFilter(FilterModel filter) =>
+    protected override void DispatchSetFilter(SavedFilter filter) =>
         Dispatcher.Dispatch(new SetFilterAction(filter));
 
     protected override void DispatchToggleEnabled(FilterId id) =>

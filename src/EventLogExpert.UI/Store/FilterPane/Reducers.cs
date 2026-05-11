@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using Fluxor;
 
 namespace EventLogExpert.UI.Store.FilterPane;
@@ -10,7 +10,7 @@ public sealed class Reducers
 {
     [ReducerMethod]
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, AddFilterAction action) =>
-        state with { Filters = state.Filters.Add(action.FilterModel) };
+        state with { Filters = state.Filters.Add(action.SavedFilter) };
 
     [ReducerMethod]
     public static FilterPaneState ReduceApplyFilterGroup(
@@ -23,7 +23,7 @@ public sealed class Reducers
         HashSet<(string Value, bool IsExcluded)> existingKeys =
             [.. state.Filters.Select(filter => (filter.ComparisonText, filter.IsExcluded))];
 
-        List<FilterModel> additions = [];
+        List<SavedFilter> additions = [];
 
         foreach (var filter in action.FilterGroup.Filters)
         {
@@ -55,23 +55,23 @@ public sealed class Reducers
     public static FilterPaneState ReduceSetFilter(FilterPaneState state, SetFilterAction action)
     {
         // Upsert: replace-by-Id (preserving position) or append.
-        var existing = state.Filters.FirstOrDefault(filter => filter.Id == action.FilterModel.Id);
+        var existing = state.Filters.FirstOrDefault(filter => filter.Id == action.SavedFilter.Id);
 
         if (existing is null)
         {
-            return state with { Filters = state.Filters.Add(action.FilterModel) };
+            return state with { Filters = state.Filters.Add(action.SavedFilter) };
         }
 
         var index = state.Filters.IndexOf(existing);
 
-        return state with { Filters = state.Filters.SetItem(index, action.FilterModel) };
+        return state with { Filters = state.Filters.SetItem(index, action.SavedFilter) };
     }
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetFilterDateRangeSuccess(
         FilterPaneState state,
         SetFilterDateRangeSuccessAction action) =>
-        state with { FilteredDateRange = action.FilterDateModel };
+        state with { FilteredDateRange = action.DateFilter };
 
     [ReducerMethod]
     public static FilterPaneState ReduceSetIsLoading(FilterPaneState state, SetIsLoadingAction action) =>
@@ -107,7 +107,7 @@ public sealed class Reducers
     private static FilterPaneState UpdateFilterById(
         FilterPaneState state,
         FilterId id,
-        Func<FilterModel, FilterModel> transform)
+        Func<SavedFilter, SavedFilter> transform)
     {
         var existing = state.Filters.FirstOrDefault(filter => filter.Id == id);
 

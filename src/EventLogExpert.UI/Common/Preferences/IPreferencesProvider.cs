@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -32,7 +32,7 @@ public interface IPreferencesProvider
 
     IEnumerable<string> RecentFiltersPreference { get; set; }
 
-    IEnumerable<FilterGroupModel> SavedFiltersPreference { get; set; }
+    IEnumerable<SavedFilterGroup> SavedFiltersPreference { get; set; }
 
     Theme ThemePreference { get; set; }
 

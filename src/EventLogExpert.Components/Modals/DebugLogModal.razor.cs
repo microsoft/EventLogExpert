@@ -2,11 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Services;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;

@@ -2,8 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Filters.Base;
-using EventLogExpert.UI;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterGroup;
 using Microsoft.AspNetCore.Components;
 
@@ -20,13 +19,13 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase
         Dispatcher.Dispatch(new RemoveFilterAction(ParentId, savedFilter.Id));
     }
 
-    protected override void DispatchSetFilter(FilterModel filter) =>
+    protected override void DispatchSetFilter(SavedFilter filter) =>
         Dispatcher.Dispatch(new SetFilterAction(ParentId, filter));
 
     protected override void DispatchToggleExclusion(FilterId id) =>
         Dispatcher.Dispatch(new ToggleFilterExcludedAction(ParentId, id));
 
-    protected override async ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
+    protected override async ValueTask<SavedFilter?> TrySaveAsync(FilterDraft draft)
     {
         var compiled = await base.TrySaveAsync(draft);
 

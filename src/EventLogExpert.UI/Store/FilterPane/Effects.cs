@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
@@ -20,16 +20,16 @@ public sealed class Effects(
     [EffectMethod]
     public Task HandleAddFilter(AddFilterAction action, IDispatcher dispatcher)
     {
-        if (!string.IsNullOrEmpty(action.FilterModel.ComparisonText))
+        if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
             UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
         }
 
-        if (action.FilterModel.FilterType is not FilterType.Cached &&
-            !string.IsNullOrEmpty(action.FilterModel.ComparisonText))
+        if (action.SavedFilter.FilterType is not FilterType.Cached &&
+            !string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
             dispatcher.Dispatch(
-                new AddRecentFilterAction(action.FilterModel.ComparisonText));
+                new AddRecentFilterAction(action.SavedFilter.ComparisonText));
         }
 
         return Task.CompletedTask;
@@ -63,7 +63,7 @@ public sealed class Effects(
         // so the user opts in by toggling. All other identity is preserved verbatim via record copy.
         dispatcher.Dispatch(
             new AddGroupAction(
-                new FilterGroupModel
+                new SavedFilterGroup
                 {
                     Name = action.Name,
                     Filters =
@@ -81,10 +81,10 @@ public sealed class Effects(
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
 
-        if (!string.IsNullOrEmpty(action.FilterModel.ComparisonText) &&
-            action.FilterModel.FilterType is not FilterType.Cached)
+        if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText) &&
+            action.SavedFilter.FilterType is not FilterType.Cached)
         {
-            dispatcher.Dispatch(new AddRecentFilterAction(action.FilterModel.ComparisonText));
+            dispatcher.Dispatch(new AddRecentFilterAction(action.SavedFilter.ComparisonText));
         }
 
         return Task.CompletedTask;
@@ -93,15 +93,15 @@ public sealed class Effects(
     [EffectMethod]
     public Task HandleSetFilterDateRange(SetFilterDateRangeAction action, IDispatcher dispatcher)
     {
-        if (action.FilterDateModel is null)
+        if (action.DateFilter is null)
         {
-            dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(action.FilterDateModel));
+            dispatcher.Dispatch(new SetFilterDateRangeSuccessAction(action.DateFilter));
 
             return Task.CompletedTask;
         }
 
-        DateTime? updatedAfter = action.FilterDateModel?.After ?? _filterPaneState.Value.FilteredDateRange?.After;
-        DateTime? updatedBefore = action.FilterDateModel?.Before ?? _filterPaneState.Value.FilteredDateRange?.Before;
+        DateTime? updatedAfter = action.DateFilter?.After ?? _filterPaneState.Value.FilteredDateRange?.After;
+        DateTime? updatedBefore = action.DateFilter?.Before ?? _filterPaneState.Value.FilteredDateRange?.Before;
 
         if (updatedAfter is null || updatedBefore is null)
         {
@@ -115,7 +115,7 @@ public sealed class Effects(
 
         dispatcher.Dispatch(
             new SetFilterDateRangeSuccessAction(
-                new FilterDateModel
+                new DateFilter
                 {
                     After = updatedAfter,
                     Before = updatedBefore
