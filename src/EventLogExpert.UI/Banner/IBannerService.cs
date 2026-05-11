@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Banner;
 
 public interface IBannerService
 {

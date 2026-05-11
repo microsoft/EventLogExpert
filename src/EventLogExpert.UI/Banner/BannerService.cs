@@ -6,7 +6,7 @@ using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Banner;
 
 public sealed class BannerService : IBannerService
 {

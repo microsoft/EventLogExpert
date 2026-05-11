@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components;

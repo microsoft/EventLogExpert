@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;

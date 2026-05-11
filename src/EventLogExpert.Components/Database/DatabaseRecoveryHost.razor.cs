@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Interfaces;
 using Microsoft.AspNetCore.Components;
 

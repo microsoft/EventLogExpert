@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Banner;
 
 public enum BannerView
 {
