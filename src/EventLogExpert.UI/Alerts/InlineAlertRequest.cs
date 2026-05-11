@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Alerts;
 
 /// <summary>
 ///     Describes an alert/prompt hosted inline by an active modal. <c>AcceptLabel</c> null means dismiss-only;

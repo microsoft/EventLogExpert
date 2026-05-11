@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;

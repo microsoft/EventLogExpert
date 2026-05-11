@@ -3,11 +3,10 @@
 
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Threading;
-using EventLogExpert.UI.Interfaces;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Alerts;
 
-public sealed class ModalAlertDialogService(
+public sealed class AlertDialogService(
     IInlineAlertHostBroker inlineAlertHostBroker,
     IMainThreadService mainThreadService,
     IBannerService bannerService,

@@ -1,12 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Modal;
-using EventLogExpert.UI.Services;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.Alerts;
+namespace EventLogExpert.UI.Tests.Alerts;
 
 public sealed class InlineAlertHostBrokerTests
 {

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Alerts;
 
 /// <summary>
 ///     Builds the message text shown when one or more logs the user just tried to open contained zero events.

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Alerts;
 
 /// <summary>
 ///     Implemented by an active modal so alerts can be routed as inline banners instead of opening a separate alert

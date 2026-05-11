@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Alerts;
 
 /// <summary>
 ///     Tracks the currently registered <see cref="IInlineAlertHost" /> so cross-cutting alert dispatchers can route

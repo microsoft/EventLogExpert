@@ -3,8 +3,8 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;

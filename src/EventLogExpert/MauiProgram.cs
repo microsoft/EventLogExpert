@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Clipboard;
@@ -128,7 +129,7 @@ public static class MauiProgram
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
             var bannerService = provider.GetRequiredService<IBannerService>();
 
-            return new ModalAlertDialogService(
+            return new AlertDialogService(
                 inlineAlertHostBroker,
                 mainThreadService,
                 bannerService,

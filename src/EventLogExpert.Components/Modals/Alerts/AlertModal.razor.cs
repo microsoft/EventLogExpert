@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 namespace EventLogExpert.Components.Modals.Alerts;
 
 /// <summary>
-///     Standalone alert modal used by <c>ModalAlertDialogService</c> when no host modal is active. Dismiss-only when
+///     Standalone alert modal used by <c>AlertDialogService</c> when no host modal is active. Dismiss-only when
 ///     <see cref="AcceptLabel" /> is null; otherwise renders Accept/Cancel.
 /// </summary>
 public sealed partial class AlertModal : ModalBase<bool>

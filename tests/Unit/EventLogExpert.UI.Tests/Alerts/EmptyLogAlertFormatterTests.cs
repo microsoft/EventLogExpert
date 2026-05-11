@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Alerts;
 
-namespace EventLogExpert.UI.Tests.Services.Alerts;
+namespace EventLogExpert.UI.Tests.Alerts;
 
 public sealed class EmptyLogAlertFormatterTests
 {

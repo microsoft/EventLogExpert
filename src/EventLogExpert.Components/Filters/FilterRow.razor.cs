@@ -3,7 +3,7 @@
 
 using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.UI;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
