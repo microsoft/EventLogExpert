@@ -5,7 +5,7 @@ using EventLogExpert.UI.Filter;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.FilterGroup;
+namespace EventLogExpert.UI.FilterGroup;
 
 [FeatureState]
 public sealed record FilterGroupState

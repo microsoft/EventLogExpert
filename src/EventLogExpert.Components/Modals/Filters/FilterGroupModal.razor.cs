@@ -5,7 +5,7 @@ using EventLogExpert.Components.Base;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterGroup;
+using EventLogExpert.UI.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
