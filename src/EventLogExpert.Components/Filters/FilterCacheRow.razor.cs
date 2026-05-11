@@ -2,9 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Filters.Base;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

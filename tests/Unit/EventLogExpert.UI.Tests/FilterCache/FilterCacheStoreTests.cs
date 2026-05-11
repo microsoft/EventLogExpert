@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store.FilterCache;
+namespace EventLogExpert.UI.Tests.FilterCache;
 
 public sealed class FilterCacheStoreTests
 {

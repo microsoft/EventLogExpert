@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterCache;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using System.Collections.Immutable;

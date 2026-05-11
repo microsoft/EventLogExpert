@@ -3,7 +3,7 @@
 
 using Fluxor;
 
-namespace EventLogExpert.UI.Store.FilterCache;
+namespace EventLogExpert.UI.FilterCache;
 
 internal sealed class Reducers
 {
