@@ -3,11 +3,12 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Extensions;
+namespace EventLogExpert.UI.Tests.Filter;
 
 public sealed class FilterMethodsTests
 {

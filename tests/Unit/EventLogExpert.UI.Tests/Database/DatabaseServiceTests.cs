@@ -2,10 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Database.Upgrade;
-using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Data.Sqlite;

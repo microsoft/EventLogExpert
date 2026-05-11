@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;

@@ -3,7 +3,7 @@
 
 using System.Collections;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Display;
 
 public sealed class ReversedListView<T> : IReadOnlyList<T>, IList<T>
 {

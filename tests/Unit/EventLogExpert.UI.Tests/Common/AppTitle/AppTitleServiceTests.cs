@@ -6,7 +6,7 @@ using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.System;
+namespace EventLogExpert.UI.Tests.Common.AppTitle;
 
 public sealed class AppTitleServiceTests
 {

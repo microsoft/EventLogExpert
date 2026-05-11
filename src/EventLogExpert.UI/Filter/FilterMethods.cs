@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.LogTable;
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.Filter;
 
 internal static class FilterMethods
 {

@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Options;
+namespace EventLogExpert.UI.Common.Files;
 
 public sealed class FileLocationOptions(string basePath)
 {
