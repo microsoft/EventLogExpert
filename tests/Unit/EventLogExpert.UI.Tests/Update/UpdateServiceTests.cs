@@ -6,13 +6,12 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using EventLogExpert.UI.Update;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.Update;
+namespace EventLogExpert.UI.Tests.Update;
 
 public sealed class UpdateServiceTests
 {

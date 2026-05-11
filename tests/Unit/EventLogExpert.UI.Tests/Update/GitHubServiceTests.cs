@@ -2,14 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
+using EventLogExpert.UI.Update;
 using NSubstitute;
 using System.Net;
 using System.Text.Json;
 
-namespace EventLogExpert.UI.Tests.Services.Update;
+namespace EventLogExpert.UI.Tests.Update;
 
 public sealed class GitHubServiceTests
 {

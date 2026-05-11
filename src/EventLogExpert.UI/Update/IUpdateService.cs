@@ -1,7 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Services;
+using EventLogExpert.UI.Services;
+
+namespace EventLogExpert.UI.Update;
 
 public interface IUpdateService
 {

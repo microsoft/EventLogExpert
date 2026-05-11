@@ -3,8 +3,8 @@
 
 using EventLogExpert.Services;
 using EventLogExpert.UI.Common.AppTitle;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Settings;
+using EventLogExpert.UI.Update;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

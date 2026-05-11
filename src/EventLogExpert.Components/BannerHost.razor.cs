@@ -4,8 +4,8 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Database;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;

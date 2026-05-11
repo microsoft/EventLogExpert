@@ -14,6 +14,7 @@ using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Identity;
 using EventLogExpert.UI.Common.Logging;
 using EventLogExpert.UI.Common.Preferences;
+using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Database;
@@ -25,6 +26,7 @@ using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
+using EventLogExpert.UI.Update;
 using Fluxor;
 
 namespace EventLogExpert;
