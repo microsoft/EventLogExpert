@@ -16,7 +16,7 @@ public sealed class FilterMethodsTests
     public void AddFilterGroup_WhenAddingToEmptyDictionary_ShouldCreateNewEntry()
     {
         // Arrange
-        var dictionary = new Dictionary<string, FilterGroupData>();
+        var dictionary = new Dictionary<string, FilterGroupNode>();
         var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var groupNames = Constants.FilterGroupName.Split('\\');
 
@@ -32,7 +32,7 @@ public sealed class FilterMethodsTests
     public void AddFilterGroup_WhenAddingToExistingSection_ShouldAppendFilterGroup()
     {
         // Arrange
-        var dictionary = new Dictionary<string, FilterGroupData>();
+        var dictionary = new Dictionary<string, FilterGroupNode>();
         var filterGroup1 = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var filterGroup2 = new SavedFilterGroup { Name = "TestSection\\AnotherGroup" };
 
@@ -49,7 +49,7 @@ public sealed class FilterMethodsTests
     public void AddFilterGroup_WhenCalled_ShouldReturnSameDictionary()
     {
         // Arrange
-        var dictionary = new Dictionary<string, FilterGroupData>();
+        var dictionary = new Dictionary<string, FilterGroupNode>();
         var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
 
         // Act
@@ -63,7 +63,7 @@ public sealed class FilterMethodsTests
     public void AddFilterGroup_WhenNestedGroupNames_ShouldCreateHierarchy()
     {
         // Arrange
-        var dictionary = new Dictionary<string, FilterGroupData>();
+        var dictionary = new Dictionary<string, FilterGroupNode>();
         var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupNameNested };
         var groupNames = Constants.FilterGroupNameNested.Split('\\');
 
@@ -72,14 +72,14 @@ public sealed class FilterMethodsTests
 
         // Assert
         Assert.True(dictionary.ContainsKey(Constants.FilterGroupSection));
-        Assert.True(dictionary[Constants.FilterGroupSection].ChildGroup.ContainsKey(Constants.FilterGroupSubSection));
+        Assert.True(dictionary[Constants.FilterGroupSection].ChildNodes.ContainsKey(Constants.FilterGroupSubSection));
     }
 
     [Fact]
     public void AddFilterGroup_WhenSingleGroupName_ShouldAddToRoot()
     {
         // Arrange
-        var dictionary = new Dictionary<string, FilterGroupData>();
+        var dictionary = new Dictionary<string, FilterGroupNode>();
         var filterGroup = new SavedFilterGroup { Name = "SingleGroup" };
         var groupNames = new[] { "SingleGroup" };
 
