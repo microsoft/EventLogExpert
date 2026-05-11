@@ -8,6 +8,7 @@ using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;

@@ -9,6 +9,7 @@ using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

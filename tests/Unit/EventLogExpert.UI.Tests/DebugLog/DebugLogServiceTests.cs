@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
+using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using NSubstitute;

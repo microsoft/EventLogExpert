@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Common.Preferences;

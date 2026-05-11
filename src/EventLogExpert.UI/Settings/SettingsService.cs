@@ -3,10 +3,9 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Interfaces;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Settings;
 
 public sealed class SettingsService(IPreferencesProvider preferences) : ISettingsService
 {
