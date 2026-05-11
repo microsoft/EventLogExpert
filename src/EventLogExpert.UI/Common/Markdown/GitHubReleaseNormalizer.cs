@@ -3,18 +3,18 @@
 
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Markdown;
 
 /// <summary>
 ///     Normalizes a GitHub release body into a clean Markdown document that can be rendered by
-///     <see cref="ReleaseNotesMarkdownRenderer" />. Future releases are hand-authored in rich Markdown (headings, bold,
-///     lists, links). Hand-authored content largely passes through; the only rewrites applied universally are converting
-///     <c>*</c> bullet markers to <c>-</c> for consistency and collapsing runs of 3+ blank lines. Legacy releases used a
-///     flat list of <c>* &lt;commit-id&gt; description</c> bullets, sometimes wrapped in raw HTML (<c>&lt;details&gt;</c>/
+///     <see cref="MarkdownRenderer" />. Future releases are hand-authored in rich Markdown (headings, bold, lists, links).
+///     Hand-authored content largely passes through; the only rewrites applied universally are converting <c>*</c> bullet
+///     markers to <c>-</c> for consistency and collapsing runs of 3+ blank lines. Legacy releases used a flat list of
+///     <c>* &lt;commit-id&gt; description</c> bullets, sometimes wrapped in raw HTML (<c>&lt;details&gt;</c>/
 ///     <c>&lt;summary&gt;</c>/ <c>&lt;b&gt;</c>) and followed by an auto-generated build-pipeline footer. This normalizer
 ///     strips that noise so the renderer (which escapes raw HTML) does not surface the markup as literal text.
 /// </summary>
-internal static partial class ReleaseNotesNormalizer
+internal static partial class GitHubReleaseNormalizer
 {
     public static string Normalize(string? rawBody)
     {
