@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.EventLog;
 
 public readonly record struct EventLogId(Guid Value)
 {

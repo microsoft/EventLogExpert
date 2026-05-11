@@ -8,11 +8,11 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.StatusBar;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -21,10 +21,10 @@ using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
 using CloseAllAction = EventLogExpert.UI.LogTable.CloseAllAction;
-using CloseLogAction = EventLogExpert.UI.Store.EventLog.CloseLogAction;
-using Effects = EventLogExpert.UI.Store.EventLog.Effects;
+using CloseLogAction = EventLogExpert.UI.EventLog.CloseLogAction;
+using Effects = EventLogExpert.UI.EventLog.Effects;
 
-namespace EventLogExpert.UI.Tests.Store.EventLog;
+namespace EventLogExpert.UI.Tests.EventLog;
 
 public sealed class EffectsTests
 {

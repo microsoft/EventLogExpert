@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Versioning;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.EventLog;
 
 namespace EventLogExpert.UI.LogTable;
 

@@ -3,8 +3,8 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;

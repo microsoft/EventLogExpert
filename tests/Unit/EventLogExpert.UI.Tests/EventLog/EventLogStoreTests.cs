@@ -3,13 +3,13 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store.EventLog;
+namespace EventLogExpert.UI.Tests.EventLog;
 
 public sealed class EventLogStoreTests
 {

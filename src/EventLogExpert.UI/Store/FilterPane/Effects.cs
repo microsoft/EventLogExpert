@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;

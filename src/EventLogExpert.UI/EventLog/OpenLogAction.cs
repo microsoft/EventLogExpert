@@ -3,6 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed record OpenLogAction(string LogName, LogPathType LogPathType, CancellationToken Token = default);

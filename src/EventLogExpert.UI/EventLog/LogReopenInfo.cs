@@ -3,6 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed record LogReopenInfo(string Name, LogPathType Type);

@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
-using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using System.Text.Json;
 
