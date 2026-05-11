@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Markdown;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using EventLogExpert.UI.Update;
 
-namespace EventLogExpert.UI.Tests.Common.Markdown;
+namespace EventLogExpert.UI.Tests.Update;
 
 public sealed class GitHubReleaseNormalizerTests
 {
