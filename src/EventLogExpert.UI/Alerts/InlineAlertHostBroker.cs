@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Modal;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Alerts;
 
 public sealed class InlineAlertHostBroker(IModalService modalService) : IInlineAlertHostBroker
 {

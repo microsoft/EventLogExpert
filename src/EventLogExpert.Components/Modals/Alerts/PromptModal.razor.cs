@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components;
 namespace EventLogExpert.Components.Modals.Alerts;
 
 /// <summary>
-///     Standalone prompt modal used by <c>ModalAlertDialogService</c> when no host modal is active. Returns the input
+///     Standalone prompt modal used by <c>AlertDialogService</c> when no host modal is active. Returns the input
 ///     value on Accept, or <see cref="string.Empty" /> on Cancel/Esc to match the existing
 ///     <c>IAlertDialogService.DisplayPrompt</c> non-null contract.
 /// </summary>

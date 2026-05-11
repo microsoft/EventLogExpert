@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;

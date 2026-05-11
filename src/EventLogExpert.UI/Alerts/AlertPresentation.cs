@@ -2,9 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Interfaces;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Alerts;
 
 /// <summary>
 ///     Controls how an <see cref="IAlertDialogService.ShowAlert(string,string,string,AlertPresentation)" /> request
@@ -13,8 +12,8 @@ namespace EventLogExpert.UI.Services;
 public enum AlertPresentation
 {
     /// <summary>
-    ///     Default. Use the existing <see cref="ModalAlertDialogService" /> routing: render inline in the active modal
-    ///     host if one is registered, otherwise open a standalone alert popup.
+    ///     Default. Use the existing <see cref="AlertDialogService" /> routing: render inline in the active modal host if
+    ///     one is registered, otherwise open a standalone alert popup.
     /// </summary>
     Auto,
 

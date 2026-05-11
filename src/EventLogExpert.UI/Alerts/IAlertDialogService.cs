@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
-
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Alerts;
 
 public interface IAlertDialogService
 {

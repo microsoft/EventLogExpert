@@ -1,13 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Threading;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Services;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.Alerts;
+namespace EventLogExpert.UI.Tests.Alerts;
 
 public sealed class ModalAlertDialogServiceTests
 {
@@ -26,7 +25,7 @@ public sealed class ModalAlertDialogServiceTests
             return true;
         });
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -58,7 +57,7 @@ public sealed class ModalAlertDialogServiceTests
             return true;
         });
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -80,7 +79,7 @@ public sealed class ModalAlertDialogServiceTests
         broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         IReadOnlyDictionary<string, object?>? capturedPrompt = null;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -105,7 +104,7 @@ public sealed class ModalAlertDialogServiceTests
         var bannerService = Substitute.For<IBannerService>();
         var mainThread = Substitute.For<IMainThreadService>();
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             Substitute.For<IInlineAlertHostBroker>(),
             mainThread,
             bannerService,
@@ -128,7 +127,7 @@ public sealed class ModalAlertDialogServiceTests
         var broker = Substitute.For<IInlineAlertHostBroker>();
         var standaloneCalled = false;
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             bannerService,
@@ -151,7 +150,7 @@ public sealed class ModalAlertDialogServiceTests
         var broker = Substitute.For<IInlineAlertHostBroker>();
         broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -179,7 +178,7 @@ public sealed class ModalAlertDialogServiceTests
         });
 
         var standaloneCalled = false;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -207,7 +206,7 @@ public sealed class ModalAlertDialogServiceTests
         });
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -231,7 +230,7 @@ public sealed class ModalAlertDialogServiceTests
         broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -253,7 +252,7 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowAlertTwoButton_BannerPresentation_ThrowsArgumentException()
     {
         // Arrange
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             Substitute.For<IInlineAlertHostBroker>(),
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -273,7 +272,7 @@ public sealed class ModalAlertDialogServiceTests
         var broker = Substitute.For<IInlineAlertHostBroker>();
         broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -298,7 +297,7 @@ public sealed class ModalAlertDialogServiceTests
         });
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -332,7 +331,7 @@ public sealed class ModalAlertDialogServiceTests
         });
 
         var standaloneCalled = false;
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -370,7 +369,7 @@ public sealed class ModalAlertDialogServiceTests
             return true;
         });
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
@@ -395,7 +394,7 @@ public sealed class ModalAlertDialogServiceTests
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
             .Returns(call => ((Func<Task>)call[0])());
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             mainThread,
             Substitute.For<IBannerService>(),
@@ -416,7 +415,7 @@ public sealed class ModalAlertDialogServiceTests
         var bannerService = Substitute.For<IBannerService>();
         var mainThread = Substitute.For<IMainThreadService>();
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             Substitute.For<IInlineAlertHostBroker>(),
             mainThread,
             bannerService,
@@ -439,7 +438,7 @@ public sealed class ModalAlertDialogServiceTests
         var broker = Substitute.For<IInlineAlertHostBroker>();
         var standaloneCalled = false;
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             broker,
             PassthroughMainThread(),
             bannerService,
@@ -462,7 +461,7 @@ public sealed class ModalAlertDialogServiceTests
         var bannerService = Substitute.For<IBannerService>();
         Func<Task> action = () => Task.CompletedTask;
 
-        var sut = new ModalAlertDialogService(
+        var sut = new AlertDialogService(
             Substitute.For<IInlineAlertHostBroker>(),
             PassthroughMainThread(),
             bannerService,
