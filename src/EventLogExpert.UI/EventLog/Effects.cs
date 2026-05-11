@@ -10,7 +10,6 @@ using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.LogTable;
-using EventLogExpert.UI.Models;
 using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -21,7 +20,7 @@ using System.Security;
 using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed class Effects(
     IState<EventLogState> eventLogState,

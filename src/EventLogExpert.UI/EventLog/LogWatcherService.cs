@@ -7,7 +7,7 @@ using EventLogExpert.Eventing.Resolvers;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed class LogWatcherService : ILogWatcherService
 {

@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 

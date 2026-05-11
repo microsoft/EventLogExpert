@@ -4,9 +4,8 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Common.AppTitle;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 using Application = Microsoft.Maui.Controls.Application;

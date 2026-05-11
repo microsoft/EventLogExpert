@@ -3,10 +3,12 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.LogTable;
-using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using CloseLogAction = EventLogExpert.UI.LogTable.CloseLogAction;
+using Reducers = EventLogExpert.UI.LogTable.Reducers;
 
 namespace EventLogExpert.UI.Tests.LogTable;
 

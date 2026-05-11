@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 

@@ -3,6 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Events;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed record SelectEventsAction(IReadOnlyCollection<ResolvedEvent> SelectedEvents);

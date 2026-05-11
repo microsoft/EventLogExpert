@@ -6,7 +6,7 @@ using EventLogExpert.UI.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using CloseLogAction = EventLogExpert.UI.Store.EventLog.CloseLogAction;
+using CloseLogAction = EventLogExpert.UI.EventLog.CloseLogAction;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;

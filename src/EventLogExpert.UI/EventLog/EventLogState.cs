@@ -6,7 +6,7 @@ using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 [FeatureState]
 public sealed record EventLogState

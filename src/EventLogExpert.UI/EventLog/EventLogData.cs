@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed record EventLogData(
     string Name,

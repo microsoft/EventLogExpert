@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;

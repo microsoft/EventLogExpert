@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using System.Linq.Dynamic.Core;

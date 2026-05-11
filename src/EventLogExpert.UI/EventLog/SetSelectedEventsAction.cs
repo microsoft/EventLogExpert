@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 /// <summary>
 ///     Replaces the entire selection with the supplied events, preserving input order and de-duplicating by reference

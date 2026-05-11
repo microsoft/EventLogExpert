@@ -3,6 +3,6 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Store.EventLog;
+namespace EventLogExpert.UI.EventLog;
 
 public sealed record SetFiltersAction(EventFilter EventFilter);
