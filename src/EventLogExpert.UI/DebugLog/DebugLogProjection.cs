@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.DebugLog;
 
 public static class DebugLogProjection
 {

@@ -1,13 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.DebugLog;
 
 /// <summary>
 ///     Parses lines written by <see cref="DebugLogService" /> into structured <see cref="DebugLogEntry" /> records.

@@ -1,12 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using System.Globalization;
 
-namespace EventLogExpert.UI.Tests.Services.DebugLog;
+namespace EventLogExpert.UI.Tests.DebugLog;
 
 public sealed class DebugLogEntryParserTests
 {
