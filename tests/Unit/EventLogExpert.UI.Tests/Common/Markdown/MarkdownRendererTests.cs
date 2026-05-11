@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Common.Markdown;
 
-namespace EventLogExpert.UI.Tests.Services.ReleaseNotes;
+namespace EventLogExpert.UI.Tests.Common.Markdown;
 
-public sealed class ReleaseNotesMarkdownRendererTests
+public sealed class MarkdownRendererTests
 {
     [Theory]
     [InlineData("[evil](javascript:alert(1))")]
@@ -14,7 +14,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [InlineData("[evil](ftp://example.com)")]
     public void RenderToHtml_AllLinkSchemes_StrippedToTextOnly(string markdown)
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+        var html = MarkdownRenderer.RenderToHtml(markdown);
 
         Assert.DoesNotContain("<a ", html);
         Assert.DoesNotContain("href=", html);
@@ -28,7 +28,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_AsteriskBoldInsideUnderscoreItalic_NestsCorrectly()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_some **bold** text_");
+        var html = MarkdownRenderer.RenderToHtml("_some **bold** text_");
 
         Assert.Contains("<em>some <strong>bold</strong> text</em>", html);
     }
@@ -36,7 +36,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_BlankLineBetweenBullets_StartsNewList()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("- a\n\n- b");
+        var html = MarkdownRenderer.RenderToHtml("- a\n\n- b");
 
         Assert.Equal("<ul><li>a</li></ul><ul><li>b</li></ul>", html);
     }
@@ -44,7 +44,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_BlankLineSeparatesParagraphs()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("para one\n\npara two");
+        var html = MarkdownRenderer.RenderToHtml("para one\n\npara two");
 
         Assert.Equal("<p>para one</p><p>para two</p>", html);
     }
@@ -52,7 +52,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_BoldDoesNotInterfereWithItalic()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("**bold** and *italic*");
+        var html = MarkdownRenderer.RenderToHtml("**bold** and *italic*");
 
         Assert.Contains("<strong>bold</strong>", html);
         Assert.Contains("<em>italic</em>", html);
@@ -61,7 +61,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_Bold_RendersStrong()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("**bold text**");
+        var html = MarkdownRenderer.RenderToHtml("**bold text**");
 
         Assert.Contains("<strong>bold text</strong>", html);
     }
@@ -72,7 +72,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [InlineData("+ item one")]
     public void RenderToHtml_BulletPrefixes_RenderAsList(string markdown)
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+        var html = MarkdownRenderer.RenderToHtml(markdown);
 
         Assert.Equal("<ul><li>item one</li></ul>", html);
     }
@@ -80,7 +80,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_CodePlaceholderSentinelInInput_DoesNotConfuseParser()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("text with \u00010\u0001 sentinel and `actual code`");
+        var html = MarkdownRenderer.RenderToHtml("text with \u00010\u0001 sentinel and `actual code`");
 
         Assert.Contains("<code>actual code</code>", html);
         Assert.False(html.Contains('\u0001'), "rendered HTML must not contain the internal placeholder sentinel");
@@ -89,7 +89,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_CodeSpanContents_NotProcessedAsMarkdown()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("`**not bold**`");
+        var html = MarkdownRenderer.RenderToHtml("`**not bold**`");
 
         Assert.Contains("<code>**not bold**</code>", html);
         Assert.DoesNotContain("<strong>", html);
@@ -98,8 +98,8 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_CrlfLineEndings_HandledLikeLf()
     {
-        var lf = ReleaseNotesMarkdownRenderer.RenderToHtml("# Heading\n\n- item");
-        var crlf = ReleaseNotesMarkdownRenderer.RenderToHtml("# Heading\r\n\r\n- item");
+        var lf = MarkdownRenderer.RenderToHtml("# Heading\n\n- item");
+        var crlf = MarkdownRenderer.RenderToHtml("# Heading\r\n\r\n- item");
 
         Assert.Equal(lf, crlf);
     }
@@ -107,7 +107,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_HashMidLine_NotTreatedAsHeading()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("Some text ## not a heading");
+        var html = MarkdownRenderer.RenderToHtml("Some text ## not a heading");
 
         Assert.DoesNotContain("<h2>", html);
     }
@@ -115,7 +115,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_HashWithoutSpace_NotTreatedAsHeading()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("#NotAHeading");
+        var html = MarkdownRenderer.RenderToHtml("#NotAHeading");
 
         Assert.DoesNotContain("<h1>", html);
         Assert.Contains("#NotAHeading", html);
@@ -128,13 +128,13 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [InlineData("#### Heading", "<h4>Heading</h4>")]
     public void RenderToHtml_Headings(string markdown, string expected)
     {
-        Assert.Equal(expected, ReleaseNotesMarkdownRenderer.RenderToHtml(markdown));
+        Assert.Equal(expected, MarkdownRenderer.RenderToHtml(markdown));
     }
 
     [Fact]
     public void RenderToHtml_HttpLink_RendersTextOnlyWithoutAnchor()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("[link](http://example.com)");
+        var html = MarkdownRenderer.RenderToHtml("[link](http://example.com)");
 
         Assert.DoesNotContain("<a ", html);
         Assert.DoesNotContain("href=", html);
@@ -145,7 +145,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_HttpsLink_RendersTextOnlyWithoutAnchor()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("see [docs](https://example.com/page)");
+        var html = MarkdownRenderer.RenderToHtml("see [docs](https://example.com/page)");
 
         Assert.DoesNotContain("<a ", html);
         Assert.DoesNotContain("href=", html);
@@ -156,7 +156,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_InlineCode_RendersCodeTag()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("use `Foo()` to call");
+        var html = MarkdownRenderer.RenderToHtml("use `Foo()` to call");
 
         Assert.Contains("<code>Foo()</code>", html);
     }
@@ -164,7 +164,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_IntrawordUnderscoreInsideText_NotItalicized()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("uses my_field and your_field together");
+        var html = MarkdownRenderer.RenderToHtml("uses my_field and your_field together");
 
         Assert.DoesNotContain("<em>", html);
         Assert.Contains("my_field", html);
@@ -174,7 +174,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_Italic_RendersEm()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("paragraph with *italic* word");
+        var html = MarkdownRenderer.RenderToHtml("paragraph with *italic* word");
 
         Assert.Contains("<em>italic</em>", html);
     }
@@ -184,7 +184,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     {
         const string markdown = "## Changes:\n\n- Fixed LF issue in App.xaml\n- Updated Azure yml to .NET 8";
 
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+        var html = MarkdownRenderer.RenderToHtml(markdown);
 
         Assert.Contains("<h2>Changes:</h2>", html);
         Assert.Contains("<ul><li>Fixed LF issue in App.xaml</li><li>Updated Azure yml to .NET 8</li></ul>", html);
@@ -193,7 +193,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_MultipleBullets_GroupedInOneList()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("- a\n- b\n- c");
+        var html = MarkdownRenderer.RenderToHtml("- a\n- b\n- c");
 
         Assert.Equal("<ul><li>a</li><li>b</li><li>c</li></ul>", html);
     }
@@ -201,7 +201,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_MultipleCodeSpansOnOneLine_AllRendered()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("call `Foo()` then `Bar()` then `Baz()`");
+        var html = MarkdownRenderer.RenderToHtml("call `Foo()` then `Bar()` then `Baz()`");
 
         Assert.Contains("<code>Foo()</code>", html);
         Assert.Contains("<code>Bar()</code>", html);
@@ -211,15 +211,15 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_NullOrWhitespace_ReturnsEmpty()
     {
-        Assert.Equal(string.Empty, ReleaseNotesMarkdownRenderer.RenderToHtml(null!));
-        Assert.Equal(string.Empty, ReleaseNotesMarkdownRenderer.RenderToHtml(string.Empty));
-        Assert.Equal(string.Empty, ReleaseNotesMarkdownRenderer.RenderToHtml("   \n\n  "));
+        Assert.Equal(string.Empty, MarkdownRenderer.RenderToHtml(null!));
+        Assert.Equal(string.Empty, MarkdownRenderer.RenderToHtml(string.Empty));
+        Assert.Equal(string.Empty, MarkdownRenderer.RenderToHtml("   \n\n  "));
     }
 
     [Fact]
     public void RenderToHtml_PlainTextLines_RenderAsParagraph()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("first line\nsecond line");
+        var html = MarkdownRenderer.RenderToHtml("first line\nsecond line");
 
         Assert.Equal("<p>first line<br />second line</p>", html);
     }
@@ -229,7 +229,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [InlineData("[xss](https://example.com'onclick='alert(1))")]
     public void RenderToHtml_QuotesInUrl_StrippedAlongWithUrl(string markdown)
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+        var html = MarkdownRenderer.RenderToHtml(markdown);
 
         Assert.DoesNotContain("onload=", html);
         Assert.DoesNotContain("onclick=", html);
@@ -240,7 +240,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_RawHtmlInInput_IsEscapedNotRendered()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("<img src=x onerror=alert(1)>");
+        var html = MarkdownRenderer.RenderToHtml("<img src=x onerror=alert(1)>");
 
         Assert.DoesNotContain("<img", html);
         Assert.Contains("&lt;img", html);
@@ -260,7 +260,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
             - Fixed crash when opening empty file
             """;
 
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml(markdown);
+        var html = MarkdownRenderer.RenderToHtml(markdown);
 
         Assert.Contains("<h2>What&#39;s New in v1.2.3</h2>", html);
         Assert.Contains("<h3>Features</h3>", html);
@@ -275,7 +275,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_ScriptTagInInput_IsEscaped()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("<script>alert(1)</script>");
+        var html = MarkdownRenderer.RenderToHtml("<script>alert(1)</script>");
 
         Assert.DoesNotContain("<script>", html);
         Assert.Contains("&lt;script&gt;", html);
@@ -284,7 +284,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_SnakeCaseIdentifier_NotItalicized()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("see snake_case_var for details");
+        var html = MarkdownRenderer.RenderToHtml("see snake_case_var for details");
 
         Assert.DoesNotContain("<em>", html);
         Assert.Contains("snake_case_var", html);
@@ -293,7 +293,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_TitleIsHtmlEscaped()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("<script>alert(1)</script>", string.Empty);
+        var html = MarkdownRenderer.RenderToHtml("<script>alert(1)</script>", string.Empty);
 
         Assert.DoesNotContain("<script>", html);
         Assert.Contains("&lt;script&gt;", html);
@@ -302,7 +302,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_TitleOnly_RendersH1()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("Release notes for v1.0", string.Empty);
+        var html = MarkdownRenderer.RenderToHtml("Release notes for v1.0", string.Empty);
 
         Assert.Equal("<h1>Release notes for v1.0</h1>", html);
     }
@@ -310,7 +310,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnderscoreAdjacentToNonAsciiLetter_NotItalicized()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("café_au_lait is a drink");
+        var html = MarkdownRenderer.RenderToHtml("café_au_lait is a drink");
 
         Assert.DoesNotContain("<em>", html);
         Assert.Contains("_au_lait", html);
@@ -319,7 +319,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnderscoreBoldMixedWithAsteriskItalic_BothRender()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__bold__ and *italic*");
+        var html = MarkdownRenderer.RenderToHtml("__bold__ and *italic*");
 
         Assert.Contains("<strong>bold</strong>", html);
         Assert.Contains("<em>italic</em>", html);
@@ -328,7 +328,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnderscoreBold_RendersStrong()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__bold text__");
+        var html = MarkdownRenderer.RenderToHtml("__bold text__");
 
         Assert.Contains("<strong>bold text</strong>", html);
     }
@@ -336,7 +336,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnderscoreItalicAtStartOfLine_RendersEm()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_All changes since the last stable release._");
+        var html = MarkdownRenderer.RenderToHtml("_All changes since the last stable release._");
 
         Assert.Contains("<em>All changes since the last stable release.</em>", html);
     }
@@ -344,7 +344,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnderscoreItalic_RendersEm()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("paragraph with _italic_ word");
+        var html = MarkdownRenderer.RenderToHtml("paragraph with _italic_ word");
 
         Assert.Contains("<em>italic</em>", html);
     }
@@ -352,7 +352,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnmatchedBoldMarkers_LeftAsLiteral()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("**unclosed bold");
+        var html = MarkdownRenderer.RenderToHtml("**unclosed bold");
 
         Assert.DoesNotContain("<strong>", html);
         Assert.Contains("**unclosed bold", html);
@@ -361,7 +361,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnmatchedUnderscoreBoldMarker_LeftAsLiteral()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("__unclosed bold");
+        var html = MarkdownRenderer.RenderToHtml("__unclosed bold");
 
         Assert.DoesNotContain("<strong>", html);
         Assert.Contains("__unclosed bold", html);
@@ -370,7 +370,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UnmatchedUnderscoreItalicMarker_LeftAsLiteral()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("_unclosed italic");
+        var html = MarkdownRenderer.RenderToHtml("_unclosed italic");
 
         Assert.DoesNotContain("<em>", html);
         Assert.Contains("_unclosed italic", html);
@@ -379,7 +379,7 @@ public sealed class ReleaseNotesMarkdownRendererTests
     [Fact]
     public void RenderToHtml_UrlWithAmpersand_NotRenderedInOutput()
     {
-        var html = ReleaseNotesMarkdownRenderer.RenderToHtml("[link](https://example.com/path?a=1&b=2)");
+        var html = MarkdownRenderer.RenderToHtml("[link](https://example.com/path?a=1&b=2)");
 
         Assert.DoesNotContain("href=", html);
         Assert.DoesNotContain("https://example.com", html);

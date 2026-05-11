@@ -6,13 +6,13 @@ using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Common.Markdown;
 
 /// <summary>
 ///     Renders a small, well-defined subset of Markdown to safe HTML for the in-app release notes modal. Inputs are
 ///     HTML-escaped first; only the renderer itself emits structural tags. Raw HTML in the input is treated as text.
 /// </summary>
-public static partial class ReleaseNotesMarkdownRenderer
+public static partial class MarkdownRenderer
 {
     private const char CodePlaceholderSentinel = '\u0001';
 

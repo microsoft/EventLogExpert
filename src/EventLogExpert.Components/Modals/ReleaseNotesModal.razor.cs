@@ -2,7 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Common.Markdown;
+using EventLogExpert.UI.Update.ReleaseNotes;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Modals;
@@ -18,7 +19,7 @@ public sealed partial class ReleaseNotesModal : ModalBase<bool>
     {
         // ReleaseNotesContent is a struct; defend against a missing parameter (default(struct))
         // even though [EditorRequired] surfaces the omission as a build warning.
-        _html = ReleaseNotesMarkdownRenderer.RenderToHtml(Content.Title ?? string.Empty, Content.Markdown ?? string.Empty);
+        _html = MarkdownRenderer.RenderToHtml(Content.Title ?? string.Empty, Content.Markdown ?? string.Empty);
 
         base.OnParametersSet();
     }

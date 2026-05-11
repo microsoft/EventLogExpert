@@ -4,9 +4,10 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
+using EventLogExpert.UI.Common.Markdown;
 using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Update.Deployment;
+using EventLogExpert.UI.Update.ReleaseNotes;
 
 namespace EventLogExpert.UI.Update;
 
@@ -172,7 +173,7 @@ public sealed class UpdateService(
             return null;
         }
 
-        var markdown = ReleaseNotesNormalizer.Normalize(_currentRawChanges);
+        var markdown = GitHubReleaseNormalizer.Normalize(_currentRawChanges);
         var title = $"Release notes for v{versionProvider.CurrentVersion}";
 
         return new ReleaseNotesContent(title, markdown);
