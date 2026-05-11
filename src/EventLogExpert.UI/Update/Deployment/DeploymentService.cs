@@ -6,13 +6,11 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Options;
 using System.Reflection;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Update.Deployment;
 
 public sealed class DeploymentService(
     ITraceLogger traceLogger,

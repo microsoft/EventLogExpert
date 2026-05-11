@@ -5,8 +5,8 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Update.Deployment;
 
 namespace EventLogExpert.UI.Update;
 

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Options;
+namespace EventLogExpert.UI.Update.Deployment;
 
 /// <summary>Options for package deployment operations.</summary>
 /// <param name="ForceUpdateFromAnyVersion">
