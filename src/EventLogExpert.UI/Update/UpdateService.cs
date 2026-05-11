@@ -48,13 +48,13 @@ public sealed class UpdateService(
             return;
         }
 
-        GitReleaseModel? latest = null;
+        GitHubRelease? latest = null;
 
         try
         {
             // Versions are based on current DateTime so this is safer than dealing with
             // stripping the v off the Version for every release
-            GitReleaseModel[] releases = [.. (await githubService.GetReleases()).OrderByDescending(x => x.ReleaseDate)];
+            GitHubRelease[] releases = [.. (await githubService.GetReleases()).OrderByDescending(x => x.ReleaseDate)];
 
             if (releases.Length <= 0)
             {

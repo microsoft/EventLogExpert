@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Update;
 
-public readonly partial record struct GitReleaseModel
+public readonly partial record struct GitHubRelease
 {
     [JsonPropertyName("name")] public string Version { get; init; }
 
@@ -14,7 +14,7 @@ public readonly partial record struct GitReleaseModel
 
     [JsonPropertyName("published_at")] public DateTime ReleaseDate { get; init; }
 
-    [JsonPropertyName("assets")] public List<GitReleaseAsset> Assets { get; init; }
+    [JsonPropertyName("assets")] public List<GitHubReleaseAsset> Assets { get; init; }
 
     [JsonPropertyName("body")] public string RawChanges { get; init; }
 
@@ -49,7 +49,7 @@ public readonly partial record struct GitReleaseModel
     private static partial Regex SplitChangeLog();
 }
 
-public readonly record struct GitReleaseAsset
+public readonly record struct GitHubReleaseAsset
 {
     [JsonPropertyName("name")] public required string Name { get; init; }
 

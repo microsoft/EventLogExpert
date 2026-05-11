@@ -5,5 +5,5 @@ namespace EventLogExpert.UI.Update;
 
 public interface IGitHubService
 {
-    Task<IEnumerable<GitReleaseModel>> GetReleases();
+    Task<IEnumerable<GitHubRelease>> GetReleases();
 }

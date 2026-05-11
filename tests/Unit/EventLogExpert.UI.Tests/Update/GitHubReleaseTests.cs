@@ -5,12 +5,12 @@ using EventLogExpert.UI.Tests.TestUtils;
 
 namespace EventLogExpert.UI.Tests.Update;
 
-public sealed class GitReleaseModelTests
+public sealed class GitHubReleaseTests
 {
     [Fact]
     public void Changes_WhenContainsRawChanges_ShouldRemoveCommitIds()
     {
-        var releaseModels = GitHubUtils.CreateGitReleaseModels();
+        var releaseModels = GitHubUtils.CreateGitHubReleases();
 
         var result = releaseModels.First().Changes;
 

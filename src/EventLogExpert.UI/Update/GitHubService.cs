@@ -11,7 +11,7 @@ public sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogge
     private readonly HttpClient _httpClient = httpClient;
     private readonly ITraceLogger _traceLogger = traceLogger;
 
-    public async Task<IEnumerable<GitReleaseModel>> GetReleases()
+    public async Task<IEnumerable<GitHubRelease>> GetReleases()
     {
         var response = await _httpClient.GetAsync("/repos/microsoft/EventLogExpert/releases");
 
@@ -25,7 +25,7 @@ public sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogge
         _traceLogger.Debug($"{nameof(GetReleases)} Attempt to retrieve {response.RequestMessage?.RequestUri} succeeded: {response.StatusCode}.");
 
         var stream = await response.Content.ReadAsStreamAsync();
-        var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitReleaseModel>>(stream);
+        var content = await JsonSerializer.DeserializeAsync<IEnumerable<GitHubRelease>>(stream);
 
         if (content is not null) { return content; }
 
