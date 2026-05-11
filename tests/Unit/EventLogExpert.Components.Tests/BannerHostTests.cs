@@ -99,7 +99,7 @@ public sealed class BannerHostTests : BunitContext
         // "Upgrading database 0 of N: " string in that gap.
         _bannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
-                Guid.NewGuid(),
+                UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
                 CurrentBatchPosition: 0,
                 CurrentBatchSize: 3,
@@ -120,7 +120,7 @@ public sealed class BannerHostTests : BunitContext
     {
         _bannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
-                Guid.NewGuid(),
+                UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
                 CurrentBatchPosition: 2,
                 CurrentBatchSize: 5,
@@ -144,7 +144,7 @@ public sealed class BannerHostTests : BunitContext
     {
         _bannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
-                Guid.NewGuid(),
+                UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
                 CurrentBatchPosition: 1,
                 CurrentBatchSize: 2,
@@ -165,7 +165,7 @@ public sealed class BannerHostTests : BunitContext
         int cancelInvocationCount = 0;
         _bannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
-                Guid.NewGuid(),
+                UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
                 CurrentBatchPosition: 1,
                 CurrentBatchSize: 1,
@@ -185,7 +185,7 @@ public sealed class BannerHostTests : BunitContext
     {
         _bannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
-                Guid.NewGuid(),
+                UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
                 CurrentBatchPosition: 1,
                 CurrentBatchSize: 1,

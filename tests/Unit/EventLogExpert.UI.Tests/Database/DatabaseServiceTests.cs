@@ -2178,7 +2178,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        var events = new List<(string Name, Guid BatchId)>();
+        var events = new List<(string Name, UpgradeBatchId BatchId)>();
         var eventLock = new object();
 
         service.UpgradeBatchStarted += (_, args) =>
@@ -2211,7 +2211,7 @@ public sealed class DatabaseServiceTests : IDisposable
             Assert.Equal(nameof(IDatabaseService.UpgradeBatchCompleted), events[4].Name);
 
             var batchId = events[0].BatchId;
-            Assert.NotEqual(Guid.Empty, batchId);
+            Assert.NotEqual(default(UpgradeBatchId), batchId);
             Assert.All(events, e => Assert.Equal(batchId, e.BatchId));
         }
     }
@@ -2299,7 +2299,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         using var firstBackingUp = new ManualResetEventSlim(initialState: false);
         using var releaseFirst = new ManualResetEventSlim(initialState: false);
-        var startedBatchIds = new List<Guid>();
+        var startedBatchIds = new List<UpgradeBatchId>();
         var startedTimes = new List<DateTime>();
 
         service.UpgradeBatchStarted += (_, args) =>

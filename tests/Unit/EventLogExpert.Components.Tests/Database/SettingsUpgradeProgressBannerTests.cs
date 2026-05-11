@@ -243,7 +243,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
         int queuedBatchesAfter = 0,
         Action? cancel = null) =>
         new(
-            Guid.NewGuid(),
+            UpgradeBatchId.Create(),
             scope,
             currentBatchPosition,
             currentBatchSize,

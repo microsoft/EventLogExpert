@@ -728,7 +728,7 @@ public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProv
         var tcs = new TaskCompletionSource<UpgradeBatchResult>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var batch = new UpgradeBatch(
-            Guid.NewGuid(),
+            UpgradeBatchId.Create(),
             scope,
             acceptable,
             tcs,
@@ -1300,7 +1300,7 @@ public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProv
         return true;
     }
 
-    private async Task UpgradeAsync(string fileName, int position, Guid batchId, CancellationToken cancellationToken)
+    private async Task UpgradeAsync(string fileName, int position, UpgradeBatchId batchId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1512,7 +1512,7 @@ public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProv
     private sealed class UpgradeRollbackFailedException(string message) : Exception(message);
 
     private sealed record UpgradeBatch(
-        Guid Id,
+        UpgradeBatchId Id,
         UpgradeProgressScope Scope,
         IReadOnlyList<DatabaseEntry> Entries,
         TaskCompletionSource<UpgradeBatchResult> Tcs,

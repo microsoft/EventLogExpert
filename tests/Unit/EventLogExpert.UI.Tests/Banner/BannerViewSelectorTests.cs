@@ -273,7 +273,7 @@ public sealed class BannerViewSelectorTests
 
     private static BannerProgressEntry BuildProgress() =>
         new(
-            Guid.NewGuid(),
+            UpgradeBatchId.Create(),
             UpgradeProgressScope.Background,
             CurrentBatchPosition: 0,
             CurrentBatchSize: 1,

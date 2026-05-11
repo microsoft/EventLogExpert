@@ -42,7 +42,7 @@ public sealed class BannerServiceTests
         // the args.Cancel() shim; verify the captured delegate calls through.
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -833,7 +833,7 @@ public sealed class BannerServiceTests
         // Arrange
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -858,8 +858,8 @@ public sealed class BannerServiceTests
         // slot or raise a spurious StateChanged.
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var currentId = Guid.NewGuid();
-        var staleId = Guid.NewGuid();
+        var currentId = UpgradeBatchId.Create();
+        var staleId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -887,7 +887,7 @@ public sealed class BannerServiceTests
         var databaseService = Substitute.For<IDatabaseService>();
         databaseService.QueuedBatchCount.Returns(0);
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -910,7 +910,7 @@ public sealed class BannerServiceTests
         // Arrange
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -939,8 +939,8 @@ public sealed class BannerServiceTests
         // Arrange — a Progress event arriving for a batch the slot doesn't hold is ignored defensively.
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var currentId = Guid.NewGuid();
-        var staleId = Guid.NewGuid();
+        var currentId = UpgradeBatchId.Create();
+        var staleId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
@@ -969,7 +969,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
 
         // Act
@@ -994,7 +994,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, batchSize: 5, cts);
 
@@ -1022,8 +1022,8 @@ public sealed class BannerServiceTests
         // invariant: a Started must be paired with a Completed before the next Started fires.
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var firstId = Guid.NewGuid();
-        var secondId = Guid.NewGuid();
+        var firstId = UpgradeBatchId.Create();
+        var secondId = UpgradeBatchId.Create();
         using var firstCts = new CancellationTokenSource();
         using var secondCts = new CancellationTokenSource();
 
@@ -1055,7 +1055,7 @@ public sealed class BannerServiceTests
         // Arrange
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
-        var batchId = Guid.NewGuid();
+        var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.SettingsTriggered, batchSize: 1, cts);
 
