@@ -4,7 +4,7 @@
 namespace EventLogExpert.UI.Banner;
 
 public sealed record ErrorBannerEntry(
-    Guid Id,
+    BannerId Id,
     string Title,
     string Message,
     string? ActionLabel,

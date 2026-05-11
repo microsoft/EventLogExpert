@@ -275,7 +275,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         sut.ReportError("First Title", "First Message");
         sut.ReportError("Second Title", "Second Message");
-        Guid firstId = sut.ErrorBanners[0].Id;
+        BannerId firstId = sut.ErrorBanners[0].Id;
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
 
@@ -298,7 +298,7 @@ public sealed class BannerServiceTests
         sut.StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.DismissError(Guid.NewGuid());
+        sut.DismissError(BannerId.Create());
 
         // Assert
         Assert.Single(sut.ErrorBanners);
@@ -312,7 +312,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         sut.ReportInfoBanner("First Title", "First Message", BannerSeverity.Info);
         sut.ReportInfoBanner("Second Title", "Second Message", BannerSeverity.Warning);
-        Guid firstId = sut.InfoBanners[0].Id;
+        BannerId firstId = sut.InfoBanners[0].Id;
         int stateChangedCount = 0;
         sut.StateChanged += () => stateChangedCount++;
 
@@ -335,7 +335,7 @@ public sealed class BannerServiceTests
         sut.StateChanged += () => stateChangedCount++;
 
         // Act
-        sut.DismissInfoBanner(Guid.NewGuid());
+        sut.DismissInfoBanner(BannerId.Create());
 
         // Assert
         Assert.Single(sut.InfoBanners);
@@ -588,7 +588,7 @@ public sealed class BannerServiceTests
         Assert.Equal("Message", sut.ErrorBanners[0].Message);
         Assert.Null(sut.ErrorBanners[0].ActionLabel);
         Assert.Null(sut.ErrorBanners[0].Action);
-        Assert.NotEqual(Guid.Empty, sut.ErrorBanners[0].Id);
+        Assert.NotEqual(default(BannerId), sut.ErrorBanners[0].Id);
         Assert.Equal(1, stateChangedCount);
     }
 
@@ -599,10 +599,10 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
         // Act
-        Guid id = sut.ReportError("Title", "Message");
+        BannerId id = sut.ReportError("Title", "Message");
 
         // Assert
-        Assert.NotEqual(Guid.Empty, id);
+        Assert.NotEqual(default(BannerId), id);
         Assert.Equal(id, sut.ErrorBanners[0].Id);
     }
 
@@ -707,7 +707,7 @@ public sealed class BannerServiceTests
         Assert.Equal("Title", sut.InfoBanners[0].Title);
         Assert.Equal("Message", sut.InfoBanners[0].Message);
         Assert.Equal(BannerSeverity.Warning, sut.InfoBanners[0].Severity);
-        Assert.NotEqual(Guid.Empty, sut.InfoBanners[0].Id);
+        Assert.NotEqual(default(BannerId), sut.InfoBanners[0].Id);
         Assert.Equal(1, stateChangedCount);
     }
 

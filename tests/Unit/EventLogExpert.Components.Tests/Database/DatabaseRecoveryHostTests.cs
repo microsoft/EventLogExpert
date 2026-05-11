@@ -19,7 +19,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     private Func<Task>? _capturedRecoveryAction;
-    private Guid _nextBannerId = Guid.NewGuid();
+    private BannerId _nextBannerId = BannerId.Create();
 
     public DatabaseRecoveryHostTests()
     {
@@ -45,7 +45,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_BannerDismissedExternally_DoesNotRepromptForSameSet()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
         _bannerService.ErrorBanners.Returns(
@@ -73,7 +73,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_BannerDismissedExternally_NewBackupEntryAppears_RepromptsWithNewCount()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
         _bannerService.ErrorBanners.Returns(
@@ -87,7 +87,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _bannerService.StateChanged += Raise.Event<Action>();
 
         // Act
-        var newId = Guid.NewGuid();
+        var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
@@ -105,7 +105,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public async Task DatabaseRecoveryHost_DialogDismissed_BannerStillVisible_DoesNotDismissBanner()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
@@ -120,14 +120,14 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Assert
         Assert.Empty(component.FindAll("dialog"));
 
-        _bannerService.DidNotReceive().DismissError(Arg.Any<Guid>());
+        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
     }
 
     [Fact]
     public async Task DatabaseRecoveryHost_DialogOpen_NewBackupEntryAppears_RefreshesBannerKeepsDialogOpen()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
@@ -137,7 +137,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         Assert.Single(component.FindAll("dialog"));
 
         // Act
-        var newId = Guid.NewGuid();
+        var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
@@ -158,7 +158,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_Disposed_DismissesOwnedBanner()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
@@ -188,7 +188,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<Guid>());
+        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
         _bannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
@@ -200,7 +200,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_Disposed_TwiceIsIdempotent()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
@@ -226,14 +226,14 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         component.Instance.Dispose();
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<Guid>());
+        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
     }
 
     [Fact]
     public void DatabaseRecoveryHost_EntriesChanged_AllRecovered_DismissesBannerAndDoesNotReprompt()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
@@ -257,14 +257,14 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_EntriesChanged_NewBackupExistsEntry_DismissesOldBannerAndRaisesNewWithUpdatedCount()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
 
         Render<DatabaseRecoveryHost>();
 
         // Act
-        var newId = Guid.NewGuid();
+        var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
@@ -292,7 +292,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<Guid>());
+        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
         _bannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
@@ -304,7 +304,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_EntriesChanged_ShrinkButStillNonEmpty_DismissesOldBannerAndRaisesNewWithUpdatedCount()
     {
         // Arrange
-        var initialId = Guid.NewGuid();
+        var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
@@ -312,7 +312,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         Render<DatabaseRecoveryHost>();
 
         // Act
-        var newId = Guid.NewGuid();
+        var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns([BuildEntry("b.db", backupExists: true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);

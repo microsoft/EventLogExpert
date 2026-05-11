@@ -109,7 +109,7 @@ public sealed class BannerService : IBannerService
         }
     }
 
-    public void DismissError(Guid id)
+    public void DismissError(BannerId id)
     {
         bool removed;
 
@@ -126,7 +126,7 @@ public sealed class BannerService : IBannerService
         }
     }
 
-    public void DismissInfoBanner(Guid id)
+    public void DismissInfoBanner(BannerId id)
     {
         bool removed;
 
@@ -170,7 +170,7 @@ public sealed class BannerService : IBannerService
         RaiseStateChanged();
     }
 
-    public Guid ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null)
+    public BannerId ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null)
     {
         bool hasAction = action is not null;
         bool hasLabel = !string.IsNullOrWhiteSpace(actionLabel);
@@ -184,7 +184,7 @@ public sealed class BannerService : IBannerService
 
         string? normalizedLabel = hasLabel ? actionLabel : null;
         Func<Task>? normalizedAction = hasAction ? action : null;
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), title, message, normalizedLabel, normalizedAction, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), title, message, normalizedLabel, normalizedAction, DateTime.UtcNow);
 
         lock (_stateLock)
         {
@@ -197,7 +197,7 @@ public sealed class BannerService : IBannerService
 
     public void ReportInfoBanner(string title, string message, BannerSeverity severity)
     {
-        var entry = new BannerInfoEntry(Guid.NewGuid(), title, message, severity, DateTime.UtcNow);
+        var entry = new BannerInfoEntry(BannerId.Create(), title, message, severity, DateTime.UtcNow);
 
         lock (_stateLock)
         {

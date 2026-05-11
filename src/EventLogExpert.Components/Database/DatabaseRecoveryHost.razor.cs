@@ -13,7 +13,7 @@ public sealed partial class DatabaseRecoveryHost : ComponentBase, IDisposable
     private bool _dialogOpen;
     private bool _disposed;
     private HashSet<string> _promptedFor = new(StringComparer.OrdinalIgnoreCase);
-    private Guid? _recoveryBannerId;
+    private BannerId? _recoveryBannerId;
 
     [Inject] private IBannerService BannerService { get; init; } = null!;
 
@@ -112,7 +112,7 @@ public sealed partial class DatabaseRecoveryHost : ComponentBase, IDisposable
         });
     }
 
-    private Guid ReportRecoveryBanner(int count)
+    private BannerId ReportRecoveryBanner(int count)
     {
         string message = count == 1
             ? "1 database needs recovery from interrupted upgrade."

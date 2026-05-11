@@ -266,10 +266,10 @@ public sealed class BannerViewSelectorTests
         new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
 
     private static ErrorBannerEntry BuildError() =>
-        new(Guid.NewGuid(), "Error Title", "Error Message", null, null, s_testTime);
+        new(BannerId.Create(), "Error Title", "Error Message", null, null, s_testTime);
 
     private static BannerInfoEntry BuildInfo() =>
-        new(Guid.NewGuid(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);
+        new(BannerId.Create(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);
 
     private static BannerProgressEntry BuildProgress() =>
         new(

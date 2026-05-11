@@ -15,7 +15,7 @@ public enum BannerView
     Info
 }
 
-public sealed record BannerCycleItem(BannerView View, int IndexWithinSlice, Guid? EntryId);
+public sealed record BannerCycleItem(BannerView View, int IndexWithinSlice, BannerId? EntryId);
 
 public static class BannerViewSelector
 {
