@@ -1,12 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Options;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Update.Deployment;
 
 public sealed class PackageDeploymentService : IPackageDeploymentService
 {

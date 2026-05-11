@@ -5,10 +5,10 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using EventLogExpert.UI.Update;
+using EventLogExpert.UI.Update.Deployment;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Update;

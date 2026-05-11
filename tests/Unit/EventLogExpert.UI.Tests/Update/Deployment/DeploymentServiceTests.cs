@@ -6,15 +6,13 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Options;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using EventLogExpert.UI.Update.Deployment;
 using NSubstitute;
 using Windows.Foundation;
 
-namespace EventLogExpert.UI.Tests.Services.Deployment;
+namespace EventLogExpert.UI.Tests.Update.Deployment;
 
 public sealed class DeploymentServiceTests
 {

@@ -1,11 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Options;
 using Windows.Foundation;
 using Windows.Management.Deployment;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Update.Deployment;
 
 public interface IPackageDeploymentService
 {

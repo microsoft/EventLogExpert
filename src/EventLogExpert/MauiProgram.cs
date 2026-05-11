@@ -27,6 +27,7 @@ using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Update;
+using EventLogExpert.UI.Update.Deployment;
 using Fluxor;
 
 namespace EventLogExpert;

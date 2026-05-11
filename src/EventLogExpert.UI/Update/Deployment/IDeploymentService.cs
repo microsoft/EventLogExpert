@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Update.Deployment;
 
 public interface IDeploymentService
 {
