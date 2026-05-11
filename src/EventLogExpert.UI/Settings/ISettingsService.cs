@@ -1,10 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Settings;
 
 public interface ISettingsService
 {

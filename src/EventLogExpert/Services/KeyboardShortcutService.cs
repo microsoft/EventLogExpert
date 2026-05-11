@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Settings;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Services;

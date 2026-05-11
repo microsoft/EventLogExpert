@@ -5,6 +5,7 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 

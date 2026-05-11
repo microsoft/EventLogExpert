@@ -3,12 +3,12 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.Settings;
+namespace EventLogExpert.UI.Tests.Settings;
 
 public sealed class SettingsServiceTests
 {
