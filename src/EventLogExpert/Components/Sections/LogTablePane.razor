@@ -1,7 +1,7 @@
 @using EventLogExpert.Eventing.Common.Events
 @inherits FluxorComponent
 
-<SplitLogTabPane />
+<LogTabBar />
 
 <div aria-labelledby="eventTable" class="table-container" @onkeydown="HandleKeyDown" role="region" tabindex="0">
     <table aria-label="Event Log Table"
@@ -18,7 +18,7 @@
                 var width = GetColumnWidth(columnHeader);
 
                 <th aria-colindex="@(columnIndex + 1)"
-                    aria-sort="@(_eventTableState.OrderBy == columnHeader ? _eventTableState.IsDescending ? "descending" : "ascending" : "none")"
+                    aria-sort="@(_logTableState.OrderBy == columnHeader ? _logTableState.IsDescending ? "descending" : "ascending" : "none")"
                     class="@columnHeader.ToString().ToLowerInvariant()"
                     data-column="@columnHeader"
                     @key="columnHeader"
@@ -32,9 +32,9 @@
                     {
                         @_headerName
                     }
-                    @if (_eventTableState.OrderBy == columnHeader)
+                    @if (_logTableState.OrderBy == columnHeader)
                     {
-                        <span class="menu-toggle" data-rotate="@_eventTableState.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
+                        <span class="menu-toggle" data-rotate="@_logTableState.IsDescending.ToString().ToLower()" @onclick="ToggleSorting">
                             <i class="bi bi-caret-up"></i>
                         </span>
                     }

@@ -4,6 +4,6 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
-public sealed record UpdateTableAction(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events);
+public sealed record AppendTableEventsAction(EventLogId LogId, IReadOnlyList<ResolvedEvent> Events);

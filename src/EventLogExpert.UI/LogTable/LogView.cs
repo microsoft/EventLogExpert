@@ -2,10 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.LogTable;
 
-public sealed record EventTableModel(EventLogId Id)
+public sealed record LogView(EventLogId Id)
 {
     public string? FileName { get; init; }
 

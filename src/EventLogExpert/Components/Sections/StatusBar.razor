@@ -1,4 +1,4 @@
-﻿@using EventLogExpert.Eventing.Common.Channels
+@using EventLogExpert.Eventing.Common.Channels
 @inherits FluxorComponent
 
 <div aria-atomic="true" aria-live="polite" class="status-bar" role="status">
@@ -14,9 +14,9 @@
 
     <span>Events Loaded: @_eventLogState.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (_eventTableState.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(_eventLogState.AppliedFilter))
+    @if (_logTableState.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(_eventLogState.AppliedFilter))
     {
-        var activeTable = _eventTableState.EventTables.FirstOrDefault(table => table.Id == _eventTableState.ActiveEventLogId);
+        var activeTable = _logTableState.EventTables.FirstOrDefault(table => table.Id == _logTableState.ActiveEventLogId);
 
         if (activeTable is null) { return; }
 
@@ -27,8 +27,8 @@
                 : 0;
 
         var filteredEvents = activeTable.IsCombined ?
-            _eventTableState.DisplayedEvents.Count :
-            _eventTableState.EventCountByLog.GetValueOrDefault(activeTable.Id, 0);
+            _logTableState.DisplayedEvents.Count :
+            _logTableState.EventCountByLog.GetValueOrDefault(activeTable.Id, 0);
 
         <span>Visible: @(filteredEvents) Hidden by filter: @(totalEvents - filteredEvents)</span>
     }

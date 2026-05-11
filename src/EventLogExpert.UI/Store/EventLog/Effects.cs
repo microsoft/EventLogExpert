@@ -9,9 +9,9 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.StatusBar;
-using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
@@ -149,7 +149,7 @@ public sealed class Effects(
 
         await _logWatcherService.RemoveAllAsync();
 
-        dispatcher.Dispatch(new EventTable.CloseAllAction());
+        dispatcher.Dispatch(new LogTable.CloseAllAction());
         dispatcher.Dispatch(new StatusBar.CloseAllAction());
 
         _resolverCache.ClearAll();
@@ -198,7 +198,7 @@ public sealed class Effects(
             // a fresh resolve must occur instead of returning stale text from a different file.
             _xmlResolver.ClearXmlCacheForLog(action.LogName);
 
-            dispatcher.Dispatch(new EventTable.CloseLogAction(action.LogId));
+            dispatcher.Dispatch(new LogTable.CloseLogAction(action.LogId));
 
             if (_eventLogState.Value.ActiveLogs.IsEmpty)
             {

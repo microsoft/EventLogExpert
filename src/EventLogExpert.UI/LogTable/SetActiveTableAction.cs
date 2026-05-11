@@ -3,6 +3,6 @@
 
 using EventLogExpert.UI.Models;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
-public sealed record ToggleLoadingAction(EventLogId LogId);
+public sealed record SetActiveTableAction(EventLogId LogId);
