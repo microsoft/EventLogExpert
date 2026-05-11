@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 

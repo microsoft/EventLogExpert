@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Store.StatusBar;
+namespace EventLogExpert.UI.StatusBar;
 
 /// <summary>Used to indicate the progress of event logs being loaded.</summary>
 /// <param name="ActivityId">

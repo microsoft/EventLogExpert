@@ -1,10 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.StatusBar;
+namespace EventLogExpert.UI.StatusBar;
 
 [FeatureState(MaximumStateChangedNotificationsPerSecond = 1)]
 public sealed record StatusBarState
