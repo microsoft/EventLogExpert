@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.Banner;
+namespace EventLogExpert.UI.Tests.Banner;
 
 public sealed class BannerServiceTests
 {

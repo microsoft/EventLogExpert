@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
 
-namespace EventLogExpert.UI.Tests.Services.Banner;
+namespace EventLogExpert.UI.Tests.Banner;
 
 public sealed class BannerViewSelectorTests
 {

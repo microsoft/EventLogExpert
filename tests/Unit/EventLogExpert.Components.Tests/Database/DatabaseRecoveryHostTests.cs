@@ -5,6 +5,7 @@ using Bunit;
 using EventLogExpert.Components.Database;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components.Web;

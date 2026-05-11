@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
 
 namespace EventLogExpert.UI.Services;
 
