@@ -18,7 +18,7 @@ namespace EventLogExpert.UI.Filter;
 ///         visible in the UI for the user to repair without forcing application start to fail.
 ///     </para>
 /// </summary>
-public sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
+internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 {
     public override SavedFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {

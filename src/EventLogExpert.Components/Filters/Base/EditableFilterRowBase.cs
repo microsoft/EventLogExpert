@@ -74,7 +74,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<SavedFilter?>
         if (Value is not { } savedFilter) { return; }
 
         OnEditSessionResetting();
-        Filter = FilterDraft.FromFilterModel(savedFilter);
+        Filter = FilterDraft.FromSavedFilter(savedFilter);
 
         await OnEditingChanged.InvokeAsync((savedFilter.Id, true));
     }

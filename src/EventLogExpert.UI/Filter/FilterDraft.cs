@@ -26,7 +26,7 @@ public sealed class FilterDraft
     ///     with the original comparison + sub-filters; otherwise opens empty Basic fields with just
     ///     <see cref="SavedFilter.ComparisonText" /> populated.
     /// </summary>
-    public static FilterDraft FromFilterModel(SavedFilter filter)
+    public static FilterDraft FromSavedFilter(SavedFilter filter)
     {
         var basicFilter = filter.FilterType == FilterType.Basic ? filter.BasicFilter : null;
 

@@ -1,4 +1,4 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using Windows.Storage;
@@ -7,7 +7,7 @@ using WinRT.Interop;
 
 namespace EventLogExpert.Platforms.Windows;
 
-public static class FolderPickerHelper
+internal static class FolderPickerHelper
 {
     /// <summary>
     ///     Presents the WinUI folder picker. Returns the selected folder's path, or <c>null</c> only when the user

@@ -10,7 +10,7 @@ namespace EventLogExpert.UI.Tests.Filter;
 public sealed class FilterDraftModelTests
 {
     [Fact]
-    public void FromFilterModel_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
+    public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
         var basicFilter = new BasicFilter(
             new FilterData
@@ -26,7 +26,7 @@ public sealed class FilterDraftModelTests
             filterType: FilterType.Basic,
             basicFilter: basicFilter);
 
-        var draft = FilterDraft.FromFilterModel(original);
+        var draft = FilterDraft.FromSavedFilter(original);
 
         draft.Comparison.Values.Clear();
         draft.Comparison.Values.Add(Constants.FilterValue500);
@@ -37,7 +37,7 @@ public sealed class FilterDraftModelTests
     }
 
     [Fact]
-    public void FromFilterModel_HydratesComparisonAndSubFiltersFromBasicFilter()
+    public void FromSavedFilter_HydratesComparisonAndSubFiltersFromBasicFilter()
     {
         var basicFilter = new BasicFilter(
             new FilterData
@@ -63,7 +63,7 @@ public sealed class FilterDraftModelTests
             filterType: FilterType.Basic,
             basicFilter: basicFilter);
 
-        var draft = FilterDraft.FromFilterModel(original);
+        var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(FilterCategory.Id, draft.Comparison.Category);
         Assert.Equal(Constants.FilterValue100, draft.Comparison.Value);
@@ -76,17 +76,17 @@ public sealed class FilterDraftModelTests
     }
 
     [Fact]
-    public void FromFilterModel_PreservesId()
+    public void FromSavedFilter_PreservesId()
     {
         var original = FilterUtils.CreateTestFilter();
 
-        var draft = FilterDraft.FromFilterModel(original);
+        var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(original.Id, draft.Id);
     }
 
     [Fact]
-    public void FromFilterModel_PreservesScalarFields()
+    public void FromSavedFilter_PreservesScalarFields()
     {
         var original = FilterUtils.CreateTestFilter(
             color: HighlightColor.Blue,
@@ -94,7 +94,7 @@ public sealed class FilterDraftModelTests
             isEnabled: true,
             isExcluded: true);
 
-        var draft = FilterDraft.FromFilterModel(original);
+        var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(HighlightColor.Blue, draft.Color);
         Assert.Equal(FilterType.Basic, draft.FilterType);
@@ -104,13 +104,13 @@ public sealed class FilterDraftModelTests
     }
 
     [Fact]
-    public void FromFilterModel_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
+    public void FromSavedFilter_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
     {
         // Advanced filters and legacy basic filters lacking BasicFilter simply expose the
         // raw ComparisonText for re-edit without populating the structured draft inputs.
         var original = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals100);
 
-        var draft = FilterDraft.FromFilterModel(original);
+        var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(FilterCategory.Id, draft.Comparison.Category);
         Assert.Null(draft.Comparison.Value);
