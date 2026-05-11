@@ -11,9 +11,9 @@ public sealed partial class FilterGroupSection
 {
     private bool _menuState = true;
 
-    [Parameter] public required FilterGroupData Data { get; set; }
-
     [Parameter] public required string Name { get; set; }
+
+    [Parameter] public required FilterGroupNode Node { get; set; }
 
     [Parameter] public required FilterGroupModal Parent { get; set; }
 

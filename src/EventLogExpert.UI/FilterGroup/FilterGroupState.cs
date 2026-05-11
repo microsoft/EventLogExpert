@@ -12,6 +12,6 @@ public sealed record FilterGroupState
 {
     public ImmutableList<SavedFilterGroup> Groups { get; init; } = [];
 
-    public IReadOnlyDictionary<string, FilterGroupData> DisplayGroups { get; init; } =
-        ImmutableDictionary<string, FilterGroupData>.Empty;
+    public IReadOnlyDictionary<string, FilterGroupNode> DisplayGroups { get; init; } =
+        ImmutableDictionary<string, FilterGroupNode>.Empty;
 }

@@ -3,9 +3,9 @@
 
 namespace EventLogExpert.UI.Filter;
 
-public sealed record FilterGroupData
+public sealed record FilterGroupNode
 {
-    public Dictionary<string, FilterGroupData> ChildGroup { get; init; } = [];
+    public Dictionary<string, FilterGroupNode> ChildNodes { get; init; } = [];
 
     public List<SavedFilterGroup> FilterGroups { get; init; } = [];
 }

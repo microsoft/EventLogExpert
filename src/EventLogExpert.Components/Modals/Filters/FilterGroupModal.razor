@@ -14,15 +14,15 @@
     @ref="ChromeRef">
     <ChildContent>
         <div class="flex-column-scroll">
-            @foreach ((string name, FilterGroupData data) in FilterGroupState.Value.DisplayGroups.OrderBy(x => x.Key))
+            @foreach ((string name, FilterGroupNode node) in FilterGroupState.Value.DisplayGroups.OrderBy(x => x.Key))
             {
                 if (!string.IsNullOrEmpty(name))
                 {
-                    <FilterGroupSection Data="data" Name="@name" Parent="this" />
+                    <FilterGroupSection Node="node" Name="@name" Parent="this" />
                 }
                 else
                 {
-                    @foreach (var group in data.FilterGroups)
+                    @foreach (var group in node.FilterGroups)
                     {
                         <FilterGroup Group="group" Parent="this" />
                     }

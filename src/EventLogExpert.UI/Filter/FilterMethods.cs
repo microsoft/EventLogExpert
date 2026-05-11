@@ -50,35 +50,35 @@ internal static class FilterMethods
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
 
-    public static Dictionary<string, FilterGroupData> AddFilterGroup(
-        this Dictionary<string, FilterGroupData> group,
+    public static Dictionary<string, FilterGroupNode> AddFilterGroup(
+        this Dictionary<string, FilterGroupNode> group,
         string[] groupNames,
         SavedFilterGroup data)
     {
         var root = groupNames.Length <= 1 ? string.Empty : groupNames.First();
         groupNames = groupNames.Skip(1).ToArray();
 
-        if (group.TryGetValue(root, out var groupData))
+        if (group.TryGetValue(root, out var node))
         {
             if (groupNames.Length > 1)
             {
-                groupData.ChildGroup.AddFilterGroup(groupNames, data);
+                node.ChildNodes.AddFilterGroup(groupNames, data);
             }
             else
             {
-                groupData.FilterGroups.Add(data);
+                node.FilterGroups.Add(data);
             }
         }
         else
         {
             group.Add(root,
                 groupNames.Length > 1 ?
-                    new FilterGroupData
+                    new FilterGroupNode
                     {
-                        ChildGroup = new Dictionary<string, FilterGroupData>()
+                        ChildNodes = new Dictionary<string, FilterGroupNode>()
                             .AddFilterGroup(groupNames, data)
                     } :
-                    new FilterGroupData { FilterGroups = [data] });
+                    new FilterGroupNode { FilterGroups = [data] });
         }
 
         return group;

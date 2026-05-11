@@ -135,10 +135,10 @@ public sealed class Reducers
             state.Groups.SetItem(index, group with { IsEditing = !group.IsEditing }));
     }
 
-    private static IReadOnlyDictionary<string, FilterGroupData> BuildDisplayGroups(
+    private static IReadOnlyDictionary<string, FilterGroupNode> BuildDisplayGroups(
         IEnumerable<SavedFilterGroup> groups)
     {
-        Dictionary<string, FilterGroupData> displayGroups = [];
+        Dictionary<string, FilterGroupNode> displayGroups = [];
 
         foreach (var group in groups)
         {

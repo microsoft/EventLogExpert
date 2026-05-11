@@ -272,9 +272,9 @@ public sealed class FilterGroupStoreTests
         // Assert
         Assert.NotEmpty(state.DisplayGroups);
         Assert.True(state.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
-        var sectionData = state.DisplayGroups[Constants.FilterGroupSection];
-        Assert.Equal(2, sectionData.FilterGroups.Count);
-        Assert.True(sectionData.ChildGroup.ContainsKey(Constants.FilterGroupSubSection));
+        var sectionNode = state.DisplayGroups[Constants.FilterGroupSection];
+        Assert.Equal(2, sectionNode.FilterGroups.Count);
+        Assert.True(sectionNode.ChildNodes.ContainsKey(Constants.FilterGroupSubSection));
     }
 
     [Fact]
