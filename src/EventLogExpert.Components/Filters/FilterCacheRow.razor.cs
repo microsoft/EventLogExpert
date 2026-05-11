@@ -4,7 +4,7 @@
 using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 

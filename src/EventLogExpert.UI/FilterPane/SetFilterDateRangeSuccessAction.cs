@@ -3,6 +3,6 @@
 
 using EventLogExpert.UI.Filter;
 
-namespace EventLogExpert.UI.Store.FilterPane;
+namespace EventLogExpert.UI.FilterPane;
 
 public sealed record SetFilterDateRangeSuccessAction(DateFilter? DateFilter);

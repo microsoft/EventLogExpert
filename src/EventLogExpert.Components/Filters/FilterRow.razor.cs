@@ -4,7 +4,7 @@
 using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.FilterPane;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Filters;

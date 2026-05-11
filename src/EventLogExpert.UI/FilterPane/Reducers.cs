@@ -4,7 +4,7 @@
 using EventLogExpert.UI.Filter;
 using Fluxor;
 
-namespace EventLogExpert.UI.Store.FilterPane;
+namespace EventLogExpert.UI.FilterPane;
 
 public sealed class Reducers
 {

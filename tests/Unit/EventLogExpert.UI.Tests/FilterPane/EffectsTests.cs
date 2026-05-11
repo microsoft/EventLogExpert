@@ -7,16 +7,16 @@ using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
-using Effects = EventLogExpert.UI.Store.FilterPane.Effects;
-using SetFilterAction = EventLogExpert.UI.Store.FilterPane.SetFilterAction;
+using Effects = EventLogExpert.UI.FilterPane.Effects;
+using SetFilterAction = EventLogExpert.UI.FilterPane.SetFilterAction;
 
-namespace EventLogExpert.UI.Tests.Store.FilterPane;
+namespace EventLogExpert.UI.Tests.FilterPane;
 
 public sealed class EffectsTests
 {

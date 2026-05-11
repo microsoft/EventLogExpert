@@ -3,6 +3,6 @@
 
 using EventLogExpert.UI.Filter;
 
-namespace EventLogExpert.UI.Store.FilterPane;
+namespace EventLogExpert.UI.FilterPane;
 
-public sealed record RemoveFilterAction(FilterId Id);
+public sealed record ToggleFilterEnabledAction(FilterId Id);

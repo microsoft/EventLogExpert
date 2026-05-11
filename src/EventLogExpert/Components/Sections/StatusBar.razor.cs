@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
-using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 
