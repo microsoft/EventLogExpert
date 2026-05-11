@@ -1,9 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Markdown;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Common.Markdown;
+namespace EventLogExpert.UI.Update;
 
 /// <summary>
 ///     Normalizes a GitHub release body into a clean Markdown document that can be rendered by

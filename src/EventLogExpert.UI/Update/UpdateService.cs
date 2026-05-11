@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
-using EventLogExpert.UI.Common.Markdown;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Update.Deployment;
 using EventLogExpert.UI.Update.ReleaseNotes;
