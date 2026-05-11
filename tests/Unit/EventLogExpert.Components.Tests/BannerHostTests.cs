@@ -7,6 +7,7 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;

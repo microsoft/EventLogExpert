@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.Menu;
 
 /// <summary>
 ///     Immutable description of a single entry in a menu (menu bar dropdown, context menu, or submenu). Used by the

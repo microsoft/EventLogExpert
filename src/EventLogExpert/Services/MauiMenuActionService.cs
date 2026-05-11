@@ -11,7 +11,7 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Settings;

@@ -3,7 +3,7 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Menu;
 
 public interface IMenuActionService
 {
