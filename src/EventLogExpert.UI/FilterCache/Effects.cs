@@ -5,7 +5,7 @@ using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.FilterCache;
+namespace EventLogExpert.UI.FilterCache;
 
 public sealed class Effects(IPreferencesProvider preferencesProvider, IState<FilterCacheState> state)
 {

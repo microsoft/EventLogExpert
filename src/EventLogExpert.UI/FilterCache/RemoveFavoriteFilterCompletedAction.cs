@@ -3,8 +3,8 @@
 
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.FilterCache;
+namespace EventLogExpert.UI.FilterCache;
 
-public sealed record LoadFiltersCompletedAction(
+public sealed record RemoveFavoriteFilterCompletedAction(
     ImmutableList<string> FavoriteFilters,
     ImmutableQueue<string> RecentFilters);

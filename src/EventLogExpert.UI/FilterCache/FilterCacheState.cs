@@ -1,10 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.FilterCache;
+namespace EventLogExpert.UI.FilterCache;
 
 [FeatureState]
 public sealed record FilterCacheState
