@@ -3,6 +3,6 @@
 
 using EventLogExpert.UI.Filter;
 
-namespace EventLogExpert.UI.Store.FilterGroup;
+namespace EventLogExpert.UI.FilterGroup;
 
 public sealed record ImportGroupsAction(IEnumerable<SavedFilterGroup> Groups);

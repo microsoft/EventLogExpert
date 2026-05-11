@@ -1,6 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Store.FilterGroup;
+namespace EventLogExpert.UI.FilterGroup;
 
 internal sealed record LoadGroupsAction;

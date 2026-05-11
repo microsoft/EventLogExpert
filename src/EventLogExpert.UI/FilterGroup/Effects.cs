@@ -4,7 +4,7 @@
 using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 
-namespace EventLogExpert.UI.Store.FilterGroup;
+namespace EventLogExpert.UI.FilterGroup;
 
 public sealed class Effects(
     IState<FilterGroupState> filterGroupState,

@@ -3,13 +3,13 @@
 
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterGroup;
+using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store.FilterGroup;
+namespace EventLogExpert.UI.Tests.FilterGroup;
 
 public sealed class EffectsTests
 {

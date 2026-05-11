@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.Store.FilterGroup;
+using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;

@@ -5,12 +5,12 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterGroup;
+using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Store.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
-using SetFilterAction = EventLogExpert.UI.Store.FilterGroup.SetFilterAction;
+using SetFilterAction = EventLogExpert.UI.FilterGroup.SetFilterAction;
 
 namespace EventLogExpert.Components.Modals.Filters;
 
