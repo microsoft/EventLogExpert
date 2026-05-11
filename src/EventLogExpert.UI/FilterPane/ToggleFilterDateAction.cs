@@ -1,6 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Store.FilterPane;
+namespace EventLogExpert.UI.FilterPane;
 
 internal sealed record ToggleFilterDateAction;

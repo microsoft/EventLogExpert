@@ -8,7 +8,7 @@ using EventLogExpert.UI.FilterGroup;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.FilterPane;
+namespace EventLogExpert.UI.FilterPane;
 
 public sealed class Effects(
     IState<EventLogState> eventLogState,

@@ -3,7 +3,7 @@
 
 using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.FilterPane;
 
 namespace EventLogExpert.Components.Filters;
 

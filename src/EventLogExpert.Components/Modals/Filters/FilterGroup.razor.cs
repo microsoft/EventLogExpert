@@ -6,7 +6,7 @@ using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.Store.FilterPane;
+using EventLogExpert.UI.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
