@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.StatusBar;
 
-public sealed record ClearStatusAction(Guid ActivityId);
+public sealed record ClearStatusAction(StatusActivityId ActivityId);
