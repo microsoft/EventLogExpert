@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Interop;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Common.Restart;
 using Windows.ApplicationModel.Core;
 
 namespace EventLogExpert.Services;

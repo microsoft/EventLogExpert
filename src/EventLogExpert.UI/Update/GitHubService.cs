@@ -2,10 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Models;
 using System.Text.Json;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Update;
 
 public sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogger) : IGitHubService
 {

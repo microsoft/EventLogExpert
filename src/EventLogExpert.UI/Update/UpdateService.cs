@@ -6,9 +6,9 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Services;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.Update;
 
 public sealed class UpdateService(
     ICurrentVersionProvider versionProvider,

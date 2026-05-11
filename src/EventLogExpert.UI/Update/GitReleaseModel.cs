@@ -1,10 +1,10 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.Update;
 
 public readonly partial record struct GitReleaseModel
 {
