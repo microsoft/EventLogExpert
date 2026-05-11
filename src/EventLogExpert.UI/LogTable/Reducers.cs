@@ -7,14 +7,14 @@ using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
 public sealed class Reducers
 {
     [ReducerMethod]
-    public static EventTableState ReduceAddTable(EventTableState state, AddTableAction action)
+    public static LogTableState ReduceAddTable(LogTableState state, AddTableAction action)
     {
-        var newTable = new EventTableModel(action.LogData.Id)
+        var newTable = new LogView(action.LogData.Id)
         {
             FileName = action.LogData.Type == LogPathType.Channel ? null : action.LogData.Name,
             LogName = action.LogData.Name,
@@ -45,7 +45,7 @@ public sealed class Reducers
             };
         }
 
-        combinedTable = new EventTableModel(EventLogId.Create()) { IsCombined = true };
+        combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
 
         return state with
         {
@@ -58,7 +58,7 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceAppendTableEvents(EventTableState state, AppendTableEventsAction action)
+    public static LogTableState ReduceAppendTableEvents(LogTableState state, AppendTableEventsAction action)
     {
         var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
 
@@ -84,8 +84,8 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceAppendTableEventsBatch(
-        EventTableState state,
+    public static LogTableState ReduceAppendTableEventsBatch(
+        LogTableState state,
         AppendTableEventsBatchAction action)
     {
         if (action.EventsByLog.Count == 0) { return state; }
@@ -133,7 +133,7 @@ public sealed class Reducers
     }
 
     [ReducerMethod(typeof(CloseAllAction))]
-    public static EventTableState ReduceCloseAll(EventTableState state) =>
+    public static LogTableState ReduceCloseAll(LogTableState state) =>
         state with
         {
             EventTables = [],
@@ -143,7 +143,7 @@ public sealed class Reducers
         };
 
     [ReducerMethod]
-    public static EventTableState ReduceCloseLog(EventTableState state, CloseLogAction action)
+    public static LogTableState ReduceCloseLog(LogTableState state, CloseLogAction action)
     {
         var closingTable = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
 
@@ -180,7 +180,7 @@ public sealed class Reducers
                 }
             default:
                 {
-                    var combinedTable = new EventTableModel(EventLogId.Create()) { IsCombined = true };
+                    var combinedTable = new LogView(EventLogId.Create()) { IsCombined = true };
                     var filtered = FilterOutOwningLog(state.DisplayedEvents, closingTable.LogName);
 
                     return state with
@@ -196,8 +196,8 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceLoadColumnsCompleted(
-        EventTableState state,
+    public static LogTableState ReduceLoadColumnsCompleted(
+        LogTableState state,
         LoadColumnsCompletedAction action) =>
         state with
         {
@@ -207,7 +207,7 @@ public sealed class Reducers
         };
 
     [ReducerMethod]
-    public static EventTableState ReduceReorderColumn(EventTableState state, ReorderColumnAction action)
+    public static LogTableState ReduceReorderColumn(LogTableState state, ReorderColumnAction action)
     {
         var order = state.ColumnOrder;
 
@@ -226,7 +226,7 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceSetActiveTable(EventTableState state, SetActiveTableAction action)
+    public static LogTableState ReduceSetActiveTable(LogTableState state, SetActiveTableAction action)
     {
         var activeTable = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
 
@@ -236,17 +236,17 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceSetColumnWidth(EventTableState state, SetColumnWidthAction action) =>
+    public static LogTableState ReduceSetColumnWidth(LogTableState state, SetColumnWidthAction action) =>
         state with { ColumnWidths = state.ColumnWidths.SetItem(action.ColumnName, action.Width) };
 
     [ReducerMethod]
-    public static EventTableState ReduceSetOrderBy(EventTableState state, SetOrderByAction action) =>
+    public static LogTableState ReduceSetOrderBy(LogTableState state, SetOrderByAction action) =>
         state.OrderBy.Equals(action.OrderBy) ?
             SortDisplayEvents(state, null, true) :
             SortDisplayEvents(state, action.OrderBy, state.IsDescending);
 
     [ReducerMethod]
-    public static EventTableState ReduceToggleLoading(EventTableState state, ToggleLoadingAction action)
+    public static LogTableState ReduceToggleLoading(LogTableState state, ToggleLoadingAction action)
     {
         var table = state.EventTables.FirstOrDefault(table => table.Id == action.LogId);
 
@@ -261,12 +261,12 @@ public sealed class Reducers
     }
 
     [ReducerMethod(typeof(ToggleSortingAction))]
-    public static EventTableState ReduceToggleSorting(EventTableState state) =>
+    public static LogTableState ReduceToggleSorting(LogTableState state) =>
         SortDisplayEvents(state, state.OrderBy, !state.IsDescending);
 
     [ReducerMethod]
-    public static EventTableState ReduceUpdateDisplayedEvents(
-        EventTableState state,
+    public static LogTableState ReduceUpdateDisplayedEvents(
+        LogTableState state,
         UpdateDisplayedEventsAction action)
     {
         // Skip log ids absent from EventTables: log closed while filter ran.
@@ -356,7 +356,7 @@ public sealed class Reducers
     }
 
     [ReducerMethod]
-    public static EventTableState ReduceUpdateTable(EventTableState state, UpdateTableAction action)
+    public static LogTableState ReduceUpdateTable(LogTableState state, UpdateTableAction action)
     {
         var table = state.EventTables.FirstOrDefault(t => action.LogId == t.Id);
 
@@ -436,7 +436,7 @@ public sealed class Reducers
         return counts.SetItem(logId, current + delta);
     }
 
-    private static EventTableModel SetComputerNameIfFirstEvent(EventTableModel table, IReadOnlyList<ResolvedEvent> newEvents)
+    private static LogView SetComputerNameIfFirstEvent(LogView table, IReadOnlyList<ResolvedEvent> newEvents)
     {
         if (!string.IsNullOrEmpty(table.ComputerName) || newEvents.Count == 0) { return table; }
 
@@ -454,7 +454,7 @@ public sealed class Reducers
         return table;
     }
 
-    private static EventTableState SortDisplayEvents(EventTableState state, ColumnName? orderBy, bool isDescending)
+    private static LogTableState SortDisplayEvents(LogTableState state, ColumnName? orderBy, bool isDescending)
     {
         var effectiveOrderBy = GetEffectiveOrderBy(orderBy);
 

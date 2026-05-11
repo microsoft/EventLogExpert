@@ -9,10 +9,10 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -20,7 +20,7 @@ using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
-using CloseAllAction = EventLogExpert.UI.Store.EventTable.CloseAllAction;
+using CloseAllAction = EventLogExpert.UI.LogTable.CloseAllAction;
 using CloseLogAction = EventLogExpert.UI.Store.EventLog.CloseLogAction;
 using Effects = EventLogExpert.UI.Store.EventLog.Effects;
 
@@ -284,7 +284,7 @@ public sealed class EffectsTests
         // Assert
         await mockLogWatcher.Received(1).RemoveLogAsync(Constants.LogNameTestLog);
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UI.Store.EventTable.CloseLogAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UI.LogTable.CloseLogAction>(a =>
             a.LogId == logId));
     }
 
@@ -485,7 +485,7 @@ public sealed class EffectsTests
         // it from ActiveLogs and canceled its CTS) while HandleOpenLog is parked on the
         // classification await. After the await releases, HandleOpenLog must bail BEFORE
         // calling LoadLogAsync — otherwise LoadLogAsync's AddTable dispatch would resurrect
-        // a table entry the user already dismissed, leaving an orphan in EventTableState.
+        // a table entry the user already dismissed, leaving an orphan in LogTableState.
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel, []);
         var initialActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
 
@@ -542,7 +542,7 @@ public sealed class EffectsTests
         classificationTcs.SetResult(true);
         await openTask;
 
-        // Assert — neither AddTable (would orphan in EventTableState) nor any resolver work
+        // Assert — neither AddTable (would orphan in LogTableState) nor any resolver work
         // happened. The bail-out path returns silently after the post-await identity check.
         mockServiceProvider.DidNotReceive().GetService(typeof(IEventResolver));
 

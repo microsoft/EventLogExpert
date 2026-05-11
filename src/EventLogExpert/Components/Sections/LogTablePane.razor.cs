@@ -7,11 +7,11 @@ using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -22,7 +22,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
 
-public sealed partial class EventTable
+public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
 
@@ -44,10 +44,9 @@ public sealed partial class EventTable
     private IReadOnlyList<ResolvedEvent>? _cachedFilteredCanonical;
     private EventLogId? _cachedFilteredTableId;
     private IReadOnlyList<ResolvedEvent>? _cachedFilteredView;
-    private EventTableModel? _currentTable;
-    private DotNetObjectReference<EventTable>? _dotNetRef;
+    private LogView? _currentTable;
+    private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
-    private EventTableState _eventTableState = null!;
     private ImmutableList<FilterModel> _filters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
@@ -58,6 +57,7 @@ public sealed partial class EventTable
     // to the equivalent row in a freshly built DisplayedEvents list. Defaults to the
     // same row as _selectionAnchor for single-row selections.
     private ResolvedEvent? _localCursor;
+    private LogTableState _logTableState = null!;
     private int _pageSize = DefaultPageSize;
     private ColumnName[] _previousEnabledColumns = [];
     private bool _resortSelectionOnNextRender;
@@ -75,13 +75,13 @@ public sealed partial class EventTable
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
-
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
     [Inject] private IMenuService MenuService { get; init; } = null!;
 
@@ -187,9 +187,9 @@ public sealed partial class EventTable
         SubscribeToAction<AppendTableEventsBatchAction>(_ => RescrollToSelected());
         SubscribeToAction<UpdateTableAction>(_ => RescrollToSelected());
 
-        _eventTableState = EventTableState.Value;
+        _logTableState = LogTableState.Value;
 
-        _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
+        _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
         _selectedEvent = SelectedEvent.Value;
         _localCursor = _selectedEvent;
@@ -213,7 +213,7 @@ public sealed partial class EventTable
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
         bool selectedEventChanged = !ReferenceEquals(SelectedEvent.Value, _selectedEvent);
 
-        if (ReferenceEquals(EventTableState.Value, _eventTableState) &&
+        if (ReferenceEquals(LogTableState.Value, _logTableState) &&
             ReferenceEquals(SelectedEvents.Value, _selectedEvents) &&
             !selectedEventChanged &&
             !filtersChanged &&
@@ -221,9 +221,9 @@ public sealed partial class EventTable
 
         bool selectionChanged = !ReferenceEquals(SelectedEvents.Value, _selectedEvents);
 
-        _eventTableState = EventTableState.Value;
+        _logTableState = LogTableState.Value;
 
-        _currentTable = _eventTableState.EventTables.FirstOrDefault(x => x.Id == _eventTableState.ActiveEventLogId);
+        _currentTable = _logTableState.EventTables.FirstOrDefault(x => x.Id == _logTableState.ActiveEventLogId);
         _enabledColumns = GetOrderedEnabledColumns();
 
         if (selectionChanged)
@@ -444,7 +444,7 @@ public sealed partial class EventTable
     }
 
     private int GetColumnWidth(ColumnName column) =>
-        _eventTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
+        _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
 
     private string GetCss(ResolvedEvent @event) =>
         _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
@@ -490,19 +490,19 @@ public sealed partial class EventTable
 
     private ColumnName[] GetOrderedEnabledColumns()
     {
-        var enabledSet = _eventTableState.Columns
+        var enabledSet = _logTableState.Columns
             .Where(column => column.Value)
             .Select(column => column.Key)
             .ToHashSet();
 
-        if (_eventTableState.ColumnOrder.IsEmpty)
+        if (_logTableState.ColumnOrder.IsEmpty)
         {
             // Use ColumnDefaults.Order for a deterministic fallback rather than
             // HashSet iteration order, which is not guaranteed.
             return ColumnDefaults.Order.Where(enabledSet.Contains).ToArray();
         }
 
-        return _eventTableState.ColumnOrder
+        return _logTableState.ColumnOrder
             .Where(enabledSet.Contains)
             .ToArray();
     }
@@ -612,7 +612,7 @@ public sealed partial class EventTable
     {
         // Snapshot the currently selected event into the closures so a subsequent selection change
         // (e.g. user clicks elsewhere while the menu is open) doesn't retarget the action. Note:
-        // selection follows the right-click in EventTable, so SelectedEvent.Value matches the row
+        // selection follows the right-click in LogTablePane, so SelectedEvent.Value matches the row
         // under the pointer at invocation time.
         var clicked = SelectedEvent.Value;
 
@@ -711,9 +711,9 @@ public sealed partial class EventTable
     {
         if (_currentTable is null) { return []; }
 
-        if (_currentTable.IsCombined) { return _eventTableState.DisplayedEvents; }
+        if (_currentTable.IsCombined) { return _logTableState.DisplayedEvents; }
 
-        var canonical = _eventTableState.DisplayedEvents;
+        var canonical = _logTableState.DisplayedEvents;
 
         if (_cachedFilteredView is not null &&
             ReferenceEquals(canonical, _cachedFilteredCanonical) &&
@@ -722,7 +722,7 @@ public sealed partial class EventTable
             return _cachedFilteredView;
         }
 
-        int expectedCapacity = _eventTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int trackedCount)
+        int expectedCapacity = _logTableState.EventCountByLog.TryGetValue(_currentTable.Id, out int trackedCount)
             ? trackedCount
             : 0;
 
@@ -883,7 +883,7 @@ public sealed partial class EventTable
 
     private IReadOnlyList<MenuItem> ShowColumnMenuItems()
     {
-        var state = EventTableState.Value;
+        var state = LogTableState.Value;
         var items = new List<MenuItem>();
 
         foreach (var (column, isVisible) in state.Columns)

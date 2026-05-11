@@ -3,7 +3,7 @@
 
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
 public sealed record LoadColumnsCompletedAction(
     IDictionary<ColumnName, bool> LoadedColumns,

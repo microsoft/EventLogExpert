@@ -2,8 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -12,23 +11,23 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
 
-public sealed partial class SplitLogTabPane
+public sealed partial class LogTabBar
 {
-    private EventTableState _eventTableState = null!;
+    private LogTableState _logTableState = null!;
 
-    private List<EventTableModel> _sortedTabs = [];
+    private List<LogView> _sortedTabs = [];
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
-    [Inject] private IState<EventTableState> EventTableState { get; init; } = null!;
-
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("registerTabPaneEvents");
+            await JSRuntime.InvokeVoidAsync("registerLogTabBarEvents");
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -36,13 +35,13 @@ public sealed partial class SplitLogTabPane
 
     protected override bool ShouldRender()
     {
-        if (ReferenceEquals(EventTableState.Value, _eventTableState)) { return false; }
+        if (ReferenceEquals(LogTableState.Value, _logTableState)) { return false; }
 
-        _eventTableState = EventTableState.Value;
+        _logTableState = LogTableState.Value;
 
         _sortedTabs =
         [
-            .. EventTableState.Value.EventTables
+            .. LogTableState.Value.EventTables
                 .OrderByDescending(table => table.IsCombined)
                 .ThenBy(table => table.ComputerName)
                 .ThenBy(table => table.LogName)
@@ -51,7 +50,7 @@ public sealed partial class SplitLogTabPane
         return true;
     }
 
-    private static string GetTabTooltip(EventTableModel table)
+    private static string GetTabTooltip(LogView table)
     {
         if (table.IsCombined) { return string.Empty; }
 
@@ -63,13 +62,13 @@ public sealed partial class SplitLogTabPane
                 $"Computer Name: {table.ComputerName}";
     }
 
-    private void CloseLog(EventTableModel table) =>
+    private void CloseLog(LogView table) =>
         Dispatcher.Dispatch(new CloseLogAction(table.Id, table.LogName));
 
-    private string GetActiveTab(EventTableModel table) =>
-        EventTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
+    private string GetActiveTab(LogView table) =>
+        LogTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
 
-    private string GetTabName(EventTableModel table)
+    private string GetTabName(LogView table)
     {
         if (table.IsCombined) { return "Combined"; }
 
@@ -79,11 +78,11 @@ public sealed partial class SplitLogTabPane
 
         if (table.IsLoading) { return tabName; }
 
-        int count = _eventTableState.EventCountByLog.GetValueOrDefault(table.Id, 0);
+        int count = _logTableState.EventCountByLog.GetValueOrDefault(table.Id, 0);
 
         return count <= 0 ? $"(Empty) {tabName}" : tabName;
     }
 
-    private void SetActiveLog(EventTableModel table) =>
+    private void SetActiveLog(LogView table) =>
         Dispatcher.Dispatch(new SetActiveTableAction(table.Id));
 }

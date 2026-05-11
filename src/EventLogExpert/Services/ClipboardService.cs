@@ -7,9 +7,9 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
-using EventLogExpert.UI.Store.EventTable;
 using Fluxor;
 using System.Collections.Immutable;
 using System.Text;
@@ -20,7 +20,7 @@ namespace EventLogExpert.Services;
 
 public sealed class ClipboardService : IClipboardService
 {
-    private readonly IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
+    private readonly IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> _eventTableColumns;
     private readonly IStateSelection<EventLogState, ResolvedEvent?> _selectedEvent;
     private readonly IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> _selectedEvents;
     private readonly ISettingsService _settings;
@@ -28,7 +28,7 @@ public sealed class ClipboardService : IClipboardService
     private readonly IEventXmlResolver _xmlResolver;
 
     public ClipboardService(
-        IStateSelection<EventTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
+        IStateSelection<LogTableState, ImmutableDictionary<ColumnName, bool>> eventTableColumns,
         IStateSelection<EventLogState, ImmutableList<ResolvedEvent>> selectedEvents,
         IStateSelection<EventLogState, ResolvedEvent?> selectedEvent,
         ISettingsService settings,

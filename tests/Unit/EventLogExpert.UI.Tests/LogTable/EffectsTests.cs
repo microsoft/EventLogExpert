@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Store.EventTable;
+using EventLogExpert.UI.LogTable;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store.EventTable;
+namespace EventLogExpert.UI.Tests.LogTable;
 
 public sealed class EffectsTests
 {
@@ -165,7 +165,7 @@ public sealed class EffectsTests
     public async Task HandleReorderColumn_ShouldPersistToPreferences()
     {
         // Arrange - state reflects post-reducer result (Source moved to index 0)
-        var postReducerState = new EventTableState
+        var postReducerState = new LogTableState
         {
             ColumnOrder = [ColumnName.Source, ColumnName.Level, ColumnName.DateAndTime]
         };
@@ -219,7 +219,7 @@ public sealed class EffectsTests
     public async Task HandleSetColumnWidth_ShouldPersistToPreferences()
     {
         // Arrange
-        var postReducerState = new EventTableState
+        var postReducerState = new LogTableState
         {
             ColumnWidths = new Dictionary<ColumnName, int>
             {
@@ -384,15 +384,15 @@ public sealed class EffectsTests
     }
 
     private static (Effects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
-        CreateEffects(List<ColumnName>? enabledColumns = null, EventTableState? state = null)
+        CreateEffects(List<ColumnName>? enabledColumns = null, LogTableState? state = null)
     {
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
         mockPreferencesProvider.EnabledEventTableColumnsPreference.Returns(enabledColumns ?? []);
         mockPreferencesProvider.ColumnWidthsPreference.Returns(new Dictionary<ColumnName, int>());
         mockPreferencesProvider.ColumnOrderPreference.Returns([]);
 
-        var mockState = Substitute.For<IState<EventTableState>>();
-        mockState.Value.Returns(state ?? new EventTableState());
+        var mockState = Substitute.For<IState<LogTableState>>();
+        mockState.Value.Returns(state ?? new LogTableState());
 
         var effects = new Effects(mockPreferencesProvider, mockState);
         var mockDispatcher = Substitute.For<IDispatcher>();

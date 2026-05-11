@@ -6,12 +6,12 @@ using EventLogExpert.UI.Models;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
 [FeatureState]
-public sealed record EventTableState
+public sealed record LogTableState
 {
-    public ImmutableList<EventTableModel> EventTables { get; init; } = [];
+    public ImmutableList<LogView> EventTables { get; init; } = [];
 
     public IReadOnlyList<ResolvedEvent> DisplayedEvents { get; init; } = [];
 

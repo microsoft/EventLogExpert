@@ -5,11 +5,11 @@ using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.EventTable;
+namespace EventLogExpert.UI.LogTable;
 
-public sealed class Effects(IPreferencesProvider preferencesProvider, IState<EventTableState> eventTableState)
+public sealed class Effects(IPreferencesProvider preferencesProvider, IState<LogTableState> logTableState)
 {
-    private readonly IState<EventTableState> _eventTableState = eventTableState;
+    private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly IPreferencesProvider _preferencesProvider = preferencesProvider;
 
     [EffectMethod(typeof(LoadColumnsAction))]
@@ -35,7 +35,7 @@ public sealed class Effects(IPreferencesProvider preferencesProvider, IState<Eve
     public Task HandleReorderColumn(ReorderColumnAction action, IDispatcher dispatcher)
     {
         // Read from post-reducer state to avoid race conditions with rapid reorder actions
-        _preferencesProvider.ColumnOrderPreference = _eventTableState.Value.ColumnOrder;
+        _preferencesProvider.ColumnOrderPreference = _logTableState.Value.ColumnOrder;
 
         return Task.CompletedTask;
     }
@@ -65,7 +65,7 @@ public sealed class Effects(IPreferencesProvider preferencesProvider, IState<Eve
     public Task HandleSetColumnWidth(SetColumnWidthAction action, IDispatcher dispatcher)
     {
         // Read from post-reducer state to avoid race conditions
-        _preferencesProvider.ColumnWidthsPreference = new Dictionary<ColumnName, int>(_eventTableState.Value.ColumnWidths);
+        _preferencesProvider.ColumnWidthsPreference = new Dictionary<ColumnName, int>(_logTableState.Value.ColumnWidths);
 
         return Task.CompletedTask;
     }
