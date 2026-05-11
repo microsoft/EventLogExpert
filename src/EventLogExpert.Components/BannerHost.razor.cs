@@ -142,9 +142,9 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     private void OnDismissAttention() => BannerService.DismissAttention();
 
-    private void OnDismissError(Guid id) => BannerService.DismissError(id);
+    private void OnDismissError(BannerId id) => BannerService.DismissError(id);
 
-    private void OnDismissInfo(Guid id) => BannerService.DismissInfoBanner(id);
+    private void OnDismissInfo(BannerId id) => BannerService.DismissInfoBanner(id);
 
     private async Task OnErrorActionClickedAsync(Func<Task> action)
     {
@@ -180,7 +180,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         {
             TraceLogger.Error($"{nameof(BannerHost)}.{nameof(OnOpenSettingsClickedAsync)}: open settings threw: {ex}");
 
-            Guid errorId = BannerService.ReportError("Settings", $"Failed to open settings: {ex.Message}");
+            BannerId errorId = BannerService.ReportError("Settings", $"Failed to open settings: {ex.Message}");
             _selectedItem = new BannerCycleItem(BannerView.Error, 0, errorId);
 
             return;
@@ -190,7 +190,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         {
             TraceLogger.Error($"{nameof(BannerHost)}.{nameof(OnOpenSettingsClickedAsync)}: open settings returned false");
 
-            Guid errorId = BannerService.ReportError("Settings", "Failed to open settings; try again from the menu.");
+            BannerId errorId = BannerService.ReportError("Settings", "Failed to open settings; try again from the menu.");
             _selectedItem = new BannerCycleItem(BannerView.Error, 0, errorId);
         }
     }

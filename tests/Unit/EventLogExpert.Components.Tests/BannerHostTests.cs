@@ -227,7 +227,7 @@ public sealed class BannerHostTests : BunitContext
         // Critical pre-empts the entire cycle — no Prev/Next chevrons should appear.
         _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _bannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -244,10 +244,10 @@ public sealed class BannerHostTests : BunitContext
         _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
 
         _bannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(Guid.NewGuid(), "Error", "E", null, null, DateTime.UtcNow)]);
+            [new ErrorBannerEntry(BannerId.Create(), "Error", "E", null, null, DateTime.UtcNow)]);
 
         _bannerService.InfoBanners.Returns([
-            new BannerInfoEntry(Guid.NewGuid(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
+            new BannerInfoEntry(BannerId.Create(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
         ]);
 
         var component = Render<BannerHost>();
@@ -279,7 +279,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_CycleErrorAndAttention_RendersFirstErrorWithCyclePagination_TwoOfTwo()
     {
-        var error = new ErrorBannerEntry(Guid.NewGuid(), "Err", "msg", null, null, DateTime.UtcNow);
+        var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([error]);
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
@@ -295,7 +295,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CycleNextAtLast_DisabledAndDoesNotAdvance()
     {
         _bannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -315,7 +315,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleNextClicked_AdvancesToAttentionItem()
     {
-        var error = new ErrorBannerEntry(Guid.NewGuid(), "Err", "msg", null, null, DateTime.UtcNow);
+        var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([error]);
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
@@ -332,7 +332,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CyclePrevAtFirst_DisabledAndDoesNotAdvance()
     {
         _bannerService.ErrorBanners.Returns(
-            [new ErrorBannerEntry(Guid.NewGuid(), "E", "m", null, null, DateTime.UtcNow)]);
+            [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
         _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
@@ -353,9 +353,9 @@ public sealed class BannerHostTests : BunitContext
         // silently jumped the user to a different error whenever a preceding error was dismissed (e.g., user on
         // E1 = index 1, then E0 dismissed → new (Error, 1) refers to E2 → user is now reading E2 without any
         // intent to navigate). BannerCycleItem.EntryId provides stable identity so the user stays on E1.
-        var e0 = new ErrorBannerEntry(Guid.NewGuid(), "First", "first message", null, null, DateTime.UtcNow);
-        var e1 = new ErrorBannerEntry(Guid.NewGuid(), "Second", "second message", null, null, DateTime.UtcNow);
-        var e2 = new ErrorBannerEntry(Guid.NewGuid(), "Third", "third message", null, null, DateTime.UtcNow);
+        var e0 = new ErrorBannerEntry(BannerId.Create(), "First", "first message", null, null, DateTime.UtcNow);
+        var e1 = new ErrorBannerEntry(BannerId.Create(), "Second", "second message", null, null, DateTime.UtcNow);
+        var e2 = new ErrorBannerEntry(BannerId.Create(), "Third", "third message", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([e0, e1, e2]);
 
         var component = Render<BannerHost>();
@@ -384,7 +384,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_DismissErrorClicked_CallsDismissErrorWithEntryId()
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
@@ -396,7 +396,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_DismissInfoClicked_CallsDismissInfoBannerWithEntryId()
     {
-        var info = new BannerInfoEntry(Guid.NewGuid(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
+        var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
         _bannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
@@ -409,8 +409,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_ErrorBannerActionClicked_InvokesSuppliedCallback()
     {
         int actionInvocationCount = 0;
-        var entry = new ErrorBannerEntry(
-            Guid.NewGuid(),
+        var entry = new ErrorBannerEntry(BannerId.Create(),
             "Database",
             "Recovery required",
             "Resolve",
@@ -431,8 +430,7 @@ public sealed class BannerHostTests : BunitContext
         // and escalate the visible banner from Error to Critical (which would replace the user's actionable error
         // with a Reload-tier critical banner).
         var actionException = new InvalidOperationException("action boom");
-        var entry = new ErrorBannerEntry(
-            Guid.NewGuid(),
+        var entry = new ErrorBannerEntry(BannerId.Create(),
             "Database",
             "Recovery required",
             "Resolve",
@@ -455,8 +453,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_ErrorBannerWithAction_RendersActionButtonWithLabel()
     {
-        var entry = new ErrorBannerEntry(
-            Guid.NewGuid(),
+        var entry = new ErrorBannerEntry(BannerId.Create(),
             "Database",
             "Recovery required",
             "Resolve",
@@ -473,7 +470,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_ErrorBannerWithoutAction_DoesNotRenderActionButton()
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
@@ -484,7 +481,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_InfoSeverity_RendersInfoStyledBanner()
     {
-        var info = new BannerInfoEntry(Guid.NewGuid(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
+        var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
         _bannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
@@ -497,8 +494,8 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_MultipleErrorBanners_RendersFirstWithPagination()
     {
-        var first = new ErrorBannerEntry(Guid.NewGuid(), "First", "First message", null, null, DateTime.UtcNow);
-        var second = new ErrorBannerEntry(Guid.NewGuid(), "Second", "Second message", null, null, DateTime.UtcNow);
+        var first = new ErrorBannerEntry(BannerId.Create(), "First", "First message", null, null, DateTime.UtcNow);
+        var second = new ErrorBannerEntry(BannerId.Create(), "Second", "Second message", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([first, second]);
 
         var component = Render<BannerHost>();
@@ -565,7 +562,7 @@ public sealed class BannerHostTests : BunitContext
         // ItemMatches preserves the stale Attention selection by (View=Attention, EntryId=null) and the user
         // never sees the failure message they need — the error banner would be one page back in the cycle.
         var attention = BuildDatabaseEntry("a.db");
-        var newErrorId = Guid.NewGuid();
+        var newErrorId = BannerId.Create();
         var newError = new ErrorBannerEntry(
             newErrorId,
             "Settings",
@@ -694,7 +691,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_SingleErrorBanner_RendersWithoutPagination()
     {
-        var entry = new ErrorBannerEntry(Guid.NewGuid(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
+        var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
         _bannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
@@ -708,7 +705,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_WarningSeverity_RendersWarningStyledBanner()
     {
-        var info = new BannerInfoEntry(Guid.NewGuid(),
+        var info = new BannerInfoEntry(BannerId.Create(),
             "Slow",
             "Performance dip",
             BannerSeverity.Warning,
