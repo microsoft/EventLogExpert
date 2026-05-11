@@ -3,8 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Components.Database;
-using EventLogExpert.UI;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 

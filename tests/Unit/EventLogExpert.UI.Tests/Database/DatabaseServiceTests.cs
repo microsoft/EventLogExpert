@@ -3,17 +3,16 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.Options;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Data.Sqlite;
 using NSubstitute;
 using System.IO.Compression;
 
-namespace EventLogExpert.UI.Tests.Services.Database;
+namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseServiceTests : IDisposable
 {

@@ -16,6 +16,7 @@ using EventLogExpert.UI.Common.Logging;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
+using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Menu;

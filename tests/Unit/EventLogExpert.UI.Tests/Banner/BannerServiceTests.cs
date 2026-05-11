@@ -3,8 +3,8 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Banner;

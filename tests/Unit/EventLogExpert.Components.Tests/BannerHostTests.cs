@@ -3,12 +3,12 @@
 
 using Bunit;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Menu;
-using EventLogExpert.UI.Models;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;

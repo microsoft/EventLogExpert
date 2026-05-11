@@ -2,13 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
