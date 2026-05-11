@@ -3,7 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.UI.Models;
+namespace EventLogExpert.UI.DebugLog;
 
 public sealed record DebugLogEntry(
     DateTimeOffset? Timestamp,

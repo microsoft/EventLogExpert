@@ -9,7 +9,7 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace EventLogExpert.UI.Services;
+namespace EventLogExpert.UI.DebugLog;
 
 public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDisposable
 {

@@ -1,14 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
-using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.Services.DebugLog;
+namespace EventLogExpert.UI.Tests.DebugLog;
 
 public sealed class DebugLogServiceTests : IDisposable
 {
