@@ -91,7 +91,7 @@ public sealed class GitHubServiceTests
     {
         // Arrange
         var mockTraceLogger = Substitute.For<ITraceLogger>();
-        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, Array.Empty<GitReleaseModel>());
+        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, Array.Empty<GitHubRelease>());
 
         var gitHubService = CreateGitHubService(mockHttpClient, mockTraceLogger);
 
@@ -147,7 +147,7 @@ public sealed class GitHubServiceTests
     {
         // Arrange
         var mockTraceLogger = Substitute.For<ITraceLogger>();
-        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitReleaseModels());
+        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitHubReleases());
 
         var gitHubService = CreateGitHubService(mockHttpClient, mockTraceLogger);
 
@@ -164,7 +164,7 @@ public sealed class GitHubServiceTests
     {
         // Arrange
         var mockTraceLogger = Substitute.For<ITraceLogger>();
-        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitReleaseModels());
+        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitHubReleases());
 
         var gitHubService = CreateGitHubService(mockHttpClient, mockTraceLogger);
 
@@ -181,7 +181,7 @@ public sealed class GitHubServiceTests
     {
         // Arrange
         var mockTraceLogger = Substitute.For<ITraceLogger>();
-        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitReleaseModels());
+        var mockHttpClient = CreateMockHttpClient(HttpStatusCode.OK, GitHubUtils.CreateGitHubReleases());
 
         var gitHubService = CreateGitHubService(mockHttpClient, mockTraceLogger);
 

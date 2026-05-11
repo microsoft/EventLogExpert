@@ -8,7 +8,7 @@ namespace EventLogExpert.UI.Tests.TestUtils;
 
 public static class GitHubUtils
 {
-    public static IEnumerable<GitReleaseModel> CreateGitReleaseModels() =>
+    public static IEnumerable<GitHubRelease> CreateGitHubReleases() =>
     [
         new()
         {
@@ -17,7 +17,7 @@ public static class GitHubUtils
             ReleaseDate = DateTime.Now,
             Assets =
             [
-                new GitReleaseAsset
+                new GitHubReleaseAsset
                 {
                     Name = GitHubPrereleaseName,
                     Uri = GitHubPrereleaseUri,
@@ -32,7 +32,7 @@ public static class GitHubUtils
             ReleaseDate = DateTime.Now.AddDays(-1),
             Assets =
             [
-                new GitReleaseAsset
+                new GitHubReleaseAsset
                 {
                     Name = GitHubLatestName,
                     Uri = GitHubLatestUri

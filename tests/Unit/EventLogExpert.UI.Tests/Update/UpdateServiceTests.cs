@@ -25,7 +25,7 @@ public sealed class UpdateServiceTests
 
         var mockAppTitleService = Substitute.For<IAppTitleService>();
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
@@ -48,7 +48,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
@@ -83,7 +83,7 @@ public sealed class UpdateServiceTests
             .Do(_ => throw new InvalidOperationException("Deployment failed"));
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
@@ -119,7 +119,7 @@ public sealed class UpdateServiceTests
             .Do(_ => throw new InvalidOperationException("Deployment failed"));
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
@@ -198,7 +198,7 @@ public sealed class UpdateServiceTests
 
         var mockGitHubService = Substitute.For<IGitHubService>();
 
-        mockGitHubService.GetReleases().Returns<IEnumerable<GitReleaseModel>>(_ =>
+        mockGitHubService.GetReleases().Returns<IEnumerable<GitHubRelease>>(_ =>
             throw new HttpRequestException("Network error"));
 
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
@@ -231,7 +231,7 @@ public sealed class UpdateServiceTests
 
         var mockGitHubService = Substitute.For<IGitHubService>();
 
-        mockGitHubService.GetReleases().Returns<IEnumerable<GitReleaseModel>>(_ =>
+        mockGitHubService.GetReleases().Returns<IEnumerable<GitHubRelease>>(_ =>
             throw new HttpRequestException("Network error"));
 
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
@@ -264,7 +264,7 @@ public sealed class UpdateServiceTests
 
         var mockGitHubService = Substitute.For<IGitHubService>();
 
-        mockGitHubService.GetReleases().Returns<IEnumerable<GitReleaseModel>>(_ =>
+        mockGitHubService.GetReleases().Returns<IEnumerable<GitHubRelease>>(_ =>
             throw new HttpRequestException("Network error"));
 
         var updateService = CreateUpdateService(
@@ -294,7 +294,7 @@ public sealed class UpdateServiceTests
             .Returns(Task.FromResult(true));
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -320,7 +320,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -345,7 +345,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var updateService = CreateUpdateService(
             mockCurrentVersionProvider,
@@ -430,7 +430,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
         var mockDeploymentService = Substitute.For<IDeploymentService>();
@@ -461,7 +461,7 @@ public sealed class UpdateServiceTests
         var mockAppTitleService = Substitute.For<IAppTitleService>();
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -489,7 +489,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -520,7 +520,7 @@ public sealed class UpdateServiceTests
             .Returns(Task.FromResult(true));
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -552,7 +552,7 @@ public sealed class UpdateServiceTests
             .Returns(Task.FromResult(false)); // User clicks "No"
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -584,7 +584,7 @@ public sealed class UpdateServiceTests
             .Returns(Task.FromResult(false)); // User clicks "No"
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockDeploymentService = Substitute.For<IDeploymentService>();
 
@@ -628,7 +628,7 @@ public sealed class UpdateServiceTests
         mockCurrentVersionProvider.IsDevBuild.Returns(false);
 
         var mockGitHubService = Substitute.For<IGitHubService>();
-        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitReleaseModels()));
+        mockGitHubService.GetReleases().Returns(Task.FromResult(GitHubUtils.CreateGitHubReleases()));
 
         var mockAlertDialogService = Substitute.For<IAlertDialogService>();
 
