@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Menu;
 
-namespace EventLogExpert.UI.Tests.Services.Menu;
+namespace EventLogExpert.UI.Tests.Menu;
 
 public sealed class MenuServiceTests
 {

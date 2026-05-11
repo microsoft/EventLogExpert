@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
-
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Menu;
 
 /// <summary>
 ///     Coordinates a single active popup menu at a time. Hosts subscribe to <see cref="StateChanged" /> and render
