@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Store.StatusBar;
+using EventLogExpert.UI.StatusBar;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Store.StatusBar;
+namespace EventLogExpert.UI.Tests.StatusBar;
 
 public sealed class StatusBarStateTests
 {

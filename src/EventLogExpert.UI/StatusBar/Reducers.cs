@@ -4,7 +4,7 @@
 using Fluxor;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Store.StatusBar;
+namespace EventLogExpert.UI.StatusBar;
 
 public sealed class Reducers
 {

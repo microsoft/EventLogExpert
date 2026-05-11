@@ -8,10 +8,10 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
+using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
 using EventLogExpert.UI.Store.FilterPane;
-using EventLogExpert.UI.Store.StatusBar;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
@@ -190,7 +190,7 @@ public sealed class EffectsTests
         await mockLogWatcher.Received(1).RemoveAllAsync();
         mockResolverCache.Received(1).ClearAll();
         mockDispatcher.Received(1).Dispatch(Arg.Any<CloseAllAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<UI.Store.StatusBar.CloseAllAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<UI.StatusBar.CloseAllAction>());
     }
 
     [Fact]

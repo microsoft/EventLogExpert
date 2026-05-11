@@ -1,6 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Store.StatusBar;
+namespace EventLogExpert.UI.StatusBar;
 
 public sealed record ClearStatusAction(Guid ActivityId);
