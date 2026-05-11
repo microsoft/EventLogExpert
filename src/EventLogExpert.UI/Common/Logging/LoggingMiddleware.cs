@@ -8,7 +8,7 @@ using EventLogExpert.UI.Store.StatusBar;
 using Fluxor;
 using System.Text.Json;
 
-namespace EventLogExpert.UI.Store;
+namespace EventLogExpert.UI.Common.Logging;
 
 public sealed class LoggingMiddleware(ITraceLogger debugLogger) : Middleware
 {

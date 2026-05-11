@@ -10,13 +10,13 @@ using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Identity;
+using EventLogExpert.UI.Common.Logging;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Options;
 using EventLogExpert.UI.Services;
-using EventLogExpert.UI.Store;
 using EventLogExpert.UI.Store.EventLog;
 using Fluxor;
 
