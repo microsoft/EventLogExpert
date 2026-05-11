@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Services;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;

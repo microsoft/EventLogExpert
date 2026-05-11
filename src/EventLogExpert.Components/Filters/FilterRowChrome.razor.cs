@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Filters;
@@ -20,7 +20,7 @@ public sealed partial class FilterRowChrome : ComponentBase
 
     [Parameter] public RenderFragment? ExtraEditingButtons { get; set; }
 
-    [Parameter] public FilterDraftModel? Filter { get; set; }
+    [Parameter] public FilterDraft? Filter { get; set; }
 
     [Parameter] public bool IsPending { get; set; }
 
@@ -44,5 +44,5 @@ public sealed partial class FilterRowChrome : ComponentBase
 
     [Parameter] public bool UseInlineErrorRow { get; set; }
 
-    [Parameter] public FilterModel? Value { get; set; }
+    [Parameter] public SavedFilter? Value { get; set; }
 }

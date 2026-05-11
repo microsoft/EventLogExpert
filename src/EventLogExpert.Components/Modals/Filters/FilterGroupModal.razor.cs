@@ -4,7 +4,7 @@
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -55,7 +55,7 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
             if (path is null) { return; }
 
             await using var stream = File.OpenRead(path);
-            var groups = await JsonSerializer.DeserializeAsync<List<FilterGroupModel>>(stream);
+            var groups = await JsonSerializer.DeserializeAsync<List<SavedFilterGroup>>(stream);
 
             if (groups is null) { return; }
 
@@ -70,5 +70,5 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
     }
 
     private void CreateGroup() =>
-        Dispatcher.Dispatch(new AddGroupAction(new FilterGroupModel { IsEditing = true }));
+        Dispatcher.Dispatch(new AddGroupAction(new SavedFilterGroup { IsEditing = true }));
 }

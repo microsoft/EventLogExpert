@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 
 namespace EventLogExpert.UI.Store.FilterGroup;
 
-public sealed record AddGroupAction(FilterGroupModel? FilterGroup = null);
+public sealed record AddGroupAction(SavedFilterGroup? FilterGroup = null);

@@ -1,14 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using static EventLogExpert.UI.Tests.TestUtils.Constants.Constants;
 
 namespace EventLogExpert.UI.Tests.TestUtils;
 
 internal static class FilterUtils
 {
-    internal static FilterModel CreateTestFilter(
+    internal static SavedFilter CreateTestFilter(
         string comparisonValue = FilterIdEquals100,
         FilterType filterType = FilterType.Advanced,
         HighlightColor color = HighlightColor.None,
@@ -16,10 +16,10 @@ internal static class FilterUtils
         bool isExcluded = false,
         BasicFilter? basicFilter = null,
         FilterId? id = null) =>
-        FilterModel.TryCreate(comparisonValue, filterType, basicFilter, color, isExcluded, isEnabled, id) ??
+        SavedFilter.TryCreate(comparisonValue, filterType, basicFilter, color, isExcluded, isEnabled, id) ??
         throw new InvalidOperationException($"Test filter expression failed to compile: '{comparisonValue}'");
 
-    internal static FilterDraftModel CreateTestFilterDraft(
+    internal static FilterDraft CreateTestFilterDraft(
         FilterId? id = null,
         string comparisonText = FilterIdEquals100,
         FilterType filterType = FilterType.Advanced,

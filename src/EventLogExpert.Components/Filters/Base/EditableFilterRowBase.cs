@@ -1,21 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI;
-using EventLogExpert.UI.Interfaces;
-using EventLogExpert.UI.Models;
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Filter;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Filters.Base;
 
 /// <summary>
-///     Base for filter rows that bind either to a saved <see cref="FilterModel" /> (via
-///     <see cref="FilterRowBase{TValue}.Value" />) or to a parent-owned <see cref="FilterDraftModel" /> draft (via
+///     Base for filter rows that bind either to a saved <see cref="SavedFilter" /> (via
+///     <see cref="FilterRowBase{TValue}.Value" />) or to a parent-owned <see cref="FilterDraft" /> draft (via
 ///     <see cref="PendingDraft" />). Exactly one must be set.
 /// </summary>
-public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
+public abstract class EditableFilterRowBase : FilterRowBase<SavedFilter?>
 {
     /// <summary>Notifies the parent which saved rows are mid-edit.</summary>
     [Parameter] public EventCallback<(FilterId Id, bool IsEditing)> OnEditingChanged { get; set; }
@@ -24,16 +21,16 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     [Parameter] public EventCallback OnPendingDiscard { get; set; }
 
     /// <summary>Pending-row save: parent must remove the draft and dispatch the upsert atomically.</summary>
-    [Parameter] public EventCallback<FilterModel> OnPendingSave { get; set; }
+    [Parameter] public EventCallback<SavedFilter> OnPendingSave { get; set; }
 
     /// <summary>Mutually exclusive with <see cref="FilterRowBase{TValue}.Value" />.</summary>
-    [Parameter] public FilterDraftModel? PendingDraft { get; set; }
+    [Parameter] public FilterDraft? PendingDraft { get; set; }
 
     [Inject] protected IDispatcher Dispatcher { get; init; } = null!;
 
     protected string ErrorMessage { get; set; } = string.Empty;
 
-    protected FilterDraftModel? Filter { get; set; }
+    protected FilterDraft? Filter { get; set; }
 
     [Inject] protected IFilterService FilterService { get; init; } = null!;
 
@@ -56,13 +53,13 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         await OnEditingChanged.InvokeAsync((savedFilter.Id, false));
     }
 
-    protected Task CommitPendingAsync(FilterModel filter) => OnPendingSave.InvokeAsync(filter);
+    protected Task CommitPendingAsync(SavedFilter filter) => OnPendingSave.InvokeAsync(filter);
 
     /// <summary>Saved rows only.</summary>
     protected abstract void DispatchRemoveFilter();
 
     /// <summary>Dispatches the appropriate set-filter action (FilterPane, FilterGroup, etc.).</summary>
-    protected abstract void DispatchSetFilter(FilterModel filter);
+    protected abstract void DispatchSetFilter(SavedFilter filter);
 
     /// <summary>Default is no-op; subclasses with an enable/disable toggle override.</summary>
     protected virtual void DispatchToggleEnabled(FilterId id) { }
@@ -77,7 +74,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
         if (Value is not { } savedFilter) { return; }
 
         OnEditSessionResetting();
-        Filter = FilterDraftModel.FromFilterModel(savedFilter);
+        Filter = FilterDraft.FromFilterModel(savedFilter);
 
         await OnEditingChanged.InvokeAsync((savedFilter.Id, true));
     }
@@ -173,27 +170,27 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
     }
 
     /// <summary>
-    ///     Validates the draft and produces the immutable <see cref="FilterModel" /> to dispatch. Returning
+    ///     Validates the draft and produces the immutable <see cref="SavedFilter" /> to dispatch. Returning
     ///     <see langword="null" /> aborts the save (subclass surfaces the error). Default enforces non-empty text and compiles
     ///     via <see cref="FilterCompiler.TryCompile" />.
     /// </summary>
-    protected virtual ValueTask<FilterModel?> TrySaveAsync(FilterDraftModel draft)
+    protected virtual ValueTask<SavedFilter?> TrySaveAsync(FilterDraft draft)
     {
         if (string.IsNullOrWhiteSpace(draft.ComparisonText))
         {
             ErrorMessage = "Cannot save an empty filter";
 
-            return ValueTask.FromResult<FilterModel?>(null);
+            return ValueTask.FromResult<SavedFilter?>(null);
         }
 
         if (!FilterCompiler.TryCompile(draft.ComparisonText, out var compiled, out var error))
         {
             ErrorMessage = error;
 
-            return ValueTask.FromResult<FilterModel?>(null);
+            return ValueTask.FromResult<SavedFilter?>(null);
         }
 
-        var result = new FilterModel
+        var result = new SavedFilter
         {
             Id = draft.Id,
             Color = draft.Color,
@@ -205,6 +202,6 @@ public abstract class EditableFilterRowBase : FilterRowBase<FilterModel?>
             IsExcluded = draft.IsExcluded
         };
 
-        return ValueTask.FromResult<FilterModel?>(result);
+        return ValueTask.FromResult<SavedFilter?>(result);
     }
 }

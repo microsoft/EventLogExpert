@@ -3,7 +3,7 @@
 
 using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.UI;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -32,7 +32,7 @@ public sealed partial class FilterCacheRow : EditableFilterRowBase
         Dispatcher.Dispatch(new RemoveFilterAction(savedFilter.Id));
     }
 
-    protected override void DispatchSetFilter(FilterModel filter) =>
+    protected override void DispatchSetFilter(SavedFilter filter) =>
         Dispatcher.Dispatch(new SetFilterAction(filter));
 
     protected override void DispatchToggleEnabled(FilterId id) =>

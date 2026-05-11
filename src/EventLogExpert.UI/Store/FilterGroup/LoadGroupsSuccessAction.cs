@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 
 namespace EventLogExpert.UI.Store.FilterGroup;
 
-public sealed record LoadGroupsSuccessAction(IEnumerable<FilterGroupModel> Groups);
+public sealed record LoadGroupsSuccessAction(IEnumerable<SavedFilterGroup> Groups);

@@ -8,7 +8,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
-using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Store.FilterPane;

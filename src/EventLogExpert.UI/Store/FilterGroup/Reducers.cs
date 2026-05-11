@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -11,7 +11,7 @@ public sealed class Reducers
 {
     [ReducerMethod]
     public static FilterGroupState ReducerAddGroup(FilterGroupState state, AddGroupAction action) =>
-        WithGroups(state, state.Groups.Add(action.FilterGroup ?? new FilterGroupModel()));
+        WithGroups(state, state.Groups.Add(action.FilterGroup ?? new SavedFilterGroup()));
 
     [ReducerMethod]
     public static FilterGroupState ReducerImportGroups(FilterGroupState state, ImportGroupsAction action) =>
@@ -136,7 +136,7 @@ public sealed class Reducers
     }
 
     private static IReadOnlyDictionary<string, FilterGroupData> BuildDisplayGroups(
-        IEnumerable<FilterGroupModel> groups)
+        IEnumerable<SavedFilterGroup> groups)
     {
         Dictionary<string, FilterGroupData> displayGroups = [];
 
@@ -150,12 +150,12 @@ public sealed class Reducers
         return displayGroups.AsReadOnly();
     }
 
-    private static IReadOnlyList<FilterModel> ReplaceFilterById(
-        IReadOnlyList<FilterModel> filters,
+    private static IReadOnlyList<SavedFilter> ReplaceFilterById(
+        IReadOnlyList<SavedFilter> filters,
         FilterId id,
-        FilterModel replacement)
+        SavedFilter replacement)
     {
-        var result = new FilterModel[filters.Count];
+        var result = new SavedFilter[filters.Count];
 
         for (var index = 0; index < filters.Count; index++)
         {
@@ -169,7 +169,7 @@ public sealed class Reducers
         FilterGroupState state,
         FilterGroupId parentId,
         FilterId filterId,
-        Func<FilterModel, FilterModel> transform)
+        Func<SavedFilter, SavedFilter> transform)
     {
         var parent = state.Groups.FirstOrDefault(x => x.Id == parentId);
 
@@ -188,6 +188,6 @@ public sealed class Reducers
                 parent with { Filters = ReplaceFilterById(parent.Filters, filterId, transform(filter)) }));
     }
 
-    private static FilterGroupState WithGroups(FilterGroupState state, ImmutableList<FilterGroupModel> newGroups) =>
+    private static FilterGroupState WithGroups(FilterGroupState state, ImmutableList<SavedFilterGroup> newGroups) =>
         state with { Groups = newGroups, DisplayGroups = BuildDisplayGroups(newGroups) };
 }

@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Filters.Base;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Filters;

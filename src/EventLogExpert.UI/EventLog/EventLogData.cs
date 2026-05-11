@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.Filter;
 
 namespace EventLogExpert.UI.EventLog;
 

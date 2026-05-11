@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Preferences;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
@@ -17,7 +17,7 @@ public sealed class EffectsTests
     public async Task HandleAddGroup_ShouldPersistToPreferences()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName }
         };
@@ -28,7 +28,7 @@ public sealed class EffectsTests
         await effects.HandleAddGroup(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
             x.Count() == 1 && x.Any(y => y.Name == Constants.FilterGroupName));
     }
 
@@ -36,7 +36,7 @@ public sealed class EffectsTests
     public async Task HandleAddGroup_WithEmptyGroups_ShouldPersistEmptyList()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>();
+        var groups = new List<SavedFilterGroup>();
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(groups);
 
@@ -44,7 +44,7 @@ public sealed class EffectsTests
         await effects.HandleAddGroup(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
             !x.Any());
     }
 
@@ -52,7 +52,7 @@ public sealed class EffectsTests
     public async Task HandleImportGroups_ShouldPersistToPreferences()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -64,7 +64,7 @@ public sealed class EffectsTests
         await effects.HandleImportGroups(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
             x.Count() == 2);
     }
 
@@ -72,7 +72,7 @@ public sealed class EffectsTests
     public async Task HandleLoadGroups_ShouldDispatchLoadGroupsSuccess()
     {
         // Arrange
-        var savedGroups = new List<FilterGroupModel>
+        var savedGroups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested }
@@ -102,7 +102,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
-        mockPreferencesProvider.SavedFiltersPreference.Returns(new List<FilterGroupModel>());
+        mockPreferencesProvider.SavedFiltersPreference.Returns(new List<SavedFilterGroup>());
 
         var mockState = Substitute.For<IState<FilterGroupState>>();
         mockState.Value.Returns(new FilterGroupState());
@@ -122,7 +122,7 @@ public sealed class EffectsTests
     public async Task HandleRemoveGroup_ShouldPersistToPreferences()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName }
         };
@@ -133,7 +133,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveGroup(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
             x.Count() == 1);
     }
 
@@ -141,7 +141,7 @@ public sealed class EffectsTests
     public async Task HandleSetGroup_ShouldPersistToPreferences()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName }
         };
@@ -152,7 +152,7 @@ public sealed class EffectsTests
         await effects.HandleSetGroup(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(g =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(g =>
             g.Any(x => x.Name == Constants.FilterGroupName));
     }
 
@@ -160,7 +160,7 @@ public sealed class EffectsTests
     public async Task HandleSetGroup_WithMultipleGroups_ShouldPersistAll()
     {
         // Arrange
-        var groups = new List<FilterGroupModel>
+        var groups = new List<SavedFilterGroup>
         {
             new() { Name = Constants.FilterGroupName },
             new() { Name = Constants.FilterGroupNameNested },
@@ -173,12 +173,12 @@ public sealed class EffectsTests
         await effects.HandleSetGroup(mockDispatcher);
 
         // Assert
-        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<FilterGroupModel>>(x =>
+        _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
             x.Count() == 3);
     }
 
     private static (Effects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
-        CreateEffects(List<FilterGroupModel>? groups = null)
+        CreateEffects(List<SavedFilterGroup>? groups = null)
     {
         var mockState = Substitute.For<IState<FilterGroupState>>();
 

@@ -2,11 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Modals.Filters;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Modal;
-using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -18,8 +17,8 @@ namespace EventLogExpert.Components.Sections;
 
 public sealed partial class FilterPane : IDisposable
 {
-    private readonly FilterDateModel _model = new();
-    private readonly List<FilterDraftModel> _pendingDrafts = [];
+    private readonly DateFilter _model = new();
+    private readonly List<FilterDraft> _pendingDrafts = [];
 
     private bool _canEditDate;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
@@ -54,7 +53,7 @@ public sealed partial class FilterPane : IDisposable
 
         SubscribeToAction<SetFilterDateRangeSuccessAction>(action =>
         {
-            UpdateFilterDate(action.FilterDateModel);
+            UpdateFilterDate(action.DateFilter);
         });
 
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
@@ -64,13 +63,13 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddAdvancedFilter()
     {
-        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Advanced });
+        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Advanced });
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Basic });
+        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Basic });
         _isFilterListVisible = true;
     }
 
@@ -93,7 +92,7 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddExclusion()
     {
-        _pendingDrafts.Add(new FilterDraftModel { FilterType = FilterType.Basic, IsExcluded = true });
+        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Basic, IsExcluded = true });
         _isFilterListVisible = true;
     }
 
@@ -101,7 +100,7 @@ public sealed partial class FilterPane : IDisposable
     {
         Dispatcher.Dispatch(
             new SetFilterDateRangeAction(
-                new FilterDateModel
+                new DateFilter
                 {
                     After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
                     Before = _model.Before?.ConvertTimeZoneToUtc(_currentTimeZone)
@@ -130,9 +129,9 @@ public sealed partial class FilterPane : IDisposable
         }
     }
 
-    private void HandlePendingDiscard(FilterDraftModel draft) => _pendingDrafts.Remove(draft);
+    private void HandlePendingDiscard(FilterDraft draft) => _pendingDrafts.Remove(draft);
 
-    private void HandlePendingSave(FilterDraftModel draft, FilterModel filter)
+    private void HandlePendingSave(FilterDraft draft, SavedFilter filter)
     {
         _pendingDrafts.Remove(draft);
         Dispatcher.Dispatch(new SetFilterAction(filter));
@@ -148,7 +147,7 @@ public sealed partial class FilterPane : IDisposable
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 
-    private void UpdateFilterDate(FilterDateModel? updatedDate)
+    private void UpdateFilterDate(DateFilter? updatedDate)
     {
         _model.Before = updatedDate?.Before?.ConvertTimeZone(_currentTimeZone);
         _model.After = updatedDate?.After?.ConvertTimeZone(_currentTimeZone);

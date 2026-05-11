@@ -2,10 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Store.FilterCache;
 using EventLogExpert.UI.Store.FilterPane;
 using Fluxor;
@@ -75,7 +74,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 
     private async Task AddFilter(string filter)
     {
-        var model = FilterModel.TryCreate(filter, FilterType.Cached, isEnabled: true);
+        var model = SavedFilter.TryCreate(filter, FilterType.Cached, isEnabled: true);
 
         if (model is null)
         {

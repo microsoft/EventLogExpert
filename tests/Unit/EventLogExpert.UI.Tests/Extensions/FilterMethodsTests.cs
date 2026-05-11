@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Models;
+using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
@@ -16,7 +16,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var dictionary = new Dictionary<string, FilterGroupData>();
-        var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var groupNames = Constants.FilterGroupName.Split('\\');
 
         // Act
@@ -32,8 +32,8 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var dictionary = new Dictionary<string, FilterGroupData>();
-        var filterGroup1 = new FilterGroupModel { Name = Constants.FilterGroupName };
-        var filterGroup2 = new FilterGroupModel { Name = "TestSection\\AnotherGroup" };
+        var filterGroup1 = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var filterGroup2 = new SavedFilterGroup { Name = "TestSection\\AnotherGroup" };
 
         // Act
         dictionary.AddFilterGroup(Constants.FilterGroupName.Split('\\'), filterGroup1);
@@ -49,7 +49,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var dictionary = new Dictionary<string, FilterGroupData>();
-        var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupName };
+        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
 
         // Act
         var result = dictionary.AddFilterGroup(Constants.FilterGroupName.Split('\\'), filterGroup);
@@ -63,7 +63,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var dictionary = new Dictionary<string, FilterGroupData>();
-        var filterGroup = new FilterGroupModel { Name = Constants.FilterGroupNameNested };
+        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupNameNested };
         var groupNames = Constants.FilterGroupNameNested.Split('\\');
 
         // Act
@@ -79,7 +79,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var dictionary = new Dictionary<string, FilterGroupData>();
-        var filterGroup = new FilterGroupModel { Name = "SingleGroup" };
+        var filterGroup = new SavedFilterGroup { Name = "SingleGroup" };
         var groupNames = new[] { "SingleGroup" };
 
         // Act
@@ -110,7 +110,7 @@ public sealed class FilterMethodsTests
         var eventTime = DateTime.Now.AddDays(2);
         var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = DateTime.Now.AddDays(-1),
             Before = DateTime.Now.AddDays(1)
@@ -130,7 +130,7 @@ public sealed class FilterMethodsTests
         var eventTime = DateTime.Now.AddDays(-2);
         var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = DateTime.Now.AddDays(-1),
             Before = DateTime.Now.AddDays(1)
@@ -150,7 +150,7 @@ public sealed class FilterMethodsTests
         var boundaryTime = DateTime.Now;
         var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = boundaryTime,
             Before = boundaryTime.AddHours(1)
@@ -170,7 +170,7 @@ public sealed class FilterMethodsTests
         var boundaryTime = DateTime.Now;
         var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = boundaryTime.AddHours(-1),
             Before = boundaryTime
@@ -189,7 +189,7 @@ public sealed class FilterMethodsTests
         // Arrange
         ResolvedEvent? @event = null;
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = DateTime.Now.AddDays(-1),
             Before = DateTime.Now.AddDays(1)
@@ -209,7 +209,7 @@ public sealed class FilterMethodsTests
         var eventTime = DateTime.Now;
         var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
 
-        var dateFilter = new FilterDateModel
+        var dateFilter = new DateFilter
         {
             After = eventTime.AddHours(-1),
             Before = eventTime.AddHours(1)
@@ -227,7 +227,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         ResolvedEvent? @event = null;
-        var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
+        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
         var result = @event.Filter(filters);
@@ -242,7 +242,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
         var filter = CreateFilter(Constants.FilterIdEquals100, true);
-        var filters = new List<FilterModel> { filter };
+        var filters = new List<SavedFilter> { filter };
 
         // Act
         var result = @event.Filter(filters);
@@ -257,7 +257,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
         var filter = CreateFilter(Constants.FilterIdEquals100, true);
-        var filters = new List<FilterModel> { filter };
+        var filters = new List<SavedFilter> { filter };
 
         // Act
         var result = @event.Filter(filters);
@@ -271,7 +271,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
-        var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
+        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
         var result = @event.Filter(filters);
@@ -285,7 +285,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filters = new List<FilterModel> { CreateFilter(Constants.FilterIdEquals100) };
+        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
         var result = @event.Filter(filters);
@@ -301,7 +301,7 @@ public sealed class FilterMethodsTests
         var @event = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
         var includeFilter = CreateFilter(Constants.FilterIdEquals100);
         var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError, true);
-        var filters = new List<FilterModel> { includeFilter, excludeFilter };
+        var filters = new List<SavedFilter> { includeFilter, excludeFilter };
 
         // Act
         var result = @event.Filter(filters);
@@ -316,7 +316,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
 
-        var filters = new List<FilterModel>
+        var filters = new List<SavedFilter>
         {
             CreateFilter(Constants.FilterIdEquals100),
             CreateFilter(Constants.FilterIdEquals200)
@@ -335,7 +335,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(300);
 
-        var filters = new List<FilterModel>
+        var filters = new List<SavedFilter>
         {
             CreateFilter(Constants.FilterIdEquals100),
             CreateFilter(Constants.FilterIdEquals200)
@@ -353,7 +353,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filters = new List<FilterModel>();
+        var filters = new List<SavedFilter>();
 
         // Act
         var result = @event.Filter(filters);
@@ -368,7 +368,7 @@ public sealed class FilterMethodsTests
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
         var filter = CreateFilter(Constants.FilterIdEquals100, true);
-        var filters = new List<FilterModel> { filter };
+        var filters = new List<SavedFilter> { filter };
 
         // Act
         var result = @event.Filter(filters);
@@ -382,7 +382,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filters = new List<FilterModel> { CreateFilter(Constants.FilterXmlContainsData) };
+        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterXmlContainsData) };
 
         // Act
         var result = @event.Filter(filters);
@@ -408,7 +408,7 @@ public sealed class FilterMethodsTests
     [Fact]
     public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReturnTrue()
     {
-        // FilterModel is now immutable, so structural change is the only signal HasFilteringChanged
+        // SavedFilter is now immutable, so structural change is the only signal HasFilteringChanged
         // needs to detect. (Pre-immutability this test guarded against in-place Comparison mutation.)
         var first = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
         var second = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
@@ -442,7 +442,7 @@ public sealed class FilterMethodsTests
     {
         // Arrange
         var original = new EventFilter(null, []);
-        var dateFilter = new FilterDateModel { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
+        var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
         var updated = new EventFilter(dateFilter, []);
 
         // Act
@@ -456,8 +456,8 @@ public sealed class FilterMethodsTests
     public void HasFilteringChanged_WhenDateFilterDifferent_ShouldReturnTrue()
     {
         // Arrange
-        var dateFilter1 = new FilterDateModel { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
-        var dateFilter2 = new FilterDateModel { After = DateTime.Now.AddDays(-2), Before = DateTime.Now };
+        var dateFilter1 = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
+        var dateFilter2 = new DateFilter { After = DateTime.Now.AddDays(-2), Before = DateTime.Now };
         var original = new EventFilter(dateFilter1, []);
         var updated = new EventFilter(dateFilter2, []);
 
@@ -472,7 +472,7 @@ public sealed class FilterMethodsTests
     public void HasFilteringChanged_WhenDateFilterRemoved_ShouldReturnTrue()
     {
         // Arrange
-        var dateFilter = new FilterDateModel { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
+        var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
         var original = new EventFilter(dateFilter, []);
         var updated = new EventFilter(null, []);
 
@@ -679,7 +679,7 @@ public sealed class FilterMethodsTests
     public void IsFilteringEnabled_WhenBothDateFilterAndFiltersExist_ShouldReturnTrue()
     {
         // Arrange
-        var dateFilter = new FilterDateModel { IsEnabled = true };
+        var dateFilter = new DateFilter { IsEnabled = true };
         var filter = CreateFilter(Constants.FilterIdEquals100);
         var eventFilter = new EventFilter(dateFilter, [filter]);
 
@@ -694,7 +694,7 @@ public sealed class FilterMethodsTests
     public void IsFilteringEnabled_WhenDateFilterDisabled_ShouldReturnFalse()
     {
         // Arrange
-        var dateFilter = new FilterDateModel { IsEnabled = false };
+        var dateFilter = new DateFilter { IsEnabled = false };
         var eventFilter = new EventFilter(dateFilter, []);
 
         // Act
@@ -708,7 +708,7 @@ public sealed class FilterMethodsTests
     public void IsFilteringEnabled_WhenDateFilterEnabled_ShouldReturnTrue()
     {
         // Arrange
-        var dateFilter = new FilterDateModel { IsEnabled = true };
+        var dateFilter = new DateFilter { IsEnabled = true };
         var eventFilter = new EventFilter(dateFilter, []);
 
         // Act
@@ -1100,6 +1100,6 @@ public sealed class FilterMethodsTests
         Assert.Equal(3L, result[2].RecordId);
     }
 
-    private static FilterModel CreateFilter(string expression, bool isExcluded = false) =>
+    private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
         FilterUtils.CreateTestFilter(comparisonValue: expression, isExcluded: isExcluded);
 }
