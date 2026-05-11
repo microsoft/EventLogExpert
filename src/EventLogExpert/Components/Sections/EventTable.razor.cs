@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;

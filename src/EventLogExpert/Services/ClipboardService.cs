@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Store.EventLog;
 using EventLogExpert.UI.Store.EventTable;
