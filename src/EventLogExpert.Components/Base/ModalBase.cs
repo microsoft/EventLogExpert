@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Interfaces;
+using EventLogExpert.UI.Modal;
 using Fluxor.Blazor.Web.Components;
 using Microsoft.AspNetCore.Components;
 

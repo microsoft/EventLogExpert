@@ -3,7 +3,7 @@
 
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Interfaces;
+namespace EventLogExpert.UI.Modal;
 
 /// <summary>
 ///     Coordinates a single active modal at a time. Hosts subscribe to <see cref="StateChanged" /> and render

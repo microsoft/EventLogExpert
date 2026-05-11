@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Services;
+using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Tests.Services.Modal;
+namespace EventLogExpert.UI.Tests.Modal;
 
 public sealed class ModalServiceTests
 {
