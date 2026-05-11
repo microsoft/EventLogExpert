@@ -8,13 +8,13 @@
     <File Path="Directory.Packages.props" />
   </Folder>
   <Folder Name="/src/">
-    <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
-    <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
-    <Project Path="src/EventLogExpert.UI/EventLogExpert.UI.csproj" />
-    <Project Path="src/EventLogExpert.Components/EventLogExpert.Components.csproj" />
     <Project Path="src/EventLogExpert/EventLogExpert.csproj">
       <Deploy Solution="*|Any CPU" />
     </Project>
+    <Project Path="src/EventLogExpert.Components/EventLogExpert.Components.csproj" />
+    <Project Path="src/EventLogExpert.UI/EventLogExpert.UI.csproj" />
+    <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
+    <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/EventLogExpert.Components.Tests/EventLogExpert.Components.Tests.csproj" />
