@@ -4,7 +4,7 @@
 using System.Reflection;
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.Common.Display;
 
 public static class DisplayExtensions
 {

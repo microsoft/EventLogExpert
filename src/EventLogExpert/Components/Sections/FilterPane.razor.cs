@@ -3,6 +3,7 @@
 
 using EventLogExpert.Components.Modals.Filters;
 using EventLogExpert.UI;
+using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Interfaces;
 using EventLogExpert.UI.Models;
 using EventLogExpert.UI.Store.EventLog;
