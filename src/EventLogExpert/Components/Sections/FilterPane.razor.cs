@@ -82,9 +82,7 @@ public sealed partial class FilterPane : IDisposable
     {
         _currentTimeZone = Settings.TimeZoneInfo;
 
-        var (after, before) = DateRangeDefaults.ComputeFromActiveLogs(
-            EventLogState.Value.ActiveLogs.Values,
-            DateTime.UtcNow);
+        var (after, before) = EventLogState.Value.ActiveLogs.Values.GetEventDateRange(DateTime.UtcNow);
 
         _model.After = after.ConvertTimeZone(_currentTimeZone);
         _model.Before = before.ConvertTimeZone(_currentTimeZone);
