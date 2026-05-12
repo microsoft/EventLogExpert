@@ -9,7 +9,7 @@ using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.Concurrent;
 
-namespace EventLogExpert.Eventing.Tests.Resolvers;
+namespace EventLogExpert.Eventing.IntegrationTests.Resolvers;
 
 public sealed class EventResolverLocalProviderTests
 {
