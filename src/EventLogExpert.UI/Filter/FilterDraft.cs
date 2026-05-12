@@ -7,7 +7,7 @@ public sealed class FilterDraft
 {
     public HighlightColor Color { get; set; } = HighlightColor.None;
 
-    public FilterDataDraft Comparison { get; set; } = new();
+    public FilterConditionDraft Comparison { get; set; } = new();
 
     public string ComparisonText { get; set; } = string.Empty;
 
@@ -39,8 +39,8 @@ public sealed class FilterDraft
             IsEnabled = filter.IsEnabled,
             IsExcluded = filter.IsExcluded,
             Comparison = basicFilter is null
-                ? new FilterDataDraft()
-                : FilterDataDraft.FromData(basicFilter.Comparison),
+                ? new FilterConditionDraft()
+                : FilterConditionDraft.FromCondition(basicFilter.Comparison),
             SubFilters = basicFilter is null
                 ? []
                 : [.. basicFilter.SubFilters.Select(SubFilterDraftFromSubFilter)]
@@ -48,12 +48,12 @@ public sealed class FilterDraft
     }
 
     public BasicFilter ToBasicFilter() =>
-        new(Comparison.ToData(), [.. SubFilters.Select(subFilter => subFilter.ToSubFilter())]);
+        new(Comparison.ToCondition(), [.. SubFilters.Select(subFilter => subFilter.ToSubFilter())]);
 
     private static SubFilterDraft SubFilterDraftFromSubFilter(SubFilter subFilter) =>
         new()
         {
-            Data = FilterDataDraft.FromData(subFilter.Data),
+            Condition = FilterConditionDraft.FromCondition(subFilter.Data),
             JoinWithAny = subFilter.JoinWithAny
         };
 }

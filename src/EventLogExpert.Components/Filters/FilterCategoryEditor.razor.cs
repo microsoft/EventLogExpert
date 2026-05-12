@@ -17,20 +17,20 @@ public sealed partial class FilterCategoryEditor : ComponentBase
 
     [Parameter] public string? CategoryAriaLabelledBy { get; set; }
 
-    [Parameter][EditorRequired] public FilterDataDraft Data { get; set; } = null!;
+    [Parameter][EditorRequired] public FilterConditionDraft Condition { get; set; } = null!;
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
     private FilterCategory CategoryBinding
     {
-        get => Data.Category;
+        get => Condition.Category;
         set
         {
-            Data.ChangeCategory(value);
+            Condition.ChangeCategory(value);
 
-            if (IsTextOnlyCategory(value) && Data.Evaluator == FilterEvaluator.MultiSelect)
+            if (IsTextOnlyCategory(value) && Condition.Evaluator == FilterEvaluator.MultiSelect)
             {
-                Data.Evaluator = FilterEvaluator.Contains;
+                Condition.Evaluator = FilterEvaluator.Contains;
             }
         }
     }
@@ -42,7 +42,7 @@ public sealed partial class FilterCategoryEditor : ComponentBase
         get
         {
             var items = Items;
-            var value = Data.Value ?? string.Empty;
+            var value = Condition.Value ?? string.Empty;
 
             if (_filteredItemsSource.Equals(items) && _filteredItemsValue == value)
             {
@@ -59,7 +59,7 @@ public sealed partial class FilterCategoryEditor : ComponentBase
     }
 
     private ImmutableArray<string> Items =>
-        FilterCategoryItemsCache.GetItems(EventLogState.Value.ActiveLogs, Data.Category);
+        FilterCategoryItemsCache.GetItems(EventLogState.Value.ActiveLogs, Condition.Category);
 
     private static bool IsTextOnlyCategory(FilterCategory category) =>
         category is FilterCategory.Description or FilterCategory.Xml;

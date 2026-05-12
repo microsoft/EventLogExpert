@@ -13,7 +13,7 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
         var basicFilter = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Id,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -40,7 +40,7 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_HydratesComparisonAndSubFiltersFromBasicFilter()
     {
         var basicFilter = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Id,
                 Evaluator = FilterEvaluator.Equals,
@@ -49,7 +49,7 @@ public sealed class FilterDraftModelTests
             },
             [
                 new SubFilter(
-                    new FilterData
+                    new FilterCondition
                     {
                         Category = FilterCategory.Level,
                         Evaluator = FilterEvaluator.Equals,
@@ -71,8 +71,8 @@ public sealed class FilterDraftModelTests
 
         Assert.Single(draft.SubFilters);
         Assert.True(draft.SubFilters[0].JoinWithAny);
-        Assert.Equal(FilterCategory.Level, draft.SubFilters[0].Data.Category);
-        Assert.Equal("Error", draft.SubFilters[0].Data.Value);
+        Assert.Equal(FilterCategory.Level, draft.SubFilters[0].Condition.Category);
+        Assert.Equal("Error", draft.SubFilters[0].Condition.Value);
     }
 
     [Fact]
@@ -123,7 +123,7 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_DoesNotShareValuesListWithDraft()
     {
         var draft = FilterUtils.CreateTestFilterDraft(
-            comparison: new FilterDataDraft
+            comparison: new FilterConditionDraft
             {
                 Category = FilterCategory.Level,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -142,7 +142,7 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_ProducesImmutableSourceMatchingEditorState()
     {
         var draft = FilterUtils.CreateTestFilterDraft(
-            comparison: new FilterDataDraft
+            comparison: new FilterConditionDraft
             {
                 Category = FilterCategory.Id,
                 Evaluator = FilterEvaluator.Equals,
@@ -152,7 +152,7 @@ public sealed class FilterDraftModelTests
             [
                 new SubFilterDraft
                 {
-                    Data = new FilterDataDraft
+                    Condition = new FilterConditionDraft
                     {
                         Category = FilterCategory.Level,
                         Evaluator = FilterEvaluator.Equals,

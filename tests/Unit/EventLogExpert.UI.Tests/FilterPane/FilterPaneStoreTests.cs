@@ -201,7 +201,7 @@ public sealed class FilterPaneReducerTests
         // Saved-to-group "re-edit as Basic" path: applying a Basic group filter must keep BasicFilter
         // and FilterType so the row reopens as Basic, not collapsed to Advanced.
         var basicFilter = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Id,
                 Evaluator = FilterEvaluator.Equals,

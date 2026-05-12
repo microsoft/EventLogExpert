@@ -7,10 +7,10 @@
 </ValueSelect>
 
 <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
-<ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Data.Evaluator" ToStringFunc="x => x.ToFullString()">
+<ValueSelect AriaLabelledBy="@($"{Id}_Comparison")" CssClass="input filter-dropdown" T="FilterEvaluator" @bind-Value="Condition.Evaluator" ToStringFunc="x => x.ToFullString()">
     @foreach (FilterEvaluator item in Enum.GetValues(typeof(FilterEvaluator)))
     {
-        @if (IsTextOnlyCategory(Data.Category) && item == FilterEvaluator.MultiSelect)
+        @if (IsTextOnlyCategory(Condition.Category) && item == FilterEvaluator.MultiSelect)
         {
             continue;
         }
@@ -19,13 +19,13 @@
 </ValueSelect>
 
 <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
-@if (IsTextOnlyCategory(Data.Category))
+@if (IsTextOnlyCategory(Condition.Category))
 {
-    <TextInput CssClass="input filter-description" @bind-Value="@Data.Value" />
+    <TextInput CssClass="input filter-description" @bind-Value="@Condition.Value" />
 }
-else if (Data.Evaluator == FilterEvaluator.MultiSelect)
+else if (Condition.Evaluator == FilterEvaluator.MultiSelect)
 {
-    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Data.Values" IsMultiSelect
+    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-multiselect-dropdown" T="string" @bind-Values="Condition.Values" IsMultiSelect
         EmptyText="All"
         ToStringFunc="@(x => string.IsNullOrWhiteSpace(x) ? "All" : x)">
         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
@@ -37,7 +37,7 @@ else if (Data.Evaluator == FilterEvaluator.MultiSelect)
 }
 else
 {
-    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Data.Value" IsInput>
+    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-value-dropdown" T="string" @bind-Value="Condition.Value" IsInput>
         <ValueSelectItem T="string" ClearItem>All</ValueSelectItem>
         @foreach (var item in FilteredItems)
         {

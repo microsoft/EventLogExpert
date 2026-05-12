@@ -87,7 +87,7 @@ public sealed class FilterService : IFilterService
 
         comparison = string.Empty;
 
-        if (!TryFormatData(basicFilter.Comparison, null, out var comparisonText))
+        if (!TryFormatCondition(basicFilter.Comparison, null, out var comparisonText))
         {
             return false;
         }
@@ -98,7 +98,7 @@ public sealed class FilterService : IFilterService
         {
             var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
 
-            if (TryFormatData(subFilter.Data, joinPrefix, out var subText))
+            if (TryFormatCondition(subFilter.Data, joinPrefix, out var subText))
             {
                 stringBuilder.AppendLine(subText);
             }
@@ -222,67 +222,67 @@ public sealed class FilterService : IFilterService
         return false;
     }
 
-    private static bool TryFormatData(FilterData data, string? joinPrefix, out string formatted)
+    private static bool TryFormatCondition(FilterCondition condition, string? joinPrefix, out string formatted)
     {
         formatted = string.Empty;
 
-        if (string.IsNullOrWhiteSpace(data.Value) &&
-            data.Evaluator != FilterEvaluator.MultiSelect) { return false; }
+        if (string.IsNullOrWhiteSpace(condition.Value) &&
+            condition.Evaluator != FilterEvaluator.MultiSelect) { return false; }
 
-        if (data.Values.Count <= 0 &&
-            data.Evaluator == FilterEvaluator.MultiSelect) { return false; }
+        if (condition.Values.Count <= 0 &&
+            condition.Evaluator == FilterEvaluator.MultiSelect) { return false; }
 
         StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
 
-        if (data.Evaluator != FilterEvaluator.MultiSelect ||
-            data.Category is FilterCategory.Keywords)
+        if (condition.Evaluator != FilterEvaluator.MultiSelect ||
+            condition.Category is FilterCategory.Keywords)
         {
-            stringBuilder.Append(GetComparisonString(data.Category, data.Evaluator));
+            stringBuilder.Append(GetComparisonString(condition.Category, condition.Evaluator));
         }
 
-        switch (data.Evaluator)
+        switch (condition.Evaluator)
         {
             case FilterEvaluator.Equals:
             case FilterEvaluator.NotEqual:
-                if (data.Category is FilterCategory.Keywords)
+                if (condition.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(data.Value)}\"");
+                    stringBuilder.Append($"\"{EscapeStringLiteral(condition.Value)}\"");
                 }
 
                 break;
             case FilterEvaluator.Contains:
             case FilterEvaluator.NotContains:
-                if (data.Category is FilterCategory.Keywords)
+                if (condition.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(data.Value)}\", StringComparison.OrdinalIgnoreCase)");
+                    stringBuilder.Append($"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 break;
             case FilterEvaluator.MultiSelect:
-                if (data.Category is FilterCategory.Keywords)
+                if (condition.Category is FilterCategory.Keywords)
                 {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", data.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
+                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", condition.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
                 }
                 else
                 {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", data.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
+                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", condition.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
                 }
 
                 break;
             default: return false;
         }
 
-        if (data is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
+        if (condition is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
         {
-            stringBuilder.Append(GetComparisonString(data.Category, data.Evaluator));
+            stringBuilder.Append(GetComparisonString(condition.Category, condition.Evaluator));
         }
 
         formatted = stringBuilder.ToString();

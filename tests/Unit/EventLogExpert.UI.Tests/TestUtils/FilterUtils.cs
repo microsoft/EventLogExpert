@@ -26,7 +26,7 @@ internal static class FilterUtils
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
-        FilterDataDraft? comparison = null,
+        FilterConditionDraft? comparison = null,
         IEnumerable<SubFilterDraft>? subFilters = null) =>
         new()
         {
@@ -34,7 +34,7 @@ internal static class FilterUtils
             Color = color,
             ComparisonText = comparisonText,
             FilterType = filterType,
-            Comparison = comparison ?? new FilterDataDraft(),
+            Comparison = comparison ?? new FilterConditionDraft(),
             SubFilters = subFilters?.ToList() ?? [],
             IsEnabled = isEnabled,
             IsExcluded = isExcluded

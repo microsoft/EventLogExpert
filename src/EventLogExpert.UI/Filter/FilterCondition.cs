@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 namespace EventLogExpert.UI.Filter;
 
 /// <summary>Immutable representation of a single Basic-filter criterion (one row of the editor).</summary>
-public sealed record FilterData
+public sealed record FilterCondition
 {
     public FilterCategory Category { get; init; }
 
@@ -20,6 +20,6 @@ public sealed record FilterData
     ///     Returns a copy with the new <paramref name="category" /> and Value/Values cleared, since the available value
     ///     space changes when the category changes.
     /// </summary>
-    public FilterData WithCategory(FilterCategory category) =>
+    public FilterCondition WithCategory(FilterCategory category) =>
         this with { Category = category, Value = null, Values = [] };
 }
