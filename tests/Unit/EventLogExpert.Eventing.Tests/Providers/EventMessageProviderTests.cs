@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 
 namespace EventLogExpert.Eventing.Tests.Providers;

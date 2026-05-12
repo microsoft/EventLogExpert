@@ -4,7 +4,7 @@
 using System.IO.Compression;
 using System.Text;
 
-namespace EventLogExpert.Eventing.Tests.TestUtils;
+namespace EventLogExpert.Eventing.TestUtils;
 
 public static class CompressionTestUtils
 {

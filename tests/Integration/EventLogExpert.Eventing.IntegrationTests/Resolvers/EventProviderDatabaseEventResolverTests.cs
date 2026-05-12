@@ -6,14 +6,13 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Eventing.Tests.TestUtils;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
-using Microsoft.Data.Sqlite;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Eventing.Tests.Resolvers;
+namespace EventLogExpert.Eventing.IntegrationTests.Resolvers;
 
 public sealed class EventResolverDatabaseTests
 {
@@ -724,33 +723,5 @@ public sealed class EventResolverDatabaseTests
         Assert.Null(exception);
     }
 
-    private static void DeleteDatabaseFile(string path, int maxRetries = 10)
-    {
-        if (!File.Exists(path)) { return; }
-
-        for (int i = 0; i < maxRetries; i++)
-        {
-            try
-            {
-                // Clear SQLite connection pool
-                SqliteConnection.ClearAllPools();
-
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                GC.Collect();
-
-                File.Delete(path);
-                return;
-            }
-            catch (IOException) when (i < maxRetries - 1)
-            {
-                Thread.Sleep(200);
-            }
-            catch (IOException)
-            {
-                // If we still can't delete after retries, just ignore - OS will clean up temp files
-                return;
-            }
-        }
-    }
+    private static void DeleteDatabaseFile(string path) => SqliteTestDb.Delete(path);
 }

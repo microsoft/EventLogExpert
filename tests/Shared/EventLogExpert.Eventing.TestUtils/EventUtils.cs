@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
-using static EventLogExpert.Eventing.Tests.TestUtils.Constants.Constants;
+using static EventLogExpert.Eventing.TestUtils.Constants.Constants;
 
-namespace EventLogExpert.Eventing.Tests.TestUtils;
+namespace EventLogExpert.Eventing.TestUtils;
 
 public static class EventUtils
 {

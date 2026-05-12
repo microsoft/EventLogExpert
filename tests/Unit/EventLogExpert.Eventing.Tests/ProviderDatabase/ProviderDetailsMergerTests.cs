@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Tests.TestUtils;
+using EventLogExpert.Eventing.TestUtils;
 
 namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
 
