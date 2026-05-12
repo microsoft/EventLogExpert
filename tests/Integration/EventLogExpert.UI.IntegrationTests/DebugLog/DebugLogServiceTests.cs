@@ -4,11 +4,11 @@
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Tests.TestUtils.Constants;
+using EventLogExpert.UI.IntegrationTests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests.DebugLog;
+namespace EventLogExpert.UI.IntegrationTests.DebugLog;
 
 public sealed class DebugLogServiceTests : IDisposable
 {
