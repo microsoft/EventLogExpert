@@ -415,31 +415,6 @@ public sealed class ProviderDbContextTests : IDisposable
     }
 
     [Fact]
-    public void PerformUpgradeIfNeeded_WithV2SchemaAndNullParameters_Throws()
-    {
-        // Arrange — V2 row with NULL Parameters column; previously this would have silently
-        // round-tripped to an empty list. Now it must surface the same hard-fail as any other V2 row.
-        var dbPath = CreateTempDatabasePath();
-        SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
-        InsertLegacyRow(
-            dbPath,
-            providerName: "V2NullParams",
-            messagesJson: "[]",
-            parametersJson: null,
-            eventsJson: "[]",
-            keywordsJson: "{}",
-            opcodesJson: "{}",
-            tasksJson: "{}");
-
-        // Act + Assert
-        using var context = new ProviderDbContext(dbPath, false);
-        var thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
-        Assert.Contains("v2", thrown.Reason);
-
-        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
-    }
-
-    [Fact]
     public void PerformUpgradeIfNeeded_WithV2Schema_Throws()
     {
         // Arrange — V2 row stores Parameters as JSON TEXT.
@@ -469,6 +444,31 @@ public sealed class ProviderDbContextTests : IDisposable
         using var verify = new ProviderDbContext(dbPath, true);
         var stateAfter = verify.IsUpgradeNeeded();
         Assert.Equal(2, stateAfter.CurrentVersion);
+        AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
+    }
+
+    [Fact]
+    public void PerformUpgradeIfNeeded_WithV2SchemaAndNullParameters_Throws()
+    {
+        // Arrange — V2 row with NULL Parameters column; previously this would have silently
+        // round-tripped to an empty list. Now it must surface the same hard-fail as any other V2 row.
+        var dbPath = CreateTempDatabasePath();
+        SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+        InsertLegacyRow(
+            dbPath,
+            providerName: "V2NullParams",
+            messagesJson: "[]",
+            parametersJson: null,
+            eventsJson: "[]",
+            keywordsJson: "{}",
+            opcodesJson: "{}",
+            tasksJson: "{}");
+
+        // Act + Assert
+        using var context = new ProviderDbContext(dbPath, false);
+        var thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
+        Assert.Contains("v2", thrown.Reason);
+
         AssertProviderDetailsRowCount(dbPath, expectedRows: 1);
     }
 

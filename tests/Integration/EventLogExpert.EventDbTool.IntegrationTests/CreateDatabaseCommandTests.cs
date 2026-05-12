@@ -11,39 +11,8 @@ namespace EventLogExpert.EventDbTool.IntegrationTests;
 
 public sealed class CreateDatabaseCommandTests : IDisposable
 {
-    private readonly List<string> _tempPaths = [];
     private readonly List<string> _tempDirs = [];
-
-    public void Dispose()
-    {
-        foreach (var path in _tempPaths)
-        {
-            DatabaseTestUtils.DeleteDatabaseFile(path);
-        }
-
-        foreach (var dir in _tempDirs)
-        {
-            DatabaseTestUtils.DeleteDirectoryRecursive(dir);
-        }
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenTargetFileAlreadyExists_LogsErrorAndDoesNotOverwrite()
-    {
-        // Arrange — target file already exists with sentinel bytes; the command must not overwrite or truncate.
-        var path = CreateTempPath();
-        var sentinel = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
-        File.WriteAllBytes(path, sentinel);
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: null, skipProvidersInFile: null);
-
-        // Assert
-        Assert.Equal(sentinel, File.ReadAllBytes(path));
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("file already exists") && h.ToString().Contains(path)));
-    }
+    private readonly List<string> _tempPaths = [];
 
     [Fact]
     public void CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
@@ -60,62 +29,6 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.False(File.Exists(path), "No file should be written when the extension is wrong.");
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("File extension must be .db")));
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenFilterRegexInvalid_LogsErrorAndDoesNotCreateFile()
-    {
-        // Arrange
-        var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: "[unclosed", skipProvidersInFile: null);
-
-        // Assert
-        Assert.False(File.Exists(path), "No file should be written when the filter is invalid.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Invalid --filter regex")));
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
-    {
-        // Arrange
-        var path = CreateTempPath();
-        var missingSource = DatabaseTestUtils.CreateTempPath(".db");
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: missingSource, filter: null, skipProvidersInFile: null);
-
-        // Assert
-        Assert.False(File.Exists(path), "No file should be written when the source is missing.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSource)));
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenSkipProvidersInFileSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
-    {
-        // Arrange — valid source but invalid skip-source. Validation order matters: a missing skip
-        // file must fail BEFORE we begin writing the output database, so an empty stub is never
-        // left behind.
-        var path = CreateTempPath();
-        var source = CreateTempPath();
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-
-        var missingSkipSource = DatabaseTestUtils.CreateTempPath(".db");
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: missingSkipSource);
-
-        // Assert
-        Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSkipSource)));
     }
 
     [Fact]
@@ -145,65 +58,19 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSkipProvidersInFileExcludesAll_DoesNotLeaveEmptyDatabaseOnDisk()
+    public void CreateDatabase_WhenFilterRegexInvalid_LogsErrorAndDoesNotCreateFile()
     {
-        // Arrange — distinct contract path from the filter case: the skip-source contains every
-        // provider in the source, leaving zero to write. The "no empty .db" guarantee must hold
-        // here too; a regression in the skip-set integration could reintroduce the empty stub.
-        var source = CreateTempPath();
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
-            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
-
-        var skipSource = CreateTempPath();
-        DatabaseTestUtils.CreateV4Database(skipSource,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
-            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
-
+        // Arrange
         var path = CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: skipSource);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: "[unclosed", skipProvidersInFile: null);
 
         // Assert
-        Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
-        logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
-            h.ToString().Contains("No provider details could be resolved") &&
-            h.ToString().Contains("Database was not created")));
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenSourceProvidersResolved_PersistsAllProvidersAndPreservesOwningPublisher()
-    {
-        // Arrange — one provider has ResolvedFromOwningPublisher set; this round-trips through the
-        // full streaming write path and we verify the persisted DB matches the source contents.
-        var source = CreateTempPath();
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
-            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName, Constants.OwningPublisherName));
-
-        var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: null);
-
-        // Assert
-        Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
-
-        using var verify = new ProviderDbContext(path, true);
-        var rows = verify.ProviderDetails.OrderBy(r => r.ProviderName).ToList();
-        Assert.Equal(2, rows.Count);
-        Assert.Equal(Constants.FirstProviderName, rows[0].ProviderName);
-        Assert.Null(rows[0].ResolvedFromOwningPublisher);
-        Assert.Equal(Constants.SecondProviderName, rows[1].ProviderName);
-        Assert.Equal(Constants.OwningPublisherName, rows[1].ResolvedFromOwningPublisher);
-        // Success path must not surface any errors or warnings; a regression that warned spuriously
-        // (e.g., "no providers resolved" reaching the success branch) would degrade operator trust.
-        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+        Assert.False(File.Exists(path), "No file should be written when the filter is invalid.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("Invalid --filter regex")));
     }
 
     [Fact]
@@ -240,6 +107,36 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
+    public void CreateDatabase_WhenSkipProvidersInFileExcludesAll_DoesNotLeaveEmptyDatabaseOnDisk()
+    {
+        // Arrange — distinct contract path from the filter case: the skip-source contains every
+        // provider in the source, leaving zero to write. The "no empty .db" guarantee must hold
+        // here too; a regression in the skip-set integration could reintroduce the empty stub.
+        var source = CreateTempPath();
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
+            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
+
+        var skipSource = CreateTempPath();
+        DatabaseTestUtils.CreateV4Database(skipSource,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
+            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName));
+
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: skipSource);
+
+        // Assert
+        Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
+        logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
+            h.ToString().Contains("No provider details could be resolved") &&
+            h.ToString().Contains("Database was not created")));
+        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+    }
+
+    [Fact]
     public void CreateDatabase_WhenSkipProvidersInFileResolves_ExcludesThoseProvidersFromOutput()
     {
         // Arrange — source has First+Second+Shared. Skip-source has Shared. Output must contain
@@ -268,6 +165,109 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         Assert.Equal(new[] { Constants.FirstProviderName, Constants.SecondProviderName }, names);
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
         logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+    }
+
+    [Fact]
+    public void CreateDatabase_WhenSkipProvidersInFileSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
+    {
+        // Arrange — valid source but invalid skip-source. Validation order matters: a missing skip
+        // file must fail BEFORE we begin writing the output database, so an empty stub is never
+        // left behind.
+        var path = CreateTempPath();
+        var source = CreateTempPath();
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
+
+        var missingSkipSource = DatabaseTestUtils.CreateTempPath(".db");
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: missingSkipSource);
+
+        // Assert
+        Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSkipSource)));
+    }
+
+    [Fact]
+    public void CreateDatabase_WhenSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
+    {
+        // Arrange
+        var path = CreateTempPath();
+        var missingSource = DatabaseTestUtils.CreateTempPath(".db");
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source: missingSource, filter: null, skipProvidersInFile: null);
+
+        // Assert
+        Assert.False(File.Exists(path), "No file should be written when the source is missing.");
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("Source not found") && h.ToString().Contains(missingSource)));
+    }
+
+    [Fact]
+    public void CreateDatabase_WhenSourceProvidersResolved_PersistsAllProvidersAndPreservesOwningPublisher()
+    {
+        // Arrange — one provider has ResolvedFromOwningPublisher set; this round-trips through the
+        // full streaming write path and we verify the persisted DB matches the source contents.
+        var source = CreateTempPath();
+        DatabaseTestUtils.CreateV4Database(source,
+            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName),
+            DatabaseTestUtils.BuildProviderDetails(Constants.SecondProviderName, Constants.OwningPublisherName));
+
+        var path = CreateTempPath();
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: null);
+
+        // Assert
+        Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
+
+        using var verify = new ProviderDbContext(path, true);
+        var rows = verify.ProviderDetails.OrderBy(r => r.ProviderName).ToList();
+        Assert.Equal(2, rows.Count);
+        Assert.Equal(Constants.FirstProviderName, rows[0].ProviderName);
+        Assert.Null(rows[0].ResolvedFromOwningPublisher);
+        Assert.Equal(Constants.SecondProviderName, rows[1].ProviderName);
+        Assert.Equal(Constants.OwningPublisherName, rows[1].ResolvedFromOwningPublisher);
+        // Success path must not surface any errors or warnings; a regression that warned spuriously
+        // (e.g., "no providers resolved" reaching the success branch) would degrade operator trust.
+        logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
+    }
+
+    [Fact]
+    public void CreateDatabase_WhenTargetFileAlreadyExists_LogsErrorAndDoesNotOverwrite()
+    {
+        // Arrange — target file already exists with sentinel bytes; the command must not overwrite or truncate.
+        var path = CreateTempPath();
+        var sentinel = new byte[] { 0xDE, 0xAD, 0xBE, 0xEF };
+        File.WriteAllBytes(path, sentinel);
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: null, skipProvidersInFile: null);
+
+        // Assert
+        Assert.Equal(sentinel, File.ReadAllBytes(path));
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("file already exists") && h.ToString().Contains(path)));
+    }
+
+    public void Dispose()
+    {
+        foreach (var path in _tempPaths)
+        {
+            DatabaseTestUtils.DeleteDatabaseFile(path);
+        }
+
+        foreach (var dir in _tempDirs)
+        {
+            DatabaseTestUtils.DeleteDirectoryRecursive(dir);
+        }
     }
 
     private string CreateTempPath()

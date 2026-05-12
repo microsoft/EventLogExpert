@@ -439,7 +439,7 @@ public sealed class EffectsTests
         // Assert: a single batched append covering both logs.
         mockDispatcher.Received(1).Dispatch(Arg.Any<AppendTableEventsBatchAction>());
         Assert.NotNull(captured);
-        Assert.Equal(2, captured!.EventsByLog.Count);
+        Assert.Equal(2, captured.EventsByLog.Count);
         Assert.Equal(2, captured.EventsByLog[applicationLog.Id].Count);
         Assert.Single(captured.EventsByLog[testLog.Id]);
     }

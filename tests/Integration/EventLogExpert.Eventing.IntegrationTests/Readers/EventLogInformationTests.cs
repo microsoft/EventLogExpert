@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 
 namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 

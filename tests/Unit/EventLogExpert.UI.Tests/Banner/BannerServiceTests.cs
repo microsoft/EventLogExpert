@@ -49,7 +49,9 @@ public sealed class BannerServiceTests
             new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 1, cts));
 
         // Act
-        sut.BackgroundProgress!.Cancel();
+        var progress = sut.BackgroundProgress;
+        Assert.NotNull(progress);
+        progress.Cancel();
 
         // Assert
         Assert.True(cts.IsCancellationRequested);
@@ -892,7 +894,9 @@ public sealed class BannerServiceTests
         databaseService.UpgradeBatchStarted += Raise.EventWith(
             databaseService,
             new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 1, cts));
-        Assert.Equal(0, sut.BackgroundProgress!.QueuedBatchesAfter);
+        var initial = sut.BackgroundProgress;
+        Assert.NotNull(initial);
+        Assert.Equal(0, initial.QueuedBatchesAfter);
 
         // Act — another batch enqueues; Progress event picks up the new count.
         databaseService.QueuedBatchCount.Returns(3);
@@ -901,7 +905,9 @@ public sealed class BannerServiceTests
             new UpgradeBatchProgressEventArgs(batchId, 1, "first.db", UpgradePhase.BackingUp));
 
         // Assert
-        Assert.Equal(3, sut.BackgroundProgress.QueuedBatchesAfter);
+        var after = sut.BackgroundProgress;
+        Assert.NotNull(after);
+        Assert.Equal(3, after.QueuedBatchesAfter);
     }
 
     [Fact]

@@ -92,18 +92,19 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenByteArrayEmpty_ShouldReturnEmptyArray()
+    public void ConvertVariant_WhenByte_ShouldReturnByte()
     {
         // Arrange
-        var variant = CreateVariantWithCount(EvtVariantType.ByteArray, IntPtr.Zero, 0);
+        byte expectedValue = 255;
+        var variant = CreateVariant(EvtVariantType.Byte, expectedValue);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<byte[]>(result);
-        Assert.Empty((byte[])result);
+        Assert.IsType<byte>(result);
+        Assert.Equal(expectedValue, result);
     }
 
     [Fact]
@@ -134,19 +135,18 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenByte_ShouldReturnByte()
+    public void ConvertVariant_WhenByteArrayEmpty_ShouldReturnEmptyArray()
     {
         // Arrange
-        byte expectedValue = 255;
-        var variant = CreateVariant(EvtVariantType.Byte, expectedValue);
+        var variant = CreateVariantWithCount(EvtVariantType.ByteArray, IntPtr.Zero, 0);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<byte>(result);
-        Assert.Equal(expectedValue, result);
+        Assert.IsType<byte[]>(result);
+        Assert.Empty((byte[])result);
     }
 
     [Theory]
@@ -231,18 +231,19 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenHexInt32ArrayEmpty_ShouldReturnEmptyArray()
+    public void ConvertVariant_WhenHexInt32_ShouldReturnInt32()
     {
         // Arrange
-        var variant = CreateVariantWithCount(EvtVariantType.HexInt32Array, IntPtr.Zero, 0);
+        int expectedValue = unchecked((int)0x1234ABCD);
+        var variant = CreateVariant(EvtVariantType.HexInt32, expectedValue);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<int[]>(result);
-        Assert.Empty((int[])result);
+        Assert.IsType<int>(result);
+        Assert.Equal(expectedValue, result);
     }
 
     [Fact]
@@ -277,19 +278,18 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenHexInt32_ShouldReturnInt32()
+    public void ConvertVariant_WhenHexInt32ArrayEmpty_ShouldReturnEmptyArray()
     {
         // Arrange
-        int expectedValue = unchecked((int)0x1234ABCD);
-        var variant = CreateVariant(EvtVariantType.HexInt32, expectedValue);
+        var variant = CreateVariantWithCount(EvtVariantType.HexInt32Array, IntPtr.Zero, 0);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<int>(result);
-        Assert.Equal(expectedValue, result);
+        Assert.IsType<int[]>(result);
+        Assert.Empty((int[])result);
     }
 
     [Fact]
@@ -463,18 +463,28 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenStringArrayEmpty_ShouldReturnEmptyArray()
+    public void ConvertVariant_WhenString_ShouldReturnString()
     {
         // Arrange
-        var variant = CreateVariantWithCount(EvtVariantType.StringArray, IntPtr.Zero, 0);
+        var testString = "Test String";
+        IntPtr stringPtr = Marshal.StringToHGlobalUni(testString);
 
-        // Act
-        var result = NativeMethods.ConvertVariant(variant);
+        try
+        {
+            var variant = CreateVariant(EvtVariantType.String, stringPtr);
 
-        // Assert
-        Assert.NotNull(result);
-        Assert.IsType<string[]>(result);
-        Assert.Empty((string[])result);
+            // Act
+            var result = NativeMethods.ConvertVariant(variant);
+
+            // Assert
+            Assert.NotNull(result);
+            Assert.IsType<string>(result);
+            Assert.Equal(testString, result);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(stringPtr);
+        }
     }
 
     [Fact]
@@ -518,28 +528,18 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenString_ShouldReturnString()
+    public void ConvertVariant_WhenStringArrayEmpty_ShouldReturnEmptyArray()
     {
         // Arrange
-        var testString = "Test String";
-        IntPtr stringPtr = Marshal.StringToHGlobalUni(testString);
+        var variant = CreateVariantWithCount(EvtVariantType.StringArray, IntPtr.Zero, 0);
 
-        try
-        {
-            var variant = CreateVariant(EvtVariantType.String, stringPtr);
+        // Act
+        var result = NativeMethods.ConvertVariant(variant);
 
-            // Act
-            var result = NativeMethods.ConvertVariant(variant);
-
-            // Assert
-            Assert.NotNull(result);
-            Assert.IsType<string>(result);
-            Assert.Equal(testString, result);
-        }
-        finally
-        {
-            Marshal.FreeHGlobal(stringPtr);
-        }
+        // Assert
+        Assert.NotNull(result);
+        Assert.IsType<string[]>(result);
+        Assert.Empty((string[])result);
     }
 
     [Fact]
@@ -581,18 +581,19 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenUInt16ArrayEmpty_ShouldReturnEmptyArray()
+    public void ConvertVariant_WhenUInt16_ShouldReturnUInt16()
     {
         // Arrange
-        var variant = CreateVariantWithCount(EvtVariantType.UInt16Array, IntPtr.Zero, 0);
+        ushort expectedValue = 65000;
+        var variant = CreateVariant(EvtVariantType.UInt16, expectedValue);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<ushort[]>(result);
-        Assert.Empty((ushort[])result);
+        Assert.IsType<ushort>(result);
+        Assert.Equal(expectedValue, result);
     }
 
     [Fact]
@@ -627,34 +628,34 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenUInt16_ShouldReturnUInt16()
+    public void ConvertVariant_WhenUInt16ArrayEmpty_ShouldReturnEmptyArray()
     {
         // Arrange
-        ushort expectedValue = 65000;
-        var variant = CreateVariant(EvtVariantType.UInt16, expectedValue);
+        var variant = CreateVariantWithCount(EvtVariantType.UInt16Array, IntPtr.Zero, 0);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<ushort>(result);
-        Assert.Equal(expectedValue, result);
+        Assert.IsType<ushort[]>(result);
+        Assert.Empty((ushort[])result);
     }
 
     [Fact]
-    public void ConvertVariant_WhenUInt32ArrayEmpty_ShouldReturnEmptyArray()
+    public void ConvertVariant_WhenUInt32_ShouldReturnUInt32()
     {
         // Arrange
-        var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, IntPtr.Zero, 0);
+        uint expectedValue = 4000000000;
+        var variant = CreateVariant(EvtVariantType.UInt32, expectedValue);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<uint[]>(result);
-        Assert.Empty((uint[])result);
+        Assert.IsType<uint>(result);
+        Assert.Equal(expectedValue, result);
     }
 
     [Fact]
@@ -689,19 +690,18 @@ public sealed class NativeMethodsEvtTests
     }
 
     [Fact]
-    public void ConvertVariant_WhenUInt32_ShouldReturnUInt32()
+    public void ConvertVariant_WhenUInt32ArrayEmpty_ShouldReturnEmptyArray()
     {
         // Arrange
-        uint expectedValue = 4000000000;
-        var variant = CreateVariant(EvtVariantType.UInt32, expectedValue);
+        var variant = CreateVariantWithCount(EvtVariantType.UInt32Array, IntPtr.Zero, 0);
 
         // Act
         var result = NativeMethods.ConvertVariant(variant);
 
         // Assert
         Assert.NotNull(result);
-        Assert.IsType<uint>(result);
-        Assert.Equal(expectedValue, result);
+        Assert.IsType<uint[]>(result);
+        Assert.Empty((uint[])result);
     }
 
     [Fact]

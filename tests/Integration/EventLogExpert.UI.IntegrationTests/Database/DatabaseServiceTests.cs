@@ -258,6 +258,22 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
     public async Task ClassifyEntriesAsync_WhenV3SchemaWithUpgradeBak_ShouldDetectAsUpgradeRequiredAndBackupExistsTrue()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -278,18 +294,18 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
+    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV3Schema(dbPath);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
 
         var service = CreateDatabaseService();
 
         await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
     }
 
@@ -311,22 +327,6 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
         Assert.False(File.Exists(bakPath), "Stale .upgrade.bak must be cleaned up once the main file reaches V4.");
-    }
-
-    [Fact]
-    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV4Schema(dbPath);
-
-        var service = CreateDatabaseService();
-
-        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
-
-        var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.Ready, entry.Status);
-        Assert.False(entry.BackupExists);
     }
 
     [Fact]
@@ -648,25 +648,6 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        CreateDatabaseFile(databasePath, Constants.TestDb1);
-
-        var service = CreateDatabaseService();
-
-        var secondSubscriberInvocations = 0;
-
-        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
-        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
-
-        service.Toggle(Constants.TestDb1);
-
-        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
-        Assert.Equal(1, secondSubscriberInvocations);
-    }
-
-    [Fact]
     public void Entries_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
     {
         // Arrange
@@ -724,6 +705,25 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
         Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
         Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
+    }
+
+    [Fact]
+    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        service.Toggle(Constants.TestDb1);
+
+        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(1, secondSubscriberInvocations);
     }
 
     [Fact]
@@ -2144,7 +2144,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         Assert.Single(result.Succeeded);
         Assert.NotNull(backupExistsDuringMigration);
-        Assert.False(backupExistsDuringMigration!.Value);
+        Assert.False(backupExistsDuringMigration.Value);
     }
 
     [Fact]

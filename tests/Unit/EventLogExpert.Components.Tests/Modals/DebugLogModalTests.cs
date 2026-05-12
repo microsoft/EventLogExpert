@@ -217,6 +217,32 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_CopyClick_CallsCopyTextAsyncWithEnvironmentNewLineJoinedDisplayed()
+    {
+        // Arrange
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage),
+            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogSecondMessage),
+        };
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var expectedContent = string.Join(Environment.NewLine, new[] { lines[1], lines[0] });
+
+        // Act
+        await component.Find("button:contains('Copy')").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        await _clipboardService.Received(1).CopyTextAsync(expectedContent);
+    }
+
+    [Fact]
     public async Task DebugLogModal_CopyClickWhilePendingFilterPending_FlushesFilterBeforeReadingDisplayed()
     {
         // Arrange
@@ -242,32 +268,6 @@ public sealed class DebugLogModalTests : BunitContext
         await _clipboardService.Received(1).CopyTextAsync(lines[1]);
         await _clipboardService.DidNotReceive().CopyTextAsync(
             Arg.Is<string>(s => s.Contains(Constants.DebugLogFirstMessage)));
-    }
-
-    [Fact]
-    public async Task DebugLogModal_CopyClick_CallsCopyTextAsyncWithEnvironmentNewLineJoinedDisplayed()
-    {
-        // Arrange
-        var lines = new[]
-        {
-            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage),
-            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogSecondMessage),
-        };
-
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-
-        var component = Render<DebugLogModal>();
-
-        await component.WaitForAssertionAsync(() =>
-            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
-
-        var expectedContent = string.Join(Environment.NewLine, new[] { lines[1], lines[0] });
-
-        // Act
-        await component.Find("button:contains('Copy')").ClickAsync(new MouseEventArgs());
-
-        // Assert
-        await _clipboardService.Received(1).CopyTextAsync(expectedContent);
     }
 
     [Fact]
@@ -306,28 +306,6 @@ public sealed class DebugLogModalTests : BunitContext
         await component.WaitForAssertionAsync(
             () => Assert.Equal("130 of 130 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()),
             TimeSpan.FromSeconds(2));
-    }
-
-    [Fact]
-    public async Task DebugLogModal_EmptyLogWithActiveFilter_StillShowsLogIsEmptyMessage()
-    {
-        // Arrange
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable([]));
-
-        var component = Render<DebugLogModal>();
-
-        await component.WaitForAssertionAsync(() =>
-            Assert.Equal("0 of 0 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
-
-        // Act: type a filter while the log is empty
-        await component.Find("input[aria-label='Filter messages']").InputAsync(new ChangeEventArgs { Value = "any-search-text" });
-
-        // Assert — zero entries (not zero filtered); "No entries match filters" would mislead.
-        await component.WaitForAssertionAsync(() =>
-        {
-            Assert.Contains("Log is Empty...", component.Markup);
-            Assert.DoesNotContain("No entries match filters.", component.Markup);
-        });
     }
 
     [Fact]
@@ -381,43 +359,25 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
-    public async Task DebugLogModal_ExportClickWhilePendingFilterPending_FlushesFilterBeforeReadingDisplayed()
+    public async Task DebugLogModal_EmptyLogWithActiveFilter_StillShowsLogIsEmptyMessage()
     {
         // Arrange
-        var lines = new[]
-        {
-            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage),
-            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogErrorMessage),
-            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogSecondMessage),
-        };
-
-        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
-
-        Func<Stream, Task>? capturedWriter = null;
-
-        _fileSaveService.SaveAsync(
-                Arg.Any<string>(),
-                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
-                Arg.Do<Func<Stream, Task>>(writer => capturedWriter = writer))
-            .Returns(Task.FromResult<string?>("C:\\debug-log.log"));
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable([]));
 
         var component = Render<DebugLogModal>();
 
         await component.WaitForAssertionAsync(() =>
-            Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+            Assert.Equal("0 of 0 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
-        // Act: type a filter that drops two entries, then click Export before debounce expires.
-        await component.Find("input[aria-label='Filter messages']").InputAsync(new ChangeEventArgs { Value = "error" });
-        await component.Find("button:contains('Export')").ClickAsync(new MouseEventArgs());
+        // Act: type a filter while the log is empty
+        await component.Find("input[aria-label='Filter messages']").InputAsync(new ChangeEventArgs { Value = "any-search-text" });
 
-        // Assert
-        await _fileSaveService.Received(1).SaveAsync(
-            Arg.Any<string>(),
-            FileSaveFileTypes.Log,
-            Arg.Any<Func<Stream, Task>>());
-
-        Assert.NotNull(capturedWriter);
-        Assert.Equal(lines[1], await InvokeWriterAndDecodeAsync(capturedWriter));
+        // Assert — zero entries (not zero filtered); "No entries match filters" would mislead.
+        await component.WaitForAssertionAsync(() =>
+        {
+            Assert.Contains("Log is Empty...", component.Markup);
+            Assert.DoesNotContain("No entries match filters.", component.Markup);
+        });
     }
 
     [Fact]
@@ -458,6 +418,46 @@ public sealed class DebugLogModalTests : BunitContext
 
         Assert.NotNull(capturedWriter);
         Assert.Equal(expectedContent, await InvokeWriterAndDecodeAsync(capturedWriter));
+    }
+
+    [Fact]
+    public async Task DebugLogModal_ExportClickWhilePendingFilterPending_FlushesFilterBeforeReadingDisplayed()
+    {
+        // Arrange
+        var lines = new[]
+        {
+            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage),
+            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogErrorMessage),
+            DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogSecondMessage),
+        };
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(DebugLogUtils.ToAsyncEnumerable(lines));
+
+        Func<Stream, Task>? capturedWriter = null;
+
+        _fileSaveService.SaveAsync(
+                Arg.Any<string>(),
+                Arg.Any<IReadOnlyDictionary<string, IReadOnlyList<string>>>(),
+                Arg.Do<Func<Stream, Task>>(writer => capturedWriter = writer))
+            .Returns(Task.FromResult<string?>("C:\\debug-log.log"));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        // Act: type a filter that drops two entries, then click Export before debounce expires.
+        await component.Find("input[aria-label='Filter messages']").InputAsync(new ChangeEventArgs { Value = "error" });
+        await component.Find("button:contains('Export')").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        await _fileSaveService.Received(1).SaveAsync(
+            Arg.Any<string>(),
+            FileSaveFileTypes.Log,
+            Arg.Any<Func<Stream, Task>>());
+
+        Assert.NotNull(capturedWriter);
+        Assert.Equal(lines[1], await InvokeWriterAndDecodeAsync(capturedWriter));
     }
 
     [Fact]
@@ -589,7 +589,8 @@ public sealed class DebugLogModalTests : BunitContext
             TimeSpan.FromSeconds(2));
 
         // Act
-        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement!;
+        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement;
+        Assert.NotNull(levelDropdown);
         var errorOption = levelDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Error");
 
@@ -630,7 +631,8 @@ public sealed class DebugLogModalTests : BunitContext
         // Act — type a string filter (debounce starts), then change the level dropdown before it elapses.
         await component.Find("input[aria-label='Filter messages']").InputAsync(new ChangeEventArgs { Value = "matching" });
 
-        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement!;
+        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement;
+        Assert.NotNull(levelDropdown);
         var errorOption = levelDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Error");
 
@@ -660,7 +662,8 @@ public sealed class DebugLogModalTests : BunitContext
             Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
         // Act: click "Error" in the level value dropdown
-        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement!;
+        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement;
+        Assert.NotNull(levelDropdown);
         var errorOption = levelDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Error");
 
@@ -690,14 +693,16 @@ public sealed class DebugLogModalTests : BunitContext
             Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
         // Act: switch operator to "Multi Select"
-        var operatorDropdown = component.Find("input[aria-label='Level operator']").ParentElement!;
+        var operatorDropdown = component.Find("input[aria-label='Level operator']").ParentElement;
+        Assert.NotNull(operatorDropdown);
         var multiSelectOption = operatorDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Multi Select");
 
         await multiSelectOption.MouseDownAsync(new MouseEventArgs());
 
         // Then pick Error and Warning from the multi-select dropdown
-        var levelsDropdown = component.Find("input[aria-label='Levels']").ParentElement!;
+        var levelsDropdown = component.Find("input[aria-label='Levels']").ParentElement;
+        Assert.NotNull(levelsDropdown);
 
         var errorOption = levelsDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Error");
@@ -733,14 +738,16 @@ public sealed class DebugLogModalTests : BunitContext
             Assert.Equal("3 of 3 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
 
         // Act: switch operator to "Not Equal"
-        var operatorDropdown = component.Find("input[aria-label='Level operator']").ParentElement!;
+        var operatorDropdown = component.Find("input[aria-label='Level operator']").ParentElement;
+        Assert.NotNull(operatorDropdown);
         var notEqualOption = operatorDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Not Equal");
 
         await notEqualOption.MouseDownAsync(new MouseEventArgs());
 
         // Then select "Information" as the value to exclude
-        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement!;
+        var levelDropdown = component.Find("input[aria-label='Level']").ParentElement;
+        Assert.NotNull(levelDropdown);
         var informationOption = levelDropdown.QuerySelectorAll("[role='option']")
             .First(o => o.TextContent.Trim() == "Information");
 

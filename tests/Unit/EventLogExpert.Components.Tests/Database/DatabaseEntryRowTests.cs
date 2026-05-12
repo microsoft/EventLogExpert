@@ -238,21 +238,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_ReadyEntryWithClassificationPending_ShowsDisabledToggle()
-    {
-        // Arrange
-        var entry = MakeEntry(DatabaseStatus.Ready);
-
-        // Act
-        var component = RenderRow(entry, isClassificationPending: true);
-
-        // Assert
-        var radios = component.FindAll(".toggle input[type='radio']");
-        Assert.NotEmpty(radios);
-        Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
-    }
-
-    [Fact]
     public void Render_ReadyEntry_ShowsToggle_AndNoBadge()
     {
         // Arrange
@@ -266,6 +251,21 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-badge"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
+    }
+
+    [Fact]
+    public void Render_ReadyEntryWithClassificationPending_ShowsDisabledToggle()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        // Act
+        var component = RenderRow(entry, isClassificationPending: true);
+
+        // Assert
+        var radios = component.FindAll(".toggle input[type='radio']");
+        Assert.NotEmpty(radios);
+        Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
     }
 
     [Fact]

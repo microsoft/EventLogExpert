@@ -5,28 +5,21 @@ using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Eventing.TestUtils;
 
-/// <summary>
-/// Helpers for managing SQLite test database files.
-/// </summary>
+/// <summary>Helpers for managing SQLite test database files.</summary>
 public static class SqliteTestDb
 {
-    /// <summary>
-    /// Deletes a SQLite test database file with retries, after first releasing pooled
-    /// SqliteConnection handles.
-    /// </summary>
+    /// <summary>Deletes a SQLite test database file with retries, after first releasing pooled SqliteConnection handles.</summary>
     /// <remarks>
-    /// <para>
-    /// <see cref="EventLogExpert.Eventing.ProviderDatabase.ProviderDbContext"/> uses
-    /// EF Core's default pooled SqliteConnection. Without
-    /// <see cref="SqliteConnection.ClearAllPools"/> the pooled handle still owns the file
-    /// after the context is disposed and <see cref="File.Delete"/> hits a sharing violation.
-    /// </para>
-    /// <para>
-    /// <see cref="SqliteConnection.ClearAllPools"/> mutates process-wide state, so it must
-    /// only be called from a test assembly configured for serial execution
-    /// (xunit.runner.json with <c>parallelizeTestCollections: false</c>) — otherwise it can
-    /// race with concurrent SQLite work on another thread.
-    /// </para>
+    ///     <para>
+    ///         <see cref="EventLogExpert.Eventing.ProviderDatabase.ProviderDbContext" /> uses EF Core's default pooled
+    ///         SqliteConnection. Without <see cref="SqliteConnection.ClearAllPools" /> the pooled handle still owns the file
+    ///         after the context is disposed and <see cref="File.Delete" /> hits a sharing violation.
+    ///     </para>
+    ///     <para>
+    ///         <see cref="SqliteConnection.ClearAllPools" /> mutates process-wide state, so it must only be called from a
+    ///         test assembly configured for serial execution (xunit.runner.json with <c>parallelizeTestCollections: false</c>)
+    ///         — otherwise it can race with concurrent SQLite work on another thread.
+    ///     </para>
     /// </remarks>
     public static void Delete(string? path, int maxAttempts = 10, int delayMs = 200)
     {
@@ -62,13 +55,12 @@ public static class SqliteTestDb
     }
 
     /// <summary>
-    /// Recursively deletes a directory containing SQLite test database files, with retries,
-    /// after first releasing pooled SqliteConnection handles.
+    ///     Recursively deletes a directory containing SQLite test database files, with retries, after first releasing
+    ///     pooled SqliteConnection handles.
     /// </summary>
     /// <remarks>
-    /// Same caveats as <see cref="Delete"/>: <see cref="SqliteConnection.ClearAllPools"/> mutates
-    /// process-wide state, so this helper must only be called from a test assembly configured
-    /// for serial execution.
+    ///     Same caveats as <see cref="Delete" />: <see cref="SqliteConnection.ClearAllPools" /> mutates process-wide
+    ///     state, so this helper must only be called from a test assembly configured for serial execution.
     /// </remarks>
     public static void DeleteDirectory(string? path, int maxAttempts = 10, int delayMs = 200)
     {

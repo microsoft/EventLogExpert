@@ -8,8 +8,8 @@ namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
 
 public sealed class ProviderJsonContextTests
 {
-    public static TheoryData<Type> SourceGeneratedTypes => new()
-    {
+    public static TheoryData<Type> SourceGeneratedTypes =>
+    [
         typeof(MessageModel),
         typeof(EventModel),
         typeof(IReadOnlyList<MessageModel>),
@@ -21,7 +21,7 @@ public sealed class ProviderJsonContextTests
         typeof(List<EventModel>),
         typeof(Dictionary<long, string>),
         typeof(Dictionary<int, string>),
-    };
+    ];
 
     [Theory]
     [MemberData(nameof(SourceGeneratedTypes))]
@@ -30,7 +30,7 @@ public sealed class ProviderJsonContextTests
         var typeInfo = ProviderJsonContext.Default.GetTypeInfo(type);
 
         Assert.NotNull(typeInfo);
-        Assert.Equal(type, typeInfo!.Type);
+        Assert.Equal(type, typeInfo.Type);
     }
 
     [Fact]
