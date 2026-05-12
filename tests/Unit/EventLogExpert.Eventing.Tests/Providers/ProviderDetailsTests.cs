@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Tests.TestUtils;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 
 namespace EventLogExpert.Eventing.Tests.Providers;
 

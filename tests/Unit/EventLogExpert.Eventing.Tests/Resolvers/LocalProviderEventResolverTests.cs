@@ -4,8 +4,8 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Eventing.Tests.TestUtils;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.Concurrent;
 

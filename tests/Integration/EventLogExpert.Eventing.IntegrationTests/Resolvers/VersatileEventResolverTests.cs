@@ -8,13 +8,12 @@ using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Eventing.Tests.TestUtils;
-using EventLogExpert.Eventing.Tests.TestUtils.Constants;
-using Microsoft.Data.Sqlite;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Eventing.Tests.Resolvers;
+namespace EventLogExpert.Eventing.IntegrationTests.Resolvers;
 
 public sealed class EventResolverTests
 {
@@ -56,13 +55,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -146,13 +139,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -201,13 +188,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -309,13 +290,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -433,13 +408,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -532,13 +501,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 
@@ -631,13 +594,7 @@ public sealed class EventResolverTests
         }
         finally
         {
-            if (File.Exists(dbPath))
-            {
-                SqliteConnection.ClearAllPools();
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                File.Delete(dbPath);
-            }
+            SqliteTestDb.Delete(dbPath);
         }
     }
 }

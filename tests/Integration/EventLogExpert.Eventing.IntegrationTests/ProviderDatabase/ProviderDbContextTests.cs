@@ -4,13 +4,13 @@
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
-using EventLogExpert.Eventing.Tests.TestUtils;
+using EventLogExpert.Eventing.TestUtils;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using System.Text;
 
-namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
+namespace EventLogExpert.Eventing.IntegrationTests.ProviderDatabase;
 
 public sealed class ProviderDbContextTests : IDisposable
 {
@@ -1040,35 +1040,7 @@ public sealed class ProviderDbContextTests : IDisposable
         Assert.Equal(expectedRows, count);
     }
 
-    private static void DeleteDatabaseFile(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) { return; }
-
-            SqliteConnection.ClearAllPools();
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            for (int i = 0; i < 10; i++)
-            {
-                try
-                {
-                    File.Delete(path);
-                    break;
-                }
-                catch (IOException)
-                {
-                    Thread.Sleep(200);
-                }
-            }
-        }
-        catch
-        {
-            // Cleanup is best effort
-        }
-    }
+    private static void DeleteDatabaseFile(string path) => SqliteTestDb.Delete(path);
 
     private static void InsertLegacyRow(
         string dbPath,

@@ -2,13 +2,10 @@
 
   <PropertyGroup>
     <IsPackable>false</IsPackable>
-    <IsTestProject>true</IsTestProject>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
-    <ProjectReference Include="..\..\Shared\EventLogExpert.Eventing.TestUtils\EventLogExpert.Eventing.TestUtils.csproj" />
   </ItemGroup>
 
 </Project>

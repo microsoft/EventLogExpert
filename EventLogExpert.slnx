@@ -25,4 +25,7 @@
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
   </Folder>
+  <Folder Name="/tests/Shared/">
+    <Project Path="tests/Shared/EventLogExpert.Eventing.TestUtils/EventLogExpert.Eventing.TestUtils.csproj" />
+  </Folder>
 </Solution>
