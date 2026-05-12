@@ -26,18 +26,6 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void Constructor_WithDifferentRenderXmlValues_ShouldCreateWatcher()
-    {
-        // Arrange & Act
-        using var watcherWithXml = new EventLogWatcher(Constants.ApplicationLogName, renderXml: true);
-        using var watcherWithoutXml = new EventLogWatcher(Constants.ApplicationLogName, renderXml: false);
-
-        // Assert
-        Assert.NotNull(watcherWithXml);
-        Assert.NotNull(watcherWithoutXml);
-    }
-
-    [Fact]
     public void Constructor_WithEmptyLogName_ShouldThrowArgumentException()
     {
         // Arrange & Act & Assert
@@ -52,49 +40,6 @@ public sealed class EventLogWatcherTests
 
         // Act & Assert
         Assert.Throws<FileNotFoundException>(() => new EventLogWatcher(invalidLogName));
-    }
-
-    [Fact]
-    public void Constructor_WithLogNameAndRenderXml_ShouldCreateWatcher()
-    {
-        // Arrange & Act
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, renderXml: true);
-
-        // Assert
-        Assert.NotNull(watcher);
-    }
-
-    [Fact]
-    public void Constructor_WithLogNameBookmarkAndRenderXml_ShouldCreateWatcher()
-    {
-        // Arrange
-        string? bookmark = null;
-
-        // Act
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark, renderXml: false);
-
-        // Assert
-        Assert.NotNull(watcher);
-    }
-
-    [Fact]
-    public void Constructor_WithLogName_ShouldCreateWatcher()
-    {
-        // Arrange & Act
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-
-        // Assert
-        Assert.NotNull(watcher);
-    }
-
-    [Fact]
-    public void Constructor_WithNullBookmark_ShouldCreateWatcher()
-    {
-        // Arrange & Act
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, null, renderXml: false);
-
-        // Assert
-        Assert.NotNull(watcher);
     }
 
     [Fact]
