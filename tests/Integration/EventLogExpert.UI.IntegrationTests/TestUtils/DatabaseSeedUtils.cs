@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using Microsoft.Data.Sqlite;
 
-namespace EventLogExpert.UI.Tests.TestUtils;
+namespace EventLogExpert.UI.IntegrationTests.TestUtils;
 
 internal static class DatabaseSeedUtils
 {

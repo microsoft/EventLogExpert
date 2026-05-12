@@ -3,9 +3,10 @@
 
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.TestUtils;
 using Microsoft.Data.Sqlite;
 
-namespace EventLogExpert.EventDbTool.Tests.TestUtils;
+namespace EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 
 internal static class DatabaseTestUtils
 {
@@ -77,63 +78,7 @@ internal static class DatabaseTestUtils
         context.SaveChanges();
     }
 
-    public static void DeleteDatabaseFile(string path)
-    {
-        try
-        {
-            if (!File.Exists(path)) { return; }
+    public static void DeleteDatabaseFile(string path) => SqliteTestDb.Delete(path);
 
-            SqliteConnection.ClearAllPools();
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            for (var i = 0; i < 10; i++)
-            {
-                try
-                {
-                    File.Delete(path);
-                    break;
-                }
-                catch (IOException)
-                {
-                    Thread.Sleep(200);
-                }
-            }
-        }
-        catch
-        {
-            // Best effort cleanup.
-        }
-    }
-
-    public static void DeleteDirectoryRecursive(string path)
-    {
-        try
-        {
-            if (!Directory.Exists(path)) { return; }
-
-            SqliteConnection.ClearAllPools();
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
-
-            for (var i = 0; i < 10; i++)
-            {
-                try
-                {
-                    Directory.Delete(path, recursive: true);
-                    break;
-                }
-                catch (IOException)
-                {
-                    Thread.Sleep(200);
-                }
-            }
-        }
-        catch
-        {
-            // Best effort cleanup.
-        }
-    }
+    public static void DeleteDirectoryRecursive(string path) => SqliteTestDb.DeleteDirectory(path);
 }

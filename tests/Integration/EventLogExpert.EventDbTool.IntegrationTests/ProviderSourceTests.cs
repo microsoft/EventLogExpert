@@ -1,12 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Tests.TestUtils;
-using EventLogExpert.EventDbTool.Tests.TestUtils.Constants;
+using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
+using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using NSubstitute;
 
-namespace EventLogExpert.EventDbTool.Tests;
+namespace EventLogExpert.EventDbTool.IntegrationTests;
 
 public sealed class ProviderSourceTests : IDisposable
 {

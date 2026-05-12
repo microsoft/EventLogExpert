@@ -60,4 +60,45 @@ public static class SqliteTestDb
             }
         }
     }
+
+    /// <summary>
+    /// Recursively deletes a directory containing SQLite test database files, with retries,
+    /// after first releasing pooled SqliteConnection handles.
+    /// </summary>
+    /// <remarks>
+    /// Same caveats as <see cref="Delete"/>: <see cref="SqliteConnection.ClearAllPools"/> mutates
+    /// process-wide state, so this helper must only be called from a test assembly configured
+    /// for serial execution.
+    /// </remarks>
+    public static void DeleteDirectory(string? path, int maxAttempts = 10, int delayMs = 200)
+    {
+        if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) { return; }
+
+        SqliteConnection.ClearAllPools();
+
+        for (int i = 0; i < maxAttempts; i++)
+        {
+            try
+            {
+                Directory.Delete(path, recursive: true);
+                return;
+            }
+            catch (IOException) when (i < maxAttempts - 1)
+            {
+                Thread.Sleep(delayMs);
+            }
+            catch (UnauthorizedAccessException) when (i < maxAttempts - 1)
+            {
+                Thread.Sleep(delayMs);
+            }
+            catch (IOException)
+            {
+                return;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return;
+            }
+        }
+    }
 }

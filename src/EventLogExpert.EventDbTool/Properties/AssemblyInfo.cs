@@ -3,4 +3,4 @@
 
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("EventLogExpert.EventDbTool.Tests")]
+[assembly: InternalsVisibleTo("EventLogExpert.EventDbTool.IntegrationTests")]
