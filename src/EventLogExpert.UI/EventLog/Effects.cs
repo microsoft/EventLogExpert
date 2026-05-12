@@ -9,7 +9,7 @@ using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
 using Fluxor;
@@ -484,7 +484,7 @@ public sealed class Effects(
         long generation = Interlocked.Increment(ref _filterGeneration);
         var activeLogsSnapshot = _eventLogState.Value.ActiveLogs.Values.ToList();
 
-        dispatcher.Dispatch(new SetIsLoadingAction(true));
+        dispatcher.Dispatch(new SetFilterLoadingAction(true));
 
         try
         {
@@ -549,7 +549,7 @@ public sealed class Effects(
         {
             if (Interlocked.Read(ref _filterGeneration) == generation)
             {
-                dispatcher.Dispatch(new SetIsLoadingAction(false));
+                dispatcher.Dispatch(new SetFilterLoadingAction(false));
             }
         }
     }

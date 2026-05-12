@@ -10,7 +10,7 @@ using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
-using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -703,7 +703,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilters_FilterBranch_ShouldDispatchSetIsLoadingTrueThenFalse()
+    public async Task HandleSetFilters_FilterBranch_ShouldBracketDisplayedEventsUpdateWithFilterLoading()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -717,14 +717,14 @@ public sealed class EffectsTests
 
         Received.InOrder(() =>
         {
-            mockDispatcher.Dispatch(Arg.Is<SetIsLoadingAction>(a => a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterLoadingAction>(a => a.IsLoading));
             mockDispatcher.Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-            mockDispatcher.Dispatch(Arg.Is<SetIsLoadingAction>(a => !a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
         });
     }
 
     [Fact]
-    public async Task HandleSetFilters_FilterBranch_WhenFilterServiceThrows_ShouldStillClearLoading()
+    public async Task HandleSetFilters_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterLoading()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -742,8 +742,8 @@ public sealed class EffectsTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => effects.HandleSetFilters(action, mockDispatcher));
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetIsLoadingAction>(a => a.IsLoading));
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetIsLoadingAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
     }
 
@@ -1014,13 +1014,13 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
             a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
 
-        // SetIsLoading(false) was dispatched by the fresh run; the stale run's finally was
+        // SetFilterLoading(false) was dispatched by the fresh run; the stale run's finally was
         // suppressed by the generation guard, so we should see exactly one false-dispatch.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetIsLoadingAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
     }
 
     [Fact]
-    public async Task HandleSetFilters_ReloadBranch_ShouldNotDispatchSetIsLoading()
+    public async Task HandleSetFilters_ReloadBranch_ShouldNotDispatchFilterLoading()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -1033,7 +1033,7 @@ public sealed class EffectsTests
         await effects.HandleSetFilters(action, mockDispatcher);
 
         Assert.True(action.EventFilter.RequiresXml);
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetIsLoadingAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
     }
 
     [Fact]

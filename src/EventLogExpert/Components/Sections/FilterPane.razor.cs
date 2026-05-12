@@ -5,6 +5,7 @@ using EventLogExpert.Components.Modals.Filters;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
@@ -27,6 +28,8 @@ public sealed partial class FilterPane : IDisposable
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+
+    [Inject] private IState<FilterLoadingState> FilterLoadingState { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
