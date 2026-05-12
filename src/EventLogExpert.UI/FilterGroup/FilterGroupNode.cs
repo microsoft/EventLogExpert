@@ -9,5 +9,5 @@ public sealed record FilterGroupNode
 {
     public Dictionary<string, FilterGroupNode> ChildNodes { get; init; } = [];
 
-    public List<SavedFilterGroup> FilterGroups { get; init; } = [];
+    public List<SavedFilterGroup> Groups { get; init; } = [];
 }

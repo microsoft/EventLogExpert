@@ -24,7 +24,7 @@ internal static class FilterGroupExtensions
                 }
                 else
                 {
-                    node.FilterGroups.Add(data);
+                    node.Groups.Add(data);
                 }
             }
             else
@@ -36,7 +36,7 @@ internal static class FilterGroupExtensions
                             ChildNodes = new Dictionary<string, FilterGroupNode>()
                                 .AddFilterGroup(groupNames, data)
                         } :
-                        new FilterGroupNode { FilterGroups = [data] });
+                        new FilterGroupNode { Groups = [data] });
             }
 
             return group;

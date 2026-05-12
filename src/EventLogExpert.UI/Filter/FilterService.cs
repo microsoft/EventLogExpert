@@ -75,8 +75,8 @@ public sealed class FilterService : IFilterService
         }
 
         return events.AsParallel()
-            .Where(e => e.FilterByDate(eventFilter.DateFilter)
-                .Filter(eventFilter.Filters))
+            .Where(e => e.MatchesDateFilter(eventFilter.DateFilter) &&
+                e.MatchesFilters(eventFilter.Filters))
             .ToList()
             .AsReadOnly();
     }
@@ -156,8 +156,8 @@ public sealed class FilterService : IFilterService
         IEnumerable<ResolvedEvent> events,
         EventFilter eventFilter) =>
         events
-            .Where(e => e.FilterByDate(eventFilter.DateFilter)
-                .Filter(eventFilter.Filters))
+            .Where(e => e.MatchesDateFilter(eventFilter.DateFilter) &&
+                e.MatchesFilters(eventFilter.Filters))
             .ToList()
             .AsReadOnly();
 
