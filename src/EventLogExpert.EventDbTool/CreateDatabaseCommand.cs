@@ -70,7 +70,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         return createDatabaseCommand;
     }
 
-    private void CreateDatabase(string path, string? source, string? filter, string? skipProvidersInFile)
+    internal void CreateDatabase(string path, string? source, string? filter, string? skipProvidersInFile)
     {
         if (File.Exists(path))
         {

@@ -52,7 +52,7 @@ public class ShowCommand(ITraceLogger logger) : DbToolCommand(logger)
         return showCommand;
     }
 
-    private void ShowProviderInfo(string? source, string? filter)
+    internal void ShowProviderInfo(string? source, string? filter)
     {
         if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { return; }
 
