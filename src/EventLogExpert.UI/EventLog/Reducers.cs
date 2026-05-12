@@ -228,7 +228,7 @@ public sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSetFilters(EventLogState state, SetFiltersAction action)
     {
-        if (!FilterMethods.HasFilteringChanged(action.EventFilter, state.AppliedFilter))
+        if (!action.EventFilter.HasFilteringChangedFrom(state.AppliedFilter))
         {
             return state;
         }

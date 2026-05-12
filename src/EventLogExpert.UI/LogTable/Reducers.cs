@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -65,7 +64,7 @@ public sealed class Reducers
 
         if (table is null || table.IsCombined || action.Events.Count == 0) { return state; }
 
-        var merged = FilterMethods.MergeSorted(
+        var merged = ResolvedEventOrdering.MergeSorted(
             state.DisplayedEvents,
             action.Events,
             GetEffectiveOrderBy(state.OrderBy),
@@ -119,7 +118,7 @@ public sealed class Reducers
 
         if (totalNew == 0) { return state; }
 
-        var merged = FilterMethods.MergeSorted(
+        var merged = ResolvedEventOrdering.MergeSorted(
             state.DisplayedEvents,
             combinedBatch,
             GetEffectiveOrderBy(state.OrderBy),
@@ -370,7 +369,7 @@ public sealed class Reducers
             ? FilterOutOwningLog(state.DisplayedEvents, table.LogName)
             : state.DisplayedEvents;
 
-        var merged = FilterMethods.MergeSorted(
+        var merged = ResolvedEventOrdering.MergeSorted(
             existing,
             action.Events,
             GetEffectiveOrderBy(state.OrderBy),

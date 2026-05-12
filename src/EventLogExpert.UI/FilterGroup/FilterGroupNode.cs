@@ -1,7 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filter;
+
+namespace EventLogExpert.UI.FilterGroup;
 
 public sealed record FilterGroupNode
 {

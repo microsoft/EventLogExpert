@@ -14,7 +14,7 @@
 
     <span>Events Loaded: @_eventLogState.ActiveLogs.Values.Sum(log => log.Events.Count)</span>
 
-    @if (_logTableState.ActiveEventLogId is not null && FilterMethods.IsFilteringEnabled(_eventLogState.AppliedFilter))
+    @if (_logTableState.ActiveEventLogId is not null && _eventLogState.AppliedFilter.IsFilteringEnabled)
     {
         var activeTable = _logTableState.EventTables.FirstOrDefault(table => table.Id == _logTableState.ActiveEventLogId);
 

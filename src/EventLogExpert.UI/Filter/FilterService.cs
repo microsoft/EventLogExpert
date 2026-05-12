@@ -23,7 +23,7 @@ public sealed class FilterService : IFilterService
         // Single log, no filters, or trivial total work: sequential per-log (inner PLINQ still
         // engages for >=10k events on a single large log).
         if (logs.Count <= 1 ||
-            !FilterMethods.IsFilteringEnabled(eventFilter) ||
+            !eventFilter.IsFilteringEnabled ||
             !ShouldParallelizeAcrossLogs(logs))
         {
             return BuildSequentialResult(logs, eventFilter);
@@ -63,7 +63,7 @@ public sealed class FilterService : IFilterService
         IEnumerable<ResolvedEvent> events,
         EventFilter eventFilter)
     {
-        if (!FilterMethods.IsFilteringEnabled(eventFilter))
+        if (!eventFilter.IsFilteringEnabled)
         {
             return events as IReadOnlyList<ResolvedEvent> ?? [.. events];
         }

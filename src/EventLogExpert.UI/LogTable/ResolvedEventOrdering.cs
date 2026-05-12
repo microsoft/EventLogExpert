@@ -2,11 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.LogTable;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.UI.LogTable;
 
-internal static class FilterMethods
+internal static class ResolvedEventOrdering
 {
     private static readonly Comparison<ResolvedEvent> s_ascByLevel =
         (a, b) => WithTieBreaker(string.Compare(a.Level, b.Level, StringComparison.Ordinal), a, b);
@@ -49,81 +48,6 @@ internal static class FilterMethods
     private static readonly Comparison<ResolvedEvent> s_descByTaskCategory = (a, b) => s_ascByTaskCategory(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByThreadId = (a, b) => s_ascByThreadId(b, a);
     private static readonly Comparison<ResolvedEvent> s_descByUser = (a, b) => s_ascByUser(b, a);
-
-    public static Dictionary<string, FilterGroupNode> AddFilterGroup(
-        this Dictionary<string, FilterGroupNode> group,
-        string[] groupNames,
-        SavedFilterGroup data)
-    {
-        var root = groupNames.Length <= 1 ? string.Empty : groupNames.First();
-        groupNames = groupNames.Skip(1).ToArray();
-
-        if (group.TryGetValue(root, out var node))
-        {
-            if (groupNames.Length > 1)
-            {
-                node.ChildNodes.AddFilterGroup(groupNames, data);
-            }
-            else
-            {
-                node.FilterGroups.Add(data);
-            }
-        }
-        else
-        {
-            group.Add(root,
-                groupNames.Length > 1 ?
-                    new FilterGroupNode
-                    {
-                        ChildNodes = new Dictionary<string, FilterGroupNode>()
-                            .AddFilterGroup(groupNames, data)
-                    } :
-                    new FilterGroupNode { FilterGroups = [data] });
-        }
-
-        return group;
-    }
-
-    public static bool HasFilteringChanged(EventFilter updated, EventFilter original)
-    {
-        if (!Equals(updated.DateFilter, original.DateFilter)) { return true; }
-
-        var updatedSnapshots = updated.Snapshots;
-        var originalSnapshots = original.Snapshots;
-
-        // Default-constructed EventFilter (rare) has an uninitialized ImmutableArray.
-        if (updatedSnapshots.IsDefault || originalSnapshots.IsDefault)
-        {
-            return updatedSnapshots.IsDefault != originalSnapshots.IsDefault;
-        }
-
-        if (updatedSnapshots.Length != originalSnapshots.Length) { return true; }
-
-        for (int index = 0; index < updatedSnapshots.Length; index++)
-        {
-            if (!updatedSnapshots[index].Equals(originalSnapshots[index])) { return true; }
-        }
-
-        return false;
-    }
-
-    /// <summary>Returns the index of the specified item in the list, or -1 if not found.</summary>
-    public static int IndexOf<T>(this IReadOnlyList<T> list, T item)
-    {
-        for (int i = 0; i < list.Count; i++)
-        {
-            if (EqualityComparer<T>.Default.Equals(list[i], item))
-            {
-                return i;
-            }
-        }
-
-        return -1;
-    }
-
-    public static bool IsFilteringEnabled(EventFilter eventFilter) =>
-        eventFilter.DateFilter?.IsEnabled is true ||
-        eventFilter.Filters.IsEmpty is false;
 
     /// <summary>Sorts events by RecordId if no order is specified. Always returns a new list.</summary>
     public static IReadOnlyList<ResolvedEvent> SortEvents(
@@ -255,37 +179,4 @@ internal static class FilterMethods
 
     private static int WithTieBreaker(int primaryResult, ResolvedEvent a, ResolvedEvent b) =>
         primaryResult != 0 ? primaryResult : FallbackTieBreaker(Nullable.Compare(a.RecordId, b.RecordId), a, b);
-
-    extension(ResolvedEvent? @event)
-    {
-        public bool Filter(IEnumerable<SavedFilter> filters)
-        {
-            if (@event is null) { return false; }
-
-            bool isEmpty = true;
-            bool isFiltered = false;
-
-            foreach (var filter in filters)
-            {
-                if (filter.Compiled is null) { continue; }
-
-                if (filter.IsExcluded && filter.Compiled.Predicate(@event)) { return false; }
-
-                if (!filter.IsExcluded) { isEmpty = false; }
-
-                if (!filter.IsExcluded && filter.Compiled.Predicate(@event)) { isFiltered = true; }
-            }
-
-            return isEmpty || isFiltered;
-        }
-
-        public ResolvedEvent? FilterByDate(DateFilter? dateFilter)
-        {
-            if (@event is null) { return null; }
-
-            if (dateFilter is null) { return @event; }
-
-            return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before ? @event : null;
-        }
-    }
 }
