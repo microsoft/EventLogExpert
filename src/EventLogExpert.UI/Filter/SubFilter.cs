@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.Filter;
 
-public sealed record SubFilter(FilterData Data, bool JoinWithAny);
+public sealed record SubFilter(FilterCondition Data, bool JoinWithAny);

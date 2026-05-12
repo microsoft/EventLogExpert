@@ -554,10 +554,10 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true)
             ]);
 
@@ -575,10 +575,10 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: false)
             ]);
 
@@ -596,10 +596,10 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: false)
             ]);
 
@@ -666,10 +666,10 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true)
             ]);
 
@@ -687,7 +687,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             []);
 
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
@@ -703,7 +703,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Keywords,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -727,7 +727,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Level,
                 Evaluator = FilterEvaluator.MultiSelect,
@@ -761,13 +761,13 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
                     JoinWithAny: true),
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
+                    new FilterCondition { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
                     JoinWithAny: false)
             ]);
 
@@ -788,13 +788,13 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             [
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
                     JoinWithAny: true),
                 new SubFilter(
-                    new FilterData { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
+                    new FilterCondition { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
                     JoinWithAny: false)
             ]);
 
@@ -816,7 +816,7 @@ public sealed class FilterServiceTests
         string? value,
         IEnumerable<string>? values = null) =>
         new(
-            new FilterData
+            new FilterCondition
             {
                 Category = category,
                 Evaluator = evaluator,

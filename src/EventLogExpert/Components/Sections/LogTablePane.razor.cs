@@ -312,7 +312,7 @@ public sealed partial class LogTablePane
         };
 
         var basicFilter = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = category,
                 Value = filterValue,

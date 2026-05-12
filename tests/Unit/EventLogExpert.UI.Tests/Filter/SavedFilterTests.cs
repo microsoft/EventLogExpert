@@ -41,7 +41,7 @@ public sealed class FilterModelTests
     public void JsonRoundTrip_BasicShape_PreservesBasicFilter()
     {
         var basicFilter = new BasicFilter(
-            new FilterData
+            new FilterCondition
             {
                 Category = FilterCategory.Level,
                 Evaluator = FilterEvaluator.Equals,
@@ -49,7 +49,7 @@ public sealed class FilterModelTests
             },
             [
                 new SubFilter(
-                    new FilterData
+                    new FilterCondition
                     {
                         Category = FilterCategory.Source,
                         Evaluator = FilterEvaluator.Contains,
@@ -180,7 +180,7 @@ public sealed class FilterModelTests
     {
         var id = FilterId.Create();
         var basicFilter = new BasicFilter(
-            new FilterData { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
             []);
 
         var model = SavedFilter.TryCreate(
