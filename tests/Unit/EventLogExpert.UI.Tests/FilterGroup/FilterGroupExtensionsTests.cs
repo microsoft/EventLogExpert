@@ -39,7 +39,7 @@ public sealed class FilterGroupExtensionsTests
 
         // Assert
         Assert.Single(dictionary);
-        Assert.Equal(2, dictionary[Constants.FilterGroupSection].FilterGroups.Count);
+        Assert.Equal(2, dictionary[Constants.FilterGroupSection].Groups.Count);
     }
 
     [Fact]
@@ -85,6 +85,6 @@ public sealed class FilterGroupExtensionsTests
 
         // Assert
         Assert.True(dictionary.ContainsKey(string.Empty));
-        Assert.Single(dictionary[string.Empty].FilterGroups);
+        Assert.Single(dictionary[string.Empty].Groups);
     }
 }

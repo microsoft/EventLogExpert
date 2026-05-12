@@ -15,7 +15,7 @@
         }
 
         <div class="flex-column-scroll">
-            @foreach (var group in Node.FilterGroups.OrderBy(x => x.Name))
+            @foreach (var group in Node.Groups.OrderBy(x => x.Name))
             {
                 <FilterGroup Parent="Parent" Group="group" />
             }

@@ -11,20 +11,20 @@ namespace EventLogExpert.UI.Tests.Filter;
 public sealed class ResolvedEventExtensionsTests
 {
     [Fact]
-    public void FilterByDate_WhenDateFilterIsNull_ShouldReturnEvent()
+    public void MatchesDateFilter_WhenDateFilterIsNull_ShouldNotConstrainEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
 
         // Act
-        var result = @event.FilterByDate(null);
+        var result = @event.MatchesDateFilter(null);
 
         // Assert
-        Assert.Same(@event, result);
+        Assert.True(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventAfterRange_ShouldReturnNull()
+    public void MatchesDateFilter_WhenEventAfterRange_ShouldFailDateConstraint()
     {
         // Arrange
         var eventTime = DateTime.Now.AddDays(2);
@@ -37,14 +37,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventBeforeRange_ShouldReturnNull()
+    public void MatchesDateFilter_WhenEventBeforeRange_ShouldFailDateConstraint()
     {
         // Arrange
         var eventTime = DateTime.Now.AddDays(-2);
@@ -57,14 +57,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventExactlyAtAfter_ShouldReturnEvent()
+    public void MatchesDateFilter_WhenEventExactlyAtAfter_ShouldTreatBoundaryAsInclusive()
     {
         // Arrange
         var boundaryTime = DateTime.Now;
@@ -77,14 +77,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Same(@event, result);
+        Assert.True(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventExactlyAtBefore_ShouldReturnEvent()
+    public void MatchesDateFilter_WhenEventExactlyAtBefore_ShouldTreatBoundaryAsInclusive()
     {
         // Arrange
         var boundaryTime = DateTime.Now;
@@ -97,14 +97,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Same(@event, result);
+        Assert.True(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventIsNull_ShouldReturnNull()
+    public void MatchesDateFilter_WhenEventIsNull_ShouldRejectNullEvent()
     {
         // Arrange
         ResolvedEvent? @event = null;
@@ -116,14 +116,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Null(result);
+        Assert.False(result);
     }
 
     [Fact]
-    public void FilterByDate_WhenEventWithinRange_ShouldReturnEvent()
+    public void MatchesDateFilter_WhenEventWithinRange_ShouldSatisfyDateConstraint()
     {
         // Arrange
         var eventTime = DateTime.Now;
@@ -136,28 +136,49 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.FilterByDate(dateFilter);
+        var result = @event.MatchesDateFilter(dateFilter);
 
         // Assert
-        Assert.Same(@event, result);
+        Assert.True(result);
+    }
+
+    [Fact(Skip = "F11: MatchesDateFilter ignores DateFilter.IsEnabled — disabled filter still gates events")]
+    public void MatchesDateFilter_WhenDateFilterDisabled_ShouldNotConstrainEvent()
+    {
+        // Arrange
+        var eventTime = DateTime.Now.AddYears(-10);
+        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+
+        var dateFilter = new DateFilter
+        {
+            IsEnabled = false,
+            After = DateTime.Now.AddDays(-1),
+            Before = DateTime.Now.AddDays(1)
+        };
+
+        // Act
+        var result = @event.MatchesDateFilter(dateFilter);
+
+        // Assert
+        Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenEventIsNull_ShouldReturnFalse()
+    public void MatchesFilters_WhenEventIsNull_ShouldRejectNullEvent()
     {
         // Arrange
         ResolvedEvent? @event = null;
         var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void Filter_WhenExcludedFilterDoesNotMatch_ShouldReturnTrue()
+    public void MatchesFilters_WhenExcludedFilterDoesNotMatch_ShouldIncludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
@@ -165,14 +186,14 @@ public sealed class ResolvedEventExtensionsTests
         var filters = new List<SavedFilter> { filter };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenExcludedFilterMatches_ShouldReturnFalse()
+    public void MatchesFilters_WhenExcludedFilterMatches_ShouldExcludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
@@ -180,42 +201,42 @@ public sealed class ResolvedEventExtensionsTests
         var filters = new List<SavedFilter> { filter };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void Filter_WhenFilterDoesNotMatch_ShouldReturnFalse()
+    public void MatchesFilters_WhenIncludeFilterDoesNotMatch_ShouldExcludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
         var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void Filter_WhenFilterMatches_ShouldReturnTrue()
+    public void MatchesFilters_WhenIncludeFilterMatches_ShouldIncludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
         var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenIncludeAndExcludeFilters_ExcludeTakesPriority()
+    public void MatchesFilters_WhenIncludeAndExcludeFilters_ExcludeTakesPriority()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
@@ -224,14 +245,14 @@ public sealed class ResolvedEventExtensionsTests
         var filters = new List<SavedFilter> { includeFilter, excludeFilter };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void Filter_WhenMultipleFiltersAnyMatch_ShouldReturnTrue()
+    public void MatchesFilters_WhenAnyIncludeFilterMatches_ShouldIncludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
@@ -243,14 +264,14 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenMultipleFiltersNoneMatch_ShouldReturnFalse()
+    public void MatchesFilters_WhenNoIncludeFilterMatches_ShouldExcludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(300);
@@ -262,28 +283,28 @@ public sealed class ResolvedEventExtensionsTests
         };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);
     }
 
     [Fact]
-    public void Filter_WhenNoFilters_ShouldReturnTrue()
+    public void MatchesFilters_WhenFilterListIsEmpty_ShouldIncludeAllEvents()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
         var filters = new List<SavedFilter>();
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenOnlyExcludedFilters_ShouldReturnTrue()
+    public void MatchesFilters_WhenOnlyExcludeFiltersExist_ShouldNotRequireIncludeMatch()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(200);
@@ -291,21 +312,21 @@ public sealed class ResolvedEventExtensionsTests
         var filters = new List<SavedFilter> { filter };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.True(result);
     }
 
     [Fact]
-    public void Filter_WhenXmlFilterDoesNotMatch_ShouldReturnFalse()
+    public void MatchesFilters_WhenXmlFilterDoesNotMatch_ShouldExcludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
         var filters = new List<SavedFilter> { CreateFilter(Constants.FilterXmlContainsData) };
 
         // Act
-        var result = @event.Filter(filters);
+        var result = @event.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);

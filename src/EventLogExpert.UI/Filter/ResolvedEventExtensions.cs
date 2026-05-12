@@ -9,7 +9,7 @@ internal static class ResolvedEventExtensions
 {
     extension(ResolvedEvent? @event)
     {
-        public bool Filter(IEnumerable<SavedFilter> filters)
+        public bool MatchesFilters(IEnumerable<SavedFilter> filters)
         {
             if (@event is null) { return false; }
 
@@ -30,13 +30,13 @@ internal static class ResolvedEventExtensions
             return isEmpty || isFiltered;
         }
 
-        public ResolvedEvent? FilterByDate(DateFilter? dateFilter)
+        public bool MatchesDateFilter(DateFilter? dateFilter)
         {
-            if (@event is null) { return null; }
+            if (@event is null) { return false; }
 
-            if (dateFilter is null) { return @event; }
+            if (dateFilter is null) { return true; }
 
-            return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before ? @event : null;
+            return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before;
         }
     }
 }
