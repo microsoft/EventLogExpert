@@ -105,9 +105,7 @@ public sealed class Effects(
 
         if (updatedAfter is null || updatedBefore is null)
         {
-            var (after, before) = DateRangeDefaults.ComputeFromActiveLogs(
-                _eventLogState.Value.ActiveLogs.Values,
-                DateTime.UtcNow);
+            var (after, before) = _eventLogState.Value.ActiveLogs.Values.GetEventDateRange(DateTime.UtcNow);
 
             updatedAfter ??= after;
             updatedBefore ??= before;
