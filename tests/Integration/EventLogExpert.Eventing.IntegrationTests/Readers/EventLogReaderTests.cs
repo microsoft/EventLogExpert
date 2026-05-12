@@ -9,47 +9,20 @@ namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
 public sealed class EventLogReaderTests
 {
-    [Fact]
-    public void Constructor_WhenEmptyLogName_ShouldFailToReadEvents()
+    [Theory]
+    [InlineData("", "empty log name")]
+    [InlineData(null, "null log name")]
+    [InlineData("Invalid<>Log|Name", "log name with special characters")]
+    [InlineData("NonExistentLog_TestSentinel_8e9c2b4a", "non-existent log name")]
+    public void Constructor_WhenInvalidLogName_ShouldFailToReadEvents(string? logName, string scenario)
     {
         // Arrange & Act
-        using var reader = new EventLogReader(string.Empty, LogPathType.Channel);
+        using var reader = new EventLogReader(logName!, LogPathType.Channel);
 
-        // Assert - TryGetEvents must fail
+        // Assert - TryGetEvents must fail without throwing
         bool success = reader.TryGetEvents(out var events);
 
-        Assert.False(success, "TryGetEvents should return false for empty log name");
-        Assert.NotNull(events);
-        Assert.Empty(events);
-    }
-
-    [Fact]
-    public void Constructor_WhenInvalidLog_ShouldFailToReadEvents()
-    {
-        // Arrange
-        var invalidLogName = "NonExistentLog_" + Guid.NewGuid();
-
-        // Act
-        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
-
-        // Assert - TryGetEvents must fail
-        bool success = reader.TryGetEvents(out var events);
-
-        Assert.False(success, "TryGetEvents should return false for invalid log name");
-        Assert.NotNull(events);
-        Assert.Empty(events);
-    }
-
-    [Fact]
-    public void Constructor_WhenNullLogName_ShouldFailToReadEvents()
-    {
-        // Arrange & Act
-        using var reader = new EventLogReader(null!, LogPathType.Channel);
-
-        // Assert - TryGetEvents must fail
-        bool success = reader.TryGetEvents(out var events);
-
-        Assert.False(success, "TryGetEvents should return false for null log name");
+        Assert.False(success, $"TryGetEvents should return false for {scenario}");
         Assert.NotNull(events);
         Assert.Empty(events);
     }
@@ -78,23 +51,6 @@ public sealed class EventLogReaderTests
 
         // Assert
         Assert.NotNull(reader);
-    }
-
-    [Fact]
-    public void Constructor_WhenSpecialCharactersInLogName_ShouldFailToReadEvents()
-    {
-        // Arrange
-        var invalidLogName = "Invalid<>Log|Name";
-
-        // Act
-        using var reader = new EventLogReader(invalidLogName, LogPathType.Channel);
-
-        // Assert - TryGetEvents must fail
-        bool success = reader.TryGetEvents(out var events);
-
-        Assert.False(success, "TryGetEvents should return false for log name with special characters");
-        Assert.NotNull(events);
-        Assert.Empty(events);
     }
 
     [Fact]

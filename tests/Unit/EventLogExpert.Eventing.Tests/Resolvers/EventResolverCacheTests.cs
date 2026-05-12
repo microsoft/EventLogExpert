@@ -7,6 +7,11 @@ namespace EventLogExpert.Eventing.Tests.Resolvers;
 
 public sealed class EventResolverCacheTests
 {
+    public enum CacheKind { Description, Value }
+
+    private static string GetOrAdd(EventResolverCache cache, CacheKind kind, string input) =>
+        kind == CacheKind.Description ? cache.GetOrAddDescription(input) : cache.GetOrAddValue(input);
+
     [Fact]
     public void ClearAll_AfterAddingItems_ShouldClearBothCaches()
     {
@@ -78,25 +83,29 @@ public sealed class EventResolverCacheTests
         Assert.Null(exception);
     }
 
-    [Fact]
-    public void GetOrAddDescription_CalledMultipleTimes_ShouldReturnSameReference()
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_CalledMultipleTimes_ShouldReturnSameReference(CacheKind kind)
     {
         // Arrange
         var cache = new EventResolverCache();
-        var description = "Test Description";
+        var input = $"Test {kind}";
 
         // Act
-        var result1 = cache.GetOrAddDescription(description);
-        var result2 = cache.GetOrAddDescription(description);
-        var result3 = cache.GetOrAddDescription(description);
+        var result1 = GetOrAdd(cache, kind, input);
+        var result2 = GetOrAdd(cache, kind, input);
+        var result3 = GetOrAdd(cache, kind, input);
 
         // Assert
         Assert.Same(result1, result2);
         Assert.Same(result2, result3);
     }
 
-    [Fact]
-    public void GetOrAddDescription_ConcurrentCalls_ShouldHandleThreadSafely()
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_ConcurrentCalls_ShouldHandleThreadSafely(CacheKind kind)
     {
         // Arrange
         var cache = new EventResolverCache();
@@ -105,159 +114,76 @@ public sealed class EventResolverCacheTests
         // Act
         Parallel.For(0, 100, i =>
         {
-            results[i] = cache.GetOrAddDescription($"Description{i % 10}");
+            results[i] = GetOrAdd(cache, kind, $"{kind}{i % 10}");
         });
 
         // Assert
-        // Verify that same descriptions share the same reference
-        for (int i = 0; i < 100; i += 10)
+        // 100 calls were spread across 10 distinct keys ("{kind}0" .. "{kind}9"), 10 calls per key.
+        // For each key, every occurrence must be the same reference (de-dup contract under
+        // contention). The previous loop only stepped i by 10, which meant i % 10 was always 0
+        // and only key "{kind}0" was actually validated; iterating each key 0..9 explicitly
+        // covers all ten distinct cache slots so a regression in any one of them fails the test.
+        for (int key = 0; key < 10; key++)
         {
-            var description = $"Description{i % 10}";
-            var firstOccurrence = results[i];
+            var expected = results[key];
+            Assert.NotNull(expected);
 
-            for (int j = i; j < 100; j += 10)
+            for (int occurrence = 1; occurrence < 10; occurrence++)
             {
-                Assert.Same(firstOccurrence, results[j]);
+                Assert.Same(expected, results[key + (occurrence * 10)]);
             }
         }
     }
 
-    [Fact]
-    public void GetOrAddDescription_WithDifferentDescriptions_ShouldReturnDifferentReferences()
+    [Theory]
+    [InlineData(CacheKind.Description, "Description 1", "Description 2")]
+    [InlineData(CacheKind.Value, "Value 1", "Value 2")]
+    public void GetOrAdd_WithDifferentInputs_ShouldReturnDifferentReferences(CacheKind kind, string a, string b)
     {
         // Arrange
         var cache = new EventResolverCache();
-        var description1 = "Description 1";
-        var description2 = "Description 2";
 
         // Act
-        var result1 = cache.GetOrAddDescription(description1);
-        var result2 = cache.GetOrAddDescription(description2);
+        var result1 = GetOrAdd(cache, kind, a);
+        var result2 = GetOrAdd(cache, kind, b);
 
         // Assert
         Assert.NotSame(result1, result2);
-        Assert.Equal("Description 1", result1);
-        Assert.Equal("Description 2", result2);
+        Assert.Equal(a, result1);
+        Assert.Equal(b, result2);
     }
 
-    [Fact]
-    public void GetOrAddDescription_WithEmptyString_ShouldReturnSameEmptyStringReference()
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_WithEmptyString_ShouldReturnSameEmptyStringReference(CacheKind kind)
     {
         // Arrange
         var cache = new EventResolverCache();
 
         // Act
-        var result1 = cache.GetOrAddDescription(string.Empty);
-        var result2 = cache.GetOrAddDescription(string.Empty);
+        var result1 = GetOrAdd(cache, kind, string.Empty);
+        var result2 = GetOrAdd(cache, kind, string.Empty);
 
         // Assert
         Assert.Same(result1, result2);
         Assert.Equal(string.Empty, result1);
     }
 
-    [Fact]
-    public void GetOrAddDescription_WithNewString_ShouldAddToCache()
+    [Theory]
+    [InlineData(CacheKind.Description)]
+    [InlineData(CacheKind.Value)]
+    public void GetOrAdd_WithNewString_ShouldAddToCache(CacheKind kind)
     {
         // Arrange
         var cache = new EventResolverCache();
-        var description = new string("Test".ToCharArray()); // Force new string instance
+        var input = new string("Test".ToCharArray()); // Force new string instance
 
         // Act
-        var result = cache.GetOrAddDescription(description);
+        var result = GetOrAdd(cache, kind, input);
 
         // Assert
-        Assert.Equal(description, result);
-    }
-
-    [Fact]
-    public void GetOrAddValue_CalledMultipleTimes_ShouldReturnSameReference()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var value = "Test Value";
-
-        // Act
-        var result1 = cache.GetOrAddValue(value);
-        var result2 = cache.GetOrAddValue(value);
-        var result3 = cache.GetOrAddValue(value);
-
-        // Assert
-        Assert.Same(result1, result2);
-        Assert.Same(result2, result3);
-    }
-
-    [Fact]
-    public void GetOrAddValue_ConcurrentCalls_ShouldHandleThreadSafely()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var results = new string[100];
-
-        // Act
-        Parallel.For(0, 100, i =>
-        {
-            results[i] = cache.GetOrAddValue($"Value{i % 10}");
-        });
-
-        // Assert
-        // Verify that same values share the same reference
-        for (int i = 0; i < 100; i += 10)
-        {
-            var value = $"Value{i % 10}";
-            var firstOccurrence = results[i];
-
-            for (int j = i; j < 100; j += 10)
-            {
-                Assert.Same(firstOccurrence, results[j]);
-            }
-        }
-    }
-
-    [Fact]
-    public void GetOrAddValue_WithDifferentValues_ShouldReturnDifferentReferences()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var value1 = "Value 1";
-        var value2 = "Value 2";
-
-        // Act
-        var result1 = cache.GetOrAddValue(value1);
-        var result2 = cache.GetOrAddValue(value2);
-
-        // Assert
-        Assert.NotSame(result1, result2);
-        Assert.Equal("Value 1", result1);
-        Assert.Equal("Value 2", result2);
-    }
-
-    [Fact]
-    public void GetOrAddValue_WithEmptyString_ShouldReturnSameEmptyStringReference()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-
-        // Act
-        var result1 = cache.GetOrAddValue(string.Empty);
-        var result2 = cache.GetOrAddValue(string.Empty);
-
-        // Assert
-        Assert.Same(result1, result2);
-        Assert.Equal(string.Empty, result1);
-    }
-
-    [Fact]
-    public void GetOrAddValue_WithNewString_ShouldAddToCache()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var value = new string("Test".ToCharArray()); // Force new string instance
-
-        // Act
-        var result = cache.GetOrAddValue(value);
-
-        // Assert
-        Assert.Equal(value, result);
+        Assert.Equal(input, result);
     }
 
     [Fact]
