@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Reflection;
@@ -143,6 +143,20 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
+    public void Dispose_WhenCalled_ShouldUnsubscribe()
+    {
+        // Arrange
+        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Enabled = true;
+
+        // Act
+        watcher.Dispose();
+
+        // Assert
+        Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
     public void Dispose_WhenCalledFromHandler_ShouldThrowInvalidOperationException()
     {
         // Arrange
@@ -154,7 +168,8 @@ public sealed class EventLogWatcherTests
         {
             try
             {
-                ((EventLogWatcher)sender!).Dispose();
+                Assert.NotNull(sender);
+                ((EventLogWatcher)sender).Dispose();
             }
             catch (Exception ex)
             {
@@ -194,20 +209,6 @@ public sealed class EventLogWatcherTests
         watcher.Dispose();
         watcher.Dispose();
         watcher.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_WhenCalled_ShouldUnsubscribe()
-    {
-        // Arrange
-        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        watcher.Enabled = true;
-
-        // Act
-        watcher.Dispose();
-
-        // Assert
-        Assert.False(watcher.Enabled);
     }
 
     [Fact]
@@ -289,6 +290,20 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
+    public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Enabled = true;
+
+        // Act
+        watcher.Enabled = false;
+
+        // Assert
+        Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
     public void Enabled_WhenSetToFalseFromHandler_ShouldThrowInvalidOperationException()
     {
         // Arrange
@@ -300,7 +315,8 @@ public sealed class EventLogWatcherTests
         {
             try
             {
-                ((EventLogWatcher)sender!).Enabled = false;
+                Assert.NotNull(sender);
+                ((EventLogWatcher)sender).Enabled = false;
             }
             catch (Exception ex)
             {
@@ -343,20 +359,6 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
-    {
-        // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        watcher.Enabled = true;
-
-        // Act
-        watcher.Enabled = false;
-
-        // Assert
-        Assert.False(watcher.Enabled);
-    }
-
-    [Fact]
     public void Enabled_WhenSetToSameValue_ShouldNotThrow()
     {
         // Arrange
@@ -366,6 +368,19 @@ public sealed class EventLogWatcherTests
         // Act & Assert
         watcher.Enabled = false;
         Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
+    public void Enabled_WhenSetToTrue_ShouldSubscribe()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+
+        // Act
+        watcher.Enabled = true;
+
+        // Assert
+        Assert.True(watcher.Enabled);
     }
 
     [Fact]
@@ -401,19 +416,6 @@ public sealed class EventLogWatcherTests
         watcher.Enabled = true;
 
         // Act - Setting to true when already true is a no-op (switch case doesn't match)
-        watcher.Enabled = true;
-
-        // Assert
-        Assert.True(watcher.Enabled);
-    }
-
-    [Fact]
-    public void Enabled_WhenSetToTrue_ShouldSubscribe()
-    {
-        // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-
-        // Act
         watcher.Enabled = true;
 
         // Assert

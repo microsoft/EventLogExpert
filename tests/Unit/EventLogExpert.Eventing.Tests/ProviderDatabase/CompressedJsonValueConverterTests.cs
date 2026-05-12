@@ -137,8 +137,9 @@ public sealed class CompressedJsonValueConverterTests
         // Assert
         Assert.NotNull(decompressed);
         Assert.Equal(originalData.Id, decompressed.Id);
+        Assert.NotNull(originalData.Child);
         Assert.NotNull(decompressed.Child);
-        Assert.Equal(originalData.Child!.Name, decompressed.Child.Name);
+        Assert.Equal(originalData.Child.Name, decompressed.Child.Name);
         Assert.Equal(originalData.Child.Value, decompressed.Child.Value);
         Assert.Equal(originalData.Child.Items, decompressed.Child.Items);
     }

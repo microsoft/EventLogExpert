@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Interop;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Globalization;
 using System.Runtime.InteropServices;
@@ -69,22 +69,6 @@ public sealed class EventMessageProviderIntegrationTests
     }
 
     [Fact]
-    public void LoadProviderDetails_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        EventMessageProvider provider = new(Constants.TestProviderName);
-
-        // Act
-        var details1 = provider.LoadProviderDetails();
-        var details2 = provider.LoadProviderDetails();
-
-        // Assert
-        Assert.NotNull(details1);
-        Assert.NotNull(details2);
-        Assert.Equal(details1.ProviderName, details2.ProviderName);
-    }
-
-    [Fact]
     public void LoadProviderDetails_WhenCalled_ShouldHaveNonNullCollections()
     {
         // Arrange
@@ -118,6 +102,22 @@ public sealed class EventMessageProviderIntegrationTests
     }
 
     [Fact]
+    public void LoadProviderDetails_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        EventMessageProvider provider = new(Constants.TestProviderName);
+
+        // Act
+        var details1 = provider.LoadProviderDetails();
+        var details2 = provider.LoadProviderDetails();
+
+        // Assert
+        Assert.NotNull(details1);
+        Assert.NotNull(details2);
+        Assert.Equal(details1.ProviderName, details2.ProviderName);
+    }
+
+    [Fact]
     public void LoadProviderDetails_WhenChannelOwningPublisherUnknown_ShouldReturnEmptyDetailsWithoutFallback()
     {
         // Arrange — name is neither a registered publisher nor a channel.
@@ -139,9 +139,10 @@ public sealed class EventMessageProviderIntegrationTests
         Assert.SkipUnless(
             TryFindProviderWithEmptyLegacyAndWorkingModern(out var providerName),
             "Test requires a provider whose legacy registry entries load zero messages and whose modern publisher metadata exposes a loadable MessageFilePath. Common on dev machines but not guaranteed.");
+        Assert.NotNull(providerName);
 
         var mockLogger = Substitute.For<ITraceLogger>();
-        EventMessageProvider provider = new(providerName!, logger: mockLogger);
+        EventMessageProvider provider = new(providerName, logger: mockLogger);
 
         var details = provider.LoadProviderDetails();
 
@@ -175,8 +176,9 @@ public sealed class EventMessageProviderIntegrationTests
         Assert.SkipUnless(
             TryFindChannelWithDistinctOwningPublisher(out var channelName, out var owningPublisher),
             "Test requires a registered channel whose owning publisher differs from the channel path itself.");
+        Assert.NotNull(channelName);
 
-        EventMessageProvider provider = new(channelName!);
+        EventMessageProvider provider = new(channelName);
 
         var details = provider.LoadProviderDetails();
 

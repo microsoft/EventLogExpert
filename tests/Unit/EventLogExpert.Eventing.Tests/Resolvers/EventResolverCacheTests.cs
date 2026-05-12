@@ -9,9 +9,6 @@ public sealed class EventResolverCacheTests
 {
     public enum CacheKind { Description, Value }
 
-    private static string GetOrAdd(EventResolverCache cache, CacheKind kind, string input) =>
-        kind == CacheKind.Description ? cache.GetOrAddDescription(input) : cache.GetOrAddValue(input);
-
     [Fact]
     public void ClearAll_AfterAddingItems_ShouldClearBothCaches()
     {
@@ -264,4 +261,7 @@ public sealed class EventResolverCacheTests
         Assert.Equal(sharedString, description);
         Assert.Equal(sharedString, value);
     }
+
+    private static string GetOrAdd(EventResolverCache cache, CacheKind kind, string input) =>
+        kind == CacheKind.Description ? cache.GetOrAddDescription(input) : cache.GetOrAddValue(input);
 }

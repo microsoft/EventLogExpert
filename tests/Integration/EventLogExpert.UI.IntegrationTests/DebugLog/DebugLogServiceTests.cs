@@ -3,8 +3,8 @@
 
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.IntegrationTests.TestUtils.Constants;
+using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
 using NSubstitute;
 
@@ -331,37 +331,6 @@ public sealed class DebugLogServiceTests : IDisposable
     }
 
     [Fact]
-    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
-    {
-        // Arrange
-        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
-
-        using var debugLogService = new DebugLogService(
-            new FileLocationOptions(_testDirectory),
-            mockSettingsService);
-
-        // Act - write at Debug (should succeed)
-        debugLogService.Debug($"debug message before change");
-        var contentBefore = ReadLogFile();
-        Assert.Contains("debug message before change", contentBefore);
-
-        // Change level to Warning
-        setLogLevel(LogLevel.Warning);
-
-        // Write at Debug (should be filtered by handler)
-        debugLogService.Debug($"debug message after change");
-
-        // Write at Warning (should succeed)
-        debugLogService.Warning($"warning message after change");
-
-        // Assert
-        var content = ReadLogFile();
-        Assert.Contains("debug message before change", content);
-        Assert.DoesNotContain("debug message after change", content);
-        Assert.Contains("warning message after change", content);
-    }
-
-    [Fact]
     public void Trace_ShouldIncludeThreadId()
     {
         // Arrange
@@ -448,7 +417,8 @@ public sealed class DebugLogServiceTests : IDisposable
                 DebugLogEntryParser.TryParseLine(line, out var entry),
                 $"Line did not parse via DebugLogEntryParser: {line}");
 
-            timestamps.Add(entry.Timestamp!.Value);
+            Assert.NotNull(entry.Timestamp);
+            timestamps.Add(entry.Timestamp.Value);
             payloads.Add(entry.Message);
         }
 
@@ -612,6 +582,37 @@ public sealed class DebugLogServiceTests : IDisposable
         var content = ReadLogFile();
         Assert.Contains("[Information]", content);
         Assert.Contains(Constants.DebugLogDefaultLevelMessage, content);
+    }
+
+    [Fact]
+    public void TraceIfEnabled_WhenLogLevelChangedAtRuntime_ShouldRespectNewLevel()
+    {
+        // Arrange
+        var (mockSettingsService, setLogLevel) = CreateMockSettingsServiceWithDynamicLogLevel(LogLevel.Debug);
+
+        using var debugLogService = new DebugLogService(
+            new FileLocationOptions(_testDirectory),
+            mockSettingsService);
+
+        // Act - write at Debug (should succeed)
+        debugLogService.Debug($"debug message before change");
+        var contentBefore = ReadLogFile();
+        Assert.Contains("debug message before change", contentBefore);
+
+        // Change level to Warning
+        setLogLevel(LogLevel.Warning);
+
+        // Write at Debug (should be filtered by handler)
+        debugLogService.Debug($"debug message after change");
+
+        // Write at Warning (should succeed)
+        debugLogService.Warning($"warning message after change");
+
+        // Assert
+        var content = ReadLogFile();
+        Assert.Contains("debug message before change", content);
+        Assert.DoesNotContain("debug message after change", content);
+        Assert.Contains("warning message after change", content);
     }
 
     [Fact]

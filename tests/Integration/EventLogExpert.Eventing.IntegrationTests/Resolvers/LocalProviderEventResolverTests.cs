@@ -155,32 +155,6 @@ public sealed class EventResolverLocalProviderTests
     }
 
     [Fact]
-    public void LoadProviderDetails_ConcurrentCallsForSameProvider_ShouldHandleThreadSafely()
-    {
-        // Arrange
-        var resolver = new EventResolver();
-        var exceptions = new Exception?[50];
-
-        // Act
-        Parallel.For(0, 50, i =>
-            {
-                try
-                {
-                    var eventRecord = EventUtils.CreateBasicEvent();
-                    eventRecord.Id = (ushort)(1000 + i);
-                    resolver.LoadProviderDetails(eventRecord);
-                }
-                catch (Exception ex)
-                {
-                    exceptions[i] = ex;
-                }
-            });
-
-        // Assert
-        Assert.All(exceptions, ex => Assert.Null(ex));
-    }
-
-    [Fact]
     public void LoadProviderDetails_ConcurrentCalls_ShouldHandleThreadSafely()
     {
         // Arrange
@@ -207,6 +181,32 @@ public sealed class EventResolverLocalProviderTests
                         Id = (ushort)(1000 + i)
                     };
 
+                    resolver.LoadProviderDetails(eventRecord);
+                }
+                catch (Exception ex)
+                {
+                    exceptions[i] = ex;
+                }
+            });
+
+        // Assert
+        Assert.All(exceptions, ex => Assert.Null(ex));
+    }
+
+    [Fact]
+    public void LoadProviderDetails_ConcurrentCallsForSameProvider_ShouldHandleThreadSafely()
+    {
+        // Arrange
+        var resolver = new EventResolver();
+        var exceptions = new Exception?[50];
+
+        // Act
+        Parallel.For(0, 50, i =>
+            {
+                try
+                {
+                    var eventRecord = EventUtils.CreateBasicEvent();
+                    eventRecord.Id = (ushort)(1000 + i);
                     resolver.LoadProviderDetails(eventRecord);
                 }
                 catch (Exception ex)

@@ -228,26 +228,6 @@ public sealed class EventResolverDatabaseTests
     }
 
     [Fact]
-    public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-        EventResolver resolver = new EventResolver(dbCollection);
-
-        // Type as base class to verify override (not 'new') is used
-        EventResolverBase baseResolver = resolver;
-
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver.Dispose();
-
-        // Assert - This should throw because ResolveEvent is overridden, not hidden with 'new'
-        Assert.Throws<ObjectDisposedException>(() => baseResolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
     public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
     {
         // Arrange
@@ -262,6 +242,26 @@ public sealed class EventResolverDatabaseTests
 
         // Assert
         Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
+        dbCollection.ActiveDatabases.Returns([]);
+        EventResolver resolver = new(dbCollection);
+
+        // Type as base class to verify override (not 'new') is used
+        EventResolverBase baseResolver = resolver;
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert - This should throw because ResolveEvent is overridden, not hidden with 'new'
+        Assert.Throws<ObjectDisposedException>(() => baseResolver.ResolveEvent(eventRecord));
     }
 
     [Fact]

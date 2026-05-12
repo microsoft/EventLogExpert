@@ -12,19 +12,6 @@ public sealed class MtaProviderSourceTests : IDisposable
     private readonly List<string> _tempDirs = [];
     private readonly List<string> _tempFiles = [];
 
-    public void Dispose()
-    {
-        foreach (var dir in _tempDirs)
-        {
-            DatabaseTestUtils.DeleteDirectoryRecursive(dir);
-        }
-
-        foreach (var file in _tempFiles)
-        {
-            DatabaseTestUtils.DeleteDatabaseFile(file);
-        }
-    }
-
     [Fact]
     public void DiscoverProviderNames_WhenEvtxFileMissing_LogsErrorReturnsEmpty()
     {
@@ -60,44 +47,17 @@ public sealed class MtaProviderSourceTests : IDisposable
             h.ToString().Contains("Evtx file not found")));
     }
 
-    [Fact]
-    public void FindMtaFiles_WhenLocaleMetaDataDirectoryMissing_LogsErrorReturnsEmpty()
+    public void Dispose()
     {
-        // Arrange — create a temp dir with an evtx file but NO LocaleMetaData subdir.
-        var dir = DatabaseTestUtils.CreateTempDirectory();
-        _tempDirs.Add(dir);
-        var evtxPath = Path.Combine(dir, "test.evtx");
-        File.WriteAllBytes(evtxPath, []);
-        var logger = Substitute.For<ITraceLogger>();
+        foreach (var dir in _tempDirs)
+        {
+            DatabaseTestUtils.DeleteDirectoryRecursive(dir);
+        }
 
-        // Act
-        var files = MtaProviderSource.FindMtaFiles(evtxPath, logger);
-
-        // Assert
-        Assert.Empty(files);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("No LocaleMetaData folder") && h.ToString().Contains(evtxPath)));
-    }
-
-    [Fact]
-    public void FindMtaFiles_WhenLocaleMetaDataDirectoryIsEmpty_LogsErrorReturnsEmpty()
-    {
-        // Arrange
-        var dir = DatabaseTestUtils.CreateTempDirectory();
-        _tempDirs.Add(dir);
-        var evtxPath = Path.Combine(dir, "test.evtx");
-        File.WriteAllBytes(evtxPath, []);
-        var localeDir = Path.Combine(dir, "LocaleMetaData");
-        Directory.CreateDirectory(localeDir);
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        var files = MtaProviderSource.FindMtaFiles(evtxPath, logger);
-
-        // Assert
-        Assert.Empty(files);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("contains no MTA files") && h.ToString().Contains(localeDir)));
+        foreach (var file in _tempFiles)
+        {
+            DatabaseTestUtils.DeleteDatabaseFile(file);
+        }
     }
 
     [Fact]
@@ -132,5 +92,45 @@ public sealed class MtaProviderSourceTests : IDisposable
         logger.Received(1).Information(Arg.Is<InformationLogHandler>(h =>
             h.ToString().Contains("3 locale metadata file") && h.ToString().Contains(localeDir)));
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
+    }
+
+    [Fact]
+    public void FindMtaFiles_WhenLocaleMetaDataDirectoryIsEmpty_LogsErrorReturnsEmpty()
+    {
+        // Arrange
+        var dir = DatabaseTestUtils.CreateTempDirectory();
+        _tempDirs.Add(dir);
+        var evtxPath = Path.Combine(dir, "test.evtx");
+        File.WriteAllBytes(evtxPath, []);
+        var localeDir = Path.Combine(dir, "LocaleMetaData");
+        Directory.CreateDirectory(localeDir);
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        var files = MtaProviderSource.FindMtaFiles(evtxPath, logger);
+
+        // Assert
+        Assert.Empty(files);
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("contains no MTA files") && h.ToString().Contains(localeDir)));
+    }
+
+    [Fact]
+    public void FindMtaFiles_WhenLocaleMetaDataDirectoryMissing_LogsErrorReturnsEmpty()
+    {
+        // Arrange — create a temp dir with an evtx file but NO LocaleMetaData subdir.
+        var dir = DatabaseTestUtils.CreateTempDirectory();
+        _tempDirs.Add(dir);
+        var evtxPath = Path.Combine(dir, "test.evtx");
+        File.WriteAllBytes(evtxPath, []);
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        var files = MtaProviderSource.FindMtaFiles(evtxPath, logger);
+
+        // Assert
+        Assert.Empty(files);
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("No LocaleMetaData folder") && h.ToString().Contains(evtxPath)));
     }
 }

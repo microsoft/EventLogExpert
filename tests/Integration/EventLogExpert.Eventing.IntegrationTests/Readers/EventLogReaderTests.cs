@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 
 namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 
@@ -244,21 +244,6 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
-    {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-
-        // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 10);
-
-        // Assert
-        Assert.True(success);
-        Assert.NotNull(events);
-        Assert.True(events.Length <= 10);
-    }
-
-    [Fact]
     public void TryGetEvents_WhenBatchSize1_ShouldReturn1Event()
     {
         // Arrange
@@ -272,6 +257,21 @@ public sealed class EventLogReaderTests
         {
             Assert.Single(events);
         }
+    }
+
+    [Fact]
+    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
+    {
+        // Arrange
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
+
+        // Act
+        bool success = reader.TryGetEvents(out var events, batchSize: 10);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(events);
+        Assert.True(events.Length <= 10);
     }
 
     [Fact]

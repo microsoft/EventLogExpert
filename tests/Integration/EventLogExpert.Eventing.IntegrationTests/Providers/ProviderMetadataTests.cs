@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 using System.Collections.ObjectModel;
 
@@ -29,8 +29,11 @@ public sealed class ProviderMetadataTests
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, Assert.NotNull);
-        Assert.All(results, r => Assert.NotEmpty(r!));
+        Assert.All(results, r =>
+        {
+            Assert.NotNull(r);
+            Assert.NotEmpty(r);
+        });
     }
 
     [Fact]
@@ -434,8 +437,9 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
+        Assert.NotNull(metadata);
 
-        var messageFilePath = metadata!.MessageFilePath;
+        var messageFilePath = metadata.MessageFilePath;
 
         Assert.NotNull(messageFilePath);
         Assert.DoesNotContain("%", messageFilePath);
@@ -501,8 +505,11 @@ public sealed class ProviderMetadataTests
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, Assert.NotNull);
-        Assert.All(results, r => Assert.NotEmpty(r!));
+        Assert.All(results, r =>
+        {
+            Assert.NotNull(r);
+            Assert.NotEmpty(r);
+        });
     }
 
     [Fact]
@@ -608,8 +615,9 @@ public sealed class ProviderMetadataTests
         var metadata = ProviderMetadata.Create(Constants.SecurityAuditingLogName);
 
         Assert.SkipUnless(metadata is not null, "Test requires Microsoft-Windows-Security-Auditing provider on the host.");
+        Assert.NotNull(metadata);
 
-        var parameterFilePath = metadata!.ParameterFilePath;
+        var parameterFilePath = metadata.ParameterFilePath;
 
         Assert.NotNull(parameterFilePath);
         Assert.DoesNotContain("%", parameterFilePath);
@@ -647,8 +655,11 @@ public sealed class ProviderMetadataTests
 
         // Assert
         var results = tasks.Select(t => t.Result).ToList();
-        Assert.All(results, Assert.NotNull);
-        Assert.All(results, r => Assert.NotEmpty(r!));
+        Assert.All(results, r =>
+        {
+            Assert.NotNull(r);
+            Assert.NotEmpty(r);
+        });
     }
 
     [Fact]

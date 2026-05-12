@@ -66,18 +66,6 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
-    {
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
-
-        var component = Render<BannerHost>();
-
-        var banner = component.Find("aside.banner-attention");
-        Assert.Contains("1 database need", banner.TextContent);
-        Assert.DoesNotContain("databases need", banner.TextContent);
-    }
-
-    [Fact]
     public void BannerHost_AttentionEntries_RendersAttentionBannerWithOpenSettingsAndDismiss()
     {
         _bannerService.AttentionEntries.Returns(
@@ -89,6 +77,18 @@ public sealed class BannerHostTests : BunitContext
         Assert.Contains("2 databases need attention", banner.TextContent);
         Assert.Equal("Open Settings", component.Find("aside.banner-attention button.banner-action").TextContent.Trim());
         Assert.Single(component.FindAll("aside.banner-attention button.banner-dismiss"));
+    }
+
+    [Fact]
+    public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
+    {
+        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+
+        var banner = component.Find("aside.banner-attention");
+        Assert.Contains("1 database need", banner.TextContent);
+        Assert.DoesNotContain("databases need", banner.TextContent);
     }
 
     [Fact]

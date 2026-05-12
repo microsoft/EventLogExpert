@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using Microsoft.Win32;
 using NSubstitute;
 
@@ -44,6 +44,26 @@ public sealed class RegistryProviderTests
     }
 
     [Fact]
+    public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
+    {
+        // Arrange
+        var provider = new RegistryProvider();
+
+        // Act
+        var result = FindAnyLegacyProviderFiles(provider);
+
+        // Assert
+        Assert.NotEmpty(result);
+
+        Assert.All(result,
+            path =>
+            {
+                var extension = Path.GetExtension(path).ToLower();
+                Assert.NotEqual(".sys", extension);
+            });
+    }
+
+    [Fact]
     public void GetMessageFilesForLegacyProvider_WhenCalledWithLogger_ShouldLogTrace()
     {
         // Arrange
@@ -72,26 +92,6 @@ public sealed class RegistryProviderTests
 
         // Assert
         Assert.NotNull(result);
-    }
-
-    [Fact]
-    public void GetMessageFilesForLegacyProvider_WhenCalled_ShouldNotIncludeSysFiles()
-    {
-        // Arrange
-        var provider = new RegistryProvider();
-
-        // Act
-        var result = FindAnyLegacyProviderFiles(provider);
-
-        // Assert
-        Assert.NotEmpty(result);
-
-        Assert.All(result,
-            path =>
-            {
-                var extension = Path.GetExtension(path).ToLower();
-                Assert.NotEqual(".sys", extension);
-            });
     }
 
     [Theory]

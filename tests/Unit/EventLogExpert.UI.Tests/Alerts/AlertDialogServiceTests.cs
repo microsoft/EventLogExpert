@@ -98,6 +98,31 @@ public sealed class ModalAlertDialogServiceTests
     }
 
     [Fact]
+    public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
+    {
+        // Arrange — capture that MainThread invocation happens before the routing decision runs.
+        var broker = Substitute.For<IInlineAlertHostBroker>();
+        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+
+        var mainThread = Substitute.For<IMainThreadService>();
+        mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
+            .Returns(call => ((Func<Task>)call[0])());
+
+        var sut = new AlertDialogService(
+            broker,
+            mainThread,
+            Substitute.For<IBannerService>(),
+            _ => Task.FromResult(true),
+            _ => Task.FromResult(string.Empty));
+
+        // Act
+        await sut.ShowAlert("t", "m", "c");
+
+        // Assert
+        await mainThread.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
+    }
+
+    [Fact]
     public async Task ShowAlertOneButton_BannerPresentation_DoesNotMarshalThroughMainThreadService()
     {
         // Arrange — banner-routed alerts skip the UI-thread marshal because the banner service is thread-safe.
@@ -381,31 +406,6 @@ public sealed class ModalAlertDialogServiceTests
 
         // Assert
         Assert.False(result);
-    }
-
-    [Fact]
-    public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
-    {
-        // Arrange — capture that MainThread invocation happens before the routing decision runs.
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
-
-        var mainThread = Substitute.For<IMainThreadService>();
-        mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
-            .Returns(call => ((Func<Task>)call[0])());
-
-        var sut = new AlertDialogService(
-            broker,
-            mainThread,
-            Substitute.For<IBannerService>(),
-            _ => Task.FromResult(true),
-            _ => Task.FromResult(string.Empty));
-
-        // Act
-        await sut.ShowAlert("t", "m", "c");
-
-        // Assert
-        await mainThread.Received(1).InvokeOnMainThreadAsync(Arg.Any<Func<Task>>());
     }
 
     [Fact]

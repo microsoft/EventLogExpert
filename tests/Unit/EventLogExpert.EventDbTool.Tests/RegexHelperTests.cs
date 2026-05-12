@@ -24,6 +24,22 @@ public sealed class RegexHelperTests
     }
 
     [Fact]
+    public void TryCreate_WhenPatternIsInvalid_ReturnsFalseLogsErrorAndYieldsNullRegex()
+    {
+        // Arrange — unbalanced character class is a parse-time ArgumentException.
+        var logger = Substitute.For<ITraceLogger>();
+
+        // Act
+        var success = RegexHelper.TryCreate("[unclosed", logger, out var regex);
+
+        // Assert
+        Assert.False(success);
+        Assert.Null(regex);
+        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
+            h.ToString().Contains("Invalid --filter regex") && h.ToString().Contains("[unclosed")));
+    }
+
+    [Fact]
     public void TryCreate_WhenPatternIsNull_ReturnsTrueAndNoRegex()
     {
         // Arrange
@@ -36,23 +52,6 @@ public sealed class RegexHelperTests
         Assert.True(success);
         Assert.Null(regex);
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
-    }
-
-    [Fact]
-    public void TryCreate_WhenPatternIsValid_ReturnsTrueAndCaseInsensitiveRegex()
-    {
-        // Arrange
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        var success = RegexHelper.TryCreate("microsoft-windows-.*", logger, out var regex);
-
-        // Assert — case insensitivity is contractual: provider names like "Microsoft-Windows-AAD" must match.
-        Assert.True(success);
-        Assert.NotNull(regex);
-        Assert.Matches(regex, "Microsoft-Windows-AAD");
-        Assert.Matches(regex, "MICROSOFT-WINDOWS-FOO");
-        Assert.DoesNotMatch(regex, "OpenSSH");
     }
 
     [Fact]
@@ -72,18 +71,19 @@ public sealed class RegexHelperTests
     }
 
     [Fact]
-    public void TryCreate_WhenPatternIsInvalid_ReturnsFalseLogsErrorAndYieldsNullRegex()
+    public void TryCreate_WhenPatternIsValid_ReturnsTrueAndCaseInsensitiveRegex()
     {
-        // Arrange — unbalanced character class is a parse-time ArgumentException.
+        // Arrange
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        var success = RegexHelper.TryCreate("[unclosed", logger, out var regex);
+        var success = RegexHelper.TryCreate("microsoft-windows-.*", logger, out var regex);
 
-        // Assert
-        Assert.False(success);
-        Assert.Null(regex);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Invalid --filter regex") && h.ToString().Contains("[unclosed")));
+        // Assert — case insensitivity is contractual: provider names like "Microsoft-Windows-AAD" must match.
+        Assert.True(success);
+        Assert.NotNull(regex);
+        Assert.Matches(regex, "Microsoft-Windows-AAD");
+        Assert.Matches(regex, "MICROSOFT-WINDOWS-FOO");
+        Assert.DoesNotMatch(regex, "OpenSSH");
     }
 }
