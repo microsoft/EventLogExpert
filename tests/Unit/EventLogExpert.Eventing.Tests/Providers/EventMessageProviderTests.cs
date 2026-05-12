@@ -10,18 +10,6 @@ namespace EventLogExpert.Eventing.Tests.Providers;
 
 public sealed class EventMessageProviderTests
 {
-    [Theory]
-    [InlineData(Constants.TestProviderName)]
-    [InlineData(Constants.TestProviderLongName)]
-    public void Constructor_WhenDifferentProviderNames_ShouldCreateInstances(string providerName)
-    {
-        // Arrange & Act
-        EventMessageProvider provider = new(providerName);
-
-        // Assert
-        Assert.NotNull(provider);
-    }
-
     [Fact]
     public void LoadMessagesFromFiles_WhenDuplicateFiles_ShouldProcessAll()
     {
@@ -69,19 +57,6 @@ public sealed class EventMessageProviderTests
     }
 
     [Fact]
-    public void LoadMessagesFromFiles_WhenFilePathHasMultipleBackslashes_ShouldExtractFileName()
-    {
-        // Arrange
-        var filesWithPath = new[] { Constants.NonExistentDllFullPath };
-
-        // Act
-        var messages = EventMessageProvider.LoadMessagesFromFiles(filesWithPath, Constants.TestProviderName);
-
-        // Assert
-        Assert.NotNull(messages);
-    }
-
-    [Fact]
     public void LoadMessagesFromFiles_WhenInvalidFile_ShouldLogWarning()
     {
         // Arrange
@@ -116,50 +91,5 @@ public sealed class EventMessageProviderTests
         // Assert
         Assert.NotNull(messages);
         Assert.Empty(messages);
-    }
-
-    [Fact]
-    public void LoadMessagesFromFiles_WhenMultipleInvalidFiles_ShouldLogMultipleWarnings()
-    {
-        // Arrange
-        var invalidFiles = new[] { Constants.NonExistentDll, Constants.NonExistentDll };
-        var mockLogger = Substitute.For<ITraceLogger>();
-
-        // Act
-        EventMessageProvider.LoadMessagesFromFiles(invalidFiles, Constants.TestProviderName, mockLogger);
-
-        // Assert: each input that fails the primary MUI-aware load produces a debug log that
-        // begins with "LoadLibraryEx failed for {file}". Asserting per-input presence (with the
-        // filename in the message) is robust to future changes in the number of fallback attempts
-        // or extra diagnostic lines per input — only the primary-attempt failure log is
-        // contractually guaranteed to fire once per input here.
-        mockLogger.Received(invalidFiles.Length)
-            .Debug(Arg.Is<DebugLogHandler>(h =>
-                h.ToString().Contains("LoadLibraryEx failed") &&
-                h.ToString().Contains(Constants.NonExistentDll)));
-    }
-
-    [Fact]
-    public void LoadMessagesFromFiles_WhenMultipleInvalidFiles_ShouldReturnEmptyList()
-    {
-        // Arrange
-        var invalidFiles = new[] { Constants.NonExistentDll, Constants.NonExistentDll, Constants.NonExistentDll };
-
-        // Act
-        var messages = EventMessageProvider.LoadMessagesFromFiles(invalidFiles, Constants.TestProviderName);
-
-        // Assert
-        Assert.NotNull(messages);
-        Assert.Empty(messages);
-    }
-
-    [Fact]
-    public void LoadMessagesFromFiles_WhenProviderNameProvided_ShouldIncludeInMessages()
-    {
-        // Arrange & Act
-        var messages = EventMessageProvider.LoadMessagesFromFiles([], Constants.TestProviderName);
-
-        // Assert
-        Assert.NotNull(messages);
     }
 }

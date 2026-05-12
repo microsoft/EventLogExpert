@@ -81,11 +81,11 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
         // Arrange
         var component = Render<SettingsUpgradeProgressBanner>();
         var instance = component.Instance;
-
-        // Act + Assert
-        instance.Dispose();
         instance.Dispose();
 
+        // Act + Assert - second Dispose must not throw
+        var exception = Record.Exception(() => instance.Dispose());
+        Assert.Null(exception);
     }
 
     [Fact]

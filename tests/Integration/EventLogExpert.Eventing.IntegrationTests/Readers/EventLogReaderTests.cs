@@ -10,16 +10,6 @@ namespace EventLogExpert.Eventing.IntegrationTests.Readers;
 public sealed class EventLogReaderTests
 {
     [Fact]
-    public void Constructor_WhenApplicationLog_ShouldNotThrow()
-    {
-        // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-
-        // Assert
-        Assert.NotNull(reader);
-    }
-
-    [Fact]
     public void Constructor_WhenEmptyLogName_ShouldFailToReadEvents()
     {
         // Arrange & Act
@@ -51,19 +41,6 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void Constructor_WhenMultipleInstances_ShouldCreateIndependentReaders()
-    {
-        // Arrange & Act
-        using var reader1 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-        using var reader2 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-
-        // Assert
-        Assert.NotNull(reader1);
-        Assert.NotNull(reader2);
-        Assert.NotSame(reader1, reader2);
-    }
-
-    [Fact]
     public void Constructor_WhenNullLogName_ShouldFailToReadEvents()
     {
         // Arrange & Act
@@ -91,21 +68,13 @@ public sealed class EventLogReaderTests
         Assert.All(events, evt => Assert.Equal(LogPathType.Channel, evt.LogPathType));
     }
 
-    [Fact]
-    public void Constructor_WhenRenderXmlFalse_ShouldNotThrow()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Constructor_WhenRenderXml_ShouldNotThrow(bool renderXml)
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: false);
-
-        // Assert
-        Assert.NotNull(reader);
-    }
-
-    [Fact]
-    public void Constructor_WhenRenderXmlTrue_ShouldNotThrow()
-    {
-        // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: renderXml);
 
         // Assert
         Assert.NotNull(reader);
@@ -150,16 +119,6 @@ public sealed class EventLogReaderTests
         // Act & Assert
         reader.Dispose();
         reader.Dispose();
-        reader.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_WhenCalled_ShouldNotThrow()
-    {
-        // Arrange
-        var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-
-        // Act & Assert
         reader.Dispose();
     }
 

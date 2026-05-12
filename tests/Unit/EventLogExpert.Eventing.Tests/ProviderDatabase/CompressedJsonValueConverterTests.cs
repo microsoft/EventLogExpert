@@ -11,16 +11,6 @@ namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
 public sealed class CompressedJsonValueConverterTests
 {
     [Fact]
-    public void Constructor_ShouldCreateInstance()
-    {
-        // Act
-        var converter = new CompressedJsonValueConverter<CompressionTestData>();
-
-        // Assert
-        Assert.NotNull(converter);
-    }
-
-    [Fact]
     public void ConvertFromCompressedJson_WithEmptyCollection_ShouldReturnEmptyCollection()
     {
         // Arrange
