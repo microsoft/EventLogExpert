@@ -175,7 +175,7 @@ public sealed class Effects(
                 filterPaneState.FilteredDateRange,
                 filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
 
-        if (!FilterMethods.HasFilteringChanged(candidate, _eventLogState.Value.AppliedFilter))
+        if (!candidate.HasFilteringChangedFrom(_eventLogState.Value.AppliedFilter))
         {
             return;
         }

@@ -22,7 +22,7 @@ public readonly record struct EventFilter
 
     public ImmutableList<SavedFilter> Filters { get; }
 
-    /// <summary>Construction-time snapshot used by <see cref="FilterMethods.HasFilteringChanged" />.</summary>
+    /// <summary>Construction-time snapshot used by <see cref="EventFilterExtensions.HasFilteringChangedFrom" />.</summary>
     public ImmutableArray<FilterSnapshot> Snapshots { get; }
 
     /// <summary>
