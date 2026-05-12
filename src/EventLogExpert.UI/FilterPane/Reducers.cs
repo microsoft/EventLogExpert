@@ -73,10 +73,6 @@ public sealed class Reducers
         SetFilterDateRangeSuccessAction action) =>
         state with { FilteredDateRange = action.DateFilter };
 
-    [ReducerMethod]
-    public static FilterPaneState ReduceSetIsLoading(FilterPaneState state, SetIsLoadingAction action) =>
-        state.IsLoading == action.IsLoading ? state : state with { IsLoading = action.IsLoading };
-
     [ReducerMethod(typeof(ToggleFilterDateAction))]
     public static FilterPaneState ReduceToggleFilterDate(FilterPaneState state)
     {

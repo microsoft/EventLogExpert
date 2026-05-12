@@ -15,6 +15,4 @@ public sealed record FilterPaneState
     public DateFilter? FilteredDateRange { get; init; }
 
     public bool IsEnabled { get; init; } = true;
-
-    public bool IsLoading { get; init; }
 }

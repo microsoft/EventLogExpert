@@ -42,14 +42,6 @@ public sealed class FilterPaneStateTests
 
         Assert.Null(state.FilteredDateRange);
     }
-
-    [Fact]
-    public void FilterPaneState_DefaultState_ShouldNotBeLoading()
-    {
-        var state = new FilterPaneState();
-
-        Assert.False(state.IsLoading);
-    }
 }
 
 public sealed class FilterPaneActionTests
@@ -122,15 +114,6 @@ public sealed class FilterPaneActionTests
         var action = new SetFilterDateRangeSuccessAction(dateModel);
 
         Assert.Equal(dateModel, action.DateFilter);
-    }
-
-    [Fact]
-    public void SetIsLoadingAction_ShouldCreateAction()
-    {
-        var action = new SetIsLoadingAction(true);
-
-        Assert.NotNull(action);
-        Assert.True(action.IsLoading);
     }
 
     [Fact]
@@ -373,40 +356,6 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
-    {
-        var state = new FilterPaneState();
-
-        var dateModel = new DateFilter
-        {
-            After = DateTime.UtcNow.AddDays(-1),
-            Before = DateTime.UtcNow
-        };
-
-        var action = new SetFilterDateRangeSuccessAction(dateModel);
-
-        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        Assert.NotNull(result.FilteredDateRange);
-        Assert.Equal(dateModel, result.FilteredDateRange);
-    }
-
-    [Fact]
-    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
-    {
-        var state = new FilterPaneState
-        {
-            FilteredDateRange = new DateFilter { After = DateTime.UtcNow }
-        };
-
-        var action = new SetFilterDateRangeSuccessAction(null);
-
-        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
-
-        Assert.Null(result.FilteredDateRange);
-    }
-
-    [Fact]
     public void ReduceSetFilter_ShouldReplaceFilter()
     {
         var originalFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
@@ -480,23 +429,37 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceSetIsLoading_ShouldSetValue()
+    public void ReduceSetFilterDateRangeSuccess_ShouldSetDateRange()
     {
-        var state = new FilterPaneState { IsLoading = false };
+        var state = new FilterPaneState();
 
-        var result = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
+        var dateModel = new DateFilter
+        {
+            After = DateTime.UtcNow.AddDays(-1),
+            Before = DateTime.UtcNow
+        };
 
-        Assert.True(result.IsLoading);
+        var action = new SetFilterDateRangeSuccessAction(dateModel);
+
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        Assert.NotNull(result.FilteredDateRange);
+        Assert.Equal(dateModel, result.FilteredDateRange);
     }
 
     [Fact]
-    public void ReduceSetIsLoading_WhenValueUnchanged_ShouldReturnSameState()
+    public void ReduceSetFilterDateRangeSuccess_WithNull_ShouldSetNullDateRange()
     {
-        var state = new FilterPaneState { IsLoading = true };
+        var state = new FilterPaneState
+        {
+            FilteredDateRange = new DateFilter { After = DateTime.UtcNow }
+        };
 
-        var result = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
+        var action = new SetFilterDateRangeSuccessAction(null);
 
-        Assert.Same(state, result);
+        var result = Reducers.ReduceSetFilterDateRangeSuccess(state, action);
+
+        Assert.Null(result.FilteredDateRange);
     }
 
     [Fact]
@@ -595,8 +558,7 @@ public sealed class FilterPaneIntegrationTests
                 FilterUtils.CreateTestFilter(Constants.FilterIdEquals200)
             ],
             FilteredDateRange = new DateFilter { After = DateTime.UtcNow },
-            IsEnabled = false,
-            IsLoading = true
+            IsEnabled = false
         };
 
         state = Reducers.ReduceClearFilters(state);
@@ -604,7 +566,6 @@ public sealed class FilterPaneIntegrationTests
         Assert.Empty(state.Filters);
         Assert.Null(state.FilteredDateRange);
         Assert.False(state.IsEnabled);
-        Assert.False(state.IsLoading);
     }
 
     [Fact]
@@ -740,23 +701,5 @@ public sealed class FilterPaneIntegrationTests
         Assert.Single(state.Filters);
         Assert.Equal(Constants.FilterIdEquals200, state.Filters[0].ComparisonText);
         Assert.False(state.Filters[0].IsEnabled);
-    }
-
-    [Fact]
-    public void ToggleOperations_ShouldAllWorkIndependently()
-    {
-        var state = new FilterPaneState
-        {
-            IsEnabled = false,
-            IsLoading = false
-        };
-
-        state = Reducers.ReduceToggleIsEnabled(state);
-        Assert.True(state.IsEnabled);
-        Assert.False(state.IsLoading);
-
-        state = Reducers.ReduceSetIsLoading(state, new SetIsLoadingAction(true));
-        Assert.True(state.IsEnabled);
-        Assert.True(state.IsLoading);
     }
 }
