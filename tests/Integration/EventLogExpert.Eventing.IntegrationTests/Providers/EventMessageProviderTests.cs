@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.TestUtils.Constants;
 using NSubstitute;
 
-namespace EventLogExpert.Eventing.Tests.Providers;
+namespace EventLogExpert.Eventing.IntegrationTests.Providers;
 
 public sealed class EventMessageProviderTests
 {
