@@ -11,7 +11,7 @@ namespace EventLogExpert.UI.Tests.Filter;
 public sealed class EventFilterExtensionsTests
 {
     [Fact]
-    public void HasFilteringChanged_WhenBothEmpty_ShouldReturnFalse()
+    public void HasFilteringChanged_WhenBothEmpty_ShouldReportNoChange()
     {
         // Arrange
         var original = new EventFilter(null, []);
@@ -25,7 +25,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReportChange()
     {
         // SavedFilter is now immutable, so structural change is the only signal HasFilteringChanged
         // needs to detect. (Pre-immutability this test guarded against in-place Comparison mutation.)
@@ -43,7 +43,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenComparisonValueDiffers_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenComparisonValueDiffers_ShouldReportChange()
     {
         // Arrange
         var original = new EventFilter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
@@ -57,7 +57,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterAdded_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenDateFilterAdded_ShouldReportChange()
     {
         // Arrange
         var original = new EventFilter(null, []);
@@ -72,7 +72,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterDifferent_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenDateFilterRangeChanges_ShouldReportChange()
     {
         // Arrange
         var dateFilter1 = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
@@ -88,7 +88,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterRemoved_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenDateFilterRemoved_ShouldReportChange()
     {
         // Arrange
         var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
@@ -103,7 +103,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReturnFalse()
+    public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReportNoChange()
     {
         // Arrange - separately allocated FilterModels and ImmutableLists with the same Value/IsExcluded.
         // Reproduces the bug where ImmutableList<T>.Equals (reference equality) caused this to return true.
@@ -123,7 +123,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenFiltersAdded_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenFiltersAdded_ShouldReportChange()
     {
         // Arrange
         var original = new EventFilter(null, []);
@@ -138,7 +138,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenFiltersRemoved_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenFiltersRemoved_ShouldReportChange()
     {
         // Arrange
         var filter = CreateFilter(Constants.FilterIdEquals100);
@@ -153,7 +153,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenIsExcludedDiffers_ShouldReturnTrue()
+    public void HasFilteringChanged_WhenIsExcludedDiffers_ShouldReportChange()
     {
         // Arrange
         var original = new EventFilter(
@@ -172,7 +172,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReturnFalse()
+    public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReportNoChange()
     {
         // Color affects highlighting, not the filtered event set.
         var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Red);
@@ -189,7 +189,24 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenSameFilters_ShouldReturnFalse()
+    public void HasFilteringChanged_WhenOnlyDateFilterIsEnabledToggles_ShouldReportChange()
+    {
+        // Arrange - pins record value-equality on DateFilter: toggling IsEnabled with identical After/Before is a structural change because IsEnabled participates in the auto-generated record Equals.
+        var bounds = (After: DateTime.Now.AddDays(-1), Before: DateTime.Now);
+        var enabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = true };
+        var disabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = false };
+        var original = new EventFilter(enabled, []);
+        var updated = new EventFilter(disabled, []);
+
+        // Act
+        var result = updated.HasFilteringChangedFrom(original);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void HasFilteringChanged_WhenSameFilters_ShouldReportNoChange()
     {
         // Arrange
         var filters = ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100));
@@ -204,7 +221,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void IsFilteringEnabled_WhenBothDateFilterAndFiltersExist_ShouldReturnTrue()
+    public void IsFilteringEnabled_WhenBothDateFilterAndFiltersExist_ShouldBeEnabled()
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
@@ -219,7 +236,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void IsFilteringEnabled_WhenDateFilterDisabled_ShouldReturnFalse()
+    public void IsFilteringEnabled_WhenDateFilterDisabledAndNoFilters_ShouldBeDisabled()
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
@@ -233,7 +250,22 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void IsFilteringEnabled_WhenDateFilterEnabled_ShouldReturnTrue()
+    public void IsFilteringEnabled_WhenDateFilterDisabledButFiltersExist_ShouldBeEnabled()
+    {
+        // Arrange - pins the OR-semantics in IsFilteringEnabled: an `||` -> `&&` regression would silently disable filtering when the date filter is toggled off.
+        var dateFilter = new DateFilter { IsEnabled = false };
+        var filter = CreateFilter(Constants.FilterIdEquals100);
+        var eventFilter = new EventFilter(dateFilter, [filter]);
+
+        // Act
+        var result = eventFilter.IsFilteringEnabled;
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void IsFilteringEnabled_WhenDateFilterEnabled_ShouldBeEnabled()
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
@@ -247,7 +279,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void IsFilteringEnabled_WhenFiltersExist_ShouldReturnTrue()
+    public void IsFilteringEnabled_WhenNoDateFilterAndFiltersExist_ShouldBeEnabled()
     {
         // Arrange
         var filter = CreateFilter(Constants.FilterIdEquals100);
@@ -261,7 +293,7 @@ public sealed class EventFilterExtensionsTests
     }
 
     [Fact]
-    public void IsFilteringEnabled_WhenNoDateFilterAndNoFilters_ShouldReturnFalse()
+    public void IsFilteringEnabled_WhenNoDateFilterAndNoFilters_ShouldBeDisabled()
     {
         // Arrange
         var eventFilter = new EventFilter(null, []);
