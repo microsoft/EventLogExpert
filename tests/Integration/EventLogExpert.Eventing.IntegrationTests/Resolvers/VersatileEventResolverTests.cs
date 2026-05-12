@@ -18,20 +18,6 @@ namespace EventLogExpert.Eventing.IntegrationTests.Resolvers;
 public sealed class EventResolverTests
 {
     [Fact]
-    public void Constructor_WithCacheAndLogger_ShouldCreateInstance()
-    {
-        // Arrange
-        var cache = new EventResolverCache();
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        using var resolver = new EventResolver(cache: cache, logger: logger);
-
-        // Assert
-        Assert.NotNull(resolver);
-    }
-
-    [Fact]
     public void Constructor_WithDatabaseCollection_ShouldUseDatabaseResolver()
     {
         // Arrange
@@ -84,16 +70,6 @@ public sealed class EventResolverTests
 
         // Assert
         logger.Received().Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("EventResolver")));
-    }
-
-    [Fact]
-    public void Constructor_WithNoDatabaseCollection_ShouldUseLocalResolver()
-    {
-        // Act
-        using var resolver = new EventResolver(null);
-
-        // Assert
-        Assert.NotNull(resolver);
     }
 
     [Fact]

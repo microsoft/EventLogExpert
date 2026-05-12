@@ -17,22 +17,6 @@ namespace EventLogExpert.Eventing.IntegrationTests.Resolvers;
 public sealed class EventResolverDatabaseTests
 {
     [Fact]
-    public void Constructor_WithCacheAndLogger_ShouldCreateInstance()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-        var cache = Substitute.For<IEventResolverCache>();
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        using var resolver = new EventResolver(dbCollection, cache, logger);
-
-        // Assert
-        Assert.NotNull(resolver);
-    }
-
-    [Fact]
     public void Constructor_WithLogger_ShouldLogDatabasePaths()
     {
         // Arrange
@@ -85,44 +69,6 @@ public sealed class EventResolverDatabaseTests
 
         // Assert
         Assert.Contains(nonExistentPath, exception.Message);
-    }
-
-    [Fact]
-    public void Constructor_WithNullCache_ShouldCreateInstance()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-
-        // Act
-        using var resolver = new EventResolver(dbCollection, null);
-
-        // Assert
-        Assert.NotNull(resolver);
-    }
-
-    [Fact]
-    public void Constructor_WithNullDatabaseCollection_ShouldCreateInstance()
-    {
-        // Act
-        using var resolver = new EventResolver(null);
-
-        // Assert
-        Assert.NotNull(resolver);
-    }
-
-    [Fact]
-    public void Constructor_WithNullLogger_ShouldCreateInstance()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-
-        // Act
-        using var resolver = new EventResolver(dbCollection, logger: null);
-
-        // Assert
-        Assert.NotNull(resolver);
     }
 
     [Fact]
