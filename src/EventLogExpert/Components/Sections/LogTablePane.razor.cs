@@ -41,6 +41,7 @@ public sealed partial class LogTablePane
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private ImmutableList<SavedFilter> _filters = [];
+    private SavedFilter[] _activeHighlightFilters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
@@ -189,6 +190,7 @@ public sealed partial class LogTablePane
         _selectedEvents = SelectedEvents.Value;
         _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         _filters = FilterPaneState.Value.Filters;
+        _activeHighlightFilters = BuildActiveHighlightFilters(_filters);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         WarnOnUnknownFilterColors(_filters);
@@ -243,6 +245,7 @@ public sealed partial class LogTablePane
         if (filtersChanged)
         {
             _filters = currentFilters;
+            _activeHighlightFilters = BuildActiveHighlightFilters(_filters);
             _highlightCache.Clear();
             WarnOnUnknownFilterColors(_filters);
         }
@@ -457,15 +460,9 @@ public sealed partial class LogTablePane
 
         string? color = null;
 
-        // Preserve existing semantics: first matching enabled+included filter
-        // wins (even if its Color is None, which suppresses any later match).
-        foreach (var filter in _filters)
+        foreach (var filter in _activeHighlightFilters)
         {
-            if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
-
-            if (filter.Compiled is null || !filter.Compiled.Predicate(@event)) { continue; }
-
-            if (!Enum.IsDefined(filter.Color)) { continue; }
+            if (!filter.Compiled!.Predicate(@event)) { continue; }
 
             color = filter.Color.ToCssName();
             break;
@@ -961,6 +958,26 @@ public sealed partial class LogTablePane
 
             return 0;
         }
+    }
+
+    private static SavedFilter[] BuildActiveHighlightFilters(ImmutableList<SavedFilter> filters)
+    {
+        if (filters.IsEmpty) { return []; }
+
+        var candidates = new List<SavedFilter>(filters.Count);
+
+        foreach (var filter in filters)
+        {
+            if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
+
+            if (filter.Compiled is null) { continue; }
+
+            if (!Enum.IsDefined(filter.Color)) { continue; }
+
+            candidates.Add(filter);
+        }
+
+        return candidates.Count == 0 ? [] : candidates.ToArray();
     }
 
     private void WarnOnUnknownFilterColors(IEnumerable<SavedFilter> filters)
