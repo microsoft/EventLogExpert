@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,8 +11,13 @@ namespace EventLogExpert.UI.Filter;
 /// <summary>
 ///     Reads and writes <see cref="SavedFilter" /> JSON. Accepts both the legacy persisted shape (
 ///     <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b }</c>) and the new shape (
-///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "FilterType": "Advanced", "BasicFilter": ... }</c>).
+///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ... }</c>).
 ///     Always writes the new shape.
+///     <para>
+///         Legacy <c>FilterType</c> Property is still read (locally) so that historical persisted Advanced/Cached filters
+///         that happened to carry a stale BasicFilter blob still drop it during load. Newly written JSON omits
+///         <c>FilterType</c> entirely; the presence of <c>BasicFilter</c> is the structural marker post-L1.
+///     </para>
 ///     <para>
 ///         When a persisted <c>ComparisonText</c> fails to compile, the loaded filter retains the text and
 ///         <see cref="SavedFilter.IsExcluded" /> but has <c>Compiled == null</c> and <c>IsEnabled == false</c> so it is
@@ -20,6 +26,8 @@ namespace EventLogExpert.UI.Filter;
 /// </summary>
 internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 {
+    private enum LegacyFilterType { Basic, Advanced, Cached }
+
     public override SavedFilter Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.StartObject)
@@ -31,9 +39,9 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
         string? comparisonText = null;
         string? legacyComparisonValue = null;
         bool isExcluded = false;
-        FilterType filterType = FilterType.Advanced;
+        LegacyFilterType legacyFilterType = LegacyFilterType.Advanced;
+        bool legacyFilterTypeSeen = false;
         BasicFilter? basicFilter = null;
-        bool filterTypeSeen = false;
 
         while (reader.Read())
         {
@@ -66,8 +74,8 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
                     isExcluded = reader.GetBoolean();
                     break;
                 case "FilterType":
-                    filterType = ReadFilterType(ref reader);
-                    filterTypeSeen = true;
+                    legacyFilterType = ReadLegacyFilterType(ref reader);
+                    legacyFilterTypeSeen = true;
                     break;
                 case "BasicFilter":
                     basicFilter = reader.TokenType == JsonTokenType.Null
@@ -83,25 +91,21 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         string text = comparisonText ?? legacyComparisonValue ?? string.Empty;
 
-        if (!filterTypeSeen && string.IsNullOrEmpty(comparisonText) && legacyComparisonValue is not null)
+        // Stale BasicFilter drop: legacy Advanced/Cached payloads occasionally carried a leftover BasicFilter
+        // blob. Honour the historical intent and discard it so the post-L1 invariant (BasicFilter != null
+        // implies the filter is structured) is preserved on load.
+        if (legacyFilterTypeSeen && legacyFilterType != LegacyFilterType.Basic && basicFilter is not null)
         {
-            // Legacy persistence had no FilterType field; preserve the historical default.
-            filterType = FilterType.Advanced;
+            basicFilter = null;
         }
 
-        if (filterType == FilterType.Basic && basicFilter is null)
+        // Inverse: legacy Basic with a missing BasicFilter is a corrupt persisted record. Surface a trace and
+        // keep the raw text so the user can repair it.
+        if (legacyFilterTypeSeen && legacyFilterType == LegacyFilterType.Basic && basicFilter is null)
         {
             Trace.TraceWarning(
-                "SavedFilterJsonConverter: persisted Basic filter has no BasicFilter; degrading to Advanced. Text='{0}'",
+                "SavedFilterJsonConverter: persisted Basic filter has no BasicFilter; loading as raw expression. Text='{0}'",
                 text);
-
-            filterType = FilterType.Advanced;
-        }
-
-        if (filterType != FilterType.Basic)
-        {
-            // BasicFilter is only meaningful for Basic filters; drop any stale value.
-            basicFilter = null;
         }
 
         CompiledFilter? compiled = null;
@@ -123,7 +127,6 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
             ComparisonText = text,
             Compiled = compiled,
             BasicFilter = basicFilter,
-            FilterType = filterType,
             IsEnabled = !compileFailed && compiled is not null,
             IsExcluded = isExcluded
         };
@@ -135,9 +138,8 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
         writer.WriteNumber("Color", (int)value.Color);
         writer.WriteString("ComparisonText", value.ComparisonText);
         writer.WriteBoolean("IsExcluded", value.IsExcluded);
-        writer.WriteString("FilterType", value.FilterType.ToString());
 
-        if (value.FilterType == FilterType.Basic && value.BasicFilter is not null)
+        if (value.BasicFilter is not null)
         {
             writer.WritePropertyName("BasicFilter");
             JsonSerializer.Serialize(writer, value.BasicFilter, options);
@@ -146,12 +148,12 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
         writer.WriteEndObject();
     }
 
-    private static FilterType ReadFilterType(ref Utf8JsonReader reader) =>
+    private static LegacyFilterType ReadLegacyFilterType(ref Utf8JsonReader reader) =>
         reader.TokenType switch
         {
-            JsonTokenType.String when Enum.TryParse<FilterType>(reader.GetString(), out var parsed) => parsed,
-            JsonTokenType.Number => (FilterType)reader.GetInt32(),
-            _ => FilterType.Advanced
+            JsonTokenType.String when Enum.TryParse<LegacyFilterType>(reader.GetString(), out var parsed) => parsed,
+            JsonTokenType.Number => (LegacyFilterType)reader.GetInt32(),
+            _ => LegacyFilterType.Advanced
         };
 
     private static HighlightColor ReadHighlightColor(ref Utf8JsonReader reader) =>

@@ -32,14 +32,14 @@ public sealed partial class FilterGroupRow : EditableFilterRowBase
         if (compiled is null) { return null; }
 
         // FilterGroupRow only edits the raw expression text, so any structured BasicFilter hydrated from
-        // the saved value is stale once the user edits the text. Force Advanced + null BasicFilter unless
-        // the text is unchanged from the saved value.
-        if (Value is { FilterType: FilterType.Basic } savedFilter &&
+        // the saved value is stale once the user edits the text. Force null BasicFilter unless the text is
+        // unchanged from the saved value.
+        if (Value is { BasicFilter: not null } savedFilter &&
             string.Equals(savedFilter.ComparisonText, draft.ComparisonText, StringComparison.Ordinal))
         {
-            return compiled;
+            return compiled with { BasicFilter = savedFilter.BasicFilter };
         }
 
-        return compiled with { FilterType = FilterType.Advanced, BasicFilter = null };
+        return compiled with { BasicFilter = null };
     }
 }

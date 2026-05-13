@@ -38,7 +38,6 @@ public sealed partial class FilterRow : EditableFilterRowBase
         {
             var model = SavedFilter.TryCreate(
                 comparisonString,
-                FilterType.Basic,
                 basicFilter,
                 draft.Color,
                 draft.IsExcluded,

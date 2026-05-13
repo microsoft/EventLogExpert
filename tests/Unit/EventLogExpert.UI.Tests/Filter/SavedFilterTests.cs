@@ -17,42 +17,23 @@ public sealed class FilterModelTests
     }
 
     [Fact]
-    public void JsonRoundTrip_AdvancedWithBasicFilter_DropsStaleBasicFilter()
-    {
-        const string staleSource =
-            $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "FilterType": "Advanced",
-              "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
-            }
-            """;
-
-        var restored = JsonSerializer.Deserialize<SavedFilter>(staleSource);
-        Assert.NotNull(restored);
-
-        Assert.Equal(FilterType.Advanced, restored.FilterType);
-        Assert.Null(restored.BasicFilter);
-    }
-
-    [Fact]
     public void JsonRoundTrip_BasicShape_PreservesBasicFilter()
     {
         var basicFilter = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Level,
-                Evaluator = FilterEvaluator.Equals,
+                Property = EventProperty.Level,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
                 Value = "Error"
             },
             [
                 new SubFilter(
-                    new FilterCondition
+                    new BasicFilterCondition
                     {
-                        Category = FilterCategory.Source,
-                        Evaluator = FilterEvaluator.Contains,
+                        Property = EventProperty.Source,
+                        Operator = ComparisonOperator.Contains,
+                        MatchMode = MatchMode.Single,
                         Value = "Kernel"
                     },
                     JoinWithAny: true)
@@ -60,37 +41,21 @@ public sealed class FilterModelTests
 
         var original = SavedFilter.TryCreate(
             Constants.FilterIdEquals100,
-            FilterType.Basic,
-            basicFilter);
+            basicFilter: basicFilter);
         Assert.NotNull(original);
 
         string json = JsonSerializer.Serialize(original);
+        Assert.DoesNotContain("FilterType", json);
+
         var restored = JsonSerializer.Deserialize<SavedFilter>(json);
         Assert.NotNull(restored);
 
-        Assert.Equal(FilterType.Basic, restored.FilterType);
         Assert.NotNull(restored.BasicFilter);
-        Assert.Equal(FilterCategory.Level, restored.BasicFilter.Comparison.Category);
+        Assert.Equal(EventProperty.Level, restored.BasicFilter.Comparison.Property);
         Assert.Equal("Error", restored.BasicFilter.Comparison.Value);
         Assert.Single(restored.BasicFilter.SubFilters);
         Assert.True(restored.BasicFilter.SubFilters[0].JoinWithAny);
-        Assert.Equal(FilterCategory.Source, restored.BasicFilter.SubFilters[0].Data.Category);
-    }
-
-    [Fact]
-    public void JsonRoundTrip_BasicWithoutBasicFilter_DegradesToAdvanced()
-    {
-        const string brokenBasic =
-            $$"""
-            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
-            """;
-
-        var restored = JsonSerializer.Deserialize<SavedFilter>(brokenBasic);
-        Assert.NotNull(restored);
-
-        Assert.Equal(FilterType.Advanced, restored.FilterType);
-        Assert.Null(restored.BasicFilter);
-        Assert.NotNull(restored.Compiled);
+        Assert.Equal(EventProperty.Source, restored.BasicFilter.SubFilters[0].Data.Property);
     }
 
     [Fact]
@@ -98,7 +63,7 @@ public sealed class FilterModelTests
     {
         const string brokenJson =
             """
-            { "Color": 0, "ComparisonText": "Id ===== ###", "IsExcluded": false, "FilterType": "Advanced" }
+            { "Color": 0, "ComparisonText": "Id ===== ###", "IsExcluded": false }
             """;
 
         var restored = JsonSerializer.Deserialize<SavedFilter>(brokenJson);
@@ -124,7 +89,7 @@ public sealed class FilterModelTests
     [Fact]
     public void JsonRoundTrip_LegacyShape_LoadsAsAdvancedAndCompiles()
     {
-        // Legacy persistence format (pre-13d): "Comparison": { "Value": "..." }, no FilterType, no BasicFilter.
+        // Legacy persistence format (pre-13d): "Comparison": { "Value": "..." }, no BasicFilter.
         const string legacyJson =
             $$"""
             { "Color": 2, "Comparison": { "Value": "{{Constants.FilterIdEquals100}}" }, "IsExcluded": true }
@@ -137,7 +102,6 @@ public sealed class FilterModelTests
         Assert.NotNull(model.Compiled);
         Assert.True(model.IsExcluded);
         Assert.True(model.IsEnabled);
-        Assert.Equal(FilterType.Advanced, model.FilterType);
         Assert.Null(model.BasicFilter);
     }
 
@@ -155,22 +119,61 @@ public sealed class FilterModelTests
     }
 
     [Fact]
+    public void JsonRoundTrip_LegacyAdvancedWithBasicFilter_DropsStaleBasicFilter()
+    {
+        // Pre-L1 persistence: legacy "FilterType":"Advanced" entries with a stale BasicFilter blob.
+        // The reader must drop that blob so the filter doesn't reappear as Basic on load.
+        const string staleSource =
+            $$"""
+            {
+              "Color": 0,
+              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "IsExcluded": false,
+              "FilterType": "Advanced",
+              "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
+            }
+            """;
+
+        var restored = JsonSerializer.Deserialize<SavedFilter>(staleSource);
+        Assert.NotNull(restored);
+
+        Assert.Null(restored.BasicFilter);
+    }
+
+    [Fact]
+    public void JsonRoundTrip_LegacyBasicWithoutBasicFilter_KeepsRawText()
+    {
+        // Pre-L1 persistence: legacy "FilterType":"Basic" entries that lost the BasicFilter blob.
+        // The reader must keep the raw ComparisonText so the user can still see/edit the expression.
+        const string brokenBasic =
+            $$"""
+            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
+            """;
+
+        var restored = JsonSerializer.Deserialize<SavedFilter>(brokenBasic);
+        Assert.NotNull(restored);
+
+        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.Null(restored.BasicFilter);
+    }
+
+    [Fact]
     public void JsonRoundTrip_NewShape_PersistsAndRestoresAllFields()
     {
         var original = SavedFilter.TryCreate(
             Constants.FilterIdEquals100,
-            FilterType.Cached,
             color: HighlightColor.Blue,
             isExcluded: true);
         Assert.NotNull(original);
 
         string json = JsonSerializer.Serialize(original);
+        Assert.DoesNotContain("FilterType", json);
+
         var restored = JsonSerializer.Deserialize<SavedFilter>(json);
         Assert.NotNull(restored);
 
         Assert.Equal(original.ComparisonText, restored.ComparisonText);
         Assert.Equal(original.Color, restored.Color);
-        Assert.Equal(original.FilterType, restored.FilterType);
         Assert.Equal(original.IsExcluded, restored.IsExcluded);
         Assert.NotNull(restored.Compiled);
     }
@@ -180,22 +183,26 @@ public sealed class FilterModelTests
     {
         var id = FilterId.Create();
         var basicFilter = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             []);
 
         var model = SavedFilter.TryCreate(
             Constants.FilterIdEquals100,
-            FilterType.Basic,
-            basicFilter,
-            HighlightColor.Red,
+            basicFilter: basicFilter,
+            color: HighlightColor.Red,
             isExcluded: true,
             isEnabled: true,
-            id);
+            id: id);
 
         Assert.NotNull(model);
         Assert.Equal(id, model.Id);
         Assert.Equal(HighlightColor.Red, model.Color);
-        Assert.Equal(FilterType.Basic, model.FilterType);
         Assert.Same(basicFilter, model.BasicFilter);
         Assert.True(model.IsEnabled);
         Assert.True(model.IsExcluded);

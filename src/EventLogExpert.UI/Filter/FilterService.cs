@@ -2,10 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering;
 using EventLogExpert.UI.EventLog;
-using System.Linq.Dynamic.Core;
 using System.Runtime.ExceptionServices;
-using System.Text;
 
 namespace EventLogExpert.UI.Filter;
 
@@ -81,75 +80,21 @@ public sealed class FilterService : IFilterService
             .AsReadOnly();
     }
 
-    public bool TryParse(BasicFilter basicFilter, out string comparison)
-    {
-        ArgumentNullException.ThrowIfNull(basicFilter);
-
-        comparison = string.Empty;
-
-        if (!TryFormatCondition(basicFilter.Comparison, null, out var comparisonText))
-        {
-            return false;
-        }
-
-        StringBuilder stringBuilder = new(comparisonText);
-
-        foreach (var subFilter in basicFilter.SubFilters)
-        {
-            var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
-
-            if (TryFormatCondition(subFilter.Data, joinPrefix, out var subText))
-            {
-                stringBuilder.AppendLine(subText);
-            }
-        }
-
-        comparison = stringBuilder.ToString();
-
-        return true;
-    }
+    public bool TryParse(BasicFilter basicFilter, out string comparison) =>
+        BasicFilterFormatter.TryFormat(basicFilter, out comparison);
 
     public bool TryParseExpression(string? expression, out string error)
     {
-        error = string.Empty;
-
-        if (string.IsNullOrEmpty(expression)) { return false; }
-
-        try
+        if (FilterCompiler.IsValid(expression, out var compileError))
         {
-            _ = Enumerable.Empty<ResolvedEvent>().AsQueryable()
-                .Where(ParsingConfig.Default, expression);
+            error = string.Empty;
 
             return true;
         }
-        catch (Exception ex)
-        {
-            error = ex.Message;
 
-            return false;
-        }
-    }
+        error = compileError;
 
-    private static string EscapeStringLiteral(string? value)
-    {
-        if (string.IsNullOrEmpty(value)) { return string.Empty; }
-
-        var builder = new StringBuilder(value.Length);
-
-        foreach (var character in value)
-        {
-            switch (character)
-            {
-                case '\\': builder.Append("\\\\"); break;
-                case '"': builder.Append("\\\""); break;
-                case '\r': builder.Append("\\r"); break;
-                case '\n': builder.Append("\\n"); break;
-                case '\t': builder.Append("\\t"); break;
-                default: builder.Append(character); break;
-            }
-        }
-
-        return builder.ToString();
+        return false;
     }
 
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(
@@ -160,44 +105,6 @@ public sealed class FilterService : IFilterService
                 e.MatchesFilters(eventFilter.Filters))
             .ToList()
             .AsReadOnly();
-
-    private static string GetComparisonString(FilterCategory type, FilterEvaluator evaluator) =>
-        evaluator switch
-        {
-            FilterEvaluator.Equals => type switch
-            {
-                FilterCategory.Keywords => $"{type}.Any(e => string.Equals(e, ",
-                FilterCategory.UserId => $"{type} != null && {type}.Value == ",
-                _ => $"{type} == "
-            },
-            FilterEvaluator.Contains => type switch
-            {
-                FilterCategory.Id or FilterCategory.ActivityId => $"{type}.ToString().Contains",
-                FilterCategory.Keywords => $"{type}.Any(e => e.Contains",
-                FilterCategory.UserId => $"{type} != null && {type}.Value.Contains",
-                _ => $"{type}.Contains"
-            },
-            FilterEvaluator.NotEqual => type switch
-            {
-                FilterCategory.Keywords => $"!{type}.Any(e => string.Equals(e, ",
-                FilterCategory.UserId => $"{type} != null && {type}.Value != ",
-                _ => $"{type} != ",
-            },
-            FilterEvaluator.NotContains => type switch
-            {
-                FilterCategory.Id or FilterCategory.ActivityId => $"!{type}.ToString().Contains",
-                FilterCategory.Keywords => $"!{type}.Any(e => e.Contains",
-                FilterCategory.UserId => $"{type} != null && !{type}.Value.Contains",
-                _ => $"!{type}.Contains"
-            },
-            FilterEvaluator.MultiSelect => type switch
-            {
-                FilterCategory.Id or FilterCategory.Level => $"{type}.ToString())",
-                FilterCategory.Keywords => $"{type}.Any",
-                _ => $"{type})"
-            },
-            _ => string.Empty
-        };
 
     private static bool ShouldParallelizeAcrossLogs(IReadOnlyList<EventLogData> logs)
     {
@@ -220,74 +127,6 @@ public sealed class FilterService : IFilterService
         }
 
         return false;
-    }
-
-    private static bool TryFormatCondition(FilterCondition condition, string? joinPrefix, out string formatted)
-    {
-        formatted = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(condition.Value) &&
-            condition.Evaluator != FilterEvaluator.MultiSelect) { return false; }
-
-        if (condition.Values.Count <= 0 &&
-            condition.Evaluator == FilterEvaluator.MultiSelect) { return false; }
-
-        StringBuilder stringBuilder = new(joinPrefix ?? string.Empty);
-
-        if (condition.Evaluator != FilterEvaluator.MultiSelect ||
-            condition.Category is FilterCategory.Keywords)
-        {
-            stringBuilder.Append(GetComparisonString(condition.Category, condition.Evaluator));
-        }
-
-        switch (condition.Evaluator)
-        {
-            case FilterEvaluator.Equals:
-            case FilterEvaluator.NotEqual:
-                if (condition.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(condition.Value)}\"");
-                }
-
-                break;
-            case FilterEvaluator.Contains:
-            case FilterEvaluator.NotContains:
-                if (condition.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase)");
-                }
-
-                break;
-            case FilterEvaluator.MultiSelect:
-                if (condition.Category is FilterCategory.Keywords)
-                {
-                    stringBuilder.Append($"(e => (new[] {{\"{string.Join("\", \"", condition.Values.Select(EscapeStringLiteral))}\"}}).Contains(e))");
-                }
-                else
-                {
-                    stringBuilder.Append($"(new[] {{\"{string.Join("\", \"", condition.Values.Select(EscapeStringLiteral))}\"}}).Contains(");
-                }
-
-                break;
-            default: return false;
-        }
-
-        if (condition is { Evaluator: FilterEvaluator.MultiSelect, Category: not FilterCategory.Keywords })
-        {
-            stringBuilder.Append(GetComparisonString(condition.Category, condition.Evaluator));
-        }
-
-        formatted = stringBuilder.ToString();
-
-        return true;
     }
 
     private Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> BuildSequentialResult(

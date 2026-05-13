@@ -63,7 +63,7 @@ public sealed partial class FilterGroup
         base.OnParametersSet();
     }
 
-    private void AddFilter() => _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Advanced });
+    private void AddFilter() => _pendingDrafts.Add(new FilterDraft());
 
     private async Task ApplyFilters()
     {

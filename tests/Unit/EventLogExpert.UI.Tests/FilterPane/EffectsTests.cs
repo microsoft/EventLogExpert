@@ -60,10 +60,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -72,14 +72,17 @@ public sealed class EffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
+            x.Filter == Constants.FilterIdEquals100));
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
+        var filterModel = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -219,10 +222,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterIsCached_ShouldNotAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Cached);
+        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -231,14 +234,17 @@ public sealed class EffectsTests
         await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterAction>(x =>
+            x.Filter == Constants.FilterIdEquals100));
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterIsNotCached_ShouldAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, FilterType.Advanced);
+        var filterModel = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -627,6 +633,17 @@ public sealed class EffectsTests
 
         return (effects, mockDispatcher);
     }
+
+    private static BasicFilter CreateBasicFilter() =>
+        new(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = Constants.FilterValue100
+            },
+            []);
 
     private static ImmutableList<SavedFilter> CreateSingleEnabledFilters() =>
         ImmutableList.Create(

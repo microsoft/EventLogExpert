@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
+using EventLogExpert.Filtering;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.Filter;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
@@ -35,7 +35,8 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     private IReadOnlyList<DebugLogEntry> _entries = [];
     private int _filteredEntryCount;
     private bool _hasLoaded;
-    private FilterEvaluator _levelOperator = FilterEvaluator.Equals;
+    private MatchMode _levelMatchMode = MatchMode.Single;
+    private ComparisonOperator _levelOperator = ComparisonOperator.Equals;
     private CancellationTokenSource? _loadCts;
     private int _loadGeneration;
     private List<LogLevel> _multiLevels = [];
@@ -111,7 +112,7 @@ public sealed partial class DebugLogModal : ModalBase<bool>
     }
 
     private IReadOnlyList<LogLevel> BuildLevelsForProjection() =>
-        _levelOperator == FilterEvaluator.MultiSelect
+        _levelMatchMode == MatchMode.Many
             ? _multiLevels
             : _singleLevel.HasValue ? [_singleLevel.Value] : [];
 
@@ -185,9 +186,10 @@ public sealed partial class DebugLogModal : ModalBase<bool>
         }
     }
 
-    private void HandleLevelOperatorChanged(FilterEvaluator op)
+    private void HandleLevelChoiceChanged((ComparisonOperator Op, MatchMode Mode) value)
     {
-        _levelOperator = op;
+        _levelOperator = value.Op;
+        _levelMatchMode = value.Mode;
         SyncPendingStringFilter();
         ApplyProjection();
     }

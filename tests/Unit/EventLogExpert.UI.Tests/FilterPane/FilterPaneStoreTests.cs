@@ -179,15 +179,15 @@ public sealed class FilterPaneReducerTests
     }
 
     [Fact]
-    public void ReduceApplyFilterGroup_PreservesBasicFilterAndFilterType()
+    public void ReduceApplyFilterGroup_PreservesBasicFilter()
     {
-        // Saved-to-group "re-edit as Basic" path: applying a Basic group filter must keep BasicFilter
-        // and FilterType so the row reopens as Basic, not collapsed to Advanced.
+        // Saved-to-group "re-edit as Basic" path: applying a Basic group filter must keep BasicFilter.
         var basicFilter = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Id,
-                Evaluator = FilterEvaluator.Equals,
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
                 Value = "100"
             },
             []);
@@ -200,7 +200,6 @@ public sealed class FilterPaneReducerTests
             [
                 FilterUtils.CreateTestFilter(
                     Constants.FilterIdEquals100,
-                    filterType: FilterType.Basic,
                     basicFilter: basicFilter)
             ]
         };
@@ -210,7 +209,6 @@ public sealed class FilterPaneReducerTests
             new ApplyFilterGroupAction(filterGroup));
 
         Assert.Single(result.Filters);
-        Assert.Equal(FilterType.Basic, result.Filters[0].FilterType);
         Assert.Equal(basicFilter, result.Filters[0].BasicFilter);
         Assert.True(result.Filters[0].IsEnabled);
     }

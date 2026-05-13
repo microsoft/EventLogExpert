@@ -1,49 +1,55 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
+
 namespace EventLogExpert.UI.Filter;
 
 /// <summary>
-///     Mutable editor mirror of <see cref="FilterCondition" /> used by the Basic-filter UI. Exists because Blazor two-way
-///     binding requires get/set properties; the immutable <see cref="FilterCondition" /> is materialized via
-///     <see cref="ToCondition" /> on save.
+///     Mutable editor mirror of <see cref="BasicFilterCondition" /> used by the Basic-filter UI. Exists because Blazor
+///     two-way binding requires get/set properties; the immutable <see cref="BasicFilterCondition" /> is materialized
+///     via <see cref="ToCondition" /> on save.
 /// </summary>
 public sealed class FilterConditionDraft
 {
-    public FilterCategory Category { get; set; }
+    public EventProperty Property { get; set; }
 
-    public FilterEvaluator Evaluator { get; set; }
+    public ComparisonOperator Operator { get; set; }
+
+    public MatchMode MatchMode { get; set; }
 
     public string? Value { get; set; }
 
     public List<string> Values { get; set; } = [];
 
-    public static FilterConditionDraft FromCondition(FilterCondition condition) =>
+    public static FilterConditionDraft FromCondition(BasicFilterCondition condition) =>
         new()
         {
-            Category = condition.Category,
-            Evaluator = condition.Evaluator,
+            Property = condition.Property,
+            Operator = condition.Operator,
+            MatchMode = condition.MatchMode,
             Value = condition.Value,
             Values = [.. condition.Values]
         };
 
     /// <summary>
-    ///     Mutates the draft to switch to <paramref name="category" />, clearing <see cref="Value" /> and
-    ///     <see cref="Values" /> because the available value space differs across categories. Mirrors the intent of
-    ///     <see cref="FilterCondition.WithCategory" /> on the immutable side.
+    ///     Mutates the draft to switch to <paramref name="property" />, clearing <see cref="Value" /> and
+    ///     <see cref="Values" /> because the available value space differs across properties. Mirrors the intent of
+    ///     <see cref="BasicFilterCondition.WithProperty" /> on the immutable side.
     /// </summary>
-    public void ChangeCategory(FilterCategory category)
+    public void ChangeProperty(EventProperty property)
     {
-        Category = category;
+        Property = property;
         Value = null;
         Values.Clear();
     }
 
-    public FilterCondition ToCondition() =>
+    public BasicFilterCondition ToCondition() =>
         new()
         {
-            Category = Category,
-            Evaluator = Evaluator,
+            Property = Property,
+            Operator = Operator,
+            MatchMode = MatchMode,
             Value = Value,
             Values = [.. Values]
         };

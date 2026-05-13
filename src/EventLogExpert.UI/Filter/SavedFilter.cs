@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
 using System.Text.Json.Serialization;
 
 namespace EventLogExpert.UI.Filter;
@@ -33,11 +34,9 @@ public sealed record SavedFilter
 
     /// <summary>
     ///     Structured form of Basic filters; persisted so re-edit reopens the original comparison + sub-filter structure.
-    ///     <c>null</c> for Advanced and Cached filters.
+    ///     <c>null</c> for filters that were authored as raw expressions.
     /// </summary>
     public BasicFilter? BasicFilter { get; init; }
-
-    public FilterType FilterType { get; init; } = FilterType.Advanced;
 
     [JsonIgnore]
     public bool IsEnabled { get; init; }
@@ -46,11 +45,11 @@ public sealed record SavedFilter
 
     /// <summary>
     ///     Compiles <paramref name="comparisonText" /> and returns a populated <see cref="SavedFilter" />, or <c>null</c>
-    ///     if the expression fails to parse.
+    ///     if the expression fails to parse. <paramref name="basicFilter" /> is retained for round-trip re-edit of
+    ///     structured filters; pass <c>null</c> for raw advanced/cached expressions.
     /// </summary>
     public static SavedFilter? TryCreate(
         string comparisonText,
-        FilterType filterType = FilterType.Advanced,
         BasicFilter? basicFilter = null,
         HighlightColor color = HighlightColor.None,
         bool isExcluded = false,
@@ -66,7 +65,6 @@ public sealed record SavedFilter
             ComparisonText = comparisonText,
             Compiled = compiled,
             BasicFilter = basicFilter,
-            FilterType = filterType,
             IsEnabled = isEnabled,
             IsExcluded = isExcluded
         };

@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
+
 namespace EventLogExpert.UI.Filter;
 
 public sealed class FilterDraft
@@ -11,9 +13,14 @@ public sealed class FilterDraft
 
     public string ComparisonText { get; set; } = string.Empty;
 
-    public FilterType FilterType { get; set; } = FilterType.Advanced;
-
     public FilterId Id { get; init; } = FilterId.Create();
+
+    /// <summary>
+    ///     Marks this draft as a Basic-row edit (structured Property/Operator/Value editor). Defaults to <c>false</c>
+    ///     (Advanced — free-form expression text). The flag drives only the editor surface; the saved filter is
+    ///     identified post-L1 by the presence of <see cref="SavedFilter.BasicFilter" />.
+    /// </summary>
+    public bool IsBasic { get; set; }
 
     public bool IsEnabled { get; set; }
 
@@ -28,14 +35,14 @@ public sealed class FilterDraft
     /// </summary>
     public static FilterDraft FromSavedFilter(SavedFilter filter)
     {
-        var basicFilter = filter.FilterType == FilterType.Basic ? filter.BasicFilter : null;
+        var basicFilter = filter.BasicFilter;
 
         return new FilterDraft
         {
             Id = filter.Id,
             Color = filter.Color,
             ComparisonText = filter.ComparisonText,
-            FilterType = filter.FilterType,
+            IsBasic = basicFilter is not null,
             IsEnabled = filter.IsEnabled,
             IsExcluded = filter.IsExcluded,
             Comparison = basicFilter is null

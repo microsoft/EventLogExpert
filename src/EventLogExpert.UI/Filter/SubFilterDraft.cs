@@ -1,6 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
+
 namespace EventLogExpert.UI.Filter;
 
 public sealed class SubFilterDraft

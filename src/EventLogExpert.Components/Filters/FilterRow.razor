@@ -22,7 +22,7 @@
                 <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
             }
 
-            <FilterCategoryEditor CategoryAriaLabelledBy="@($"{Id}_IsExcluded")" Condition="filter.Comparison" Id="@Id" />
+            <BasicFilterConditionEditor Condition="filter.Comparison" Id="@Id" PropertyAriaLabelledBy="@($"{Id}_IsExcluded")" />
         }
     </EditingContent>
     <ExtraEditingButtons>

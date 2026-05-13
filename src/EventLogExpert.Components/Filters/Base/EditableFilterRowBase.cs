@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering;
 using EventLogExpert.UI.Filter;
 using Microsoft.AspNetCore.Components;
 using IDispatcher = Fluxor.IDispatcher;
@@ -172,7 +173,8 @@ public abstract class EditableFilterRowBase : FilterRowBase<SavedFilter?>
     /// <summary>
     ///     Validates the draft and produces the immutable <see cref="SavedFilter" /> to dispatch. Returning
     ///     <see langword="null" /> aborts the save (subclass surfaces the error). Default enforces non-empty text and compiles
-    ///     via <see cref="FilterCompiler.TryCompile" />.
+    ///     via <see cref="FilterCompiler.TryCompile" />. Default produces a raw-text filter with no
+    ///     <see cref="SavedFilter.BasicFilter" />; the Basic-row subclass overrides to attach structured content.
     /// </summary>
     protected virtual ValueTask<SavedFilter?> TrySaveAsync(FilterDraft draft)
     {
@@ -196,8 +198,7 @@ public abstract class EditableFilterRowBase : FilterRowBase<SavedFilter?>
             Color = draft.Color,
             ComparisonText = draft.ComparisonText,
             Compiled = compiled,
-            BasicFilter = draft.FilterType == FilterType.Basic ? draft.ToBasicFilter() : null,
-            FilterType = draft.FilterType,
+            BasicFilter = null,
             IsEnabled = true,
             IsExcluded = draft.IsExcluded
         };

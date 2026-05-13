@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Filtering;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
@@ -201,7 +202,7 @@ public sealed partial class LogTablePane
 
     protected override bool ShouldRender()
     {
-        // Snapshot once so the short-circuit check and the field assignment
+        // Snapshot once so the short-circuit check and the Property assignment
         // below see the same reference even if Fluxor publishes a new state
         // mid-method.
         var currentFilters = FilterPaneState.Value.Filters;
@@ -226,7 +227,7 @@ public sealed partial class LogTablePane
             _selectedEvents = SelectedEvents.Value;
             // Reference equality is intentional. Even though ResolvedEvent is
             // now a fully immutable record (no mutating ResolveXml() workaround),
-            // value-equality requires hashing every string field on every selection
+            // value-equality requires hashing every string Property on every selection
             // mutation. Reference equality keeps selection bookkeeping O(1) and
             // also avoids any chance that two distinct event instances that happen
             // to be value-equal would collapse into a single selected row.
@@ -295,25 +296,26 @@ public sealed partial class LogTablePane
         return null;
     }
 
-    private void ApplySelectedFilter(ResolvedEvent selectedEvent, FilterCategory category, bool exclude)
+    private void ApplySelectedFilter(ResolvedEvent selectedEvent, EventProperty property, bool exclude)
     {
-        string filterValue = category switch
+        string filterValue = property switch
         {
-            FilterCategory.Id => selectedEvent.Id.ToString(),
-            FilterCategory.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
-            FilterCategory.Level => selectedEvent.Level,
-            FilterCategory.Keywords => selectedEvent.KeywordsDisplayName,
-            FilterCategory.Source => selectedEvent.Source,
-            FilterCategory.TaskCategory => selectedEvent.TaskCategory,
+            EventProperty.Id => selectedEvent.Id.ToString(),
+            EventProperty.ActivityId => selectedEvent.ActivityId?.ToString() ?? string.Empty,
+            EventProperty.Level => selectedEvent.Level,
+            EventProperty.Keywords => selectedEvent.KeywordsDisplayName,
+            EventProperty.Source => selectedEvent.Source,
+            EventProperty.TaskCategory => selectedEvent.TaskCategory,
             _ => string.Empty,
         };
 
         var basicFilter = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = category,
+                Property = property,
                 Value = filterValue,
-                Evaluator = FilterEvaluator.Equals,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
             },
             []);
 
@@ -321,7 +323,6 @@ public sealed partial class LogTablePane
 
         var filter = SavedFilter.TryCreate(
             comparisonString,
-            FilterType.Basic,
             basicFilter,
             isExcluded: exclude,
             isEnabled: true);
@@ -917,23 +918,23 @@ public sealed partial class LogTablePane
                 Dispatcher.Dispatch(new SetFilterDateRangeAction(
                     new DateFilter { After = selectedEvent.TimeCreated }))),
             MenuItem.Separator(),
-            MenuItem.SubMenu("Include", ShowFilterCategoryItems(selectedEvent, exclude: false)),
-            MenuItem.SubMenu("Exclude", ShowFilterCategoryItems(selectedEvent, exclude: true)),
+            MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, exclude: false)),
+            MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, exclude: true)),
         ];
     }
 
-    private IReadOnlyList<MenuItem> ShowFilterCategoryItems(ResolvedEvent selectedEvent, bool exclude)
+    private IReadOnlyList<MenuItem> ShowEventFieldItems(ResolvedEvent selectedEvent, bool exclude)
     {
         var items = new List<MenuItem>();
 
-        foreach (FilterCategory category in Enum.GetValues<FilterCategory>())
+        foreach (EventProperty property in Enum.GetValues<EventProperty>())
         {
-            if (category is FilterCategory.Description or FilterCategory.Xml) { continue; }
+            if (property is EventProperty.Description or EventProperty.Xml) { continue; }
 
-            var capturedCategory = category;
+            var capturedProperty = property;
             items.Add(MenuItem.Item(
-                category.ToFullString(),
-                () => ApplySelectedFilter(selectedEvent, capturedCategory, exclude)));
+                property.ToFullString(),
+                () => ApplySelectedFilter(selectedEvent, capturedProperty, exclude)));
         }
 
         return items;

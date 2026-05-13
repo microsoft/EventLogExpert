@@ -15,17 +15,12 @@
     <ChildContent>
         <div aria-label="Filters" class="debug-log-filter-bar" role="group">
             <label>Level</label>
-            <ValueSelect AriaLabel="Level operator"
-                CssClass="input filter-dropdown"
-                T="FilterEvaluator"
-                ToStringFunc="@(x => x.ToFullString())"
-                Value="_levelOperator"
-                ValueChanged="HandleLevelOperatorChanged">
-                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.Equals" />
-                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.NotEqual" />
-                <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.MultiSelect" />
-            </ValueSelect>
-            @if (_levelOperator == FilterEvaluator.MultiSelect)
+            <ComparisonOperatorSelect AriaLabel="Level operator"
+                MatchMode="_levelMatchMode"
+                OnChanged="HandleLevelChoiceChanged"
+                Operator="_levelOperator"
+                SupportsMany="true" />
+            @if (_levelMatchMode == MatchMode.Many)
             {
                 <ValueSelect AriaLabel="Levels"
                     CssClass="input filter-dropdown debug-log-level-multi"

@@ -13,17 +13,17 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
         var basicFilter = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Id,
-                Evaluator = FilterEvaluator.MultiSelect,
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
                 Values = [Constants.FilterValue100, Constants.FilterValue1000]
             },
             []);
 
         var original = FilterUtils.CreateTestFilter(
             comparisonValue: Constants.FilterIdEquals100,
-            filterType: FilterType.Basic,
             basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
@@ -40,19 +40,21 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_HydratesComparisonAndSubFiltersFromBasicFilter()
     {
         var basicFilter = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Id,
-                Evaluator = FilterEvaluator.Equals,
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
                 Value = Constants.FilterValue100,
                 Values = [Constants.FilterValue100, Constants.FilterValue1000]
             },
             [
                 new SubFilter(
-                    new FilterCondition
+                    new BasicFilterCondition
                     {
-                        Category = FilterCategory.Level,
-                        Evaluator = FilterEvaluator.Equals,
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
                     JoinWithAny: true)
@@ -60,18 +62,17 @@ public sealed class FilterDraftModelTests
 
         var original = FilterUtils.CreateTestFilter(
             comparisonValue: Constants.FilterIdEquals100,
-            filterType: FilterType.Basic,
             basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
 
-        Assert.Equal(FilterCategory.Id, draft.Comparison.Category);
+        Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Equal(Constants.FilterValue100, draft.Comparison.Value);
         Assert.Equal(2, draft.Comparison.Values.Count);
 
         Assert.Single(draft.SubFilters);
         Assert.True(draft.SubFilters[0].JoinWithAny);
-        Assert.Equal(FilterCategory.Level, draft.SubFilters[0].Condition.Category);
+        Assert.Equal(EventProperty.Level, draft.SubFilters[0].Condition.Property);
         Assert.Equal("Error", draft.SubFilters[0].Condition.Value);
     }
 
@@ -88,16 +89,26 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_PreservesScalarFields()
     {
+        var basicFilter = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = Constants.FilterValue100
+            },
+            []);
+
         var original = FilterUtils.CreateTestFilter(
             color: HighlightColor.Blue,
-            filterType: FilterType.Basic,
+            basicFilter: basicFilter,
             isEnabled: true,
             isExcluded: true);
 
         var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(HighlightColor.Blue, draft.Color);
-        Assert.Equal(FilterType.Basic, draft.FilterType);
+        Assert.True(draft.IsBasic);
         Assert.True(draft.IsEnabled);
         Assert.True(draft.IsExcluded);
         Assert.Equal(Constants.FilterIdEquals100, draft.ComparisonText);
@@ -106,13 +117,13 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
     {
-        // Advanced filters and legacy basic filters lacking BasicFilter simply expose the
-        // raw ComparisonText for re-edit without populating the structured draft inputs.
+        // Advanced filters expose raw ComparisonText without populating structured draft inputs.
         var original = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals100);
 
         var draft = FilterDraft.FromSavedFilter(original);
 
-        Assert.Equal(FilterCategory.Id, draft.Comparison.Category);
+        Assert.False(draft.IsBasic);
+        Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Null(draft.Comparison.Value);
         Assert.Empty(draft.Comparison.Values);
         Assert.Empty(draft.SubFilters);
@@ -125,8 +136,9 @@ public sealed class FilterDraftModelTests
         var draft = FilterUtils.CreateTestFilterDraft(
             comparison: new FilterConditionDraft
             {
-                Category = FilterCategory.Level,
-                Evaluator = FilterEvaluator.MultiSelect,
+                Property = EventProperty.Level,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
                 Values = ["Error"]
             });
 
@@ -144,8 +156,9 @@ public sealed class FilterDraftModelTests
         var draft = FilterUtils.CreateTestFilterDraft(
             comparison: new FilterConditionDraft
             {
-                Category = FilterCategory.Id,
-                Evaluator = FilterEvaluator.Equals,
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
                 Value = Constants.FilterValue100
             },
             subFilters:
@@ -154,8 +167,9 @@ public sealed class FilterDraftModelTests
                 {
                     Condition = new FilterConditionDraft
                     {
-                        Category = FilterCategory.Level,
-                        Evaluator = FilterEvaluator.Equals,
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
                     JoinWithAny = true
@@ -164,11 +178,11 @@ public sealed class FilterDraftModelTests
 
         var source = draft.ToBasicFilter();
 
-        Assert.Equal(FilterCategory.Id, source.Comparison.Category);
+        Assert.Equal(EventProperty.Id, source.Comparison.Property);
         Assert.Equal(Constants.FilterValue100, source.Comparison.Value);
         Assert.Single(source.SubFilters);
         Assert.True(source.SubFilters[0].JoinWithAny);
-        Assert.Equal(FilterCategory.Level, source.SubFilters[0].Data.Category);
+        Assert.Equal(EventProperty.Level, source.SubFilters[0].Data.Property);
         Assert.Equal("Error", source.SubFilters[0].Data.Value);
     }
 }

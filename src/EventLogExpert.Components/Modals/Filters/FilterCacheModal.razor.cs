@@ -74,7 +74,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 
     private async Task AddFilter(string filter)
     {
-        var model = SavedFilter.TryCreate(filter, FilterType.Cached, isEnabled: true);
+        var model = SavedFilter.TryCreate(filter, isEnabled: true);
 
         if (model is null)
         {

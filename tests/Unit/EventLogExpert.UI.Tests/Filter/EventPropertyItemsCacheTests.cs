@@ -11,11 +11,11 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.Filter;
 
-public sealed class FilterCategoryItemsCacheTests : IDisposable
+public sealed class EventPropertyItemsCacheTests : IDisposable
 {
-    public FilterCategoryItemsCacheTests() => FilterCategoryItemsCache.Clear();
+    public EventPropertyItemsCacheTests() => EventPropertyItemsCache.Clear();
 
-    public void Dispose() => FilterCategoryItemsCache.Clear();
+    public void Dispose() => EventPropertyItemsCache.Clear();
 
     [Fact]
     public void GetItems_DifferentSnapshot_RecomputesValues()
@@ -28,25 +28,25 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
             Constants.LogNameLog2,
             new EventLogData(Constants.LogNameLog2, LogPathType.Channel, [EventUtils.CreateTestEvent(id: 200)]));
 
-        var idsA = FilterCategoryItemsCache.GetItems(snapshotA, FilterCategory.Id);
-        var idsB = FilterCategoryItemsCache.GetItems(snapshotB, FilterCategory.Id);
+        var idsA = EventPropertyItemsCache.GetItems(snapshotA, EventProperty.Id);
+        var idsB = EventPropertyItemsCache.GetItems(snapshotB, EventProperty.Id);
 
         Assert.Equal(["100"], idsA);
         Assert.Equal(["100", "200"], idsB);
     }
 
     [Fact]
-    public void GetItems_LevelCategory_ReturnsAllSeverityLevelNames()
+    public void GetItems_LevelField_ReturnsAllSeverityLevelNames()
     {
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty;
 
-        var items = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Level);
+        var items = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Level);
 
         Assert.Equal(Enum.GetNames<SeverityLevel>(), items);
     }
 
     [Fact]
-    public void GetItems_LogDerivedCategory_ReturnsDistinctSortedValues()
+    public void GetItems_LogDerivedField_ReturnsDistinctSortedValues()
     {
         var events = new List<ResolvedEvent>
         {
@@ -59,15 +59,15 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var ids = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Id);
-        var sources = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Source);
+        var ids = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
+        var sources = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Source);
 
         Assert.Equal(["100", "200", "300"], ids);
         Assert.Equal(["Alpha", "Bravo", "Charlie"], sources);
     }
 
     [Fact]
-    public void GetItems_SameSnapshotAndCategory_ReturnsCachedInstance()
+    public void GetItems_SameSnapshotAndField_ReturnsCachedInstance()
     {
         var logData = new EventLogData(
             Constants.LogNameTestLog,
@@ -76,20 +76,20 @@ public sealed class FilterCategoryItemsCacheTests : IDisposable
 
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var first = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Id);
-        var second = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Id);
+        var first = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
+        var second = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
 
-        Assert.True(first == second, "ImmutableArray instance should be reused for the same snapshot/category.");
+        Assert.True(first == second, "ImmutableArray instance should be reused for the same snapshot/Property.");
     }
 
     [Fact]
-    public void GetItems_UnsupportedCategory_ReturnsEmpty()
+    public void GetItems_UnsupportedField_ReturnsEmpty()
     {
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(
             Constants.LogNameTestLog,
             new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent()]));
 
-        var items = FilterCategoryItemsCache.GetItems(activeLogs, FilterCategory.Description);
+        var items = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Description);
 
         Assert.Empty(items);
     }

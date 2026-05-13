@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.DebugLog;
@@ -10,7 +10,7 @@ public static class DebugLogProjection
 {
     public static (List<string> Lines, int MatchedEntryCount) Project(
         IReadOnlyList<DebugLogEntry> entries,
-        FilterEvaluator levelOperator,
+        ComparisonOperator levelOperator,
         IReadOnlyList<LogLevel> levels,
         string? textFilter)
     {
@@ -23,7 +23,7 @@ public static class DebugLogProjection
         IReadOnlyList<DebugLogEntry> entries,
         int startIndex,
         int endIndex,
-        FilterEvaluator levelOperator,
+        ComparisonOperator levelOperator,
         IReadOnlyList<LogLevel> levels,
         string? textFilter)
     {
@@ -76,12 +76,12 @@ public static class DebugLogProjection
         }
     }
 
-    private static bool MatchesLevel(DebugLogEntry entry, FilterEvaluator op, IReadOnlyList<LogLevel> levels)
+    private static bool MatchesLevel(DebugLogEntry entry, ComparisonOperator op, IReadOnlyList<LogLevel> levels)
     {
-        if (entry.Level is null) { return op == FilterEvaluator.NotEqual; }
+        if (entry.Level is null) { return op == ComparisonOperator.NotEqual; }
 
         var contains = levels.Contains(entry.Level.Value);
 
-        return op == FilterEvaluator.NotEqual ? !contains : contains;
+        return op == ComparisonOperator.NotEqual ? !contains : contains;
     }
 }

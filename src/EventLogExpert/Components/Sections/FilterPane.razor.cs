@@ -66,13 +66,13 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddAdvancedFilter()
     {
-        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Advanced });
+        _pendingDrafts.Add(new FilterDraft());
         _isFilterListVisible = true;
     }
 
     private void AddBasicFilter()
     {
-        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Basic });
+        _pendingDrafts.Add(new FilterDraft { IsBasic = true });
         _isFilterListVisible = true;
     }
 
@@ -93,7 +93,7 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddExclusion()
     {
-        _pendingDrafts.Add(new FilterDraft { FilterType = FilterType.Basic, IsExcluded = true });
+        _pendingDrafts.Add(new FilterDraft { IsBasic = true, IsExcluded = true });
         _isFilterListVisible = true;
     }
 

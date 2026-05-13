@@ -139,7 +139,7 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void EventLogData_GetCategoryValues_ForId_ShouldReturnDistinctIds()
+    public void EventLogData_GetEventValues_ForId_ShouldReturnDistinctIds()
     {
         // Arrange
         var events = new List<ResolvedEvent>
@@ -152,7 +152,7 @@ public sealed class EventLogStoreTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
 
         // Act
-        var values = logData.GetCategoryValues(FilterCategory.Id).ToList();
+        var values = logData.GetEventValues(EventProperty.Id).ToList();
 
         // Assert
         Assert.Equal(2, values.Count);
@@ -161,20 +161,20 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void EventLogData_GetCategoryValues_ForLevel_ShouldReturnAllSeverityLevels()
+    public void EventLogData_GetEventValues_ForLevel_ShouldReturnAllSeverityLevels()
     {
         // Arrange
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
 
         // Act
-        var values = logData.GetCategoryValues(FilterCategory.Level).ToList();
+        var values = logData.GetEventValues(EventProperty.Level).ToList();
 
         // Assert
         Assert.Equal(Enum.GetNames<SeverityLevel>().Length, values.Count);
     }
 
     [Fact]
-    public void EventLogData_GetCategoryValues_ForSource_ShouldReturnDistinctSources()
+    public void EventLogData_GetEventValues_ForSource_ShouldReturnDistinctSources()
     {
         // Arrange
         var events = new List<ResolvedEvent>
@@ -187,20 +187,20 @@ public sealed class EventLogStoreTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
 
         // Act
-        var values = logData.GetCategoryValues(FilterCategory.Source).ToList();
+        var values = logData.GetEventValues(EventProperty.Source).ToList();
 
         // Assert
         Assert.Equal(2, values.Count);
     }
 
     [Fact]
-    public void EventLogData_GetCategoryValues_ForUnknownCategory_ShouldReturnEmpty()
+    public void EventLogData_GetEventValues_ForUnknownField_ShouldReturnEmpty()
     {
         // Arrange
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent(100)]);
 
         // Act
-        var values = logData.GetCategoryValues((FilterCategory)999).ToList();
+        var values = logData.GetEventValues((EventProperty)999).ToList();
 
         // Assert
         Assert.Empty(values);
