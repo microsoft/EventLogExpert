@@ -35,7 +35,7 @@
         <div class="footer-group" inert="@HasInlineAlert">
             @if (ExtraFooterContent is not null)
             {
-                <div class="footer-extra">
+                <div class="footer-extra@(StackFooterExtra ? " footer-extra-stacked" : null)">
                     @ExtraFooterContent
                 </div>
             }

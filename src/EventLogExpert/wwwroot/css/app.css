@@ -162,16 +162,25 @@ html, body {
 
 .footer-group {
     display: flex;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     align-items: center;
     gap: 0.5rem;
 
     margin-top: .5rem;
 }
 
-    .footer-group.align-right { justify-content: flex-end; }
-
     .footer-group .footer-extra { flex: 1 1 auto; min-width: 0; }
+
+    /* Opt-in: force the extra slot onto its own full-width row so the action
+       buttons wrap to a second row beneath it. Used when the extra content is a
+       label/control pair that should align with the dialog body. */
+    .footer-group .footer-extra.footer-extra-stacked { flex: 0 0 100%; }
+
+    /* Preserve the "secondary actions on the left, primary on the right" split
+       used by FooterPreset.ImportExportClose. The non-final .button-group is
+       pushed left while the trailing primary button stays at flex-end. */
+    .footer-group > .button-group:not(:last-child) { margin-right: auto; }
 
 a { color: var(--clr-lightblue); }
 
