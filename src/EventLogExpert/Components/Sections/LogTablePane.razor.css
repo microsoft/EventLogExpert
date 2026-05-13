@@ -68,14 +68,54 @@ tr {
 /* Single rule applies any highlight color via the [data-highlight] palette
    defined in app.css. Bg/fg pair guarantees WCAG-compliant contrast.
    Specificity (.table-row[data-highlight] = 0,2,0) beats
-   tr:nth-child(odd) (0,1,1) without needing !important. */
+   tr:nth-child(odd) (0,1,1) without needing !important. The inset
+   box-shadow mirrors .selected's non-color cue so highlighted rows remain
+   distinguishable in forced-colors / high-contrast modes that strip bg/fg. */
 .table-row[data-highlight] {
     background-color: var(--hl-bg);
     color: var(--hl-fg);
+    box-shadow: inset 3px 0 0 var(--hl-fg);
 
     & span.error { color: var(--hl-fg); }
 
     & span.warning { color: var(--hl-fg); }
+}
+
+/* Selected + highlighted rows: stack both cues so neither state is lost.
+   Without this rule the [data-highlight] box-shadow would override
+   .selected's box-shadow (same specificity, later in source order). 0,3,0
+   beats both individual rules. */
+.table-row.selected[data-highlight] {
+    box-shadow:
+        inset 3px 0 0 var(--clr-statusbar),
+        inset 6px 0 0 var(--hl-fg);
+}
+
+/* When the user (typically Windows High Contrast) forces a system palette,
+   var(--hl-bg)/var(--hl-fg) are stripped. Map to the CSS system colors
+   reserved for marked text (Mark/MarkText, paired by spec). The
+   forced-color-adjust: none below is LOAD-BEARING: per css-color-adjust-1
+   §3.1, box-shadow computes to none in forced-colors mode whenever
+   forced-color-adjust is auto, regardless of color value. Removing it
+   silently erases the inset stripe — the very non-color cue this rule
+   exists to provide. */
+@media (forced-colors: active) {
+    .table-row[data-highlight] {
+        background-color: Mark;
+        color: MarkText;
+        box-shadow: inset 3px 0 0 MarkText;
+        forced-color-adjust: none;
+
+        & span.error { color: MarkText; }
+
+        & span.warning { color: MarkText; }
+    }
+
+    .table-row.selected[data-highlight] {
+        box-shadow:
+            inset 3px 0 0 Highlight,
+            inset 6px 0 0 MarkText;
+    }
 }
 
 .description { width: 100%; }
