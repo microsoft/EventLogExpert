@@ -67,7 +67,7 @@
         else
         {
             <div class="flex-align-center">
-                <div class="mx-2 color-box" data-highlight="@(filter.Color == HighlightColor.None ? null : filter.Color.ToString().ToLowerInvariant())"></div>
+                <div class="mx-2 color-box" data-highlight="@filter.Color.ToCssName()"></div>
 
                 @if (filter.IsExcluded)
                 {

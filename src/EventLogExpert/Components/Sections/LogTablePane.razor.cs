@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
@@ -24,11 +23,6 @@ namespace EventLogExpert.Components.Sections;
 public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
-
-    private static readonly Dictionary<HighlightColor, string?> s_highlightNames =
-        Enum.GetValues<HighlightColor>().ToDictionary(
-            color => color,
-            color => color == HighlightColor.None ? null : color.ToString().ToLowerInvariant());
 
     // Tracks HighlightColor enum values we've already warned about so the
     // warning is emitted at most once per unknown value across the app's
@@ -471,14 +465,9 @@ public sealed partial class LogTablePane
 
             if (filter.Compiled is null || !filter.Compiled.Predicate(@event)) { continue; }
 
-            // Skip filters whose Color is outside the defined HighlightColor
-            // range (e.g., from corrupted persisted state) so they don't
-            // suppress legitimate later matches. Unknown values are reported
-            // once when the filter set changes (see WarnOnUnknownFilterColors)
-            // rather than per-event from this hot path.
-            if (!s_highlightNames.TryGetValue(filter.Color, out var name)) { continue; }
+            if (!Enum.IsDefined(filter.Color)) { continue; }
 
-            color = name;
+            color = filter.Color.ToCssName();
             break;
         }
 
@@ -978,7 +967,7 @@ public sealed partial class LogTablePane
     {
         foreach (var filter in filters)
         {
-            if (s_highlightNames.ContainsKey(filter.Color)) { continue; }
+            if (Enum.IsDefined(filter.Color)) { continue; }
 
             int rawValue = (int)filter.Color;
             bool shouldWarn;

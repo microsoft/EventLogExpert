@@ -33,12 +33,12 @@ else
                         <ValueSelect AriaLabel="Highlight Color"
                             @bind-Value="Filter.Color"
                             CssClass="input color-dropdown"
-                            DataHighlight="@(Filter.Color == HighlightColor.None ? null : Filter.Color.ToString().ToLowerInvariant())"
+                            DataHighlight="@Filter.Color.ToCssName()"
                             T="HighlightColor">
-                            @foreach (HighlightColor item in Enum.GetValues(typeof(HighlightColor)))
+                            @foreach (var item in Enum.GetValues<HighlightColor>())
                             {
                                 <ValueSelectItem CssClass="color-dropdown-item"
-                                    DataHighlight="@(item == HighlightColor.None ? null : item.ToString().ToLowerInvariant())"
+                                    DataHighlight="@item.ToCssName()"
                                     T="HighlightColor"
                                     Value="item" />
                             }
@@ -57,7 +57,7 @@ else
                     {
                         if (savedFilter.Color != HighlightColor.None)
                         {
-                            <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToString().ToLowerInvariant()"></div>
+                            <div class="mx-2 color-box" data-highlight="@savedFilter.Color.ToCssName()"></div>
                         }
 
                         if (savedFilter.IsExcluded)
