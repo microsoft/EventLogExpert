@@ -41,6 +41,11 @@
     /* Always-dark text suitable for use on light highlight tints
        (--highlight-light* colors). */
     --clr-on-light-highlight: light-dark(#1A1A1A, var(--background-darkgray));
+    /* Always-dark text used on the dark-mode branch of the Mid+Dark highlight
+       tiers. The re-toned dark-mode hexes sit at L_rel >= 0.22 where #353535
+       (--clr-on-light-highlight dark branch) only reaches ~3.2:1; #1A1A1A
+       clears 4.5:1 from the WCAG floor up. */
+    --clr-on-dark-highlight: #1A1A1A;
     /* Default body text color. Component CSS should reference this rather than
        hardcoding white/black. */
     --text-primary: var(--clr-lightblue);
@@ -83,34 +88,42 @@
    Adding or removing a color requires only updating this block (and the
    matching enum / serialization). All consumers (table rows, color box,
    color dropdown items) read --hl-bg / --hl-fg from these declarations.
+
+   Light-tier rules use a single hex (passes WCAG AA in both themes with
+   --clr-on-light-highlight). Mid+Dark tier rules use light-dark() so each
+   theme gets a hex that clears 4.5:1 with its mode-appropriate text color
+   (white in light, --clr-on-dark-highlight in dark). Dark-mode hexes are
+   re-toned to L_rel >= 0.22 (WCAG SC 1.4.11 floor vs odd row #353535) using
+   a hue-locked white/black-mix derivation that preserves original hue within
+   +/-8 deg.
    -------------------------------------------------------------------------- */
 [data-highlight="lightred"]     { --hl-bg: #EE8F86; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="red"]          { --hl-bg: #D03B2D; --hl-fg: var(--clr-white); }
-[data-highlight="darkred"]      { --hl-bg: #73190E; --hl-fg: var(--clr-white); }
+[data-highlight="red"]          { --hl-bg: light-dark(#D03B2D, #FF6769); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkred"]      { --hl-bg: light-dark(#73190E, #FF1A09); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightorange"]  { --hl-bg: #FEB95E; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="orange"]       { --hl-bg: #FE9100; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="darkorange"]   { --hl-bg: #B05E00; --hl-fg: var(--clr-white); }
+[data-highlight="darkorange"]   { --hl-bg: light-dark(#B05E00, #C46A00); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightyellow"]  { --hl-bg: #FCE393; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="yellow"]       { --hl-bg: #F8C84B; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="darkyellow"]   { --hl-bg: #F29A3B; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="lightgreen"]   { --hl-bg: #A5E1AC; --hl-fg: var(--clr-on-light-highlight); }
 [data-highlight="green"]        { --hl-bg: #5AC358; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="darkgreen"]    { --hl-bg: #3C8331; --hl-fg: var(--clr-white); }
+[data-highlight="darkgreen"]    { --hl-bg: light-dark(#3C8331, #00960E); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightteal"]    { --hl-bg: #5DC2B4; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="teal"]         { --hl-bg: #017866; --hl-fg: var(--clr-white); }
-[data-highlight="darkteal"]     { --hl-bg: #01594C; --hl-fg: var(--clr-white); }
+[data-highlight="teal"]         { --hl-bg: light-dark(#017866, #00B19C); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkteal"]     { --hl-bg: light-dark(#01594C, #009280); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightblue"]    { --hl-bg: #73B8FD; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="blue"]         { --hl-bg: #066EE2; --hl-fg: var(--clr-white); }
-[data-highlight="darkblue"]     { --hl-bg: #013B73; --hl-fg: var(--clr-white); }
+[data-highlight="blue"]         { --hl-bg: light-dark(#066EE2, #679CFF); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkblue"]     { --hl-bg: light-dark(#013B73, #0186D6); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightpurple"]  { --hl-bg: #B28BF5; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="purple"]       { --hl-bg: #7446F2; --hl-fg: var(--clr-white); }
-[data-highlight="darkpurple"]   { --hl-bg: #271296; --hl-fg: var(--clr-white); }
+[data-highlight="purple"]       { --hl-bg: light-dark(#7446F2, #9E80FF); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkpurple"]   { --hl-bg: light-dark(#271296, #776CFF); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightmagenta"] { --hl-bg: #E495DD; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="magenta"]      { --hl-bg: #C330B9; --hl-fg: var(--clr-white); }
-[data-highlight="darkmagenta"]  { --hl-bg: #9526AF; --hl-fg: var(--clr-white); }
+[data-highlight="magenta"]      { --hl-bg: light-dark(#C330B9, #FF5FF4); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkmagenta"]  { --hl-bg: light-dark(#9526AF, #D732FF); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 [data-highlight="lightpink"]    { --hl-bg: #FF74A1; --hl-fg: var(--clr-on-light-highlight); }
-[data-highlight="pink"]         { --hl-bg: #E2074C; --hl-fg: var(--clr-white); }
-[data-highlight="darkpink"]     { --hl-bg: #960131; --hl-fg: var(--clr-white); }
+[data-highlight="pink"]         { --hl-bg: light-dark(#E2074C, #FF5A78); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
+[data-highlight="darkpink"]     { --hl-bg: light-dark(#960131, #FF005A); --hl-fg: light-dark(var(--clr-white), var(--clr-on-dark-highlight)); }
 
 *, *::before, *::after { box-sizing: border-box; }
 
