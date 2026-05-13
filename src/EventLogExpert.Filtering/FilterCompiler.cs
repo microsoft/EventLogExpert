@@ -6,7 +6,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering;
 
 /// <summary>Single source of truth for compiling a Dynamic LINQ expression string into a <see cref="CompiledFilter" />.</summary>
 public static class FilterCompiler

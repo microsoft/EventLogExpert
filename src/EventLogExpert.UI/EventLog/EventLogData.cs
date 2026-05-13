@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering;
 
 namespace EventLogExpert.UI.EventLog;
 
@@ -14,16 +14,16 @@ public sealed record EventLogData(
 {
     public EventLogId Id { get; } = EventLogId.Create();
 
-    /// <summary>Gets a distinct list of values for the specified category.</summary>
-    public IEnumerable<string> GetCategoryValues(FilterCategory category) =>
-        category switch
+    /// <summary>Gets a distinct list of values for the specified <paramref name="property" />.</summary>
+    public IEnumerable<string> GetEventValues(EventProperty property) =>
+        property switch
         {
-            FilterCategory.Id => Events.Select(e => e.Id.ToString()).Distinct(),
-            FilterCategory.ActivityId => Events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
-            FilterCategory.Level => Enum.GetNames<SeverityLevel>(),
-            FilterCategory.Keywords => Events.SelectMany(e => e.Keywords).Distinct(),
-            FilterCategory.Source => Events.Select(e => e.Source).Distinct(),
-            FilterCategory.TaskCategory => Events.Select(e => e.TaskCategory).Distinct(),
+            EventProperty.Id => Events.Select(e => e.Id.ToString()).Distinct(),
+            EventProperty.ActivityId => Events.Select(e => e.ActivityId?.ToString() ?? string.Empty).Distinct(),
+            EventProperty.Level => Enum.GetNames<SeverityLevel>(),
+            EventProperty.Keywords => Events.SelectMany(e => e.Keywords).Distinct(),
+            EventProperty.Source => Events.Select(e => e.Source).Distinct(),
+            EventProperty.TaskCategory => Events.Select(e => e.TaskCategory).Distinct(),
             _ => [],
         };
 }

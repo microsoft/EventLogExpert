@@ -105,48 +105,31 @@
 
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            switch (item.FilterType)
+            if (item.BasicFilter is not null)
             {
-                case FilterType.Basic:
-                    <FilterRow @key="item.Id" Value="item" />
-
-                    break;
-                case FilterType.Advanced:
-                    <AdvancedFilterRow @key="item.Id" Value="item" />
-
-                    break;
-                case FilterType.Cached:
-                    <FilterCacheRow @key="item.Id" Value="item" />
-
-                    break;
+                <FilterRow @key="item.Id" Value="item" />
+            }
+            else
+            {
+                <AdvancedFilterRow @key="item.Id" Value="item" />
             }
         }
 
         @foreach (var draft in _pendingDrafts)
         {
-            switch (draft.FilterType)
+            if (draft.IsBasic)
             {
-                case FilterType.Basic:
-                    <FilterRow @key="draft.Id"
-                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                        PendingDraft="draft" />
-
-                    break;
-                case FilterType.Advanced:
-                    <AdvancedFilterRow @key="draft.Id"
-                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                        PendingDraft="draft" />
-
-                    break;
-                case FilterType.Cached:
-                    <FilterCacheRow @key="draft.Id"
-                        OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                        OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                        PendingDraft="draft" />
-
-                    break;
+                <FilterRow @key="draft.Id"
+                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                    PendingDraft="draft" />
+            }
+            else
+            {
+                <AdvancedFilterRow @key="draft.Id"
+                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                    PendingDraft="draft" />
             }
         }
     </div>

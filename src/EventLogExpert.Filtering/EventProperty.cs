@@ -3,9 +3,9 @@
 
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering;
 
-public enum FilterCategory
+public enum EventProperty
 {
     [EnumMember(Value = "Event ID")] Id,
     [EnumMember(Value = "Activity ID")] ActivityId,

@@ -340,11 +340,15 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenCategoryIsXml_ShouldReturnTrue()
+    public void TryParse_WhenFieldIsXml_ShouldReturnTrue()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Xml, FilterEvaluator.Contains, "test");
+        var source = CreateBasicFilter(
+            EventProperty.Xml,
+            ComparisonOperator.Contains,
+            MatchMode.Single,
+            "test");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -355,23 +359,26 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(FilterCategory.Description,
-        FilterEvaluator.Contains,
+    [InlineData(EventProperty.Description,
+        ComparisonOperator.Contains,
+        MatchMode.Single,
         "error",
         "Description.Contains(\"error\", StringComparison.OrdinalIgnoreCase)")]
-    [InlineData(FilterCategory.Source,
-        FilterEvaluator.Contains,
+    [InlineData(EventProperty.Source,
+        ComparisonOperator.Contains,
+        MatchMode.Single,
         "Test",
         "Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
-    public void TryParse_WhenContainsEvaluator_ShouldGenerateCorrectComparison(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+    public void TryParse_WhenContainsOperator_ShouldGenerateCorrectComparison(
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string value,
         string expectedComparison)
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(category, evaluator, value);
+        var source = CreateBasicFilter(property, op, card, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -382,11 +389,15 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenEmptyValueAndNotMultiSelect_ShouldReturnFalse()
+    public void TryParse_WhenEmptyValueAndSingleMatchMode_ShouldReturnFalse()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.Equals, null);
+        var source = CreateBasicFilter(
+            EventProperty.Id,
+            ComparisonOperator.Equals,
+            MatchMode.Single,
+            null);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -397,11 +408,15 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenEmptyValuesAndMultiSelect_ShouldReturnFalse()
+    public void TryParse_WhenEmptyValuesAndManyMatchMode_ShouldReturnFalse()
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.MultiSelect, null);
+        var source = CreateBasicFilter(
+            EventProperty.Id,
+            ComparisonOperator.Equals,
+            MatchMode.Many,
+            null);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -412,18 +427,19 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(FilterCategory.Id, FilterEvaluator.Equals, "100", "Id == \"100\"")]
-    [InlineData(FilterCategory.Level, FilterEvaluator.Equals, "Error", "Level == \"Error\"")]
-    [InlineData(FilterCategory.Source, FilterEvaluator.Equals, "TestSource", "Source == \"TestSource\"")]
-    public void TryParse_WhenEqualsEvaluator_ShouldGenerateCorrectComparison(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+    [InlineData(EventProperty.Id, ComparisonOperator.Equals, MatchMode.Single, "100", "Id == \"100\"")]
+    [InlineData(EventProperty.Level, ComparisonOperator.Equals, MatchMode.Single, "Error", "Level == \"Error\"")]
+    [InlineData(EventProperty.Source, ComparisonOperator.Equals, MatchMode.Single, "TestSource", "Source == \"TestSource\"")]
+    public void TryParse_WhenEqualsOperator_ShouldGenerateCorrectComparison(
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string value,
         string expectedComparison)
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(category, evaluator, value);
+        var source = CreateBasicFilter(property, op, card, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -438,7 +454,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Id, FilterEvaluator.Contains, "10");
+        var source = CreateBasicFilter(
+            EventProperty.Id,
+            ComparisonOperator.Contains,
+            MatchMode.Single,
+            "10");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -453,7 +473,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Keywords, FilterEvaluator.Equals, "Audit Success");
+        var source = CreateBasicFilter(
+            EventProperty.Keywords,
+            ComparisonOperator.Equals,
+            MatchMode.Single,
+            "Audit Success");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -470,8 +494,9 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = CreateBasicFilter(
-            FilterCategory.Level,
-            FilterEvaluator.MultiSelect,
+            EventProperty.Level,
+            ComparisonOperator.Equals,
+            MatchMode.Many,
             value: null,
             values: ["Error", "Warning"]);
 
@@ -486,23 +511,26 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(FilterCategory.Description,
-        FilterEvaluator.NotContains,
+    [InlineData(EventProperty.Description,
+        ComparisonOperator.NotContains,
+        MatchMode.Single,
         "error",
         "!Description.Contains(\"error\", StringComparison.OrdinalIgnoreCase)")]
-    [InlineData(FilterCategory.Source,
-        FilterEvaluator.NotContains,
+    [InlineData(EventProperty.Source,
+        ComparisonOperator.NotContains,
+        MatchMode.Single,
         "Test",
         "!Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
-    public void TryParse_WhenNotContainsEvaluator_ShouldGenerateCorrectComparison(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+    public void TryParse_WhenNotContainsOperator_ShouldGenerateCorrectComparison(
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string value,
         string expectedComparison)
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(category, evaluator, value);
+        var source = CreateBasicFilter(property, op, card, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -513,17 +541,18 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(FilterCategory.Id, FilterEvaluator.NotEqual, "100", "Id != \"100\"")]
-    [InlineData(FilterCategory.Level, FilterEvaluator.NotEqual, "Error", "Level != \"Error\"")]
-    public void TryParse_WhenNotEqualEvaluator_ShouldGenerateCorrectComparison(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+    [InlineData(EventProperty.Id, ComparisonOperator.NotEqual, MatchMode.Single, "100", "Id != \"100\"")]
+    [InlineData(EventProperty.Level, ComparisonOperator.NotEqual, MatchMode.Single, "Error", "Level != \"Error\"")]
+    public void TryParse_WhenNotEqualOperator_ShouldGenerateCorrectComparison(
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string value,
         string expectedComparison)
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(category, evaluator, value);
+        var source = CreateBasicFilter(property, op, card, value);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -538,7 +567,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.Description, FilterEvaluator.Contains, "test\"value");
+        var source = CreateBasicFilter(
+            EventProperty.Description,
+            ComparisonOperator.Contains,
+            MatchMode.Single,
+            "test\"value");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -554,10 +587,22 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
                     JoinWithAny: true)
             ]);
 
@@ -575,10 +620,22 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
                     JoinWithAny: false)
             ]);
 
@@ -596,10 +653,22 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
                     JoinWithAny: false)
             ]);
 
@@ -617,7 +686,11 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(FilterCategory.UserId, FilterEvaluator.Equals, "S-1-5-21");
+        var source = CreateBasicFilter(
+            EventProperty.UserId,
+            ComparisonOperator.Equals,
+            MatchMode.Single,
+            "S-1-5-21");
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -628,18 +701,19 @@ public sealed class FilterServiceTests
     }
 
     [Theory]
-    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, "He said \"hi\".")]
-    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, @"path\to\file")]
-    [InlineData(FilterCategory.Description, FilterEvaluator.Contains, "line one\r\nline two")]
-    [InlineData(FilterCategory.Description, FilterEvaluator.Equals, "She wrote: \"yes\\no\".")]
-    [InlineData(FilterCategory.Source, FilterEvaluator.Equals, "Source\"With\"Quotes")]
+    [InlineData(EventProperty.Description, ComparisonOperator.Contains, MatchMode.Single, "He said \"hi\".")]
+    [InlineData(EventProperty.Description, ComparisonOperator.Contains, MatchMode.Single, @"path\to\file")]
+    [InlineData(EventProperty.Description, ComparisonOperator.Contains, MatchMode.Single, "line one\r\nline two")]
+    [InlineData(EventProperty.Description, ComparisonOperator.Equals, MatchMode.Single, "She wrote: \"yes\\no\".")]
+    [InlineData(EventProperty.Source, ComparisonOperator.Equals, MatchMode.Single, "Source\"With\"Quotes")]
     public void TryParse_WhenValueHasSpecialCharacters_GeneratesParsableExpressionThatRoundTrips(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string rawValue)
     {
         var filterService = CreateFilterService();
-        var source = CreateBasicFilter(category, evaluator, rawValue);
+        var source = CreateBasicFilter(property, op, card, rawValue);
 
         var result = filterService.TryParse(source, out var comparison);
 
@@ -649,11 +723,11 @@ public sealed class FilterServiceTests
         // If the escape syntax is wrong, TryCompile will return false.
         Assert.True(FilterCompiler.TryCompile(comparison, out var compiled, out _));
 
-        var matchingEvent = category switch
+        var matchingEvent = property switch
         {
-            FilterCategory.Description => EventUtils.CreateTestEvent(description: rawValue),
-            FilterCategory.Source => EventUtils.CreateTestEvent(source: rawValue),
-            _ => throw new ArgumentOutOfRangeException(nameof(category))
+            EventProperty.Description => EventUtils.CreateTestEvent(description: rawValue),
+            EventProperty.Source => EventUtils.CreateTestEvent(source: rawValue),
+            _ => throw new ArgumentOutOfRangeException(nameof(property))
         };
 
         Assert.NotNull(compiled);
@@ -666,10 +740,22 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = string.Empty },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = string.Empty
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
                     JoinWithAny: true)
             ]);
 
@@ -687,7 +773,13 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             []);
 
         var sourceResult = filterService.TryParse(source, out var sourceComparison);
@@ -703,10 +795,11 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Keywords,
-                Evaluator = FilterEvaluator.MultiSelect,
+                Property = EventProperty.Keywords,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
                 Values = ["Audit Success", "Audit Failure"]
             },
             []);
@@ -727,10 +820,11 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = FilterCategory.Level,
-                Evaluator = FilterEvaluator.MultiSelect,
+                Property = EventProperty.Level,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Many,
                 Values = ["Error", "Warning"]
             },
             []);
@@ -761,13 +855,31 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "   " },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "   "
+                    },
                     JoinWithAny: true),
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Equals, Value = "Kernel" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Source,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Kernel"
+                    },
                     JoinWithAny: false)
             ]);
 
@@ -788,13 +900,31 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new FilterCondition { Category = FilterCategory.Id, Evaluator = FilterEvaluator.Equals, Value = "100" },
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
             [
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Level, Evaluator = FilterEvaluator.Equals, Value = "Error" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
                     JoinWithAny: true),
                 new SubFilter(
-                    new FilterCondition { Category = FilterCategory.Source, Evaluator = FilterEvaluator.Contains, Value = "Kernel" },
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Source,
+                        Operator = ComparisonOperator.Contains,
+                        MatchMode = MatchMode.Single,
+                        Value = "Kernel"
+                    },
                     JoinWithAny: false)
             ]);
 
@@ -811,15 +941,17 @@ public sealed class FilterServiceTests
     }
 
     private static BasicFilter CreateBasicFilter(
-        FilterCategory category,
-        FilterEvaluator evaluator,
+        EventProperty property,
+        ComparisonOperator op,
+        MatchMode card,
         string? value,
         IEnumerable<string>? values = null) =>
         new(
-            new FilterCondition
+            new BasicFilterCondition
             {
-                Category = category,
-                Evaluator = evaluator,
+                Property = property,
+                Operator = op,
+                MatchMode = card,
                 Value = value,
                 Values = values?.ToImmutableList() ?? []
             },

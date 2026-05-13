@@ -23,11 +23,7 @@ public sealed class Effects(
         if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
             UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
-        }
 
-        if (action.SavedFilter.FilterType is not FilterType.Cached &&
-            !string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
-        {
             dispatcher.Dispatch(
                 new AddRecentFilterAction(action.SavedFilter.ComparisonText));
         }
@@ -81,8 +77,7 @@ public sealed class Effects(
     {
         UpdateEventTableFilters(_filterPaneState.Value, dispatcher);
 
-        if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText) &&
-            action.SavedFilter.FilterType is not FilterType.Cached)
+        if (!string.IsNullOrEmpty(action.SavedFilter.ComparisonText))
         {
             dispatcher.Dispatch(new AddRecentFilterAction(action.SavedFilter.ComparisonText));
         }

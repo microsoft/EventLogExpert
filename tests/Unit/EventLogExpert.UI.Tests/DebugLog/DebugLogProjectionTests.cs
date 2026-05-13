@@ -27,7 +27,7 @@ public sealed class DebugLogProjectionTests
             entries,
             startIndex: 1,
             endIndex: 3,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [LogLevel.Information],
             string.Empty);
 
@@ -57,7 +57,7 @@ public sealed class DebugLogProjectionTests
                 entries,
                 startIndex,
                 endIndex,
-                FilterEvaluator.Equals,
+                ComparisonOperator.Equals,
                 [],
                 string.Empty));
     }
@@ -77,7 +77,7 @@ public sealed class DebugLogProjectionTests
             entries,
             startIndex: 2,
             endIndex: 2,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [],
             string.Empty);
 
@@ -102,7 +102,7 @@ public sealed class DebugLogProjectionTests
             entries,
             startIndex: 1,
             endIndex: 3,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [],
             string.Empty);
 
@@ -120,14 +120,14 @@ public sealed class DebugLogProjectionTests
     {
         // Act + Assert
         Assert.Throws<ArgumentNullException>(() =>
-            DebugLogProjection.Project(null!, FilterEvaluator.Equals, [], string.Empty));
+            DebugLogProjection.Project(null!, ComparisonOperator.Equals, [], string.Empty));
     }
 
     [Fact]
     public void Project_WhenInputEmpty_ShouldReturnEmpty()
     {
         // Act
-        var (lines, count) = DebugLogProjection.Project([], FilterEvaluator.Equals, [], string.Empty);
+        var (lines, count) = DebugLogProjection.Project([], ComparisonOperator.Equals, [], string.Empty);
 
         // Assert
         Assert.Empty(lines);
@@ -148,7 +148,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (view, count) = ProjectView(
             entries,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [LogLevel.Information],
             "foo");
 
@@ -172,7 +172,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (view, count) = ProjectView(
             entries,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [LogLevel.Information],
             string.Empty);
 
@@ -196,7 +196,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (_, count) = DebugLogProjection.Project(
             entries,
-            FilterEvaluator.Equals,
+            ComparisonOperator.Equals,
             [LogLevel.Information],
             string.Empty);
 
@@ -217,7 +217,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (_, count) = DebugLogProjection.Project(
             entries,
-            FilterEvaluator.MultiSelect,
+            ComparisonOperator.Equals,
             [LogLevel.Information, LogLevel.Warning],
             string.Empty);
 
@@ -240,7 +240,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (view, count) = ProjectView(
             entries,
-            FilterEvaluator.MultiSelect,
+            ComparisonOperator.Equals,
             [LogLevel.Error, LogLevel.Critical],
             string.Empty);
 
@@ -264,7 +264,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (lines, count) = DebugLogProjection.Project(
             entries,
-            FilterEvaluator.NotEqual,
+            ComparisonOperator.NotEqual,
             [LogLevel.Information],
             string.Empty);
 
@@ -288,7 +288,7 @@ public sealed class DebugLogProjectionTests
         // Act
         var (lines, count) = DebugLogProjection.Project(
             entries,
-            FilterEvaluator.NotEqual,
+            ComparisonOperator.NotEqual,
             [LogLevel.Information],
             string.Empty);
 
@@ -309,7 +309,7 @@ public sealed class DebugLogProjectionTests
         };
 
         // Act
-        var (_, count) = DebugLogProjection.Project(entries, FilterEvaluator.NotEqual, [], string.Empty);
+        var (_, count) = DebugLogProjection.Project(entries, ComparisonOperator.NotEqual, [], string.Empty);
 
         // Assert
         Assert.Equal(2, count);
@@ -320,7 +320,7 @@ public sealed class DebugLogProjectionTests
     {
         // Act + Assert
         Assert.Throws<ArgumentNullException>(() =>
-            DebugLogProjection.Project([], FilterEvaluator.Equals, null!, string.Empty));
+            DebugLogProjection.Project([], ComparisonOperator.Equals, null!, string.Empty));
     }
 
     [Fact]
@@ -340,7 +340,7 @@ public sealed class DebugLogProjectionTests
             rawLine);
 
         // Act
-        var (view, count) = ProjectView([entry], FilterEvaluator.Equals, [], string.Empty);
+        var (view, count) = ProjectView([entry], ComparisonOperator.Equals, [], string.Empty);
 
         // Assert
         Assert.Equal(1, count);
@@ -367,7 +367,7 @@ public sealed class DebugLogProjectionTests
             rawLine);
 
         // Act
-        var (view, count) = ProjectView([entry], FilterEvaluator.Equals, [], "foo");
+        var (view, count) = ProjectView([entry], ComparisonOperator.Equals, [], "foo");
 
         // Assert
         Assert.Equal(1, count);
@@ -389,7 +389,7 @@ public sealed class DebugLogProjectionTests
         };
 
         // Act
-        var (view, count) = ProjectView(entries, FilterEvaluator.Equals, [], string.Empty);
+        var (view, count) = ProjectView(entries, ComparisonOperator.Equals, [], string.Empty);
 
         // Assert
         Assert.Equal(3, count);
@@ -409,7 +409,7 @@ public sealed class DebugLogProjectionTests
         };
 
         // Act
-        var (_, count) = DebugLogProjection.Project(entries, FilterEvaluator.Equals, [], "FOO");
+        var (_, count) = DebugLogProjection.Project(entries, ComparisonOperator.Equals, [], "FOO");
 
         // Assert
         Assert.Equal(1, count);
@@ -427,7 +427,7 @@ public sealed class DebugLogProjectionTests
         };
 
         // Act
-        var (view, count) = ProjectView(entries, FilterEvaluator.Equals, [], "foo");
+        var (view, count) = ProjectView(entries, ComparisonOperator.Equals, [], "foo");
 
         // Assert
         Assert.Equal(2, count);
@@ -450,7 +450,7 @@ public sealed class DebugLogProjectionTests
 
     private static (ReversedListView<string> View, int Count) ProjectView(
         IReadOnlyList<DebugLogEntry> entries,
-        FilterEvaluator levelOperator,
+        ComparisonOperator levelOperator,
         IReadOnlyList<LogLevel> levels,
         string? textFilter)
     {

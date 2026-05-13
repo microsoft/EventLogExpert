@@ -3,13 +3,12 @@
 
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering;
 
-public enum FilterEvaluator
+public enum ComparisonOperator
 {
     Equals,
     Contains,
     [EnumMember(Value = "Not Equal")] NotEqual,
-    [EnumMember(Value = "Not Contains")] NotContains,
-    [EnumMember(Value = "Multi Select")] MultiSelect
+    [EnumMember(Value = "Not Contains")] NotContains
 }

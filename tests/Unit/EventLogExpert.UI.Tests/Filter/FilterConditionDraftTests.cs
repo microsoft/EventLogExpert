@@ -8,53 +8,54 @@ namespace EventLogExpert.UI.Tests.Filter;
 public sealed class FilterConditionDraftTests
 {
     [Fact]
-    public void ChangeCategory_ClearsValueAndValues()
+    public void ChangeProperty_ClearsValueAndValues()
     {
         var draft = new FilterConditionDraft
         {
-            Category = FilterCategory.Id,
+            Property = EventProperty.Id,
             Value = "100",
             Values = ["100", "200"]
         };
 
-        draft.ChangeCategory(FilterCategory.Source);
+        draft.ChangeProperty(EventProperty.Source);
 
         Assert.Null(draft.Value);
         Assert.Empty(draft.Values);
     }
 
     [Fact]
-    public void ChangeCategory_DoesNotResetEvaluator()
+    public void ChangeProperty_DoesNotResetOperatorOrMatchMode()
     {
-        // Evaluator coercion is the UI's responsibility (FilterCategoryEditor.CategoryBinding),
-        // not the draft's — keeping it on the draft would entangle non-overlapping concerns.
+        // Operator/match-mode coercion is the UI's responsibility, not the draft's.
         var draft = new FilterConditionDraft
         {
-            Category = FilterCategory.Id,
-            Evaluator = FilterEvaluator.MultiSelect
+            Property = EventProperty.Id,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many
         };
 
-        draft.ChangeCategory(FilterCategory.Description);
+        draft.ChangeProperty(EventProperty.Description);
 
-        Assert.Equal(FilterEvaluator.MultiSelect, draft.Evaluator);
+        Assert.Equal(ComparisonOperator.Equals, draft.Operator);
+        Assert.Equal(MatchMode.Many, draft.MatchMode);
     }
 
     [Fact]
-    public void ChangeCategory_SetsNewCategory()
+    public void ChangeProperty_SetsNewProperty()
     {
-        var draft = new FilterConditionDraft { Category = FilterCategory.Id };
+        var draft = new FilterConditionDraft { Property = EventProperty.Id };
 
-        draft.ChangeCategory(FilterCategory.Source);
+        draft.ChangeProperty(EventProperty.Source);
 
-        Assert.Equal(FilterCategory.Source, draft.Category);
+        Assert.Equal(EventProperty.Source, draft.Property);
     }
 
     [Fact]
     public void FromCondition_DoesNotShareValuesListWithDraft()
     {
-        var condition = new FilterCondition
+        var condition = new BasicFilterCondition
         {
-            Category = FilterCategory.Level,
+            Property = EventProperty.Level,
             Values = ["Error"]
         };
 
@@ -69,18 +70,20 @@ public sealed class FilterConditionDraftTests
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        var original = new FilterCondition
+        var original = new BasicFilterCondition
         {
-            Category = FilterCategory.Level,
-            Evaluator = FilterEvaluator.MultiSelect,
+            Property = EventProperty.Level,
+            Operator = ComparisonOperator.Equals,
+            MatchMode = MatchMode.Many,
             Value = "Error",
             Values = ["Error", "Warning"]
         };
 
         var roundTripped = FilterConditionDraft.FromCondition(original).ToCondition();
 
-        Assert.Equal(original.Category, roundTripped.Category);
-        Assert.Equal(original.Evaluator, roundTripped.Evaluator);
+        Assert.Equal(original.Property, roundTripped.Property);
+        Assert.Equal(original.Operator, roundTripped.Operator);
+        Assert.Equal(original.MatchMode, roundTripped.MatchMode);
         Assert.Equal(original.Value, roundTripped.Value);
         Assert.Equal(original.Values, roundTripped.Values);
     }
@@ -90,7 +93,7 @@ public sealed class FilterConditionDraftTests
     {
         var draft = new FilterConditionDraft
         {
-            Category = FilterCategory.Level,
+            Property = EventProperty.Level,
             Values = ["Error"]
         };
 

@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering;
 using EventLogExpert.UI.EventLog;
 
 namespace EventLogExpert.UI.Filter;

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <SingleProject>true</SingleProject>
@@ -6,17 +6,15 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Fluxor.Blazor.Web" />
+    <PackageReference Include="System.Linq.Dynamic.Core" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
-    <ProjectReference Include="..\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="EventLogExpert" />
-    <InternalsVisibleTo Include="EventLogExpert.UI.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.Filtering.Tests" />
   </ItemGroup>
 
 </Project>
