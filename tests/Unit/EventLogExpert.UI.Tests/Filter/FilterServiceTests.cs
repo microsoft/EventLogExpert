@@ -50,11 +50,11 @@ public sealed class FilterServiceTests
         var eventFilter = new EventFilter(dateFilter, []);
 
         var log1Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         var log2Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
         var logData = new List<EventLogData>
@@ -75,32 +75,6 @@ public sealed class FilterServiceTests
         Assert.Equal(expectedLog2.Count, result[logData[1].Id].Count);
         Assert.Equal(expectedLog1.Select(e => e.RecordId), result[logData[0].Id].Select(e => e.RecordId));
         Assert.Equal(expectedLog2.Select(e => e.RecordId), result[logData[1].Id].Select(e => e.RecordId));
-    }
-
-    [Fact]
-    public void FilterActiveLogs_WhenMultipleLogsButFilteringDisabled_ShouldReturnAllEventsPerLog()
-    {
-        // Arrange — IsFilteringEnabled short-circuit must stay engaged even with many logs to
-        // avoid spinning up parallel work for a no-op filter.
-        var filterService = CreateFilterService();
-
-        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
-        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
-
-        var logData = new List<EventLogData>
-        {
-            new("Log1", LogPathType.Channel, log1Events),
-            new("Log2", LogPathType.Channel, log2Events)
-        };
-
-        var eventFilter = new EventFilter(null, []);
-
-        // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
-
-        // Assert
-        Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
-        Assert.Equal(log2Events.Count, result[logData[1].Id].Count);
     }
 
     [Fact]
@@ -134,6 +108,32 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public void FilterActiveLogs_WhenMultipleLogsButFilteringDisabled_ShouldReturnAllEventsPerLog()
+    {
+        // Arrange — IsFilteringEnabled short-circuit must stay engaged even with many logs to
+        // avoid spinning up parallel work for a no-op filter.
+        var filterService = CreateFilterService();
+
+        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+
+        var logData = new List<EventLogData>
+        {
+            new("Log1", LogPathType.Channel, log1Events),
+            new("Log2", LogPathType.Channel, log2Events)
+        };
+
+        var eventFilter = new EventFilter(null, []);
+
+        // Act
+        var result = filterService.FilterActiveLogs(logData, eventFilter);
+
+        // Assert
+        Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
+        Assert.Equal(log2Events.Count, result[logData[1].Id].Count);
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public sealed class FilterServiceTests
         // Create events: half before cutoff, half after
         var events = Enumerable.Range(0, eventCount)
             .Select(i => EventUtils.CreateTestEvent(
-                id: i,
+                i,
                 timeCreated: baseTime.AddMinutes(i),
                 recordId: i))
             .ToList();
@@ -208,12 +208,12 @@ public sealed class FilterServiceTests
 
         // Small collection (sequential path)
         var smallEvents = Enumerable.Range(0, 100)
-            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         // Large collection (PLINQ path) with the same first 100 events
         var largeEvents = Enumerable.Range(0, 15_000)
-            .Select(i => EventUtils.CreateTestEvent(id: i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         // Act
@@ -249,25 +249,6 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Equal(3, result.Count);
-    }
-
-    [Fact]
-    public void TryParse_WhenFieldIsXml_ShouldReturnTrue()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-        var source = CreateBasicFilter(
-            EventProperty.Xml,
-            ComparisonOperator.Contains,
-            MatchMode.Single,
-            "test");
-
-        // Act
-        var result = filterService.TryParse(source, out var comparison);
-
-        // Assert
-        Assert.True(result);
-        Assert.NotEmpty(comparison);
     }
 
     [Theory]
@@ -362,6 +343,25 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
+    public void TryParse_WhenFieldIsXml_ShouldReturnTrue()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = CreateBasicFilter(
+            EventProperty.Xml,
+            ComparisonOperator.Contains,
+            MatchMode.Single,
+            "test");
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.True(result);
+        Assert.NotEmpty(comparison);
+    }
+
+    [Fact]
     public void TryParse_WhenIdToStringContains_ShouldGenerateCorrectComparison()
     {
         // Arrange
@@ -409,8 +409,8 @@ public sealed class FilterServiceTests
             EventProperty.Level,
             ComparisonOperator.Equals,
             MatchMode.Many,
-            value: null,
-            values: ["Error", "Warning"]);
+            null,
+            ["Error", "Warning"]);
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -494,6 +494,40 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
+    public void TryParse_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
+    {
+        // Arrange
+        var filterService = CreateFilterService();
+        var source = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
+            [
+                new SubFilter(
+                    new BasicFilterCondition
+                    {
+                        Property = EventProperty.Level,
+                        Operator = ComparisonOperator.Equals,
+                        MatchMode = MatchMode.Single,
+                        Value = "Error"
+                    },
+                    false)
+            ]);
+
+        // Act
+        var result = filterService.TryParse(source, out var comparison);
+
+        // Assert
+        Assert.True(result);
+        Assert.Contains("Id == \"100\"", comparison);
+        Assert.Contains("Level == \"Error\"", comparison);
+    }
+
+    [Fact]
     public void TryParse_WhenSubFilterWithCompareAny_ShouldUseOrOperator()
     {
         // Arrange
@@ -515,7 +549,7 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
-                    JoinWithAny: true)
+                    true)
             ]);
 
         // Act
@@ -548,7 +582,7 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
-                    JoinWithAny: false)
+                    false)
             ]);
 
         // Act
@@ -557,40 +591,6 @@ public sealed class FilterServiceTests
         // Assert
         Assert.True(result);
         Assert.Contains(" && ", comparison);
-    }
-
-    [Fact]
-    public void TryParse_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
-    {
-        // Arrange
-        var filterService = CreateFilterService();
-        var source = new BasicFilter(
-            new BasicFilterCondition
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = "100"
-            },
-            [
-                new SubFilter(
-                    new BasicFilterCondition
-                    {
-                        Property = EventProperty.Level,
-                        Operator = ComparisonOperator.Equals,
-                        MatchMode = MatchMode.Single,
-                        Value = "Error"
-                    },
-                    JoinWithAny: false)
-            ]);
-
-        // Act
-        var result = filterService.TryParse(source, out var comparison);
-
-        // Assert
-        Assert.True(result);
-        Assert.Contains("Id == \"100\"", comparison);
-        Assert.Contains("Level == \"Error\"", comparison);
     }
 
     [Fact]
@@ -668,7 +668,7 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
-                    JoinWithAny: true)
+                    true)
             ]);
 
         // Act
@@ -758,7 +758,7 @@ public sealed class FilterServiceTests
         var filterService = CreateFilterService();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => filterService.TryParse((BasicFilter)null!, out _));
+        Assert.Throws<ArgumentNullException>(() => filterService.TryParse(null!, out _));
     }
 
     [Fact]
@@ -783,7 +783,7 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "   "
                     },
-                    JoinWithAny: true),
+                    true),
                 new SubFilter(
                     new BasicFilterCondition
                     {
@@ -792,10 +792,10 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Kernel"
                     },
-                    JoinWithAny: false)
+                    false)
             ]);
 
-        var expected = "Id == \"100\" && Source == \"Kernel\"" + Environment.NewLine;
+        var expected = "Id == \"100\" && Source == \"Kernel\"";
 
         // Act
         var result = filterService.TryParse(source, out var comparison);
@@ -807,7 +807,7 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenSubFiltersPresent_ShouldUseExactJoinAndNewlineOrdering()
+    public void TryParse_WithBasicFilter_WhenSubFiltersPresent_ShouldUseExactJoinOrdering()
     {
         // Arrange
         var filterService = CreateFilterService();
@@ -828,7 +828,7 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
-                    JoinWithAny: true),
+                    true),
                 new SubFilter(
                     new BasicFilterCondition
                     {
@@ -837,12 +837,12 @@ public sealed class FilterServiceTests
                         MatchMode = MatchMode.Single,
                         Value = "Kernel"
                     },
-                    JoinWithAny: false)
+                    false)
             ]);
 
         var expected =
-            "Id == \"100\" || Level == \"Error\"" + Environment.NewLine +
-            " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)" + Environment.NewLine;
+            "Id == \"100\" || Level == \"Error\"" +
+            " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)";
 
         // Act
         var result = filterService.TryParse(source, out var comparison);

@@ -70,7 +70,7 @@ public static class BasicFilterFormatter
 
             if (TryFormatCondition(subFilter.Data, joinPrefix, out var subText))
             {
-                stringBuilder.AppendLine(subText);
+                stringBuilder.Append(subText);
             }
         }
 
