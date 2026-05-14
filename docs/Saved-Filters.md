@@ -34,7 +34,7 @@ Per-group buttons (when the group is not in edit mode):
 | Button | Behavior |
 | --- | --- |
 | `Apply Filters` | Adds this group's filters to the current filter pane, skipping any whose comparison text + include/exclude flag already exists in the pane. Closes the modal afterwards. Existing pane filters are not touched. |
-| `Copy` | Copies the group's filter expressions to the clipboard, joined with ` || ` if more than one filter. |
+| `Copy` | Copies the group's filter expressions to the clipboard. With multiple filters, each is wrapped in parentheses and joined with the Dynamic LINQ OR operator so the result is a single Advanced expression you can paste back into the filter pane. |
 | `Export` | Saves the entire group (name + filters) as a JSON file. |
 | `Edit` | Switches the group into edit mode (per-row controls, `Add Filter`, `Save`, `Cancel`, `Import`, `Remove`). |
 | `Remove` | Deletes the group. |
@@ -43,7 +43,7 @@ In edit mode each filter row gets the same chrome as the filter pane (toggle ena
 
 The pencil icon next to the group name renames it. Empty names are rejected. The new name's `\` segment becomes the new section prefix.
 
-`Create Group` at the bottom of the modal creates a new group named `New Filter Section\New Filter Group` (in section `New Filter Section`); rename it before saving filters into it. Group creation also seeds the `Save All Filters` flow on the `Edit` menu — that command prompts for a `Group Name` and saves the current filter pane as a new group with that name.
+`Create Group` at the bottom of the modal creates a new group named `New Filter Section\New Filter Group` (in section `New Filter Section`); rename it before saving filters into it. Group creation also seeds the `Save All Filters` flow on the `Edit` menu — that command prompts for a `Group Name` and saves the current filter rows as a new group with that name. Saved groups persist filter rows only; the date filter is stored separately and is not part of a group.
 
 **Modal-level Import / Export.** The footer reads and writes JSON files containing the **entire** groups list. `Export` saves every group; `Import` reads a list of groups and adds them to whatever's already there (no merge by name, so re-importing the same file produces duplicates).
 

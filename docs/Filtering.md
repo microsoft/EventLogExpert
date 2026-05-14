@@ -14,7 +14,7 @@ The Filter pane sits above the event table. Every event in the active log set is
 
 Each saved row carries a chrome strip with `Edit`, `Exclude` (or `Include` when the row is already an exclusion), `Remove`, and a `Disable` / `Enable` toggle. While editing, the chrome shows `Save` and `Cancel`. Non-exclusion rows also show a highlight-color picker (`Highlight Color`) before the comparison content. When any filter is being applied, the pane shows `[Applying Filters]` with a spinner; otherwise it shows `[Active Filters: N]`. The pane can be collapsed via the caret in the top-right corner.
 
-`Edit` → `Save All Filters` and `Edit` → `Clear All Filters` operate on the entire pane — see [Keyboard and Copy](Keyboard-And-Copy.md). `View` → `Show All Events` (`Ctrl+H`) suspends evaluation without removing any filters.
+`Edit` → `Clear All Filters` removes every filter row and the date filter from the pane in one step. `Edit` → `Save All Filters` persists only the filter rows — the date filter is not part of a saved group. See [Keyboard and Copy](Keyboard-And-Copy.md). `View` → `Show All Events` (`Ctrl+H`) suspends evaluation without removing any filters.
 
 ### Basic filters
 
@@ -87,7 +87,7 @@ Available properties:
 
 ### Excluded filters
 
-Either an `Add Exclusion` row from the start, or any Basic / Advanced row toggled with the `Exclude` chrome button. Matching events are hidden. Excluded filters are evaluated independently of `View` → `Show All Events`: the show-all toggle disables only the inclusion side, so exclusions and the date filter remain in effect when it's on. To suspend everything at once, use `Edit` → `Clear All Filters`.
+Either an `Add Exclusion` row from the start, or any Basic / Advanced row toggled with the `Exclude` chrome button. Matching events are hidden. Excluded filters are evaluated independently of `View` → `Show All Events`: the show-all toggle disables only the inclusion side, so exclusions and the date filter remain in effect when it's on. `Edit` → `Clear All Filters` removes every filter from the pane (including the date filter and exclusions) — there's no built-in way to reversibly suspend everything at once.
 
 ### Cached filters
 

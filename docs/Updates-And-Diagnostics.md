@@ -20,7 +20,7 @@ The `.appinstaller` distributed with each release also wires up app-installer-dr
 
 ### Release Notes
 
-Opens the Release Notes modal, which renders the markdown body of the published GitHub release for the running build. If the release body for the current version couldn't be fetched (no network, version not found), an alert titled `Release Notes Failure` appears instead and the modal stays closed.
+Opens the Release Notes modal, which renders the markdown body of the published GitHub release for the running build. The modal can only render notes that the most recent `Check for Updates` succeeded in fetching for the running version — that means the running version was the newest applicable release at the time of the check. When the running build is behind (a newer release exists), when the version isn't published on GitHub, or when no update check has completed yet, an alert titled `Release Notes Failure` appears instead and the modal stays closed. Run `Check for Updates` first when in doubt.
 
 ### View Logs
 
