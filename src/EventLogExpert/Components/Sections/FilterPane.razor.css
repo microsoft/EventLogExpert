@@ -30,3 +30,27 @@
 }
 
 .filter-form > input { color: var(--text-primary); }
+
+.filter-header-secondary {
+    display: flex;
+    align-items: center;
+    justify-self: end;
+    gap: 0.25rem;
+
+    /* Anchor to the third grid column so the icon row stays right-aligned even when the
+       middle column (active filter count) is conditionally hidden. */
+    grid-column: 3;
+}
+
+.icon-button[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.icon-button[aria-disabled="true"]:hover { filter: none; }
+
+.filter-empty-state {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.25rem 0.5rem;
+}

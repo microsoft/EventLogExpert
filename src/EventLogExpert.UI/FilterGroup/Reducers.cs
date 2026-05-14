@@ -74,13 +74,14 @@ public sealed class Reducers
         }
 
         // Replace the filter in-place. `with` preserves IsExcluded/IsEnabled. Color, ComparisonText,
-        // Compiled, and BasicFilter are overridden from the incoming action.
+        // Compiled, BasicFilter, and Mode are overridden from the incoming action.
         var updatedFilter = existing with
         {
             Color = action.Filter.Color,
             ComparisonText = action.Filter.ComparisonText,
             Compiled = action.Filter.Compiled,
-            BasicFilter = action.Filter.BasicFilter
+            BasicFilter = action.Filter.BasicFilter,
+            Mode = action.Filter.Mode
         };
 
         return WithGroups(

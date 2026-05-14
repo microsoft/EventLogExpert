@@ -2,26 +2,40 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering;
-using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace EventLogExpert.UI.Filter;
 
 /// <summary>
-///     Reads and writes <see cref="SavedFilter" /> JSON. Accepts both the legacy persisted shape (
-///     <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b }</c>) and the new shape (
-///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ... }</c>). Always writes the new shape.
+///     Reads and writes <see cref="SavedFilter" /> JSON. Accepts three persisted shapes:
+///     <list type="bullet">
+///         <item>
+///             <description>
+///                 <b>Modern (post-L4b)</b>: <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ?,
+///                 "Mode": "Basic|Advanced|Cached" }</c>. <c>Mode</c> is authoritative.
+///             </description>
+///         </item>
+///         <item>
+///             <description>
+///                 <b>L1..L4a</b>: <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ? }</c>. No
+///                 <c>Mode</c> field; converter infers <see cref="FilterMode.Basic" /> when <c>BasicFilter</c> is present,
+///                 otherwise <see cref="FilterMode.Advanced" /> (legacy disk has no Cached records — those went through
+///                 <c>FilterCacheModal</c> and were saved as Advanced filters).
+///             </description>
+///         </item>
+///         <item>
+///             <description>
+///                 <b>Pre-L1 legacy</b>: <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b, "FilterType":
+///                 "Basic|Advanced|Cached" }</c>. <c>FilterType</c> maps directly to <see cref="FilterMode" />.
+///             </description>
+///         </item>
+///     </list>
+///     Always writes the modern shape (with <c>Mode</c>).
 ///     <para>
-///         Legacy <c>FilterType</c> Property is still read (locally) so that historical persisted Advanced/Cached
-///         filters that happened to carry a stale BasicFilter blob still drop it during load — and so that legacy
-///         <c>FilterType: Basic</c> entries whose <c>BasicFilter</c> blob was lost can be repaired by running
-///         <see cref="BasicFilterDecomposer" /> against the persisted text. Newly written JSON omits <c>FilterType</c>
-///         entirely; the presence of <c>BasicFilter</c> is the structural marker post-L1.
-///     </para>
-///     <para>
-///         The validation/construction step (compile the text, hydrate <c>BasicFilter</c>, surface compile failures) is
-///         delegated to <see cref="SavedFilter.LoadFromPersisted" />. The converter holds the legacy-intent policy only.
+///         The validation/construction step (compile the text, hydrate <c>BasicFilter</c>, run repair-decompose for
+///         Basic-mode records whose <c>BasicFilter</c> blob is missing) is delegated to
+///         <see cref="SavedFilter.LoadFromPersisted" />. The converter holds the legacy-intent policy only.
 ///     </para>
 /// </summary>
 internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
@@ -41,6 +55,7 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
         bool isExcluded = false;
         LegacyFilterType legacyFilterType = LegacyFilterType.Advanced;
         bool legacyFilterTypeSeen = false;
+        FilterMode? modernMode = null;
         BasicFilter? basicFilter = null;
 
         while (reader.Read())
@@ -77,6 +92,9 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
                     legacyFilterType = ReadLegacyFilterType(ref reader);
                     legacyFilterTypeSeen = true;
                     break;
+                case "Mode":
+                    modernMode = ReadFilterMode(ref reader);
+                    break;
                 case "BasicFilter":
                     basicFilter = reader.TokenType == JsonTokenType.Null
                         ? null
@@ -91,30 +109,30 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         string text = comparisonText ?? legacyComparisonValue ?? string.Empty;
 
-        if (legacyFilterTypeSeen)
+        FilterMode mode;
+
+        if (modernMode is { } resolvedMode)
         {
-            // Stale BasicFilter drop: legacy Advanced/Cached payloads occasionally carried a leftover BasicFilter
-            // blob. Honour the historical intent and discard it so the post-L1 invariant (BasicFilter != null
-            // implies the filter is structured) is preserved on load.
-            if (legacyFilterType != LegacyFilterType.Basic && basicFilter is not null)
+            // Modern record: Mode wins. LoadFromPersisted enforces Mode-vs-BasicFilter consistency
+            // (Advanced/Cached force BasicFilter=null regardless).
+            mode = resolvedMode;
+        }
+        else if (legacyFilterTypeSeen)
+        {
+            mode = legacyFilterType switch
             {
-                basicFilter = null;
-            }
-
-            // Repair path: legacy Basic with a missing BasicFilter blob. Recover the structured form by running the
-            // decomposer against the persisted text. May still leave basicFilter null when text is non-decomposable;
-            // LoadFromPersisted then preserves the raw form so the user can repair the filter manually.
-            if (legacyFilterType == LegacyFilterType.Basic && basicFilter is null && !string.IsNullOrEmpty(text))
-            {
-                BasicFilterDecomposer.TryDecompose(text, out basicFilter);
-
-                Trace.TraceWarning(
-                    "SavedFilterJsonConverter: legacy Basic filter has no BasicFilter blob; recovered via fresh decompose. Text='{0}'",
-                    text);
-            }
+                LegacyFilterType.Basic => FilterMode.Basic,
+                LegacyFilterType.Cached => FilterMode.Cached,
+                _ => FilterMode.Advanced
+            };
+        }
+        else
+        {
+            // Neither modern Mode nor legacy FilterType: infer from BasicFilter presence (post-L1, pre-L4b shape).
+            mode = basicFilter is not null ? FilterMode.Basic : FilterMode.Advanced;
         }
 
-        return SavedFilter.LoadFromPersisted(text, color, isExcluded, basicFilter);
+        return SavedFilter.LoadFromPersisted(text, color, isExcluded, basicFilter, mode);
     }
 
     public override void Write(Utf8JsonWriter writer, SavedFilter value, JsonSerializerOptions options)
@@ -123,6 +141,7 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
         writer.WriteNumber("Color", (int)value.Color);
         writer.WriteString("ComparisonText", value.ComparisonText);
         writer.WriteBoolean("IsExcluded", value.IsExcluded);
+        writer.WriteString("Mode", value.Mode.ToString());
 
         if (value.BasicFilter is not null)
         {
@@ -132,6 +151,14 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         writer.WriteEndObject();
     }
+
+    private static FilterMode ReadFilterMode(ref Utf8JsonReader reader) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.String when Enum.TryParse<FilterMode>(reader.GetString(), out var parsed) => parsed,
+            JsonTokenType.Number => (FilterMode)reader.GetInt32(),
+            _ => FilterMode.Advanced
+        };
 
     private static HighlightColor ReadHighlightColor(ref Utf8JsonReader reader) =>
         reader.TokenType switch

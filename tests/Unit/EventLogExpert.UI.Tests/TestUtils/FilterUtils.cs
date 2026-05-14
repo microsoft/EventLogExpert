@@ -15,14 +15,22 @@ internal static class FilterUtils
         bool isEnabled = false,
         bool isExcluded = false,
         BasicFilter? basicFilter = null,
-        FilterId? id = null) =>
-        SavedFilter.TryCreate(comparisonValue, basicFilter, color, isExcluded, isEnabled, id) ??
+        FilterId? id = null,
+        FilterMode mode = FilterMode.Advanced) =>
+        SavedFilter.TryCreate(
+            comparisonValue,
+            basicFilter,
+            color,
+            isExcluded,
+            isEnabled,
+            id,
+            basicFilter is not null ? FilterMode.Basic : mode) ??
         throw new InvalidOperationException($"Test filter expression failed to compile: '{comparisonValue}'");
 
     internal static FilterDraft CreateTestFilterDraft(
         FilterId? id = null,
         string comparisonText = FilterIdEquals100,
-        bool isBasic = false,
+        FilterMode mode = FilterMode.Advanced,
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
         bool isExcluded = false,
@@ -33,7 +41,7 @@ internal static class FilterUtils
             Id = id ?? FilterId.Create(),
             Color = color,
             ComparisonText = comparisonText,
-            IsBasic = isBasic,
+            Mode = mode,
             Comparison = comparison ?? new FilterConditionDraft(),
             SubFilters = subFilters?.ToList() ?? [],
             IsEnabled = isEnabled,

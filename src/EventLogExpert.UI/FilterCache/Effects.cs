@@ -16,11 +16,23 @@ public sealed class Effects(IPreferencesProvider preferencesProvider, IState<Fil
     {
         if (state.Value.FavoriteFilters.Contains(action.Filter)) { return Task.CompletedTask; }
 
-        var newFilters = state.Value.FavoriteFilters.Add(action.Filter);
+        var newFavorites = state.Value.FavoriteFilters.Add(action.Filter);
 
-        preferencesProvider.FavoriteFiltersPreference = newFilters;
+        // Recent and Favorite are mutually exclusive views of cached filter strings; promoting a
+        // filter to Favorite removes it from Recent so it isn't shown twice in the picker.
+        var newRecents = ImmutableQueue.CreateRange(
+            state.Value.RecentFilters.Where(filter =>
+                !string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)));
 
-        dispatcher.Dispatch(new AddFavoriteFilterCompletedAction(newFilters));
+        preferencesProvider.FavoriteFiltersPreference = newFavorites;
+        preferencesProvider.RecentFiltersPreference = newRecents.ToList();
+
+        dispatcher.Dispatch(new AddFavoriteFilterCompletedAction(newFavorites));
+
+        if (newRecents.Count() != state.Value.RecentFilters.Count())
+        {
+            dispatcher.Dispatch(new AddRecentFilterCompletedAction(newRecents));
+        }
 
         return Task.CompletedTask;
     }
@@ -29,6 +41,8 @@ public sealed class Effects(IPreferencesProvider preferencesProvider, IState<Fil
     public Task HandleAddRecentFilter(AddRecentFilterAction action, IDispatcher dispatcher)
     {
         if (string.IsNullOrWhiteSpace(action.Filter) ||
+            state.Value.FavoriteFilters.Any(filter =>
+                string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)) ||
             state.Value.RecentFilters.Any(filter =>
                 string.Equals(filter, action.Filter, StringComparison.OrdinalIgnoreCase)))
         {

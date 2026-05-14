@@ -59,9 +59,9 @@
     {
         @if (Group.IsEditing)
         {
-            <FilterGroupRow @key="filter.Id"
+            <FilterRow @key="filter.Id"
                 OnEditingChanged="OnRowEditingChanged"
-                ParentId="Group.Id"
+                ParentFilterGroupId="Group.Id"
                 Value="filter" />
         }
         else
@@ -85,8 +85,8 @@
     {
         @foreach (var draft in _pendingDrafts)
         {
-            <FilterGroupRow @key="draft.Id"
-                ParentId="Group.Id"
+            <FilterRow @key="draft.Id"
+                ParentFilterGroupId="Group.Id"
                 PendingDraft="draft"
                 OnPendingSave="filter => HandlePendingSave(draft, filter)"
                 OnPendingDiscard="() => HandlePendingDiscard(draft)" />

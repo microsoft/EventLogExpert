@@ -3,9 +3,20 @@
 <div class="filter-pane">
     <div class="filter-header">
         <div>
-            <button class="button" @onclick="AddBasicFilter">
-                <i class="bi bi-plus-circle"></i> Add Basic Filter
-            </button>
+            <div class="split-button">
+                <button class="button split-button-primary" @onclick="AddBasicFilter" title="Add Basic filter (use chevron for Advanced or Cached)">
+                    <i class="bi bi-plus-circle"></i> Add Filter
+                </button>
+                <button aria-haspopup="menu"
+                    aria-label="Choose filter mode"
+                    class="button split-button-chevron"
+                    @onclick="OpenAddFilterMenuAsync"
+                    @onkeydown="HandleAddFilterChevronKeyDownAsync"
+                    @ref="_addFilterChevronRef"
+                    type="button">
+                    <i class="bi bi-caret-down-fill"></i>
+                </button>
+            </div>
 
             @if (!IsDateFilterVisible)
             {
@@ -14,16 +25,12 @@
                 </button>
             }
 
-            <button class="button" @onclick="AddAdvancedFilter">
-                <i class="bi bi-plus-circle"></i> Add Advanced Filter
-            </button>
-
-            <button class="button" @onclick="AddCachedFilter">
-                <i class="bi bi-plus-circle"></i> Add Cached Filter
-            </button>
-
             <button class="button" @onclick="AddExclusion">
                 <i class="bi bi-plus-circle"></i> Add Exclusion
+            </button>
+
+            <button class="button" @onclick="AddFilterGroup">
+                <i class="bi bi-plus-circle"></i> Apply Filter Group
             </button>
         </div>
 
@@ -44,27 +51,63 @@
                     }
                 </div>
             }
-
-            <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")" class="menu-toggle justify-self-right"
-                data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
-                <i class="bi bi-caret-up"></i>
-            </span>
         }
+
+        <div class="filter-header-secondary">
+            <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
+                aria-disabled="@(!HasSavableFilters)" aria-label="Save Filters as Group"
+                class="button icon-button" @onclick="SaveFiltersAsGroupAsync"
+                title="@(HasSavableFilters ? "Save Filters as Group..." : "No filters to save")"
+                type="button">
+                <i class="bi bi-bookmark-plus"></i>
+            </button>
+
+            <button aria-describedby="@(HasFilters ? null : "clear-filters-empty-hint")"
+                aria-disabled="@(!HasFilters)" aria-label="Clear All Filters"
+                class="button icon-button" @onclick="ClearAllFiltersAsync"
+                title="@(HasFilters ? "Clear All Filters..." : "No filters to clear")"
+                type="button">
+                <i class="bi bi-trash"></i>
+            </button>
+
+            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenSavedFiltersModal"
+                title="Manage Cached Filters" type="button">
+                <i class="bi bi-bookmark"></i>
+            </button>
+
+            <button aria-label="Manage Filter Groups" class="button icon-button" @onclick="OpenFilterGroupsModal"
+                title="Manage Filter Groups" type="button">
+                <i class="bi bi-collection"></i>
+            </button>
+
+            <span class="visually-hidden" id="save-filters-empty-hint">
+                Add a filter before saving as a group.
+            </span>
+            <span class="visually-hidden" id="clear-filters-empty-hint">
+                There are no filters to clear.
+            </span>
+
+            @if (HasFilters || FilterLoadingState.Value.IsLoading)
+            {
+                <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")" class="menu-toggle"
+                    data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
+                    <i class="bi bi-caret-up"></i>
+                </span>
+            }
+        </div>
     </div>
 
     <div class="filter-group" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
-            <EditForm class="flex-row filter-form" Model="_model">
+            <EditForm class="filter-form flex-row" Model="_model">
                 <span>
                     After:
-                    <InputDate aria-label="After" @bind-Value="_model.After" class="input filter-datetime"
-                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                    <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
                 <span>
                     Before:
-                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="input filter-datetime"
-                        disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
                 </span>
 
                 @if (_canEditDate)
@@ -103,34 +146,55 @@
             </EditForm>
         }
 
+        @if (_isGroupPickerVisible)
+        {
+            <div class="filter-form flex-row">
+                @if (HasFilterGroups)
+                {
+                    <span>
+                        Filter Group:
+                        <ValueSelect AriaLabel="Filter Group"
+                            CssClass="input filter-group-dropdown"
+                            T="FilterGroupId"
+                            ToStringFunc="@(GetGroupName)"
+                            Value="_selectedGroupId"
+                            ValueChanged="id => _selectedGroupId = id">
+                            @foreach (var group in FilterGroupState.Value.Groups.OrderBy(g => g.Name))
+                            {
+                                <ValueSelectItem T="FilterGroupId" Value="group.Id">@group.Name</ValueSelectItem>
+                            }
+                        </ValueSelect>
+                    </span>
+
+                    <button class="button button-green" disabled="@(_selectedGroupId == default)" @onclick="ApplyFilterGroupSelection">
+                        <i class="bi bi-check-circle"></i> Apply
+                    </button>
+                }
+                else
+                {
+                    <span class="filter-empty-state">
+                        No saved filter groups yet — use <strong>Save Filters as Group</strong> on the right
+                        to create one from the current pane.
+                    </span>
+                }
+
+                <button class="button button-red" @onclick="CancelFilterGroupPicker" type="button">
+                    <i class="bi bi-dash-circle"></i> Cancel
+                </button>
+            </div>
+        }
+
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            if (item.BasicFilter is not null)
-            {
-                <FilterRow @key="item.Id" Value="item" />
-            }
-            else
-            {
-                <AdvancedFilterRow @key="item.Id" Value="item" />
-            }
+            <FilterRow @key="item.Id" Value="item" />
         }
 
         @foreach (var draft in _pendingDrafts)
         {
-            if (draft.IsBasic)
-            {
-                <FilterRow @key="draft.Id"
-                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                    PendingDraft="draft" />
-            }
-            else
-            {
-                <AdvancedFilterRow @key="draft.Id"
-                    OnPendingDiscard="() => HandlePendingDiscard(draft)"
-                    OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                    PendingDraft="draft" />
-            }
+            <FilterRow @key="draft.Id"
+                OnPendingDiscard="() => HandlePendingDiscard(draft)"
+                OnPendingSave="filter => HandlePendingSave(draft, filter)"
+                PendingDraft="draft" />
         }
     </div>
 </div>

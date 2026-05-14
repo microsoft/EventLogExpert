@@ -43,10 +43,6 @@ public interface IMenuActionService
 
     Task ShowDebugLogsAsync();
 
-    Task ShowFilterCacheAsync();
-
-    Task ShowFilterGroupsAsync();
-
     Task ShowReleaseNotesAsync();
 
     void ToggleShowAllEvents();

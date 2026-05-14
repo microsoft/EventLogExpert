@@ -1,9 +1,0 @@
-﻿.filter-group-row {
-    display: flex;
-    flex-direction: column;
-}
-
-.error-row {
-    text-align: center;
-    width: 100%;
-}

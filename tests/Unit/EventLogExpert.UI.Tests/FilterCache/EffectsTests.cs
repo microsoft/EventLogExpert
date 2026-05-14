@@ -73,6 +73,57 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleAddFavoriteFilter_WhenFilterInRecent_ShouldRemoveFromRecent()
+    {
+        // Favorite and Recent are mutually exclusive in the picker; promoting to Favorite must drop
+        // the same string from Recent so the cached-filter dropdown doesn't show it twice.
+        var existingFavorites = ImmutableList<string>.Empty;
+        var existingRecent = ImmutableQueue.Create(
+            Constants.FilterIdEquals100,
+            Constants.FilterLevelEqualsError);
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
+            existingFavorites,
+            existingRecent);
+
+        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals100);
+
+        // Act
+        await effects.HandleAddFavoriteFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(x =>
+            x.Filters.Count == 1 &&
+            x.Filters.Contains(Constants.FilterIdEquals100)));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterCompletedAction>(x =>
+            x.Filters.Count() == 1 &&
+            !x.Filters.Contains(Constants.FilterIdEquals100) &&
+            x.Filters.Contains(Constants.FilterLevelEqualsError)));
+
+        _ = mockPreferencesProvider.Received(1).RecentFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
+            !x.Contains(Constants.FilterIdEquals100));
+    }
+
+    [Fact]
+    public async Task HandleAddFavoriteFilter_WhenFilterNotInRecent_ShouldNotDispatchRecentAction()
+    {
+        // Arrange — recent untouched, so we shouldn't dispatch a no-op AddRecentFilterCompletedAction.
+        var existingRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
+            recentFilters: existingRecent);
+
+        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals100);
+
+        // Act
+        await effects.HandleAddFavoriteFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+    }
+
+    [Fact]
     public async Task HandleAddRecentFilter_ShouldPersistToPreferences()
     {
         // Arrange
@@ -103,6 +154,43 @@ public sealed class EffectsTests
             recentFilters: existingRecent);
 
         var action = new AddRecentFilterAction(Constants.FilterIdEquals100);
+
+        // Act
+        await effects.HandleAddRecentFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+    }
+
+    [Fact]
+    public async Task HandleAddRecentFilter_WhenFilterAlreadyFavorite_ShouldNotDispatch()
+    {
+        // Symmetric to the Favorite-eviction rule: a filter already in Favorites shouldn't get
+        // duplicated into Recent (e.g., when re-applying a favorite filter through the row).
+        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
+            existingFavorites);
+
+        var action = new AddRecentFilterAction(Constants.FilterIdEquals100);
+
+        // Act
+        await effects.HandleAddRecentFilter(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+    }
+
+    [Fact]
+    public async Task HandleAddRecentFilter_WhenFilterAlreadyFavoriteCaseInsensitive_ShouldNotDispatch()
+    {
+        // Arrange
+        var existingFavorites = ImmutableList.Create("Id == 100");
+
+        var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
+            existingFavorites);
+
+        var action = new AddRecentFilterAction("ID == 100");
 
         // Act
         await effects.HandleAddRecentFilter(action, mockDispatcher);

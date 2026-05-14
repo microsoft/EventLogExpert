@@ -1,6 +1,6 @@
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="Saved Filters"
+<ModalChrome AriaLabel="Cached Filters"
     CloseLabel="Exit"
     Footer="FooterPreset.ImportExportClose"
     Height="60%"
@@ -29,12 +29,6 @@
                                 </button>
                                 <span>@filter</span>
                             </div>
-
-                            <button aria-label="@($"Apply filter {filter}")" class="button button-green"
-                                @onclick="() => AddFilter(filter)"
-                                type="button">
-                                <i aria-hidden="true" class="bi bi-plus-circle"></i>
-                            </button>
                         </div>
                     }
                 </div>
@@ -57,12 +51,6 @@
                                 </button>
                                 <span>@filter</span>
                             </div>
-
-                            <button aria-label="@($"Apply filter {filter}")" class="button button-green"
-                                @onclick="() => AddFilter(filter)"
-                                type="button">
-                                <i aria-hidden="true" class="bi bi-plus-circle"></i>
-                            </button>
                         </div>
                     }
                 </div>

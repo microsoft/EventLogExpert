@@ -306,10 +306,6 @@ public sealed class MauiMenuActionService(
 
     public Task ShowDebugLogsAsync() => ShowModalAsync<DebugLogModal>("debug logs");
 
-    public Task ShowFilterCacheAsync() => ShowModalAsync<FilterCacheModal>("filter cache");
-
-    public Task ShowFilterGroupsAsync() => ShowModalAsync<FilterGroupModal>("filter groups");
-
     public async Task ShowReleaseNotesAsync()
     {
         try

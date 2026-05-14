@@ -9,8 +9,9 @@ namespace EventLogExpert.UI.Filter;
 
 /// <summary>
 ///     Immutable saved filter. Carries <see cref="ComparisonText" /> together with the pre-compiled
-///     <see cref="Compiled" /> predicate so consumers never have to recompile to evaluate. Basic filters additionally
-///     retain <see cref="BasicFilter" /> for round-trip re-edit.
+///     <see cref="Compiled" /> predicate so consumers never have to recompile to evaluate. <see cref="Mode" />
+///     determines how the row is reopened for re-edit; Basic-mode filters additionally retain
+///     <see cref="BasicFilter" /> for round-trip structure.
 /// </summary>
 [JsonConverter(typeof(SavedFilterJsonConverter))]
 public sealed record SavedFilter
@@ -34,8 +35,8 @@ public sealed record SavedFilter
     public required CompiledFilter? Compiled { get; init; }
 
     /// <summary>
-    ///     Structured form of Basic filters; persisted so re-edit reopens the original comparison + sub-filter structure.
-    ///     <c>null</c> for filters that were authored as raw expressions.
+    ///     Structured form of Basic-mode filters; persisted so re-edit reopens the original comparison + sub-filter
+    ///     structure. <c>null</c> for Advanced and Cached modes (preserved-as-text only).
     /// </summary>
     public BasicFilter? BasicFilter { get; init; }
 
@@ -45,14 +46,24 @@ public sealed record SavedFilter
     public bool IsExcluded { get; init; }
 
     /// <summary>
+    ///     Authoring mode, persisted so re-edit reopens on the same surface (Basic structured editor / Advanced free-text
+    ///     input / Cached inline picker). Defaults to <see cref="FilterMode.Advanced" /> for back-compat with legacy
+    ///     persisted records that omitted the field; the converter infers the actual intent from
+    ///     <see cref="BasicFilter" /> presence on legacy reads (see <see cref="SavedFilterJsonConverter" />).
+    /// </summary>
+    public FilterMode Mode { get; init; } = FilterMode.Advanced;
+
+    /// <summary>
     ///     Compiles <paramref name="comparisonText" /> and returns a populated <see cref="SavedFilter" />, or <c>null</c>
-    ///     if the expression fails to parse. When <paramref name="basicFilter" /> is supplied it is retained verbatim
-    ///     (caller-provided structure always wins). When <paramref name="basicFilter" /> is <c>null</c> the factory
-    ///     opportunistically runs <see cref="BasicFilterDecomposer.TryDecompose" /> against the compiled text and populates
-    ///     <see cref="BasicFilter" /> when the expression maps to the closed Basic vocabulary; non-decomposable text leaves
-    ///     <see cref="BasicFilter" /> <c>null</c> (raw / Advanced shape preserved). Callers that intentionally want the raw
-    ///     shape regardless of decomposability — e.g. the Advanced-row save path in <c>EditableFilterRowBase.TrySaveAsync</c>
-    ///     — must construct <see cref="SavedFilter" /> directly rather than route through this factory.
+    ///     if the expression fails to parse. <paramref name="mode" /> is authoritative — when
+    ///     <paramref name="basicFilter" /> is supplied, <paramref name="mode" /> must be
+    ///     <see cref="FilterMode.Basic" /> (a mismatch throws <see cref="ArgumentException" /> so caller errors fail
+    ///     loudly at the call site rather than silently mutating the row's persisted authoring intent). When
+    ///     <paramref name="mode" /> is <see cref="FilterMode.Basic" /> and no <paramref name="basicFilter" /> is
+    ///     supplied, the factory opportunistically runs <see cref="BasicFilterDecomposer.TryDecompose" /> against the
+    ///     compiled text and populates <see cref="BasicFilter" /> when the expression maps to the closed Basic
+    ///     vocabulary. Advanced and Cached modes always force <see cref="BasicFilter" /> to <c>null</c> (preserves the
+    ///     L3 "Advanced stays Advanced" intent guard explicitly).
     /// </summary>
     public static SavedFilter? TryCreate(
         string comparisonText,
@@ -60,13 +71,26 @@ public sealed record SavedFilter
         HighlightColor color = HighlightColor.None,
         bool isExcluded = false,
         bool isEnabled = false,
-        FilterId? id = null)
+        FilterId? id = null,
+        FilterMode mode = FilterMode.Advanced)
     {
+        if (basicFilter is not null && mode != FilterMode.Basic)
+        {
+            throw new ArgumentException(
+                $"Supplying a {nameof(BasicFilter)} requires {nameof(mode)} = {nameof(FilterMode.Basic)}; got '{mode}'.",
+                nameof(mode));
+        }
+
         if (!FilterCompiler.TryCompile(comparisonText, out var compiled, out _)) { return null; }
 
-        if (basicFilter is null && BasicFilterDecomposer.TryDecompose(comparisonText, out var decomposed))
+        if (basicFilter is null && mode == FilterMode.Basic
+            && BasicFilterDecomposer.TryDecompose(comparisonText, out var decomposed))
         {
             basicFilter = decomposed;
+        }
+        else if (mode != FilterMode.Basic)
+        {
+            basicFilter = null;
         }
 
         return new SavedFilter
@@ -77,7 +101,8 @@ public sealed record SavedFilter
             Compiled = compiled,
             BasicFilter = basicFilter,
             IsEnabled = isEnabled,
-            IsExcluded = isExcluded
+            IsExcluded = isExcluded,
+            Mode = mode
         };
     }
 
@@ -86,23 +111,32 @@ public sealed record SavedFilter
     ///     persistence corruption never blocks application start: invalid expressions surface as a disabled filter whose text
     ///     is preserved for the user to repair.
     ///     <para>
-    ///         Hydration policy for <paramref name="persistedBasicFilter" /> when <paramref name="text" /> compiles:
+    ///         <paramref name="mode" /> is authoritative for <see cref="BasicFilter" /> hydration:
     ///         <list type="bullet">
     ///             <item>
     ///                 <description>
-    ///                     <c>null</c> → <see cref="BasicFilter" /> stays <c>null</c>. The caller (typically the JSON
-    ///                     converter) is responsible for distinguishing "no structured signal on disk" (preserve null intent —
-    ///                     Advanced filters stay Advanced even when their text happens to decompose) from "structured signal
-    ///                     present but blob missing" (caller pre-decomposes for the repair path).
+    ///                     <see cref="FilterMode.Advanced" /> or <see cref="FilterMode.Cached" /> → <see cref="BasicFilter" />
+    ///                     is forced to <c>null</c> regardless of <paramref name="persistedBasicFilter" /> (preserves the L3
+    ///                     "Advanced stays Advanced" intent guard explicitly; Cached rows always reopen with empty structure).
     ///                 </description>
     ///             </item>
     ///             <item>
     ///                 <description>
-    ///                     not <c>null</c> → run <see cref="BasicFilterDecomposer.TryDecompose" /> against
-    ///                     <paramref name="text" />. When the decomposer succeeds, prefer the freshly-decomposed structure
-    ///                     (canonical, drift-resistant, immune to formatter-version skew). When it refuses (e.g. older
-    ///                     persisted vocabulary), fall back to <paramref name="persistedBasicFilter" /> so the structure isn't
-    ///                     lost.
+    ///                     <see cref="FilterMode.Basic" /> with <paramref name="persistedBasicFilter" /> <c>null</c> →
+    ///                     run <see cref="BasicFilterDecomposer.TryDecompose" /> against <paramref name="text" /> to
+    ///                     attempt structure recovery (covers hand-edited / partial-write JSON where the BasicFilter
+    ///                     blob is missing). When the decomposer also refuses, leaves <see cref="BasicFilter" />
+    ///                     <c>null</c>; the editor surfaces the row as empty Basic structure but preserves the raw
+    ///                     <see cref="ComparisonText" /> so a subsequent mode switch to Advanced can recover it.
+    ///                 </description>
+    ///             </item>
+    ///             <item>
+    ///                 <description>
+    ///                     <see cref="FilterMode.Basic" /> with non-<c>null</c> <paramref name="persistedBasicFilter" /> →
+    ///                     run <see cref="BasicFilterDecomposer.TryDecompose" /> against <paramref name="text" />. When the
+    ///                     decomposer succeeds, prefer the freshly-decomposed structure (canonical, drift-resistant,
+    ///                     immune to formatter-version skew). When it refuses (e.g. older persisted vocabulary), fall back
+    ///                     to <paramref name="persistedBasicFilter" /> so the structure isn't lost.
     ///                 </description>
     ///             </item>
     ///         </list>
@@ -112,7 +146,8 @@ public sealed record SavedFilter
         string text,
         HighlightColor color,
         bool isExcluded,
-        BasicFilter? persistedBasicFilter)
+        BasicFilter? persistedBasicFilter,
+        FilterMode mode)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -123,7 +158,8 @@ public sealed record SavedFilter
                 Compiled = null,
                 BasicFilter = null,
                 IsEnabled = false,
-                IsExcluded = isExcluded
+                IsExcluded = isExcluded,
+                Mode = mode
             };
         }
 
@@ -141,17 +177,27 @@ public sealed record SavedFilter
                 Compiled = null,
                 BasicFilter = null,
                 IsEnabled = false,
-                IsExcluded = isExcluded
+                IsExcluded = isExcluded,
+                Mode = mode
             };
         }
 
         BasicFilter? hydrated = null;
 
-        if (persistedBasicFilter is not null)
+        if (mode == FilterMode.Basic)
         {
-            hydrated = BasicFilterDecomposer.TryDecompose(text, out var fresh)
-                ? fresh
-                : persistedBasicFilter;
+            // Try fresh decompose first (canonical, drift-resistant). When that refuses, fall back to the persisted
+            // blob if the caller supplied one. This means hand-edited / partial-write JSON whose Mode=Basic but
+            // BasicFilter blob is missing still gets a recovery attempt — without it the row would reopen with an
+            // empty Basic editor while the raw text stays hidden, and the next save would silently wipe the text.
+            if (BasicFilterDecomposer.TryDecompose(text, out var fresh))
+            {
+                hydrated = fresh;
+            }
+            else if (persistedBasicFilter is not null)
+            {
+                hydrated = persistedBasicFilter;
+            }
         }
 
         return new SavedFilter
@@ -161,7 +207,8 @@ public sealed record SavedFilter
             Compiled = compiled,
             BasicFilter = hydrated,
             IsEnabled = true,
-            IsExcluded = isExcluded
+            IsExcluded = isExcluded,
+            Mode = mode
         };
     }
 }
