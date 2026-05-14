@@ -52,7 +52,6 @@ public sealed class Effects(
     private readonly IFilterService _filterService = filterService;
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logCloseCompletions = new();
-
     /// <summary>
     ///     Serializes <see cref="HandleSetFilters" />'s XML-reload path with
     ///     <see cref="PrepareForDatabaseRemovalAsync" />. Both write into <see cref="_logCloseCompletions" /> with raw
@@ -63,9 +62,8 @@ public sealed class Effects(
     ///     it.
     /// </summary>
     private readonly SemaphoreSlim _logCloseCoordinatorLock = new(1, 1);
-
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
-
+    private readonly ITraceLogger _logger = logger;
     /// <summary>
     ///     Tracks per-log load completion so <see cref="HandleCloseLog" /> can wait for the in-flight
     ///     <see cref="LoadLogAsync" /> service scope to dispose before draining the watcher. Without this, cts.Cancel() merely
@@ -73,16 +71,13 @@ public sealed class Effects(
     ///     disposes once HandleOpenLog's outer using/finally runs.
     /// </summary>
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
-    private readonly ILogWatcherService _logWatcherService = logWatcherService;
-    private readonly ITraceLogger _logger = logger;
-
     /// <summary>
     ///     Tracks which currently-open logs (by <see cref="EventLogData.Id" />) were loaded with renderXml=true. A
     ///     reload-on-transition only re-opens logs that lack XML; logs that already have it are left alone. Removing or
     ///     disabling an XML filter never triggers a reload because the XML data is already in memory and harmless to keep.
     /// </summary>
     private readonly ConcurrentDictionary<EventLogId, byte> _logsLoadedWithXml = new();
-
+    private readonly ILogWatcherService _logWatcherService = logWatcherService;
     /// <summary>
     ///     Pending selection restore per log name, populated when a filter transition forces a reload. Consumed by
     ///     <see cref="HandleLoadEvents" /> when the reloaded log finishes loading. Carries both the selected record-ids and
@@ -146,8 +141,7 @@ public sealed class Effects(
     {
         CancelAllLoads();
 
-        await _logWatcherService.RemoveAllAsync();
-
+        // Sync prefix: subsequent OpenLogAction must see cleared LogTable.
         dispatcher.Dispatch(new LogTable.CloseAllAction());
         dispatcher.Dispatch(new StatusBar.CloseAllAction());
 
@@ -155,6 +149,8 @@ public sealed class Effects(
         _xmlResolver.ClearAll();
         _logsLoadedWithXml.Clear();
         _pendingSelectionRestore.Clear();
+
+        await _logWatcherService.RemoveAllAsync();
     }
 
     [EffectMethod]
