@@ -6,42 +6,40 @@ A Windows Event Log viewer for tech support and IT professionals.
 
 ## Key features
 
-* Quickly load huge .evtx files. File -> Open and select multiple files, or just drag-and-drop them into the view. The tool will happily load multiple .evtx files concurrently.
-* View multiple .evtx files in an interleaved combined view and examine how events line up across multiple servers.
-* See event description previews right in the table without having to open each individual event.
-* Filter using friendly drop-downs, use Advanced Filter and enter a LINQ expression, or combine both.
-* Create an event database to view .evtx files on computers that don't have the same product installed. For example, view Exchange Server or SQL Server logs on a user workstation.
-* Can be used as a replacement for Event Viewer to view live event logs. Choose Continuously Update on the View menu and watch new events appear in real time.
+* Loads `.evtx` files concurrently — `File` → `Open`, drag-and-drop, or open every `.evtx` in a folder in one step.
+* Combined view interleaves events from any mix of file and live logs by time across multiple machines.
+* Configurable event-table columns (visibility, ordering, sort) with per-row highlight colors driven by your filters.
+* Filter pane with Basic (category × evaluator) filters, sub-filters joined with `AND` / `OR`, Date filter, Advanced Dynamic LINQ expressions, and Exclusion filters.
+* Filter Cache (Favorites + Recent) and named, importable / exportable Filter Groups.
+* Live event channels with auto-discovery (admin-only channels disabled when not elevated), `Continuously Update`, and a `Load New Events` buffered mode.
+* Provider Databases — load `.db` files captured on another machine so its `.evtx` files resolve descriptions and task categories correctly.
+* In-line description previews in the table; on-demand event XML in the Details pane.
+* Configurable Ctrl+C copy mode (`Default`, `Simple`, `XML`, `Full`); System / Light / Dark theme.
+* In-app Release Notes and Debug Log viewer; opt-in pre-release update channel.
 
 For more information, check our [docs](docs/Home.md).
 
 ## Quick Start
 
-### Windows 10 or 11
+Download the `EventLogExpert_<version>_x64.appinstaller` (or the matching `EventLogExpert_<version>_x64.msix`) from the latest release and run it: <https://github.com/microsoft/EventLogExpert/releases/latest>.
 
-Simply download the `EventLogExpert*.msix` file from the latest and run it: [https://github.com/microsoft/EventLogExpert/releases/latest/](https://github.com/microsoft/EventLogExpert/releases/latest/).
+The `.appinstaller` declares its dependency on the Windows App Runtime (currently `Microsoft.WindowsAppRuntime.1.7.msix`, also published in the same release) so App Installer fetches the runtime automatically on a clean machine. Updates are checked on launch.
 
-### Windows Server 2019 or 2022
+If you'd rather install the runtime manually first, grab `Microsoft.WindowsAppRuntime.1.7.msix` from the release and install it with:
 
-Note: Auto-updates do not work on 2019.
+```
+Add-AppxPackage $home\Downloads\Microsoft.WindowsAppRuntime.1.7.msix
+```
 
-* Download the `EventLogExpert*.msix`.
-* Windows 2019 will also need the `Microsoft.WindowsAppRuntime*.msix` unless it was already installed by something else. You'll find this file in the release with the `EventLogExpert*.msix`.
-* Enable sideloading:
+Then install the app:
 
-    `Set-ItemProperty -Path HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock -Name AllowAllTrustedApps -Value 1`
-
-* Install the runtime with Add-AppxPackage. Example:
-
-    `Add-AppxPackage $home\Downloads\Microsoft.WindowsAppRuntime.1.2.msix`
-
-* Install EventLogExpert:
-
-    `Add-AppxPackage $home\Downloads\EventLogExpert_23.5.19.1256_x64.msix`
+```
+Add-AppxPackage $home\Downloads\EventLogExpert_<version>_x64.msix
+```
 
 ### First time setup
 
-Head over to our [docs](docs/Home.md).
+Head over to our [docs](docs/Settings.md).
 
 ## Contributing
 
