@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Linq.Dynamic.Core" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\..\src\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
   </ItemGroup>
 
