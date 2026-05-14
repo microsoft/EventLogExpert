@@ -9,8 +9,6 @@ public interface IMenuActionService
 {
     Task CheckForUpdatesAsync();
 
-    void ClearAllFilters();
-
     Task CloseAllLogsAsync();
 
     Task CopySelectedAsync(EventCopyFormat? format);
@@ -37,7 +35,7 @@ public interface IMenuActionService
 
     Task<bool> OpenSettingsAsync();
 
-    Task SaveAllFiltersAsync();
+    Task SaveFiltersAsGroupAsync();
 
     void SetContinuouslyUpdate(bool value);
 

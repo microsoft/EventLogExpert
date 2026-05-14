@@ -31,7 +31,7 @@
                 </button>
             }
 
-            <button class="button" @onclick="AddFilterGroup">
+            <button class="button" @onclick="OpenFilterGroupPicker">
                 <i class="bi bi-plus-circle"></i> Apply Filter Group
             </button>
         </div>
@@ -68,7 +68,7 @@
                 <i class="bi bi-trash"></i>
             </button>
 
-            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenSavedFiltersModal" title="Manage Cached Filters" type="button">
+            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenCachedFiltersModal" title="Manage Cached Filters" type="button">
                 <i class="bi bi-bookmark"></i>
             </button>
 
