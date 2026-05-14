@@ -28,6 +28,7 @@ public sealed partial class FilterPane : IDisposable
     private readonly List<FilterDraft> _pendingDrafts = [];
 
     private ElementReference _addFilterChevronRef;
+    private long _addFilterMenuId;
     private bool _canEditDate;
     private TimeZoneInfo _currentTimeZone = TimeZoneInfo.Utc;
     private bool _isFilterListVisible;
@@ -51,14 +52,25 @@ public sealed partial class FilterPane : IDisposable
     private bool HasCachedFilters =>
         FilterCacheState.Value.FavoriteFilters.Any() || FilterCacheState.Value.RecentFilters.Any();
 
+    // Things Clear All actually removes: persisted filters, pending drafts, open date editor.
+    // The apply-group picker is a UI-only surface (Cancel closes it) and is intentionally excluded
+    // so the trash icon doesn't appear actionable when there's nothing destructive to do.
+    private bool HasClearableFilters =>
+        IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
+
     private bool HasFilterGroups => !FilterGroupState.Value.Groups.IsEmpty;
 
+    // True whenever the pane has anything to show below the header (committed filters, pending drafts,
+    // an open date editor, or the apply-group picker). Drives expand/collapse + active-count visibility.
     private bool HasFilters =>
         IsDateFilterVisible || _isGroupPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
     // Save-as-group only persists committed pane filters (effect reads `FilterPaneState.Value.Filters`).
     // Pending drafts, the date filter, and an open group picker are NOT saved, so they don't enable Save.
     private bool HasSavableFilters => !FilterPaneState.Value.Filters.IsEmpty;
+
+    private bool IsAddFilterMenuOpen =>
+        _addFilterMenuId != 0 && MenuService.ActiveMenuId == _addFilterMenuId && MenuService.ActiveItems is not null;
 
     private bool IsDateFilterVisible => _canEditDate || FilterPaneState.Value.FilteredDateRange is not null;
 
@@ -74,7 +86,11 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
-    public void Dispose() => Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
+    public void Dispose()
+    {
+        Settings.TimeZoneChanged -= UpdateFilterDateTimeZone;
+        MenuService.StateChanged -= OnMenuServiceStateChanged;
+    }
 
     protected override void OnInitialized()
     {
@@ -92,6 +108,7 @@ public sealed partial class FilterPane : IDisposable
         });
 
         Settings.TimeZoneChanged += UpdateFilterDateTimeZone;
+        MenuService.StateChanged += OnMenuServiceStateChanged;
 
         base.OnInitialized();
     }
@@ -153,10 +170,18 @@ public sealed partial class FilterPane : IDisposable
 
     private void AddFilterGroup()
     {
+        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
+        // overwritten by `Groups.First()` reset. Cancel button is the only way to dismiss the picker.
+        if (_isGroupPickerVisible) { return; }
+
         // Per locked design: trigger is always enabled. Picker shows empty-state copy when no groups
         // exist (rather than disabling the trigger and leaving users without a discovery hint).
+        // Pre-select uses the dropdown's display order (alphabetical) so the highlighted entry
+        // matches the first row a sighted user sees.
         _isGroupPickerVisible = true;
-        _selectedGroupId = HasFilterGroups ? FilterGroupState.Value.Groups.First().Id : default;
+        _selectedGroupId = HasFilterGroups
+            ? FilterGroupState.Value.Groups.OrderBy(g => g.Name).First().Id
+            : default;
         _isFilterListVisible = true;
     }
 
@@ -189,7 +214,13 @@ public sealed partial class FilterPane : IDisposable
     [
         MenuItem.Item("Basic", AddBasicFilterFromMenu),
         MenuItem.Item("Advanced", AddAdvancedFilterFromMenu),
-        MenuItem.Item("Cached", AddCachedFilterFromMenu, isEnabled: HasCachedFilters),
+        MenuItem.Item(
+            "Cached",
+            AddCachedFilterFromMenu,
+            isEnabled: HasCachedFilters,
+            disabledReason: HasCachedFilters
+                ? null
+                : "No cached filters yet — apply a Basic or Advanced filter to populate."),
     ];
 
     private void CancelFilterGroupPicker()
@@ -200,21 +231,18 @@ public sealed partial class FilterPane : IDisposable
 
     private async Task ClearAllFiltersAsync()
     {
-        if (!HasFilters) { return; }
+        if (!HasClearableFilters) { return; }
 
         // Counts everything Clear All actually removes: persisted filters (regardless of IsEnabled),
-        // any open date filter row, and any uncommitted pending drafts. Group picker is just a UI
-        // surface (no data behind it) so it's reset, not counted.
+        // any open date filter row, and any uncommitted pending drafts.
         int count = FilterPaneState.Value.Filters.Count
             + _pendingDrafts.Count
             + (IsDateFilterVisible ? 1 : 0);
 
-        string message = count switch
-        {
-            0 => "Clear all filters? This cannot be undone.",
-            1 => "Clear 1 filter? This cannot be undone.",
-            _ => $"Clear {count} filters? This cannot be undone.",
-        };
+        // HasClearableFilters guarantees count >= 1, so the message is always factual.
+        string message = count == 1
+            ? "Clear 1 filter? This cannot be undone."
+            : $"Clear {count} filters? This cannot be undone.";
 
         bool confirmed = await AlertDialogService.ShowAlert("Clear All Filters", message, "Clear", "Cancel");
 
@@ -264,12 +292,18 @@ public sealed partial class FilterPane : IDisposable
         Dispatcher.Dispatch(new SetFilterAction(filter));
     }
 
+    // Marshaled through the renderer dispatcher because StateChanged may fire from arbitrary threads;
+    // re-renders so the chevron's aria-expanded reflects open/close state.
+    private void OnMenuServiceStateChanged() => _ = InvokeAsync(StateHasChanged);
+
     private async Task OpenAddFilterMenuAsync() => await OpenAddFilterMenuAtAsync(true);
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
     {
         var rect = await JSRuntime.InvokeAsync<AnchorRect>("getMenuElementRect", _addFilterChevronRef);
         MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst);
+        _addFilterMenuId = MenuService.ActiveMenuId;
+        StateHasChanged();
     }
 
     private async Task OpenFilterGroupsModal() => await ModalService.Show<FilterGroupModal, bool>();
@@ -282,12 +316,7 @@ public sealed partial class FilterPane : IDisposable
         Dispatcher.Dispatch(new SetFilterDateRangeAction(null));
     }
 
-    private Task SaveFiltersAsGroupAsync()
-    {
-        if (!HasSavableFilters) { return Task.CompletedTask; }
-
-        return MenuActions.SaveAllFiltersAsync();
-    }
+    private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveAllFiltersAsync();
 
     private void ToggleDateFilter() => Dispatcher.Dispatch(new ToggleFilterDateAction());
 

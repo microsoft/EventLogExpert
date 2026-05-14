@@ -16,9 +16,13 @@ public sealed partial class MenuRenderer
 
     // Type-ahead matches reset after this idle window (WAI-ARIA Authoring Practices guidance).
     private static readonly TimeSpan s_typeAheadResetWindow = TimeSpan.FromMilliseconds(500);
-    private bool _focusOnNextRender;
+    // Per-instance suffix for aria-describedby ids so nested MenuRenderers don't collide.
+    private static long s_rendererIdCounter;
+
+    private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
 
     private int _focusedIndex = -1;
+    private bool _focusOnNextRender;
     private ElementReference[] _itemElements = [];
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;
@@ -148,7 +152,7 @@ public sealed partial class MenuRenderer
         {
             var candidate = Items[i];
 
-            if (!candidate.IsSeparator && candidate.IsEnabled) { return i; }
+            if (candidate.IsFocusable) { return i; }
         }
 
         return -1;
@@ -169,7 +173,8 @@ public sealed partial class MenuRenderer
 
         if (item.Children is not null || item.ChildrenLoader is not null)
         {
-            await OpenSubmenu(item, focusFirstChild: true);
+            await OpenSubmenu(item, true);
+
             return;
         }
 
@@ -271,7 +276,7 @@ public sealed partial class MenuRenderer
             int index = (startIndex + offset) % Items.Count;
             var candidate = Items[index];
 
-            if (candidate.IsSeparator || !candidate.IsEnabled) { continue; }
+            if (!candidate.IsFocusable) { continue; }
 
             if (candidate.Label.StartsWith(matchPrefix, StringComparison.OrdinalIgnoreCase))
             {
@@ -294,9 +299,10 @@ public sealed partial class MenuRenderer
             start = ((start + direction) % Items.Count + Items.Count) % Items.Count;
             var candidate = Items[start];
 
-            if (candidate.IsSeparator || !candidate.IsEnabled) { continue; }
+            if (!candidate.IsFocusable) { continue; }
 
             MoveFocusTo(start);
+
             return;
         }
     }
@@ -307,6 +313,7 @@ public sealed partial class MenuRenderer
 
         _focusedIndex = index;
         _focusOnNextRender = true;
+
         StateHasChanged();
     }
 
@@ -314,6 +321,7 @@ public sealed partial class MenuRenderer
     {
         _openItem = null;
         _resolvedChildren = null;
+
         await OnActivated.InvokeAsync();
     }
 
@@ -325,7 +333,8 @@ public sealed partial class MenuRenderer
 
         if (item.Children is not null || item.ChildrenLoader is not null)
         {
-            await OpenSubmenu(item, focusFirstChild: true);
+            await OpenSubmenu(item, true);
+
             return;
         }
 
@@ -343,7 +352,21 @@ public sealed partial class MenuRenderer
 
     private void OnItemHover(MenuItem item, int index)
     {
-        if (!item.IsEnabled) { return; }
+        if (!item.IsFocusable) { return; }
+
+        // Informative-disabled items: move focus on hover so the disabled reason is announced,
+        // but never open a submenu or change submenu state.
+        if (!item.IsEnabled)
+        {
+            if (_focusedIndex == index) { return; }
+
+            _focusedIndex = index;
+            _focusOnNextRender = true;
+
+            StateHasChanged();
+
+            return;
+        }
 
         if (item.Children is null && item.ChildrenLoader is null)
         {
@@ -355,6 +378,7 @@ public sealed partial class MenuRenderer
             _resolvedChildren = null;
             _focusedIndex = index;
             _focusOnNextRender = true;
+
             StateHasChanged();
 
             return;
@@ -366,6 +390,7 @@ public sealed partial class MenuRenderer
 
             _focusedIndex = index;
             _focusOnNextRender = true;
+
             StateHasChanged();
 
             return;
@@ -373,7 +398,7 @@ public sealed partial class MenuRenderer
 
         _focusedIndex = index;
         _focusOnNextRender = true;
-        _ = OpenSubmenu(item, focusFirstChild: false);
+        _ = OpenSubmenu(item, false);
     }
 
     private async Task OnSubmenuRequestedClose()
@@ -383,7 +408,9 @@ public sealed partial class MenuRenderer
         _openItem = null;
         _resolvedChildren = null;
         _focusOnNextRender = true;
+
         StateHasChanged();
+
         await Task.CompletedTask;
     }
 
