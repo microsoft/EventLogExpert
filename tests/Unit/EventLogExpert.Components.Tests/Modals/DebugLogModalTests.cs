@@ -68,6 +68,26 @@ public sealed class DebugLogModalTests : BunitContext
     }
 
     [Fact]
+    public async Task DebugLogModal_AfterLoad_RowsCarryTitleAttributeMirroringText()
+    {
+        var firstHeader = DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogFirstMessage);
+        var secondHeader = DebugLogUtils.BuildLine(LogLevel.Information, Constants.DebugLogSecondMessage);
+
+        _fileLogger.LoadAsync(Arg.Any<CancellationToken>()).Returns(
+            DebugLogUtils.ToAsyncEnumerable([firstHeader, secondHeader]));
+
+        var component = Render<DebugLogModal>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Equal("2 of 2 entries", component.Find(".debug-log-footer-counter").TextContent.Trim()));
+
+        var rows = component.FindAll(".debug-log-row");
+        Assert.Equal(
+            rows.Select(row => row.TextContent).ToArray(),
+            rows.Select(row => row.GetAttribute("title")).ToArray());
+    }
+
+    [Fact]
     public async Task DebugLogModal_AfterLoad_ViewportHasRegionRoleWithoutAriaLiveAndIsKeyboardFocusable()
     {
         // Arrange
