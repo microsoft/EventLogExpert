@@ -13,4 +13,8 @@
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Filtering.Tests" />
+  </ItemGroup>
+
 </Project>

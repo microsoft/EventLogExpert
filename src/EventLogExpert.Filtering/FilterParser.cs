@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Emit;
 using EventLogExpert.Filtering.Lowering;
 using EventLogExpert.Filtering.Parsing;
 using System.Diagnostics.CodeAnalysis;
@@ -15,6 +16,51 @@ namespace EventLogExpert.Filtering;
 /// </summary>
 public static class FilterParser
 {
+    /// <summary>
+    ///     Compiles <paramref name="filterText" /> to a <see cref="CompiledFilter" /> via the hand-rolled tokenizer +
+    ///     parser + lowerer + emitter pipeline, with no LINQ-Expression compilation, no Reflection.Emit, and no Dynamic.Core
+    ///     dependency on the per-event hot path. Returns <c>false</c> with a human-readable diagnostic in
+    ///     <paramref name="error" /> on any failure. Never throws on bad input.
+    /// </summary>
+    public static bool TryCompile(
+        string? filterText,
+        [NotNullWhen(true)] out CompiledFilter? compiled,
+        [NotNullWhen(false)] out string? error)
+    {
+        compiled = null;
+
+        if (string.IsNullOrWhiteSpace(filterText))
+        {
+            error = "Expression is empty.";
+
+            return false;
+        }
+
+        if (!Tokenizer.TryTokenize(filterText, out var tokens, out error))
+        {
+            return false;
+        }
+
+        if (!Parser.TryParse(tokens, out var syntax, out error))
+        {
+            return false;
+        }
+
+        if (!Lowerer.TryLower(syntax!, out var semantic, out error))
+        {
+            return false;
+        }
+
+        if (!Emitter.TryEmit(semantic!, out compiled, out error))
+        {
+            return false;
+        }
+
+        error = null;
+
+        return true;
+    }
+
     /// <summary>
     ///     Returns <c>true</c> when <paramref name="filterText" /> is a syntactically and semantically well-formed filter
     ///     expression in the closed Dynamic-LINQ subset this library supports. Returns <c>false</c> with a human-readable
@@ -49,3 +95,4 @@ public static class FilterParser
         return true;
     }
 }
+
