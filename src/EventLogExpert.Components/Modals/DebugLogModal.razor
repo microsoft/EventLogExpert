@@ -1,4 +1,3 @@
-@using EventLogExpert.UI
 @using Microsoft.Extensions.Logging
 @inherits ModalBase<bool>
 
@@ -19,9 +18,9 @@
             <ValueSelect AriaLabel="Level operator"
                 CssClass="input filter-dropdown"
                 T="FilterEvaluator"
+                ToStringFunc="@(x => x.ToFullString())"
                 Value="_levelOperator"
-                ValueChanged="HandleLevelOperatorChanged"
-                ToStringFunc="@(x => x.ToFullString())">
+                ValueChanged="HandleLevelOperatorChanged">
                 <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.Equals" />
                 <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.NotEqual" />
                 <ValueSelectItem T="FilterEvaluator" Value="FilterEvaluator.MultiSelect" />
@@ -33,10 +32,10 @@
                     EmptyText="All"
                     IsMultiSelect
                     T="LogLevel"
+                    ToStringFunc="@(x => x.ToString())"
                     Values="_multiLevels"
-                    ValuesChanged="HandleMultiLevelsChanged"
-                    ToStringFunc="@(x => x.ToString())">
-                    <ValueSelectItem T="LogLevel" ClearItem>All</ValueSelectItem>
+                    ValuesChanged="HandleMultiLevelsChanged">
+                    <ValueSelectItem ClearItem T="LogLevel">All</ValueSelectItem>
                     @foreach (var level in s_logLevels)
                     {
                         <ValueSelectItem T="LogLevel" Value="level" />
@@ -48,10 +47,10 @@
                 <ValueSelect AriaLabel="Level"
                     CssClass="input filter-dropdown"
                     T="LogLevel?"
+                    ToStringFunc="@(x => x?.ToString() ?? "All")"
                     Value="_singleLevel"
-                    ValueChanged="HandleSingleLevelChanged"
-                    ToStringFunc="@(x => x?.ToString() ?? "All")">
-                    <ValueSelectItem T="LogLevel?" ClearItem>All</ValueSelectItem>
+                    ValueChanged="HandleSingleLevelChanged">
+                    <ValueSelectItem ClearItem T="LogLevel?">All</ValueSelectItem>
                     @foreach (var level in s_logLevels)
                     {
                         <ValueSelectItem T="LogLevel?" Value="level" />
@@ -59,16 +58,16 @@
                 </ValueSelect>
             }
             <input aria-label="Filter messages"
-                class="input debug-log-text-filter"
+                class="debug-log-text-filter input"
                 @oninput="HandleStringFilterInput"
                 placeholder="Filter messages..."
                 type="text"
                 value="@_pendingStringFilter" />
         </div>
         <div aria-busy="@(_hasLoaded ? "false" : "true")" aria-label="Debug log entries" class="debug-log-viewport" role="region" tabindex="0">
-            <Virtualize Items="_displayedView" Context="line" ItemSize="@RowHeightPx" OverscanCount="20">
+            <Virtualize Context="line" Items="_displayedView" ItemSize="@RowHeightPx" OverscanCount="20">
                 <ItemContent>
-                    <div class="debug-log-row">@line</div>
+                    <div class="debug-log-row" title="@line">@line</div>
                 </ItemContent>
                 <EmptyContent>
                     @if (_hasLoaded)
