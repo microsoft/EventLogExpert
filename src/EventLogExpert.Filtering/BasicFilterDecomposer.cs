@@ -16,7 +16,7 @@ namespace EventLogExpert.Filtering;
 ///     emitter consumes — pattern-matches on <see cref="SemanticNode" /> rather than on the raw syntax — so the
 ///     refusal/acceptance contract is identical to the rest of the pipeline.
 /// </summary>
-internal static class BasicFilterDecomposer
+public static class BasicFilterDecomposer
 {
     /// <summary>
     ///     Attempts to decompose <paramref name="filterText" /> into a structured <see cref="BasicFilter" />. Returns

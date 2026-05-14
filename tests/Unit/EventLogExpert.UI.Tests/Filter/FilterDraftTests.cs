@@ -23,7 +23,7 @@ public sealed class FilterDraftModelTests
             []);
 
         var original = FilterUtils.CreateTestFilter(
-            comparisonValue: Constants.FilterIdEquals100,
+            Constants.FilterIdEquals100,
             basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
@@ -57,11 +57,11 @@ public sealed class FilterDraftModelTests
                         MatchMode = MatchMode.Single,
                         Value = "Error"
                     },
-                    JoinWithAny: true)
+                    true)
             ]);
 
         var original = FilterUtils.CreateTestFilter(
-            comparisonValue: Constants.FilterIdEquals100,
+            Constants.FilterIdEquals100,
             basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
@@ -117,8 +117,16 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
     {
-        // Advanced filters expose raw ComparisonText without populating structured draft inputs.
-        var original = FilterUtils.CreateTestFilter(comparisonValue: Constants.FilterIdEquals100);
+        // Advanced-row save flow constructs SavedFilter directly (bypassing TryCreate's auto-decompose) so the
+        // raw text isn't silently re-shaped into a Basic filter. Mirror that here so the test exercises the
+        // genuine BasicFilter == null path even when the text happens to be Basic-vocabulary.
+        var original = new SavedFilter
+        {
+            ComparisonText = Constants.FilterIdEquals100,
+            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
+            BasicFilter = null,
+            IsEnabled = true
+        };
 
         var draft = FilterDraft.FromSavedFilter(original);
 

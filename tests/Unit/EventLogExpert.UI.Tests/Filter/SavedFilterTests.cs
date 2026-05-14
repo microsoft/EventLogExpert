@@ -19,30 +19,11 @@ public sealed class FilterModelTests
     [Fact]
     public void JsonRoundTrip_BasicShape_PreservesBasicFilter()
     {
-        var basicFilter = new BasicFilter(
-            new BasicFilterCondition
-            {
-                Property = EventProperty.Level,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = "Error"
-            },
-            [
-                new SubFilter(
-                    new BasicFilterCondition
-                    {
-                        Property = EventProperty.Source,
-                        Operator = ComparisonOperator.Contains,
-                        MatchMode = MatchMode.Single,
-                        Value = "Kernel"
-                    },
-                    JoinWithAny: true)
-            ]);
-
-        var original = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
-            basicFilter: basicFilter);
+        // TryCreate auto-decomposes when no BasicFilter is supplied, so the round-trip must preserve the structured
+        // shape derived from the text (primary + AND-joined sub-filter).
+        var original = SavedFilter.TryCreate(Constants.FilterIdEquals100AndLevelError);
         Assert.NotNull(original);
+        Assert.NotNull(original.BasicFilter);
 
         string json = JsonSerializer.Serialize(original);
         Assert.DoesNotContain("FilterType", json);
@@ -51,22 +32,23 @@ public sealed class FilterModelTests
         Assert.NotNull(restored);
 
         Assert.NotNull(restored.BasicFilter);
-        Assert.Equal(EventProperty.Level, restored.BasicFilter.Comparison.Property);
-        Assert.Equal("Error", restored.BasicFilter.Comparison.Value);
+        Assert.Equal(EventProperty.Id, restored.BasicFilter.Comparison.Property);
+        Assert.Equal("100", restored.BasicFilter.Comparison.Value);
         Assert.Single(restored.BasicFilter.SubFilters);
-        Assert.True(restored.BasicFilter.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Source, restored.BasicFilter.SubFilters[0].Data.Property);
+        Assert.False(restored.BasicFilter.SubFilters[0].JoinWithAny);
+        Assert.Equal(EventProperty.Level, restored.BasicFilter.SubFilters[0].Data.Property);
+        Assert.Equal("Error", restored.BasicFilter.SubFilters[0].Data.Value);
     }
 
     [Fact]
     public void JsonRoundTrip_InvalidExpression_DisablesFilterButRetainsText()
     {
-        const string brokenJson =
+        const string BrokenJson =
             """
             { "Color": 0, "ComparisonText": "Id ===== ###", "IsExcluded": false }
             """;
 
-        var restored = JsonSerializer.Deserialize<SavedFilter>(brokenJson);
+        var restored = JsonSerializer.Deserialize<SavedFilter>(BrokenJson);
         Assert.NotNull(restored);
 
         Assert.Equal("Id ===== ###", restored.ComparisonText);
@@ -75,11 +57,53 @@ public sealed class FilterModelTests
     }
 
     [Fact]
+    public void JsonRoundTrip_LegacyAdvancedWithBasicFilter_DropsStaleBasicFilter()
+    {
+        // Pre-L1 persistence: legacy "FilterType":"Advanced" entries with a stale BasicFilter blob.
+        // The reader must drop that blob so the filter doesn't reappear as Basic on load.
+        const string StaleSource =
+            $$"""
+            {
+              "Color": 0,
+              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "IsExcluded": false,
+              "FilterType": "Advanced",
+              "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
+            }
+            """;
+
+        var restored = JsonSerializer.Deserialize<SavedFilter>(StaleSource);
+        Assert.NotNull(restored);
+
+        Assert.Null(restored.BasicFilter);
+    }
+
+    [Fact]
+    public void JsonRoundTrip_LegacyBasicMissingBlob_RepairsViaFreshDecompose()
+    {
+        // Pre-L1 persistence: legacy "FilterType":"Basic" entries that lost the BasicFilter blob.
+        // The reader recovers the structured form by running BasicFilterDecomposer against the persisted text
+        // so the filter reopens as Basic on next edit instead of forcing the user to re-author it.
+        const string BrokenBasic =
+            $$"""
+            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
+            """;
+
+        var restored = JsonSerializer.Deserialize<SavedFilter>(BrokenBasic);
+        Assert.NotNull(restored);
+
+        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.NotNull(restored.BasicFilter);
+        Assert.Equal(EventProperty.Id, restored.BasicFilter.Comparison.Property);
+        Assert.Equal("100", restored.BasicFilter.Comparison.Value);
+    }
+
+    [Fact]
     public void JsonRoundTrip_LegacyComparisonNullValue_DoesNotThrow()
     {
-        const string legacyNullValue = """{ "Color": 0, "Comparison": { "Value": null }, "IsExcluded": false }""";
+        const string LegacyNullValue = """{ "Color": 0, "Comparison": { "Value": null }, "IsExcluded": false }""";
 
-        var restored = JsonSerializer.Deserialize<SavedFilter>(legacyNullValue);
+        var restored = JsonSerializer.Deserialize<SavedFilter>(LegacyNullValue);
         Assert.NotNull(restored);
 
         Assert.Equal(string.Empty, restored.ComparisonText);
@@ -90,12 +114,12 @@ public sealed class FilterModelTests
     public void JsonRoundTrip_LegacyShape_LoadsAsAdvancedAndCompiles()
     {
         // Legacy persistence format (pre-13d): "Comparison": { "Value": "..." }, no BasicFilter.
-        const string legacyJson =
+        const string LegacyJson =
             $$"""
             { "Color": 2, "Comparison": { "Value": "{{Constants.FilterIdEquals100}}" }, "IsExcluded": true }
             """;
 
-        var model = JsonSerializer.Deserialize<SavedFilter>(legacyJson);
+        var model = JsonSerializer.Deserialize<SavedFilter>(LegacyJson);
         Assert.NotNull(model);
 
         Assert.Equal(Constants.FilterIdEquals100, model.ComparisonText);
@@ -108,9 +132,9 @@ public sealed class FilterModelTests
     [Fact]
     public void JsonRoundTrip_MissingComparisonText_DoesNotThrow()
     {
-        const string emptyJson = """{ "Color": 0, "IsExcluded": false }""";
+        const string EmptyJson = """{ "Color": 0, "IsExcluded": false }""";
 
-        var restored = JsonSerializer.Deserialize<SavedFilter>(emptyJson);
+        var restored = JsonSerializer.Deserialize<SavedFilter>(EmptyJson);
         Assert.NotNull(restored);
 
         Assert.Equal(string.Empty, restored.ComparisonText);
@@ -119,41 +143,22 @@ public sealed class FilterModelTests
     }
 
     [Fact]
-    public void JsonRoundTrip_LegacyAdvancedWithBasicFilter_DropsStaleBasicFilter()
+    public void JsonRoundTrip_NewShape_BasicFilterAbsent_DecomposableText_PreservesNullIntent()
     {
-        // Pre-L1 persistence: legacy "FilterType":"Advanced" entries with a stale BasicFilter blob.
-        // The reader must drop that blob so the filter doesn't reappear as Basic on load.
-        const string staleSource =
+        // Reproduces the Advanced-row save-then-reload path: the user typed a Basic-vocabulary expression in the
+        // Advanced row, so EditableFilterRowBase.TrySaveAsync persisted it without a BasicFilter blob. The reader
+        // must NOT auto-decompose on reload, otherwise the row silently flips from Advanced to Basic.
+        const string AdvancedJson =
             $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "FilterType": "Advanced",
-              "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
-            }
+            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false }
             """;
 
-        var restored = JsonSerializer.Deserialize<SavedFilter>(staleSource);
-        Assert.NotNull(restored);
-
-        Assert.Null(restored.BasicFilter);
-    }
-
-    [Fact]
-    public void JsonRoundTrip_LegacyBasicWithoutBasicFilter_KeepsRawText()
-    {
-        // Pre-L1 persistence: legacy "FilterType":"Basic" entries that lost the BasicFilter blob.
-        // The reader must keep the raw ComparisonText so the user can still see/edit the expression.
-        const string brokenBasic =
-            $$"""
-            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
-            """;
-
-        var restored = JsonSerializer.Deserialize<SavedFilter>(brokenBasic);
+        var restored = JsonSerializer.Deserialize<SavedFilter>(AdvancedJson);
         Assert.NotNull(restored);
 
         Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.NotNull(restored.Compiled);
+        Assert.True(restored.IsEnabled);
         Assert.Null(restored.BasicFilter);
     }
 
@@ -179,6 +184,132 @@ public sealed class FilterModelTests
     }
 
     [Fact]
+    public void LoadFromPersisted_CompileFailure_DisablesAndPreservesText()
+    {
+        var model = SavedFilter.LoadFromPersisted(
+            "Id ===== ###",
+            HighlightColor.Blue,
+            true,
+            null);
+
+        Assert.Equal("Id ===== ###", model.ComparisonText);
+        Assert.Null(model.Compiled);
+        Assert.False(model.IsEnabled);
+        Assert.True(model.IsExcluded);
+        Assert.Equal(HighlightColor.Blue, model.Color);
+        Assert.Null(model.BasicFilter);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_CompileSuccess_NullPersisted_PreservesNullIntent()
+    {
+        // Decomposable text + null persisted → MUST NOT auto-decompose. This is the regression for Advanced
+        // filters whose text happens to map into the Basic vocabulary; reloading must keep them Advanced
+        // (BasicFilter == null) so FilterPane doesn't silently re-render them as a structured row.
+        var model = SavedFilter.LoadFromPersisted(
+            Constants.FilterIdEquals100,
+            HighlightColor.None,
+            false,
+            null);
+
+        Assert.NotNull(model.Compiled);
+        Assert.True(model.IsEnabled);
+        Assert.Null(model.BasicFilter);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_CompileSuccess_PersistedNonNullDecomposable_PrefersFresh()
+    {
+        // Persisted carries a stale shape that doesn't match the text; LoadFromPersisted prefers the freshly
+        // decomposed structure so the structured form stays consistent with what evaluates against events.
+        var stale = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Level,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "Error"
+            },
+            []);
+
+        var model = SavedFilter.LoadFromPersisted(
+            Constants.FilterIdEquals100,
+            HighlightColor.None,
+            false,
+            stale);
+
+        Assert.NotNull(model.BasicFilter);
+        Assert.NotSame(stale, model.BasicFilter);
+        Assert.Equal(EventProperty.Id, model.BasicFilter.Comparison.Property);
+        Assert.Equal("100", model.BasicFilter.Comparison.Value);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_CompileSuccess_PersistedNonNullNonDecomposable_FallsBackToPersisted()
+    {
+        // Text is non-decomposable (ComputerName is outside the BasicFilter authoring vocabulary) but persisted
+        // carries a structured shape — preserve persisted so a future vocabulary widening (or an earlier-version
+        // decomposer that accepted the shape) doesn't lose the user's structure.
+        var stale = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Source,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "TestSource"
+            },
+            []);
+
+        var model = SavedFilter.LoadFromPersisted(
+            Constants.FilterComputerNameEqualsServer01,
+            HighlightColor.None,
+            false,
+            stale);
+
+        Assert.NotNull(model.Compiled);
+        Assert.True(model.IsEnabled);
+        Assert.Same(stale, model.BasicFilter);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_EmptyText_ReturnsPlaceholder()
+    {
+        var model = SavedFilter.LoadFromPersisted(
+            string.Empty,
+            HighlightColor.None,
+            false,
+            null);
+
+        Assert.Equal(string.Empty, model.ComparisonText);
+        Assert.Null(model.Compiled);
+        Assert.False(model.IsEnabled);
+        Assert.Null(model.BasicFilter);
+    }
+
+    [Fact]
+    public void TryCreate_NoBasicFilterProvided_DecomposableText_AutoDecomposes()
+    {
+        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100);
+
+        Assert.NotNull(model);
+        Assert.NotNull(model.BasicFilter);
+        Assert.Equal(EventProperty.Id, model.BasicFilter.Comparison.Property);
+        Assert.Equal("100", model.BasicFilter.Comparison.Value);
+    }
+
+    [Fact]
+    public void TryCreate_NoBasicFilterProvided_NonDecomposableText_BasicFilterStaysNull()
+    {
+        // ComputerName is outside the BasicFilter authoring vocabulary; the decomposer refuses, leaving the filter
+        // as Advanced (BasicFilter == null) even though the expression compiles successfully.
+        var model = SavedFilter.TryCreate(Constants.FilterComputerNameEqualsServer01);
+
+        Assert.NotNull(model);
+        Assert.NotNull(model.Compiled);
+        Assert.Null(model.BasicFilter);
+    }
+
+    [Fact]
     public void TryCreate_PreservesOptionalFields()
     {
         var id = FilterId.Create();
@@ -194,11 +325,11 @@ public sealed class FilterModelTests
 
         var model = SavedFilter.TryCreate(
             Constants.FilterIdEquals100,
-            basicFilter: basicFilter,
-            color: HighlightColor.Red,
-            isExcluded: true,
-            isEnabled: true,
-            id: id);
+            basicFilter,
+            HighlightColor.Red,
+            true,
+            true,
+            id);
 
         Assert.NotNull(model);
         Assert.Equal(id, model.Id);

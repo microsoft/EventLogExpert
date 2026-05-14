@@ -11,17 +11,17 @@ namespace EventLogExpert.UI.Filter;
 /// <summary>
 ///     Reads and writes <see cref="SavedFilter" /> JSON. Accepts both the legacy persisted shape (
 ///     <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b }</c>) and the new shape (
-///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ... }</c>).
-///     Always writes the new shape.
+///     <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ... }</c>). Always writes the new shape.
 ///     <para>
-///         Legacy <c>FilterType</c> Property is still read (locally) so that historical persisted Advanced/Cached filters
-///         that happened to carry a stale BasicFilter blob still drop it during load. Newly written JSON omits
-///         <c>FilterType</c> entirely; the presence of <c>BasicFilter</c> is the structural marker post-L1.
+///         Legacy <c>FilterType</c> Property is still read (locally) so that historical persisted Advanced/Cached
+///         filters that happened to carry a stale BasicFilter blob still drop it during load — and so that legacy
+///         <c>FilterType: Basic</c> entries whose <c>BasicFilter</c> blob was lost can be repaired by running
+///         <see cref="BasicFilterDecomposer" /> against the persisted text. Newly written JSON omits <c>FilterType</c>
+///         entirely; the presence of <c>BasicFilter</c> is the structural marker post-L1.
 ///     </para>
 ///     <para>
-///         When a persisted <c>ComparisonText</c> fails to compile, the loaded filter retains the text and
-///         <see cref="SavedFilter.IsExcluded" /> but has <c>Compiled == null</c> and <c>IsEnabled == false</c> so it is
-///         visible in the UI for the user to repair without forcing application start to fail.
+///         The validation/construction step (compile the text, hydrate <c>BasicFilter</c>, surface compile failures) is
+///         delegated to <see cref="SavedFilter.LoadFromPersisted" />. The converter holds the legacy-intent policy only.
 ///     </para>
 /// </summary>
 internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
@@ -91,45 +91,30 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         string text = comparisonText ?? legacyComparisonValue ?? string.Empty;
 
-        // Stale BasicFilter drop: legacy Advanced/Cached payloads occasionally carried a leftover BasicFilter
-        // blob. Honour the historical intent and discard it so the post-L1 invariant (BasicFilter != null
-        // implies the filter is structured) is preserved on load.
-        if (legacyFilterTypeSeen && legacyFilterType != LegacyFilterType.Basic && basicFilter is not null)
+        if (legacyFilterTypeSeen)
         {
-            basicFilter = null;
+            // Stale BasicFilter drop: legacy Advanced/Cached payloads occasionally carried a leftover BasicFilter
+            // blob. Honour the historical intent and discard it so the post-L1 invariant (BasicFilter != null
+            // implies the filter is structured) is preserved on load.
+            if (legacyFilterType != LegacyFilterType.Basic && basicFilter is not null)
+            {
+                basicFilter = null;
+            }
+
+            // Repair path: legacy Basic with a missing BasicFilter blob. Recover the structured form by running the
+            // decomposer against the persisted text. May still leave basicFilter null when text is non-decomposable;
+            // LoadFromPersisted then preserves the raw form so the user can repair the filter manually.
+            if (legacyFilterType == LegacyFilterType.Basic && basicFilter is null && !string.IsNullOrEmpty(text))
+            {
+                BasicFilterDecomposer.TryDecompose(text, out basicFilter);
+
+                Trace.TraceWarning(
+                    "SavedFilterJsonConverter: legacy Basic filter has no BasicFilter blob; recovered via fresh decompose. Text='{0}'",
+                    text);
+            }
         }
 
-        // Inverse: legacy Basic with a missing BasicFilter is a corrupt persisted record. Surface a trace and
-        // keep the raw text so the user can repair it.
-        if (legacyFilterTypeSeen && legacyFilterType == LegacyFilterType.Basic && basicFilter is null)
-        {
-            Trace.TraceWarning(
-                "SavedFilterJsonConverter: persisted Basic filter has no BasicFilter; loading as raw expression. Text='{0}'",
-                text);
-        }
-
-        CompiledFilter? compiled = null;
-        bool compileFailed = false;
-
-        if (!string.IsNullOrEmpty(text) && !FilterCompiler.TryCompile(text, out compiled, out string? error))
-        {
-            Trace.TraceWarning(
-                "SavedFilterJsonConverter: failed to compile persisted filter expression. Text='{0}', Error='{1}'",
-                text,
-                error);
-
-            compileFailed = true;
-        }
-
-        return new SavedFilter
-        {
-            Color = color,
-            ComparisonText = text,
-            Compiled = compiled,
-            BasicFilter = basicFilter,
-            IsEnabled = !compileFailed && compiled is not null,
-            IsExcluded = isExcluded
-        };
+        return SavedFilter.LoadFromPersisted(text, color, isExcluded, basicFilter);
     }
 
     public override void Write(Utf8JsonWriter writer, SavedFilter value, JsonSerializerOptions options)
@@ -147,14 +132,6 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         writer.WriteEndObject();
     }
-
-    private static LegacyFilterType ReadLegacyFilterType(ref Utf8JsonReader reader) =>
-        reader.TokenType switch
-        {
-            JsonTokenType.String when Enum.TryParse<LegacyFilterType>(reader.GetString(), out var parsed) => parsed,
-            JsonTokenType.Number => (LegacyFilterType)reader.GetInt32(),
-            _ => LegacyFilterType.Advanced
-        };
 
     private static HighlightColor ReadHighlightColor(ref Utf8JsonReader reader) =>
         reader.TokenType switch
@@ -200,4 +177,13 @@ internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 
         return value;
     }
+
+    private static LegacyFilterType ReadLegacyFilterType(ref Utf8JsonReader reader) =>
+        reader.TokenType switch
+        {
+            JsonTokenType.String when Enum.TryParse<LegacyFilterType>(reader.GetString(), out var parsed) => parsed,
+            JsonTokenType.Number => (LegacyFilterType)reader.GetInt32(),
+            _ => LegacyFilterType.Advanced
+        };
 }
+
