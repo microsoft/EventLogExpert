@@ -36,6 +36,7 @@ public sealed partial class LogTablePane
     private readonly Dictionary<ResolvedEvent, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);
 
     private IReadOnlyList<ResolvedEvent> _activeDisplayedEvents = [];
+    private SavedFilter[] _activeHighlightFilters = [];
     private IReadOnlyList<ResolvedEvent>? _cachedFilteredCanonical;
     private EventLogId? _cachedFilteredTableId;
     private IReadOnlyList<ResolvedEvent>? _cachedFilteredView;
@@ -43,7 +44,6 @@ public sealed partial class LogTablePane
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private ImmutableList<SavedFilter> _filters = [];
-    private SavedFilter[] _activeHighlightFilters = [];
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
@@ -191,8 +191,9 @@ public sealed partial class LogTablePane
         _localCursor = _selectedEvent;
         _selectedEvents = SelectedEvents.Value;
         _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
-        _filters = FilterPaneState.Value.Filters;
-        _activeHighlightFilters = BuildActiveHighlightFilters(_filters);
+        var initialPaneState = FilterPaneState.Value;
+        _filters = initialPaneState.Filters;
+        _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(initialPaneState);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         WarnOnUnknownFilterColors(_filters);
@@ -206,7 +207,8 @@ public sealed partial class LogTablePane
         // Snapshot once so the short-circuit check and the Property assignment
         // below see the same reference even if Fluxor publishes a new state
         // mid-method.
-        var currentFilters = FilterPaneState.Value.Filters;
+        var currentPaneState = FilterPaneState.Value;
+        var currentFilters = currentPaneState.Filters;
         bool filtersChanged = !ReferenceEquals(currentFilters, _filters);
         bool selectedEventChanged = !ReferenceEquals(SelectedEvent.Value, _selectedEvent);
 
@@ -247,7 +249,7 @@ public sealed partial class LogTablePane
         if (filtersChanged)
         {
             _filters = currentFilters;
-            _activeHighlightFilters = BuildActiveHighlightFilters(_filters);
+            _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentPaneState);
             _highlightCache.Clear();
             WarnOnUnknownFilterColors(_filters);
         }
@@ -468,6 +470,7 @@ public sealed partial class LogTablePane
             if (!filter.Compiled!.Predicate(@event)) { continue; }
 
             color = filter.Color.ToCssName();
+
             break;
         }
 
@@ -920,8 +923,8 @@ public sealed partial class LogTablePane
                 Dispatcher.Dispatch(new SetFilterDateRangeAction(
                     new DateFilter { After = selectedEvent.TimeCreated }))),
             MenuItem.Separator(),
-            MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, exclude: false)),
-            MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, exclude: true)),
+            MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, false)),
+            MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, true)),
         ];
     }
 
@@ -961,26 +964,6 @@ public sealed partial class LogTablePane
 
             return 0;
         }
-    }
-
-    private static SavedFilter[] BuildActiveHighlightFilters(ImmutableList<SavedFilter> filters)
-    {
-        if (filters.IsEmpty) { return []; }
-
-        var candidates = new List<SavedFilter>(filters.Count);
-
-        foreach (var filter in filters)
-        {
-            if (filter is not { IsEnabled: true, IsExcluded: false }) { continue; }
-
-            if (filter.Compiled is null) { continue; }
-
-            if (!Enum.IsDefined(filter.Color)) { continue; }
-
-            candidates.Add(filter);
-        }
-
-        return candidates.Count == 0 ? [] : candidates.ToArray();
     }
 
     private void WarnOnUnknownFilterColors(IEnumerable<SavedFilter> filters)
