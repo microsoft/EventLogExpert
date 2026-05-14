@@ -139,6 +139,28 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleCloseAll_DispatchesStateClearsBeforeWatcherDrain()
+    {
+        var (effects, mockDispatcher, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
+
+        var watcherTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveAllAsync().Returns(watcherTcs.Task);
+
+        var closeTask = effects.HandleCloseAll(mockDispatcher);
+
+        Assert.False(closeTask.IsCompleted, "HandleCloseAll must still be awaiting RemoveAllAsync.");
+        mockDispatcher.Received(1).Dispatch(Arg.Any<CloseAllAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<UI.StatusBar.CloseAllAction>());
+        mockResolverCache.Received(1).ClearAll();
+
+        watcherTcs.SetResult();
+        await closeTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        Assert.True(closeTask.IsCompletedSuccessfully);
+        await mockLogWatcher.Received(1).RemoveAllAsync();
+    }
+
+    [Fact]
     public async Task HandleCloseAll_ShouldClearAllResolvedXml()
     {
         // Arrange
@@ -688,7 +710,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var filter = FilterUtils.CreateTestFilter(isEnabled: true);
         var action = new SetFiltersAction(new EventFilter(null, [filter]));
 
         await effects.HandleSetFilters(action, mockDispatcher);
@@ -714,7 +736,7 @@ public sealed class EffectsTests
             .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>()))
             .Do(_ => throw new InvalidOperationException("boom"));
 
-        var filter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var filter = FilterUtils.CreateTestFilter(isEnabled: true);
         var action = new SetFiltersAction(new EventFilter(null, [filter]));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -763,7 +785,7 @@ public sealed class EffectsTests
                 return filterResult;
             });
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
         var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
 
         // Act
@@ -827,7 +849,7 @@ public sealed class EffectsTests
                 },
                 _ => pass2Result);
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
         var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
 
         // Act
@@ -914,7 +936,7 @@ public sealed class EffectsTests
                     return pass2Result;
                 });
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
         var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
 
         // Act
@@ -952,7 +974,7 @@ public sealed class EffectsTests
         var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
-        var freshFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var freshFilterModel = FilterUtils.CreateTestFilter(isEnabled: true);
 
         var staleFilter = new EventFilter(null, [staleFilterModel]);
         var freshFilter = new EventFilter(null, [freshFilterModel]);
@@ -1053,7 +1075,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
         var eventFilter = new EventFilter(null, [nonXmlFilter]);
         var action = new SetFiltersAction(eventFilter);
 
@@ -1065,50 +1087,6 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<CloseLogAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-    }
-
-    [Fact]
-    public async Task HandleSetFilters_WhenFilterRequiresXmlAndLogLacksXml_ShouldCloseAndReopenLog()
-    {
-        // Arrange — active log has not been loaded with XML, so it must be re-read.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        // Route CloseLog → HandleCloseLog so HandleSetFilters' await on the close-completion
-        // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
-        // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
-        // being swallowed by the discard.
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
-        var eventFilter = new EventFilter(null, [xmlFilter]);
-        var action = new SetFiltersAction(eventFilter);
-
-        // Act
-        await effects.HandleSetFilters(action, mockDispatcher);
-
-        // Assert
-        Assert.True(eventFilter.RequiresXml);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
-
-        // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
@@ -1240,6 +1218,50 @@ public sealed class EffectsTests
         // Assert — SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetSelectedEventsAction>(a =>
             a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleSetFilters_WhenFilterRequiresXmlAndLogLacksXml_ShouldCloseAndReopenLog()
+    {
+        // Arrange — active log has not been loaded with XML, so it must be re-read.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog → HandleCloseLog so HandleSetFilters' await on the close-completion
+        // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
+        // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
+        // being swallowed by the discard.
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var eventFilter = new EventFilter(null, [xmlFilter]);
+        var action = new SetFiltersAction(eventFilter);
+
+        // Act
+        await effects.HandleSetFilters(action, mockDispatcher);
+
+        // Assert
+        Assert.True(eventFilter.RequiresXml);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
+
+        // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
 
         // Surface any HandleCloseLog faults before exiting the test.
         await Task.WhenAll(closeTasks);
