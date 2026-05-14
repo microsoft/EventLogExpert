@@ -108,7 +108,7 @@ public sealed class FilterDraftModelTests
         var draft = FilterDraft.FromSavedFilter(original);
 
         Assert.Equal(HighlightColor.Blue, draft.Color);
-        Assert.True(draft.IsBasic);
+        Assert.Equal(FilterMode.Basic, draft.Mode);
         Assert.True(draft.IsEnabled);
         Assert.True(draft.IsExcluded);
         Assert.Equal(Constants.FilterIdEquals100, draft.ComparisonText);
@@ -117,25 +117,57 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
     {
-        // Advanced-row save flow constructs SavedFilter directly (bypassing TryCreate's auto-decompose) so the
-        // raw text isn't silently re-shaped into a Basic filter. Mirror that here so the test exercises the
-        // genuine BasicFilter == null path even when the text happens to be Basic-vocabulary.
+        // Advanced/Cached saved filters reopen with empty structure regardless of whether the persisted
+        // text happens to be Basic-vocabulary; FromSavedFilter gates structure hydration on Mode == Basic
+        // so a future opportunistic-decompose path can't silently flip the row's mode on re-edit.
         var original = new SavedFilter
         {
             ComparisonText = Constants.FilterIdEquals100,
             Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
             BasicFilter = null,
+            Mode = FilterMode.Advanced,
             IsEnabled = true
         };
 
         var draft = FilterDraft.FromSavedFilter(original);
 
-        Assert.False(draft.IsBasic);
+        Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Null(draft.Comparison.Value);
         Assert.Empty(draft.Comparison.Values);
         Assert.Empty(draft.SubFilters);
         Assert.Equal("Id == 100", draft.ComparisonText);
+    }
+
+    [Fact]
+    public void FromSavedFilter_AdvancedModeWithStaleBasicFilter_DoesNotHydrateStructure()
+    {
+        // Defensive: even if a SavedFilter somehow carries Mode=Advanced + a non-null BasicFilter (e.g. a
+        // hand-edited persistence file), FromSavedFilter must NOT hydrate structure — Mode wins.
+        var staleBasic = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = Constants.FilterValue100
+            },
+            []);
+
+        var original = new SavedFilter
+        {
+            ComparisonText = Constants.FilterIdEquals100,
+            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
+            BasicFilter = staleBasic,
+            Mode = FilterMode.Advanced,
+            IsEnabled = true
+        };
+
+        var draft = FilterDraft.FromSavedFilter(original);
+
+        Assert.Equal(FilterMode.Advanced, draft.Mode);
+        Assert.Null(draft.Comparison.Value);
+        Assert.Empty(draft.SubFilters);
     }
 
     [Fact]

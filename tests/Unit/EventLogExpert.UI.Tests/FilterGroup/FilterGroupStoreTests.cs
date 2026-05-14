@@ -604,6 +604,51 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
+    public void ReducerSetFilter_WhenModeChanges_ShouldPersistNewMode()
+    {
+        // Regression guard: prior to L4b polish the reducer's `with { }` clause omitted Mode, so editing a
+        // group filter from Basic → Cached (or Advanced → Cached) silently kept Mode at the original value.
+        // The row would reopen on the wrong editor surface and cache linkage would be lost.
+        var basicFilter = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
+            []);
+
+        var initial = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            basicFilter: basicFilter,
+            mode: FilterMode.Basic);
+
+        var group = new SavedFilterGroup
+        {
+            Name = Constants.FilterGroupName,
+            Filters = [initial]
+        };
+
+        var state = new FilterGroupState { Groups = [group] };
+
+        var updatedAsCached = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            id: initial.Id,
+            mode: FilterMode.Cached);
+
+        var newState = Reducers.ReducerSetFilter(
+            state,
+            new SetFilterAction(group.Id, updatedAsCached));
+
+        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
+        var resultFilter = updatedGroup.Filters.Single();
+
+        Assert.Equal(FilterMode.Cached, resultFilter.Mode);
+        Assert.Null(resultFilter.BasicFilter);
+    }
+
+    [Fact]
     public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
         // Pending-draft commit path: SetFilter for an Id that was never in state.

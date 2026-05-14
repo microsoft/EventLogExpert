@@ -295,6 +295,8 @@ input[type="text"].input { padding: 0; }
 
 .input.filter-multiselect-dropdown { width: 600px; }
 
+.input.filter-group-dropdown { width: 600px; }
+
 .input.filter-value-dropdown,
 .input.filter-description {
     width: 300px;
@@ -338,6 +340,20 @@ input[type="text"].input { padding: 0; }
 .button.button-yellow { --btn-color: var(--clr-yellow); }
 
 .button.fixed-width { width: 11ch; }
+
+.split-button {
+    display: inline-flex;
+    align-items: stretch;
+}
+
+.split-button .split-button-primary { padding-right: 0.25rem; }
+
+.split-button .split-button-chevron {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
+.split-button .split-button-chevron .bi { font-size: 0.75em; }
 
 .input.color-dropdown,
 .color-dropdown-item,

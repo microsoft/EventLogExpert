@@ -25,7 +25,7 @@ public sealed class EffectsTests
     public async Task HandleAddFilter_WhenComparisonValueExists_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var filterModel = FilterUtils.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new AddFilterAction(filterModel);
@@ -60,10 +60,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
+        var filterModel = FilterUtils.CreateTestFilter(basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -77,12 +77,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
-            basicFilter: CreateBasicFilter());
+        var filterModel = FilterUtils.CreateTestFilter();
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -113,7 +111,7 @@ public sealed class EffectsTests
     {
         // Effect must dispatch even when pane state is empty if applied still has filters.
         var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
+            true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
 
         // Act
@@ -128,7 +126,7 @@ public sealed class EffectsTests
     {
         // Pane state empty, applied still has the removed filter.
         var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
+            true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
 
         // Act
@@ -145,7 +143,7 @@ public sealed class EffectsTests
         var filters = ImmutableList.Create(
             FilterUtils.CreateTestFilter(
                 Constants.FilterIdEquals100,
-                color: HighlightColor.Red,
+                HighlightColor.Red,
                 isExcluded: true));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
@@ -169,7 +167,7 @@ public sealed class EffectsTests
         var filters = ImmutableList.Create(
             FilterUtils.CreateTestFilter(
                 Constants.FilterIdEquals100,
-                color: HighlightColor.Blue,
+                HighlightColor.Blue,
                 isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
@@ -186,12 +184,27 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleSaveFilterGroup_WhenPaneEmpty_ShouldNotDispatchAddGroupAction()
+    {
+        // Empty-set guard: prevents silent creation of empty groups when the Save flow races against
+        // a clear or fires before any filter is committed (defensive complement to the disabled icon).
+        var (effects, mockDispatcher) = CreateEffects(filters: ImmutableList<SavedFilter>.Empty);
+        var action = new SaveFilterGroupAction(Constants.FilterGroupName);
+
+        // Act
+        await effects.HandleSaveFilterGroup(action, mockDispatcher);
+
+        // Assert
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddGroupAction>());
+    }
+
+    [Fact]
     public async Task HandleSaveFilterGroup_WithMultipleFilters_ShouldSaveAll()
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Blue),
-            FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError, color: HighlightColor.Red));
+            FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue),
+            FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError, HighlightColor.Red));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
         var action = new SaveFilterGroupAction(Constants.FilterGroupName);
@@ -209,7 +222,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var filterModel = FilterUtils.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
@@ -222,10 +235,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
+        var filterModel = FilterUtils.CreateTestFilter(basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -239,12 +252,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
+    public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
-            basicFilter: CreateBasicFilter());
+        var filterModel = FilterUtils.CreateTestFilter();
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -438,7 +449,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true);
+        var filterModel = FilterUtils.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
@@ -455,7 +466,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
+            true,
             filteredDateRange: new DateFilter
             {
                 After = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc),
@@ -513,20 +524,16 @@ public sealed class EffectsTests
     {
         // Structurally equivalent but distinct instances; HasFilteringChanged must short-circuit.
         var paneFilters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(
-                Constants.FilterIdEquals100,
-                isEnabled: true,
+            FilterUtils.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
 
         var appliedFilters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(
-                Constants.FilterIdEquals100,
-                isEnabled: true,
+            FilterUtils.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
-            filters: paneFilters,
+            true,
+            paneFilters,
             appliedFilter: new EventFilter(null, appliedFilters));
 
         // Act
@@ -541,9 +548,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(
-                Constants.FilterIdEquals100,
-                isEnabled: true,
+            FilterUtils.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
             FilterUtils.CreateTestFilter(
                 Constants.FilterLevelEqualsError,
@@ -566,9 +571,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(
-                Constants.FilterIdEquals100,
-                isEnabled: true,
+            FilterUtils.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
             FilterUtils.CreateTestFilter(
                 Constants.FilterLevelEqualsError,
@@ -592,8 +595,8 @@ public sealed class EffectsTests
         // No-op guard must skip both loading toggles and the SetFilters dispatch.
         var filters = CreateSingleEnabledFilters();
         var (effects, mockDispatcher) = CreateEffects(
-            isEnabled: true,
-            filters: filters,
+            true,
+            filters,
             appliedFilter: new EventFilter(null, filters));
 
         // Act
@@ -603,6 +606,17 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFiltersAction>());
     }
+
+    private static BasicFilter CreateBasicFilter() =>
+        new(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = Constants.FilterValue100
+            },
+            []);
 
     private static (Effects effects, IDispatcher mockDispatcher) CreateEffects(
         bool isEnabled = false,
@@ -634,18 +648,7 @@ public sealed class EffectsTests
         return (effects, mockDispatcher);
     }
 
-    private static BasicFilter CreateBasicFilter() =>
-        new(
-            new BasicFilterCondition
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100
-            },
-            []);
-
     private static ImmutableList<SavedFilter> CreateSingleEnabledFilters() =>
         ImmutableList.Create(
-            FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, isEnabled: true));
+            FilterUtils.CreateTestFilter(isEnabled: true));
 }

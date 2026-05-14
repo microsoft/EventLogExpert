@@ -55,6 +55,10 @@ public sealed class Effects(
     [EffectMethod]
     public Task HandleSaveFilterGroup(SaveFilterGroupAction action, IDispatcher dispatcher)
     {
+        // Empty pane → no-op. Without this guard the user can create empty groups via the Save
+        // affordance (icon click after the pane was just cleared, etc.).
+        if (_filterPaneState.Value.Filters.IsEmpty) { return Task.CompletedTask; }
+
         // New Id so re-applying the group inserts cleanly into the pane's de-dup; IsEnabled cleared
         // so the user opts in by toggling. All other identity is preserved verbatim via record copy.
         dispatcher.Dispatch(

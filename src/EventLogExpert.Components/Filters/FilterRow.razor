@@ -1,4 +1,4 @@
-@inherits EditableFilterRowBase
+@inherits FilterRowBase<SavedFilter?>
 
 <FilterRowChrome ErrorMessage="@ErrorMessage"
     Filter="Filter"
@@ -9,30 +9,96 @@
     OnSave="SaveFilter"
     OnToggleEnabled="ToggleFilter"
     OnToggleExclusion="ToggleFilterExclusion"
+    OuterCssClass="@OuterCssClass"
+    RightCssClass="@RightCssClass"
+    ShowToggleEnabled="@ShowToggleEnabled"
+    UseInlineErrorRow="@UseInlineErrorRow"
     Value="Value">
     <EditingContent>
         @if (Filter is { } filter)
         {
-            @if (filter.IsExcluded)
-            {
-                <label aria-label="Exclude On" id="@($"{Id}_IsExcluded")">Exclude On: </label>
-            }
-            else
-            {
-                <label aria-label="Filter On" id="@($"{Id}_IsExcluded")">Filter On: </label>
-            }
+            <div class="filter-row-editor">
+                <span class="filter-row-mode">
+                    <label aria-label="Filter Mode" id="@($"{Id}_Mode")">Mode: </label>
+                    <ValueSelect AriaLabelledBy="@($"{Id}_Mode")"
+                        CssClass="input filter-dropdown"
+                        T="FilterMode"
+                        Value="filter.Mode"
+                        ValueChanged="TryChangeModeAsync">
+                        @foreach (var mode in Enum.GetValues<FilterMode>())
+                        {
+                            <ValueSelectItem T="FilterMode" Value="mode" />
+                        }
+                    </ValueSelect>
+                </span>
 
-            <BasicFilterConditionEditor Condition="filter.Comparison" Id="@Id" PropertyAriaLabelledBy="@($"{Id}_IsExcluded")" />
+                @switch (filter.Mode)
+                {
+                    case FilterMode.Basic:
+                        <span class="filter-row-structured">
+                            <BasicFilterConditionEditor Condition="filter.Comparison"
+                                Id="@($"{Id}_main")" />
+                        </span>
+                        break;
+                    case FilterMode.Advanced:
+                        <span class="filter-row-text">
+                            @if (filter.IsExcluded)
+                            {
+                                <label aria-label="Exclude Expression" for="@Id">Exclude Expression: </label>
+                            }
+                            else
+                            {
+                                <label aria-label="Expression" for="@Id">Expression: </label>
+                            }
+
+                            <input class="advanced-filter input"
+                                id="@Id"
+                                @oninput="OnAdvancedTextInput"
+                                placeholder='(Id == 1000 || Id == 1001) && Description.Contains("Fault")'
+                                type="text"
+                                value="@filter.ComparisonText" />
+                        </span>
+                        break;
+                    case FilterMode.Cached:
+                        <span class="filter-row-cached">
+                            <label aria-label="Cached Filter" id="@($"{Id}_Cached")">Saved: </label>
+                            <ValueSelect AriaLabelledBy="@($"{Id}_Cached")"
+                                CssClass="input cache-dropdown"
+                                T="string"
+                                Value="filter.ComparisonText"
+                                ValueChanged="OnCachedSelectionChanged">
+                                @foreach (var option in CachedOptions)
+                                {
+                                    <ValueSelectItem T="string" Value="option.Value">
+                                        @if (option.IsFavorite)
+                                        {
+                                            <i aria-label="Favorite" class="bi bi-star-fill cached-favorite-icon"></i>
+                                        }
+                                        else
+                                        {
+                                            <span aria-hidden="true" class="cached-favorite-icon-placeholder"></span>
+                                        }
+                                        <span class="cached-option-text">@option.Value</span>
+                                    </ValueSelectItem>
+                                }
+                            </ValueSelect>
+                        </span>
+                        break;
+                }
+            </div>
         }
     </EditingContent>
     <ExtraEditingButtons>
-        <button class="button" @onclick="AddSubFilter">
-            <i class="bi bi-plus-circle"></i> Add Sub Filter
-        </button>
+        @if (Filter is { Mode: FilterMode.Basic })
+        {
+            <button class="button" @onclick="AddSubFilter">
+                <i class="bi bi-plus-circle"></i> Add Sub Filter
+            </button>
+        }
     </ExtraEditingButtons>
 </FilterRowChrome>
 
-@if (Filter is not null && Filter.SubFilters.Count > 0)
+@if (Filter is { Mode: FilterMode.Basic, SubFilters.Count: > 0 })
 {
     <div class="flex-column">
         @foreach (var item in Filter.SubFilters)

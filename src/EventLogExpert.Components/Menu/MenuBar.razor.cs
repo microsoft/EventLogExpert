@@ -90,9 +90,6 @@ public sealed partial class MenuBar : IDisposable
             MenuItem.Item("Copy Selected (Full)",
                 () => Actions.CopySelectedAsync(EventCopyFormat.Full),
                 defaultCopyFormat == EventCopyFormat.Full ? "Ctrl+C" : null),
-            MenuItem.Separator(),
-            MenuItem.Item("Save All Filters", () => Actions.SaveAllFiltersAsync()),
-            MenuItem.Item("Clear All Filters", Actions.ClearAllFilters),
         ];
     }
 
@@ -103,7 +100,7 @@ public sealed partial class MenuBar : IDisposable
         return
         [
             MenuItem.SubMenu("Open", BuildOpenSubMenu(false)),
-            MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), isEnabled: hasActiveLogs),
+            MenuItem.SubMenu("Combine", BuildOpenSubMenu(true), hasActiveLogs),
             MenuItem.Separator(),
             MenuItem.Item("Close All", () => Actions.CloseAllLogsAsync(), isEnabled: hasActiveLogs),
             MenuItem.Item("Exit", Actions.Exit),
@@ -211,13 +208,11 @@ public sealed partial class MenuBar : IDisposable
                 "Show All Events",
                 Actions.ToggleShowAllEvents,
                 "Ctrl+H",
-                isChecked: !isFilterEnabled),
+                !isFilterEnabled),
             MenuItem.Item("Load New Events", Actions.LoadNewEvents), MenuItem.Item(
                 "Continuously Update",
                 () => Actions.SetContinuouslyUpdate(!isContinuouslyUpdating),
                 isChecked: isContinuouslyUpdating),
-            MenuItem.Separator(), MenuItem.Item("Show Cached Filters", () => Actions.ShowFilterCacheAsync()),
-            MenuItem.Item("Show Filter Groups", () => Actions.ShowFilterGroupsAsync()),
         ];
     }
 
@@ -297,7 +292,7 @@ public sealed partial class MenuBar : IDisposable
             case "ArrowDown":
                 // Enter/Space are intentionally not handled here so the browser's native button
                 // click fires once — handling them on keydown would toggle the menu shut.
-                await OpenBarAsync(_bars[index], index, true);
+                await OpenBarAsync(_bars[index], index);
                 return;
             case "ArrowUp":
                 // WAI-ARIA menubar: ArrowUp opens and focuses the last item.

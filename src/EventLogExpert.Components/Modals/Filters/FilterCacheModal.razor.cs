@@ -4,9 +4,7 @@
 using EventLogExpert.Components.Base;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
@@ -71,24 +69,6 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
     }
 
     private void AddFavorite(string filter) => Dispatcher.Dispatch(new AddFavoriteFilterAction(filter));
-
-    private async Task AddFilter(string filter)
-    {
-        var model = SavedFilter.TryCreate(filter, isEnabled: true);
-
-        if (model is null)
-        {
-            await AlertDialogService.ShowAlert("Invalid Filter",
-                $"The selected cached filter could not be parsed and will not be added:{Environment.NewLine}{Environment.NewLine}{filter}",
-                "OK");
-
-            return;
-        }
-
-        Dispatcher.Dispatch(new AddFilterAction(model));
-
-        await CloseAsync();
-    }
 
     private void RemoveFavorite(string filter) =>
         Dispatcher.Dispatch(new RemoveFavoriteFilterAction(filter));

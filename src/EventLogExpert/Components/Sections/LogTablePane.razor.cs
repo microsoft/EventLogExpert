@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
+using FilterMode = EventLogExpert.UI.Filter.FilterMode;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
@@ -325,7 +326,8 @@ public sealed partial class LogTablePane
             comparisonString,
             basicFilter,
             isExcluded: exclude,
-            isEnabled: true);
+            isEnabled: true,
+            mode: FilterMode.Basic);
 
         if (filter is null) { return; }
 

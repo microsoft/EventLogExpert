@@ -51,7 +51,20 @@ public static class BasicFilterFormatter
         return true;
     }
 
-    public static bool TryFormat(BasicFilter basicFilter, out string comparison)
+    public static bool TryFormat(BasicFilter basicFilter, out string comparison) =>
+        TryFormat(basicFilter, strictSubFilters: false, out comparison);
+
+    /// <summary>
+    ///     Formats <paramref name="basicFilter" /> to its Dynamic-LINQ source expression. When
+    ///     <paramref name="strictSubFilters" /> is <see langword="false" /> (the default) any sub-filter whose
+    ///     condition cannot be emitted is silently skipped — the lenient mode used by the runtime parse path so
+    ///     that one corrupt sub-filter doesn't disqualify the whole expression. When
+    ///     <paramref name="strictSubFilters" /> is <see langword="true" /> the formatter fails (returns
+    ///     <see langword="false" />) the moment any sub-filter cannot be emitted — used by the editor row's
+    ///     "structured matches text" gate so an incomplete sub-filter cannot silently round-trip into a
+    ///     persisted <see cref="BasicFilter" /> that disagrees with the saved expression text.
+    /// </summary>
+    public static bool TryFormat(BasicFilter basicFilter, bool strictSubFilters, out string comparison)
     {
         ArgumentNullException.ThrowIfNull(basicFilter);
 
@@ -71,6 +84,10 @@ public static class BasicFilterFormatter
             if (TryFormatCondition(subFilter.Data, joinPrefix, out var subText))
             {
                 stringBuilder.Append(subText);
+            }
+            else if (strictSubFilters)
+            {
+                return false;
             }
         }
 

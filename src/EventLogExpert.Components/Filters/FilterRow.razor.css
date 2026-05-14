@@ -1,0 +1,33 @@
+.filter-row-editor {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.filter-row-mode,
+.filter-row-text,
+.filter-row-structured,
+.filter-row-cached {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+::deep .cached-favorite-icon,
+::deep .cached-favorite-icon-placeholder {
+    display: inline-block;
+    width: 1rem;
+    margin-right: 0.4rem;
+    text-align: center;
+}
+
+::deep .cached-favorite-icon { color: var(--clr-yellow); }
+
+::deep .cached-option-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
