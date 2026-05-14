@@ -8,13 +8,6 @@ using System.Globalization;
 
 namespace EventLogExpert.Filtering.Emit;
 
-/// <summary>
-///     Walks a <see cref="SemanticNode" /> tree and emits a <see cref="CompiledFilter" /> (closure + RequiresXml
-///     flag). Per N-D4: literals are baked at compile time, allocations on the per-event hot path are avoided (
-///     <c>Keywords.Any</c> + <c>(new[] {...}).Contains</c> use index-based loops rather than LINQ enumerators), and 2-3
-///     condition AND / OR chains specialize into a single closure that flattens the nested
-///     <c>Func&lt;ResolvedEvent, bool&gt;</c> dispatch into one closure invocation followed by direct condition dispatch.
-/// </summary>
 internal static class Emitter
 {
     public static bool TryEmit(
@@ -381,6 +374,16 @@ internal static class Emitter
 
     private static Func<ResolvedEvent, bool> EmitNot(NotNode node)
     {
+        if (node.Operand is ContainsNode { Field: ResolvedEventField.UserId } userIdContains)
+        {
+            var needle = userIdContains.Needle;
+            var comparison = userIdContains.IgnoreCase
+                ? StringComparison.OrdinalIgnoreCase
+                : StringComparison.Ordinal;
+
+            return e => e.UserId is not null && !e.UserId.Value.Contains(needle, comparison);
+        }
+
         var inner = EmitNode(node.Operand);
 
         return e => !inner(e);

@@ -91,6 +91,9 @@ public sealed partial class Constants
     public const string FilterUserIdContainsService =
         "UserId != null && UserId.Value.Contains(\"S-1-5\", StringComparison.OrdinalIgnoreCase)";
 
+    public const string FilterUserIdNotContainsService =
+        "UserId != null && !UserId.Value.Contains(\"S-1-5-99\", StringComparison.OrdinalIgnoreCase)";
+
     // UserId guarded shapes.
     public const string FilterUserIdEqualsLocalSystem = "UserId != null && UserId.Value == \"S-1-5-18\"";
     public const string FilterUserIdNotEqualsLocalSystem = "UserId != null && UserId.Value != \"S-1-5-18\"";

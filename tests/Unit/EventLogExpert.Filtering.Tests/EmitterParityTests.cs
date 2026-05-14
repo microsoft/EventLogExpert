@@ -6,13 +6,6 @@ using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests;
 
-/// <summary>
-///     Golden parity suite: for every filter expression in the closed grammar, both the legacy Dynamic.Core compiler
-///     (<see cref="FilterCompiler" />) and the hand-rolled emitter (<see cref="FilterParser.TryCompile" />) must produce
-///     <c>bool</c>-equal predicates and identical <c>RequiresXml</c> flags against every event fixture. A divergence on
-///     any (filter, event) pair is the regression we ship N2 to prevent — the existing UI and end-to-end suites are
-///     written against Dynamic.Core's behavior, so anything the new emitter does differently is a behavior change.
-/// </summary>
 public sealed class EmitterParityTests
 {
     public static IEnumerable<object[]> ParityCases() =>
@@ -109,6 +102,7 @@ public sealed class EmitterParityTests
         Constants.FilterUserIdEqualsLocalSystem,
         Constants.FilterUserIdNotEqualsLocalSystem,
         Constants.FilterUserIdContainsService,
+        Constants.FilterUserIdNotContainsService,
         Constants.FilterTwoConditionAnd,
         Constants.FilterThreeConditionAnd,
         Constants.FilterFourConditionAnd,
