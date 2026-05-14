@@ -12,7 +12,7 @@ When at least one database is enabled in `Tools` → `Settings`, providers are r
 2. Then the enabled databases, in load order — the first database that knows the provider wins.
 3. Then the local machine's installed providers as a fallback.
 
-Disable all databases (or remove them) to fall back entirely to local providers.
+Disabling a database skips it from step 2 only. Exported logs that ship with sibling `LocaleMetaData/*.MTA` files still resolve via those (step 1), and any provider not resolved by databases still falls through to local providers (step 3).
 
 ### Lifecycle (Settings → Databases)
 
@@ -21,6 +21,7 @@ Disable all databases (or remove them) to fall back entirely to local providers.
 | Status | Behavior |
 | --- | --- |
 | `Ready` | Loaded and used to resolve events. |
+| `Classifying…` | Initial classification pass hasn't reached this row yet. The enable / disable toggle is suppressed until classification completes. The same state is reflected by the top-of-list `Classifying databases…` banner. |
 | `Upgrade required` | Schema is older than the running build but in-place upgrade is supported. The row's `Upgrade` button performs the migration in place; a backup of the original is kept on disk. |
 | `Upgrade failed` | Most recent upgrade attempt failed. Use `Retry Upgrade`, re-import, or remove. |
 | `Recovery required` | A previous upgrade left a backup; the original is still safe but the row needs reconciliation before going back to `Ready`. |
@@ -69,7 +70,7 @@ The `<file>` argument must end in `.db` and must not already exist.
 | `file` | `File to create. Must have a .db extension.` |
 | `source` (optional) | `Optional provider source: a .db file, an exported .evtx file, or a folder containing .db and/or .evtx files (top-level only). When omitted, local providers on this machine are used. When supplied, ONLY the source is used (no fallback to local providers).` |
 | `--filter` | `Only providers matching specified regex string will be added to the database.` |
-| `--skip-providers-in-file` | Excludes any provider name found in the supplied source. Useful for differencing — e.g., capture a fresh-OS database first, then create an Exchange-only database with `--skip-providers-in-file fresh-os.db` to omit OS providers and keep only what Exchange added. |
+| `--skip-providers-in-file` | `Any providers found in the specified source (a .db file, an exported .evtx file, or a folder containing them, top-level only) will not be included in the new database. For example, when creating a database of event providers for Exchange Server, it may be useful to provide a database of all providers from a fresh OS install with no other products. That way, all the OS providers are skipped, and only providers added by Exchange or other installed products would be saved in the new database.` |
 | `--verbose` | `Enable verbose logging. May be useful for troubleshooting.` |
 
 ### `eventdbtool merge`

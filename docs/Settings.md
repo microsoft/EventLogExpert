@@ -4,7 +4,7 @@
 
 `Tools` → `Settings` opens the Settings modal.
 
-`Save` writes the form fields and any pending enable/disable toggles you've made on database rows; `Exit` discards them. `Import Database`, `Remove`, and `Upgrade` are immediate side effects — they run as soon as you click and persist regardless of `Save` / `Exit`.
+`Save` writes the form fields and any pending enable/disable toggles you've made on database rows; `Exit` discards them. `Remove` and `Upgrade` are immediate side effects that persist regardless of `Save` / `Exit`. `Import Database` is also immediate, but a successful import additionally applies any pending form fields and toggles and closes the modal — make any other changes you want to keep before clicking it.
 
 <!-- screenshot: settings-modal --> ![Settings modal](.images/settings-modal.png)
 
@@ -23,13 +23,16 @@ A row badge shows the current state. While the initial pass is running, a `Class
 | Badge | Meaning |
 | --- | --- |
 | (none) | `Ready` (loaded and usable) — or `Upgrade required`, in which case the row's `Upgrade` button replaces the badge as the visible affordance. |
+| `Classifying…` | Initial classification hasn't reached this row yet (also reflected in the top-of-list banner). The enable / disable toggle is suppressed until classification completes. |
 | `Upgrade failed` | The most recent upgrade attempt failed; the row offers `Retry Upgrade`. Re-import or remove if the retry keeps failing. |
 | `Recovery required` | A previous upgrade left a backup file in place; the original is still safe but needs reconciliation before the row goes back to `Ready`. |
 | `Unrecognized` | The file isn't a database produced by this tool. |
 | `Obsolete` | A v1 / v2 database from a long-superseded build of the tool; not upgradable in place — recreate with `eventdbtool create`. |
 | `Classification failed` | Initial classification threw; details surface in `View Logs`. |
 
-Closing the modal after enabling, disabling, or removing a database prompts to reload all open logs so resolution reflects the new set. See [Provider Databases](Provider-Databases.md) for the rationale and the `eventdbtool` CLI reference.
+Enabling or disabling a database is a pending change — closing the modal afterwards prompts to reload all open logs so resolution reflects the new set. `Remove` is immediate: removing a `Ready` and enabled database while logs are open prompts a confirmation that warns affected log views will be closed and reopened, and the reload happens right then (no modal-close prompt afterwards). Removing a database that's disabled or not `Ready` only asks for confirmation and skips the reload.
+
+See [Provider Databases](Provider-Databases.md) for the rationale and the `eventdbtool` CLI reference.
 
 ### Expand Display Pane On Selection Change
 
@@ -54,7 +57,7 @@ The Edit menu always exposes all four formats explicitly (`Copy Selected`, `Copy
 
 ### Logging Level
 
-Controls the verbosity of the in-app debug log surfaced by `Help` → `View Logs`. Lower levels produce more rows and slow logging-heavy operations slightly; raise it before reproducing an issue you intend to report.
+The threshold for what gets written to the in-app debug log surfaced by `Help` → `View Logs`. Anything less verbose than the chosen level is dropped: `Trace` records everything; `Critical` records only the most severe entries. Set this lower (`Debug` or `Trace`) before reproducing an issue you intend to report so the relevant detail is captured; raise it back up after to keep the log small.
 
 ### Pre-release Builds
 
