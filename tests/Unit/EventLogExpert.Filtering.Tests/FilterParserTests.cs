@@ -77,8 +77,9 @@ public sealed class FilterParserTests
     [Fact]
     public void TryValidate_HandlesMultilineFormatterOutput()
     {
-        // BasicFilterFormatter emits sub-filters separated by AppendLine, producing CRLF between conditions.
-        // The tokenizer treats CRLF as whitespace.
+        // Legacy on-disk Basic filters were persisted with CRLF between sub-conditions (the old
+        // BasicFilterFormatter emitted AppendLine). The tokenizer treats CRLF as whitespace so the
+        // legacy shape still loads cleanly even though the current formatter joins inline.
         var filter = "Id == 100\r\n && Level == \"Error\"";
 
         var ok = FilterParser.TryValidate(filter, out var error);
