@@ -83,20 +83,6 @@ public sealed class FilterService : IFilterService
     public bool TryParse(BasicFilter basicFilter, out string comparison) =>
         BasicFilterFormatter.TryFormat(basicFilter, out comparison);
 
-    public bool TryParseExpression(string? expression, out string error)
-    {
-        if (FilterCompiler.IsValid(expression, out var compileError))
-        {
-            error = string.Empty;
-
-            return true;
-        }
-
-        error = compileError;
-
-        return false;
-    }
-
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(
         IEnumerable<ResolvedEvent> events,
         EventFilter eventFilter) =>
