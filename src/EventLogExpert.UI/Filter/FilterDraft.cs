@@ -256,7 +256,7 @@ public sealed class FilterDraft
     private static SubFilterDraft SubFilterDraftFromSubFilter(SubFilter subFilter) =>
         new()
         {
-            Condition = FilterConditionDraft.FromCondition(subFilter.Data),
+            Condition = FilterConditionDraft.FromCondition(subFilter.Comparison),
             JoinWithAny = subFilter.JoinWithAny
         };
 

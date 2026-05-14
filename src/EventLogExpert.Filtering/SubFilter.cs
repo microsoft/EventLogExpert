@@ -1,6 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 namespace EventLogExpert.Filtering;
 
-public sealed record SubFilter(BasicFilterCondition Data, bool JoinWithAny);
+[JsonConverter(typeof(SubFilterJsonConverter))]
+public sealed record SubFilter(BasicFilterCondition Comparison, bool JoinWithAny);

@@ -7,6 +7,50 @@ namespace EventLogExpert.Filtering;
 
 public static class BasicFilterFormatter
 {
+    public static bool TryFormat(BasicFilter basicFilter, out string comparison) =>
+        TryFormat(basicFilter, false, out comparison);
+
+    /// <summary>
+    ///     Formats <paramref name="basicFilter" /> to its Dynamic-LINQ source expression. When
+    ///     <paramref name="strictSubFilters" /> is <see langword="false" /> (the default) any sub-filter whose condition
+    ///     cannot be emitted is silently skipped — the lenient mode used by the runtime parse path so that one corrupt
+    ///     sub-filter doesn't disqualify the whole expression. When <paramref name="strictSubFilters" /> is
+    ///     <see langword="true" /> the formatter fails (returns <see langword="false" />) the moment any sub-filter cannot be
+    ///     emitted — used by the editor row's "structured matches text" gate so an incomplete sub-filter cannot silently
+    ///     round-trip into a persisted <see cref="BasicFilter" /> that disagrees with the saved expression text.
+    /// </summary>
+    public static bool TryFormat(BasicFilter basicFilter, bool strictSubFilters, out string comparison)
+    {
+        ArgumentNullException.ThrowIfNull(basicFilter);
+
+        comparison = string.Empty;
+
+        if (!TryFormatCondition(basicFilter.Comparison, null, out var comparisonText))
+        {
+            return false;
+        }
+
+        StringBuilder stringBuilder = new(comparisonText);
+
+        foreach (var subFilter in basicFilter.SubFilters)
+        {
+            var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
+
+            if (TryFormatCondition(subFilter.Comparison, joinPrefix, out var subText))
+            {
+                stringBuilder.Append(subText);
+            }
+            else if (strictSubFilters)
+            {
+                return false;
+            }
+        }
+
+        comparison = stringBuilder.ToString();
+
+        return true;
+    }
+
     public static bool TryFormatCondition(BasicFilterCondition condition, string? joinPrefix, out string formatted)
     {
         ArgumentNullException.ThrowIfNull(condition);
@@ -47,51 +91,6 @@ public static class BasicFilterFormatter
         }
 
         formatted = stringBuilder.ToString();
-
-        return true;
-    }
-
-    public static bool TryFormat(BasicFilter basicFilter, out string comparison) =>
-        TryFormat(basicFilter, strictSubFilters: false, out comparison);
-
-    /// <summary>
-    ///     Formats <paramref name="basicFilter" /> to its Dynamic-LINQ source expression. When
-    ///     <paramref name="strictSubFilters" /> is <see langword="false" /> (the default) any sub-filter whose
-    ///     condition cannot be emitted is silently skipped — the lenient mode used by the runtime parse path so
-    ///     that one corrupt sub-filter doesn't disqualify the whole expression. When
-    ///     <paramref name="strictSubFilters" /> is <see langword="true" /> the formatter fails (returns
-    ///     <see langword="false" />) the moment any sub-filter cannot be emitted — used by the editor row's
-    ///     "structured matches text" gate so an incomplete sub-filter cannot silently round-trip into a
-    ///     persisted <see cref="BasicFilter" /> that disagrees with the saved expression text.
-    /// </summary>
-    public static bool TryFormat(BasicFilter basicFilter, bool strictSubFilters, out string comparison)
-    {
-        ArgumentNullException.ThrowIfNull(basicFilter);
-
-        comparison = string.Empty;
-
-        if (!TryFormatCondition(basicFilter.Comparison, null, out var comparisonText))
-        {
-            return false;
-        }
-
-        StringBuilder stringBuilder = new(comparisonText);
-
-        foreach (var subFilter in basicFilter.SubFilters)
-        {
-            var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
-
-            if (TryFormatCondition(subFilter.Data, joinPrefix, out var subText))
-            {
-                stringBuilder.Append(subText);
-            }
-            else if (strictSubFilters)
-            {
-                return false;
-            }
-        }
-
-        comparison = stringBuilder.ToString();
 
         return true;
     }

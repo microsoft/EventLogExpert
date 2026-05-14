@@ -39,8 +39,31 @@ public sealed class FilterModelTests
         Assert.Equal("100", restored.BasicFilter.Comparison.Value);
         Assert.Single(restored.BasicFilter.SubFilters);
         Assert.False(restored.BasicFilter.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, restored.BasicFilter.SubFilters[0].Data.Property);
-        Assert.Equal("Error", restored.BasicFilter.SubFilters[0].Data.Value);
+        Assert.Equal(EventProperty.Level, restored.BasicFilter.SubFilters[0].Comparison.Property);
+        Assert.Equal("Error", restored.BasicFilter.SubFilters[0].Comparison.Value);
+    }
+
+    [Fact]
+    public void JsonRoundTrip_CachedMode_PersistsAndRestoresMode()
+    {
+        var original = SavedFilter.TryCreate(
+            Constants.FilterIdEquals100,
+            color: HighlightColor.Yellow,
+            mode: FilterMode.Cached);
+
+        Assert.NotNull(original);
+        Assert.Equal(FilterMode.Cached, original.Mode);
+        Assert.Null(original.BasicFilter);
+
+        string json = JsonSerializer.Serialize(original);
+        Assert.Contains("\"Mode\":\"Cached\"", json);
+
+        var restored = JsonSerializer.Deserialize<SavedFilter>(json);
+        Assert.NotNull(restored);
+
+        Assert.Equal(FilterMode.Cached, restored.Mode);
+        Assert.Null(restored.BasicFilter);
+        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
     }
 
     [Fact]
@@ -198,29 +221,6 @@ public sealed class FilterModelTests
     }
 
     [Fact]
-    public void JsonRoundTrip_CachedMode_PersistsAndRestoresMode()
-    {
-        var original = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
-            color: HighlightColor.Yellow,
-            mode: FilterMode.Cached);
-
-        Assert.NotNull(original);
-        Assert.Equal(FilterMode.Cached, original.Mode);
-        Assert.Null(original.BasicFilter);
-
-        string json = JsonSerializer.Serialize(original);
-        Assert.Contains("\"Mode\":\"Cached\"", json);
-
-        var restored = JsonSerializer.Deserialize<SavedFilter>(json);
-        Assert.NotNull(restored);
-
-        Assert.Equal(FilterMode.Cached, restored.Mode);
-        Assert.Null(restored.BasicFilter);
-        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
-    }
-
-    [Fact]
     public void JsonRoundTrip_NewShape_PersistsAndRestoresAllFields()
     {
         var original = SavedFilter.TryCreate(
@@ -241,25 +241,6 @@ public sealed class FilterModelTests
         Assert.Equal(original.IsExcluded, restored.IsExcluded);
         Assert.Equal(original.Mode, restored.Mode);
         Assert.NotNull(restored.Compiled);
-    }
-
-    [Fact]
-    public void LoadFromPersisted_CompileFailure_DisablesAndPreservesText()
-    {
-        var model = SavedFilter.LoadFromPersisted(
-            "Id ===== ###",
-            HighlightColor.Blue,
-            true,
-            null,
-            FilterMode.Basic);
-
-        Assert.Equal("Id ===== ###", model.ComparisonText);
-        Assert.Null(model.Compiled);
-        Assert.False(model.IsEnabled);
-        Assert.True(model.IsExcluded);
-        Assert.Equal(HighlightColor.Blue, model.Color);
-        Assert.Null(model.BasicFilter);
-        Assert.Equal(FilterMode.Basic, model.Mode);
     }
 
     [Fact]
@@ -305,30 +286,6 @@ public sealed class FilterModelTests
 
         Assert.Null(model.BasicFilter);
         Assert.Equal(FilterMode.Advanced, model.Mode);
-    }
-
-    [Fact]
-    public void LoadFromPersisted_CachedMode_StalePersistedBasicFilter_ForcesNull()
-    {
-        var stale = new BasicFilter(
-            new BasicFilterCondition
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = "100"
-            },
-            []);
-
-        var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
-            HighlightColor.None,
-            false,
-            stale,
-            FilterMode.Cached);
-
-        Assert.Null(model.BasicFilter);
-        Assert.Equal(FilterMode.Cached, model.Mode);
     }
 
     [Fact]
@@ -398,7 +355,7 @@ public sealed class FilterModelTests
             Constants.FilterIdEquals100,
             HighlightColor.None,
             false,
-            persistedBasicFilter: null,
+            null,
             FilterMode.Basic);
 
         Assert.NotNull(model.BasicFilter);
@@ -417,11 +374,54 @@ public sealed class FilterModelTests
             Constants.FilterComputerNameEqualsServer01,
             HighlightColor.None,
             false,
-            persistedBasicFilter: null,
+            null,
             FilterMode.Basic);
 
         Assert.Null(model.BasicFilter);
         Assert.Equal(Constants.FilterComputerNameEqualsServer01, model.ComparisonText);
+        Assert.Equal(FilterMode.Basic, model.Mode);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_CachedMode_StalePersistedBasicFilter_ForcesNull()
+    {
+        var stale = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
+            []);
+
+        var model = SavedFilter.LoadFromPersisted(
+            Constants.FilterIdEquals100,
+            HighlightColor.None,
+            false,
+            stale,
+            FilterMode.Cached);
+
+        Assert.Null(model.BasicFilter);
+        Assert.Equal(FilterMode.Cached, model.Mode);
+    }
+
+    [Fact]
+    public void LoadFromPersisted_CompileFailure_DisablesAndPreservesText()
+    {
+        var model = SavedFilter.LoadFromPersisted(
+            "Id ===== ###",
+            HighlightColor.Blue,
+            true,
+            null,
+            FilterMode.Basic);
+
+        Assert.Equal("Id ===== ###", model.ComparisonText);
+        Assert.Null(model.Compiled);
+        Assert.False(model.IsEnabled);
+        Assert.True(model.IsExcluded);
+        Assert.Equal(HighlightColor.Blue, model.Color);
+        Assert.Null(model.BasicFilter);
         Assert.Equal(FilterMode.Basic, model.Mode);
     }
 
@@ -440,18 +440,6 @@ public sealed class FilterModelTests
         Assert.False(model.IsEnabled);
         Assert.Null(model.BasicFilter);
         Assert.Equal(FilterMode.Advanced, model.Mode);
-    }
-
-    [Fact]
-    public void TryCreate_BasicMode_NoBasicFilterProvided_DecomposableText_AutoDecomposes()
-    {
-        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
-
-        Assert.NotNull(model);
-        Assert.Equal(FilterMode.Basic, model.Mode);
-        Assert.NotNull(model.BasicFilter);
-        Assert.Equal(EventProperty.Id, model.BasicFilter.Comparison.Property);
-        Assert.Equal("100", model.BasicFilter.Comparison.Value);
     }
 
     [Fact]
@@ -509,6 +497,18 @@ public sealed class FilterModelTests
     }
 
     [Fact]
+    public void TryCreate_BasicMode_NoBasicFilterProvided_DecomposableText_AutoDecomposes()
+    {
+        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
+
+        Assert.NotNull(model);
+        Assert.Equal(FilterMode.Basic, model.Mode);
+        Assert.NotNull(model.BasicFilter);
+        Assert.Equal(EventProperty.Id, model.BasicFilter.Comparison.Property);
+        Assert.Equal("100", model.BasicFilter.Comparison.Value);
+    }
+
+    [Fact]
     public void TryCreate_NoBasicFilterProvided_NonDecomposableText_BasicFilterStaysNull()
     {
         // ComputerName is outside the BasicFilter authoring vocabulary; the decomposer refuses, leaving the filter
@@ -541,7 +541,7 @@ public sealed class FilterModelTests
             true,
             true,
             id,
-            mode: FilterMode.Basic);
+            FilterMode.Basic);
 
         Assert.NotNull(model);
         Assert.Equal(id, model.Id);

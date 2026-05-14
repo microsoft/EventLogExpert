@@ -429,7 +429,7 @@ public sealed class BasicFilterDecomposerTests
         for (var i = 0; i < expected.SubFilters.Count; i++)
         {
             Assert.Equal(expected.SubFilters[i].JoinWithAny, actual.SubFilters[i].JoinWithAny);
-            AssertConditionStructurallyEqual(expected.SubFilters[i].Data, actual.SubFilters[i].Data);
+            AssertConditionStructurallyEqual(expected.SubFilters[i].Comparison, actual.SubFilters[i].Comparison);
         }
     }
 
