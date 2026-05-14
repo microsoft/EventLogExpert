@@ -10,6 +10,37 @@ namespace EventLogExpert.UI.Tests.Filter;
 public sealed class FilterDraftModelTests
 {
     [Fact]
+    public void FromSavedFilter_AdvancedModeWithStaleBasicFilter_DoesNotHydrateStructure()
+    {
+        // Defensive: even if a SavedFilter somehow carries Mode=Advanced + a non-null BasicFilter (e.g. a
+        // hand-edited persistence file), FromSavedFilter must NOT hydrate structure — Mode wins.
+        var staleBasic = new BasicFilter(
+            new BasicFilterCondition
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = Constants.FilterValue100
+            },
+            []);
+
+        var original = new SavedFilter
+        {
+            ComparisonText = Constants.FilterIdEquals100,
+            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
+            BasicFilter = staleBasic,
+            Mode = FilterMode.Advanced,
+            IsEnabled = true
+        };
+
+        var draft = FilterDraft.FromSavedFilter(original);
+
+        Assert.Equal(FilterMode.Advanced, draft.Mode);
+        Assert.Null(draft.Comparison.Value);
+        Assert.Empty(draft.SubFilters);
+    }
+
+    [Fact]
     public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
         var basicFilter = new BasicFilter(
@@ -22,9 +53,7 @@ public sealed class FilterDraftModelTests
             },
             []);
 
-        var original = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
-            basicFilter: basicFilter);
+        var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
 
@@ -60,9 +89,7 @@ public sealed class FilterDraftModelTests
                     true)
             ]);
 
-        var original = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
-            basicFilter: basicFilter);
+        var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
 
         var draft = FilterDraft.FromSavedFilter(original);
 
@@ -140,37 +167,6 @@ public sealed class FilterDraftModelTests
     }
 
     [Fact]
-    public void FromSavedFilter_AdvancedModeWithStaleBasicFilter_DoesNotHydrateStructure()
-    {
-        // Defensive: even if a SavedFilter somehow carries Mode=Advanced + a non-null BasicFilter (e.g. a
-        // hand-edited persistence file), FromSavedFilter must NOT hydrate structure — Mode wins.
-        var staleBasic = new BasicFilter(
-            new BasicFilterCondition
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100
-            },
-            []);
-
-        var original = new SavedFilter
-        {
-            ComparisonText = Constants.FilterIdEquals100,
-            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
-            BasicFilter = staleBasic,
-            Mode = FilterMode.Advanced,
-            IsEnabled = true
-        };
-
-        var draft = FilterDraft.FromSavedFilter(original);
-
-        Assert.Equal(FilterMode.Advanced, draft.Mode);
-        Assert.Null(draft.Comparison.Value);
-        Assert.Empty(draft.SubFilters);
-    }
-
-    [Fact]
     public void ToBasicFilter_DoesNotShareValuesListWithDraft()
     {
         var draft = FilterUtils.CreateTestFilterDraft(
@@ -222,7 +218,7 @@ public sealed class FilterDraftModelTests
         Assert.Equal(Constants.FilterValue100, source.Comparison.Value);
         Assert.Single(source.SubFilters);
         Assert.True(source.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, source.SubFilters[0].Data.Property);
-        Assert.Equal("Error", source.SubFilters[0].Data.Value);
+        Assert.Equal(EventProperty.Level, source.SubFilters[0].Comparison.Property);
+        Assert.Equal("Error", source.SubFilters[0].Comparison.Value);
     }
 }

@@ -34,7 +34,7 @@ internal static class ResolvedEventExtensions
         {
             if (@event is null) { return false; }
 
-            if (dateFilter is null) { return true; }
+            if (dateFilter is null || !dateFilter.IsEnabled) { return true; }
 
             return @event.TimeCreated >= dateFilter.After && @event.TimeCreated <= dateFilter.Before;
         }
