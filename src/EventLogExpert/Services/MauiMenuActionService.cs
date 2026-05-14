@@ -2,12 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Modals;
-using EventLogExpert.Components.Modals.Filters;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Versioning;
@@ -65,10 +63,8 @@ public sealed class MauiMenuActionService(
             return;
         }
 
-        await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, userInitiated: true);
+        await _updateService.CheckForUpdates(_settings.IsPreReleaseEnabled, true);
     }
-
-    public void ClearAllFilters() => _dispatcher.Dispatch(new ClearAllFiltersAction());
 
     public async Task CloseAllLogsAsync()
     {
@@ -289,7 +285,7 @@ public sealed class MauiMenuActionService(
 
     public Task<bool> OpenSettingsAsync() => ShowModalAsync<SettingsModal>("settings");
 
-    public async Task SaveAllFiltersAsync()
+    public async Task SaveFiltersAsGroupAsync()
     {
         var groupName = await _dialogService.DisplayPrompt(
             "Group Name",

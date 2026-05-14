@@ -331,7 +331,7 @@ public sealed partial class MenuBar : IDisposable
         var requestId = Interlocked.Increment(ref _openRequestId);
 
         // Anchor the dropdown to the bottom-left of the trigger button.
-        var rect = await JSRuntime.InvokeAsync<MenuBarItemRect>(
+        var rect = await JSRuntime.InvokeAsync<MenuAnchorRect>(
             "getMenuElementRect",
             _barElements[index]);
 
@@ -349,12 +349,4 @@ public sealed partial class MenuBar : IDisposable
     }
 
     private sealed record TopLevel(string Label, Func<IReadOnlyList<MenuItem>> BuildItems);
-
-    private sealed record MenuBarItemRect(
-        double Left,
-        double Top,
-        double Right,
-        double Bottom,
-        double Width,
-        double Height);
 }

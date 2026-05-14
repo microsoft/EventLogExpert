@@ -168,23 +168,6 @@ public sealed partial class FilterPane : IDisposable
         _isFilterListVisible = true;
     }
 
-    private void AddFilterGroup()
-    {
-        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
-        // overwritten by `Groups.First()` reset. Cancel button is the only way to dismiss the picker.
-        if (_isGroupPickerVisible) { return; }
-
-        // Per locked design: trigger is always enabled. Picker shows empty-state copy when no groups
-        // exist (rather than disabling the trigger and leaving users without a discovery hint).
-        // Pre-select uses the dropdown's display order (alphabetical) so the highlighted entry
-        // matches the first row a sighted user sees.
-        _isGroupPickerVisible = true;
-        _selectedGroupId = HasFilterGroups
-            ? FilterGroupState.Value.Groups.OrderBy(g => g.Name).First().Id
-            : default;
-        _isFilterListVisible = true;
-    }
-
     private void ApplyDateFilter()
     {
         Dispatcher.Dispatch(
@@ -246,7 +229,7 @@ public sealed partial class FilterPane : IDisposable
 
         bool confirmed = await AlertDialogService.ShowAlert("Clear All Filters", message, "Clear", "Cancel");
 
-        if (confirmed) { MenuActions.ClearAllFilters(); }
+        if (confirmed) { Dispatcher.Dispatch(new ClearAllFiltersAction()); }
     }
 
     private void EditDateFilter() => _canEditDate = true;
@@ -300,15 +283,32 @@ public sealed partial class FilterPane : IDisposable
 
     private async Task OpenAddFilterMenuAtAsync(bool focusFirst)
     {
-        var rect = await JSRuntime.InvokeAsync<AnchorRect>("getMenuElementRect", _addFilterChevronRef);
+        var rect = await JSRuntime.InvokeAsync<MenuAnchorRect>("getMenuElementRect", _addFilterChevronRef);
         MenuService.OpenAt(rect.Left, rect.Bottom, BuildAddFilterMenu(), focusFirst);
         _addFilterMenuId = MenuService.ActiveMenuId;
         StateHasChanged();
     }
 
-    private async Task OpenFilterGroupsModal() => await ModalService.Show<FilterGroupModal, bool>();
+    private async Task OpenCachedFiltersModal() => await ModalService.Show<FilterCacheModal, bool>();
 
-    private async Task OpenSavedFiltersModal() => await ModalService.Show<FilterCacheModal, bool>();
+    private void OpenFilterGroupPicker()
+    {
+        // Re-clicking the trigger is a no-op so an in-progress dropdown selection isn't silently
+        // overwritten by `Groups.First()` reset. Cancel button is the only way to dismiss the picker.
+        if (_isGroupPickerVisible) { return; }
+
+        // Per locked design: trigger is always enabled. Picker shows empty-state copy when no groups
+        // exist (rather than disabling the trigger and leaving users without a discovery hint).
+        // Pre-select uses the dropdown's display order (alphabetical) so the highlighted entry
+        // matches the first row a sighted user sees.
+        _isGroupPickerVisible = true;
+        _selectedGroupId = HasFilterGroups
+            ? FilterGroupState.Value.Groups.OrderBy(g => g.Name).First().Id
+            : default;
+        _isFilterListVisible = true;
+    }
+
+    private async Task OpenFilterGroupsModal() => await ModalService.Show<FilterGroupModal, bool>();
 
     private void RemoveDateFilter()
     {
@@ -316,7 +316,7 @@ public sealed partial class FilterPane : IDisposable
         Dispatcher.Dispatch(new SetFilterDateRangeAction(null));
     }
 
-    private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveAllFiltersAsync();
+    private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsGroupAsync();
 
     private void ToggleDateFilter() => Dispatcher.Dispatch(new ToggleFilterDateAction());
 
@@ -338,6 +338,4 @@ public sealed partial class FilterPane : IDisposable
 
         _currentTimeZone = timeZoneInfo;
     }
-
-    private sealed record AnchorRect(double Left, double Top, double Right, double Bottom, double Width, double Height);
 }
