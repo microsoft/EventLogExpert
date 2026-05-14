@@ -11,7 +11,18 @@
 
 .filter-header {
     display: grid;
-    grid-template-columns: 1fr max-content 1fr;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.filter-header-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem;
+    grid-column: 1;
+    min-width: 0;
 }
 
 .filter-group {
@@ -34,12 +45,19 @@
 .filter-header-secondary {
     display: flex;
     align-items: center;
-    justify-self: end;
+    flex-wrap: wrap;
+    justify-content: flex-end;
     gap: 0.25rem;
-
-    /* Anchor to the third grid column so the icon row stays right-aligned even when the
-       middle column (active filter count) is conditionally hidden. */
     grid-column: 3;
+    justify-self: end;
+    min-width: 0;
+}
+
+.filter-header-status {
+    grid-column: 2;
+    justify-self: center;
+    white-space: nowrap;
+    text-align: center;
 }
 
 .icon-button[aria-disabled="true"] {

@@ -2,12 +2,14 @@
 
 <div class="filter-pane">
     <div class="filter-header">
-        <div>
+        <div class="filter-header-actions">
             <div class="split-button">
                 <button class="button split-button-primary" @onclick="AddBasicFilter" title="Add Basic filter (use chevron for Advanced or Cached)">
                     <i class="bi bi-plus-circle"></i> Add Filter
                 </button>
-                <button aria-haspopup="menu"
+                <button aria-controls="menu-host-popup"
+                    aria-expanded="@(IsAddFilterMenuOpen ? "true" : "false")"
+                    aria-haspopup="menu"
                     aria-label="Choose filter mode"
                     class="button split-button-chevron"
                     @onclick="OpenAddFilterMenuAsync"
@@ -18,6 +20,10 @@
                 </button>
             </div>
 
+            <button class="button" @onclick="AddExclusion">
+                <i class="bi bi-plus-circle"></i> Add Exclusion
+            </button>
+
             @if (!IsDateFilterVisible)
             {
                 <button class="button" @onclick="AddDateFilter">
@@ -25,58 +31,48 @@
                 </button>
             }
 
-            <button class="button" @onclick="AddExclusion">
-                <i class="bi bi-plus-circle"></i> Add Exclusion
-            </button>
-
             <button class="button" @onclick="AddFilterGroup">
                 <i class="bi bi-plus-circle"></i> Apply Filter Group
             </button>
         </div>
 
-        @if (HasFilters || FilterLoadingState.Value.IsLoading)
+        @if (FilterLoadingState.Value.IsLoading)
         {
-            @if (FilterLoadingState.Value.IsLoading)
-            {
-                <div class="text-align-center">
-                    <span>[<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]</span>
-                </div>
-            }
-            else
-            {
-                <div class="text-align-center">
-                    @if (GetActiveFilters() > 0)
-                    {
-                        <span>[Active Filters: @GetActiveFilters()]</span>
-                    }
-                </div>
-            }
+            <span class="filter-header-status">
+                [<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]
+            </span>
+        }
+        else if (HasFilters && GetActiveFilters() > 0)
+        {
+            <span class="filter-header-status">[Active Filters: @GetActiveFilters()]</span>
         }
 
         <div class="filter-header-secondary">
             <button aria-describedby="@(HasSavableFilters ? null : "save-filters-empty-hint")"
-                aria-disabled="@(!HasSavableFilters)" aria-label="Save Filters as Group"
-                class="button icon-button" @onclick="SaveFiltersAsGroupAsync"
+                aria-disabled="@(!HasSavableFilters)"
+                aria-label="Save Filters as Group"
+                class="button icon-button"
+                @onclick="SaveFiltersAsGroupAsync"
                 title="@(HasSavableFilters ? "Save Filters as Group..." : "No filters to save")"
                 type="button">
                 <i class="bi bi-bookmark-plus"></i>
             </button>
 
-            <button aria-describedby="@(HasFilters ? null : "clear-filters-empty-hint")"
-                aria-disabled="@(!HasFilters)" aria-label="Clear All Filters"
-                class="button icon-button" @onclick="ClearAllFiltersAsync"
-                title="@(HasFilters ? "Clear All Filters..." : "No filters to clear")"
+            <button aria-describedby="@(HasClearableFilters ? null : "clear-filters-empty-hint")"
+                aria-disabled="@(!HasClearableFilters)"
+                aria-label="Clear All Filters"
+                class="button icon-button"
+                @onclick="ClearAllFiltersAsync"
+                title="@(HasClearableFilters ? "Clear All Filters..." : "No filters to clear")"
                 type="button">
                 <i class="bi bi-trash"></i>
             </button>
 
-            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenSavedFiltersModal"
-                title="Manage Cached Filters" type="button">
+            <button aria-label="Manage Cached Filters" class="button icon-button" @onclick="OpenSavedFiltersModal" title="Manage Cached Filters" type="button">
                 <i class="bi bi-bookmark"></i>
             </button>
 
-            <button aria-label="Manage Filter Groups" class="button icon-button" @onclick="OpenFilterGroupsModal"
-                title="Manage Filter Groups" type="button">
+            <button aria-label="Manage Filter Groups" class="button icon-button" @onclick="OpenFilterGroupsModal" title="Manage Filter Groups" type="button">
                 <i class="bi bi-collection"></i>
             </button>
 
@@ -89,8 +85,13 @@
 
             @if (HasFilters || FilterLoadingState.Value.IsLoading)
             {
-                <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")" class="menu-toggle"
-                    data-rotate="@MenuState" @onclick="ToggleMenu" @onkeydown="HandleKeyDown" role="button" tabindex="0">
+                <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
+                    class="menu-toggle"
+                    data-rotate="@MenuState"
+                    @onclick="ToggleMenu"
+                    @onkeydown="HandleKeyDown"
+                    role="button"
+                    tabindex="0">
                     <i class="bi bi-caret-up"></i>
                 </span>
             }
@@ -173,8 +174,16 @@
                 else
                 {
                     <span class="filter-empty-state">
-                        No saved filter groups yet — use <strong>Save Filters as Group</strong> on the right
-                        to create one from the current pane.
+                        @if (HasSavableFilters)
+                        {
+                            @:No saved filter groups yet — use <strong>Save Filters as Group</strong> on the right
+                            @:to create one from the current pane.
+                        }
+                        else
+                        {
+                            @:No saved filter groups yet. Add and apply filters first, then use
+                            @:<strong>Save Filters as Group</strong> on the right to create one.
+                        }
                     </span>
                 }
 

@@ -30,7 +30,11 @@
 
                 if (item.IsDanger) { itemClass += " danger"; }
 
+                bool hasReason = !item.IsEnabled && !string.IsNullOrEmpty(item.DisabledReason);
+                string? reasonId = hasReason ? $"menu-item-reason-{_rendererId}-{capturedIndex}" : null;
+
                 <li aria-checked="@(item.IsChecked is null ? null : (item.IsChecked.Value ? "true" : "false"))"
+                    aria-describedby="@reasonId"
                     aria-disabled="@(!item.IsEnabled ? "true" : null)"
                     aria-expanded="@(hasChildren ? isOpen.ToString().ToLowerInvariant() : null)"
                     aria-haspopup="@(hasChildren ? "menu" : null)"
@@ -41,9 +45,15 @@
                     @onmouseenter="() => OnItemHover(item, capturedIndex)"
                     @ref="_itemElements[capturedIndex]"
                     role="@(item.IsChecked is null ? "menuitem" : "menuitemcheckbox")"
-                    tabindex="@(isFocused && item.IsEnabled ? 0 : -1)">
+                    tabindex="@(isFocused && item.IsFocusable ? 0 : -1)"
+                    title="@(hasReason ? item.DisabledReason : null)">
 
                     <span class="menu-label">@item.Label</span>
+
+                    @if (hasReason)
+                    {
+                        <span class="visually-hidden" id="@reasonId">@item.DisabledReason</span>
+                    }
 
                     @if (item.IsChecked is true)
                     {

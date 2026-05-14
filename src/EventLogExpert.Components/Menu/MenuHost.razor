@@ -6,15 +6,16 @@
         @oncontextmenu:preventDefault="true">
         <div aria-label="Menu"
             class="menu-host-popup"
-            @ref="_popupElement"
+            id="menu-host-popup"
             @onclick:stopPropagation
             @onkeydown="HandleKeyDown"
+            @ref="_popupElement"
             role="presentation"
             style="@PositionStyle"
             tabindex="-1">
-            <MenuRenderer Items="MenuService.ActiveItems"
+            <MenuRenderer InitialFocusIndex="@(MenuService.ActiveFocusFirst ? 0 : -1)"
+                Items="MenuService.ActiveItems"
                 @key="MenuService.ActiveMenuId"
-                InitialFocusIndex="@(MenuService.ActiveFocusFirst ? 0 : -1)"
                 OnActivated="HandleActivated"
                 OnNavigateBar="HandleNavigateBar" />
         </div>
