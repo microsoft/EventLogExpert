@@ -2,14 +2,14 @@
 
 ## Saved Filters
 
-Two separate persisted surfaces, both reached from the `View` menu:
+Two separate persisted surfaces, both reached from the [Filter pane](Filtering.md) header's right-side icon strip:
 
-- `View` → `Show Cached Filters` opens the **filter cache** modal — a flat list of single-expression filter strings split into `Favorite Filters` and `Recent Filters` sections.
-- `View` → `Show Filter Groups` opens the **filter groups** modal — named, structured collections of full filters (with categories, evaluators, comparison values, and per-filter highlight colors).
+- The bookmark icon (`Manage Cached Filters`) opens the **filter cache** modal — a flat list of single-expression filter strings split into `Favorite Filters` and `Recent Filters` sections.
+- The collection icon (`Manage Filter Groups`) opens the **filter groups** modal — named, structured collections of full filters (with categories, evaluators, comparison values, and per-filter highlight colors).
 
 The two have different shapes and different intended uses. The cache is a one-string-per-entry shortcut for the comparison values you keep typing. Groups are reusable filter sets you assemble once and reapply or share.
 
-### Filter cache (`Show Cached Filters`)
+### Filter cache (`Manage Cached Filters`)
 
 <!-- screenshot: filter-cache-modal --> ![Filter cache modal](.images/filter-cache-modal.png)
 
@@ -23,7 +23,7 @@ The two have different shapes and different intended uses. The cache is a one-st
 
 The cache persists across app sessions in user preferences.
 
-### Filter groups (`Show Filter Groups`)
+### Filter groups (`Manage Filter Groups`)
 
 <!-- screenshot: filter-groups-modal --> ![Filter groups modal](.images/filter-groups-modal.png)
 
@@ -43,7 +43,7 @@ In edit mode each filter row gets the same chrome as the filter pane (toggle ena
 
 The pencil icon next to the group name renames it. Empty names are rejected. The new name's `\` segment becomes the new section prefix.
 
-`Create Group` at the bottom of the modal creates a new group named `New Filter Section\New Filter Group` (in section `New Filter Section`); rename it before saving filters into it. Group creation also seeds the `Save All Filters` flow on the `Edit` menu — that command prompts for a `Group Name` and saves the current filter rows as a new group with that name. Saved groups persist filter rows only; the date filter is stored separately and is not part of a group.
+`Create Group` at the bottom of the modal creates a new group named `New Filter Section\New Filter Group` (in section `New Filter Section`); rename it before saving filters into it. The same prompt seeds the filter pane's `Save Filters as Group` flow (bookmark-plus icon on the pane header) — that action prompts for a `Group Name` and saves the current filter rows as a new group with that name. Saved groups persist filter rows only; the date filter is stored separately and is not part of a group.
 
 **Modal-level Import / Export.** The footer reads and writes JSON files containing the **entire** groups list. `Export` saves every group; `Import` reads a list of groups and adds them to whatever's already there (no merge by name, so re-importing the same file produces duplicates).
 

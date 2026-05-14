@@ -14,7 +14,7 @@ The Filter pane sits above the event table. Every event in the active log set is
 
 Each saved row carries a chrome strip with `Edit`, `Exclude` (or `Include` when the row is already an exclusion), `Remove`, and a `Disable` / `Enable` toggle. While editing, the chrome shows `Save` and `Cancel`. Non-exclusion rows also show a highlight-color picker (`Highlight Color`) before the comparison content. When any filter is being applied, the pane shows `[Applying Filters]` with a spinner; otherwise it shows `[Active Filters: N]`. The pane can be collapsed via the caret in the top-right corner.
 
-`Edit` → `Clear All Filters` removes every filter row and the date filter from the pane in one step. `Edit` → `Save All Filters` persists only the filter rows — the date filter is not part of a saved group. See [Keyboard and Copy](Keyboard-And-Copy.md). `View` → `Show All Events` (`Ctrl+H`) suspends evaluation without removing any filters.
+The pane header's right-side icon strip carries the persistence and management actions: `Save Filters as Group` (bookmark-plus icon — prompts for a group name and saves the current filter rows), `Clear All Filters` (trash icon — confirms then removes every filter row, the date filter, and any pending drafts), `Manage Cached Filters` (bookmark icon — opens the [filter cache modal](Saved-Filters.md)), and `Manage Filter Groups` (collection icon — opens the [filter groups modal](Saved-Filters.md)). The save and clear icons announce themselves as disabled when the pane has nothing to act on. See [Keyboard and Copy](Keyboard-And-Copy.md). `View` → `Show All Events` (`Ctrl+H`) suspends evaluation without removing any filters.
 
 ### Basic filters
 
@@ -87,7 +87,7 @@ Available properties:
 
 ### Excluded filters
 
-Either an `Add Exclusion` row from the start, or any Basic / Advanced row toggled with the `Exclude` chrome button. Matching events are hidden. Excluded filters are evaluated independently of `View` → `Show All Events`: the show-all toggle disables only the inclusion side, so exclusions and the date filter remain in effect when it's on. `Edit` → `Clear All Filters` removes every filter from the pane (including the date filter and exclusions) — there's no built-in way to reversibly suspend everything at once.
+Either an `Add Exclusion` row from the start, or any Basic / Advanced row toggled with the `Exclude` chrome button. Matching events are hidden. Excluded filters are evaluated independently of `View` → `Show All Events`: the show-all toggle disables only the inclusion side, so exclusions and the date filter remain in effect when it's on. The pane header's `Clear All Filters` icon (trash) removes every filter from the pane (including the date filter and exclusions) — there's no built-in way to reversibly suspend everything at once.
 
 ### Cached filters
 
