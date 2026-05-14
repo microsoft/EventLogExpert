@@ -16,6 +16,4 @@ public interface IFilterService
     IReadOnlyList<ResolvedEvent> GetFilteredEvents(IEnumerable<ResolvedEvent> events, EventFilter eventFilter);
 
     bool TryParse(BasicFilter basicFilter, out string comparison);
-
-    bool TryParseExpression(string? expression, out string error);
 }
