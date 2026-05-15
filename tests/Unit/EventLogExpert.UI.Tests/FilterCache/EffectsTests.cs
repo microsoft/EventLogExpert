@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
@@ -439,7 +438,7 @@ public sealed class EffectsTests
             Constants.FilterSourceContainsTest
         };
 
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterCachePreferencesProvider>();
         mockPreferencesProvider.FavoriteFiltersPreference.Returns(favoritesPreference);
         mockPreferencesProvider.RecentFiltersPreference.Returns(recentPreference);
 
@@ -466,7 +465,7 @@ public sealed class EffectsTests
     public async Task HandleLoadFilters_WhenPreferencesEmpty_ShouldLoadEmptyLists()
     {
         // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterCachePreferencesProvider>();
         mockPreferencesProvider.FavoriteFiltersPreference.Returns(new List<string>());
         mockPreferencesProvider.RecentFiltersPreference.Returns(new List<string>());
 
@@ -615,7 +614,7 @@ public sealed class EffectsTests
             x.RecentFilters.Contains(Constants.FilterIdEquals100)));
     }
 
-    private static (Effects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider) CreateEffects(
+    private static (Effects effects, IDispatcher mockDispatcher, IFilterCachePreferencesProvider mockPreferencesProvider) CreateEffects(
         ImmutableList<string>? favoriteFilters = null,
         ImmutableQueue<string>? recentFilters = null)
     {
@@ -627,7 +626,7 @@ public sealed class EffectsTests
             RecentFilters = recentFilters ?? ImmutableQueue<string>.Empty
         });
 
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterCachePreferencesProvider>();
 
         var effects = new Effects(mockPreferencesProvider, mockState);
         var mockDispatcher = Substitute.For<IDispatcher>();

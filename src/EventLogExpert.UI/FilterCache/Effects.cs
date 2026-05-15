@@ -1,13 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed class Effects(IPreferencesProvider preferencesProvider, IState<FilterCacheState> state)
+public sealed class Effects(IFilterCachePreferencesProvider preferencesProvider, IState<FilterCacheState> state)
 {
     private const int MaxRecentFilterCount = 20;
 
