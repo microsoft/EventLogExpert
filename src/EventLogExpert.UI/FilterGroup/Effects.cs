@@ -1,14 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 
 namespace EventLogExpert.UI.FilterGroup;
 
 public sealed class Effects(
     IState<FilterGroupState> filterGroupState,
-    IPreferencesProvider preferencesProvider)
+    IFilterGroupPreferencesProvider preferencesProvider)
 {
     [EffectMethod(typeof(AddGroupAction))]
     public Task HandleAddGroup(IDispatcher dispatcher)

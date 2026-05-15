@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -78,7 +77,7 @@ public sealed class EffectsTests
             new() { Name = Constants.FilterGroupNameNested }
         };
 
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterGroupPreferencesProvider>();
         mockPreferencesProvider.SavedFiltersPreference.Returns(savedGroups);
 
         var mockState = Substitute.For<IState<FilterGroupState>>();
@@ -101,7 +100,7 @@ public sealed class EffectsTests
     public async Task HandleLoadGroups_WhenPreferencesEmpty_ShouldDispatchEmptyList()
     {
         // Arrange
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterGroupPreferencesProvider>();
         mockPreferencesProvider.SavedFiltersPreference.Returns(new List<SavedFilterGroup>());
 
         var mockState = Substitute.For<IState<FilterGroupState>>();
@@ -177,7 +176,7 @@ public sealed class EffectsTests
             x.Count() == 3);
     }
 
-    private static (Effects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
+    private static (Effects effects, IDispatcher mockDispatcher, IFilterGroupPreferencesProvider mockPreferencesProvider)
         CreateEffects(List<SavedFilterGroup>? groups = null)
     {
         var mockState = Substitute.For<IState<FilterGroupState>>();
@@ -187,7 +186,7 @@ public sealed class EffectsTests
             Groups = ImmutableList.CreateRange(groups ?? [])
         });
 
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<IFilterGroupPreferencesProvider>();
 
         var effects = new Effects(mockState, mockPreferencesProvider);
         var mockDispatcher = Substitute.For<IDispatcher>();
