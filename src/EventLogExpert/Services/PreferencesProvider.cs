@@ -4,6 +4,7 @@
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;

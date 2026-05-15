@@ -19,6 +19,7 @@ using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
