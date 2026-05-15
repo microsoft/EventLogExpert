@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.Filter;
@@ -16,7 +15,6 @@ using System.Text.Json;
 namespace EventLogExpert.Services;
 
 public sealed class PreferencesProvider :
-    IPreferencesProvider,
     ILogTablePreferencesProvider,
     IFilterGroupPreferencesProvider,
     IFilterCachePreferencesProvider,
