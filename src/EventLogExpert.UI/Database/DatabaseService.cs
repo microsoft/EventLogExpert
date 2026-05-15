@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Database.Upgrade;
 using Microsoft.Data.Sqlite;
 using System.Collections.Immutable;
@@ -23,7 +22,7 @@ public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProv
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly HashSet<string> _filesInOperation = new(StringComparer.OrdinalIgnoreCase);
     private readonly Lock _mutationLock = new();
-    private readonly IPreferencesProvider _preferences;
+    private readonly IDatabasePreferencesProvider _preferences;
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
@@ -34,7 +33,7 @@ public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProv
 
     public DatabaseService(
         FileLocationOptions fileLocationOptions,
-        IPreferencesProvider preferences,
+        IDatabasePreferencesProvider preferences,
         ITraceLogger traceLogger)
     {
         _fileLocationOptions = fileLocationOptions;

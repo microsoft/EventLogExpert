@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.IntegrationTests.TestUtils;
@@ -34,7 +33,7 @@ public sealed class DatabaseServiceTests : IDisposable
         CreateDatabaseFile(databasePath, Constants.TestDb2);
         CreateDatabaseFile(databasePath, Constants.TestDb3);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([Constants.TestDb2]);
 
         var service = CreateDatabaseService(preferences);
@@ -365,7 +364,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([Constants.TestDb1.ToUpper()]);
 
         // Act
@@ -466,8 +465,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var inFlight = new ManualResetEventSlim(initialState: false);
-        using var release = new ManualResetEventSlim(initialState: false);
+        using var inFlight = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
 
         service.UpgradeBatchProgress += (_, args) =>
         {
@@ -601,8 +600,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var inFlight = new ManualResetEventSlim(initialState: false);
-        using var release = new ManualResetEventSlim(initialState: false);
+        using var inFlight = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
 
         service.UpgradeBatchProgress += (_, args) =>
         {
@@ -780,7 +779,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
         DatabaseSeedUtils.SeedV3Schema(sourceFile);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -839,7 +838,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var sourceFile = Path.Combine(sourceDir, Constants.TestDb1);
         DatabaseSeedUtils.SeedV4Schema(sourceFile);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -870,7 +869,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var existingPath = Path.Combine(databasePath, Constants.TestDb1);
         DatabaseSeedUtils.SeedV4Schema(existingPath);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -907,7 +906,7 @@ public sealed class DatabaseServiceTests : IDisposable
         DatabaseSeedUtils.SeedV4Schema(existingPath);
         var existingLength = new FileInfo(existingPath).Length;
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -944,7 +943,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var existingPath = Path.Combine(databasePath, Constants.TestDb1);
         DatabaseSeedUtils.SeedV4Schema(existingPath);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -974,7 +973,7 @@ public sealed class DatabaseServiceTests : IDisposable
         DatabaseSeedUtils.SeedV4Schema(existingPath);
         var existingLength = new FileInfo(existingPath).Length;
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -1294,7 +1293,7 @@ public sealed class DatabaseServiceTests : IDisposable
             });
 
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
-        var prefs = Substitute.For<IPreferencesProvider>();
+        var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
         var service = new DatabaseService(fileLocationOptions, prefs, throwingLogger);
         Assert.Single(service.Entries);
@@ -1372,8 +1371,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var inFlight = new ManualResetEventSlim(initialState: false);
-        using var release = new ManualResetEventSlim(initialState: false);
+        using var inFlight = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
 
         service.UpgradeBatchProgress += (_, args) =>
         {
@@ -1500,8 +1499,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var inFlight = new ManualResetEventSlim(initialState: false);
-        using var release = new ManualResetEventSlim(initialState: false);
+        using var inFlight = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
 
         service.UpgradeBatchProgress += (_, args) =>
         {
@@ -1598,7 +1597,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var prefs = Substitute.For<IPreferencesProvider>();
+        var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([Constants.TestDb1]);
         var service = CreateDatabaseService(prefs);
 
@@ -1615,8 +1614,8 @@ public sealed class DatabaseServiceTests : IDisposable
         // Act
         await service.RemoveAsync(
             Constants.TestDb1,
-            prepareForDeletionAsync: PrepareCallback,
-            cancellationToken: TestContext.Current.CancellationToken);
+            PrepareCallback,
+            TestContext.Current.CancellationToken);
 
         // Assert
         Assert.True(prepareInvoked);
@@ -1632,7 +1631,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var prefs = Substitute.For<IPreferencesProvider>();
+        var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
         var service = CreateDatabaseService(prefs);
 
@@ -1655,8 +1654,8 @@ public sealed class DatabaseServiceTests : IDisposable
         // Act
         await service.RemoveAsync(
             Constants.TestDb1,
-            prepareForDeletionAsync: PrepareCallback,
-            cancellationToken: TestContext.Current.CancellationToken);
+            PrepareCallback,
+            TestContext.Current.CancellationToken);
 
         // Assert — prepare callback observed IsEnabled=false (Phase 1 ran first) and the
         // file still present (Phase 3 had not yet run).
@@ -1710,7 +1709,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var prefs = Substitute.For<IPreferencesProvider>();
+        var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
         var service = CreateDatabaseService(prefs);
 
@@ -1722,8 +1721,8 @@ public sealed class DatabaseServiceTests : IDisposable
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.RemoveAsync(
                 Constants.TestDb1,
-                prepareForDeletionAsync: _ => throw new InvalidOperationException("prepare boom"),
-                cancellationToken: TestContext.Current.CancellationToken));
+                _ => throw new InvalidOperationException("prepare boom"),
+                TestContext.Current.CancellationToken));
 
         // Assert
         Assert.Equal("prepare boom", ex.Message);
@@ -1758,8 +1757,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var inFlight = new ManualResetEventSlim(initialState: false);
-        using var release = new ManualResetEventSlim(initialState: false);
+        using var inFlight = new ManualResetEventSlim(false);
+        using var release = new ManualResetEventSlim(false);
 
         service.UpgradeBatchProgress += (_, args) =>
         {
@@ -1908,7 +1907,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
-        var preferences = Substitute.For<IPreferencesProvider>();
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
         preferences.DisabledDatabasesPreference.Returns([]);
 
         var service = CreateDatabaseService(preferences);
@@ -2297,8 +2296,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var service = CreateDatabaseService();
 
-        using var firstBackingUp = new ManualResetEventSlim(initialState: false);
-        using var releaseFirst = new ManualResetEventSlim(initialState: false);
+        using var firstBackingUp = new ManualResetEventSlim(false);
+        using var releaseFirst = new ManualResetEventSlim(false);
         var startedBatchIds = new List<UpgradeBatchId>();
         var startedTimes = new List<DateTime>();
 
@@ -2399,10 +2398,10 @@ public sealed class DatabaseServiceTests : IDisposable
         return path;
     }
 
-    private DatabaseService CreateDatabaseService(IPreferencesProvider? preferences = null, ITraceLogger? traceLogger = null)
+    private DatabaseService CreateDatabaseService(IDatabasePreferencesProvider? preferences = null, ITraceLogger? traceLogger = null)
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
-        var prefs = preferences ?? Substitute.For<IPreferencesProvider>();
+        var prefs = preferences ?? Substitute.For<IDatabasePreferencesProvider>();
 
         if (preferences is null)
         {
