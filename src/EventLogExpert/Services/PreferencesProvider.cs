@@ -3,7 +3,10 @@
 
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Preferences;
+using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.FilterCache;
+using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using Microsoft.Extensions.Logging;
@@ -11,7 +14,14 @@ using System.Text.Json;
 
 namespace EventLogExpert.Services;
 
-public sealed class PreferencesProvider : IPreferencesProvider
+public sealed class PreferencesProvider :
+    IPreferencesProvider,
+    ILogTablePreferencesProvider,
+    IFilterGroupPreferencesProvider,
+    IFilterCachePreferencesProvider,
+    ISettingsPreferencesProvider,
+    IDetailsPanePreferencesProvider,
+    IDatabasePreferencesProvider
 {
     private const string ColumnOrder = "column-order";
     private const string ColumnWidths = "column-widths";

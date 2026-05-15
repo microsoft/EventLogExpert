@@ -21,6 +21,9 @@ using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.FilterCache;
+using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
@@ -64,7 +67,7 @@ public static class MauiProgram
         // (SettingsModal) get the single per-app instance with its dictionaries of in-flight loads
         // and close completions.
         builder.Services.AddSingleton<ILogReloadCoordinator>(sp =>
-            sp.GetRequiredService<Effects>());
+            sp.GetRequiredService<UI.EventLog.Effects>());
 
         // Core Services
         builder.Services.AddSingleton<DebugLogService>();
@@ -106,11 +109,20 @@ public static class MauiProgram
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
+        // Preference Providers
+        builder.Services.AddSingleton<PreferencesProvider>();
+        builder.Services.AddSingleton<IPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<ILogTablePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<IFilterGroupPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<IFilterCachePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<ISettingsPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<IDetailsPanePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<IDatabasePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+
         // UI Services
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
-        builder.Services.AddSingleton<IPreferencesProvider, PreferencesProvider>();
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
         builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
