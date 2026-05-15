@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Tests.TestUtils;
 
 namespace EventLogExpert.UI.Tests.EventLog;
@@ -39,7 +39,7 @@ public sealed class EventLogDataExtensionsTests
     }
 
     [Fact]
-    public void GetEventDateRange_WhenMultipleNonOverlappingLogs_ReturnsEnvelopeAndAfterPrecedesBefore()
+    public void GetEventDateRange_WhenMultipleNonOverlappingLogs_ReturnsRangeAndAfterPrecedesBefore()
     {
         // Regression: previous (intersection) implementation would invert After/Before for non-overlapping logs.
         var logA = CreateLog(
@@ -55,11 +55,11 @@ public sealed class EventLogDataExtensionsTests
 
         Assert.Equal(new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc), after);
         Assert.Equal(new DateTime(2024, 1, 5, 22, 0, 0, DateTimeKind.Utc), before);
-        Assert.True(after < before, "envelope bounds must not invert");
+        Assert.True(after < before, "range bounds must not invert");
     }
 
     [Fact]
-    public void GetEventDateRange_WhenMultipleOverlappingLogs_ReturnsEnvelope()
+    public void GetEventDateRange_WhenMultipleOverlappingLogs_ReturnsRange()
     {
         var logA = CreateLog(
             "A",
@@ -83,7 +83,7 @@ public sealed class EventLogDataExtensionsTests
     {
         // Ceil of an exact-hour value must be the same value (no extra hour).
         var exactHour = new DateTime(2024, 1, 1, 14, 0, 0, DateTimeKind.Utc);
-        var log = CreateLog("ExactHour", newest: exactHour, oldest: exactHour);
+        var log = CreateLog("ExactHour", exactHour, exactHour);
 
         var (after, before) = new[] { log }.GetEventDateRange(s_fallbackNow);
 
@@ -105,7 +105,7 @@ public sealed class EventLogDataExtensionsTests
     {
         var exactHour = new DateTime(2024, 1, 1, 8, 0, 0, DateTimeKind.Utc);
         var newer = new DateTime(2024, 1, 1, 9, 30, 0, DateTimeKind.Utc);
-        var log = CreateLog("ExactHourOldest", newest: newer, oldest: exactHour);
+        var log = CreateLog("ExactHourOldest", newer, exactHour);
 
         var (after, _) = new[] { log }.GetEventDateRange(s_fallbackNow);
 

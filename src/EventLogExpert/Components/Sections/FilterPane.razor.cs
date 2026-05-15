@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Modals.Filters;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;

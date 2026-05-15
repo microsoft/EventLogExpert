@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -461,33 +461,6 @@ public sealed class LogTableStoreTests
     }
 
     [Fact]
-    public void ReduceAppendTableEventsBatch_WhenBatchTargetsClosedLog_ShouldSkipThatBatch()
-    {
-        // Arrange — open log plus a stale log id whose tab no longer exists (race: closed mid-flight)
-        var openLog = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var state = new LogTableState();
-        state = Reducers.ReduceAddTable(state, new AddTableAction(openLog));
-
-        var staleLogId = EventLogId.Create();
-        var batches = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            { openLog.Id, [new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 }] },
-            { staleLogId, [new ResolvedEvent("ClosedLog", LogPathType.Channel) { Id = 99, RecordId = 99 }] }
-        };
-
-        // Act
-        var newState = Reducers.ReduceAppendTableEventsBatch(
-            state,
-            new AppendTableEventsBatchAction(batches));
-
-        // Assert — stale batch is skipped; canonical and EventCountByLog only reflect the open log
-        Assert.Single(newState.DisplayedEvents);
-        Assert.Equal(1L, newState.DisplayedEvents[0].RecordId);
-        Assert.False(newState.EventCountByLog.ContainsKey(staleLogId));
-        Assert.Equal(1, newState.EventCountByLog[openLog.Id]);
-    }
-
-    [Fact]
     public void ReduceAppendTableEvents_ShouldAppendEventsToExistingDisplayedEvents()
     {
         // Arrange
@@ -604,6 +577,33 @@ public sealed class LogTableStoreTests
 
         // Assert
         Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReduceAppendTableEventsBatch_WhenBatchTargetsClosedLog_ShouldSkipThatBatch()
+    {
+        // Arrange — open log plus a stale log id whose tab no longer exists (race: closed mid-flight)
+        var openLog = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var state = new LogTableState();
+        state = Reducers.ReduceAddTable(state, new AddTableAction(openLog));
+
+        var staleLogId = EventLogId.Create();
+        var batches = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            { openLog.Id, [new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1 }] },
+            { staleLogId, [new ResolvedEvent("ClosedLog", LogPathType.Channel) { Id = 99, RecordId = 99 }] }
+        };
+
+        // Act
+        var newState = Reducers.ReduceAppendTableEventsBatch(
+            state,
+            new AppendTableEventsBatchAction(batches));
+
+        // Assert — stale batch is skipped; canonical and EventCountByLog only reflect the open log
+        Assert.Single(newState.DisplayedEvents);
+        Assert.Equal(1L, newState.DisplayedEvents[0].RecordId);
+        Assert.False(newState.EventCountByLog.ContainsKey(staleLogId));
+        Assert.Equal(1, newState.EventCountByLog[openLog.Id]);
     }
 
     [Fact]

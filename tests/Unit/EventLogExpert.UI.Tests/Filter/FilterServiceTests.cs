@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -21,6 +21,53 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.Null(exception);
+    }
+
+    [Fact]
+    public void FilterActiveLogs_WhenDuplicateLogIds_ShouldThrowOnSequentialPath()
+    {
+        // Arrange — two logs sharing the same Id (record-copy preserves Id).
+        // logs.Count == 2 + IsFilteringEnabled false routes through the sequential path.
+        var filterService = CreateFilterService();
+        var original = new EventLogData("Log1", LogPathType.Channel, [EventUtils.CreateTestEvent(100)]);
+        var duplicate = original with { Name = "Log2", Events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(200) }.AsReadOnly() };
+
+        Assert.Equal(original.Id, duplicate.Id);
+
+        var logData = new List<EventLogData> { original, duplicate };
+        var eventFilter = new EventFilter(null, []);
+
+        // Act + Assert — Dictionary.Add throws on the duplicate key.
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, eventFilter));
+    }
+
+    [Fact]
+    public void FilterActiveLogs_WhenDuplicateLogIdsAndParallelPath_ShouldThrowOnDuplicate()
+    {
+        // Arrange — two 6k-event logs (>10k total) with shared Id, with filtering enabled.
+        // This forces the parallel path; the post-Parallel.For filtered.Add still throws.
+        var filterService = CreateFilterService();
+        var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var cutoff = baseTime.AddMinutes(3_000);
+        var dateFilter = new DateFilter { After = cutoff, Before = baseTime.AddMinutes(20_000), IsEnabled = true };
+        var eventFilter = new EventFilter(dateFilter, []);
+
+        var log1Events = Enumerable.Range(0, 6_000)
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .ToList();
+        var log2Events = Enumerable.Range(0, 6_000)
+            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .ToList();
+
+        var original = new EventLogData("Log1", LogPathType.Channel, log1Events);
+        var duplicate = original with { Name = "Log2", Events = log2Events };
+
+        Assert.Equal(original.Id, duplicate.Id);
+
+        var logData = new List<EventLogData> { original, duplicate };
+
+        // Act + Assert
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, eventFilter));
     }
 
     [Fact]
