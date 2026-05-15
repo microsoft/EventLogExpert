@@ -12,6 +12,214 @@ namespace EventLogExpert.UI.Tests.FilterPane;
 public sealed class HighlightFilterSelectorTests
 {
     [Fact]
+    public void ComputeHighlightKey_WhenCandidateAdded_ReturnsDifferentKey()
+    {
+        var first = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var second = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals200,
+            HighlightColor.Blue,
+            true);
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first, second)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenCandidatesReordered_ReturnsDifferentKey()
+    {
+        // Order is significant because GetHighlight is first-match-wins: swapping two candidates
+        // can change which color an event ends up with.
+        var first = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var second = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals200,
+            HighlightColor.Blue,
+            true);
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first, second)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(second, first)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenColorChangesWithinDefinedRange_ReturnsDifferentKey()
+    {
+        var red = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var blue = red with { Color = HighlightColor.Blue };
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(red)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(blue)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenColorMovesOutOfDefinedRange_ReturnsDifferentKey()
+    {
+        // A filter whose color drops out of the enum range stops being a candidate (per
+        // SelectFromFilters' Enum.IsDefined gate), so the candidate count drops and the key flips.
+        var defined = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var undefined = defined with { Color = (HighlightColor)9999 };
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(defined)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(undefined)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenCompiledReferenceDiffers_ReturnsDifferentKey()
+    {
+        // Even when both filters target the same ComparisonText, every compile produces a fresh
+        // CompiledFilter instance — and the hash uses RuntimeHelpers.GetHashCode (reference identity)
+        // so a recompile invalidates the cache. This is the conservative semantic: the predicate
+        // delegate may close over different state across compiles.
+        var first = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var second = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        Assert.NotSame(first.Compiled, second.Compiled);
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(second)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenIdenticalFilters_ReturnsSameKey()
+    {
+        var keeper = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var filters = ImmutableList.Create(keeper);
+
+        Assert.Equal(
+            HighlightFilterSelector.ComputeHighlightKey(filters),
+            HighlightFilterSelector.ComputeHighlightKey(filters));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenIsEnabledToggled_ReturnsDifferentKey()
+    {
+        var enabled = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var disabled = enabled with { IsEnabled = false };
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(enabled)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabled)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenIsExcludedToggled_ReturnsDifferentKey()
+    {
+        var included = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var excluded = included with { IsExcluded = true };
+
+        Assert.NotEqual(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(included)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(excluded)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenNonHighlightFieldsChange_ReturnsSameKey()
+    {
+        // Mode, BasicFilter, Id, and ComparisonText (when Compiled is unchanged) do not affect
+        // SelectHighlightCandidates — so the change-key must not flip on those, otherwise the
+        // optimization gives no benefit on common Mode-toggle / re-id workflows.
+        var original = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var withDifferentMode = original with { Mode = FilterMode.Cached };
+        var withDifferentId = original with { Id = FilterId.Create() };
+        var withDifferentText = original with { ComparisonText = "Id == 12345" };
+
+        int originalKey = HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(original));
+        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentMode)));
+        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentId)));
+        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentText)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenSkippedFilterFieldsChange_ReturnsSameKey()
+    {
+        // The whole point of the optimization: editing a non-candidate filter (disabled / excluded /
+        // null-Compiled / undefined-color) must not invalidate the highlight cache, since none of
+        // those filters ever contribute to GetHighlight.
+        var keeper = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red,
+            true);
+
+        var disabledOriginal = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals200,
+            HighlightColor.Blue);
+
+        var disabledWithDifferentCompiled = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals999,
+            HighlightColor.Green);
+
+        Assert.NotSame(disabledOriginal.Compiled, disabledWithDifferentCompiled.Compiled);
+
+        Assert.Equal(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledOriginal)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledWithDifferentCompiled)));
+    }
+
+    [Fact]
+    public void ComputeHighlightKey_WhenSkippedFiltersReorderedAroundCandidate_ReturnsSameKey()
+    {
+        // Disabled filters' positions don't affect GetHighlight (they're filtered out before iteration),
+        // so reordering them around a candidate must keep the key stable.
+        var disabledA = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals100,
+            HighlightColor.Red);
+
+        var disabledB = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals200,
+            HighlightColor.Blue);
+
+        var keeper = FilterUtils.CreateTestFilter(
+            Constants.FilterIdEquals999,
+            HighlightColor.Green,
+            true);
+
+        Assert.Equal(
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabledA, keeper, disabledB)),
+            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabledB, keeper, disabledA)));
+    }
+
+    [Fact]
     public void SelectHighlightCandidates_ResultIsIdenticalAcrossIsEnabledToggle()
     {
         var filters = ImmutableList.Create(
