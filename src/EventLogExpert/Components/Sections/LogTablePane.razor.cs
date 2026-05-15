@@ -44,6 +44,7 @@ public sealed partial class LogTablePane
     private DotNetObjectReference<LogTablePane>? _dotNetRef;
     private ColumnName[] _enabledColumns = null!;
     private ImmutableList<SavedFilter> _filters = [];
+    private int _filtersHighlightKey;
     private bool _focusActiveOnNextRender;
     private string _headerName = string.Empty;
     private IReadOnlyList<ResolvedEvent>? _lastIndexedDisplayedEvents;
@@ -194,6 +195,7 @@ public sealed partial class LogTablePane
         var initialPaneState = FilterPaneState.Value;
         _filters = initialPaneState.Filters;
         _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(initialPaneState);
+        _filtersHighlightKey = HighlightFilterSelector.ComputeHighlightKey(initialPaneState.Filters);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         WarnOnUnknownFilterColors(_filters);
@@ -249,9 +251,15 @@ public sealed partial class LogTablePane
         if (filtersChanged)
         {
             _filters = currentFilters;
-            _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentPaneState);
-            _highlightCache.Clear();
-            WarnOnUnknownFilterColors(_filters);
+            int newHighlightKey = HighlightFilterSelector.ComputeHighlightKey(currentFilters);
+
+            if (newHighlightKey != _filtersHighlightKey)
+            {
+                _filtersHighlightKey = newHighlightKey;
+                _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentPaneState);
+                _highlightCache.Clear();
+                WarnOnUnknownFilterColors(_filters);
+            }
         }
 
         _timeZoneSettings = Settings.TimeZoneInfo;
