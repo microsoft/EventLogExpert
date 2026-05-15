@@ -16,6 +16,7 @@ using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Security;
 using System.Threading.Channels;
 using IDispatcher = Fluxor.IDispatcher;
@@ -139,6 +140,8 @@ public sealed class Effects(
     [EffectMethod(typeof(CloseAllAction))]
     public async Task HandleCloseAll(IDispatcher dispatcher)
     {
+        _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
+
         CancelAllLoads();
 
         // Sync prefix: subsequent OpenLogAction must see cleared LogTable.
@@ -156,6 +159,8 @@ public sealed class Effects(
     [EffectMethod]
     public async Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher)
     {
+        _logger.Trace($"{nameof(HandleCloseLog)} requested for '{action.LogName}' (id: {action.LogId}).");
+
         try
         {
             if (_logCts.TryGetValue(action.LogId, out var cts))
@@ -267,10 +272,16 @@ public sealed class Effects(
     [EffectMethod]
     public async Task HandleOpenLog(OpenLogAction action, IDispatcher dispatcher)
     {
+        var stopwatch = Stopwatch.StartNew();
+
+        _logger.Information($"{nameof(HandleOpenLog)} '{action.LogName}' (path type: {action.LogPathType}).");
+
         long startGeneration = Volatile.Read(ref _cancelGeneration);
 
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var logData))
         {
+            _logger.Warning($"Open '{action.LogName}' aborted: log not found in ActiveLogs (no prior AddLog dispatch).");
+
             dispatcher.Dispatch(new SetResolverStatusAction($"Error: Failed to open {action.LogName}"));
 
             return;
@@ -291,6 +302,8 @@ public sealed class Effects(
         // _logCts iteration may also have missed us. Cancel ourselves to be safe.
         if (Volatile.Read(ref _cancelGeneration) != startGeneration)
         {
+            _logger.Trace($"Open '{action.LogName}': cancel generation changed during CTS link; aborting load.");
+
             try { perLoadCts.Cancel(); }
             catch (ObjectDisposedException) { /* CTS already disposed; cancel is moot. */ }
         }
@@ -311,6 +324,8 @@ public sealed class Effects(
             if (!_eventLogState.Value.ActiveLogs.TryGetValue(action.LogName, out var current)
                 || current.Id != logData.Id)
             {
+                _logger.Trace($"Open '{action.LogName}': log was closed or replaced before resolver scope creation; aborting after {stopwatch.ElapsedMilliseconds}ms.");
+
                 return;
             }
 
@@ -331,12 +346,14 @@ public sealed class Effects(
 
             if (eventResolver is null)
             {
+                _logger.Warning($"Open '{action.LogName}' aborted: no IEventResolver registered.");
+
                 dispatcher.Dispatch(new SetResolverStatusAction("Error: No event resolver available"));
 
                 return;
             }
 
-            await LoadLogAsync(action, logData, eventResolver, serviceScope, dispatcher, token);
+            await LoadLogAsync(action, logData, eventResolver, dispatcher, token, stopwatch);
         }
         finally
         {
@@ -740,9 +757,9 @@ public sealed class Effects(
         OpenLogAction action,
         EventLogData logData,
         IEventResolver eventResolver,
-        IServiceScope serviceScope,
         IDispatcher dispatcher,
-        CancellationToken token)
+        CancellationToken token,
+        Stopwatch stopwatch)
     {
         if (action.LogPathType == LogPathType.File)
         {
@@ -914,6 +931,8 @@ public sealed class Effects(
 
             _pendingSelectionRestore.TryRemove(logData.Name, out _);
 
+            _logger?.Trace($"Open '{action.LogName}': canceled after {stopwatch.ElapsedMilliseconds}ms ({Volatile.Read(ref resolved)} resolved, {Volatile.Read(ref failed)} failed).");
+
             if (_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var currentLog)
                 && currentLog.Id == logData.Id)
             {
@@ -926,7 +945,7 @@ public sealed class Effects(
         }
         catch (Exception ex)
         {
-            _logger?.Error($"Failed to load log {action.LogName}: {ex.Message}");
+            _logger?.Error($"Failed to load log {action.LogName} after {stopwatch.ElapsedMilliseconds}ms: {ex.Message}");
 
             await StopProducerAsync(producerTask);
 
@@ -952,6 +971,8 @@ public sealed class Effects(
         if (!_eventLogState.Value.ActiveLogs.TryGetValue(logData.Name, out var activeLog)
             || activeLog.Id != logData.Id)
         {
+            _logger?.Trace($"Open '{action.LogName}': log was closed or replaced after producer completed; discarding {events.Count} resolved events after {stopwatch.ElapsedMilliseconds}ms.");
+
             _pendingSelectionRestore.TryRemove(logData.Name, out _);
 
             return;
@@ -972,6 +993,8 @@ public sealed class Effects(
         }
 
         dispatcher.Dispatch(new SetResolverStatusAction(string.Empty));
+
+        _logger?.Information($"Loaded '{action.LogName}': {events.Count} events ({failed} failed) in {stopwatch.ElapsedMilliseconds}ms.");
     }
 
     private void ProcessNewEventBuffer(EventLogState state, IDispatcher dispatcher)
