@@ -6,6 +6,7 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
+using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.AppTitle;
@@ -53,7 +54,9 @@ public static class MauiProgram
 
         builder.Services.AddFluxor(options =>
         {
-            options.ScanAssemblies(typeof(MauiProgram).Assembly).WithLifetime(StoreLifetime.Singleton);
+            options.ScanAssemblies(typeof(MauiProgram).Assembly)
+                .RegisterStateLibrary()
+                .WithLifetime(StoreLifetime.Singleton);
         });
 
         // Effects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
