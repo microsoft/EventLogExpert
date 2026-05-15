@@ -13,7 +13,6 @@ using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Identity;
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
@@ -112,7 +111,6 @@ public static class MauiProgram
 
         // Preference Providers
         builder.Services.AddSingleton<PreferencesProvider>();
-        builder.Services.AddSingleton<IPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
         builder.Services.AddSingleton<ILogTablePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
         builder.Services.AddSingleton<IFilterGroupPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
         builder.Services.AddSingleton<IFilterCachePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
