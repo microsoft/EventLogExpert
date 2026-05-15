@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Microsoft.Extensions.Logging;
@@ -26,7 +25,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Full);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -44,7 +43,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -60,7 +59,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenPreferenceIsNull_ShouldReturnDefault()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
 
         var settingsService = CreateSettingsService(mockPreferences);
 
@@ -72,10 +71,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void CopyFormat_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.CopyFormat = EventCopyFormat.Full;
+
+        // Assert
+        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
+    }
+
+    [Fact]
     public void CopyFormat_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         var eventInvoked = false;
@@ -96,7 +109,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenSetToEachValue_ShouldPersistCorrectly(EventCopyFormat copyFormat)
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
@@ -110,7 +123,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -130,7 +143,7 @@ public sealed class SettingsServiceTests
     public void CopyFormat_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.KeyboardCopyFormatPreference.Returns(EventCopyFormat.Xml);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -147,24 +160,10 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void CopyFormat_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.CopyFormat = EventCopyFormat.Full;
-
-        // Assert
-        mockPreferences.Received(1).KeyboardCopyFormatPreference = EventCopyFormat.Full;
-    }
-
-    [Fact]
     public void CopyType_WhenSet_ShouldUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
@@ -178,7 +177,7 @@ public sealed class SettingsServiceTests
     public void IsPreReleaseEnabled_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.PreReleasePreference.Returns(true);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -196,7 +195,7 @@ public sealed class SettingsServiceTests
     public void IsPreReleaseEnabled_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.PreReleasePreference.Returns(true);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -212,7 +211,7 @@ public sealed class SettingsServiceTests
     public void IsPreReleaseEnabled_WhenPreferenceIsDefault_ShouldReturnFalse()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
 
         var settingsService = CreateSettingsService(mockPreferences);
 
@@ -224,10 +223,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void IsPreReleaseEnabled_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.IsPreReleaseEnabled = true;
+
+        // Assert
+        mockPreferences.Received(1).PreReleasePreference = true;
+    }
+
+    [Fact]
     public void IsPreReleaseEnabled_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.PreReleasePreference.Returns(true);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -242,24 +255,10 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void IsPreReleaseEnabled_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.IsPreReleaseEnabled = true;
-
-        // Assert
-        mockPreferences.Received(1).PreReleasePreference = true;
-    }
-
-    [Fact]
     public void LogLevel_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.LogLevelPreference.Returns(LogLevel.Trace);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -277,7 +276,7 @@ public sealed class SettingsServiceTests
     public void LogLevel_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.LogLevelPreference.Returns(LogLevel.Debug);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -293,7 +292,7 @@ public sealed class SettingsServiceTests
     public void LogLevel_WhenPreferenceIsDefault_ShouldReturnTrace()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
 
         var settingsService = CreateSettingsService(mockPreferences);
 
@@ -305,10 +304,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void LogLevel_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.LogLevel = LogLevel.Warning;
+
+        // Assert
+        mockPreferences.Received(1).LogLevelPreference = LogLevel.Warning;
+    }
+
+    [Fact]
     public void LogLevel_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         var eventInvoked = false;
@@ -331,7 +344,7 @@ public sealed class SettingsServiceTests
     public void LogLevel_WhenSetToEachValue_ShouldPersistCorrectly(LogLevel logLevel)
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
@@ -345,7 +358,7 @@ public sealed class SettingsServiceTests
     public void LogLevel_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.LogLevelPreference.Returns(LogLevel.Warning);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -365,7 +378,7 @@ public sealed class SettingsServiceTests
     public void LogLevel_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.LogLevelPreference.Returns(LogLevel.Debug);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -380,105 +393,10 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void LogLevel_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.LogLevel = LogLevel.Warning;
-
-        // Assert
-        mockPreferences.Received(1).LogLevelPreference = LogLevel.Warning;
-    }
-
-    [Fact]
-    public void ShowDisplayPaneOnSelectionChange_WhenAccessedMultipleTimes_ShouldCacheValue()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.DisplayPaneSelectionPreference.Returns(true);
-
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        _ = settingsService.ShowDisplayPaneOnSelectionChange;
-        _ = settingsService.ShowDisplayPaneOnSelectionChange;
-        _ = settingsService.ShowDisplayPaneOnSelectionChange;
-
-        // Assert
-        _ = mockPreferences.Received(1).DisplayPaneSelectionPreference;
-    }
-
-    [Fact]
-    public void ShowDisplayPaneOnSelectionChange_WhenFirstAccessed_ShouldReturnFromPreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.DisplayPaneSelectionPreference.Returns(true);
-
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        var result = settingsService.ShowDisplayPaneOnSelectionChange;
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void ShowDisplayPaneOnSelectionChange_WhenPreferenceIsDefault_ShouldReturnFalse()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        var result = settingsService.ShowDisplayPaneOnSelectionChange;
-
-        // Assert
-        Assert.False(result);
-    }
-
-    [Fact]
-    public void ShowDisplayPaneOnSelectionChange_WhenSetToSameValue_ShouldNotUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        mockPreferences.DisplayPaneSelectionPreference.Returns(true);
-
-        var settingsService = CreateSettingsService(mockPreferences);
-        _ = settingsService.ShowDisplayPaneOnSelectionChange; // Cache the value
-        mockPreferences.ClearReceivedCalls();
-
-        // Act
-        settingsService.ShowDisplayPaneOnSelectionChange = true;
-
-        // Assert
-        mockPreferences.DidNotReceive().DisplayPaneSelectionPreference = Arg.Any<bool>();
-    }
-
-    [Fact]
-    public void ShowDisplayPaneOnSelectionChange_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.ShowDisplayPaneOnSelectionChange = true;
-
-        // Assert
-        mockPreferences.Received(1).DisplayPaneSelectionPreference = true;
-    }
-
-    [Fact]
     public void Theme_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.ThemePreference.Returns(Theme.Light);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -496,7 +414,7 @@ public sealed class SettingsServiceTests
     public void Theme_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.ThemePreference.Returns(Theme.Light);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -512,7 +430,7 @@ public sealed class SettingsServiceTests
     public void Theme_WhenPreferenceIsDefault_ShouldReturnSystem()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
 
         var settingsService = CreateSettingsService(mockPreferences);
 
@@ -524,10 +442,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void Theme_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.Theme = Theme.Dark;
+
+        // Assert
+        mockPreferences.Received(1).ThemePreference = Theme.Dark;
+    }
+
+    [Fact]
     public void Theme_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         var eventInvoked = false;
@@ -547,7 +479,7 @@ public sealed class SettingsServiceTests
     public void Theme_WhenSetToEachValue_ShouldPersistCorrectly(Theme theme)
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         // Act
@@ -561,7 +493,7 @@ public sealed class SettingsServiceTests
     public void Theme_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.ThemePreference.Returns(Theme.Light);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -581,7 +513,7 @@ public sealed class SettingsServiceTests
     public void Theme_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.ThemePreference.Returns(Theme.Dark);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -596,24 +528,10 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void Theme_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.Theme = Theme.Dark;
-
-        // Assert
-        mockPreferences.Received(1).ThemePreference = Theme.Dark;
-    }
-
-    [Fact]
     public void TimeZoneId_WhenAccessedMultipleTimes_ShouldCacheValue()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZoneUtc);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -631,7 +549,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneId_WhenFirstAccessed_ShouldReturnFromPreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZonePacific);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -647,7 +565,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneId_WhenPreferenceIsNull_ShouldReturnLocalTimeZone()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns((string)null!);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -660,10 +578,24 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
+    public void TimeZoneId_WhenSet_ShouldUpdatePreferences()
+    {
+        // Arrange
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
+        var settingsService = CreateSettingsService(mockPreferences);
+
+        // Act
+        settingsService.TimeZoneId = Constants.TimeZoneEastern;
+
+        // Assert
+        mockPreferences.Received(1).TimeZonePreference = Constants.TimeZoneEastern;
+    }
+
+    [Fact]
     public void TimeZoneId_WhenSetToDifferentValue_ShouldInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         var settingsService = CreateSettingsService(mockPreferences);
 
         object? receivedSender = null;
@@ -688,7 +620,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneId_WhenSetToSameValue_ShouldNotInvokeChangedEvent()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZoneUtc);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -708,7 +640,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneId_WhenSetToSameValue_ShouldNotUpdatePreferences()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZoneUtc);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -723,24 +655,10 @@ public sealed class SettingsServiceTests
     }
 
     [Fact]
-    public void TimeZoneId_WhenSet_ShouldUpdatePreferences()
-    {
-        // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
-        var settingsService = CreateSettingsService(mockPreferences);
-
-        // Act
-        settingsService.TimeZoneId = Constants.TimeZoneEastern;
-
-        // Assert
-        mockPreferences.Received(1).TimeZonePreference = Constants.TimeZoneEastern;
-    }
-
-    [Fact]
     public void TimeZoneInfo_WhenTimeZoneIdChanges_ShouldReturnUpdatedTimeZone()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZoneUtc);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -758,7 +676,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneInfo_WhenTimeZoneIdIsLocal_ShouldReturnLocalTimeZone()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(TimeZoneInfo.Local.Id);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -774,7 +692,7 @@ public sealed class SettingsServiceTests
     public void TimeZoneInfo_WhenTimeZoneIdIsValid_ShouldReturnCorrectTimeZone()
     {
         // Arrange
-        var mockPreferences = Substitute.For<IPreferencesProvider>();
+        var mockPreferences = Substitute.For<ISettingsPreferencesProvider>();
         mockPreferences.TimeZonePreference.Returns(Constants.TimeZoneUtc);
 
         var settingsService = CreateSettingsService(mockPreferences);
@@ -786,6 +704,6 @@ public sealed class SettingsServiceTests
         Assert.Equal(TimeZoneInfo.Utc, result);
     }
 
-    private static SettingsService CreateSettingsService(IPreferencesProvider? preferencesProvider = null) =>
-        new(preferencesProvider ?? Substitute.For<IPreferencesProvider>());
+    private static SettingsService CreateSettingsService(ISettingsPreferencesProvider? preferencesProvider = null) =>
+        new(preferencesProvider ?? Substitute.For<ISettingsPreferencesProvider>());
 }

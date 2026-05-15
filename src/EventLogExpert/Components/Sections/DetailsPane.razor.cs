@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.UI.Common.Preferences;
+using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Settings;
 using Fluxor;
@@ -38,7 +38,7 @@ public sealed partial class DetailsPane
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
-    [Inject] private IPreferencesProvider PreferencesProvider { get; init; } = null!;
+    [Inject] private IDetailsPanePreferencesProvider PreferencesProvider { get; init; } = null!;
 
     [Inject] private IStateSelection<EventLogState, ResolvedEvent?> SelectedEvent { get; init; } = null!;
 
@@ -167,7 +167,7 @@ public sealed partial class DetailsPane
                 return;
             }
 
-            if (!_hasOpened || Settings.ShowDisplayPaneOnSelectionChange) { _isVisible = true; }
+            if (!_hasOpened || PreferencesProvider.DisplayPaneSelectionPreference) { _isVisible = true; }
 
             // Short-circuit: live-watcher events arrive with XML already pre-rendered. Skip the
             // resolver round-trip (and the "Resolving XML..." flicker) when we already have it.

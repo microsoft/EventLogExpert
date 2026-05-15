@@ -18,8 +18,6 @@ public interface ISettingsService
 
     Action? LogLevelChanged { get; set; }
 
-    bool ShowDisplayPaneOnSelectionChange { get; set; }
-
     Theme Theme { get; set; }
 
     Action? ThemeChanged { get; set; }

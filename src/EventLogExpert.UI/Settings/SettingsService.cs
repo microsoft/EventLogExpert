@@ -2,19 +2,17 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Preferences;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Settings;
 
-public sealed class SettingsService(IPreferencesProvider preferences) : ISettingsService
+public sealed class SettingsService(ISettingsPreferencesProvider preferences) : ISettingsService
 {
-    private readonly IPreferencesProvider _preferences = preferences;
+    private readonly ISettingsPreferencesProvider _preferences = preferences;
 
     private EventCopyFormat? _copyFormat;
     private bool? _isPreReleaseEnabled;
     private LogLevel? _logLevel;
-    private bool? _showDisplayPaneOnSelectionChange;
     private Theme? _theme;
     private string? _timeZoneId;
 
@@ -74,23 +72,6 @@ public sealed class SettingsService(IPreferencesProvider preferences) : ISetting
     }
 
     public Action? LogLevelChanged { get; set; }
-
-    public bool ShowDisplayPaneOnSelectionChange
-    {
-        get
-        {
-            _showDisplayPaneOnSelectionChange ??= _preferences.DisplayPaneSelectionPreference;
-
-            return _showDisplayPaneOnSelectionChange ?? false;
-        }
-        set
-        {
-            if (_showDisplayPaneOnSelectionChange == value) { return; }
-
-            _showDisplayPaneOnSelectionChange = value;
-            _preferences.DisplayPaneSelectionPreference = value;
-        }
-    }
 
     public Theme Theme
     {

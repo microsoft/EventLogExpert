@@ -8,6 +8,7 @@ using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Database.Upgrade;
+using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Settings;
 using Fluxor;
@@ -42,6 +43,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
+
+    [Inject] private IDetailsPanePreferencesProvider DetailsPanePreferences { get; init; } = null!;
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
@@ -110,7 +113,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         Settings.CopyFormat = _copyFormat;
         Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
         Settings.LogLevel = _logLevel;
-        Settings.ShowDisplayPaneOnSelectionChange = _showDisplayPaneOnSelectionChange;
+        DetailsPanePreferences.DisplayPaneSelectionPreference = _showDisplayPaneOnSelectionChange;
         Settings.Theme = _theme;
         Settings.TimeZoneId = _timeZoneId;
 
@@ -231,7 +234,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         _copyFormat = Settings.CopyFormat;
         _isPreReleaseEnabled = Settings.IsPreReleaseEnabled;
         _logLevel = Settings.LogLevel;
-        _showDisplayPaneOnSelectionChange = Settings.ShowDisplayPaneOnSelectionChange;
+        _showDisplayPaneOnSelectionChange = DetailsPanePreferences.DisplayPaneSelectionPreference;
         _theme = Settings.Theme;
         _timeZoneId = Settings.TimeZoneId;
     }
