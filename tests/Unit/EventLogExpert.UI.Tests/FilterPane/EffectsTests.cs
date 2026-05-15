@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
@@ -269,7 +270,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldUseEnvelopeFromActiveLogs()
+    public async Task HandleSetFilterDateRange_WhenAfterIsNull_ShouldUseRangeFromActiveLogs()
     {
         // Arrange
         var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
@@ -300,7 +301,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldUseEnvelopeFromActiveLogs()
+    public async Task HandleSetFilterDateRange_WhenBeforeIsNull_ShouldUseRangeFromActiveLogs()
     {
         // Arrange
         var oldest = new DateTime(2024, 1, 1, 8, 30, 45, DateTimeKind.Utc);
@@ -331,10 +332,10 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeEnvelope()
+    public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeRange()
     {
-        // Logs A and B don't overlap; envelope must span both, and intersection (the previous bug)
-        // would have inverted After/Before.
+        // Arrange — Logs A and B don't overlap; range must span both. The previous (intersection)
+        // implementation would have inverted After/Before for non-overlapping logs.
         var logAOldest = new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc);
         var logANewest = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc);
         var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
@@ -634,15 +635,16 @@ public sealed class EffectsTests
             FilteredDateRange = filteredDateRange
         });
 
-        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+        var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, EventFilter>>();
+        mockAppliedFilter.Value.Returns(appliedFilter ?? new EventFilter(null, []));
 
-        mockEventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty,
-            AppliedFilter = appliedFilter ?? new EventFilter(null, [])
-        });
+        var mockEventDateRange =
+            Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();
 
-        var effects = new Effects(mockEventLogState, mockFilterPaneState);
+        var logs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty;
+        mockEventDateRange.Value.Returns(logs.Values.TryGetEventDateRange(out var range) ? range : null);
+
+        var effects = new Effects(mockAppliedFilter, mockEventDateRange, mockFilterPaneState);
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher);

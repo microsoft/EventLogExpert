@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Common.AppTitle;

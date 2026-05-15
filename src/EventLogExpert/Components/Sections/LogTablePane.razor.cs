@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering;
 using EventLogExpert.UI.Common.Clipboard;

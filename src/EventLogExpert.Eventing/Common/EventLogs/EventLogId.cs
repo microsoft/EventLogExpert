@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.EventLog;
+namespace EventLogExpert.Eventing.Common.EventLogs;
 
 public readonly record struct EventLogId(Guid Value)
 {

@@ -2,13 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering;
-using EventLogExpert.UI.EventLog;
+using EventLogExpert.Eventing.Common.EventLogs;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering;
 
 /// <summary>
 ///     Caches the distinct, sorted list of property values across all active logs, keyed by the
@@ -23,7 +22,7 @@ public static class EventPropertyItemsCache
     private static readonly ImmutableArray<string> s_levelItems = [.. Enum.GetNames<SeverityLevel>()];
 
     /// <summary>Test-only hook to clear the snapshot cache between scenarios.</summary>
-    public static void Clear() => s_cache.Clear();
+    internal static void Clear() => s_cache.Clear();
 
     public static ImmutableArray<string> GetItems(
         ImmutableDictionary<string, EventLogData> activeLogs,

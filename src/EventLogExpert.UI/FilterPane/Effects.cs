@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
@@ -10,12 +11,24 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed class Effects(
-    IState<EventLogState> eventLogState,
-    IState<FilterPaneState> filterPaneState)
+public sealed class Effects
 {
-    private readonly IState<EventLogState> _eventLogState = eventLogState;
-    private readonly IState<FilterPaneState> _filterPaneState = filterPaneState;
+    private readonly IStateSelection<EventLogState, EventFilter> _appliedFilter;
+    private readonly IStateSelection<EventLogState, (DateTime After, DateTime Before)?> _eventDateRange;
+    private readonly IState<FilterPaneState> _filterPaneState;
+
+    public Effects(
+        IStateSelection<EventLogState, EventFilter> appliedFilter,
+        IStateSelection<EventLogState, (DateTime After, DateTime Before)?> eventDateRange,
+        IState<FilterPaneState> filterPaneState)
+    {
+        _appliedFilter = appliedFilter;
+        _eventDateRange = eventDateRange;
+        _filterPaneState = filterPaneState;
+
+        _appliedFilter.Select(static s => s.AppliedFilter);
+        _eventDateRange.Select(static s => s.ActiveLogs.Values.TryGetEventDateRange(out var range) ? range : null);
+    }
 
     [EffectMethod]
     public Task HandleAddFilter(AddFilterAction action, IDispatcher dispatcher)
@@ -104,7 +117,7 @@ public sealed class Effects(
 
         if (updatedAfter is null || updatedBefore is null)
         {
-            var (after, before) = _eventLogState.Value.ActiveLogs.Values.GetEventDateRange(DateTime.UtcNow);
+            var (after, before) = _eventDateRange.Value.RoundOrFallback(DateTime.UtcNow);
 
             updatedAfter ??= after;
             updatedBefore ??= before;
@@ -172,7 +185,7 @@ public sealed class Effects(
                 filterPaneState.FilteredDateRange,
                 filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
 
-        if (!candidate.HasFilteringChangedFrom(_eventLogState.Value.AppliedFilter))
+        if (!candidate.HasFilteringChangedFrom(_appliedFilter.Value))
         {
             return;
         }

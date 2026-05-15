@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.EventLog;
+using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.UI.LogTable;
 

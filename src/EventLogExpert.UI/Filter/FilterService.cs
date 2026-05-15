@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering;
-using EventLogExpert.UI.EventLog;
 using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Filter;
