@@ -12,7 +12,6 @@ using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Identity;
-using EventLogExpert.UI.Common.Logging;
 using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
@@ -55,7 +54,6 @@ public static class MauiProgram
         builder.Services.AddFluxor(options =>
         {
             options.ScanAssemblies(typeof(MauiProgram).Assembly).WithLifetime(StoreLifetime.Singleton);
-            options.AddMiddleware<LoggingMiddleware>();
         });
 
         // Effects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
