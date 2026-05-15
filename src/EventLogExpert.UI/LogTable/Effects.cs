@@ -1,16 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using Fluxor;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed class Effects(IPreferencesProvider preferencesProvider, IState<LogTableState> logTableState)
+public sealed class Effects(ILogTablePreferencesProvider preferencesProvider, IState<LogTableState> logTableState)
 {
     private readonly IState<LogTableState> _logTableState = logTableState;
-    private readonly IPreferencesProvider _preferencesProvider = preferencesProvider;
+    private readonly ILogTablePreferencesProvider _preferencesProvider = preferencesProvider;
 
     [EffectMethod(typeof(LoadColumnsAction))]
     public Task HandleLoadColumns(IDispatcher dispatcher)

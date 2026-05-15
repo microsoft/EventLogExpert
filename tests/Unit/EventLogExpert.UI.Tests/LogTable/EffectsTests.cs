@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Preferences;
 using EventLogExpert.UI.LogTable;
 using Fluxor;
 using NSubstitute;
@@ -383,10 +382,10 @@ public sealed class EffectsTests
                 columns.Count() == 2);
     }
 
-    private static (Effects effects, IDispatcher mockDispatcher, IPreferencesProvider mockPreferencesProvider)
+    private static (Effects effects, IDispatcher mockDispatcher, ILogTablePreferencesProvider mockPreferencesProvider)
         CreateEffects(List<ColumnName>? enabledColumns = null, LogTableState? state = null)
     {
-        var mockPreferencesProvider = Substitute.For<IPreferencesProvider>();
+        var mockPreferencesProvider = Substitute.For<ILogTablePreferencesProvider>();
         mockPreferencesProvider.EnabledEventTableColumnsPreference.Returns(enabledColumns ?? []);
         mockPreferencesProvider.ColumnWidthsPreference.Returns(new Dictionary<ColumnName, int>());
         mockPreferencesProvider.ColumnOrderPreference.Returns([]);
