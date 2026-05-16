@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -9,13 +10,14 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterPane;
 
-public sealed class HighlightFilterSelectorTests
+public sealed class HighlightSelectorTests
 {
-    private static readonly HighlightFilterSelector s_selector = new();
+    private static readonly HighlightSelector s_selector = new();
 
     [Fact]
     public void ComputeHighlightKey_WhenCandidateAdded_ReturnsDifferentKey()
     {
+        // Arrange
         var first = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -26,6 +28,7 @@ public sealed class HighlightFilterSelectorTests
             HighlightColor.Blue,
             true);
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(first)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(first, second)));
@@ -34,8 +37,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenCandidatesReordered_ReturnsDifferentKey()
     {
-        // Order is significant because GetHighlight is first-match-wins: swapping two candidates
-        // can change which color an event ends up with.
+        // Arrange — GetHighlight is first-match-wins, so order is load-bearing.
         var first = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -46,6 +48,7 @@ public sealed class HighlightFilterSelectorTests
             HighlightColor.Blue,
             true);
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(first, second)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(second, first)));
@@ -54,6 +57,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenColorChangesWithinDefinedRange_ReturnsDifferentKey()
     {
+        // Arrange
         var red = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -61,6 +65,7 @@ public sealed class HighlightFilterSelectorTests
 
         var blue = red with { Color = HighlightColor.Blue };
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(red)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(blue)));
@@ -69,8 +74,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenColorMovesOutOfDefinedRange_ReturnsDifferentKey()
     {
-        // A filter whose color drops out of the enum range stops being a candidate (per
-        // SelectFromFilters' Enum.IsDefined gate), so the candidate count drops and the key flips.
+        // Arrange
         var defined = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -78,6 +82,7 @@ public sealed class HighlightFilterSelectorTests
 
         var undefined = defined with { Color = (HighlightColor)9999 };
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(defined)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(undefined)));
@@ -86,10 +91,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenCompiledReferenceDiffers_ReturnsDifferentKey()
     {
-        // Even when both filters target the same ComparisonText, every compile produces a fresh
-        // CompiledFilter instance — and the hash uses RuntimeHelpers.GetHashCode (reference identity)
-        // so a recompile invalidates the cache. This is the conservative semantic: the predicate
-        // delegate may close over different state across compiles.
+        // Arrange — hash uses RuntimeHelpers.GetHashCode (reference identity).
         var first = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -100,6 +102,7 @@ public sealed class HighlightFilterSelectorTests
             HighlightColor.Red,
             true);
 
+        // Act + Assert
         Assert.NotSame(first.Compiled, second.Compiled);
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(first)),
@@ -109,6 +112,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenIdenticalFilters_ReturnsSameKey()
     {
+        // Arrange
         var keeper = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -116,6 +120,7 @@ public sealed class HighlightFilterSelectorTests
 
         var filters = ImmutableList.Create(keeper);
 
+        // Act + Assert
         Assert.Equal(
             s_selector.ComputeHighlightKey(filters),
             s_selector.ComputeHighlightKey(filters));
@@ -124,6 +129,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenIsEnabledToggled_ReturnsDifferentKey()
     {
+        // Arrange
         var enabled = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -131,6 +137,7 @@ public sealed class HighlightFilterSelectorTests
 
         var disabled = enabled with { IsEnabled = false };
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(enabled)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(disabled)));
@@ -139,6 +146,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenIsExcludedToggled_ReturnsDifferentKey()
     {
+        // Arrange
         var included = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -146,6 +154,7 @@ public sealed class HighlightFilterSelectorTests
 
         var excluded = included with { IsExcluded = true };
 
+        // Act + Assert
         Assert.NotEqual(
             s_selector.ComputeHighlightKey(ImmutableList.Create(included)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(excluded)));
@@ -154,9 +163,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenNonHighlightFieldsChange_ReturnsSameKey()
     {
-        // Mode, BasicFilter, Id, and ComparisonText (when Compiled is unchanged) do not affect
-        // SelectHighlightCandidates — so the change-key must not flip on those, otherwise the
-        // optimization gives no benefit on common Mode-toggle / re-id workflows.
+        // Arrange
         var original = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -166,7 +173,10 @@ public sealed class HighlightFilterSelectorTests
         var withDifferentId = original with { Id = FilterId.Create() };
         var withDifferentText = original with { ComparisonText = "Id == 12345" };
 
+        // Act
         int originalKey = s_selector.ComputeHighlightKey(ImmutableList.Create(original));
+
+        // Assert
         Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentMode)));
         Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentId)));
         Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentText)));
@@ -175,9 +185,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenSkippedFilterFieldsChange_ReturnsSameKey()
     {
-        // The whole point of the optimization: editing a non-candidate filter (disabled / excluded /
-        // null-Compiled / undefined-color) must not invalidate the highlight cache, since none of
-        // those filters ever contribute to GetHighlight.
+        // Arrange
         var keeper = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -191,6 +199,7 @@ public sealed class HighlightFilterSelectorTests
             Constants.FilterIdEquals999,
             HighlightColor.Green);
 
+        // Act + Assert
         Assert.NotSame(disabledOriginal.Compiled, disabledWithDifferentCompiled.Compiled);
 
         Assert.Equal(
@@ -201,8 +210,7 @@ public sealed class HighlightFilterSelectorTests
     [Fact]
     public void ComputeHighlightKey_WhenSkippedFiltersReorderedAroundCandidate_ReturnsSameKey()
     {
-        // Disabled filters' positions don't affect GetHighlight (they're filtered out before iteration),
-        // so reordering them around a candidate must keep the key stable.
+        // Arrange
         var disabledA = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red);
@@ -216,14 +224,16 @@ public sealed class HighlightFilterSelectorTests
             HighlightColor.Green,
             true);
 
+        // Act + Assert
         Assert.Equal(
             s_selector.ComputeHighlightKey(ImmutableList.Create(disabledA, keeper, disabledB)),
             s_selector.ComputeHighlightKey(ImmutableList.Create(disabledB, keeper, disabledA)));
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ResultIsIdenticalAcrossIsEnabledToggle()
+    public void Select_ResultIsIdenticalAcrossIsEnabledToggle()
     {
+        // Arrange
         var filters = ImmutableList.Create(
             FilterUtils.CreateTestFilter(
                 Constants.FilterIdEquals100,
@@ -237,9 +247,11 @@ public sealed class HighlightFilterSelectorTests
         var enabled = new FilterPaneState { IsEnabled = true, Filters = filters };
         var disabled = new FilterPaneState { IsEnabled = false, Filters = filters };
 
-        var fromEnabled = s_selector.SelectHighlightCandidates(enabled.Filters);
-        var fromDisabled = s_selector.SelectHighlightCandidates(disabled.Filters);
+        // Act
+        var fromEnabled = s_selector.Select(enabled.Filters);
+        var fromDisabled = s_selector.Select(disabled.Filters);
 
+        // Assert
         Assert.Equal(fromEnabled.Length, fromDisabled.Length);
 
         for (int i = 0; i < fromEnabled.Length; i++)
@@ -249,10 +261,9 @@ public sealed class HighlightFilterSelectorTests
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldPreserveHighlightColorNoneCandidates()
+    public void Select_ShouldPreserveHighlightColorNoneCandidates()
     {
-        // HighlightColor.None is enum-defined, so the candidate list keeps it; the downstream
-        // LogTablePane.GetHighlight loop then no-ops it via ToCssName() returning null.
+        // Arrange — None is enum-defined; the GetHighlight loop no-ops it later.
         var noneColored = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.None,
@@ -260,15 +271,18 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(noneColored) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Single(result);
         Assert.Same(noneColored, result[0]);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldReturnEnabledNonExcludedCompiledColoredFilters()
+    public void Select_ShouldReturnEnabledNonExcludedCompiledColoredFilters()
     {
+        // Arrange
         var keeper = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -276,29 +290,35 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(keeper) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Single(result);
         Assert.Same(keeper, result[0]);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldSkipDisabledFilters()
+    public void Select_ShouldSkipDisabledFilters()
     {
+        // Arrange
         var disabled = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red);
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(disabled) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldSkipExcludedFilters()
+    public void Select_ShouldSkipExcludedFilters()
     {
+        // Arrange
         var excluded = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -307,16 +327,17 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(excluded) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldSkipFiltersWithNullCompiled()
+    public void Select_ShouldSkipFiltersWithNullCompiled()
     {
-        // A SavedFilter whose ComparisonText is empty has Compiled == null even when IsEnabled / Color
-        // would otherwise qualify it as a highlight candidate.
+        // Arrange
         var uncompiled = new SavedFilter
         {
             ComparisonText = string.Empty,
@@ -328,17 +349,17 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(uncompiled) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_ShouldSkipFiltersWithUndefinedColor()
+    public void Select_ShouldSkipFiltersWithUndefinedColor()
     {
-        // A persisted color value outside the HighlightColor enum range — produced by a future palette
-        // mismatch or hand-edited persistence — must be skipped, mirroring LogTablePane.GetHighlight's
-        // defensive `Enum.IsDefined` filter and matching WarnOnUnknownFilterColors's intent.
+        // Arrange
         var keeper = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -348,14 +369,17 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(rogue) };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_WhenFilterPaneDisabled_ShouldStillReturnEnabledColoredIncludeFilters()
+    public void Select_WhenFilterPaneDisabled_ShouldStillReturnEnabledColoredIncludeFilters()
     {
+        // Arrange
         var keeper = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red,
@@ -367,25 +391,31 @@ public sealed class HighlightFilterSelectorTests
             Filters = ImmutableList.Create(keeper)
         };
 
-        var result = s_selector.SelectHighlightCandidates(disabledPaneState.Filters);
+        // Act
+        var result = s_selector.Select(disabledPaneState.Filters);
 
+        // Assert
         Assert.Single(result);
         Assert.Same(keeper, result[0]);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_WhenStateHasNoFilters_ShouldReturnEmpty()
+    public void Select_WhenStateHasNoFilters_ShouldReturnEmpty()
     {
+        // Arrange
         var state = new FilterPaneState();
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Empty(result);
     }
 
     [Fact]
-    public void SelectHighlightCandidates_WithMixedFilterList_ShouldReturnOnlyQualifyingCandidates()
+    public void Select_WithMixedFilterList_ShouldReturnOnlyQualifyingCandidates()
     {
+        // Arrange
         var disabled = FilterUtils.CreateTestFilter(
             Constants.FilterIdEquals100,
             HighlightColor.Red);
@@ -411,8 +441,10 @@ public sealed class HighlightFilterSelectorTests
             Filters = ImmutableList.Create(disabled, excluded, firstKeeper, secondKeeper)
         };
 
-        var result = s_selector.SelectHighlightCandidates(state.Filters);
+        // Act
+        var result = s_selector.Select(state.Filters);
 
+        // Assert
         Assert.Equal(2, result.Length);
         Assert.Same(firstKeeper, result[0]);
         Assert.Same(secondKeeper, result[1]);

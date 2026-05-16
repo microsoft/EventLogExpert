@@ -7,12 +7,12 @@ using System.Runtime.CompilerServices;
 
 namespace EventLogExpert.UI.FilterPane;
 
-internal sealed class HighlightFilterSelector : IHighlightFilterSelector
+internal sealed class HighlightSelector : IHighlightSelector
 {
     public int ComputeHighlightKey(ImmutableList<SavedFilter> filters)
     {
         var hash = new HashCode();
-        int candidateCount = 0;
+        int eligibleCount = 0;
 
         foreach (var filter in filters)
         {
@@ -24,19 +24,19 @@ internal sealed class HighlightFilterSelector : IHighlightFilterSelector
 
             hash.Add(RuntimeHelpers.GetHashCode(filter.Compiled));
             hash.Add((int)filter.Color);
-            candidateCount++;
+            eligibleCount++;
         }
 
-        hash.Add(candidateCount);
+        hash.Add(eligibleCount);
 
         return hash.ToHashCode();
     }
 
-    public SavedFilter[] SelectHighlightCandidates(ImmutableList<SavedFilter> filters)
+    public SavedFilter[] Select(ImmutableList<SavedFilter> filters)
     {
         if (filters.IsEmpty) { return []; }
 
-        var candidates = new List<SavedFilter>(filters.Count);
+        var selected = new List<SavedFilter>(filters.Count);
 
         foreach (var filter in filters)
         {
@@ -46,9 +46,9 @@ internal sealed class HighlightFilterSelector : IHighlightFilterSelector
 
             if (!Enum.IsDefined(filter.Color)) { continue; }
 
-            candidates.Add(filter);
+            selected.Add(filter);
         }
 
-        return candidates.Count == 0 ? [] : candidates.ToArray();
+        return selected.Count == 0 ? [] : selected.ToArray();
     }
 }

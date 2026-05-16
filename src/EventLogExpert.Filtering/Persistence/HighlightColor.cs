@@ -3,7 +3,7 @@
 
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Persistence;
 
 public enum HighlightColor
 {

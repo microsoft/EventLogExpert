@@ -19,20 +19,20 @@ public sealed class UiServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterGroupCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
-    [InlineData(typeof(IHighlightFilterSelector))]
+    [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
     public void RegisterUiLibrary_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
-        // Pins that RegisterUiLibrary() wires every host-facing intent / capability API the MAUI head
-        // consumes — preventing a runtime composition failure after a future cleanup wave that moves
-        // existing public impls behind the same registrar.
+        // Arrange
         var services = new ServiceCollection();
         services.AddSingleton(Substitute.For<IDispatcher>());
         services.RegisterUiLibrary();
         using var provider = services.BuildServiceProvider();
 
+        // Act
         var resolved = provider.GetService(serviceType);
 
+        // Assert
         Assert.NotNull(resolved);
     }
 }
