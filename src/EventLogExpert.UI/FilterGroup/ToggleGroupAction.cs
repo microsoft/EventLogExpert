@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-public sealed record ToggleGroupAction(FilterGroupId Id);
+internal sealed record ToggleGroupAction(FilterGroupId Id);
