@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed class Effects(
+internal sealed class Effects(
     ILogTablePreferencesProvider preferencesProvider,
     IState<LogTableState> logTableState,
     ILogTableColumnDefaultsProvider columnDefaults)
