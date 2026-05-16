@@ -7,7 +7,7 @@ using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed partial class PersistencePolicyTests
 {

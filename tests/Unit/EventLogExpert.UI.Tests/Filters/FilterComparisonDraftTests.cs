@@ -3,7 +3,7 @@
 
 using EventLogExpert.Filtering.Drafts;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class FilterComparisonDraftTests
 {

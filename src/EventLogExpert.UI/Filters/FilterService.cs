@@ -7,7 +7,7 @@ using EventLogExpert.Filtering;
 using EventLogExpert.Filtering.Runtime;
 using System.Runtime.ExceptionServices;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.UI.Filters;
 
 public sealed class FilterService : IFilterService
 {
@@ -16,17 +16,17 @@ public sealed class FilterService : IFilterService
 
     public IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
-        EventFilter eventFilter)
+        Filter filter)
     {
         var logs = logData as IReadOnlyList<EventLogData> ?? [.. logData];
 
         // Single log, no filters, or trivial total work: sequential per-log (inner PLINQ still
         // engages for >=10k events on a single large log).
         if (logs.Count <= 1 ||
-            !eventFilter.IsFilteringEnabled ||
+            !filter.IsFilteringEnabled ||
             !ShouldParallelizeAcrossLogs(logs))
         {
-            return BuildSequentialResult(logs, eventFilter);
+            return BuildSequentialResult(logs, filter);
         }
 
         // Multi-log heavy work: parallelize across logs, sequential within each log to avoid
@@ -39,7 +39,7 @@ public sealed class FilterService : IFilterService
                 logs.Count,
                 index =>
                 {
-                    results[index] = FilterEventsSequential(logs[index].Events, eventFilter);
+                    results[index] = FilterEventsSequential(logs[index].Events, filter);
                 });
         }
         catch (AggregateException aggregate) when (aggregate.InnerExceptions.Count == 1)
@@ -61,9 +61,9 @@ public sealed class FilterService : IFilterService
 
     public IReadOnlyList<ResolvedEvent> GetFilteredEvents(
         IEnumerable<ResolvedEvent> events,
-        EventFilter eventFilter)
+        Filter filter)
     {
-        if (!eventFilter.IsFilteringEnabled)
+        if (!filter.IsFilteringEnabled)
         {
             return events as IReadOnlyList<ResolvedEvent> ?? [.. events];
         }
@@ -71,12 +71,12 @@ public sealed class FilterService : IFilterService
         // PLINQ scheduling overhead exceeds the benefit below this threshold.
         if (events is IReadOnlyCollection<ResolvedEvent> { Count: < 10_000 } collection)
         {
-            return FilterEventsSequential(collection, eventFilter);
+            return FilterEventsSequential(collection, filter);
         }
 
         return events.AsParallel()
-            .Where(e => e.MatchesDateFilter(eventFilter.DateFilter) &&
-                e.MatchesFilters(eventFilter.Filters))
+            .Where(e => e.MatchesDateFilter(filter.DateFilter) &&
+                e.MatchesFilters(filter.Filters))
             .ToList()
             .AsReadOnly();
     }
@@ -86,10 +86,10 @@ public sealed class FilterService : IFilterService
 
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(
         IEnumerable<ResolvedEvent> events,
-        EventFilter eventFilter) =>
+        Filter filter) =>
         events
-            .Where(e => e.MatchesDateFilter(eventFilter.DateFilter) &&
-                e.MatchesFilters(eventFilter.Filters))
+            .Where(e => e.MatchesDateFilter(filter.DateFilter) &&
+                e.MatchesFilters(filter.Filters))
             .ToList()
             .AsReadOnly();
 
@@ -118,13 +118,13 @@ public sealed class FilterService : IFilterService
 
     private Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>> BuildSequentialResult(
         IReadOnlyList<EventLogData> logs,
-        EventFilter eventFilter)
+        Filter filter)
     {
         var filtered = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(logs.Count);
 
         foreach (var data in logs)
         {
-            filtered.Add(data.Id, GetFilteredEvents(data.Events, eventFilter));
+            filtered.Add(data.Id, GetFilteredEvents(data.Events, filter));
         }
 
         return filtered;

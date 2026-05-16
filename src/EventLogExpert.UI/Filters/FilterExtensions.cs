@@ -3,20 +3,20 @@
 
 using EventLogExpert.Filtering.Runtime;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.UI.Filters;
 
-internal static class EventFilterExtensions
+internal static class FilterExtensions
 {
-    extension(EventFilter eventFilter)
+    extension(Filter filter)
     {
-        public bool HasFilteringChangedFrom(EventFilter original)
+        public bool HasFilteringChangedFrom(Filter original)
         {
-            if (!Equals(eventFilter.DateFilter, original.DateFilter)) { return true; }
+            if (!Equals(filter.DateFilter, original.DateFilter)) { return true; }
 
-            var currentSnapshots = eventFilter.Snapshots;
+            var currentSnapshots = filter.Snapshots;
             var originalSnapshots = original.Snapshots;
 
-            // Default-constructed EventFilter (rare) has an uninitialized ImmutableArray.
+            // Default-constructed Filter (rare) has an uninitialized ImmutableArray.
             if (currentSnapshots.IsDefault || originalSnapshots.IsDefault)
             {
                 return currentSnapshots.IsDefault != originalSnapshots.IsDefault;

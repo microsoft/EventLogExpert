@@ -110,16 +110,16 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void EventLogAction_SetFilters_ShouldStoreEventFilter()
+    public void EventLogAction_SetFilters_ShouldStoreFilter()
     {
         // Arrange
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var action = new SetFiltersAction(eventFilter);
+        var action = new SetFiltersAction(filter);
 
         // Assert
-        Assert.Equal(eventFilter, action.EventFilter);
+        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]
@@ -908,7 +908,7 @@ public sealed class EventLogStoreTests
 
         var after = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var before = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
-        var newFilter = new EventFilter(new DateFilter { After = after, Before = before }, []);
+        var newFilter = new Filter(new DateFilter { After = after, Before = before }, []);
 
         var action = new SetFiltersAction(newFilter);
 
@@ -923,7 +923,7 @@ public sealed class EventLogStoreTests
     public void ReduceSetFilters_WhenFilterUnchanged_ShouldReturnSameState()
     {
         // Arrange
-        var filter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
         var state = new EventLogState { AppliedFilter = filter };
         var action = new SetFiltersAction(filter);
 

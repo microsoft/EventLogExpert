@@ -20,7 +20,7 @@ using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.DependencyInjection;
 using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.LogTable;

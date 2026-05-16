@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using Fluxor;
@@ -14,12 +14,12 @@ namespace EventLogExpert.UI.FilterPane;
 
 public sealed class Effects
 {
-    private readonly IStateSelection<EventLogState, EventFilter> _appliedFilter;
+    private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
     private readonly IStateSelection<EventLogState, (DateTime After, DateTime Before)?> _eventDateRange;
     private readonly IState<FilterPaneState> _filterPaneState;
 
     public Effects(
-        IStateSelection<EventLogState, EventFilter> appliedFilter,
+        IStateSelection<EventLogState, Filter> appliedFilter,
         IStateSelection<EventLogState, (DateTime After, DateTime Before)?> eventDateRange,
         IState<FilterPaneState> filterPaneState)
     {
@@ -175,14 +175,14 @@ public sealed class Effects
         return Task.CompletedTask;
     }
 
-    private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
+    private static Filter GetFilter(FilterPaneState filterPaneState) =>
         new(filterPaneState.FilteredDateRange, [.. filterPaneState.Filters.Where(f => f.IsEnabled)]);
 
     private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
         var candidate = filterPaneState.IsEnabled
-            ? GetEventFilter(filterPaneState)
-            : new EventFilter(
+            ? GetFilter(filterPaneState)
+            : new Filter(
                 filterPaneState.FilteredDateRange,
                 [.. filterPaneState.Filters.Where(filter => filter.IsExcluded)]);
 
