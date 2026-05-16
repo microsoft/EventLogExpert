@@ -120,6 +120,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDatabasePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
 
         // UI Services
+        builder.Services.AddEventLogFiltering();
         builder.Services.RegisterUiLibrary();
 
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
