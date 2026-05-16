@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record SetContinuouslyUpdateAction(bool ContinuouslyUpdate);
+internal sealed record SetContinuouslyUpdateAction(bool ContinuouslyUpdate);

@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.EventLogs;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record CloseLogAction(EventLogId LogId, string LogName);
+internal sealed record CloseLogAction(EventLogId LogId, string LogName);

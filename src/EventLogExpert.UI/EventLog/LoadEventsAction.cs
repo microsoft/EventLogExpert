@@ -6,4 +6,4 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record LoadEventsAction(EventLogData LogData, IReadOnlyList<ResolvedEvent> Events);
+internal sealed record LoadEventsAction(EventLogData LogData, IReadOnlyList<ResolvedEvent> Events);

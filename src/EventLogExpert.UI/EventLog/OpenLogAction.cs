@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.Channels;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record OpenLogAction(string LogName, LogPathType LogPathType, CancellationToken Token = default);
+internal sealed record OpenLogAction(string LogName, LogPathType LogPathType, CancellationToken Token = default);

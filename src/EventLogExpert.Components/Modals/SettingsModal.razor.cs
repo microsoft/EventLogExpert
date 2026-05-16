@@ -43,6 +43,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
+
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
     [Inject] private IDetailsPanePreferencesProvider DetailsPanePreferences { get; init; } = null!;
@@ -293,7 +295,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         foreach (var log in logsToReopen)
         {
-            Dispatcher.Dispatch(new OpenLogAction(log.Name, log.Type));
+            EventLogCommands.OpenLog(log.Name, log.Type);
         }
     }
 

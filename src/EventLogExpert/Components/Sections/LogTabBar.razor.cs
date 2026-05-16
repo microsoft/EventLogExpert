@@ -2,11 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
+using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using CloseLogAction = EventLogExpert.UI.EventLog.CloseLogAction;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
@@ -18,6 +18,8 @@ public sealed partial class LogTabBar
     private List<LogView> _sortedTabs = [];
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -64,8 +66,7 @@ public sealed partial class LogTabBar
                 $"Computer Name: {table.ComputerName}";
     }
 
-    private void CloseLog(LogView table) =>
-        Dispatcher.Dispatch(new CloseLogAction(table.Id, table.LogName));
+    private void CloseLog(LogView table) => EventLogCommands.CloseLog(table.Id, table.LogName);
 
     private string GetActiveTab(LogView table) =>
         LogTableState.Value.ActiveEventLogId == table.Id ? "tab active" : "tab";
