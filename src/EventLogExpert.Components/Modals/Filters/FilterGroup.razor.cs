@@ -11,7 +11,6 @@ using EventLogExpert.UI.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 using IDispatcher = Fluxor.IDispatcher;
-using SetFilterAction = EventLogExpert.UI.FilterGroup.SetFilterAction;
 
 namespace EventLogExpert.Components.Modals.Filters;
 
@@ -31,6 +30,8 @@ public sealed partial class FilterGroup
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
@@ -75,7 +76,7 @@ public sealed partial class FilterGroup
         await Parent.CloseAsync();
     }
 
-    private void CancelGroup() => Dispatcher.Dispatch(new ToggleGroupAction(Group.Id));
+    private void CancelGroup() => FilterGroupCommands.ToggleGroup(Group.Id);
 
     private async Task CopyGroup()
     {
@@ -113,7 +114,7 @@ public sealed partial class FilterGroup
     {
         _pendingDrafts.Remove(draft);
 
-        Dispatcher.Dispatch(new SetFilterAction(Group.Id, filter));
+        FilterGroupCommands.SetFilter(Group.Id, filter);
     }
 
     private async Task ImportGroup()
@@ -137,7 +138,7 @@ public sealed partial class FilterGroup
                 Filters = group.Filters
             };
 
-            Dispatcher.Dispatch(new SetGroupAction(updatedGroup));
+            FilterGroupCommands.SetGroup(updatedGroup);
         }
         catch (Exception ex)
         {
@@ -159,7 +160,7 @@ public sealed partial class FilterGroup
         }
     }
 
-    private void RemoveGroup() => Dispatcher.Dispatch(new RemoveGroupAction(Group.Id));
+    private void RemoveGroup() => FilterGroupCommands.RemoveGroup(Group.Id);
 
     private async Task RenameGroup()
     {
@@ -180,7 +181,7 @@ public sealed partial class FilterGroup
             return;
         }
 
-        Dispatcher.Dispatch(new SetGroupAction(Group with { Name = newName }));
+        FilterGroupCommands.SetGroup(Group with { Name = newName });
     }
 
     private void SaveGroup()
@@ -190,8 +191,8 @@ public sealed partial class FilterGroup
 
         if (_pendingDrafts.Count > 0) { return; }
 
-        Dispatcher.Dispatch(new SetGroupAction(Group));
+        FilterGroupCommands.SetGroup(Group);
     }
 
-    private void ToggleGroup() => Dispatcher.Dispatch(new ToggleGroupAction(Group.Id));
+    private void ToggleGroup() => FilterGroupCommands.ToggleGroup(Group.Id);
 }

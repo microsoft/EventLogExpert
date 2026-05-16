@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-public sealed record ImportGroupsAction(IEnumerable<SavedFilterGroup> Groups);
+internal sealed record ImportGroupsAction(IEnumerable<SavedFilterGroup> Groups);
