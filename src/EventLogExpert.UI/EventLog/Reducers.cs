@@ -11,7 +11,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed class Reducers
+internal sealed class Reducers
 {
     [ReducerMethod]
     public static EventLogState ReduceAddEventBuffered(EventLogState state, AddEventBufferedAction action) =>

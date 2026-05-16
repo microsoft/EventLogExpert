@@ -75,6 +75,8 @@ public sealed partial class LogTablePane
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
+    [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
+
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
@@ -420,7 +422,7 @@ public sealed partial class LogTablePane
 
         ordered.AddRange(outOfTable);
 
-        Dispatcher.Dispatch(new SetSelectedEventsAction(ordered, selected));
+        EventLogCommands.SetSelectedEvents(ordered, selected);
     }
 
     private async Task FocusActiveRow()

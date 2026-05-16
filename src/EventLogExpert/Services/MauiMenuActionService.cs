@@ -245,7 +245,8 @@ public sealed class MauiMenuActionService(
             _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        _dispatcher.Dispatch(new OpenLogAction(logPath, pathType, _cancellationTokenSource.Token));
+        _eventLogCommands.OpenLog(logPath, pathType, _cancellationTokenSource.Token);
+
         return OpenLogStatus.Opened;
     }
 
@@ -303,7 +304,7 @@ public sealed class MauiMenuActionService(
     }
 
     public void SetContinuouslyUpdate(bool value) =>
-        _dispatcher.Dispatch(new SetContinuouslyUpdateAction(value));
+        _eventLogCommands.SetContinuouslyUpdate(value);
 
     public Task ShowDebugLogsAsync() => ShowModalAsync<DebugLogModal>("debug logs");
 

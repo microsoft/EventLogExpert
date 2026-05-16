@@ -19,6 +19,6 @@ namespace EventLogExpert.UI.EventLog;
 ///     The new focused event, or null to clear focus. Does not need to be a member of
 ///     <paramref name="SelectedEvents" />.
 /// </param>
-public sealed record SetSelectedEventsAction(
+internal sealed record SetSelectedEventsAction(
     IReadOnlyCollection<ResolvedEvent> SelectedEvents,
     ResolvedEvent? SelectedEvent);
