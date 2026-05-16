@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed record SetColumnWidthAction(ColumnName ColumnName, int Width);
+internal sealed record SetColumnWidthAction(ColumnName ColumnName, int Width);

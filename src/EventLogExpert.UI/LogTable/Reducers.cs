@@ -10,7 +10,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed class Reducers
+internal sealed class Reducers
 {
     [ReducerMethod]
     public static LogTableState ReduceAddTable(LogTableState state, AddTableAction action)
