@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.Common.Lifecycle;
 using EventLogExpert.UI.Filters;
 using Fluxor;
 using System.Collections.Immutable;
@@ -20,7 +21,7 @@ public sealed class Reducers
     public static EventLogState ReduceAddEventSuccess(EventLogState state, AddEventSuccessAction action) =>
         state with { ActiveLogs = action.ActiveLogs };
 
-    [ReducerMethod(typeof(CloseAllAction))]
+    [ReducerMethod(typeof(CloseAllLogsAction))]
     public static EventLogState ReduceCloseAll(EventLogState state) =>
         state with
         {

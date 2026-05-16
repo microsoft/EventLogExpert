@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Lifecycle;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -21,7 +22,7 @@ public sealed class Reducers
         return updatedState;
     }
 
-    [ReducerMethod(typeof(CloseAllAction))]
+    [ReducerMethod(typeof(CloseAllLogsAction))]
     public static StatusBarState ReduceCloseAll(StatusBarState state) => new();
 
     [ReducerMethod]
