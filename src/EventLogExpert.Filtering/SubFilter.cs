@@ -6,4 +6,4 @@ using System.Text.Json.Serialization;
 namespace EventLogExpert.Filtering;
 
 [JsonConverter(typeof(SubFilterJsonConverter))]
-public sealed record SubFilter(BasicFilterCondition Comparison, bool JoinWithAny);
+public sealed record SubFilter(FilterComparison Comparison, bool JoinWithAny);

@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.Filtering.Tests;
 
-public sealed class BasicFilterConditionJsonConverterTests
+public sealed class FilterComparisonJsonConverterTests
 {
     [Fact]
     public void EventProperty_MemberCount_IsFrozenAcrossF16()
@@ -21,7 +21,7 @@ public sealed class BasicFilterConditionJsonConverterTests
     public void JsonRoundTrip_ModernShape_PreservesAllFields()
     {
         // Arrange
-        var original = new BasicFilterCondition
+        var original = new FilterComparison
         {
             Property = EventProperty.Source,
             Operator = ComparisonOperator.Contains,
@@ -32,7 +32,7 @@ public sealed class BasicFilterConditionJsonConverterTests
 
         // Act
         string json = JsonSerializer.Serialize(original);
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(json);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
 
         // Assert
         Assert.NotNull(restored);
@@ -54,8 +54,8 @@ public sealed class BasicFilterConditionJsonConverterTests
             """{ "Property": "Source", "Category": 0, "Operator": "Equals", "MatchMode": "Single", "Values": [] }""";
 
         // Act
-        var categoryThenProperty = JsonSerializer.Deserialize<BasicFilterCondition>(CategoryThenProperty);
-        var propertyThenCategory = JsonSerializer.Deserialize<BasicFilterCondition>(PropertyThenCategory);
+        var categoryThenProperty = JsonSerializer.Deserialize<FilterComparison>(CategoryThenProperty);
+        var propertyThenCategory = JsonSerializer.Deserialize<FilterComparison>(PropertyThenCategory);
 
         // Assert
         Assert.NotNull(categoryThenProperty);
@@ -82,7 +82,7 @@ public sealed class BasicFilterConditionJsonConverterTests
         string json = $$"""{ "Category": {{legacyCategoryOrdinal}}, "Operator": "Equals", "MatchMode": "Single", "Value": "x", "Values": [] }""";
 
         // Act
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(json);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
 
         // Assert
         Assert.NotNull(restored);
@@ -104,7 +104,7 @@ public sealed class BasicFilterConditionJsonConverterTests
         string json = $$"""{ "Property": "Id", "Evaluator": {{legacyEvaluator}}, "Value": "100", "Values": [] }""";
 
         // Act
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(json);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
 
         // Assert
         Assert.NotNull(restored);
@@ -130,7 +130,7 @@ public sealed class BasicFilterConditionJsonConverterTests
         string json = $$"""{ "Property": "Id", "Evaluator": "{{legacyEvaluator}}", "Value": "100", "Values": [] }""";
 
         // Act
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(json);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(json);
 
         // Assert
         Assert.NotNull(restored);
@@ -150,8 +150,8 @@ public sealed class BasicFilterConditionJsonConverterTests
             """{ "Property": "Id", "Evaluator": "MultiSelect", "Operator": "Equals", "MatchMode": "Single", "Values": [] }""";
 
         // Act
-        var modernFirst = JsonSerializer.Deserialize<BasicFilterCondition>(ModernFirst);
-        var legacyFirst = JsonSerializer.Deserialize<BasicFilterCondition>(LegacyFirst);
+        var modernFirst = JsonSerializer.Deserialize<FilterComparison>(ModernFirst);
+        var legacyFirst = JsonSerializer.Deserialize<FilterComparison>(LegacyFirst);
 
         // Assert
         Assert.NotNull(modernFirst);
@@ -172,8 +172,8 @@ public sealed class BasicFilterConditionJsonConverterTests
             """{ "Property": "Id", "Evaluator": "Equals", "Operator": "Contains", "MatchMode": "Single", "Values": [] }""";
 
         // Act
-        var modernFirst = JsonSerializer.Deserialize<BasicFilterCondition>(ModernFirst);
-        var legacyFirst = JsonSerializer.Deserialize<BasicFilterCondition>(LegacyFirst);
+        var modernFirst = JsonSerializer.Deserialize<FilterComparison>(ModernFirst);
+        var legacyFirst = JsonSerializer.Deserialize<FilterComparison>(LegacyFirst);
 
         // Assert
         Assert.NotNull(modernFirst);
@@ -190,7 +190,7 @@ public sealed class BasicFilterConditionJsonConverterTests
             """{ "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "FutureField": { "nested": true }, "Value": "100", "Values": [] }""";
 
         // Act
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(JsonWithUnknown);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(JsonWithUnknown);
 
         // Assert
         Assert.NotNull(restored);
@@ -206,7 +206,7 @@ public sealed class BasicFilterConditionJsonConverterTests
             """{ "Property": "Source", "Operator": "Equals", "MatchMode": "Many", "Value": null, "Values": ["x", "y", "z"] }""";
 
         // Act
-        var restored = JsonSerializer.Deserialize<BasicFilterCondition>(Json);
+        var restored = JsonSerializer.Deserialize<FilterComparison>(Json);
 
         // Assert
         Assert.NotNull(restored);
@@ -218,7 +218,7 @@ public sealed class BasicFilterConditionJsonConverterTests
     public void Write_ModernShape_UsesStringEnumsAndOmitsLegacyKeys()
     {
         // Arrange
-        var condition = new BasicFilterCondition
+        var comparison = new FilterComparison
         {
             Property = EventProperty.Id,
             Operator = ComparisonOperator.Equals,
@@ -228,7 +228,7 @@ public sealed class BasicFilterConditionJsonConverterTests
         };
 
         // Act
-        string json = JsonSerializer.Serialize(condition);
+        string json = JsonSerializer.Serialize(comparison);
 
         // Assert — modern keys use CLR enum names; legacy aliases must be absent.
         Assert.Contains("\"Property\":\"Id\"", json);

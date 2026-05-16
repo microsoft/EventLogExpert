@@ -322,7 +322,7 @@ public sealed class FilterServiceTests
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -341,7 +341,7 @@ public sealed class FilterServiceTests
             null);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -360,7 +360,7 @@ public sealed class FilterServiceTests
             null);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -383,7 +383,7 @@ public sealed class FilterServiceTests
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -402,7 +402,7 @@ public sealed class FilterServiceTests
             "test");
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -421,7 +421,7 @@ public sealed class FilterServiceTests
             "10");
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -440,7 +440,7 @@ public sealed class FilterServiceTests
             "Audit Success");
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -461,7 +461,7 @@ public sealed class FilterServiceTests
             ["Error", "Warning"]);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -493,7 +493,7 @@ public sealed class FilterServiceTests
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -515,7 +515,7 @@ public sealed class FilterServiceTests
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -534,7 +534,7 @@ public sealed class FilterServiceTests
             "test\"value");
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -547,7 +547,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -556,7 +556,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -567,7 +567,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -581,7 +581,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -590,7 +590,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -601,7 +601,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -614,7 +614,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -623,7 +623,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -634,7 +634,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -653,7 +653,7 @@ public sealed class FilterServiceTests
             "S-1-5-21");
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -675,7 +675,7 @@ public sealed class FilterServiceTests
         var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, rawValue);
 
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         Assert.True(result);
 
@@ -700,7 +700,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -709,7 +709,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -720,7 +720,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -733,7 +733,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -742,7 +742,7 @@ public sealed class FilterServiceTests
             },
             []);
 
-        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -755,7 +755,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Keywords,
                 Operator = ComparisonOperator.Equals,
@@ -765,7 +765,7 @@ public sealed class FilterServiceTests
             []);
 
         // Act
-        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -780,7 +780,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,
@@ -790,7 +790,7 @@ public sealed class FilterServiceTests
             []);
 
         // Act
-        var sourceResult = filterService.TryParse(source, out var sourceComparison);
+        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -806,7 +806,7 @@ public sealed class FilterServiceTests
         var filterService = CreateFilterService();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => filterService.TryParse(null!, out _));
+        Assert.Throws<ArgumentNullException>(() => filterService.TryFormat(null!, out _));
     }
 
     [Fact]
@@ -815,7 +815,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -824,7 +824,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -833,7 +833,7 @@ public sealed class FilterServiceTests
                     },
                     true),
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Source,
                         Operator = ComparisonOperator.Equals,
@@ -846,7 +846,7 @@ public sealed class FilterServiceTests
         var expected = "Id == \"100\" && Source == \"Kernel\"";
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -860,7 +860,7 @@ public sealed class FilterServiceTests
         // Arrange
         var filterService = CreateFilterService();
         var source = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -869,7 +869,7 @@ public sealed class FilterServiceTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -878,7 +878,7 @@ public sealed class FilterServiceTests
                     },
                     true),
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Source,
                         Operator = ComparisonOperator.Contains,
@@ -893,7 +893,7 @@ public sealed class FilterServiceTests
             " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)";
 
         // Act
-        var result = filterService.TryParse(source, out var comparison);
+        var result = filterService.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -907,7 +907,7 @@ public sealed class FilterServiceTests
         string? value,
         IEnumerable<string>? values = null) =>
         new(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = property,
                 Operator = op,

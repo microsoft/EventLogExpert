@@ -81,7 +81,7 @@ public sealed class FilterService : IFilterService
             .AsReadOnly();
     }
 
-    public bool TryParse(BasicFilter basicFilter, out string comparison) =>
+    public bool TryFormat(BasicFilter basicFilter, out string comparison) =>
         BasicFilterFormatter.TryFormat(basicFilter, out comparison);
 
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(

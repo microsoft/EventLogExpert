@@ -608,7 +608,7 @@ public sealed class EffectsTests
 
     private static BasicFilter CreateBasicFilter() =>
         new(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,

@@ -12,20 +12,20 @@
 
 <label aria-label="Comparison" id="@($"{Id}_Comparison")">Comparison: </label>
 <ComparisonOperatorSelect AriaLabelledBy="@($"{Id}_Comparison")"
-    MatchMode="Condition.MatchMode"
+    MatchMode="Comparison.MatchMode"
     OnChanged="HandleOperatorChanged"
-    Operator="Condition.Operator"
-    SupportsMany="!IsTextOnlyProperty(Condition.Property)" />
+    Operator="Comparison.Operator"
+    SupportsMany="!IsTextOnlyProperty(Comparison.Property)" />
 
 <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
-@if (IsTextOnlyProperty(Condition.Property))
+@if (IsTextOnlyProperty(Comparison.Property))
 {
-    <TextInput @bind-Value="@Condition.Value" CssClass="input filter-description" />
+    <TextInput @bind-Value="@Comparison.Value" CssClass="input filter-description" />
 }
-else if (Condition.MatchMode == MatchMode.Many)
+else if (Comparison.MatchMode == MatchMode.Many)
 {
     <ValueSelect AriaLabelledBy="@($"{Id}_Value")"
-        @bind-Values="Condition.Values"
+        @bind-Values="Comparison.Values"
         CssClass="input filter-multiselect-dropdown"
         EmptyText="All"
         IsMultiSelect
@@ -40,7 +40,7 @@ else if (Condition.MatchMode == MatchMode.Many)
 }
 else
 {
-    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" @bind-Value="Condition.Value" CssClass="input filter-value-dropdown" IsInput T="string">
+    <ValueSelect AriaLabelledBy="@($"{Id}_Value")" @bind-Value="Comparison.Value" CssClass="input filter-value-dropdown" IsInput T="string">
         <ValueSelectItem ClearItem T="string">All</ValueSelectItem>
         @foreach (var item in FilteredItems)
         {

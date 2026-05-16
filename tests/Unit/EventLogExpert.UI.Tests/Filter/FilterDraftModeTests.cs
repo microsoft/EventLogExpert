@@ -100,7 +100,7 @@ public sealed class FilterDraftModeTests
 
         draft.SubFilters.Add(new SubFilterDraft
         {
-            Condition = new FilterConditionDraft
+            Comparison = new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,
@@ -195,7 +195,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void HasMeaningfulStructure_OnlyPropertyDefaulted_IsFalse()
     {
-        // FilterConditionDraft.Property defaults to the first enum value (the dropdown's initial selection).
+        // FilterComparisonDraft.Property defaults to the first enum value (the dropdown's initial selection).
         // The default selection is not "user input" — without a value, save validation must reject as empty.
         var draft = new FilterDraft();
         draft.Comparison.Property = EventProperty.Source;
@@ -282,7 +282,7 @@ public sealed class FilterDraftModeTests
 
         draft.SubFilters.Add(new SubFilterDraft
         {
-            Condition = new FilterConditionDraft
+            Comparison = new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,
@@ -423,7 +423,7 @@ public sealed class FilterDraftModeTests
 
         draft.SubFilters.Add(new SubFilterDraft
         {
-            Condition = new FilterConditionDraft
+            Comparison = new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,

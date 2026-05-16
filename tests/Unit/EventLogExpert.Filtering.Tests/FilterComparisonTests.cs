@@ -3,21 +3,21 @@
 
 namespace EventLogExpert.Filtering.Tests;
 
-public sealed class BasicFilterConditionTests
+public sealed class FilterComparisonTests
 {
     [Fact]
     public void Default_ShouldHaveEmptyValuesAndNullValue()
     {
-        var condition = new BasicFilterCondition();
+        var comparison = new FilterComparison();
 
-        Assert.Null(condition.Value);
-        Assert.Empty(condition.Values);
+        Assert.Null(comparison.Value);
+        Assert.Empty(comparison.Values);
     }
 
     [Fact]
     public void WithField_ShouldNotMutateOriginal()
     {
-        var original = new BasicFilterCondition
+        var original = new FilterComparison
         {
             Property = EventProperty.Source,
             Value = "100",
@@ -34,7 +34,7 @@ public sealed class BasicFilterConditionTests
     [Fact]
     public void WithField_WhenCalled_ShouldReturnNewInstanceWithClearedValueAndValues()
     {
-        var original = new BasicFilterCondition
+        var original = new FilterComparison
         {
             Property = EventProperty.Source,
             Operator = ComparisonOperator.Contains,

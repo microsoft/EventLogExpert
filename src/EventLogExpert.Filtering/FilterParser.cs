@@ -8,20 +8,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Filtering;
 
-/// <summary>
-///     Lightweight, allocation-conscious validation entry point for filter expression strings. Runs the full
-///     tokenizer + parser + lowerer pipeline (per N-D5: identifier resolution and method-shape validation happen in the
-///     lowerer, not just syntactic parsing) but skips closure emission. Intended for editor pre-flight (live keystroke
-///     validation) and as the testable seam for the internal AST in the absence of <c>InternalsVisibleTo</c>.
-/// </summary>
-public static class FilterParser
+internal static class FilterParser
 {
-    /// <summary>
-    ///     Compiles <paramref name="filterText" /> to a <see cref="CompiledFilter" /> via the hand-rolled tokenizer +
-    ///     parser + lowerer + emitter pipeline, with no LINQ-Expression compilation, no Reflection.Emit, and no Dynamic.Core
-    ///     dependency on the per-event hot path. Returns <c>false</c> with a human-readable diagnostic in
-    ///     <paramref name="error" /> on any failure. Never throws on bad input.
-    /// </summary>
     public static bool TryCompile(
         string? filterText,
         [NotNullWhen(true)] out CompiledFilter? compiled,
@@ -61,11 +49,6 @@ public static class FilterParser
         return true;
     }
 
-    /// <summary>
-    ///     Returns <c>true</c> when <paramref name="filterText" /> is a syntactically and semantically well-formed filter
-    ///     expression in the closed Dynamic-LINQ subset this library supports. Returns <c>false</c> with a human-readable
-    ///     diagnostic in <paramref name="error" /> otherwise. Never throws on bad input.
-    /// </summary>
     public static bool TryValidate(string? filterText, [NotNullWhen(false)] out string? error)
     {
         if (string.IsNullOrWhiteSpace(filterText))

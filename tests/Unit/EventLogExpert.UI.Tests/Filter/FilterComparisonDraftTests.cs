@@ -5,12 +5,12 @@ using EventLogExpert.Filtering.Drafts;
 
 namespace EventLogExpert.UI.Tests.Filter;
 
-public sealed class FilterConditionDraftTests
+public sealed class FilterComparisonDraftTests
 {
     [Fact]
     public void ChangeProperty_ClearsValueAndValues()
     {
-        var draft = new FilterConditionDraft
+        var draft = new FilterComparisonDraft
         {
             Property = EventProperty.Id,
             Value = "100",
@@ -27,7 +27,7 @@ public sealed class FilterConditionDraftTests
     public void ChangeProperty_DoesNotResetOperatorOrMatchMode()
     {
         // Operator/match-mode coercion is the UI's responsibility, not the draft's.
-        var draft = new FilterConditionDraft
+        var draft = new FilterComparisonDraft
         {
             Property = EventProperty.Id,
             Operator = ComparisonOperator.Equals,
@@ -43,7 +43,7 @@ public sealed class FilterConditionDraftTests
     [Fact]
     public void ChangeProperty_SetsNewProperty()
     {
-        var draft = new FilterConditionDraft { Property = EventProperty.Id };
+        var draft = new FilterComparisonDraft { Property = EventProperty.Id };
 
         draft.ChangeProperty(EventProperty.Source);
 
@@ -51,26 +51,26 @@ public sealed class FilterConditionDraftTests
     }
 
     [Fact]
-    public void FromCondition_DoesNotShareValuesListWithDraft()
+    public void FromComparison_DoesNotShareValuesListWithDraft()
     {
-        var condition = new BasicFilterCondition
+        var comparison = new FilterComparison
         {
             Property = EventProperty.Level,
             Values = ["Error"]
         };
 
-        var draft = FilterConditionDraft.FromCondition(condition);
+        var draft = FilterComparisonDraft.FromComparison(comparison);
 
         draft.Values.Add("Warning");
 
-        Assert.Single(condition.Values);
-        Assert.Equal("Error", condition.Values[0]);
+        Assert.Single(comparison.Values);
+        Assert.Equal("Error", comparison.Values[0]);
     }
 
     [Fact]
     public void RoundTrip_PreservesAllFields()
     {
-        var original = new BasicFilterCondition
+        var original = new FilterComparison
         {
             Property = EventProperty.Level,
             Operator = ComparisonOperator.Equals,
@@ -79,7 +79,7 @@ public sealed class FilterConditionDraftTests
             Values = ["Error", "Warning"]
         };
 
-        var roundTripped = FilterConditionDraft.FromCondition(original).ToCondition();
+        var roundTripped = FilterComparisonDraft.FromComparison(original).ToComparison();
 
         Assert.Equal(original.Property, roundTripped.Property);
         Assert.Equal(original.Operator, roundTripped.Operator);
@@ -89,19 +89,19 @@ public sealed class FilterConditionDraftTests
     }
 
     [Fact]
-    public void ToCondition_DoesNotShareValuesListWithDraft()
+    public void ToComparison_DoesNotShareValuesListWithDraft()
     {
-        var draft = new FilterConditionDraft
+        var draft = new FilterComparisonDraft
         {
             Property = EventProperty.Level,
             Values = ["Error"]
         };
 
-        var condition = draft.ToCondition();
+        var comparison = draft.ToComparison();
 
         draft.Values.Add("Warning");
 
-        Assert.Single(condition.Values);
-        Assert.Equal("Error", condition.Values[0]);
+        Assert.Single(comparison.Values);
+        Assert.Equal("Error", comparison.Values[0]);
     }
 }

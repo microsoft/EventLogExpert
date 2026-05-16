@@ -11,14 +11,14 @@ public sealed class FilterDraft
 {
     public HighlightColor Color { get; set; } = HighlightColor.None;
 
-    public FilterConditionDraft Comparison { get; set; } = new();
+    public FilterComparisonDraft Comparison { get; set; } = new();
 
     public string ComparisonText { get; set; } = string.Empty;
 
     /// <summary>
     ///     <see langword="true" /> when the primary <see cref="Comparison" /> has user-supplied input or any sub-filter
     ///     exists. Used by the row's mode-switch + Basic-mode save validation as the "structure carries data" signal —
-    ///     <see cref="FilterConditionDraft.Property" /> defaulting to the first enum value (the dropdown's initial selection)
+    ///     <see cref="FilterComparisonDraft.Property" /> defaulting to the first enum value (the dropdown's initial selection)
     ///     does NOT count as meaningful input on its own.
     /// </summary>
     public bool HasMeaningfulStructure =>
@@ -32,20 +32,10 @@ public sealed class FilterDraft
 
     public bool IsExcluded { get; set; }
 
-    /// <summary>
-    ///     Authoring mode for this draft. Drives which editor body the row renders and is persisted on save through to
-    ///     <see cref="SavedFilter.Mode" /> so re-edit reopens on the same surface.
-    /// </summary>
     public FilterMode Mode { get; set; } = FilterMode.Advanced;
 
     public List<SubFilterDraft> SubFilters { get; set; } = [];
 
-    /// <summary>
-    ///     Hydrates a draft from a persisted <see cref="SavedFilter" />. <see cref="Mode" /> propagates verbatim;
-    ///     structured fields are hydrated only when <see cref="Mode" /> is <see cref="FilterMode.Basic" /> (Advanced and
-    ///     Cached modes always reopen with empty structure even if the persisted record carries a stale
-    ///     <see cref="SavedFilter.BasicFilter" />).
-    /// </summary>
     public static FilterDraft FromSavedFilter(SavedFilter filter)
     {
         var draft = new FilterDraft
@@ -82,11 +72,9 @@ public sealed class FilterDraft
                 ClearStructure();
                 break;
             case FilterMode.Basic:
-                if (!string.IsNullOrEmpty(ComparisonText) &&
-                    BasicFilterDecomposer.TryDecompose(ComparisonText, out var decomposed) &&
-                    decomposed is { } basicFilter)
+                if (!string.IsNullOrEmpty(ComparisonText) && BasicFilterDecomposer.TryDecompose(ComparisonText, out var decomposed))
                 {
-                    HydrateStructure(basicFilter);
+                    HydrateStructure(decomposed);
                 }
                 else
                 {
@@ -140,12 +128,12 @@ public sealed class FilterDraft
     /// </summary>
     public void HydrateStructure(BasicFilter basicFilter)
     {
-        Comparison = FilterConditionDraft.FromCondition(basicFilter.Comparison);
+        Comparison = FilterComparisonDraft.FromComparison(basicFilter.Comparison);
         SubFilters = [.. basicFilter.SubFilters.Select(SubFilterDraftFromSubFilter)];
     }
 
     public BasicFilter ToBasicFilter() =>
-        new(Comparison.ToCondition(), [.. SubFilters.Select(subFilter => subFilter.ToSubFilter())]);
+        new(Comparison.ToComparison(), [.. SubFilters.Select(subFilter => subFilter.ToSubFilter())]);
 
     /// <summary>
     ///     Builds a <see cref="SavedFilter" /> from this draft per <see cref="Mode" />. Returns <see langword="false" />
@@ -257,13 +245,13 @@ public sealed class FilterDraft
     private static SubFilterDraft SubFilterDraftFromSubFilter(SubFilter subFilter) =>
         new()
         {
-            Condition = FilterConditionDraft.FromCondition(subFilter.Comparison),
+            Comparison = FilterComparisonDraft.FromComparison(subFilter.Comparison),
             JoinWithAny = subFilter.JoinWithAny
         };
 
     private void ClearStructure()
     {
-        Comparison = new FilterConditionDraft();
+        Comparison = new FilterComparisonDraft();
         SubFilters.Clear();
     }
 }

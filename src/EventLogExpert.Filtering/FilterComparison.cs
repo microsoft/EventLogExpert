@@ -7,8 +7,8 @@ using System.Text.Json.Serialization;
 namespace EventLogExpert.Filtering;
 
 /// <summary>Immutable representation of a single Basic-filter criterion (one row of the editor).</summary>
-[JsonConverter(typeof(BasicFilterConditionJsonConverter))]
-public sealed record BasicFilterCondition
+[JsonConverter(typeof(FilterComparisonJsonConverter))]
+public sealed record FilterComparison
 {
     public EventProperty Property { get; init; }
 
@@ -24,6 +24,6 @@ public sealed record BasicFilterCondition
     ///     Returns a copy with the new <paramref name="property" /> and Value/Values cleared, since the available value
     ///     space changes when the property changes.
     /// </summary>
-    public BasicFilterCondition WithProperty(EventProperty property) =>
+    public FilterComparison WithProperty(EventProperty property) =>
         this with { Property = property, Value = null, Values = [] };
 }
