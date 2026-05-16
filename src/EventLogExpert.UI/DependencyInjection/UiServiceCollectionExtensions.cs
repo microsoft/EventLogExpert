@@ -6,21 +6,21 @@ using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.LogTable;
 using Microsoft.Extensions.DependencyInjection;
+using Effects = EventLogExpert.UI.EventLog.Effects;
 
 namespace EventLogExpert.UI.DependencyInjection;
 
 /// <summary>
-///     Composition-root extension for registering the UI library's host-facing intent and
-///     capability APIs. Lets the MAUI head consume <see cref="EventLogExpert.UI" /> without
-///     needing <c>InternalsVisibleTo</c> on its internal facade implementations.
+///     Composition-root extension for registering the UI library's host-facing intent and capability APIs. Lets the
+///     MAUI head consume <see cref="EventLogExpert.UI" /> without needing <c>InternalsVisibleTo</c> on its internal facade
+///     implementations.
 /// </summary>
 public static class UiServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers the public host-facing intent and capability APIs exposed by
-    ///     <see cref="EventLogExpert.UI" />. Implementations are <c>internal sealed</c> per
-    ///     least-privilege; this extension is the only public entry point for the host to wire
-    ///     them up.
+    ///     Registers the public host-facing intent and capability APIs exposed by <see cref="EventLogExpert.UI" />.
+    ///     Implementations are <c>internal sealed</c> per least-privilege; this extension is the only public entry point for
+    ///     the host to wire them up.
     /// </summary>
     public static IServiceCollection RegisterUiLibrary(this IServiceCollection services)
     {
@@ -32,6 +32,7 @@ public static class UiServiceCollectionExtensions
         services.AddSingleton<ILogTableCommands, LogTableCommands>();
         services.AddSingleton<IHighlightSelector, HighlightSelector>();
         services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
+        services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<Effects>());
 
         return services;
     }

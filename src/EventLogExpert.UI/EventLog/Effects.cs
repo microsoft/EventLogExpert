@@ -25,7 +25,7 @@ using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed class Effects(
+internal sealed class Effects(
     IState<EventLogState> eventLogState,
     IFilterService filterService,
     ITraceLogger logger,

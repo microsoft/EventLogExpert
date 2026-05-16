@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record AddEventAction(ResolvedEvent NewEvent);
+internal sealed record AddEventAction(ResolvedEvent NewEvent);

@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record SelectEventAction(
+internal sealed record SelectEventAction(
     ResolvedEvent SelectedEvent,
     bool IsMultiSelect = false,
     bool ShouldStaySelected = false);

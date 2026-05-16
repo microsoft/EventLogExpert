@@ -30,7 +30,6 @@ using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
 using EventLogExpert.UI.Update.Deployment;
 using Fluxor;
-using Effects = EventLogExpert.UI.EventLog.Effects;
 
 namespace EventLogExpert;
 
@@ -62,13 +61,6 @@ public static class MauiProgram
                 .RegisterStateLibrary()
                 .WithLifetime(StoreLifetime.Singleton);
         });
-
-        // Effects implements ILogReloadCoordinator. Fluxor registers Effects as singletons
-        // by assembly scan; resolve the same instance through the coordinator interface so callers
-        // (SettingsModal) get the single per-app instance with its dictionaries of in-flight loads
-        // and close completions.
-        builder.Services.AddSingleton<ILogReloadCoordinator>(sp =>
-            sp.GetRequiredService<Effects>());
 
         // Core Services
         builder.Services.AddSingleton<DebugLogService>();
