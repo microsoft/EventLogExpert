@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.UI.Common.Lifecycle;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -132,7 +133,7 @@ public sealed class Reducers
         };
     }
 
-    [ReducerMethod(typeof(CloseAllAction))]
+    [ReducerMethod(typeof(CloseAllLogsAction))]
     public static LogTableState ReduceCloseAll(LogTableState state) =>
         state with
         {

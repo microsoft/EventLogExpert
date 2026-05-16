@@ -6,6 +6,7 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
+using EventLogExpert.UI.Common.Lifecycle;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.Database.Upgrade;
 using EventLogExpert.UI.DetailsPane;
@@ -288,7 +289,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         var logsToReopen = EventLogState.Value.ActiveLogs.Values;
 
-        Dispatcher.Dispatch(new CloseAllAction());
+        Dispatcher.Dispatch(new CloseAllLogsAction());
 
         foreach (var log in logsToReopen)
         {

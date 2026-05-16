@@ -1,14 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.StatusBar;
+using EventLogExpert.UI.Common.Lifecycle;
 using Fluxor;
 
 namespace EventLogExpert.UI.FilterLoading;
 
 public sealed class Reducers
 {
-    [ReducerMethod(typeof(CloseAllAction))]
+    [ReducerMethod(typeof(CloseAllLogsAction))]
     public static FilterLoadingState ReduceCloseAll(FilterLoadingState state) =>
         state.IsLoading ? new FilterLoadingState() : state;
 
