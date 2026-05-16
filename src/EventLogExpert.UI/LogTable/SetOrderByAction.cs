@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed record SetOrderByAction(ColumnName? OrderBy);
+internal sealed record SetOrderByAction(ColumnName? OrderBy);

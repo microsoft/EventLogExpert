@@ -21,6 +21,8 @@ public sealed partial class LogTabBar
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
+    [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
+
     [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -84,5 +86,5 @@ public sealed partial class LogTabBar
     }
 
     private void SetActiveLog(LogView table) =>
-        Dispatcher.Dispatch(new SetActiveTableAction(table.Id));
+        LogTableCommands.SetActiveTable(table.Id);
 }

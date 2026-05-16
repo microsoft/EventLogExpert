@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed record ToggleColumnAction(ColumnName ColumnName);
+internal sealed record ToggleColumnAction(ColumnName ColumnName);

@@ -103,7 +103,7 @@ public sealed partial class LogTablePane
         if (Enum.TryParse<ColumnName>(columnName, out var column) &&
             Enum.TryParse<ColumnName>(targetColumn, out var target))
         {
-            Dispatcher.Dispatch(new ReorderColumnAction(column, target, insertAfter));
+            LogTableCommands.ReorderColumn(column, target, insertAfter);
         }
     }
 
@@ -112,7 +112,7 @@ public sealed partial class LogTablePane
     {
         if (Enum.TryParse<ColumnName>(columnName, out var column))
         {
-            Dispatcher.Dispatch(new SetColumnWidthAction(column, width));
+            LogTableCommands.SetColumnWidth(column, width);
         }
     }
 
@@ -897,7 +897,7 @@ public sealed partial class LogTablePane
             var capturedColumn = column;
             items.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => Dispatcher.Dispatch(new ToggleColumnAction(capturedColumn)),
+                () => LogTableCommands.ToggleColumn(capturedColumn),
                 isChecked: isVisible));
         }
 
@@ -909,7 +909,7 @@ public sealed partial class LogTablePane
             var capturedColumn = column;
             orderItems.Add(MenuItem.Item(
                 column.ToFullString(),
-                () => Dispatcher.Dispatch(new SetOrderByAction(capturedColumn)),
+                () => LogTableCommands.SetOrderBy(capturedColumn),
                 isChecked: state.OrderBy.Equals(capturedColumn)));
         }
 

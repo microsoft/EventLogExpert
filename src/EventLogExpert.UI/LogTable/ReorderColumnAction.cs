@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed record ReorderColumnAction(ColumnName ColumnName, ColumnName TargetColumn, bool InsertAfter);
+internal sealed record ReorderColumnAction(ColumnName ColumnName, ColumnName TargetColumn, bool InsertAfter);
