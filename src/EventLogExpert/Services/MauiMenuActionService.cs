@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
+using EventLogExpert.UI.Common.Lifecycle;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterPane;
@@ -73,7 +74,7 @@ public sealed class MauiMenuActionService(
     public async Task CloseAllLogsAsync()
     {
         await _cancellationTokenSource.CancelAsync();
-        _dispatcher.Dispatch(new CloseAllAction());
+        _dispatcher.Dispatch(new CloseAllLogsAction());
     }
 
     public async Task CopySelectedAsync(EventCopyFormat? format) => await _clipboardService.CopySelectedEvent(format);
@@ -236,7 +237,7 @@ public sealed class MauiMenuActionService(
         if (!combineLog)
         {
             await _cancellationTokenSource.CancelAsync();
-            _dispatcher.Dispatch(new CloseAllAction());
+            _dispatcher.Dispatch(new CloseAllLogsAction());
         }
 
         if (_cancellationTokenSource.IsCancellationRequested)
