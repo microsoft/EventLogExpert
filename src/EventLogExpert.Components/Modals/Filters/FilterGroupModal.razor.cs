@@ -19,6 +19,8 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
+
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
@@ -59,7 +61,7 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 
             if (groups is null) { return; }
 
-            Dispatcher.Dispatch(new ImportGroupsAction(groups));
+            FilterGroupCommands.ImportGroups(groups);
         }
         catch (Exception ex)
         {
@@ -70,5 +72,5 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
     }
 
     private void CreateGroup() =>
-        Dispatcher.Dispatch(new AddGroupAction(new SavedFilterGroup { IsEditing = true }));
+        FilterGroupCommands.AddGroup(new SavedFilterGroup { IsEditing = true });
 }

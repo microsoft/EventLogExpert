@@ -8,7 +8,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-public sealed class Reducers
+internal sealed class Reducers
 {
     [ReducerMethod]
     public static FilterGroupState ReducerAddGroup(FilterGroupState state, AddGroupAction action) =>
