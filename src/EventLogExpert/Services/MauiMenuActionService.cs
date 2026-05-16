@@ -299,7 +299,7 @@ public sealed class MauiMenuActionService(
 
         if (string.IsNullOrEmpty(groupName)) { return; }
 
-        _dispatcher.Dispatch(new SaveFilterGroupAction(groupName));
+        _filterPaneCommands.SaveFilterGroup(groupName);
     }
 
     public void SetContinuouslyUpdate(bool value) =>

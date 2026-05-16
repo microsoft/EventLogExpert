@@ -6,7 +6,7 @@ using Fluxor;
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed class Reducers
+internal sealed class Reducers
 {
     [ReducerMethod]
     public static FilterPaneState ReduceAddFilter(FilterPaneState state, AddFilterAction action) =>

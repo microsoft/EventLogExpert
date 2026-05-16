@@ -75,6 +75,8 @@ public sealed partial class LogTablePane
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
     [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
@@ -346,7 +348,7 @@ public sealed partial class LogTablePane
 
         if (filter is null) { return; }
 
-        Dispatcher.Dispatch(new SetFilterAction(filter));
+        FilterPaneCommands.SetFilter(filter);
     }
 
     private IReadOnlyList<ResolvedEvent> BuildRange(
@@ -930,11 +932,11 @@ public sealed partial class LogTablePane
             MenuItem.Item("Copy Selected (Full)", () => ClipboardService.CopySelectedEvent(EventCopyFormat.Full)),
             MenuItem.Separator(),
             MenuItem.Item("Exclude Events Before", () =>
-                Dispatcher.Dispatch(new SetFilterDateRangeAction(
-                    new DateFilter { Before = selectedEvent.TimeCreated }))),
+                FilterPaneCommands.SetFilterDateRange(
+                    new DateFilter { Before = selectedEvent.TimeCreated })),
             MenuItem.Item("Exclude Events After", () =>
-                Dispatcher.Dispatch(new SetFilterDateRangeAction(
-                    new DateFilter { After = selectedEvent.TimeCreated }))),
+                FilterPaneCommands.SetFilterDateRange(
+                    new DateFilter { After = selectedEvent.TimeCreated })),
             MenuItem.Separator(),
             MenuItem.SubMenu("Include", ShowEventFieldItems(selectedEvent, false)),
             MenuItem.SubMenu("Exclude", ShowEventFieldItems(selectedEvent, true)),

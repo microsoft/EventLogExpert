@@ -32,6 +32,8 @@ public sealed partial class FilterGroup
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
@@ -68,7 +70,8 @@ public sealed partial class FilterGroup
 
     private async Task ApplyFilters()
     {
-        Dispatcher.Dispatch(new ApplyFilterGroupAction(Group));
+        FilterPaneCommands.ApplyFilterGroup(Group);
+
         await Parent.CloseAsync();
     }
 

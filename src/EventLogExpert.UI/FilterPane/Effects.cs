@@ -12,7 +12,7 @@ using Fluxor;
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed class Effects
+internal sealed class Effects
 {
     private readonly IStateSelection<EventLogState, Filter> _appliedFilter;
     private readonly IStateSelection<EventLogState, (DateTime After, DateTime Before)?> _eventDateRange;
