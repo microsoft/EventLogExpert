@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Runtime;
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed record SetFilterDateRangeAction(DateFilter? DateFilter);
+internal sealed record SetFilterDateRangeAction(DateFilter? DateFilter);

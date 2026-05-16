@@ -7,11 +7,11 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.FilterCache;
+using EventLogExpert.UI.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using GroupActions = EventLogExpert.UI.FilterGroup;
 using IDispatcher = Fluxor.IDispatcher;
-using PaneActions = EventLogExpert.UI.FilterPane;
 
 namespace EventLogExpert.Components.Filters;
 
@@ -64,6 +64,8 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     }
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     private string ErrorMessage { get; set; } = string.Empty;
 
@@ -140,7 +142,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         }
         else
         {
-            Dispatcher.Dispatch(new PaneActions.RemoveFilterAction(id));
+            FilterPaneCommands.RemoveFilter(id);
         }
     }
 
@@ -152,7 +154,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         }
         else
         {
-            Dispatcher.Dispatch(new PaneActions.SetFilterAction(filter));
+            FilterPaneCommands.SetFilter(filter);
         }
     }
 
@@ -160,7 +162,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     {
         if (ParentFilterGroupId is not null) { return; }
 
-        Dispatcher.Dispatch(new PaneActions.ToggleFilterEnabledAction(id));
+        FilterPaneCommands.ToggleFilterEnabled(id);
     }
 
     private void DispatchToggleExclusion(FilterId id)
@@ -171,7 +173,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         }
         else
         {
-            Dispatcher.Dispatch(new PaneActions.ToggleFilterExcludedAction(id));
+            FilterPaneCommands.ToggleFilterExcluded(id);
         }
     }
 
