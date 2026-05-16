@@ -6,8 +6,12 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed class Effects(ILogTablePreferencesProvider preferencesProvider, IState<LogTableState> logTableState)
+public sealed class Effects(
+    ILogTablePreferencesProvider preferencesProvider,
+    IState<LogTableState> logTableState,
+    ILogTableColumnDefaultsProvider columnDefaults)
 {
+    private readonly ILogTableColumnDefaultsProvider _columnDefaults = columnDefaults;
     private readonly IState<LogTableState> _logTableState = logTableState;
     private readonly ILogTablePreferencesProvider _preferencesProvider = preferencesProvider;
 
@@ -46,16 +50,16 @@ public sealed class Effects(ILogTablePreferencesProvider preferencesProvider, IS
 
         foreach (ColumnName column in Enum.GetValues<ColumnName>())
         {
-            columns.Add(column, ColumnDefaults.EnabledColumns.Contains(column));
+            columns.Add(column, _columnDefaults.EnabledColumns.Contains(column));
         }
 
-        _preferencesProvider.EnabledEventTableColumnsPreference = ColumnDefaults.EnabledColumns;
+        _preferencesProvider.EnabledEventTableColumnsPreference = _columnDefaults.EnabledColumns;
         _preferencesProvider.ColumnWidthsPreference = new Dictionary<ColumnName, int>();
         _preferencesProvider.ColumnOrderPreference = [];
 
-        var widths = new Dictionary<ColumnName, int>(ColumnDefaults.Widths);
+        var widths = new Dictionary<ColumnName, int>(_columnDefaults.ColumnWidths);
 
-        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns, widths, ColumnDefaults.Order));
+        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns, widths, _columnDefaults.ColumnOrder));
 
         return Task.CompletedTask;
     }
@@ -99,13 +103,13 @@ public sealed class Effects(ILogTablePreferencesProvider preferencesProvider, IS
 
         if (savedOrder.Count == 0)
         {
-            return ColumnDefaults.Order;
+            return _columnDefaults.ColumnOrder;
         }
 
         // Start with saved order, then append any new columns not in saved order
         var allColumns = Enum.GetValues<ColumnName>().ToHashSet();
         var ordered = savedOrder.Where(allColumns.Contains).ToList();
-        var missing = ColumnDefaults.Order.Where(c => !ordered.Contains(c));
+        var missing = _columnDefaults.ColumnOrder.Where(c => !ordered.Contains(c));
 
         return [.. ordered, .. missing];
     }
@@ -117,7 +121,7 @@ public sealed class Effects(ILogTablePreferencesProvider preferencesProvider, IS
 
         foreach (ColumnName column in Enum.GetValues<ColumnName>())
         {
-            widths[column] = savedWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
+            widths[column] = savedWidths.TryGetValue(column, out int width) ? width : _columnDefaults.GetColumnWidth(column);
         }
 
         return widths;

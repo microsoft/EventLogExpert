@@ -10,6 +10,8 @@ namespace EventLogExpert.UI.Tests.LogTable;
 
 public sealed class EffectsTests
 {
+    private static readonly ColumnDefaults s_columnDefaults = new();
+
     [Fact]
     public async Task HandleLoadColumns_ShouldLoadAllColumnsFromPreferences()
     {
@@ -106,7 +108,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
-            action.ColumnOrder.SequenceEqual(ColumnDefaults.Order)));
+            action.ColumnOrder.SequenceEqual(s_columnDefaults.ColumnOrder)));
     }
 
     [Fact]
@@ -122,7 +124,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
-            action.ColumnWidths[ColumnName.Level] == ColumnDefaults.GetWidth(ColumnName.Level)));
+            action.ColumnWidths[ColumnName.Level] == s_columnDefaults.GetColumnWidth(ColumnName.Level)));
     }
 
     [Fact]
@@ -193,19 +195,19 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).EnabledEventTableColumnsPreference =
-            Arg.Is<IEnumerable<ColumnName>>(c => c.SequenceEqual(ColumnDefaults.EnabledColumns));
+            Arg.Is<IEnumerable<ColumnName>>(c => c.SequenceEqual(s_columnDefaults.EnabledColumns));
         _ = mockPreferencesProvider.Received(1).ColumnWidthsPreference =
             Arg.Is<IDictionary<ColumnName, int>>(w => w.Count == 0);
         _ = mockPreferencesProvider.Received(1).ColumnOrderPreference =
             Arg.Is<IEnumerable<ColumnName>>(o => !o.Any());
 
-        var expectedWidths = ColumnDefaults.Widths.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+        var expectedWidths = s_columnDefaults.ColumnWidths.ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadColumnsCompletedAction>(action =>
             action.ColumnWidths.Count == expectedWidths.Count &&
             action.ColumnWidths.All(kvp =>
                 expectedWidths.ContainsKey(kvp.Key) && expectedWidths[kvp.Key] == kvp.Value) &&
-            action.ColumnOrder.SequenceEqual(ColumnDefaults.Order) &&
+            action.ColumnOrder.SequenceEqual(s_columnDefaults.ColumnOrder) &&
             action.LoadedColumns[ColumnName.Level] == true &&
             action.LoadedColumns[ColumnName.DateAndTime] == true &&
             action.LoadedColumns[ColumnName.Source] == true &&
@@ -393,7 +395,7 @@ public sealed class EffectsTests
         var mockState = Substitute.For<IState<LogTableState>>();
         mockState.Value.Returns(state ?? new LogTableState());
 
-        var effects = new Effects(mockPreferencesProvider, mockState);
+        var effects = new Effects(mockPreferencesProvider, mockState, s_columnDefaults);
         var mockDispatcher = Substitute.For<IDispatcher>();
 
         return (effects, mockDispatcher, mockPreferencesProvider);

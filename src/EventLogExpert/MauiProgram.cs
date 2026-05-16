@@ -6,7 +6,6 @@ using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
-using EventLogExpert.UI;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.AppTitle;
@@ -18,6 +17,7 @@ using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.DependencyInjection;
 using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
@@ -119,6 +119,8 @@ public static class MauiProgram
         builder.Services.AddSingleton<IDatabasePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
 
         // UI Services
+        builder.Services.RegisterUiLibrary();
+
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
         builder.Services.AddSingleton<IAppTitleService, AppTitleService>();

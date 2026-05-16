@@ -22,6 +22,14 @@ public readonly record struct EventFilter
 
     public ImmutableList<SavedFilter> Filters { get; }
 
+    /// <summary>
+    ///     True when either the date filter is active or at least one saved filter is present.
+    ///     Drives short-circuits in <see cref="EventLogExpert.UI.Filter.FilterService" /> and the
+    ///     status-bar's visible/hidden counts.
+    /// </summary>
+    public bool IsFilteringEnabled =>
+        DateFilter?.IsEnabled is true || Filters.IsEmpty is false;
+
     /// <summary>Construction-time snapshot used by <see cref="EventFilterExtensions.HasFilteringChangedFrom" />.</summary>
     public ImmutableArray<FilterSnapshot> Snapshots { get; }
 

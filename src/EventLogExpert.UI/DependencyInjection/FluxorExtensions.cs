@@ -3,7 +3,7 @@
 
 using Fluxor.DependencyInjection;
 
-namespace EventLogExpert.UI;
+namespace EventLogExpert.UI.DependencyInjection;
 
 /// <summary>
 ///     Fluxor configuration helpers that own the EventLogExpert.UI assembly identity. The host project calls

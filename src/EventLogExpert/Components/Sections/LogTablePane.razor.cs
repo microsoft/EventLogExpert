@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering;
 using EventLogExpert.UI.Common.Clipboard;
@@ -71,13 +71,19 @@ public sealed partial class LogTablePane
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
+    [Inject] private ILogTableColumnDefaultsProvider ColumnDefaults { get; init; } = null!;
+
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
+    [Inject] private IHighlightFilterSelector HighlightFilterSelector { get; init; } = null!;
+
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private ILogTableCommands LogTableCommands { get; init; } = null!;
 
     [Inject] private IState<LogTableState> LogTableState { get; init; } = null!;
 
@@ -195,7 +201,7 @@ public sealed partial class LogTablePane
         _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         var initialPaneState = FilterPaneState.Value;
         _filters = initialPaneState.Filters;
-        _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(initialPaneState);
+        _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(initialPaneState.Filters);
         _filtersHighlightKey = HighlightFilterSelector.ComputeHighlightKey(initialPaneState.Filters);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
@@ -257,7 +263,7 @@ public sealed partial class LogTablePane
             if (newHighlightKey != _filtersHighlightKey)
             {
                 _filtersHighlightKey = newHighlightKey;
-                _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentPaneState);
+                _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentFilters);
                 _highlightCache.Clear();
                 WarnOnUnknownFilterColors(_filters);
             }
@@ -454,7 +460,7 @@ public sealed partial class LogTablePane
     }
 
     private int GetColumnWidth(ColumnName column) =>
-        _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetWidth(column);
+        _logTableState.ColumnWidths.TryGetValue(column, out int width) ? width : ColumnDefaults.GetColumnWidth(column);
 
     private string GetCss(ResolvedEvent @event) =>
         _selectedSet.Contains(@event) ? "table-row selected" : "table-row";
@@ -497,9 +503,9 @@ public sealed partial class LogTablePane
 
         if (_logTableState.ColumnOrder.IsEmpty)
         {
-            // Use ColumnDefaults.Order for a deterministic fallback rather than
+            // Use ColumnDefaults.ColumnOrder for a deterministic fallback rather than
             // HashSet iteration order, which is not guaranteed.
-            return ColumnDefaults.Order.Where(enabledSet.Contains).ToArray();
+            return ColumnDefaults.ColumnOrder.Where(enabledSet.Contains).ToArray();
         }
 
         return _logTableState.ColumnOrder
@@ -911,7 +917,7 @@ public sealed partial class LogTablePane
         items.Add(MenuItem.Separator());
         items.Add(MenuItem.Item(
             "Reset Column Defaults",
-            () => Dispatcher.Dispatch(new ResetColumnDefaultsAction())));
+            () => LogTableCommands.ResetColumnDefaults()));
 
         return items;
     }
@@ -954,7 +960,7 @@ public sealed partial class LogTablePane
         return items;
     }
 
-    private void ToggleSorting() => Dispatcher.Dispatch(new ToggleSortingAction());
+    private void ToggleSorting() => LogTableCommands.ToggleSortDirection();
 
     private async Task<int> TryRefreshPageSize()
     {

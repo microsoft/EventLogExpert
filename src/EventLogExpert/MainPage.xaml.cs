@@ -36,6 +36,8 @@ public sealed partial class MainPage : ContentPage, IDisposable
 
     public MainPage(
         IDispatcher fluxorDispatcher,
+        ILogTableCommands logTableCommands,
+        IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
         ISettingsService settings,
         IAppTitleService appTitleService,
@@ -55,9 +57,9 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _activeLogs.SelectedValueChanged += OnActiveLogsChanged;
         _settings.ThemeChanged += OnThemeChanged;
 
-        fluxorDispatcher.Dispatch(new LoadColumnsAction());
+        logTableCommands.LoadColumns();
         fluxorDispatcher.Dispatch(new LoadFiltersAction());
-        fluxorDispatcher.Dispatch(new LoadGroupsAction());
+        filterGroupCommands.LoadGroups();
 
         _ = ProcessCommandLine();
     }

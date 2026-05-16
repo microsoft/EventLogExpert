@@ -14,6 +14,8 @@ namespace EventLogExpert.UI.Tests.LogTable;
 
 public sealed class LogTableStoreTests
 {
+    private static readonly ColumnDefaults s_columnDefaults = new();
+
     [Fact]
     public void EventTableAction_AddTable_ShouldStoreLogData()
     {
@@ -56,7 +58,7 @@ public sealed class LogTableStoreTests
             { ColumnName.DateAndTime, 160 }
         };
 
-        var order = ColumnDefaults.Order;
+        var order = s_columnDefaults.ColumnOrder;
 
         // Act
         var action = new LoadColumnsCompletedAction(columns, widths, order);
@@ -179,7 +181,7 @@ public sealed class LogTableStoreTests
 
         state = Reducers.ReduceLoadColumnsCompleted(
             state,
-            new LoadColumnsCompletedAction(columns, new Dictionary<ColumnName, int>(), ColumnDefaults.Order));
+            new LoadColumnsCompletedAction(columns, new Dictionary<ColumnName, int>(), s_columnDefaults.ColumnOrder));
 
         // Assert
         Assert.Equal(3, state.Columns.Count);
