@@ -7,12 +7,12 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterLoading;
+using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
 using EventLogExpert.UI.Tests.TestUtils;
@@ -86,7 +86,7 @@ public sealed class EffectsTests
             CreateEffectsWithServices(true, activeLogs);
 
         // Mock the filter to drop everything (simulate "no events match the active filter").
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(new List<ResolvedEvent>());
 
         var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
@@ -171,7 +171,7 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockXmlResolver = Substitute.For<IEventXmlResolver>();
@@ -261,7 +261,7 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockXmlResolver = Substitute.For<IEventXmlResolver>();
@@ -363,7 +363,7 @@ public sealed class EffectsTests
         await effects.HandleLoadEvents(action, mockDispatcher);
 
         // Assert
-        mockFilterService.Received(1).GetFilteredEvents(events, Arg.Any<EventFilter>());
+        mockFilterService.Received(1).GetFilteredEvents(events, Arg.Any<Filter>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateTableAction>());
     }
 
@@ -414,7 +414,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, mockFilterService) =
             CreateEffectsWithServices(activeLogs: activeLogs, newEventBuffer: bufferedEvents);
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(new List<ResolvedEvent>());
 
         // Act
@@ -519,7 +519,7 @@ public sealed class EffectsTests
         var initialState = new EventLogState
         {
             ActiveLogs = initialActiveLogs,
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         };
         mockEventLogState.Value.Returns(initialState);
 
@@ -558,7 +558,7 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         // Act 3 — release classification; HandleOpenLog should detect the missing log and bail.
@@ -713,7 +713,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
         var filter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [filter]));
+        var action = new SetFiltersAction(new Filter(null, [filter]));
 
         await effects.HandleSetFilters(action, mockDispatcher);
 
@@ -735,11 +735,11 @@ public sealed class EffectsTests
             CreateEffectsWithServices(activeLogs: activeLogs);
 
         mockFilterService
-            .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>()))
+            .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>()))
             .Do(_ => throw new InvalidOperationException("boom"));
 
         var filter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [filter]));
+        var action = new SetFiltersAction(new Filter(null, [filter]));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => effects.HandleSetFilters(action, mockDispatcher));
@@ -763,7 +763,7 @@ public sealed class EffectsTests
             ContinuouslyUpdate = false,
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             NewEventBuffer = [],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         };
 
         var postCloseState = snapshotState with
@@ -780,7 +780,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(_ =>
             {
                 volatileState = postCloseState;
@@ -788,7 +788,7 @@ public sealed class EffectsTests
             });
 
         var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
+        var action = new SetFiltersAction(new Filter(null, [nonXmlFilter]));
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
@@ -812,7 +812,7 @@ public sealed class EffectsTests
             ContinuouslyUpdate = false,
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             NewEventBuffer = [],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         };
 
         var liveTailEvents = new List<ResolvedEvent>
@@ -842,7 +842,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(
                 _ =>
                 {
@@ -852,7 +852,7 @@ public sealed class EffectsTests
                 _ => pass2Result);
 
         var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
+        var action = new SetFiltersAction(new Filter(null, [nonXmlFilter]));
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
@@ -862,11 +862,11 @@ public sealed class EffectsTests
         // pass-1 snapshot). Dispatch contains the re-filtered slice, not the stale pass-1 result.
         mockFilterService.Received(2).FilterActiveLogs(
             Arg.Any<IEnumerable<EventLogData>>(),
-            Arg.Any<EventFilter>());
+            Arg.Any<Filter>());
 
         mockFilterService.Received(1).FilterActiveLogs(
             Arg.Is<IEnumerable<EventLogData>>(logs => logs.Any(l => ReferenceEquals(l.Events, liveTailEvents))),
-            Arg.Any<EventFilter>());
+            Arg.Any<Filter>());
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
             a => a.ActiveLogs.ContainsKey(snapshotData.Id)
@@ -887,7 +887,7 @@ public sealed class EffectsTests
             ContinuouslyUpdate = false,
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
             NewEventBuffer = [],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         };
 
         var pass1MutationEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
@@ -925,7 +925,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(
                 _ =>
                 {
@@ -939,7 +939,7 @@ public sealed class EffectsTests
                 });
 
         var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [nonXmlFilter]));
+        var action = new SetFiltersAction(new Filter(null, [nonXmlFilter]));
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
@@ -947,7 +947,7 @@ public sealed class EffectsTests
         // Assert — both filter passes ran; dispatch omits the still-stale log id.
         mockFilterService.Received(2).FilterActiveLogs(
             Arg.Any<IEnumerable<EventLogData>>(),
-            Arg.Any<EventFilter>());
+            Arg.Any<Filter>());
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
             a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
@@ -978,14 +978,14 @@ public sealed class EffectsTests
         var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
         var freshFilterModel = FilterUtils.CreateTestFilter(isEnabled: true);
 
-        var staleFilter = new EventFilter(null, [staleFilterModel]);
-        var freshFilter = new EventFilter(null, [freshFilterModel]);
+        var staleFilter = new Filter(null, [staleFilterModel]);
+        var freshFilter = new Filter(null, [freshFilterModel]);
 
         mockFilterService
-            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(callInfo =>
             {
-                var filter = callInfo.Arg<EventFilter>();
+                var filter = callInfo.Arg<Filter>();
 
                 if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == Constants.FilterIdEquals999)
                 {
@@ -1030,11 +1030,11 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
-        var action = new SetFiltersAction(new EventFilter(null, [xmlFilter]));
+        var action = new SetFiltersAction(new Filter(null, [xmlFilter]));
 
         await effects.HandleSetFilters(action, mockDispatcher);
 
-        Assert.True(action.EventFilter.RequiresXml);
+        Assert.True(action.Filter.RequiresXml);
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
     }
 
@@ -1053,8 +1053,8 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, mockFilterService) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var eventFilter = new EventFilter(null, []);
-        var action = new SetFiltersAction(eventFilter);
+        var Filter = new Filter(null, []);
+        var action = new SetFiltersAction(Filter);
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
@@ -1062,7 +1062,7 @@ public sealed class EffectsTests
         // Assert
         mockFilterService.Received(1).FilterActiveLogs(
             Arg.Any<IEnumerable<EventLogData>>(),
-            eventFilter);
+            Filter);
 
         mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
     }
@@ -1078,14 +1078,14 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
         var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
-        var eventFilter = new EventFilter(null, [nonXmlFilter]);
-        var action = new SetFiltersAction(eventFilter);
+        var Filter = new Filter(null, [nonXmlFilter]);
+        var action = new SetFiltersAction(Filter);
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
 
         // Assert — UpdateDisplayedEvents path; no Close/Open dispatches.
-        Assert.False(eventFilter.RequiresXml);
+        Assert.False(Filter.RequiresXml);
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<CloseLogAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
@@ -1120,10 +1120,10 @@ public sealed class EffectsTests
             });
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
-        var eventFilter = new EventFilter(null, [xmlFilter]);
+        var Filter = new Filter(null, [xmlFilter]);
 
         // Act — start HandleSetFilters; it must remain pending until watcherCompletion fires.
-        var setFiltersTask = effects.HandleSetFilters(new SetFiltersAction(eventFilter), mockDispatcher);
+        var setFiltersTask = effects.HandleSetFilters(new SetFiltersAction(Filter), mockDispatcher);
 
         // Assert — task is blocked because HandleCloseLog can't finish until RemoveLogAsync
         // returns. Without the close-completion await in HandleSetFilters, the task would
@@ -1160,12 +1160,12 @@ public sealed class EffectsTests
         {
             ActiveLogs = activeLogs,
             SelectedEvents = [selectedEvent],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -1204,10 +1204,10 @@ public sealed class EffectsTests
             });
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
-        var eventFilter = new EventFilter(null, [xmlFilter]);
+        var Filter = new Filter(null, [xmlFilter]);
 
         // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
-        await effects.HandleSetFilters(new SetFiltersAction(eventFilter), mockDispatcher);
+        await effects.HandleSetFilters(new SetFiltersAction(Filter), mockDispatcher);
 
         // Act 2: Simulate the subsequent LoadEvents that the new OpenLog produces. The
         // reloaded events include the previously-selected RecordId=42 plus an unrelated one.
@@ -1247,14 +1247,14 @@ public sealed class EffectsTests
             });
 
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
-        var eventFilter = new EventFilter(null, [xmlFilter]);
-        var action = new SetFiltersAction(eventFilter);
+        var Filter = new Filter(null, [xmlFilter]);
+        var action = new SetFiltersAction(Filter);
 
         // Act
         await effects.HandleSetFilters(action, mockDispatcher);
 
         // Assert
-        Assert.True(eventFilter.RequiresXml);
+        Assert.True(Filter.RequiresXml);
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a =>
             a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
@@ -1305,15 +1305,15 @@ public sealed class EffectsTests
             ContinuouslyUpdate = continuouslyUpdate,
             ActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty,
             NewEventBuffer = newEventBuffer ?? [],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
@@ -1375,7 +1375,7 @@ public sealed class EffectsTests
         mockEventLogState.Value.Returns(new EventLogState
         {
             ActiveLogs = activeLogs,
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
@@ -1423,10 +1423,10 @@ public sealed class EffectsTests
 
         var mockFilterService = Substitute.For<IFilterService>();
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();
@@ -1476,15 +1476,15 @@ public sealed class EffectsTests
             ContinuouslyUpdate = continuouslyUpdate,
             ActiveLogs = activeLogs ?? ImmutableDictionary<string, EventLogData>.Empty,
             NewEventBuffer = newEventBuffer ?? [],
-            AppliedFilter = new EventFilter(null, [])
+            AppliedFilter = new Filter(null, [])
         });
 
         var mockFilterService = Substitute.For<IFilterService>();
 
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<EventFilter>())
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
             .Returns(new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>());
 
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<EventFilter>())
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
 
         var mockLogger = Substitute.For<ITraceLogger>();

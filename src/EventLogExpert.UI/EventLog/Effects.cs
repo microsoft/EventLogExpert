@@ -9,7 +9,7 @@ using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
@@ -357,7 +357,7 @@ public sealed class Effects(
     [EffectMethod]
     public async Task HandleSetFilters(SetFiltersAction action, IDispatcher dispatcher)
     {
-        bool newRequiresXml = action.EventFilter.RequiresXml;
+        bool newRequiresXml = action.Filter.RequiresXml;
 
         // Identify open logs that lack pre-rendered XML. Disabling/removing an XML filter is a
         // no-op: XML already in memory is harmless. Re-enabling against logs that were
@@ -476,7 +476,7 @@ public sealed class Effects(
         try
         {
             var filteredActiveLogs = await Task.Run(
-                () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.EventFilter));
+                () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.Filter));
 
             if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
 
@@ -509,7 +509,7 @@ public sealed class Effects(
             if (staleLogs.Count > 0)
             {
                 var refiltered = await Task.Run(
-                    () => _filterService.FilterActiveLogs(staleLogs, action.EventFilter));
+                    () => _filterService.FilterActiveLogs(staleLogs, action.Filter));
 
                 if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
 

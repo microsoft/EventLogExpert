@@ -4,11 +4,11 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class ResolvedEventExtensionsTests
 {

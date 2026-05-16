@@ -5,7 +5,7 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class FilterDraftModeTests
 {

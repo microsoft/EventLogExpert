@@ -6,7 +6,7 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Text.Json;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class FilterModelTests
 {

@@ -10,7 +10,7 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;

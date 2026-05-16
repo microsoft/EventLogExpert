@@ -3,21 +3,21 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
-public sealed class EventFilterExtensionsTests
+public sealed class FilterExtensionsTests
 {
     [Fact]
     public void HasFilteringChanged_WhenBothEmpty_ShouldReportNoChange()
     {
         // Arrange
-        var original = new EventFilter(null, []);
-        var updated = new EventFilter(null, []);
+        var original = new Filter(null, []);
+        var updated = new Filter(null, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -33,8 +33,8 @@ public sealed class EventFilterExtensionsTests
         var first = FilterUtils.CreateTestFilter();
         var second = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
 
-        var original = new EventFilter(null, ImmutableList.Create(first));
-        var updated = new EventFilter(null, ImmutableList.Create(second));
+        var original = new Filter(null, ImmutableList.Create(first));
+        var updated = new Filter(null, ImmutableList.Create(second));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -47,8 +47,8 @@ public sealed class EventFilterExtensionsTests
     public void HasFilteringChanged_WhenComparisonValueDiffers_ShouldReportChange()
     {
         // Arrange
-        var original = new EventFilter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
-        var updated = new EventFilter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
+        var original = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+        var updated = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -61,9 +61,9 @@ public sealed class EventFilterExtensionsTests
     public void HasFilteringChanged_WhenDateFilterAdded_ShouldReportChange()
     {
         // Arrange
-        var original = new EventFilter(null, []);
+        var original = new Filter(null, []);
         var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
-        var updated = new EventFilter(dateFilter, []);
+        var updated = new Filter(dateFilter, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -78,8 +78,8 @@ public sealed class EventFilterExtensionsTests
         // Arrange
         var dateFilter1 = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
         var dateFilter2 = new DateFilter { After = DateTime.Now.AddDays(-2), Before = DateTime.Now };
-        var original = new EventFilter(dateFilter1, []);
-        var updated = new EventFilter(dateFilter2, []);
+        var original = new Filter(dateFilter1, []);
+        var updated = new Filter(dateFilter2, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -93,8 +93,8 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
-        var original = new EventFilter(dateFilter, []);
-        var updated = new EventFilter(null, []);
+        var original = new Filter(dateFilter, []);
+        var updated = new Filter(null, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -107,11 +107,11 @@ public sealed class EventFilterExtensionsTests
     public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReportNoChange()
     {
         // Arrange
-        var original = new EventFilter(
+        var original = new Filter(
             null,
             ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
 
-        var updated = new EventFilter(
+        var updated = new Filter(
             null,
             ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
 
@@ -126,9 +126,9 @@ public sealed class EventFilterExtensionsTests
     public void HasFilteringChanged_WhenFiltersAdded_ShouldReportChange()
     {
         // Arrange
-        var original = new EventFilter(null, []);
+        var original = new Filter(null, []);
         var filter = CreateFilter(Constants.FilterIdEquals100);
-        var updated = new EventFilter(null, [filter]);
+        var updated = new Filter(null, [filter]);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -142,8 +142,8 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var filter = CreateFilter(Constants.FilterIdEquals100);
-        var original = new EventFilter(null, [filter]);
-        var updated = new EventFilter(null, []);
+        var original = new Filter(null, [filter]);
+        var updated = new Filter(null, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -156,11 +156,11 @@ public sealed class EventFilterExtensionsTests
     public void HasFilteringChanged_WhenIsExcludedDiffers_ShouldReportChange()
     {
         // Arrange
-        var original = new EventFilter(
+        var original = new Filter(
             null,
             ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
 
-        var updated = new EventFilter(
+        var updated = new Filter(
             null,
             ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, true)));
 
@@ -178,8 +178,8 @@ public sealed class EventFilterExtensionsTests
         var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Red);
         var blueFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue);
 
-        var original = new EventFilter(null, ImmutableList.Create(redFilter));
-        var updated = new EventFilter(null, ImmutableList.Create(blueFilter));
+        var original = new Filter(null, ImmutableList.Create(redFilter));
+        var updated = new Filter(null, ImmutableList.Create(blueFilter));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -195,8 +195,8 @@ public sealed class EventFilterExtensionsTests
         var bounds = (After: DateTime.Now.AddDays(-1), Before: DateTime.Now);
         var enabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = true };
         var disabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = false };
-        var original = new EventFilter(enabled, []);
-        var updated = new EventFilter(disabled, []);
+        var original = new Filter(enabled, []);
+        var updated = new Filter(disabled, []);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -210,8 +210,8 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var filters = ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100));
-        var original = new EventFilter(null, filters);
-        var updated = new EventFilter(null, filters);
+        var original = new Filter(null, filters);
+        var updated = new Filter(null, filters);
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -226,10 +226,10 @@ public sealed class EventFilterExtensionsTests
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
         var filter = CreateFilter(Constants.FilterIdEquals100);
-        var eventFilter = new EventFilter(dateFilter, [filter]);
+        var Filter = new Filter(dateFilter, [filter]);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -240,10 +240,10 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var Filter = new Filter(dateFilter, []);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.False(result);
@@ -255,10 +255,10 @@ public sealed class EventFilterExtensionsTests
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
         var filter = CreateFilter(Constants.FilterIdEquals100);
-        var eventFilter = new EventFilter(dateFilter, [filter]);
+        var Filter = new Filter(dateFilter, [filter]);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -269,10 +269,10 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var Filter = new Filter(dateFilter, []);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -283,10 +283,10 @@ public sealed class EventFilterExtensionsTests
     {
         // Arrange
         var filter = CreateFilter(Constants.FilterIdEquals100);
-        var eventFilter = new EventFilter(null, [filter]);
+        var Filter = new Filter(null, [filter]);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -296,10 +296,10 @@ public sealed class EventFilterExtensionsTests
     public void IsFilteringEnabled_WhenNoDateFilterAndNoFilters_ShouldBeDisabled()
     {
         // Arrange
-        var eventFilter = new EventFilter(null, []);
+        var Filter = new Filter(null, []);
 
         // Act
-        var result = eventFilter.IsFilteringEnabled;
+        var result = Filter.IsFilteringEnabled;
 
         // Assert
         Assert.False(result);

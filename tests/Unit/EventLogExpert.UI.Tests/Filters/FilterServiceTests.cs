@@ -5,12 +5,12 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class FilterServiceTests
 {
@@ -36,10 +36,10 @@ public sealed class FilterServiceTests
         Assert.Equal(original.Id, duplicate.Id);
 
         var logData = new List<EventLogData> { original, duplicate };
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act + Assert — Dictionary.Add throws on the duplicate key.
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, eventFilter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
     }
 
     [Fact]
@@ -51,7 +51,7 @@ public sealed class FilterServiceTests
         var baseTime = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
         var cutoff = baseTime.AddMinutes(3_000);
         var dateFilter = new DateFilter { After = cutoff, Before = baseTime.AddMinutes(20_000), IsEnabled = true };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         var log1Events = Enumerable.Range(0, 6_000)
             .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
@@ -68,7 +68,7 @@ public sealed class FilterServiceTests
         var logData = new List<EventLogData> { original, duplicate };
 
         // Act + Assert
-        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, eventFilter));
+        Assert.Throws<ArgumentException>(() => filterService.FilterActiveLogs(logData, filter));
     }
 
     [Fact]
@@ -76,10 +76,10 @@ public sealed class FilterServiceTests
     {
         // Arrange
         var filterService = CreateFilterService();
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs([], eventFilter);
+        var result = filterService.FilterActiveLogs([], filter);
 
         // Assert
         Assert.Empty(result);
@@ -95,7 +95,7 @@ public sealed class FilterServiceTests
         var cutoff = baseTime.AddMinutes(3_000);
 
         var dateFilter = new DateFilter { After = cutoff, Before = baseTime.AddMinutes(20_000), IsEnabled = true };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         var log1Events = Enumerable.Range(0, 6_000)
             .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
@@ -115,7 +115,7 @@ public sealed class FilterServiceTests
         var expectedLog2 = log2Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -149,10 +149,10 @@ public sealed class FilterServiceTests
             new("Log2", LogPathType.Channel, log2Events)
         };
 
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -174,10 +174,10 @@ public sealed class FilterServiceTests
             new("Log2", LogPathType.Channel, log2Events)
         };
 
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         Assert.Equal(log1Events.Count, result[logData[0].Id].Count);
@@ -201,10 +201,10 @@ public sealed class FilterServiceTests
             new("TestLog", LogPathType.Channel, events)
         };
 
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.FilterActiveLogs(logData, eventFilter);
+        var result = filterService.FilterActiveLogs(logData, filter);
 
         // Assert
         var logId = logData[0].Id;
@@ -232,10 +232,10 @@ public sealed class FilterServiceTests
 
         var cutoff = baseTime.AddMinutes(eventCount / 2);
         var dateFilter = new DateFilter { After = cutoff, Before = baseTime.AddMinutes(eventCount), IsEnabled = true };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         // Act
-        var result = filterService.GetFilteredEvents(events, eventFilter);
+        var result = filterService.GetFilteredEvents(events, filter);
 
         // Assert — should return only events at or after the cutoff
         var expectedCount = events.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(eventCount));
@@ -252,7 +252,7 @@ public sealed class FilterServiceTests
         var cutoff = baseTime.AddMinutes(50);
 
         var dateFilter = new DateFilter { After = cutoff, Before = baseTime.AddMinutes(200), IsEnabled = true };
-        var eventFilter = new EventFilter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         // Small collection (sequential path)
         var smallEvents = Enumerable.Range(0, 100)
@@ -265,8 +265,8 @@ public sealed class FilterServiceTests
             .ToList();
 
         // Act
-        var smallResult = filterService.GetFilteredEvents(smallEvents, eventFilter);
-        var largeResult = filterService.GetFilteredEvents(largeEvents, eventFilter);
+        var smallResult = filterService.GetFilteredEvents(smallEvents, filter);
+        var largeResult = filterService.GetFilteredEvents(largeEvents, filter);
 
         // Assert — small result should match the first 100 events' filtered subset
         var expectedSmallCount = smallEvents.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(200));
@@ -290,10 +290,10 @@ public sealed class FilterServiceTests
             EventUtils.CreateTestEvent(300)
         };
 
-        var eventFilter = new EventFilter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = filterService.GetFilteredEvents(events, eventFilter);
+        var result = filterService.GetFilteredEvents(events, filter);
 
         // Assert
         Assert.Equal(3, result.Count);

@@ -8,9 +8,9 @@ namespace EventLogExpert.Filtering.Runtime;
 
 public readonly record struct FilterSnapshot(string Value, bool IsExcluded);
 
-public readonly record struct EventFilter
+public readonly record struct Filter
 {
-    public EventFilter(DateFilter? dateFilter, ImmutableList<SavedFilter> filters)
+    public Filter(DateFilter? dateFilter, ImmutableList<SavedFilter> filters)
     {
         DateFilter = dateFilter;
         Filters = filters;

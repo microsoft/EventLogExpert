@@ -5,7 +5,7 @@ using EventLogExpert.Filtering.Persistence;
 using System.Reflection;
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.UI.Filters;
 
 public static class HighlightColorExtensions
 {
