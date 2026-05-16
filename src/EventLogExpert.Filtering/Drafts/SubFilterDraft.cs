@@ -2,8 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Persistence;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Drafts;
 
 public sealed class SubFilterDraft
 {

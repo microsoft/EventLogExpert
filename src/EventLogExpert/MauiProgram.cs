@@ -30,6 +30,7 @@ using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
 using EventLogExpert.UI.Update.Deployment;
 using Fluxor;
+using Effects = EventLogExpert.UI.EventLog.Effects;
 
 namespace EventLogExpert;
 
@@ -67,7 +68,7 @@ public static class MauiProgram
         // (SettingsModal) get the single per-app instance with its dictionaries of in-flight loads
         // and close completions.
         builder.Services.AddSingleton<ILogReloadCoordinator>(sp =>
-            sp.GetRequiredService<UI.EventLog.Effects>());
+            sp.GetRequiredService<Effects>());
 
         // Core Services
         builder.Services.AddSingleton<DebugLogService>();

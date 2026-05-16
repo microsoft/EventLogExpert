@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Persistence;
 
 public readonly record struct FilterId(Guid Value)
 {

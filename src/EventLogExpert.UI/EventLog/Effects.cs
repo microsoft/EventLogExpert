@@ -36,12 +36,6 @@ public sealed class Effects(
     IBannerService bannerService,
     IDispatcher dispatcher) : ILogReloadCoordinator
 {
-    /// <summary>
-    ///     Defensive timeout when awaiting a log close — both for the load task to unwind (so the LoadLogAsync service
-    ///     scope disposes and releases its event resolver) and for the watcher callbacks to drain (so per-event resolver
-    ///     scopes finish releasing their pooled SQLite handles). 30 seconds is generous; in practice each completes in
-    ///     milliseconds once cancellation is propagated.
-    /// </summary>
     public static readonly TimeSpan LogCloseTimeout = TimeSpan.FromSeconds(30);
 
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
@@ -54,37 +48,12 @@ public sealed class Effects(
     private readonly IFilterService _filterService = filterService;
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logCloseCompletions = new();
-    /// <summary>
-    ///     Serializes <see cref="HandleSetFilters" />'s XML-reload path with
-    ///     <see cref="PrepareForDatabaseRemovalAsync" />. Both write into <see cref="_logCloseCompletions" /> with raw
-    ///     assignment; concurrent overlap on the same log id would orphan the first caller's TCS (HandleCloseLog signals
-    ///     whichever is currently in the dict, the orphaned awaiter then hits the 30s timeout). The lock ensures only one
-    ///     coordinator pre-registers, dispatches, and awaits at a time. <see cref="HandleCloseLog" /> does NOT take this lock
-    ///     — it only signals/removes existing entries and would deadlock against a coordinator holding the lock and awaiting
-    ///     it.
-    /// </summary>
     private readonly SemaphoreSlim _logCloseCoordinatorLock = new(1, 1);
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
     private readonly ITraceLogger _logger = logger;
-    /// <summary>
-    ///     Tracks per-log load completion so <see cref="HandleCloseLog" /> can wait for the in-flight
-    ///     <see cref="LoadLogAsync" /> service scope to dispose before draining the watcher. Without this, cts.Cancel() merely
-    ///     requests cancellation — LoadLogAsync's service scope (which owns the IEventResolver and its SQLite handles) only
-    ///     disposes once HandleOpenLog's outer using/finally runs.
-    /// </summary>
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
-    /// <summary>
-    ///     Tracks which currently-open logs (by <see cref="EventLogData.Id" />) were loaded with renderXml=true. A
-    ///     reload-on-transition only re-opens logs that lack XML; logs that already have it are left alone. Removing or
-    ///     disabling an XML filter never triggers a reload because the XML data is already in memory and harmless to keep.
-    /// </summary>
     private readonly ConcurrentDictionary<EventLogId, byte> _logsLoadedWithXml = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
-    /// <summary>
-    ///     Pending selection restore per log name, populated when a filter transition forces a reload. Consumed by
-    ///     <see cref="HandleLoadEvents" /> when the reloaded log finishes loading. Carries both the selected record-ids and
-    ///     the focused record-id (if any), so reload preserves the focused row in addition to the selection.
-    /// </summary>
     private readonly ConcurrentDictionary<string, PendingSelectionRestore> _pendingSelectionRestore = new();
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;

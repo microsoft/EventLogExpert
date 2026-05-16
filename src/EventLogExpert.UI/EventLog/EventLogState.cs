@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Runtime;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -16,7 +16,7 @@ public sealed record EventLogState
     public static int MaxNewEvents => 1000;
 
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
-        ImmutableDictionary<string, EventLogData>.Empty;
+        [];
 
     public EventFilter AppliedFilter { get; init; } = new(null, []);
 

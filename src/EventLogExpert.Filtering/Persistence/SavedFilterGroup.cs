@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Persistence;
 
 public sealed record SavedFilterGroup
 {

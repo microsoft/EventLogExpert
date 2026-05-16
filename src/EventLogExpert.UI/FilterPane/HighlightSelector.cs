@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
@@ -49,6 +49,6 @@ internal sealed class HighlightSelector : IHighlightSelector
             selected.Add(filter);
         }
 
-        return selected.Count == 0 ? [] : selected.ToArray();
+        return selected.Count == 0 ? [] : [.. selected];
     }
 }

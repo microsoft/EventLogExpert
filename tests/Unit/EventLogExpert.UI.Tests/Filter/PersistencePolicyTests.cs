@@ -1,7 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Text.Json;
@@ -9,7 +11,7 @@ using System.Text.RegularExpressions;
 
 namespace EventLogExpert.UI.Tests.Filter;
 
-public sealed class PersistencePolicyTests
+public sealed partial class PersistencePolicyTests
 {
     [Fact]
     public void BasicFilter_Write_PinsNestedComparisonAndSubFiltersKeys()
@@ -43,7 +45,7 @@ public sealed class PersistencePolicyTests
         Assert.Equal("Cached", nameof(FilterMode.Cached));
 
         var declared = Enum.GetNames<FilterMode>().ToHashSet();
-        Assert.Equal(new HashSet<string> { "Basic", "Advanced", "Cached" }, declared);
+        Assert.Equal(["Basic", "Advanced", "Cached"], declared);
     }
 
     [Fact]
@@ -263,7 +265,7 @@ public sealed class PersistencePolicyTests
 
         // Act + Assert
         Assert.Matches(
-            new Regex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;"""),
+            MyRegex(),
             source);
 
         Assert.Contains("Preferences.Default.Get(SavedFilters, \"[]\")", source);
@@ -281,8 +283,11 @@ public sealed class PersistencePolicyTests
 
         Assert.NotNull(directory);
 
-        string combined = Path.Combine(new[] { directory.FullName }.Concat(segments).ToArray());
+        string combined = Path.Combine([directory.FullName, .. segments]);
         Assert.True(File.Exists(combined), $"Expected source file at {combined} to exist.");
         return combined;
     }
+
+    [GeneratedRegex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;""")]
+    private static partial Regex MyRegex();
 }

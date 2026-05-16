@@ -10,6 +10,19 @@ namespace EventLogExpert.UI.Tests.FilterCache;
 public sealed class FilterCacheStoreTests
 {
     [Fact]
+    public void FilterCacheAction_AddFavoriteFilter_ShouldStoreFilter()
+    {
+        // Arrange
+        var filter = Constants.FilterIdEquals100;
+
+        // Act
+        var action = new AddFavoriteFilterAction(filter);
+
+        // Assert
+        Assert.Equal(filter, action.Filter);
+    }
+
+    [Fact]
     public void FilterCacheAction_AddFavoriteFilterCompleted_ShouldStoreFilters()
     {
         // Arrange
@@ -25,13 +38,13 @@ public sealed class FilterCacheStoreTests
     }
 
     [Fact]
-    public void FilterCacheAction_AddFavoriteFilter_ShouldStoreFilter()
+    public void FilterCacheAction_AddRecentFilter_ShouldStoreFilter()
     {
         // Arrange
-        var filter = Constants.FilterIdEquals100;
+        var filter = Constants.FilterLevelEqualsError;
 
         // Act
-        var action = new AddFavoriteFilterAction(filter);
+        var action = new AddRecentFilterAction(filter);
 
         // Assert
         Assert.Equal(filter, action.Filter);
@@ -48,19 +61,6 @@ public sealed class FilterCacheStoreTests
 
         // Assert
         Assert.Equal(2, action.Filters.Count());
-    }
-
-    [Fact]
-    public void FilterCacheAction_AddRecentFilter_ShouldStoreFilter()
-    {
-        // Arrange
-        var filter = Constants.FilterLevelEqualsError;
-
-        // Act
-        var action = new AddRecentFilterAction(filter);
-
-        // Assert
-        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]
@@ -92,6 +92,19 @@ public sealed class FilterCacheStoreTests
     }
 
     [Fact]
+    public void FilterCacheAction_RemoveFavoriteFilter_ShouldStoreFilter()
+    {
+        // Arrange
+        var filter = Constants.FilterIdEquals100;
+
+        // Act
+        var action = new RemoveFavoriteFilterAction(filter);
+
+        // Assert
+        Assert.Equal(filter, action.Filter);
+    }
+
+    [Fact]
     public void FilterCacheAction_RemoveFavoriteFilterCompleted_ShouldStoreBothFilters()
     {
         // Arrange
@@ -104,19 +117,6 @@ public sealed class FilterCacheStoreTests
         // Assert
         Assert.Single(action.FavoriteFilters);
         Assert.Single(action.RecentFilters);
-    }
-
-    [Fact]
-    public void FilterCacheAction_RemoveFavoriteFilter_ShouldStoreFilter()
-    {
-        // Arrange
-        var filter = Constants.FilterIdEquals100;
-
-        // Act
-        var action = new RemoveFavoriteFilterAction(filter);
-
-        // Assert
-        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]
@@ -448,8 +448,8 @@ public sealed class FilterCacheStoreTests
         var state = new FilterCacheState { FavoriteFilters = favorites };
 
         var action = new RemoveFavoriteFilterCompletedAction(
-            ImmutableList<string>.Empty,
-            ImmutableQueue.Create(Constants.FilterIdEquals100));
+            [],
+            [Constants.FilterIdEquals100]);
 
         // Act
         var newState = Reducers.ReduceRemoveFavoriteFilterCompleted(state, action);

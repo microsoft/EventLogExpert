@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 
