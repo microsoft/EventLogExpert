@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Text.Json;
@@ -13,12 +14,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void BasicFilter_Write_PinsNestedComparisonAndSubFiltersKeys()
     {
-        // Arrange — invariant 5 (nested keys): BasicFilter is plain default-STJ (no [JsonConverter]). Its
-        // record positional parameters are Comparison and SubFilters, which become the persisted property names.
-        // Renaming BasicFilter.Comparison → "Condition" (a plausible F16d rename, since BasicFilterCondition
-        // itself is slated to become FilterComparison) would silently change the wire shape and break every
-        // Basic-mode filter already persisted. SavedFilter.LoadFromPersisted's re-decompose path can mask the
-        // regression on read, so we pin the WRITE-side literal keys here.
+        // Arrange
         var basicFilter = new BasicFilter(
             new BasicFilterCondition
             {
@@ -32,7 +28,7 @@ public sealed class PersistencePolicyTests
         // Act
         string json = JsonSerializer.Serialize(basicFilter);
 
-        // Assert — literal nested keys present; renaming the record properties would fail this test.
+        // Assert
         Assert.Contains("\"Comparison\"", json);
         Assert.Contains("\"SubFilters\"", json);
         Assert.DoesNotContain("\"Condition\"", json);
@@ -41,9 +37,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void FilterMode_MemberNames_AreFrozenAcrossF16()
     {
-        // Act + Assert — invariant 4: FilterMode is persisted as a string of the CLR member name. Renaming any
-        // member would silently fail to deserialize and fall back to FilterMode.Advanced, dropping Basic-mode
-        // structure on every persisted row.
+        // Act + Assert
         Assert.Equal("Basic", nameof(FilterMode.Basic));
         Assert.Equal("Advanced", nameof(FilterMode.Advanced));
         Assert.Equal("Cached", nameof(FilterMode.Cached));
@@ -55,8 +49,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void HighlightColor_MemberCount_IsFrozenAcrossF16()
     {
-        // Act + Assert — pairs with the per-member ordinal theory: if a new color is added or one is removed,
-        // the theory above continues to pass but this guard fails, forcing a deliberate update.
+        // Act + Assert
         Assert.Equal(28, Enum.GetValues<HighlightColor>().Length);
     }
 
@@ -91,9 +84,7 @@ public sealed class PersistencePolicyTests
     [InlineData(HighlightColor.DarkPink, 27)]
     public void HighlightColor_OrdinalValue_IsFrozenAcrossF16(HighlightColor member, int expectedOrdinal)
     {
-        // Act + Assert — invariant 3: HighlightColor is persisted as a numeric int by SavedFilterJsonConverter.
-        // Reordering members, inserting a value mid-sequence, or changing an explicit `= N` assignment would
-        // silently remap user-saved highlights to a different color.
+        // Act + Assert
         Assert.Equal(expectedOrdinal, (int)member);
     }
 
@@ -116,8 +107,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void SavedFilter_BasicMode_Read_AcceptsLiteralBasicFilterKey()
     {
-        // Arrange — invariant 1 (read side): the converter must continue reading the literal "BasicFilter" key
-        // so previously-persisted Basic-mode rows survive a rename pass intact.
+        // Arrange
         const string PersistedJson =
             $$"""
             {
@@ -156,8 +146,7 @@ public sealed class PersistencePolicyTests
         // Act
         string json = JsonSerializer.Serialize(filter);
 
-        // Assert — the converter writes Mode as Enum.ToString(); persisted strings must use the CLR member names
-        // so legacy readers (and our own reader) can Enum.TryParse them back.
+        // Assert
         Assert.Contains(expectedFragment, json);
     }
 
@@ -167,9 +156,7 @@ public sealed class PersistencePolicyTests
     [InlineData(2, FilterMode.Cached)]
     public void SavedFilter_NumericMode_IsAccepted_ByConverter(int numericMode, FilterMode expectedMode)
     {
-        // Arrange — SavedFilterJsonConverter.ReadFilterMode accepts both string ("Basic") and numeric (1) modes
-        // to tolerate persisted records from intermediate L4 builds. F16d must keep the numeric branch alive
-        // (line 159 of SavedFilterJsonConverter) or those records silently fall back to FilterMode.Advanced.
+        // Arrange
         string json =
             $$"""
             {
@@ -191,10 +178,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void SavedFilter_StringHighlightColor_IsAccepted_ByConverter()
     {
-        // Arrange — invariant 3 (read side, string branch): SavedFilterJsonConverter.ReadHighlightColor accepts
-        // CLR enum names via Enum.TryParse (line 167). This characterization pins the read-side string branch so
-        // F16d can't drop it. The legacy [EnumMember] slugs on EventProperty are NOT used for HighlightColor;
-        // CLR names like "LightRed" are the only accepted string form.
+        // Arrange
         const string Json =
             $$"""
             {
@@ -218,11 +202,7 @@ public sealed class PersistencePolicyTests
     [InlineData(FilterMode.Cached)]
     public void SavedFilter_Write_NonBasicMode_OmitsBasicFilterKey(FilterMode mode)
     {
-        // Arrange — invariant 5 (write side): the converter only emits "BasicFilter" when value.BasicFilter is
-        // not null (lines 146-150). Non-Basic modes force BasicFilter=null in TryCreate / LoadFromPersisted,
-        // so the key must be absent. If F16d dropped the [JsonConverter] attribute and fell back to default-STJ,
-        // "BasicFilter":null would land on disk for every Advanced/Cached row and the failure mode would only
-        // surface as Basic-mode misidentification on next read.
+        // Arrange
         var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: mode);
         Assert.NotNull(filter);
         Assert.Null(filter.BasicFilter);
@@ -237,18 +217,14 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void SavedFilter_Write_OmitsJsonIgnoredProperties()
     {
-        // Arrange — SavedFilter has [JsonIgnore] on Id, Compiled, and IsEnabled. The converter must omit them
-        // from persisted output so loading never has to migrate around their absence. If F16d's rename or move
-        // dropped the converter and fell back to default-STJ, these would still be omitted thanks to the
-        // attributes; this test pins both the attribute presence and the converter's behavior together.
+        // Arrange
         var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
         Assert.NotNull(filter);
 
         // Act
         string json = JsonSerializer.Serialize(filter);
 
-        // Assert — pin the property-name pattern (trailing colon) so the substring "Id" inside the hydrated
-        // BasicFilter's "Property":"Id" payload doesn't trigger a false positive.
+        // Assert
         Assert.DoesNotContain("\"Id\":", json);
         Assert.DoesNotContain("\"Compiled\":", json);
         Assert.DoesNotContain("\"IsEnabled\":", json);
@@ -257,11 +233,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void SavedFilter_Write_PinsNumericHighlightColor()
     {
-        // Arrange — invariant 3 (write side): the converter writes Color as a number (writer.WriteNumber on
-        // line 141). The read side accepts both numeric and string forms, so a silent switch to
-        // writer.WriteString would NOT fail round-trip tests but WOULD change the on-disk shape for every new
-        // record. Blue=17 is chosen because the ordinal is distinctive (no leading-zero ambiguity) and the value
-        // is mid-enum so a member reorder would shift it.
+        // Arrange
         var filter = SavedFilter.TryCreate(
             Constants.FilterIdEquals100,
             color: HighlightColor.Blue,
@@ -272,7 +244,7 @@ public sealed class PersistencePolicyTests
         // Act
         string json = JsonSerializer.Serialize(filter);
 
-        // Assert — literal numeric form, not "\"Color\":\"Blue\"".
+        // Assert
         Assert.Contains("\"Color\":17", json);
         Assert.DoesNotContain("\"Color\":\"Blue\"", json);
     }
@@ -280,11 +252,7 @@ public sealed class PersistencePolicyTests
     [Fact]
     public void SavedFiltersStorageKey_LiteralValue_IsFrozenAcrossF16()
     {
-        // Arrange — invariant 6: the MAUI Preferences.Default storage key "saved-filters" in PreferencesProvider
-        // is part of the storage contract; renaming the key would silently strand every user's persisted filters.
-        // PreferencesProvider lives in the MAUI head (EventLogExpert.csproj) which has no test project and no IVT
-        // grant, so we pin the key by inspecting the source file directly. A repo-root marker (the .slnx file)
-        // anchors the walk so the test is resilient to bin/ depth changes.
+        // Arrange
         string preferencesProviderPath = ResolveRepoRelativePath(
             "src",
             "EventLogExpert",
@@ -293,8 +261,7 @@ public sealed class PersistencePolicyTests
 
         string source = File.ReadAllText(preferencesProviderPath);
 
-        // Act + Assert — pin the constant declaration AND both call-through sites so a future search-and-replace
-        // can't accidentally leave the constant intact while breaking the read/write usages.
+        // Act + Assert
         Assert.Matches(
             new Regex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;"""),
             source);

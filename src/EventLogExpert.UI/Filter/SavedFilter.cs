@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Persistence;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
 

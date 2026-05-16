@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -27,9 +28,8 @@ public sealed class EventFilterExtensionsTests
     [Fact]
     public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReportChange()
     {
-        // SavedFilter is now immutable, so structural change is the only signal HasFilteringChanged
-        // needs to detect. (Pre-immutability this test guarded against in-place Comparison mutation.)
-        var first = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100);
+        // Arrange
+        var first = FilterUtils.CreateTestFilter();
         var second = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
 
         var original = new EventFilter(null, ImmutableList.Create(first));
@@ -105,8 +105,7 @@ public sealed class EventFilterExtensionsTests
     [Fact]
     public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReportNoChange()
     {
-        // Arrange - separately allocated FilterModels and ImmutableLists with the same Value/IsExcluded.
-        // Reproduces the bug where ImmutableList<T>.Equals (reference equality) caused this to return true.
+        // Arrange
         var original = new EventFilter(
             null,
             ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
@@ -158,7 +157,7 @@ public sealed class EventFilterExtensionsTests
         // Arrange
         var original = new EventFilter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, false)));
+            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
 
         var updated = new EventFilter(
             null,
@@ -174,9 +173,9 @@ public sealed class EventFilterExtensionsTests
     [Fact]
     public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReportNoChange()
     {
-        // Color affects highlighting, not the filtered event set.
-        var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Red);
-        var blueFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, color: HighlightColor.Blue);
+        // Arrange
+        var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Red);
+        var blueFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue);
 
         var original = new EventFilter(null, ImmutableList.Create(redFilter));
         var updated = new EventFilter(null, ImmutableList.Create(blueFilter));
@@ -191,7 +190,7 @@ public sealed class EventFilterExtensionsTests
     [Fact]
     public void HasFilteringChanged_WhenOnlyDateFilterIsEnabledToggles_ShouldReportChange()
     {
-        // Arrange - pins record value-equality on DateFilter: toggling IsEnabled with identical After/Before is a structural change because IsEnabled participates in the auto-generated record Equals.
+        // Arrange
         var bounds = (After: DateTime.Now.AddDays(-1), Before: DateTime.Now);
         var enabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = true };
         var disabled = new DateFilter { After = bounds.After, Before = bounds.Before, IsEnabled = false };
@@ -252,7 +251,7 @@ public sealed class EventFilterExtensionsTests
     [Fact]
     public void IsFilteringEnabled_WhenDateFilterDisabledButFiltersExist_ShouldBeEnabled()
     {
-        // Arrange - pins the OR-semantics in IsFilteringEnabled: an `||` -> `&&` regression would silently disable filtering when the date filter is toggled off.
+        // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
         var filter = CreateFilter(Constants.FilterIdEquals100);
         var eventFilter = new EventFilter(dateFilter, [filter]);
@@ -306,5 +305,5 @@ public sealed class EventFilterExtensionsTests
     }
 
     private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
-        FilterUtils.CreateTestFilter(comparisonValue: expression, isExcluded: isExcluded);
+        FilterUtils.CreateTestFilter(expression, isExcluded: isExcluded);
 }

@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -12,8 +13,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_AdvancedModeWithStaleBasicFilter_DoesNotHydrateStructure()
     {
-        // Defensive: even if a SavedFilter somehow carries Mode=Advanced + a non-null BasicFilter (e.g. a
-        // hand-edited persistence file), FromSavedFilter must NOT hydrate structure — Mode wins.
+        // Arrange
         var staleBasic = new BasicFilter(
             new BasicFilterCondition
             {
@@ -33,8 +33,10 @@ public sealed class FilterDraftModelTests
             IsEnabled = true
         };
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
+        // Assert
         Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.Null(draft.Comparison.Value);
         Assert.Empty(draft.SubFilters);
@@ -43,6 +45,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_DeepCopiesValuesList_SoEditorMutationDoesNotAffectModel()
     {
+        // Arrange
         var basicFilter = new BasicFilter(
             new BasicFilterCondition
             {
@@ -55,11 +58,13 @@ public sealed class FilterDraftModelTests
 
         var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
         draft.Comparison.Values.Clear();
         draft.Comparison.Values.Add(Constants.FilterValue500);
 
+        // Assert
         Assert.NotNull(original.BasicFilter);
         Assert.Equal(2, original.BasicFilter.Comparison.Values.Count);
         Assert.Equal(Constants.FilterValue100, original.BasicFilter.Comparison.Values[0]);
@@ -68,6 +73,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_HydratesComparisonAndSubFiltersFromBasicFilter()
     {
+        // Arrange
         var basicFilter = new BasicFilter(
             new BasicFilterCondition
             {
@@ -91,8 +97,10 @@ public sealed class FilterDraftModelTests
 
         var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
+        // Assert
         Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Equal(Constants.FilterValue100, draft.Comparison.Value);
         Assert.Equal(2, draft.Comparison.Values.Count);
@@ -106,16 +114,20 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_PreservesId()
     {
+        // Arrange
         var original = FilterUtils.CreateTestFilter();
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
+        // Assert
         Assert.Equal(original.Id, draft.Id);
     }
 
     [Fact]
     public void FromSavedFilter_PreservesScalarFields()
     {
+        // Arrange
         var basicFilter = new BasicFilter(
             new BasicFilterCondition
             {
@@ -132,8 +144,10 @@ public sealed class FilterDraftModelTests
             isEnabled: true,
             isExcluded: true);
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
+        // Assert
         Assert.Equal(HighlightColor.Blue, draft.Color);
         Assert.Equal(FilterMode.Basic, draft.Mode);
         Assert.True(draft.IsEnabled);
@@ -144,9 +158,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void FromSavedFilter_WhenNoBasicFilter_LeavesComparisonAndSubFiltersEmpty()
     {
-        // Advanced/Cached saved filters reopen with empty structure regardless of whether the persisted
-        // text happens to be Basic-vocabulary; FromSavedFilter gates structure hydration on Mode == Basic
-        // so a future opportunistic-decompose path can't silently flip the row's mode on re-edit.
+        // Arrange
         var original = new SavedFilter
         {
             ComparisonText = Constants.FilterIdEquals100,
@@ -156,8 +168,10 @@ public sealed class FilterDraftModelTests
             IsEnabled = true
         };
 
+        // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
+        // Assert
         Assert.Equal(FilterMode.Advanced, draft.Mode);
         Assert.Equal(EventProperty.Id, draft.Comparison.Property);
         Assert.Null(draft.Comparison.Value);
@@ -169,6 +183,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void ToBasicFilter_DoesNotShareValuesListWithDraft()
     {
+        // Arrange
         var draft = FilterUtils.CreateTestFilterDraft(
             comparison: new FilterConditionDraft
             {
@@ -178,10 +193,12 @@ public sealed class FilterDraftModelTests
                 Values = ["Error"]
             });
 
+        // Act
         var source = draft.ToBasicFilter();
 
         draft.Comparison.Values.Add("Warning");
 
+        // Assert
         Assert.Single(source.Comparison.Values);
         Assert.Equal("Error", source.Comparison.Values[0]);
     }
@@ -189,6 +206,7 @@ public sealed class FilterDraftModelTests
     [Fact]
     public void ToBasicFilter_ProducesImmutableSourceMatchingEditorState()
     {
+        // Arrange
         var draft = FilterUtils.CreateTestFilterDraft(
             comparison: new FilterConditionDraft
             {
@@ -212,8 +230,10 @@ public sealed class FilterDraftModelTests
                 }
             ]);
 
+        // Act
         var source = draft.ToBasicFilter();
 
+        // Assert
         Assert.Equal(EventProperty.Id, source.Comparison.Property);
         Assert.Equal(Constants.FilterValue100, source.Comparison.Value);
         Assert.Single(source.SubFilters);

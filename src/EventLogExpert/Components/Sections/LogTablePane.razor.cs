@@ -79,7 +79,7 @@ public sealed partial class LogTablePane
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 
-    [Inject] private IHighlightFilterSelector HighlightFilterSelector { get; init; } = null!;
+    [Inject] private IHighlightSelector HighlightSelector { get; init; } = null!;
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
@@ -201,8 +201,8 @@ public sealed partial class LogTablePane
         _selectedSet = new HashSet<ResolvedEvent>(_selectedEvents, ReferenceEqualityComparer.Instance);
         var initialPaneState = FilterPaneState.Value;
         _filters = initialPaneState.Filters;
-        _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(initialPaneState.Filters);
-        _filtersHighlightKey = HighlightFilterSelector.ComputeHighlightKey(initialPaneState.Filters);
+        _activeHighlightFilters = HighlightSelector.Select(initialPaneState.Filters);
+        _filtersHighlightKey = HighlightSelector.ComputeHighlightKey(initialPaneState.Filters);
         _timeZoneSettings = Settings.TimeZoneInfo;
 
         WarnOnUnknownFilterColors(_filters);
@@ -258,12 +258,12 @@ public sealed partial class LogTablePane
         if (filtersChanged)
         {
             _filters = currentFilters;
-            int newHighlightKey = HighlightFilterSelector.ComputeHighlightKey(currentFilters);
+            int newHighlightKey = HighlightSelector.ComputeHighlightKey(currentFilters);
 
             if (newHighlightKey != _filtersHighlightKey)
             {
                 _filtersHighlightKey = newHighlightKey;
-                _activeHighlightFilters = HighlightFilterSelector.SelectHighlightCandidates(currentFilters);
+                _activeHighlightFilters = HighlightSelector.Select(currentFilters);
                 _highlightCache.Clear();
                 WarnOnUnknownFilterColors(_filters);
             }

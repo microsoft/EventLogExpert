@@ -30,7 +30,7 @@ public static class UiServiceCollectionExtensions
         services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<IFilterGroupCommands, FilterGroupCommands>();
         services.AddSingleton<ILogTableCommands, LogTableCommands>();
-        services.AddSingleton<IHighlightFilterSelector, HighlightFilterSelector>();
+        services.AddSingleton<IHighlightSelector, HighlightSelector>();
         services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
 
         return services;

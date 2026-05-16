@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
@@ -42,8 +43,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleAddFilter_WhenComparisonValueIsNull_ShouldNotUpdateEventTableFilters()
     {
-        // Arrange — empty comparison cannot compile, so the placeholder filter has no Compiled artifact
-        // and the effect must skip dispatching SetFilters.
+        // Arrange
         var filterModel = new SavedFilter
         {
             ComparisonText = string.Empty,
@@ -110,7 +110,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleClearAllFilters_ShouldUpdateEventTableFilters()
     {
-        // Effect must dispatch even when pane state is empty if applied still has filters.
+        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
@@ -125,7 +125,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleRemoveAdvancedFilter_ShouldUpdateEventTableFilters()
     {
-        // Pane state empty, applied still has the removed filter.
+        // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
             appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
@@ -187,8 +187,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSaveFilterGroup_WhenPaneEmpty_ShouldNotDispatchAddGroupAction()
     {
-        // Empty-set guard: prevents silent creation of empty groups when the Save flow races against
-        // a clear or fires before any filter is committed (defensive complement to the disabled icon).
+        // Arrange
         var (effects, mockDispatcher) = CreateEffects(filters: ImmutableList<SavedFilter>.Empty);
         var action = new SaveFilterGroupAction(Constants.FilterGroupName);
 
@@ -334,8 +333,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleSetFilterDateRange_WhenBothNullAcrossMultipleLogs_ShouldComputeRange()
     {
-        // Arrange — Logs A and B don't overlap; range must span both. The previous (intersection)
-        // implementation would have inverted After/Before for non-overlapping logs.
+        // Arrange
         var logAOldest = new DateTime(2024, 1, 1, 4, 0, 0, DateTimeKind.Utc);
         var logANewest = new DateTime(2024, 1, 1, 6, 0, 0, DateTimeKind.Utc);
         var logBOldest = new DateTime(2024, 1, 5, 20, 0, 0, DateTimeKind.Utc);
@@ -523,7 +521,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenEquivalentFiltersFromDifferentInstances_ShouldNotDispatch()
     {
-        // Structurally equivalent but distinct instances; HasFilteringChanged must short-circuit.
+        // Arrange
         var paneFilters = ImmutableList.Create(
             FilterUtils.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
@@ -593,7 +591,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task UpdateEventTableFilters_WhenFilterUnchanged_ShouldNotDispatch()
     {
-        // No-op guard must skip both loading toggles and the SetFilters dispatch.
+        // Arrange
         var filters = CreateSingleEnabledFilters();
         var (effects, mockDispatcher) = CreateEffects(
             true,
