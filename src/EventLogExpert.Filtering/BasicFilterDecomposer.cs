@@ -9,21 +9,8 @@ using System.Globalization;
 
 namespace EventLogExpert.Filtering;
 
-/// <summary>
-///     Reverses <see cref="BasicFilterFormatter" />. Given a filter expression string, attempts to recover the
-///     <see cref="BasicFilter" /> that would have produced it. Returns <c>false</c> for any expression outside the closed
-///     formatter vocabulary so the caller can keep the filter as Advanced-only. Consumes the same semantic AST that the
-///     emitter consumes — pattern-matches on <see cref="SemanticNode" /> rather than on the raw syntax — so the
-///     refusal/acceptance contract is identical to the rest of the pipeline.
-/// </summary>
 public static class BasicFilterDecomposer
 {
-    /// <summary>
-    ///     Attempts to decompose <paramref name="filterText" /> into a structured <see cref="BasicFilter" />. Returns
-    ///     <c>false</c> with <paramref name="structured" /> set to <c>null</c> for any unsupported shape (relational
-    ///     operators, properties outside the BasicFilter vocabulary, parenthesized OR-groups, raw <c>NotNode</c> wrapping a
-    ///     comparison, double negation, empty single Value, etc.). Never throws on malformed input.
-    /// </summary>
     public static bool TryDecompose(string? filterText, [NotNullWhen(true)] out BasicFilter? structured)
     {
         structured = null;
@@ -85,20 +72,20 @@ public static class BasicFilterDecomposer
         }
 
         // Map every leaf first; reject before allocating any BasicFilter parts if any leaf is unsupported.
-        var mapped = new List<List<BasicFilterCondition>>(orClauses.Count);
+        var mapped = new List<List<FilterComparison>>(orClauses.Count);
 
         foreach (var orClause in orClauses)
         {
-            var conditions = new List<BasicFilterCondition>(orClause.Count);
+            var conditions = new List<FilterComparison>(orClause.Count);
 
             foreach (var leaf in orClause)
             {
-                if (!TryMapLeaf(leaf, out var condition))
+                if (!TryMapLeaf(leaf, out var comparison))
                 {
                     return false;
                 }
 
-                conditions.Add(condition);
+                conditions.Add(comparison);
             }
 
             mapped.Add(conditions);
@@ -106,7 +93,7 @@ public static class BasicFilterDecomposer
 
         var subFilters = ImmutableList.CreateBuilder<SubFilter>();
         var firstClause = mapped[0];
-        var comparison = firstClause[0];
+        var rootComparison = firstClause[0];
 
         for (var i = 1; i < firstClause.Count; i++)
         {
@@ -124,7 +111,7 @@ public static class BasicFilterDecomposer
             }
         }
 
-        structured = new BasicFilter(comparison, subFilters.ToImmutable());
+        structured = new BasicFilter(rootComparison, subFilters.ToImmutable());
 
         return true;
     }
@@ -163,9 +150,9 @@ public static class BasicFilterDecomposer
 
     private static bool TryMapComparison(
         ComparisonNode cmp,
-        [NotNullWhen(true)] out BasicFilterCondition? condition)
+        [NotNullWhen(true)] out FilterComparison? comparison)
     {
-        condition = null;
+        comparison = null;
 
         if (cmp.Op is not (FilterBinaryOperator.Equal or FilterBinaryOperator.NotEqual))
         {
@@ -199,7 +186,7 @@ public static class BasicFilterDecomposer
             ? ComparisonOperator.Equals
             : ComparisonOperator.NotEqual;
 
-        condition = new BasicFilterCondition
+        comparison = new FilterComparison
         {
             Property = property,
             Operator = op,
@@ -225,7 +212,6 @@ public static class BasicFilterDecomposer
             case ResolvedEventField.UserId: property = EventProperty.UserId; return true;
             case ResolvedEventField.Description: property = EventProperty.Description; return true;
             case ResolvedEventField.Xml: property = EventProperty.Xml; return true;
-            // ComputerName, LogName, RecordId, TimeCreated have no BasicFilter authoring slot.
             case ResolvedEventField.ComputerName:
             case ResolvedEventField.LogName:
             case ResolvedEventField.RecordId:
@@ -237,14 +223,14 @@ public static class BasicFilterDecomposer
         }
     }
 
-    private static bool TryMapLeaf(SemanticNode node, [NotNullWhen(true)] out BasicFilterCondition? condition)
+    private static bool TryMapLeaf(SemanticNode node, [NotNullWhen(true)] out FilterComparison? comparison)
     {
-        condition = null;
+        comparison = null;
 
         switch (node)
         {
             case ComparisonNode cmp:
-                return TryMapComparison(cmp, out condition);
+                return TryMapComparison(cmp, out comparison);
 
             case ContainsNode contains:
                 if (!contains.IgnoreCase
@@ -255,7 +241,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = containsProp,
                     Operator = ComparisonOperator.Contains,
@@ -271,7 +257,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = EventProperty.Keywords,
                     Operator = ComparisonOperator.Equals,
@@ -287,7 +273,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = EventProperty.Keywords,
                     Operator = ComparisonOperator.Contains,
@@ -303,7 +289,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = EventProperty.Keywords,
                     Operator = ComparisonOperator.Equals,
@@ -321,7 +307,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = multiProp,
                     Operator = ComparisonOperator.Equals,
@@ -332,16 +318,16 @@ public static class BasicFilterDecomposer
                 return true;
 
             case NotNode not:
-                return TryMapNegatedLeaf(not, out condition);
+                return TryMapNegatedLeaf(not, out comparison);
 
             default:
                 return false;
         }
     }
 
-    private static bool TryMapNegatedLeaf(NotNode not, [NotNullWhen(true)] out BasicFilterCondition? condition)
+    private static bool TryMapNegatedLeaf(NotNode not, [NotNullWhen(true)] out FilterComparison? comparison)
     {
-        condition = null;
+        comparison = null;
 
         switch (not.Operand)
         {
@@ -354,7 +340,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = containsProp,
                     Operator = ComparisonOperator.NotContains,
@@ -370,7 +356,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = EventProperty.Keywords,
                     Operator = ComparisonOperator.NotEqual,
@@ -386,7 +372,7 @@ public static class BasicFilterDecomposer
                     return false;
                 }
 
-                condition = new BasicFilterCondition
+                comparison = new FilterComparison
                 {
                     Property = EventProperty.Keywords,
                     Operator = ComparisonOperator.NotContains,

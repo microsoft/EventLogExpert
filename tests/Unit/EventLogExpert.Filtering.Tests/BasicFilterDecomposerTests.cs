@@ -6,14 +6,6 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests;
 
-/// <summary>
-///     Round-trips the <see cref="BasicFilterFormatter" /> through <see cref="BasicFilterDecomposer" />. The contract
-///     is <c>BasicFilter &#x2192; format &#x2192; decompose &#x2192; reformat = canonical text</c> (numeric typed-field
-///     literals normalize through the lowerer's coercion — e.g., <c>Id "001"</c> &#x2192; <c>1</c> &#x2192; <c>"1"</c> —
-///     so raw input equality is too strict for those; string-typed values such as escape sequences in Description
-///     round-trip exactly). Plus refusal tests for every shape outside the closed formatter vocabulary, and
-///     escape-preservation tests for backslash / quote / CR / LF / tab.
-/// </summary>
 public sealed class BasicFilterDecomposerTests
 {
     public static IEnumerable<object[]> ManyValueRoundTrips() =>
@@ -39,10 +31,10 @@ public sealed class BasicFilterDecomposerTests
     {
         // Pins NotContains-on-nullable-Guid reconstruction in a non-leading subfilter position.
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.ActivityId, ComparisonOperator.NotContains, "abc"), false),
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
+                new SubFilter(Comparison(EventProperty.ActivityId, ComparisonOperator.NotContains, "abc"), false),
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -52,11 +44,11 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenAllUserIdOperatorVariantsInChain_ReconstructsEachUserIdSubFilter()
     {
         var original = new BasicFilter(
-            Condition(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"),
+            Comparison(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"),
             [
-                new SubFilter(Condition(EventProperty.UserId, ComparisonOperator.NotEqual, "S-1-5-19"), false),
-                new SubFilter(Condition(EventProperty.UserId, ComparisonOperator.Contains, "5-18"), false),
-                new SubFilter(Condition(EventProperty.UserId, ComparisonOperator.NotContains, "5-99"), false)
+                new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.NotEqual, "S-1-5-19"), false),
+                new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.Contains, "5-18"), false),
+                new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.NotContains, "5-99"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -66,10 +58,10 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenAndChainOfThree_ReconstructsConjunctionOfSubFilters()
     {
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false),
-                new SubFilter(Condition(EventProperty.Level, ComparisonOperator.Equals, "Error"), false)
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false),
+                new SubFilter(Comparison(EventProperty.Level, ComparisonOperator.Equals, "Error"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -188,10 +180,10 @@ public sealed class BasicFilterDecomposerTests
     {
         // Pins JoinWithAny=true reconstruction for the negated-Keywords subfilter shape after an OR boundary.
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.Keywords, ComparisonOperator.NotContains, "Audit"), true),
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
+                new SubFilter(Comparison(EventProperty.Keywords, ComparisonOperator.NotContains, "Audit"), true),
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -204,7 +196,7 @@ public sealed class BasicFilterDecomposerTests
         ImmutableList<string> values)
     {
         var original = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = property,
                 Operator = ComparisonOperator.Equals,
@@ -221,11 +213,11 @@ public sealed class BasicFilterDecomposerTests
     {
         // Layout: A AND B OR C AND D — i.e., (A && B) || (C && D).
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false),
-                new SubFilter(Condition(EventProperty.Id, ComparisonOperator.Equals, "200"), true),
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "OtherSource"), false)
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false),
+                new SubFilter(Comparison(EventProperty.Id, ComparisonOperator.Equals, "200"), true),
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "OtherSource"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -256,10 +248,10 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenOrChainOfThree_ReconstructsDisjunctionOfSubFilters()
     {
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.Id, ComparisonOperator.Equals, "200"), true),
-                new SubFilter(Condition(EventProperty.Id, ComparisonOperator.Equals, "300"), true)
+                new SubFilter(Comparison(EventProperty.Id, ComparisonOperator.Equals, "200"), true),
+                new SubFilter(Comparison(EventProperty.Id, ComparisonOperator.Equals, "300"), true)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -317,7 +309,7 @@ public sealed class BasicFilterDecomposerTests
         string value)
     {
         var original = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = property,
                 Operator = op,
@@ -355,8 +347,8 @@ public sealed class BasicFilterDecomposerTests
         // The formatter emits UserId as a 2-AND template; this used to fail to lower when the UserId guard
         // appeared in any position other than the top of an AndNode. The L2 lowerer extension fixes that.
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
-            [new SubFilter(Condition(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"), false)]);
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            [new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"), false)]);
 
         AssertCanonicalRoundTrip(original);
     }
@@ -365,10 +357,10 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenUserIdGuardSurroundedByOtherConditions_ReconstructsCenterUserIdSubFilter()
     {
         var original = new BasicFilter(
-            Condition(EventProperty.Id, ComparisonOperator.Equals, "100"),
+            Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
-                new SubFilter(Condition(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"), false),
-                new SubFilter(Condition(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
+                new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"), false),
+                new SubFilter(Comparison(EventProperty.Source, ComparisonOperator.Equals, "TestSource"), false)
             ]);
 
         AssertCanonicalRoundTrip(original);
@@ -384,7 +376,7 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenValueContainsEscapeSequences_RecoversOriginalEscapedString(string value)
     {
         var original = new BasicFilter(
-            Condition(EventProperty.Description, ComparisonOperator.Equals, value),
+            Comparison(EventProperty.Description, ComparisonOperator.Equals, value),
             []);
 
         Assert.True(BasicFilterFormatter.TryFormat(original, out var formatted));
@@ -408,7 +400,7 @@ public sealed class BasicFilterDecomposerTests
         AssertStructuralEquivalence(original, decomposed);
     }
 
-    private static void AssertConditionStructurallyEqual(BasicFilterCondition expected, BasicFilterCondition actual)
+    private static void AssertComparisonStructurallyEqual(FilterComparison expected, FilterComparison actual)
     {
         Assert.Equal(expected.Property, actual.Property);
         Assert.Equal(expected.Operator, actual.Operator);
@@ -423,17 +415,17 @@ public sealed class BasicFilterDecomposerTests
 
     private static void AssertStructuralEquivalence(BasicFilter expected, BasicFilter actual)
     {
-        AssertConditionStructurallyEqual(expected.Comparison, actual.Comparison);
+        AssertComparisonStructurallyEqual(expected.Comparison, actual.Comparison);
         Assert.Equal(expected.SubFilters.Count, actual.SubFilters.Count);
 
         for (var i = 0; i < expected.SubFilters.Count; i++)
         {
             Assert.Equal(expected.SubFilters[i].JoinWithAny, actual.SubFilters[i].JoinWithAny);
-            AssertConditionStructurallyEqual(expected.SubFilters[i].Comparison, actual.SubFilters[i].Comparison);
+            AssertComparisonStructurallyEqual(expected.SubFilters[i].Comparison, actual.SubFilters[i].Comparison);
         }
     }
 
-    private static BasicFilterCondition Condition(EventProperty property, ComparisonOperator op, string value) =>
+    private static FilterComparison Comparison(EventProperty property, ComparisonOperator op, string value) =>
         new()
         {
             Property = property,

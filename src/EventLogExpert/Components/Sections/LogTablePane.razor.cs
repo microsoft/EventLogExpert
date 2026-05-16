@@ -325,7 +325,7 @@ public sealed partial class LogTablePane
         };
 
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = property,
                 Value = filterValue,
@@ -334,7 +334,7 @@ public sealed partial class LogTablePane
             },
             []);
 
-        if (!FilterService.TryParse(basicFilter, out var comparisonString)) { return; }
+        if (!FilterService.TryFormat(basicFilter, out var comparisonString)) { return; }
 
         var filter = SavedFilter.TryCreate(
             comparisonString,

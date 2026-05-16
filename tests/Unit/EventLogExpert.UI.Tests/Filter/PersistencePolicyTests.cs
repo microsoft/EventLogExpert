@@ -1,10 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -18,7 +16,7 @@ public sealed partial class PersistencePolicyTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -272,6 +270,9 @@ public sealed partial class PersistencePolicyTests
         Assert.Contains("Preferences.Default.Set(SavedFilters, JsonSerializer.Serialize(value))", source);
     }
 
+    [GeneratedRegex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;""")]
+    private static partial Regex MyRegex();
+
     private static string ResolveRepoRelativePath(params string[] segments)
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
@@ -287,7 +288,4 @@ public sealed partial class PersistencePolicyTests
         Assert.True(File.Exists(combined), $"Expected source file at {combined} to exist.");
         return combined;
     }
-
-    [GeneratedRegex("""private\s+const\s+string\s+SavedFilters\s*=\s*"saved-filters"\s*;""")]
-    private static partial Regex MyRegex();
 }

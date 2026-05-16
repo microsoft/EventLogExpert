@@ -643,7 +643,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,

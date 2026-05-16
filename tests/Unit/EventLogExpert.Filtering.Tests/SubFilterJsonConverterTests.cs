@@ -34,7 +34,7 @@ public sealed class SubFilterJsonConverterTests
         Assert.False(restored.SubFilters[0].JoinWithAny);
 
         var fresh = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -42,7 +42,7 @@ public sealed class SubFilterJsonConverterTests
                 Value = "100"
             },
             ImmutableList.Create(new SubFilter(
-                new BasicFilterCondition
+                new FilterComparison
                 {
                     Property = EventProperty.Level,
                     Operator = ComparisonOperator.Equals,
@@ -113,7 +113,7 @@ public sealed class SubFilterJsonConverterTests
     [Fact]
     public void JsonRoundTrip_LegacyDataKeyWithLegacyConditionShape_ReadsBothLayers()
     {
-        // Worst-case legacy persistence: both the SubFilter wrapper and the inner BasicFilterCondition use legacy
+        // Worst-case legacy persistence: both the SubFilter wrapper and the inner FilterComparison use legacy
         // keys (Data + Category/Evaluator). The composed converter dispatch must hydrate both layers.
         const string LegacyJson =
             """
@@ -133,7 +133,7 @@ public sealed class SubFilterJsonConverterTests
     public void JsonRoundTrip_ModernShape_PersistsAsComparison_AndRestores()
     {
         var original = new SubFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,

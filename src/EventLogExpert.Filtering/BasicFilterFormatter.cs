@@ -10,22 +10,13 @@ public static class BasicFilterFormatter
     public static bool TryFormat(BasicFilter basicFilter, out string comparison) =>
         TryFormat(basicFilter, false, out comparison);
 
-    /// <summary>
-    ///     Formats <paramref name="basicFilter" /> to its Dynamic-LINQ source expression. When
-    ///     <paramref name="strictSubFilters" /> is <see langword="false" /> (the default) any sub-filter whose condition
-    ///     cannot be emitted is silently skipped — the lenient mode used by the runtime parse path so that one corrupt
-    ///     sub-filter doesn't disqualify the whole expression. When <paramref name="strictSubFilters" /> is
-    ///     <see langword="true" /> the formatter fails (returns <see langword="false" />) the moment any sub-filter cannot be
-    ///     emitted — used by the editor row's "structured matches text" gate so an incomplete sub-filter cannot silently
-    ///     round-trip into a persisted <see cref="BasicFilter" /> that disagrees with the saved expression text.
-    /// </summary>
     public static bool TryFormat(BasicFilter basicFilter, bool strictSubFilters, out string comparison)
     {
         ArgumentNullException.ThrowIfNull(basicFilter);
 
         comparison = string.Empty;
 
-        if (!TryFormatCondition(basicFilter.Comparison, null, out var comparisonText))
+        if (!TryFormatComparison(basicFilter.Comparison, null, out var comparisonText))
         {
             return false;
         }
@@ -36,7 +27,7 @@ public static class BasicFilterFormatter
         {
             var joinPrefix = subFilter.JoinWithAny ? " || " : " && ";
 
-            if (TryFormatCondition(subFilter.Comparison, joinPrefix, out var subText))
+            if (TryFormatComparison(subFilter.Comparison, joinPrefix, out var subText))
             {
                 stringBuilder.Append(subText);
             }
@@ -51,18 +42,18 @@ public static class BasicFilterFormatter
         return true;
     }
 
-    public static bool TryFormatCondition(BasicFilterCondition condition, string? joinPrefix, out string formatted)
+    public static bool TryFormatComparison(FilterComparison comparison, string? joinPrefix, out string formatted)
     {
-        ArgumentNullException.ThrowIfNull(condition);
+        ArgumentNullException.ThrowIfNull(comparison);
 
         formatted = string.Empty;
 
-        if (condition.MatchMode == MatchMode.Single && string.IsNullOrWhiteSpace(condition.Value))
+        if (comparison.MatchMode == MatchMode.Single && string.IsNullOrWhiteSpace(comparison.Value))
         {
             return false;
         }
 
-        if (condition is { MatchMode: MatchMode.Many, Values.Count: <= 0 })
+        if (comparison is { MatchMode: MatchMode.Many, Values.Count: <= 0 })
         {
             return false;
         }
@@ -71,23 +62,23 @@ public static class BasicFilterFormatter
 
         // The Many+non-Keywords shape is `(new[]{...}).Contains(property)` — the property-reference template
         // moves to the suffix. Everything else prepends the operator+property template.
-        if (condition.MatchMode != MatchMode.Many || condition.Property is EventProperty.Keywords)
+        if (comparison.MatchMode != MatchMode.Many || comparison.Property is EventProperty.Keywords)
         {
-            stringBuilder.Append(GetComparisonString(condition.Property, condition.Operator, condition.MatchMode));
+            stringBuilder.Append(GetComparisonString(comparison.Property, comparison.Operator, comparison.MatchMode));
         }
 
-        if (condition.MatchMode == MatchMode.Many)
+        if (comparison.MatchMode == MatchMode.Many)
         {
-            EmitManyValues(condition, stringBuilder);
+            EmitManyValues(comparison, stringBuilder);
         }
-        else if (!EmitSingleValue(condition, stringBuilder))
+        else if (!EmitSingleValue(comparison, stringBuilder))
         {
             return false;
         }
 
-        if (condition is { MatchMode: MatchMode.Many, Property: not EventProperty.Keywords })
+        if (comparison is { MatchMode: MatchMode.Many, Property: not EventProperty.Keywords })
         {
-            stringBuilder.Append(GetComparisonString(condition.Property, condition.Operator, condition.MatchMode));
+            stringBuilder.Append(GetComparisonString(comparison.Property, comparison.Operator, comparison.MatchMode));
         }
 
         formatted = stringBuilder.ToString();
@@ -95,11 +86,11 @@ public static class BasicFilterFormatter
         return true;
     }
 
-    private static void EmitManyValues(BasicFilterCondition condition, StringBuilder stringBuilder)
+    private static void EmitManyValues(FilterComparison comparison, StringBuilder stringBuilder)
     {
-        var joined = string.Join("\", \"", condition.Values.Select(EscapeStringLiteral));
+        var joined = string.Join("\", \"", comparison.Values.Select(EscapeStringLiteral));
 
-        if (condition.Property is EventProperty.Keywords)
+        if (comparison.Property is EventProperty.Keywords)
         {
             stringBuilder.Append($"(e => (new[] {{\"{joined}\"}}).Contains(e))");
         }
@@ -109,34 +100,34 @@ public static class BasicFilterFormatter
         }
     }
 
-    private static bool EmitSingleValue(BasicFilterCondition condition, StringBuilder stringBuilder)
+    private static bool EmitSingleValue(FilterComparison comparison, StringBuilder stringBuilder)
     {
-        switch (condition.Operator)
+        switch (comparison.Operator)
         {
             case ComparisonOperator.Equals:
             case ComparisonOperator.NotEqual:
-                if (condition.Property is EventProperty.Keywords)
+                if (comparison.Property is EventProperty.Keywords)
                 {
                     stringBuilder.Append(
-                        $"\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                        $"\"{EscapeStringLiteral(comparison.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
-                    stringBuilder.Append($"\"{EscapeStringLiteral(condition.Value)}\"");
+                    stringBuilder.Append($"\"{EscapeStringLiteral(comparison.Value)}\"");
                 }
 
                 return true;
             case ComparisonOperator.Contains:
             case ComparisonOperator.NotContains:
-                if (condition.Property is EventProperty.Keywords)
+                if (comparison.Property is EventProperty.Keywords)
                 {
                     stringBuilder.Append(
-                        $"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase))");
+                        $"(\"{EscapeStringLiteral(comparison.Value)}\", StringComparison.OrdinalIgnoreCase))");
                 }
                 else
                 {
                     stringBuilder.Append(
-                        $"(\"{EscapeStringLiteral(condition.Value)}\", StringComparison.OrdinalIgnoreCase)");
+                        $"(\"{EscapeStringLiteral(comparison.Value)}\", StringComparison.OrdinalIgnoreCase)");
                 }
 
                 return true;

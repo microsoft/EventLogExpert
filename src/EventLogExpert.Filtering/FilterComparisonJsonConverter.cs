@@ -7,18 +7,9 @@ using System.Text.Json.Serialization;
 
 namespace EventLogExpert.Filtering;
 
-/// <summary>
-///     Reads and writes <see cref="BasicFilterCondition" /> JSON. Accepts both the legacy persisted format (<c>Category</c>
-///     + <c>Evaluator</c>; numeric or member-name enums) and the updated format (<c>Property</c> + <c>Operator</c> +
-///     <c>MatchMode</c>). Always writes the updated format with member-name enums.
-///     <para>
-///         Legacy <c>FilterEvaluator</c> values map to <see cref="ComparisonOperator" /> / <see cref="MatchMode" /> as
-///         follows: <c>Equals/Contains/NotEqual/NotContains -> (op, Single)</c>; <c>MultiSelect -> (Equals, Many)</c>.
-///     </para>
-/// </summary>
-internal sealed class BasicFilterConditionJsonConverter : JsonConverter<BasicFilterCondition>
+internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterComparison>
 {
-    public override BasicFilterCondition Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override FilterComparison Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
     {
         if (reader.TokenType != JsonTokenType.StartObject)
         {
@@ -83,7 +74,7 @@ internal sealed class BasicFilterConditionJsonConverter : JsonConverter<BasicFil
             }
         }
 
-        return new BasicFilterCondition
+        return new FilterComparison
         {
             Property = property,
             Operator = op,
@@ -93,7 +84,7 @@ internal sealed class BasicFilterConditionJsonConverter : JsonConverter<BasicFil
         };
     }
 
-    public override void Write(Utf8JsonWriter writer, BasicFilterCondition value, JsonSerializerOptions options)
+    public override void Write(Utf8JsonWriter writer, FilterComparison value, JsonSerializerOptions options)
     {
         writer.WriteStartObject();
         writer.WriteString("Property", value.Property.ToString());

@@ -10,12 +10,12 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Components.Filters;
 
-public sealed partial class BasicFilterConditionEditor : ComponentBase
+public sealed partial class FilterComparisonEditor : ComponentBase
 {
     private ImmutableArray<string> _filteredItemsSource = [];
     private string? _filteredItemsValue;
 
-    [Parameter][EditorRequired] public FilterConditionDraft Condition { get; set; } = null!;
+    [Parameter][EditorRequired] public FilterComparisonDraft Comparison { get; set; } = null!;
 
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
@@ -28,7 +28,7 @@ public sealed partial class BasicFilterConditionEditor : ComponentBase
         get
         {
             var items = Items;
-            var value = Condition.Value ?? string.Empty;
+            var value = Comparison.Value ?? string.Empty;
 
             if (_filteredItemsSource.Equals(items) && _filteredItemsValue == value)
             {
@@ -45,30 +45,30 @@ public sealed partial class BasicFilterConditionEditor : ComponentBase
     } = [];
 
     private ImmutableArray<string> Items =>
-        EventPropertyItemsCache.GetItems(EventLogState.Value.ActiveLogs, Condition.Property);
+        EventPropertyItemsCache.GetItems(EventLogState.Value.ActiveLogs, Comparison.Property);
 
     private EventProperty PropertyBinding
     {
-        get => Condition.Property;
+        get => Comparison.Property;
         set
         {
-            Condition.ChangeProperty(value);
+            Comparison.ChangeProperty(value);
 
-            if (!IsTextOnlyProperty(value) || Condition.MatchMode != MatchMode.Many)
+            if (!IsTextOnlyProperty(value) || Comparison.MatchMode != MatchMode.Many)
             {
                 return;
             }
 
-            Condition.Operator = ComparisonOperator.Contains;
-            Condition.MatchMode = MatchMode.Single;
+            Comparison.Operator = ComparisonOperator.Contains;
+            Comparison.MatchMode = MatchMode.Single;
         }
     }
 
-    private static bool IsTextOnlyProperty(EventProperty property) => ComparisonOperatorSets.IsTextOnly(property);
+    private static bool IsTextOnlyProperty(EventProperty property) => FilterPropertyConstraints.IsTextOnly(property);
 
     private void HandleOperatorChanged((ComparisonOperator Op, MatchMode Mode) value)
     {
-        Condition.Operator = value.Op;
-        Condition.MatchMode = value.Mode;
+        Comparison.Operator = value.Op;
+        Comparison.MatchMode = value.Mode;
     }
 }

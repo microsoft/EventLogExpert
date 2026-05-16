@@ -316,7 +316,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var stale = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -343,7 +343,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var stale = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,
@@ -373,7 +373,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var stale = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Source,
                 Operator = ComparisonOperator.Equals,
@@ -436,7 +436,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var stale = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -515,7 +515,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -540,7 +540,7 @@ public sealed class FilterModelTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -586,7 +586,7 @@ public sealed class FilterModelTests
         // Arrange
         var id = FilterId.Create();
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,

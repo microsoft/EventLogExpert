@@ -15,8 +15,8 @@ internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
             throw new JsonException($"Expected StartObject, got {reader.TokenType}.");
         }
 
-        BasicFilterCondition? modernComparison = null;
-        BasicFilterCondition? legacyData = null;
+        FilterComparison? modernComparison = null;
+        FilterComparison? legacyData = null;
         bool joinWithAny = false;
 
         while (reader.Read())
@@ -38,10 +38,10 @@ internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
             switch (propertyName)
             {
                 case "Comparison":
-                    modernComparison = ReadCondition(ref reader, options);
+                    modernComparison = ReadComparison(ref reader, options);
                     break;
                 case "Data":
-                    legacyData = ReadCondition(ref reader, options);
+                    legacyData = ReadComparison(ref reader, options);
                     break;
                 case "JoinWithAny":
                     joinWithAny = reader.TokenType == JsonTokenType.True;
@@ -52,7 +52,7 @@ internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
             }
         }
 
-        return new SubFilter(modernComparison ?? legacyData ?? new BasicFilterCondition(), joinWithAny);
+        return new SubFilter(modernComparison ?? legacyData ?? new FilterComparison(), joinWithAny);
     }
 
     public override void Write(Utf8JsonWriter writer, SubFilter value, JsonSerializerOptions options)
@@ -64,8 +64,8 @@ internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
         writer.WriteEndObject();
     }
 
-    private static BasicFilterCondition? ReadCondition(ref Utf8JsonReader reader, JsonSerializerOptions options) =>
+    private static FilterComparison? ReadComparison(ref Utf8JsonReader reader, JsonSerializerOptions options) =>
         reader.TokenType == JsonTokenType.Null
             ? null
-            : JsonSerializer.Deserialize<BasicFilterCondition>(ref reader, options);
+            : JsonSerializer.Deserialize<FilterComparison>(ref reader, options);
 }

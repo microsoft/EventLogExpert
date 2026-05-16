@@ -238,7 +238,7 @@ public sealed class FilterPaneReducerTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,

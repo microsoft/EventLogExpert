@@ -16,7 +16,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var staleBasic = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -48,7 +48,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -76,7 +76,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -86,7 +86,7 @@ public sealed class FilterDraftModelTests
             },
             [
                 new SubFilter(
-                    new BasicFilterCondition
+                    new FilterComparison
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
@@ -108,8 +108,8 @@ public sealed class FilterDraftModelTests
 
         Assert.Single(draft.SubFilters);
         Assert.True(draft.SubFilters[0].JoinWithAny);
-        Assert.Equal(EventProperty.Level, draft.SubFilters[0].Condition.Property);
-        Assert.Equal("Error", draft.SubFilters[0].Condition.Value);
+        Assert.Equal(EventProperty.Level, draft.SubFilters[0].Comparison.Property);
+        Assert.Equal("Error", draft.SubFilters[0].Comparison.Value);
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var basicFilter = new BasicFilter(
-            new BasicFilterCondition
+            new FilterComparison
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -186,7 +186,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var draft = FilterUtils.CreateTestFilterDraft(
-            comparison: new FilterConditionDraft
+            comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
                 Operator = ComparisonOperator.Equals,
@@ -209,7 +209,7 @@ public sealed class FilterDraftModelTests
     {
         // Arrange
         var draft = FilterUtils.CreateTestFilterDraft(
-            comparison: new FilterConditionDraft
+            comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
@@ -220,7 +220,7 @@ public sealed class FilterDraftModelTests
             [
                 new SubFilterDraft
                 {
-                    Condition = new FilterConditionDraft
+                    Comparison = new FilterComparisonDraft
                     {
                         Property = EventProperty.Level,
                         Operator = ComparisonOperator.Equals,
