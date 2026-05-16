@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.UI.FilterGroup;
 
@@ -14,7 +14,7 @@ internal static class FilterGroupExtensions
             SavedFilterGroup data)
         {
             var root = groupNames.Length <= 1 ? string.Empty : groupNames.First();
-            groupNames = groupNames.Skip(1).ToArray();
+            groupNames = [.. groupNames.Skip(1)];
 
             if (group.TryGetValue(root, out var node))
             {

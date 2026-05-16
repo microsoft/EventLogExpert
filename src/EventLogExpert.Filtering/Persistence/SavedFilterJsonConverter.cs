@@ -1,44 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering;
-using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Persistence;
 
-/// <summary>
-///     Reads and writes <see cref="SavedFilter" /> JSON. Accepts three persisted shapes:
-///     <list type="bullet">
-///         <item>
-///             <description>
-///                 <b>Modern (post-L4b)</b>: <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ?,
-///                 "Mode": "Basic|Advanced|Cached" }</c>. <c>Mode</c> is authoritative.
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <b>L1..L4a</b>: <c>{ "Color": n, "ComparisonText": "...", "IsExcluded": b, "BasicFilter": ? }</c>. No
-///                 <c>Mode</c> field; converter infers <see cref="FilterMode.Basic" /> when <c>BasicFilter</c> is present,
-///                 otherwise <see cref="FilterMode.Advanced" /> (legacy disk has no Cached records — those went through
-///                 <c>FilterCacheModal</c> and were saved as Advanced filters).
-///             </description>
-///         </item>
-///         <item>
-///             <description>
-///                 <b>Pre-L1 legacy</b>: <c>{ "Color": n, "Comparison": { "Value": "..." }, "IsExcluded": b, "FilterType":
-///                 "Basic|Advanced|Cached" }</c>. <c>FilterType</c> maps directly to <see cref="FilterMode" />.
-///             </description>
-///         </item>
-///     </list>
-///     Always writes the modern shape (with <c>Mode</c>).
-///     <para>
-///         The validation/construction step (compile the text, hydrate <c>BasicFilter</c>, run repair-decompose for
-///         Basic-mode records whose <c>BasicFilter</c> blob is missing) is delegated to
-///         <see cref="SavedFilter.LoadFromPersisted" />. The converter holds the legacy-intent policy only.
-///     </para>
-/// </summary>
 internal sealed class SavedFilterJsonConverter : JsonConverter<SavedFilter>
 {
     private enum LegacyFilterType { Basic, Advanced, Cached }

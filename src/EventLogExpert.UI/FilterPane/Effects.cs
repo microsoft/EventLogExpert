@@ -2,12 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using Fluxor;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterPane;
 
@@ -175,7 +176,7 @@ public sealed class Effects
     }
 
     private static EventFilter GetEventFilter(FilterPaneState filterPaneState) =>
-        new(filterPaneState.FilteredDateRange, filterPaneState.Filters.Where(f => f.IsEnabled).ToImmutableList());
+        new(filterPaneState.FilteredDateRange, [.. filterPaneState.Filters.Where(f => f.IsEnabled)]);
 
     private void UpdateEventTableFilters(FilterPaneState filterPaneState, IDispatcher dispatcher)
     {
@@ -183,7 +184,7 @@ public sealed class Effects
             ? GetEventFilter(filterPaneState)
             : new EventFilter(
                 filterPaneState.FilteredDateRange,
-                filterPaneState.Filters.Where(filter => filter.IsExcluded).ToImmutableList());
+                [.. filterPaneState.Filters.Where(filter => filter.IsExcluded)]);
 
         if (!candidate.HasFilteringChangedFrom(_appliedFilter.Value))
         {

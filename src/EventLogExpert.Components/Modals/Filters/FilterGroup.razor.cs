@@ -1,10 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using Microsoft.AspNetCore.Components;

@@ -1,12 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
-using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Tests.FilterGroup;
 
@@ -183,7 +182,7 @@ public sealed class EffectsTests
 
         mockState.Value.Returns(new FilterGroupState
         {
-            Groups = ImmutableList.CreateRange(groups ?? [])
+            Groups = [.. groups ?? []]
         });
 
         var mockPreferencesProvider = Substitute.For<IFilterGroupPreferencesProvider>();

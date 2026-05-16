@@ -2,8 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Filters.Base;
+using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
@@ -13,13 +15,6 @@ using PaneActions = EventLogExpert.UI.FilterPane;
 
 namespace EventLogExpert.Components.Filters;
 
-/// <summary>
-///     Single editor row that hosts every authoring mode (Basic, Advanced, Cached) behind a Mode dropdown. Mode
-///     switches go through <see cref="FilterDraft.WouldLoseDataSwitchingTo" /> + a confirm dialog before
-///     <see cref="FilterDraft.ApplyModeSwitch" /> mutates the draft, so a destructive switch can be cancelled without
-///     leaking state. Save delegates to <see cref="FilterDraft.TryBuildSavedFilter" /> so the per-mode validation lives
-///     next to the data and is unit-testable.
-/// </summary>
 public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
 {
     /// <summary>Notifies the parent which saved rows are mid-edit.</summary>

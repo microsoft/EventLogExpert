@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DetailsPane;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.LogTable;
@@ -45,7 +45,7 @@ public sealed class PreferencesProvider :
 
     public IDictionary<ColumnName, int> ColumnWidthsPreference
     {
-        get => JsonSerializer.Deserialize<Dictionary<ColumnName, int>>(Preferences.Default.Get(ColumnWidths, "{}")) ?? new Dictionary<ColumnName, int>();
+        get => JsonSerializer.Deserialize<Dictionary<ColumnName, int>>(Preferences.Default.Get(ColumnWidths, "{}")) ?? [];
         set => Preferences.Default.Set(ColumnWidths, JsonSerializer.Serialize(value));
     }
 

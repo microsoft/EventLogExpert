@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Runtime;
 
 namespace EventLogExpert.UI.Filter;
 

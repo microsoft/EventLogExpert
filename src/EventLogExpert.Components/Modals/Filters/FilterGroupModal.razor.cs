@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

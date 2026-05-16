@@ -24,7 +24,7 @@ public sealed class Reducers
     public static EventLogState ReduceCloseAll(EventLogState state) =>
         state with
         {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty,
+            ActiveLogs = [],
             SelectedEvent = null,
             SelectedEvents = [],
             NewEventBuffer = [],

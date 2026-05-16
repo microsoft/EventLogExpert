@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Runtime;
 
-/// <summary>Snapshot of <see cref="SavedFilter" /> fields that affect the filtered event set.</summary>
 public readonly record struct FilterSnapshot(string Value, bool IsExcluded);
 
 public readonly record struct EventFilter
@@ -22,21 +22,11 @@ public readonly record struct EventFilter
 
     public ImmutableList<SavedFilter> Filters { get; }
 
-    /// <summary>
-    ///     True when either the date filter is active or at least one saved filter is present.
-    ///     Drives short-circuits in <see cref="EventLogExpert.UI.Filter.FilterService" /> and the
-    ///     status-bar's visible/hidden counts.
-    /// </summary>
     public bool IsFilteringEnabled =>
         DateFilter?.IsEnabled is true || Filters.IsEmpty is false;
 
-    /// <summary>Construction-time snapshot used by <see cref="EventFilterExtensions.HasFilteringChangedFrom" />.</summary>
     public ImmutableArray<FilterSnapshot> Snapshots { get; }
 
-    /// <summary>
-    ///     True when any filter or sub-filter references
-    ///     <see cref="EventLogExpert.Eventing.Common.Events.ResolvedEvent.Xml" />.
-    /// </summary>
     public bool RequiresXml { get; }
 
     private static bool ComputeRequiresXml(ImmutableList<SavedFilter> filters)
@@ -53,7 +43,7 @@ public readonly record struct EventFilter
 
     private static ImmutableArray<FilterSnapshot> ComputeSnapshots(ImmutableList<SavedFilter> filters)
     {
-        if (filters.Count == 0) { return ImmutableArray<FilterSnapshot>.Empty; }
+        if (filters.Count == 0) { return []; }
 
         var builder = ImmutableArray.CreateBuilder<FilterSnapshot>(filters.Count);
 

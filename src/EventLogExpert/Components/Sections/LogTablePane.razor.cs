@@ -5,6 +5,8 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
@@ -18,7 +20,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
-using FilterMode = EventLogExpert.UI.Filter.FilterMode;
+using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
@@ -27,11 +29,6 @@ public sealed partial class LogTablePane
 {
     private const int DefaultPageSize = 20;
 
-    // Tracks HighlightColor enum values we've already warned about so the
-    // warning is emitted at most once per unknown value across the app's
-    // lifetime, instead of once per matched event in the GetHighlight hot
-    // path. Synchronized because filter updates can flow through Fluxor
-    // effects on background threads.
     private static readonly HashSet<int> s_warnedUnknownColors = [];
 
     private readonly Dictionary<ResolvedEvent, string?> _highlightCache = new(ReferenceEqualityComparer.Instance);

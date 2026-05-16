@@ -1,22 +1,20 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering;
-
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.Filtering.Drafts;
 
 /// <summary>
-///     Mutable editor mirror of <see cref="BasicFilterCondition" /> used by the Basic-filter UI. Exists because Blazor
-///     two-way binding requires get/set properties; the immutable <see cref="BasicFilterCondition" /> is materialized
-///     via <see cref="ToCondition" /> on save.
+///     Mutable editor mirror of <see cref="BasicFilterCondition" /> used by the Basic-filter UI. Exists because
+///     Blazor two-way binding requires get/set properties; the immutable <see cref="BasicFilterCondition" /> is
+///     materialized via <see cref="ToCondition" /> on save.
 /// </summary>
 public sealed class FilterConditionDraft
 {
-    public EventProperty Property { get; set; }
+    public MatchMode MatchMode { get; set; }
 
     public ComparisonOperator Operator { get; set; }
 
-    public MatchMode MatchMode { get; set; }
+    public EventProperty Property { get; set; }
 
     public string? Value { get; set; }
 

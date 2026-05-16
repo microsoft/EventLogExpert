@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;

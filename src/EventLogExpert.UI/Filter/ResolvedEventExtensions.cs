@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 
 namespace EventLogExpert.UI.Filter;
 

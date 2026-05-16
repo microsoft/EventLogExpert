@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
@@ -12,7 +12,7 @@ namespace EventLogExpert.Components.Filters;
 
 public sealed partial class BasicFilterConditionEditor : ComponentBase
 {
-    private ImmutableArray<string> _filteredItemsSource = ImmutableArray<string>.Empty;
+    private ImmutableArray<string> _filteredItemsSource = [];
     private string? _filteredItemsValue;
 
     [Parameter][EditorRequired] public FilterConditionDraft Condition { get; set; } = null!;

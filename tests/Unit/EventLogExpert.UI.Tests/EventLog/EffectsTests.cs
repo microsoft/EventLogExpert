@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.EventLog;

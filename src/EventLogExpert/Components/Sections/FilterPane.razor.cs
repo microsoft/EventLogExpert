@@ -3,10 +3,12 @@
 
 using EventLogExpert.Components.Modals.Filters;
 using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filter;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.FilterPane;
@@ -18,7 +20,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using FilterGroupState = EventLogExpert.UI.FilterGroup.FilterGroupState;
-using FilterMode = EventLogExpert.UI.Filter.FilterMode;
+using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
@@ -53,23 +55,16 @@ public sealed partial class FilterPane : IDisposable
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     private bool HasCachedFilters =>
-        FilterCacheState.Value.FavoriteFilters.Any() || FilterCacheState.Value.RecentFilters.Any();
+        !FilterCacheState.Value.FavoriteFilters.IsEmpty || !FilterCacheState.Value.RecentFilters.IsEmpty;
 
-    // Things Clear All actually removes: persisted filters, pending drafts, open date editor.
-    // The apply-group picker is a UI-only surface (Cancel closes it) and is intentionally excluded
-    // so the trash icon doesn't appear actionable when there's nothing destructive to do.
     private bool HasClearableFilters =>
         IsDateFilterVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
     private bool HasFilterGroups => !FilterGroupState.Value.Groups.IsEmpty;
 
-    // True whenever the pane has anything to show below the header (committed filters, pending drafts,
-    // an open date editor, or the apply-group picker). Drives expand/collapse + active-count visibility.
     private bool HasFilters =>
         IsDateFilterVisible || _isGroupPickerVisible || FilterPaneState.Value.Filters.IsEmpty is false || _pendingDrafts.Count > 0;
 
-    // Save-as-group only persists committed pane filters (effect reads `FilterPaneState.Value.Filters`).
-    // Pending drafts, the date filter, and an open group picker are NOT saved, so they don't enable Save.
     private bool HasSavableFilters => !FilterPaneState.Value.Filters.IsEmpty;
 
     private bool IsAddFilterMenuOpen =>
