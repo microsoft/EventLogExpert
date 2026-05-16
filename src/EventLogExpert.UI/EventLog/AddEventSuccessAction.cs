@@ -6,4 +6,4 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record AddEventSuccessAction(ImmutableDictionary<string, EventLogData> ActiveLogs);
+internal sealed record AddEventSuccessAction(ImmutableDictionary<string, EventLogData> ActiveLogs);
