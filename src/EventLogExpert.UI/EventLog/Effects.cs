@@ -8,6 +8,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Common.Lifecycle;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.FilterLoading;
 using EventLogExpert.UI.Filters;
@@ -107,16 +108,12 @@ public sealed class Effects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod(typeof(CloseAllAction))]
-    public async Task HandleCloseAll(IDispatcher dispatcher)
+    [EffectMethod(typeof(CloseAllLogsAction))]
+    public async Task HandleCloseAll()
     {
         _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
 
         CancelAllLoads();
-
-        // Sync prefix: subsequent OpenLogAction must see cleared LogTable.
-        dispatcher.Dispatch(new LogTable.CloseAllAction());
-        dispatcher.Dispatch(new StatusBar.CloseAllAction());
 
         _resolverCache.ClearAll();
         _xmlResolver.ClearAll();

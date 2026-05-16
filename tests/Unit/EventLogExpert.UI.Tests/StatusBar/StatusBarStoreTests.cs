@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Common.Lifecycle;
 using EventLogExpert.UI.StatusBar;
 using System.Collections.Immutable;
 
@@ -37,9 +38,9 @@ public sealed class StatusBarActionTests
     }
 
     [Fact]
-    public void CloseAllAction_ShouldCreateAction()
+    public void CloseAllLogsAction_ShouldCreateAction()
     {
-        var action = new CloseAllAction();
+        var action = new CloseAllLogsAction();
 
         Assert.NotNull(action);
     }

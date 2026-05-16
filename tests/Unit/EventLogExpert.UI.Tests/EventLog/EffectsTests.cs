@@ -21,7 +21,7 @@ using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
-using CloseAllAction = EventLogExpert.UI.LogTable.CloseAllAction;
+using CloseAllLogsAction = EventLogExpert.UI.Common.Lifecycle.CloseAllLogsAction;
 using CloseLogAction = EventLogExpert.UI.EventLog.CloseLogAction;
 using Effects = EventLogExpert.UI.EventLog.Effects;
 
@@ -148,11 +148,9 @@ public sealed class EffectsTests
         var watcherTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogWatcher.RemoveAllAsync().Returns(watcherTcs.Task);
 
-        var closeTask = effects.HandleCloseAll(mockDispatcher);
+        var closeTask = effects.HandleCloseAll();
 
         Assert.False(closeTask.IsCompleted, "HandleCloseAll must still be awaiting RemoveAllAsync.");
-        mockDispatcher.Received(1).Dispatch(Arg.Any<CloseAllAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<UI.StatusBar.CloseAllAction>());
         mockResolverCache.Received(1).ClearAll();
 
         watcherTcs.SetResult();
@@ -193,10 +191,8 @@ public sealed class EffectsTests
             Substitute.For<IBannerService>(),
             Substitute.For<IDispatcher>());
 
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
         // Act
-        await effects.HandleCloseAll(mockDispatcher);
+        await effects.HandleCloseAll();
 
         // Assert
         mockXmlResolver.Received(1).ClearAll();
@@ -206,16 +202,14 @@ public sealed class EffectsTests
     public async Task HandleCloseAll_ShouldRemoveAllLogsAndClearCache()
     {
         // Arrange
-        var (effects, mockDispatcher, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
+        var (effects, _, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
 
         // Act
-        await effects.HandleCloseAll(mockDispatcher);
+        await effects.HandleCloseAll();
 
         // Assert
         await mockLogWatcher.Received(1).RemoveAllAsync();
         mockResolverCache.Received(1).ClearAll();
-        mockDispatcher.Received(1).Dispatch(Arg.Any<CloseAllAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<UI.StatusBar.CloseAllAction>());
     }
 
     [Fact]
