@@ -168,13 +168,12 @@ public sealed partial class FilterPane : IDisposable
 
     private void ApplyDateFilter()
     {
-        Dispatcher.Dispatch(
-            new SetFilterDateRangeAction(
-                new DateFilter
-                {
-                    After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
-                    Before = _model.Before?.ConvertTimeZoneToUtc(_currentTimeZone)
-                }));
+        FilterPaneCommands.SetFilterDateRange(
+            new DateFilter
+            {
+                After = _model.After?.ConvertTimeZoneToUtc(_currentTimeZone),
+                Before = _model.Before?.ConvertTimeZoneToUtc(_currentTimeZone)
+            });
 
         _canEditDate = false;
     }
@@ -185,7 +184,7 @@ public sealed partial class FilterPane : IDisposable
 
         if (group is not null)
         {
-            Dispatcher.Dispatch(new ApplyFilterGroupAction(group));
+            FilterPaneCommands.ApplyFilterGroup(group);
         }
 
         CancelFilterGroupPicker();
@@ -270,7 +269,7 @@ public sealed partial class FilterPane : IDisposable
     private void HandlePendingSave(FilterDraft draft, SavedFilter filter)
     {
         _pendingDrafts.Remove(draft);
-        Dispatcher.Dispatch(new SetFilterAction(filter));
+        FilterPaneCommands.SetFilter(filter);
     }
 
     // Marshaled through the renderer dispatcher because StateChanged may fire from arbitrary threads;
@@ -311,7 +310,7 @@ public sealed partial class FilterPane : IDisposable
     private void RemoveDateFilter()
     {
         _canEditDate = false;
-        Dispatcher.Dispatch(new SetFilterDateRangeAction(null));
+        FilterPaneCommands.SetFilterDateRange(null);
     }
 
     private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsGroupAsync();

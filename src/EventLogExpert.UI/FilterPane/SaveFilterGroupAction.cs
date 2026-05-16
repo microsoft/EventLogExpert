@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterPane;
 
-public sealed record SaveFilterGroupAction(string Name);
+internal sealed record SaveFilterGroupAction(string Name);
