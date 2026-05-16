@@ -6,15 +6,15 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering;
 using EventLogExpert.Filtering.Runtime;
 
-namespace EventLogExpert.UI.Filter;
+namespace EventLogExpert.UI.Filters;
 
 public interface IFilterService
 {
     IReadOnlyDictionary<EventLogId, IReadOnlyList<ResolvedEvent>> FilterActiveLogs(
         IEnumerable<EventLogData> logData,
-        EventFilter eventFilter);
+        Filter filter);
 
-    IReadOnlyList<ResolvedEvent> GetFilteredEvents(IEnumerable<ResolvedEvent> events, EventFilter eventFilter);
+    IReadOnlyList<ResolvedEvent> GetFilteredEvents(IEnumerable<ResolvedEvent> events, Filter filter);
 
     bool TryFormat(BasicFilter basicFilter, out string comparison);
 }

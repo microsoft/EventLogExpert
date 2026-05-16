@@ -113,7 +113,7 @@ public sealed class EffectsTests
         // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
-            appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
+            appliedFilter: new Filter(null, CreateSingleEnabledFilters()));
 
         // Act
         await effects.HandleClearAllFilters(mockDispatcher);
@@ -128,7 +128,7 @@ public sealed class EffectsTests
         // Arrange
         var (effects, mockDispatcher) = CreateEffects(
             true,
-            appliedFilter: new EventFilter(null, CreateSingleEnabledFilters()));
+            appliedFilter: new Filter(null, CreateSingleEnabledFilters()));
 
         // Act
         await effects.HandleRemoveAdvancedFilter(mockDispatcher);
@@ -533,7 +533,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects(
             true,
             paneFilters,
-            appliedFilter: new EventFilter(null, appliedFilters));
+            appliedFilter: new Filter(null, appliedFilters));
 
         // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
@@ -561,8 +561,8 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFiltersAction>(x =>
-            x.EventFilter.Filters.Count == 1 &&
-            x.EventFilter.Filters[0].IsExcluded));
+            x.Filter.Filters.Count == 1 &&
+            x.Filter.Filters[0].IsExcluded));
     }
 
     [Fact]
@@ -584,8 +584,8 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFiltersAction>(x =>
-            x.EventFilter.Filters.Count == 1 &&
-            x.EventFilter.Filters[0].ComparisonText == Constants.FilterIdEquals100));
+            x.Filter.Filters.Count == 1 &&
+            x.Filter.Filters[0].ComparisonText == Constants.FilterIdEquals100));
     }
 
     [Fact]
@@ -596,7 +596,7 @@ public sealed class EffectsTests
         var (effects, mockDispatcher) = CreateEffects(
             true,
             filters,
-            appliedFilter: new EventFilter(null, filters));
+            appliedFilter: new Filter(null, filters));
 
         // Act
         await effects.HandleToggleIsEnabled(mockDispatcher);
@@ -622,7 +622,7 @@ public sealed class EffectsTests
         ImmutableList<SavedFilter>? filters = null,
         DateFilter? filteredDateRange = null,
         ImmutableDictionary<string, EventLogData>? activeLogs = null,
-        EventFilter? appliedFilter = null)
+        Filter? appliedFilter = null)
     {
         var mockFilterPaneState = Substitute.For<IState<FilterPaneState>>();
 
@@ -633,8 +633,8 @@ public sealed class EffectsTests
             FilteredDateRange = filteredDateRange
         });
 
-        var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, EventFilter>>();
-        mockAppliedFilter.Value.Returns(appliedFilter ?? new EventFilter(null, []));
+        var mockAppliedFilter = Substitute.For<IStateSelection<EventLogState, Filter>>();
+        mockAppliedFilter.Value.Returns(appliedFilter ?? new Filter(null, []));
 
         var mockEventDateRange =
             Substitute.For<IStateSelection<EventLogState, (DateTime After, DateTime Before)?>>();

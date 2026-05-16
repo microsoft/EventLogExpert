@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Runtime;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed record SetFiltersAction(EventFilter EventFilter);
+public sealed record SetFiltersAction(Filter Filter);

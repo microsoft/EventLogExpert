@@ -18,7 +18,7 @@ public sealed record EventLogState
     public ImmutableDictionary<string, EventLogData> ActiveLogs { get; init; } =
         [];
 
-    public EventFilter AppliedFilter { get; init; } = new(null, []);
+    public Filter AppliedFilter { get; init; } = new(null, []);
 
     public bool ContinuouslyUpdate { get; init; } = false;
 

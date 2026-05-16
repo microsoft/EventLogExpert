@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -229,12 +229,12 @@ public sealed class Reducers
     [ReducerMethod]
     public static EventLogState ReduceSetFilters(EventLogState state, SetFiltersAction action)
     {
-        if (!action.EventFilter.HasFilteringChangedFrom(state.AppliedFilter))
+        if (!action.Filter.HasFilteringChangedFrom(state.AppliedFilter))
         {
             return state;
         }
 
-        return state with { AppliedFilter = action.EventFilter };
+        return state with { AppliedFilter = action.Filter };
     }
 
     [ReducerMethod]

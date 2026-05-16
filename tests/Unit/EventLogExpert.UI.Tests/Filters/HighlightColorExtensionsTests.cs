@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.Filter;
+using EventLogExpert.UI.Filters;
 
-namespace EventLogExpert.UI.Tests.Filter;
+namespace EventLogExpert.UI.Tests.Filters;
 
 public sealed class HighlightColorExtensionsTests
 {
