@@ -7,10 +7,10 @@ using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.FilterCache;
+using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using GroupActions = EventLogExpert.UI.FilterGroup;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Filters;
@@ -64,6 +64,8 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     }
 
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
+
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
@@ -138,7 +140,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     {
         if (ParentFilterGroupId is { } parentId)
         {
-            Dispatcher.Dispatch(new GroupActions.RemoveFilterAction(parentId, id));
+            FilterGroupCommands.RemoveFilter(parentId, id);
         }
         else
         {
@@ -150,7 +152,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     {
         if (ParentFilterGroupId is { } parentId)
         {
-            Dispatcher.Dispatch(new GroupActions.SetFilterAction(parentId, filter));
+            FilterGroupCommands.SetFilter(parentId, filter);
         }
         else
         {
@@ -169,7 +171,7 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
     {
         if (ParentFilterGroupId is { } parentId)
         {
-            Dispatcher.Dispatch(new GroupActions.ToggleFilterExcludedAction(parentId, id));
+            FilterGroupCommands.ToggleFilterExcluded(parentId, id);
         }
         else
         {
