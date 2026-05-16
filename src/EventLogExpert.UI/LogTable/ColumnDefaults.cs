@@ -6,9 +6,9 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-internal static class ColumnDefaults
+internal sealed class ColumnDefaults : ILogTableColumnDefaultsProvider
 {
-    public static readonly ImmutableList<ColumnName> EnabledColumns =
+    private static readonly ImmutableList<ColumnName> s_enabledColumns =
     [
         ColumnName.Level,
         ColumnName.DateAndTime,
@@ -17,7 +17,7 @@ internal static class ColumnDefaults
         ColumnName.TaskCategory
     ];
 
-    public static readonly ImmutableList<ColumnName> Order =
+    private static readonly ImmutableList<ColumnName> s_order =
     [
         ColumnName.Level,
         ColumnName.DateAndTime,
@@ -33,7 +33,7 @@ internal static class ColumnDefaults
         ColumnName.User
     ];
 
-    public static readonly FrozenDictionary<ColumnName, int> Widths = new Dictionary<ColumnName, int>
+    private static readonly FrozenDictionary<ColumnName, int> s_widths = new Dictionary<ColumnName, int>
     {
         [ColumnName.Level] = 100,
         [ColumnName.DateAndTime] = 160,
@@ -49,6 +49,12 @@ internal static class ColumnDefaults
         [ColumnName.User] = 180
     }.ToFrozenDictionary();
 
-    public static int GetWidth(ColumnName column) =>
-        Widths.TryGetValue(column, out int width) ? width : 100;
+    public ImmutableList<ColumnName> EnabledColumns => s_enabledColumns;
+
+    public ImmutableList<ColumnName> ColumnOrder => s_order;
+
+    public FrozenDictionary<ColumnName, int> ColumnWidths => s_widths;
+
+    public int GetColumnWidth(ColumnName column) =>
+        s_widths.TryGetValue(column, out int width) ? width : 100;
 }

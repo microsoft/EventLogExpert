@@ -6,6 +6,8 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using Fluxor;
 using System.Collections.Immutable;
@@ -22,6 +24,8 @@ public sealed partial class App : Application
 
     public App(
         IDispatcher fluxorDispatcher,
+        ILogTableCommands logTableCommands,
+        IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
         ISettingsService settings,
         IAppTitleService appTitleService,
@@ -37,6 +41,8 @@ public sealed partial class App : Application
 
         _mainPage = new MainPage(
             fluxorDispatcher,
+            logTableCommands,
+            filterGroupCommands,
             activeLogs,
             settings,
             appTitleService,

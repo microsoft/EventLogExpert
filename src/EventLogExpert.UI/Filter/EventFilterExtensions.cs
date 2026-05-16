@@ -7,10 +7,6 @@ internal static class EventFilterExtensions
 {
     extension(EventFilter eventFilter)
     {
-        public bool IsFilteringEnabled =>
-            eventFilter.DateFilter?.IsEnabled is true ||
-            eventFilter.Filters.IsEmpty is false;
-
         public bool HasFilteringChangedFrom(EventFilter original)
         {
             if (!Equals(eventFilter.DateFilter, original.DateFilter)) { return true; }

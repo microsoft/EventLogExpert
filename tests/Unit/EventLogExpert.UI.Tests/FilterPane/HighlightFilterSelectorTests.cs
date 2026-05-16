@@ -11,6 +11,8 @@ namespace EventLogExpert.UI.Tests.FilterPane;
 
 public sealed class HighlightFilterSelectorTests
 {
+    private static readonly HighlightFilterSelector s_selector = new();
+
     [Fact]
     public void ComputeHighlightKey_WhenCandidateAdded_ReturnsDifferentKey()
     {
@@ -25,8 +27,8 @@ public sealed class HighlightFilterSelectorTests
             true);
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first, second)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(first)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(first, second)));
     }
 
     [Fact]
@@ -45,8 +47,8 @@ public sealed class HighlightFilterSelectorTests
             true);
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first, second)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(second, first)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(first, second)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(second, first)));
     }
 
     [Fact]
@@ -60,8 +62,8 @@ public sealed class HighlightFilterSelectorTests
         var blue = red with { Color = HighlightColor.Blue };
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(red)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(blue)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(red)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(blue)));
     }
 
     [Fact]
@@ -77,8 +79,8 @@ public sealed class HighlightFilterSelectorTests
         var undefined = defined with { Color = (HighlightColor)9999 };
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(defined)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(undefined)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(defined)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(undefined)));
     }
 
     [Fact]
@@ -100,8 +102,8 @@ public sealed class HighlightFilterSelectorTests
 
         Assert.NotSame(first.Compiled, second.Compiled);
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(first)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(second)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(first)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(second)));
     }
 
     [Fact]
@@ -115,8 +117,8 @@ public sealed class HighlightFilterSelectorTests
         var filters = ImmutableList.Create(keeper);
 
         Assert.Equal(
-            HighlightFilterSelector.ComputeHighlightKey(filters),
-            HighlightFilterSelector.ComputeHighlightKey(filters));
+            s_selector.ComputeHighlightKey(filters),
+            s_selector.ComputeHighlightKey(filters));
     }
 
     [Fact]
@@ -130,8 +132,8 @@ public sealed class HighlightFilterSelectorTests
         var disabled = enabled with { IsEnabled = false };
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(enabled)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabled)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(enabled)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(disabled)));
     }
 
     [Fact]
@@ -145,8 +147,8 @@ public sealed class HighlightFilterSelectorTests
         var excluded = included with { IsExcluded = true };
 
         Assert.NotEqual(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(included)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(excluded)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(included)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(excluded)));
     }
 
     [Fact]
@@ -164,10 +166,10 @@ public sealed class HighlightFilterSelectorTests
         var withDifferentId = original with { Id = FilterId.Create() };
         var withDifferentText = original with { ComparisonText = "Id == 12345" };
 
-        int originalKey = HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(original));
-        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentMode)));
-        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentId)));
-        Assert.Equal(originalKey, HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(withDifferentText)));
+        int originalKey = s_selector.ComputeHighlightKey(ImmutableList.Create(original));
+        Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentMode)));
+        Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentId)));
+        Assert.Equal(originalKey, s_selector.ComputeHighlightKey(ImmutableList.Create(withDifferentText)));
     }
 
     [Fact]
@@ -192,8 +194,8 @@ public sealed class HighlightFilterSelectorTests
         Assert.NotSame(disabledOriginal.Compiled, disabledWithDifferentCompiled.Compiled);
 
         Assert.Equal(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledOriginal)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledWithDifferentCompiled)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledOriginal)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(keeper, disabledWithDifferentCompiled)));
     }
 
     [Fact]
@@ -215,8 +217,8 @@ public sealed class HighlightFilterSelectorTests
             true);
 
         Assert.Equal(
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabledA, keeper, disabledB)),
-            HighlightFilterSelector.ComputeHighlightKey(ImmutableList.Create(disabledB, keeper, disabledA)));
+            s_selector.ComputeHighlightKey(ImmutableList.Create(disabledA, keeper, disabledB)),
+            s_selector.ComputeHighlightKey(ImmutableList.Create(disabledB, keeper, disabledA)));
     }
 
     [Fact]
@@ -235,8 +237,8 @@ public sealed class HighlightFilterSelectorTests
         var enabled = new FilterPaneState { IsEnabled = true, Filters = filters };
         var disabled = new FilterPaneState { IsEnabled = false, Filters = filters };
 
-        var fromEnabled = HighlightFilterSelector.SelectHighlightCandidates(enabled);
-        var fromDisabled = HighlightFilterSelector.SelectHighlightCandidates(disabled);
+        var fromEnabled = s_selector.SelectHighlightCandidates(enabled.Filters);
+        var fromDisabled = s_selector.SelectHighlightCandidates(disabled.Filters);
 
         Assert.Equal(fromEnabled.Length, fromDisabled.Length);
 
@@ -258,7 +260,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(noneColored) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Single(result);
         Assert.Same(noneColored, result[0]);
@@ -274,7 +276,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(keeper) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Single(result);
         Assert.Same(keeper, result[0]);
@@ -289,7 +291,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(disabled) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Empty(result);
     }
@@ -305,7 +307,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(excluded) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Empty(result);
     }
@@ -326,7 +328,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(uncompiled) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Empty(result);
     }
@@ -346,7 +348,7 @@ public sealed class HighlightFilterSelectorTests
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(rogue) };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Empty(result);
     }
@@ -365,7 +367,7 @@ public sealed class HighlightFilterSelectorTests
             Filters = ImmutableList.Create(keeper)
         };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(disabledPaneState);
+        var result = s_selector.SelectHighlightCandidates(disabledPaneState.Filters);
 
         Assert.Single(result);
         Assert.Same(keeper, result[0]);
@@ -376,7 +378,7 @@ public sealed class HighlightFilterSelectorTests
     {
         var state = new FilterPaneState();
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Empty(result);
     }
@@ -409,7 +411,7 @@ public sealed class HighlightFilterSelectorTests
             Filters = ImmutableList.Create(disabled, excluded, firstKeeper, secondKeeper)
         };
 
-        var result = HighlightFilterSelector.SelectHighlightCandidates(state);
+        var result = s_selector.SelectHighlightCandidates(state.Filters);
 
         Assert.Equal(2, result.Length);
         Assert.Same(firstKeeper, result[0]);

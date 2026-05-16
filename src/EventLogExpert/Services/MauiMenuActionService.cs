@@ -30,6 +30,8 @@ namespace EventLogExpert.Services;
 /// </summary>
 public sealed class MauiMenuActionService(
     IDispatcher dispatcher,
+    IEventLogCommands eventLogCommands,
+    IFilterPaneCommands filterPaneCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
     IModalService modalService,
@@ -43,7 +45,9 @@ public sealed class MauiMenuActionService(
     private readonly ICurrentVersionProvider _currentVersionProvider = currentVersionProvider;
     private readonly IAlertDialogService _dialogService = dialogService;
     private readonly IDispatcher _dispatcher = dispatcher;
+    private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
+    private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
     private readonly IModalService _modalService = modalService;
     private readonly ISettingsService _settings = settings;
@@ -130,7 +134,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public void LoadNewEvents() => _dispatcher.Dispatch(new LoadNewEventsAction());
+    public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
 
     public Task OpenDocsAsync() =>
         OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
@@ -319,7 +323,7 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public void ToggleShowAllEvents() => _dispatcher.Dispatch(new ToggleIsEnabledAction());
+    public void ToggleShowAllEvents() => _filterPaneCommands.ToggleFilteringEnabled();
 
     private static string GetEmptyLogDisplayName(string path, LogPathType type)
     {

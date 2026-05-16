@@ -48,6 +48,8 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IState<FilterLoadingState> FilterLoadingState { get; init; } = null!;
 
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     private bool HasCachedFilters =>
@@ -319,7 +321,7 @@ public sealed partial class FilterPane : IDisposable
 
     private Task SaveFiltersAsGroupAsync() => !HasSavableFilters ? Task.CompletedTask : MenuActions.SaveFiltersAsGroupAsync();
 
-    private void ToggleDateFilter() => Dispatcher.Dispatch(new ToggleFilterDateAction());
+    private void ToggleDateFilter() => FilterPaneCommands.ToggleFilterDate();
 
     private void ToggleMenu() => _isFilterListVisible = !_isFilterListVisible;
 

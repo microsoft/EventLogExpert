@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterPane;
 
-internal sealed record ClearAllFiltersAction;
+public sealed record ClearAllFiltersAction;
