@@ -28,7 +28,7 @@ public sealed class EventLogStoreTests
         };
 
         // Act - Buffer events
-        state = Reducers.ReduceAddEventBuffered(state, new AddEventBufferedAction(events, false));
+        state = Reducers.ReduceEventBuffered(state, new EventBufferedAction(events, false));
 
         // Assert
         Assert.Equal(2, state.NewEventBuffer.Count);
@@ -328,43 +328,6 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void ReduceAddEventBuffered_ShouldUpdateBufferAndFullFlag()
-    {
-        // Arrange
-        var state = new EventLogState();
-
-        var events = new List<ResolvedEvent>
-        {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
-        };
-
-        var action = new AddEventBufferedAction(events, true);
-
-        // Act
-        var newState = Reducers.ReduceAddEventBuffered(state, action);
-
-        // Assert
-        Assert.Equal(2, newState.NewEventBuffer.Count);
-        Assert.True(newState.NewEventBufferIsFull);
-    }
-
-    [Fact]
-    public void ReduceAddEventBuffered_WhenNotFull_ShouldSetFullFlagFalse()
-    {
-        // Arrange
-        var state = new EventLogState { NewEventBufferIsFull = true };
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
-        var action = new AddEventBufferedAction(events, false);
-
-        // Act
-        var newState = Reducers.ReduceAddEventBuffered(state, action);
-
-        // Assert
-        Assert.False(newState.NewEventBufferIsFull);
-    }
-
-    [Fact]
     public void ReduceAddEventSuccess_ShouldUpdateActiveLogs()
     {
         // Arrange
@@ -512,6 +475,43 @@ public sealed class EventLogStoreTests
         Assert.Single(newState.ActiveLogs);
         Assert.False(newState.ActiveLogs.ContainsKey(Constants.LogNameLog1));
         Assert.True(newState.ActiveLogs.ContainsKey(Constants.LogNameLog2));
+    }
+
+    [Fact]
+    public void ReduceEventBuffered_ShouldUpdateBufferAndFullFlag()
+    {
+        // Arrange
+        var state = new EventLogState();
+
+        var events = new List<ResolvedEvent>
+        {
+            EventUtils.CreateTestEvent(100),
+            EventUtils.CreateTestEvent(200)
+        };
+
+        var action = new EventBufferedAction(events, true);
+
+        // Act
+        var newState = Reducers.ReduceEventBuffered(state, action);
+
+        // Assert
+        Assert.Equal(2, newState.NewEventBuffer.Count);
+        Assert.True(newState.NewEventBufferIsFull);
+    }
+
+    [Fact]
+    public void ReduceEventBuffered_WhenNotFull_ShouldSetFullFlagFalse()
+    {
+        // Arrange
+        var state = new EventLogState { NewEventBufferIsFull = true };
+        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var action = new EventBufferedAction(events, false);
+
+        // Act
+        var newState = Reducers.ReduceEventBuffered(state, action);
+
+        // Assert
+        Assert.False(newState.NewEventBufferIsFull);
     }
 
     [Fact]
