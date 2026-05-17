@@ -3,7 +3,7 @@
 
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Basic;
 
 [JsonConverter(typeof(SubFilterJsonConverter))]
 public sealed record SubFilter(FilterComparison Comparison, bool JoinWithAny);

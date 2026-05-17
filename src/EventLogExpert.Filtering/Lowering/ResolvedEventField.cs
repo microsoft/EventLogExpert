@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Common;
 
 namespace EventLogExpert.Filtering.Lowering;
 

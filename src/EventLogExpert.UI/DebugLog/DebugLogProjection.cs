@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Common;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.DebugLog;

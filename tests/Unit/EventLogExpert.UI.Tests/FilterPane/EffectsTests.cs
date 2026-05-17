@@ -4,6 +4,8 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.EventLog;

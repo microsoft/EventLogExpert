@@ -1,8 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.EventData;
 using EventLogExpert.UI.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;

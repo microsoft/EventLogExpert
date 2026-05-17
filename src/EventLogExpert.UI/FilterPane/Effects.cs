@@ -5,9 +5,9 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.Filters;
 using Fluxor;
 
 namespace EventLogExpert.UI.FilterPane;
