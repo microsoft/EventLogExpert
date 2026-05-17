@@ -2,13 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Database;
-using EventLogExpert.UI.DetailsPane;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.LogTable;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 

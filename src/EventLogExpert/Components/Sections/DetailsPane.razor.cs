@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.UI.DetailsPane;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

@@ -3,7 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Components.Menu;
-using EventLogExpert.UI.Menu;
+using EventLogExpert.Runtime.Menu;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Tests.Menu;

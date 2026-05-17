@@ -2,9 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Services;
-using EventLogExpert.UI.Common.AppTitle;
-using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Update;
+using EventLogExpert.Runtime.Common.AppTitle;
+using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Runtime.Update;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

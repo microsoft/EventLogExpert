@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Menu;
-using EventLogExpert.UI.Modal;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Modal;
+using EventLogExpert.Runtime.Settings;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.Services;

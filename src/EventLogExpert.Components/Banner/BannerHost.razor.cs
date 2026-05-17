@@ -2,11 +2,11 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Restart;
-using EventLogExpert.UI.Database;
-using EventLogExpert.UI.Menu;
+using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Restart;
+using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

@@ -3,11 +3,11 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.Filtering.Common;
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Display;
-using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.DebugLog;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Display;
+using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.DebugLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 

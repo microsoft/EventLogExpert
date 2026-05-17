@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Versioning;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.FilterPane;
-using EventLogExpert.UI.Menu;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

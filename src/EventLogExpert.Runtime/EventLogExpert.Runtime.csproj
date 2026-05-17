@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <SingleProject>true</SingleProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Fluxor.Blazor.Web" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Runtime.IntegrationTests" />
+    <InternalsVisibleTo Include="EventLogExpert.Runtime.Tests" />
+  </ItemGroup>
+
+</Project>

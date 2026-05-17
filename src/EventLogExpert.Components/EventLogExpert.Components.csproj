@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
   </ItemGroup>
 
 </Project>

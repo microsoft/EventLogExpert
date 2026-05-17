@@ -4,8 +4,8 @@
 using Bunit;
 using EventLogExpert.Components.Database;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Database.Upgrade;
+using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Database.Upgrade;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
