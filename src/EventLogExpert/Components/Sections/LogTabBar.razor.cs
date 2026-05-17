@@ -7,7 +7,6 @@ using EventLogExpert.UI.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
 
@@ -16,8 +15,6 @@ public sealed partial class LogTabBar
     private LogTableState _logTableState = null!;
 
     private List<LogView> _sortedTabs = [];
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
