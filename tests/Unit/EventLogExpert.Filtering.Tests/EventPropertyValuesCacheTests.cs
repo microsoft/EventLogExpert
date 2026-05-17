@@ -18,7 +18,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     public void Dispose() => EventPropertyValuesCache.Clear();
 
     [Fact]
-    public void GetItems_DifferentSnapshot_RecomputesValues()
+    public void GetValues_DifferentSnapshot_RecomputesValues()
     {
         // Arrange
         var snapshotA = ImmutableDictionary<string, EventLogData>.Empty.Add(
@@ -39,7 +39,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_LevelField_ReturnsAllSeverityLevelNames()
+    public void GetValues_LevelField_ReturnsAllSeverityLevelNames()
     {
         // Arrange
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty;
@@ -52,7 +52,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_LogDerivedField_ReturnsDistinctSortedValues()
+    public void GetValues_LogDerivedField_ReturnsDistinctSortedValues()
     {
         // Arrange
         var events = new List<ResolvedEvent>
@@ -76,7 +76,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_SameSnapshotAndField_ReturnsCachedInstance()
+    public void GetValues_SameSnapshotAndField_ReturnsCachedInstance()
     {
         // Arrange
         var logData = new EventLogData(
@@ -95,7 +95,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_SnapshotMutatedViaWith_ProducesDistinctCacheEntry()
+    public void GetValues_SnapshotMutatedViaWith_ProducesDistinctCacheEntry()
     {
         // Arrange
         var original = new EventLogData(
@@ -121,7 +121,7 @@ public sealed class EventPropertyValuesCacheTests : IDisposable
     }
 
     [Fact]
-    public void GetItems_UnsupportedField_ReturnsEmpty()
+    public void GetValues_UnsupportedField_ReturnsEmpty()
     {
         // Arrange
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(
