@@ -48,7 +48,7 @@ public sealed class FilterGroupStoreTests
         };
 
         // Act
-        var action = new ImportGroupsAction(groups);
+        var action = new ImportGroupsAction([.. groups]);
 
         // Assert
         Assert.Equal(2, action.Groups.Count());
@@ -61,7 +61,7 @@ public sealed class FilterGroupStoreTests
         var groups = new List<SavedFilterGroup> { new() { Name = Constants.FilterGroupName } };
 
         // Act
-        var action = new LoadGroupsSuccessAction(groups);
+        var action = new LoadGroupsSuccessAction([.. groups]);
 
         // Assert
         Assert.Single(action.Groups);
@@ -270,7 +270,7 @@ public sealed class FilterGroupStoreTests
         // Act
         state = Reducers.ReducerLoadGroupsSuccess(
             state,
-            new LoadGroupsSuccessAction(groups));
+            new LoadGroupsSuccessAction([.. groups]));
 
         // Assert
         Assert.NotEmpty(state.DisplayGroups);
@@ -331,7 +331,7 @@ public sealed class FilterGroupStoreTests
         // Act
         state = Reducers.ReducerLoadGroupsSuccess(
             state,
-            new LoadGroupsSuccessAction(groups));
+            new LoadGroupsSuccessAction([.. groups]));
 
         // Assert
         Assert.Equal(2, state.Groups.Count);
@@ -407,7 +407,7 @@ public sealed class FilterGroupStoreTests
             new() { Name = "Another\\Group" }
         };
 
-        var action = new ImportGroupsAction(newGroups);
+        var action = new ImportGroupsAction([.. newGroups]);
 
         // Act
         var newState = Reducers.ReducerImportGroups(state, action);
@@ -428,7 +428,7 @@ public sealed class FilterGroupStoreTests
             new() { Name = Constants.FilterGroupNameNested }
         };
 
-        var action = new LoadGroupsSuccessAction(groups);
+        var action = new LoadGroupsSuccessAction([.. groups]);
 
         // Act
         var newState = Reducers.ReducerLoadGroupsSuccess(state, action);
@@ -451,7 +451,7 @@ public sealed class FilterGroupStoreTests
             new() { Name = Constants.FilterGroupNameNested }
         };
 
-        var action = new LoadGroupsSuccessAction(newGroups);
+        var action = new LoadGroupsSuccessAction([.. newGroups]);
 
         // Act
         var newState = Reducers.ReducerLoadGroupsSuccess(state, action);

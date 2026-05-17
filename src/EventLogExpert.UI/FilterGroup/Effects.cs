@@ -30,7 +30,7 @@ internal sealed class Effects(
     {
         var loadedFilters = preferencesProvider.SavedFiltersPreference;
 
-        dispatcher.Dispatch(new LoadGroupsSuccessAction(loadedFilters));
+        dispatcher.Dispatch(new LoadGroupsSuccessAction([.. loadedFilters]));
 
         return Task.CompletedTask;
     }
