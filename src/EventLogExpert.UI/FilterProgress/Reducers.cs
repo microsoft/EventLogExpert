@@ -6,7 +6,7 @@ using Fluxor;
 
 namespace EventLogExpert.UI.FilterProgress;
 
-public sealed class Reducers
+internal sealed class Reducers
 {
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static FilterProgressState ReduceCloseAll(FilterProgressState state) =>
