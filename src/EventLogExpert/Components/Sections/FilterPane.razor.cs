@@ -21,7 +21,6 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using FilterGroupState = EventLogExpert.UI.FilterGroup.FilterGroupState;
 using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
 
@@ -39,8 +38,6 @@ public sealed partial class FilterPane : IDisposable
     private FilterGroupId _selectedGroupId;
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
 
@@ -226,7 +223,7 @@ public sealed partial class FilterPane : IDisposable
 
         bool confirmed = await AlertDialogService.ShowAlert("Clear All Filters", message, "Clear", "Cancel");
 
-        if (confirmed) { Dispatcher.Dispatch(new ClearAllFiltersAction()); }
+        if (confirmed) { FilterPaneCommands.ClearAllFilters(); }
     }
 
     private void EditDateFilter() => _canEditDate = true;
