@@ -13,7 +13,7 @@ using System.Threading.Channels;
 
 namespace EventLogExpert.UI.Database;
 
-public sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProvider
+internal sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProvider
 {
     public const string UpgradeBackupSuffix = ".upgrade.bak";
 

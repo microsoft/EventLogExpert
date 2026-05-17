@@ -1,10 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.Common.Databases;
+using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.Common.Versioning;
+using EventLogExpert.UI.Database;
+using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
@@ -52,6 +56,12 @@ public static class UiServiceCollectionExtensions
         // Application services.
         services.AddSingleton<IAppTitleService, AppTitleService>();
         services.AddSingleton<IBannerService, BannerService>();
+        services.AddSingleton<DatabaseService>();
+        services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
+        services.AddSingleton<IActiveDatabasePathsProvider>(static sp => sp.GetRequiredService<DatabaseService>());
+        services.AddSingleton<DebugLogService>();
+        services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
+        services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());
         services.AddSingleton<IFilterService, FilterService>();
         services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
         services.AddSingleton<ILogWatcherService, LogWatcherService>();

@@ -11,7 +11,7 @@ using System.Text;
 
 namespace EventLogExpert.UI.DebugLog;
 
-public sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDisposable
+internal sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 
