@@ -26,11 +26,11 @@ internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvide
         preferencesProvider.FavoriteFiltersPreference = newFavorites;
         preferencesProvider.RecentFiltersPreference = newRecents.ToList();
 
-        dispatcher.Dispatch(new AddFavoriteFilterCompletedAction(newFavorites));
+        dispatcher.Dispatch(new AddFavoriteFilterSuccessAction(newFavorites));
 
         if (newRecents.Count() != state.Value.RecentFilters.Count())
         {
-            dispatcher.Dispatch(new AddRecentFilterCompletedAction(newRecents));
+            dispatcher.Dispatch(new AddRecentFilterSuccessAction(newRecents));
         }
 
         return Task.CompletedTask;
@@ -54,7 +54,7 @@ internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvide
 
         preferencesProvider.RecentFiltersPreference = newFilters.ToList();
 
-        dispatcher.Dispatch(new AddRecentFilterCompletedAction(newFilters));
+        dispatcher.Dispatch(new AddRecentFilterSuccessAction(newFilters));
 
         return Task.CompletedTask;
     }
@@ -75,7 +75,7 @@ internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvide
 
         preferencesProvider.FavoriteFiltersPreference = newFilters;
 
-        dispatcher.Dispatch(new AddFavoriteFilterCompletedAction([.. newFilters]));
+        dispatcher.Dispatch(new AddFavoriteFilterSuccessAction([.. newFilters]));
 
         return Task.CompletedTask;
     }
@@ -100,7 +100,7 @@ internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvide
         }
 
         dispatcher.Dispatch(
-            new LoadFiltersCompletedAction([.. favorites], ImmutableQueue.CreateRange(recent)));
+            new LoadFiltersSuccessAction([.. favorites], ImmutableQueue.CreateRange(recent)));
 
         return Task.CompletedTask;
     }
@@ -133,7 +133,7 @@ internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvide
         preferencesProvider.FavoriteFiltersPreference = favorites;
         preferencesProvider.RecentFiltersPreference = recent.ToList();
 
-        dispatcher.Dispatch(new RemoveFavoriteFilterCompletedAction(favorites, recent));
+        dispatcher.Dispatch(new RemoveFavoriteFilterSuccessAction(favorites, recent));
 
         return Task.CompletedTask;
     }

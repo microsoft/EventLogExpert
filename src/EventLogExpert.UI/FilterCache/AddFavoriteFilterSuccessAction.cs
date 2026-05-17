@@ -5,4 +5,4 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterCache;
 
-internal sealed record AddFavoriteFilterCompletedAction(ImmutableList<string> Filters);
+internal sealed record AddFavoriteFilterSuccessAction(ImmutableList<string> Filters);
