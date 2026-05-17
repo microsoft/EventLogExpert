@@ -1267,6 +1267,70 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleApplyFilter_WhenCloseAllArrivesMidReopenLoop_ShouldDispatchCloseLogForJustReopenedLogs()
+    {
+        // Arrange — pin down the per-iteration revalidation in the reopen loop. With two
+        // logs needing reload, hook the FIRST OpenLogAction dispatch to land CloseAll
+        // before the second iteration. The loop must:
+        //   (1) detect the supersession on iteration 2,
+        //   (2) dispatch CloseLogAction for the log it already reopened on iteration 1,
+        //   (3) NOT dispatch the second OpenLog,
+        //   (4) clear pending selection restore for both logs in the reload set.
+        // Without per-iteration revalidation, both OpenLogs would land and re-add the logs
+        // the user just closed.
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameLog1, logData1)
+            .Add(Constants.LogNameLog2, logData2);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        // Hook the FIRST OpenLogAction dispatch to land CloseAll synchronously, which bumps
+        // _closeAllGeneration before the loop's next iteration check.
+        var openLogCount = 0;
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<OpenLogAction>()))
+            .Do(_ =>
+            {
+                openLogCount++;
+
+                if (openLogCount == 1)
+                {
+                    // Run HandleCloseAll synchronously inside the dispatch hook so the next
+                    // loop iteration sees the bumped _closeAllGeneration.
+                    effects.HandleCloseAll(mockDispatcher).GetAwaiter().GetResult();
+                }
+            });
+
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act
+        await effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        // Assert — exactly one OpenLog dispatched (the second iteration bailed). A CloseLog
+        // for the first-reopened log must have been dispatched as cleanup. The original two
+        // CloseLog dispatches (reload-path close+await) plus the cleanup CloseLog = 3 total
+        // CloseLog dispatches for these two log names.
+        mockDispatcher.Received(1).Dispatch(Arg.Any<OpenLogAction>());
+
+        // The cleanup CloseLog targets the log we already reopened (Log1).
+        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == Constants.LogNameLog1));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
     public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldClearPendingSelectionRestoreEntries()
     {
         // Arrange — pin down that when CloseAll supersedes a reload, the
