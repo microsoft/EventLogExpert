@@ -7,6 +7,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
+using System.Collections.Immutable;
 using CloseLogAction = EventLogExpert.UI.LogTable.CloseLogAction;
 using Reducers = EventLogExpert.UI.LogTable.Reducers;
 
@@ -61,7 +62,7 @@ public sealed class LogTableStoreTests
         var order = s_columnDefaults.ColumnOrder;
 
         // Act
-        var action = new LoadColumnsCompletedAction(columns, widths, order);
+        var action = new LoadColumnsCompletedAction(columns.ToImmutableDictionary(), widths.ToImmutableDictionary(), order);
 
         // Assert
         Assert.Equal(2, action.LoadedColumns.Count);
@@ -181,7 +182,7 @@ public sealed class LogTableStoreTests
 
         state = Reducers.ReduceLoadColumnsCompleted(
             state,
-            new LoadColumnsCompletedAction(columns, new Dictionary<ColumnName, int>(), s_columnDefaults.ColumnOrder));
+            new LoadColumnsCompletedAction(columns.ToImmutableDictionary(), ImmutableDictionary<ColumnName, int>.Empty, s_columnDefaults.ColumnOrder));
 
         // Assert
         Assert.Equal(3, state.Columns.Count);

@@ -202,8 +202,8 @@ internal sealed class Reducers
         LoadColumnsCompletedAction action) =>
         state with
         {
-            Columns = action.LoadedColumns.ToImmutableDictionary(),
-            ColumnWidths = action.ColumnWidths.ToImmutableDictionary(),
+            Columns = action.LoadedColumns,
+            ColumnWidths = action.ColumnWidths,
             ColumnOrder = action.ColumnOrder
         };
 

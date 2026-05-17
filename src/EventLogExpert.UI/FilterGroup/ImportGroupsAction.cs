@@ -2,7 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-internal sealed record ImportGroupsAction(IEnumerable<SavedFilterGroup> Groups);
+internal sealed record ImportGroupsAction(ImmutableList<SavedFilterGroup> Groups);
