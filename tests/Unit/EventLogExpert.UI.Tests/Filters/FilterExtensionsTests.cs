@@ -225,11 +225,11 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        var Filter = new Filter(dateFilter, [filter]);
+        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var filter = new Filter(dateFilter, [savedFilter]);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -240,10 +240,10 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
-        var Filter = new Filter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.False(result);
@@ -254,11 +254,11 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        var Filter = new Filter(dateFilter, [filter]);
+        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var filter = new Filter(dateFilter, [savedFilter]);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -269,10 +269,10 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
-        var Filter = new Filter(dateFilter, []);
+        var filter = new Filter(dateFilter, []);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -282,11 +282,11 @@ public sealed class FilterExtensionsTests
     public void IsFilteringEnabled_WhenNoDateFilterAndFiltersExist_ShouldBeEnabled()
     {
         // Arrange
-        var filter = CreateFilter(Constants.FilterIdEquals100);
-        var Filter = new Filter(null, [filter]);
+        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var filter = new Filter(null, [savedFilter]);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.True(result);
@@ -296,10 +296,10 @@ public sealed class FilterExtensionsTests
     public void IsFilteringEnabled_WhenNoDateFilterAndNoFilters_ShouldBeDisabled()
     {
         // Arrange
-        var Filter = new Filter(null, []);
+        var filter = new Filter(null, []);
 
         // Act
-        var result = Filter.IsFilteringEnabled;
+        var result = filter.IsFilteringEnabled;
 
         // Assert
         Assert.False(result);
