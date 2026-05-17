@@ -11,14 +11,14 @@
     <Project Path="src/EventLogExpert/EventLogExpert.csproj">
       <Deploy Solution="*|Any CPU" />
     </Project>
-    <Project Path="src/EventLogExpert.Components/EventLogExpert.Components.csproj" />
+    <Project Path="src/EventLogExpert.UI/EventLogExpert.UI.csproj" />
     <Project Path="src/EventLogExpert.Runtime/EventLogExpert.Runtime.csproj" />
     <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
-    <Project Path="tests/Unit/EventLogExpert.Components.Tests/EventLogExpert.Components.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.EventDbTool.Tests/EventLogExpert.EventDbTool.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
