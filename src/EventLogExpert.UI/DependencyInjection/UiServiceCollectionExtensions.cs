@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.LogTable;
@@ -27,6 +28,7 @@ public static class UiServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         services.AddSingleton<IEventLogCommands, EventLogCommands>();
+        services.AddSingleton<IFilterCacheCommands, FilterCacheCommands>();
         services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<IFilterGroupCommands, FilterGroupCommands>();
         services.AddSingleton<ILogTableCommands, LogTableCommands>();

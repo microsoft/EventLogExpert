@@ -5,6 +5,6 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed record LoadFiltersCompletedAction(
+internal sealed record LoadFiltersCompletedAction(
     ImmutableList<string> FavoriteFilters,
     ImmutableQueue<string> RecentFilters);
