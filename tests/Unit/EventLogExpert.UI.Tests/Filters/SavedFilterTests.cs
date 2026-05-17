@@ -10,7 +10,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.UI.Tests.Filters;
 
-public sealed class FilterModelTests
+public sealed class SavedFilterTests
 {
     [Fact]
     public void Empty_HasNoCompiledArtifact()
