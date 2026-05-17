@@ -587,7 +587,7 @@ internal sealed class Effects(
 
         if (activeLogs.Count == 0) { return; }
 
-        // Serialize with HandleApplyFilter' XML-reload path (see _logCloseCoordinatorLock
+        // Serialize with HandleApplyFilter's XML-reload path (see _logCloseCoordinatorLock
         // doc-comment). Without this lock a concurrent reload-on-XML-filter could overwrite
         // our pre-registered TCSes (or vice versa), orphaning awaiters until they hit the
         // 30s timeout.
