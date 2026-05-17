@@ -191,6 +191,6 @@ internal sealed class Effects
             return;
         }
 
-        dispatcher.Dispatch(new SetFiltersAction(candidate));
+        dispatcher.Dispatch(new ApplyFilterAction(candidate));
     }
 }
