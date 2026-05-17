@@ -45,7 +45,7 @@ public sealed partial class FilterComparisonEditor : ComponentBase
     } = [];
 
     private ImmutableArray<string> Items =>
-        EventPropertyItemsCache.GetItems(EventLogState.Value.ActiveLogs, Comparison.Property);
+        EventPropertyValuesCache.GetValues(EventLogState.Value.ActiveLogs, Comparison.Property);
 
     private EventProperty PropertyBinding
     {
