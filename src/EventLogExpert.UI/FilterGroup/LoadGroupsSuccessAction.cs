@@ -6,4 +6,4 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-public sealed record LoadGroupsSuccessAction(ImmutableList<SavedFilterGroup> Groups);
+internal sealed record LoadGroupsSuccessAction(ImmutableList<SavedFilterGroup> Groups);
