@@ -5,7 +5,7 @@ using EventLogExpert.UI.FilterGroup;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
-namespace EventLogExpert.Components.Modals.Filters;
+namespace EventLogExpert.Components.FilterGroup;
 
 public sealed partial class FilterGroupSection
 {

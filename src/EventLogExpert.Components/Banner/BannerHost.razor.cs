@@ -10,7 +10,7 @@ using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Components;
+namespace EventLogExpert.Components.Banner;
 
 public sealed partial class BannerHost : ComponentBase, IDisposable
 {
