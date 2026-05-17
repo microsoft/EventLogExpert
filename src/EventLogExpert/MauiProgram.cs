@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Components.Modals.Alerts;
-using EventLogExpert.Eventing.Common.Databases;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Components.Alerts;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Alerts;
@@ -15,12 +13,10 @@ using EventLogExpert.UI.Common.Identity;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
 using EventLogExpert.UI.Database;
-using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.DependencyInjection;
 using EventLogExpert.UI.DetailsPane;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;

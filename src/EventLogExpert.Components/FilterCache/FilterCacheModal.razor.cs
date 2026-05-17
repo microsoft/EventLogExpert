@@ -9,7 +9,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 
-namespace EventLogExpert.Components.Modals.Filters;
+namespace EventLogExpert.Components.FilterCache;
 
 public sealed partial class FilterCacheModal : ModalBase<bool>
 {

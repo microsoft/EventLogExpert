@@ -4,7 +4,7 @@
 using EventLogExpert.Components.Base;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Components.Modals.Alerts;
+namespace EventLogExpert.Components.Alerts;
 
 /// <summary>
 ///     Standalone prompt modal used by <c>AlertDialogService</c> when no host modal is active. Returns the input

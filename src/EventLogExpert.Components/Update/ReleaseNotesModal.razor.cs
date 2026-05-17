@@ -6,7 +6,7 @@ using EventLogExpert.UI.Common.Markdown;
 using EventLogExpert.UI.Update.ReleaseNotes;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Components.Modals;
+namespace EventLogExpert.Components.Update;
 
 public sealed partial class ReleaseNotesModal : ModalBase<bool>
 {

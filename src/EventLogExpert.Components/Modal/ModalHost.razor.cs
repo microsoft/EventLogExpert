@@ -4,7 +4,7 @@
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.Components.Modals;
+namespace EventLogExpert.Components.Modal;
 
 public sealed partial class ModalHost : ComponentBase, IDisposable
 {

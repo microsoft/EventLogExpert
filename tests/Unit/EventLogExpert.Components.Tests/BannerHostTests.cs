@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Components.Banner;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Common.Clipboard;
@@ -101,12 +102,12 @@ public sealed class BannerHostTests : BunitContext
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
-                CurrentBatchPosition: 0,
-                CurrentBatchSize: 3,
-                CurrentEntryName: string.Empty,
-                CurrentPhase: UpgradePhase.BackingUp,
-                QueuedBatchesAfter: 0,
-                Cancel: () => { }));
+                0,
+                3,
+                string.Empty,
+                UpgradePhase.BackingUp,
+                0,
+                () => { }));
 
         var component = Render<BannerHost>();
 
@@ -122,12 +123,12 @@ public sealed class BannerHostTests : BunitContext
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
-                CurrentBatchPosition: 2,
-                CurrentBatchSize: 5,
-                CurrentEntryName: "MyDb.evtx",
-                CurrentPhase: UpgradePhase.MigratingSchema,
-                QueuedBatchesAfter: 0,
-                Cancel: () => { }));
+                2,
+                5,
+                "MyDb.evtx",
+                UpgradePhase.MigratingSchema,
+                0,
+                () => { }));
 
         var component = Render<BannerHost>();
 
@@ -146,12 +147,12 @@ public sealed class BannerHostTests : BunitContext
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
-                CurrentBatchPosition: 1,
-                CurrentBatchSize: 2,
-                CurrentEntryName: "x.evtx",
-                CurrentPhase: UpgradePhase.Verifying,
-                QueuedBatchesAfter: 3,
-                Cancel: () => { }));
+                1,
+                2,
+                "x.evtx",
+                UpgradePhase.Verifying,
+                3,
+                () => { }));
 
         var component = Render<BannerHost>();
 
@@ -167,12 +168,12 @@ public sealed class BannerHostTests : BunitContext
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
-                CurrentBatchPosition: 1,
-                CurrentBatchSize: 1,
-                CurrentEntryName: "x.evtx",
-                CurrentPhase: UpgradePhase.MigratingSchema,
-                QueuedBatchesAfter: 0,
-                Cancel: () => cancelInvocationCount++));
+                1,
+                1,
+                "x.evtx",
+                UpgradePhase.MigratingSchema,
+                0,
+                () => cancelInvocationCount++));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new MouseEventArgs());
@@ -187,12 +188,12 @@ public sealed class BannerHostTests : BunitContext
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
-                CurrentBatchPosition: 1,
-                CurrentBatchSize: 1,
-                CurrentEntryName: "x.evtx",
-                CurrentPhase: UpgradePhase.MigratingSchema,
-                QueuedBatchesAfter: 0,
-                Cancel: () => throw new InvalidOperationException("cts disposed")));
+                1,
+                1,
+                "x.evtx",
+                UpgradePhase.MigratingSchema,
+                0,
+                () => throw new InvalidOperationException("cts disposed")));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new MouseEventArgs());
@@ -720,5 +721,5 @@ public sealed class BannerHostTests : BunitContext
     }
 
     private static DatabaseEntry BuildDatabaseEntry(string fileName) =>
-        new(fileName, $@"C:\dbs\{fileName}", IsEnabled: false, DatabaseStatus.UpgradeRequired);
+        new(fileName, $@"C:\dbs\{fileName}", false, DatabaseStatus.UpgradeRequired);
 }
