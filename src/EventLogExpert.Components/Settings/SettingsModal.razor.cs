@@ -18,7 +18,7 @@ using Microsoft.Extensions.Logging;
 using System.Text;
 using IDispatcher = Fluxor.IDispatcher;
 
-namespace EventLogExpert.Components.Modals;
+namespace EventLogExpert.Components.Settings;
 
 public sealed partial class SettingsModal : ModalBase<bool>
 {

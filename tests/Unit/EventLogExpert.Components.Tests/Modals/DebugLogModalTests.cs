@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.Components.Modals;
+using EventLogExpert.Components.DebugLog;
 using EventLogExpert.Components.Tests.TestUtils;
 using EventLogExpert.Components.Tests.TestUtils.Constants;
 using EventLogExpert.UI.Alerts;

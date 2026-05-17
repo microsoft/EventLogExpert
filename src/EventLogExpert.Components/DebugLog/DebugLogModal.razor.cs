@@ -11,7 +11,7 @@ using EventLogExpert.UI.DebugLog;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 
-namespace EventLogExpert.Components.Modals;
+namespace EventLogExpert.Components.DebugLog;
 
 public sealed partial class DebugLogModal : ModalBase<bool>
 {

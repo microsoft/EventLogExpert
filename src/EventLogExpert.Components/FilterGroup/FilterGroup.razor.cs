@@ -11,7 +11,7 @@ using EventLogExpert.UI.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 
-namespace EventLogExpert.Components.Modals.Filters;
+namespace EventLogExpert.Components.FilterGroup;
 
 public sealed partial class FilterGroup
 {
