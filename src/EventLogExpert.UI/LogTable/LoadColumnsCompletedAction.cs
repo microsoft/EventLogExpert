@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.LogTable;
 
-public sealed record LoadColumnsCompletedAction(
+internal sealed record LoadColumnsCompletedAction(
     ImmutableDictionary<ColumnName, bool> LoadedColumns,
     ImmutableDictionary<ColumnName, int> ColumnWidths,
     ImmutableList<ColumnName> ColumnOrder);

@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterProgress;
 
-public sealed record SetFilterProgressAction(bool IsLoading);
+internal sealed record SetFilterProgressAction(bool IsLoading);

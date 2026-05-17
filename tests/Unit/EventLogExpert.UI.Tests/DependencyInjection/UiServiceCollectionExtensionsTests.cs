@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.DependencyInjection;
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.LogTable;
@@ -16,6 +17,7 @@ public sealed class UiServiceCollectionExtensionsTests
 {
     [Theory]
     [InlineData(typeof(IEventLogCommands))]
+    [InlineData(typeof(IFilterCacheCommands))]
     [InlineData(typeof(IFilterGroupCommands))]
     [InlineData(typeof(IFilterPaneCommands))]
     [InlineData(typeof(ILogTableCommands))]
