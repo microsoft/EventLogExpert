@@ -4,14 +4,15 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Filtering;
+using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Common.Clipboard;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Settings;

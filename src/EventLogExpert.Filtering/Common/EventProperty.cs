@@ -3,7 +3,7 @@
 
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Common;
 
 public enum EventProperty
 {

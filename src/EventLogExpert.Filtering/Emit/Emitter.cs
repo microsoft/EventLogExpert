@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Lowering;
+using EventLogExpert.Filtering.Runtime;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 

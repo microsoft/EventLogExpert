@@ -4,7 +4,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Basic;
 
 internal sealed class SubFilterJsonConverter : JsonConverter<SubFilter>
 {

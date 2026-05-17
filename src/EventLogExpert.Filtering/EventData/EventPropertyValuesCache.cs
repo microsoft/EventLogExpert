@@ -3,11 +3,12 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Common;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using System.Runtime.CompilerServices;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.EventData;
 
 /// <summary>
 ///     Caches the distinct, sorted list of property values across all active logs, keyed by the
