@@ -108,6 +108,193 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
+    [EffectMethod]
+    public async Task HandleApplyFilter(ApplyFilterAction action, IDispatcher dispatcher)
+    {
+        bool newRequiresXml = action.Filter.RequiresXml;
+
+        // Identify open logs that lack pre-rendered XML. Disabling/removing an XML filter is a
+        // no-op: XML already in memory is harmless. Re-enabling against logs that were
+        // previously loaded with XML is also a no-op for the same reason. Only logs that
+        // are actually missing XML need to be re-read; logs that already have it are left
+        // intact to avoid unnecessary reloads (and the selection-loss / latency they cause).
+        var logsNeedingReload = newRequiresXml && !_eventLogState.Value.ActiveLogs.IsEmpty
+            ? _eventLogState.Value.ActiveLogs.Values
+                .Where(d => !_logsLoadedWithXml.ContainsKey(d.Id))
+                .Select(d => (d.Id, d.Name, d.Type))
+                .ToList()
+            : [];
+
+        if (logsNeedingReload.Count > 0)
+        {
+            var reloadNames = logsNeedingReload.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+
+            var selectionByLog = _eventLogState.Value.SelectedEvents
+                .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
+                .GroupBy(e => e.OwningLog)
+                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
+
+            var selectedEvent = _eventLogState.Value.SelectedEvent;
+            long? selectedRecordId = selectedEvent?.RecordId;
+            string? selectedLogName = selectedEvent?.OwningLog;
+
+            // The focused row may live in a reloading log even when no rows of
+            // that log are selected (Explorer-style cursor without selection).
+            // Ensure a pending entry exists so HandleLoadEvents can restore focus.
+            if (selectedRecordId.HasValue
+                && !string.IsNullOrEmpty(selectedLogName)
+                && reloadNames.Contains(selectedLogName)
+                && !selectionByLog.ContainsKey(selectedLogName))
+            {
+                selectionByLog[selectedLogName] = new HashSet<long>();
+            }
+
+            // Close + reopen only the logs that lack XML. Other open logs keep their state.
+            // HandleCloseLog clears _pendingSelectionRestore for the log name as part of its
+            // async cleanup (after awaiting watcher shutdown). Pre-register a close-completion
+            // TCS for each log, dispatch the closes, then AWAIT each completion before
+            // populating the restore map — otherwise an in-flight HandleCloseLog can wipe the
+            // freshly-written entry and silently lose the user's selection.
+            //
+            // The semaphore serializes this path with PrepareForDatabaseRemovalAsync: both
+            // write into _logCloseCompletions with raw assignment, so concurrent overlap on
+            // the same log id would orphan the first caller's TCS (HandleCloseLog signals
+            // whichever entry happens to be in the dict at the time).
+            await _logCloseCoordinatorLock.WaitAsync();
+
+            try
+            {
+                var closeWaiters = new List<(EventLogId Id, string Name, Task Task)>(logsNeedingReload.Count);
+
+                foreach (var (id, name, _) in logsNeedingReload)
+                {
+                    var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _logCloseCompletions[id] = tcs;
+                    closeWaiters.Add((id, name, tcs.Task));
+                }
+
+                foreach (var (id, name, _) in logsNeedingReload)
+                {
+                    dispatcher.Dispatch(new CloseLogAction(id, name));
+                }
+
+                var timedOutLogs = new HashSet<string>(StringComparer.Ordinal);
+
+                foreach (var (id, name, task) in closeWaiters)
+                {
+                    try
+                    {
+                        await task.WaitAsync(LogCloseTimeout);
+                    }
+                    catch (TimeoutException)
+                    {
+                        _logCloseCompletions.TryRemove(id, out _);
+                        timedOutLogs.Add(name);
+                        _logger.Trace($"{nameof(HandleApplyFilter)}: close for log '{name}' did not complete within {LogCloseTimeout}; selection will not be restored to avoid race with the delayed close wiping the entry.");
+                    }
+                }
+
+                foreach (var (name, ids) in selectionByLog)
+                {
+                    if (timedOutLogs.Contains(name))
+                    {
+                        // The delayed HandleCloseLog will eventually call _pendingSelectionRestore
+                        // .TryRemove(name) — writing here would be silently wiped. Skip.
+                        continue;
+                    }
+
+                    long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
+                    _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
+                }
+
+                foreach (var (_, name, type) in logsNeedingReload)
+                {
+                    dispatcher.Dispatch(new OpenLogAction(name, type));
+                }
+            }
+            finally
+            {
+                _logCloseCoordinatorLock.Release();
+            }
+
+            return;
+        }
+
+        // Generation guard: when filter changes arrive in quick succession, only the latest
+        // run may publish results or clear the loading flag; superseded runs silently exit.
+        long generation = Interlocked.Increment(ref _filterGeneration);
+        var activeLogsSnapshot = _eventLogState.Value.ActiveLogs.Values.ToList();
+
+        dispatcher.Dispatch(new SetFilterLoadingAction(true));
+
+        try
+        {
+            var filteredActiveLogs = await Task.Run(
+                () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.Filter));
+
+            if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
+
+            // Pass 1: keep slices whose source Events ref is still current. Logs whose
+            // Events ref changed (live event arrived during the filter run) get re-filtered
+            // once below so the new filter is applied to the post-mutation rows too.
+            var snapshotById = activeLogsSnapshot.ToDictionary(d => d.Id);
+            var currentByName = _eventLogState.Value.ActiveLogs;
+            var fresh = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(filteredActiveLogs.Count);
+            var staleLogs = new List<EventLogData>();
+
+            foreach (var (logId, filteredEvents) in filteredActiveLogs)
+            {
+                if (!snapshotById.TryGetValue(logId, out var snapshotData)) { continue; }
+
+                if (!currentByName.TryGetValue(snapshotData.Name, out var currentData)) { continue; }
+
+                if (ReferenceEquals(snapshotData.Events, currentData.Events))
+                {
+                    fresh[logId] = filteredEvents;
+                }
+                else
+                {
+                    staleLogs.Add(currentData);
+                }
+            }
+
+            // Pass 2: single retry. If a log is still stale after this pass, leave it omitted —
+            // the reducer preserves existing rows so live events are not lost.
+            if (staleLogs.Count > 0)
+            {
+                var refiltered = await Task.Run(
+                    () => _filterService.FilterActiveLogs(staleLogs, action.Filter));
+
+                if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
+
+                var pass2InputById = staleLogs.ToDictionary(d => d.Id);
+                currentByName = _eventLogState.Value.ActiveLogs;
+
+                foreach (var (logId, filteredEvents) in refiltered)
+                {
+                    if (!pass2InputById.TryGetValue(logId, out var pass2Input)) { continue; }
+
+                    if (!currentByName.TryGetValue(pass2Input.Name, out var nowCurrent)) { continue; }
+
+                    // pass2Input.Events IS the list ref pass 2 consumed; new ref = stale.
+                    if (ReferenceEquals(pass2Input.Events, nowCurrent.Events))
+                    {
+                        fresh[logId] = filteredEvents;
+                    }
+                }
+            }
+
+            dispatcher.Dispatch(new UpdateDisplayedEventsAction(fresh));
+        }
+        finally
+        {
+            if (Interlocked.Read(ref _filterGeneration) == generation)
+            {
+                dispatcher.Dispatch(new SetFilterLoadingAction(false));
+            }
+        }
+    }
+
     [EffectMethod(typeof(CloseAllLogsAction))]
     public async Task HandleCloseAll()
     {
@@ -351,193 +538,6 @@ internal sealed class Effects(
         return Task.CompletedTask;
     }
 
-    [EffectMethod]
-    public async Task HandleSetFilters(SetFiltersAction action, IDispatcher dispatcher)
-    {
-        bool newRequiresXml = action.Filter.RequiresXml;
-
-        // Identify open logs that lack pre-rendered XML. Disabling/removing an XML filter is a
-        // no-op: XML already in memory is harmless. Re-enabling against logs that were
-        // previously loaded with XML is also a no-op for the same reason. Only logs that
-        // are actually missing XML need to be re-read; logs that already have it are left
-        // intact to avoid unnecessary reloads (and the selection-loss / latency they cause).
-        var logsNeedingReload = newRequiresXml && !_eventLogState.Value.ActiveLogs.IsEmpty
-            ? _eventLogState.Value.ActiveLogs.Values
-                .Where(d => !_logsLoadedWithXml.ContainsKey(d.Id))
-                .Select(d => (d.Id, d.Name, d.Type))
-                .ToList()
-            : [];
-
-        if (logsNeedingReload.Count > 0)
-        {
-            var reloadNames = logsNeedingReload.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
-
-            var selectionByLog = _eventLogState.Value.SelectedEvents
-                .Where(e => e.RecordId.HasValue && reloadNames.Contains(e.OwningLog))
-                .GroupBy(e => e.OwningLog)
-                .ToDictionary(g => g.Key, g => (IReadOnlySet<long>)g.Select(e => e.RecordId!.Value).ToHashSet());
-
-            var selectedEvent = _eventLogState.Value.SelectedEvent;
-            long? selectedRecordId = selectedEvent?.RecordId;
-            string? selectedLogName = selectedEvent?.OwningLog;
-
-            // The focused row may live in a reloading log even when no rows of
-            // that log are selected (Explorer-style cursor without selection).
-            // Ensure a pending entry exists so HandleLoadEvents can restore focus.
-            if (selectedRecordId.HasValue
-                && !string.IsNullOrEmpty(selectedLogName)
-                && reloadNames.Contains(selectedLogName)
-                && !selectionByLog.ContainsKey(selectedLogName))
-            {
-                selectionByLog[selectedLogName] = new HashSet<long>();
-            }
-
-            // Close + reopen only the logs that lack XML. Other open logs keep their state.
-            // HandleCloseLog clears _pendingSelectionRestore for the log name as part of its
-            // async cleanup (after awaiting watcher shutdown). Pre-register a close-completion
-            // TCS for each log, dispatch the closes, then AWAIT each completion before
-            // populating the restore map — otherwise an in-flight HandleCloseLog can wipe the
-            // freshly-written entry and silently lose the user's selection.
-            //
-            // The semaphore serializes this path with PrepareForDatabaseRemovalAsync: both
-            // write into _logCloseCompletions with raw assignment, so concurrent overlap on
-            // the same log id would orphan the first caller's TCS (HandleCloseLog signals
-            // whichever entry happens to be in the dict at the time).
-            await _logCloseCoordinatorLock.WaitAsync();
-
-            try
-            {
-                var closeWaiters = new List<(EventLogId Id, string Name, Task Task)>(logsNeedingReload.Count);
-
-                foreach (var (id, name, _) in logsNeedingReload)
-                {
-                    var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                    _logCloseCompletions[id] = tcs;
-                    closeWaiters.Add((id, name, tcs.Task));
-                }
-
-                foreach (var (id, name, _) in logsNeedingReload)
-                {
-                    dispatcher.Dispatch(new CloseLogAction(id, name));
-                }
-
-                var timedOutLogs = new HashSet<string>(StringComparer.Ordinal);
-
-                foreach (var (id, name, task) in closeWaiters)
-                {
-                    try
-                    {
-                        await task.WaitAsync(LogCloseTimeout);
-                    }
-                    catch (TimeoutException)
-                    {
-                        _logCloseCompletions.TryRemove(id, out _);
-                        timedOutLogs.Add(name);
-                        _logger.Trace($"{nameof(HandleSetFilters)}: close for log '{name}' did not complete within {LogCloseTimeout}; selection will not be restored to avoid race with the delayed close wiping the entry.");
-                    }
-                }
-
-                foreach (var (name, ids) in selectionByLog)
-                {
-                    if (timedOutLogs.Contains(name))
-                    {
-                        // The delayed HandleCloseLog will eventually call _pendingSelectionRestore
-                        // .TryRemove(name) — writing here would be silently wiped. Skip.
-                        continue;
-                    }
-
-                    long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
-                    _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
-                }
-
-                foreach (var (_, name, type) in logsNeedingReload)
-                {
-                    dispatcher.Dispatch(new OpenLogAction(name, type));
-                }
-            }
-            finally
-            {
-                _logCloseCoordinatorLock.Release();
-            }
-
-            return;
-        }
-
-        // Generation guard: when filter changes arrive in quick succession, only the latest
-        // run may publish results or clear the loading flag; superseded runs silently exit.
-        long generation = Interlocked.Increment(ref _filterGeneration);
-        var activeLogsSnapshot = _eventLogState.Value.ActiveLogs.Values.ToList();
-
-        dispatcher.Dispatch(new SetFilterLoadingAction(true));
-
-        try
-        {
-            var filteredActiveLogs = await Task.Run(
-                () => _filterService.FilterActiveLogs(activeLogsSnapshot, action.Filter));
-
-            if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
-
-            // Pass 1: keep slices whose source Events ref is still current. Logs whose
-            // Events ref changed (live event arrived during the filter run) get re-filtered
-            // once below so the new filter is applied to the post-mutation rows too.
-            var snapshotById = activeLogsSnapshot.ToDictionary(d => d.Id);
-            var currentByName = _eventLogState.Value.ActiveLogs;
-            var fresh = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>(filteredActiveLogs.Count);
-            var staleLogs = new List<EventLogData>();
-
-            foreach (var (logId, filteredEvents) in filteredActiveLogs)
-            {
-                if (!snapshotById.TryGetValue(logId, out var snapshotData)) { continue; }
-
-                if (!currentByName.TryGetValue(snapshotData.Name, out var currentData)) { continue; }
-
-                if (ReferenceEquals(snapshotData.Events, currentData.Events))
-                {
-                    fresh[logId] = filteredEvents;
-                }
-                else
-                {
-                    staleLogs.Add(currentData);
-                }
-            }
-
-            // Pass 2: single retry. If a log is still stale after this pass, leave it omitted —
-            // the reducer preserves existing rows so live events are not lost.
-            if (staleLogs.Count > 0)
-            {
-                var refiltered = await Task.Run(
-                    () => _filterService.FilterActiveLogs(staleLogs, action.Filter));
-
-                if (Interlocked.Read(ref _filterGeneration) != generation) { return; }
-
-                var pass2InputById = staleLogs.ToDictionary(d => d.Id);
-                currentByName = _eventLogState.Value.ActiveLogs;
-
-                foreach (var (logId, filteredEvents) in refiltered)
-                {
-                    if (!pass2InputById.TryGetValue(logId, out var pass2Input)) { continue; }
-
-                    if (!currentByName.TryGetValue(pass2Input.Name, out var nowCurrent)) { continue; }
-
-                    // pass2Input.Events IS the list ref pass 2 consumed; new ref = stale.
-                    if (ReferenceEquals(pass2Input.Events, nowCurrent.Events))
-                    {
-                        fresh[logId] = filteredEvents;
-                    }
-                }
-            }
-
-            dispatcher.Dispatch(new UpdateDisplayedEventsAction(fresh));
-        }
-        finally
-        {
-            if (Interlocked.Read(ref _filterGeneration) == generation)
-            {
-                dispatcher.Dispatch(new SetFilterLoadingAction(false));
-            }
-        }
-    }
-
     public async Task PrepareForDatabaseRemovalAsync(LogReopenSnapshot snapshot, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
@@ -546,7 +546,7 @@ internal sealed class Effects(
 
         if (activeLogs.Count == 0) { return; }
 
-        // Serialize with HandleSetFilters' XML-reload path (see _logCloseCoordinatorLock
+        // Serialize with HandleApplyFilter' XML-reload path (see _logCloseCoordinatorLock
         // doc-comment). Without this lock a concurrent reload-on-XML-filter could overwrite
         // our pre-registered TCSes (or vice versa), orphaning awaiters until they hit the
         // 30s timeout.

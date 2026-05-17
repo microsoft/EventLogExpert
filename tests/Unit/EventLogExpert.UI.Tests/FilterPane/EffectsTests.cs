@@ -38,7 +38,7 @@ public sealed class EffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received().Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received().Dispatch(Arg.Any<ApplyFilterAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
     }
 
@@ -59,7 +59,7 @@ public sealed class EffectsTests
         await effects.HandleAddFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -106,7 +106,7 @@ public sealed class EffectsTests
         await effects.HandleApplyFilterGroup(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public sealed class EffectsTests
         await effects.HandleClearAllFilters(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -136,7 +136,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveAdvancedFilter(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -233,7 +233,7 @@ public sealed class EffectsTests
         await effects.HandleSetFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -459,7 +459,7 @@ public sealed class EffectsTests
         await effects.HandleSetFilterDateRangeSuccess(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -478,7 +478,7 @@ public sealed class EffectsTests
         await effects.HandleToggleFilterDate(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -491,7 +491,7 @@ public sealed class EffectsTests
         await effects.HandleToggleFilterEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -504,7 +504,7 @@ public sealed class EffectsTests
         await effects.HandleToggleFilterExcluded(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -517,7 +517,7 @@ public sealed class EffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -541,7 +541,7 @@ public sealed class EffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     [Fact]
@@ -562,7 +562,7 @@ public sealed class EffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFiltersAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
             x.Filter.Filters.Count == 1 &&
             x.Filter.Filters[0].IsExcluded));
     }
@@ -585,7 +585,7 @@ public sealed class EffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFiltersAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<ApplyFilterAction>(x =>
             x.Filter.Filters.Count == 1 &&
             x.Filter.Filters[0].ComparisonText == Constants.FilterIdEquals100));
     }
@@ -605,7 +605,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFiltersAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 
     private static BasicFilter CreateBasicFilter() =>
