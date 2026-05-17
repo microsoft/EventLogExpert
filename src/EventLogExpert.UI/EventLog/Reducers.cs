@@ -21,6 +21,17 @@ internal sealed class Reducers
     public static EventLogState ReduceAddEventSuccess(EventLogState state, AddEventSuccessAction action) =>
         state with { ActiveLogs = action.ActiveLogs };
 
+    [ReducerMethod]
+    public static EventLogState ReduceApplyFilter(EventLogState state, ApplyFilterAction action)
+    {
+        if (!action.Filter.HasFilteringChangedFrom(state.AppliedFilter))
+        {
+            return state;
+        }
+
+        return state with { AppliedFilter = action.Filter };
+    }
+
     [ReducerMethod(typeof(CloseAllLogsAction))]
     public static EventLogState ReduceCloseAll(EventLogState state) =>
         state with
@@ -226,17 +237,6 @@ internal sealed class Reducers
         EventLogState state,
         SetContinuouslyUpdateAction action) =>
         state with { ContinuouslyUpdate = action.ContinuouslyUpdate };
-
-    [ReducerMethod]
-    public static EventLogState ReduceSetFilters(EventLogState state, SetFiltersAction action)
-    {
-        if (!action.Filter.HasFilteringChangedFrom(state.AppliedFilter))
-        {
-            return state;
-        }
-
-        return state with { AppliedFilter = action.Filter };
-    }
 
     [ReducerMethod]
     public static EventLogState ReduceSetSelectedEvents(EventLogState state, SetSelectedEventsAction action)

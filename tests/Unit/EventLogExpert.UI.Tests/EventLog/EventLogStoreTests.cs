@@ -117,7 +117,7 @@ public sealed class EventLogStoreTests
         var filter = new Filter(null, []);
 
         // Act
-        var action = new SetFiltersAction(filter);
+        var action = new ApplyFilterAction(filter);
 
         // Assert
         Assert.Equal(filter, action.Filter);
@@ -379,6 +379,40 @@ public sealed class EventLogStoreTests
         // Assert
         Assert.Single(newState.ActiveLogs);
         Assert.True(newState.ActiveLogs.ContainsKey(Constants.LogNameTestLog));
+    }
+
+    [Fact]
+    public void ReduceApplyFilter_WhenFilterChanged_ShouldUpdateFilter()
+    {
+        // Arrange
+        var state = new EventLogState();
+
+        var after = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+        var before = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
+        var newFilter = new Filter(new DateFilter { After = after, Before = before }, []);
+
+        var action = new ApplyFilterAction(newFilter);
+
+        // Act
+        var newState = Reducers.ReduceApplyFilter(state, action);
+
+        // Assert
+        Assert.Equal(newFilter, newState.AppliedFilter);
+    }
+
+    [Fact]
+    public void ReduceApplyFilter_WhenFilterUnchanged_ShouldReturnSameState()
+    {
+        // Arrange
+        var filter = new Filter(null, []);
+        var state = new EventLogState { AppliedFilter = filter };
+        var action = new ApplyFilterAction(filter);
+
+        // Act
+        var newState = Reducers.ReduceApplyFilter(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
     }
 
     [Fact]
@@ -899,40 +933,6 @@ public sealed class EventLogStoreTests
 
         // Assert
         Assert.True(newState.ContinuouslyUpdate);
-    }
-
-    [Fact]
-    public void ReduceSetFilters_WhenFilterChanged_ShouldUpdateFilter()
-    {
-        // Arrange
-        var state = new EventLogState();
-
-        var after = new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
-        var before = new DateTime(2024, 1, 2, 12, 0, 0, DateTimeKind.Utc);
-        var newFilter = new Filter(new DateFilter { After = after, Before = before }, []);
-
-        var action = new SetFiltersAction(newFilter);
-
-        // Act
-        var newState = Reducers.ReduceSetFilters(state, action);
-
-        // Assert
-        Assert.Equal(newFilter, newState.AppliedFilter);
-    }
-
-    [Fact]
-    public void ReduceSetFilters_WhenFilterUnchanged_ShouldReturnSameState()
-    {
-        // Arrange
-        var filter = new Filter(null, []);
-        var state = new EventLogState { AppliedFilter = filter };
-        var action = new SetFiltersAction(filter);
-
-        // Act
-        var newState = Reducers.ReduceSetFilters(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
     }
 
     [Fact]
