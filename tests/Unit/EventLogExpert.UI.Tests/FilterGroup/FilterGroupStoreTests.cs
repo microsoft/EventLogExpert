@@ -68,7 +68,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_RemoveFilter_ShouldStoreParentIdAndFilterId()
+    public void FilterGroupAction_RemoveGroupFilter_ShouldStoreParentIdAndFilterId()
     {
         // Arrange
         var parentId = FilterGroupId.Create();
@@ -96,7 +96,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_SetFilter_ShouldStoreParentIdAndFilter()
+    public void FilterGroupAction_SetGroupFilter_ShouldStoreParentIdAndFilter()
     {
         // Arrange
         var parentId = FilterGroupId.Create();
@@ -124,7 +124,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_ToggleFilterExcluded_ShouldStoreParentIdAndFilterId()
+    public void FilterGroupAction_ToggleGroupFilterExcluded_ShouldStoreParentIdAndFilterId()
     {
         // Arrange
         var parentId = FilterGroupId.Create();
@@ -476,7 +476,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerRemoveFilter_ShouldRemoveFilterFromGroup()
+    public void ReducerRemoveGroupFilter_ShouldRemoveFilterFromGroup()
     {
         // Arrange
         var filter = FilterUtils.CreateTestFilter();
@@ -499,7 +499,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerRemoveFilter_WhenFilterNotFound_ShouldReturnSameState()
+    public void ReducerRemoveGroupFilter_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
@@ -514,7 +514,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerRemoveFilter_WhenGroupNotFound_ShouldReturnSameState()
+    public void ReducerRemoveGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
     {
         // Arrange
         var state = new FilterGroupState();
@@ -576,7 +576,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetFilter_ShouldUpdateFilter()
+    public void ReducerSetGroupFilter_ShouldUpdateFilter()
     {
         // Arrange
         var filter = FilterUtils.CreateTestFilter();
@@ -607,7 +607,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetFilter_WhenFilterNotFound_ShouldAppendFilter()
+    public void ReducerSetGroupFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
         // Arrange
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
@@ -627,7 +627,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetFilter_WhenGroupNotFound_ShouldReturnSameState()
+    public void ReducerSetGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
     {
         // Arrange
         var state = new FilterGroupState();
@@ -641,7 +641,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetFilter_WhenModeChanges_ShouldPersistNewMode()
+    public void ReducerSetGroupFilter_WhenModeChanges_ShouldPersistNewMode()
     {
         // Arrange
         var basicFilter = new BasicFilter(
@@ -721,7 +721,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerToggleFilterExcluded_ShouldToggleIsExcluded()
+    public void ReducerToggleGroupFilterExcluded_ShouldToggleIsExcluded()
     {
         // Arrange
         var filter = FilterUtils.CreateTestFilter(isExcluded: false);
@@ -744,7 +744,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerToggleFilterExcluded_WhenFilterNotFound_ShouldReturnSameState()
+    public void ReducerToggleGroupFilterExcluded_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
@@ -759,7 +759,7 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerToggleFilterExcluded_WhenGroupNotFound_ShouldReturnSameState()
+    public void ReducerToggleGroupFilterExcluded_WhenGroupNotFound_ShouldReturnSameState()
     {
         // Arrange
         var state = new FilterGroupState();
