@@ -10,7 +10,7 @@ using EventLogExpert.UI.Alerts;
 using EventLogExpert.UI.Common.Display;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterLoading;
+using EventLogExpert.UI.FilterProgress;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
@@ -45,7 +45,7 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
-    [Inject] private IState<FilterLoadingState> FilterLoadingState { get; init; } = null!;
+    [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 

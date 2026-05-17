@@ -11,7 +11,7 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.FilterLoading;
+using EventLogExpert.UI.FilterProgress;
 using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.StatusBar;
@@ -713,9 +713,9 @@ public sealed class EffectsTests
 
         Received.InOrder(() =>
         {
-            mockDispatcher.Dispatch(Arg.Is<SetFilterLoadingAction>(a => a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
             mockDispatcher.Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-            mockDispatcher.Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
         });
     }
 
@@ -738,8 +738,8 @@ public sealed class EffectsTests
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => effects.HandleApplyFilter(action, mockDispatcher));
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => a.IsLoading));
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
     }
 
@@ -1012,7 +1012,7 @@ public sealed class EffectsTests
 
         // SetFilterLoading(false) was dispatched by the fresh run; the stale run's finally was
         // suppressed by the generation guard, so we should see exactly one false-dispatch.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterLoadingAction>(a => !a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
     }
 
     [Fact]
@@ -1029,7 +1029,7 @@ public sealed class EffectsTests
         await effects.HandleApplyFilter(action, mockDispatcher);
 
         Assert.True(action.Filter.RequiresXml);
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
     }
 
     [Fact]
