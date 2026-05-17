@@ -1016,8 +1016,13 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleApplyFilter_ReloadBranch_ShouldNotDispatchFilterLoading()
+    public async Task HandleApplyFilter_ReloadBranch_ShouldClearStaleFilterLoadingSpinner()
     {
+        // The reload path must dispatch SetFilterProgressAction(false) to clear any spinner
+        // left over from a superseded filter-only run. Without this clear, the reload's
+        // per-table IsLoading takes over the UI but the (stale) filter spinner would appear
+        // stuck. The reload path itself must never dispatch SetFilterProgressAction(true) —
+        // per-table loading covers the close+reopen window.
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
@@ -1029,7 +1034,8 @@ public sealed class EffectsTests
         await effects.HandleApplyFilter(action, mockDispatcher);
 
         Assert.True(action.Filter.RequiresXml);
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
     }
 
     [Fact]
@@ -1261,6 +1267,59 @@ public sealed class EffectsTests
 
         // Surface any HandleCloseLog faults before exiting the test.
         await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenReloadSupersedesFilterOnly_ShouldDropFilterOnlyResults()
+    {
+        // A reload-path ApplyFilter must invalidate any in-flight filter-only run. The
+        // Fluxor reducer for this action runs synchronously before this effect, so the
+        // older run is now working against a stale filter — its UpdateDisplayedEvents
+        // result must not land on top of the new applied filter.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(999) }
+        };
+
+        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
+        var staleFilter = new Filter(null, [staleFilterModel]);
+
+        var xmlFilterModel = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = new Filter(null, [xmlFilterModel]);
+
+        mockFilterService
+            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(callInfo =>
+            {
+                staleStarted.TrySetResult(true);
+                staleGate.Task.GetAwaiter().GetResult();
+                return staleResult;
+            });
+
+        // Start the filter-only run and wait until it is parked inside FilterActiveLogs.
+        var staleTask = effects.HandleApplyFilter(new ApplyFilterAction(staleFilter), mockDispatcher);
+        await staleStarted.Task;
+
+        // While the filter-only run is parked, run the reload-path filter (XML). This must
+        // bump _filterGeneration so the parked run is detected as superseded.
+        await effects.HandleApplyFilter(new ApplyFilterAction(xmlFilter), mockDispatcher);
+
+        // Release the parked filter; the post-await check should now fail the generation guard.
+        staleGate.SetResult(true);
+        await staleTask;
+
+        // The stale run must NOT have dispatched UpdateDisplayedEvents.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
     }
 
     [Fact]
