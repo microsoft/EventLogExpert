@@ -25,7 +25,15 @@ internal sealed class Reducers
         WithGroups(state, [.. action.Groups]);
 
     [ReducerMethod]
-    public static FilterGroupState ReducerRemoveFilter(FilterGroupState state, RemoveFilterAction action)
+    public static FilterGroupState ReducerRemoveGroup(FilterGroupState state, RemoveGroupAction action)
+    {
+        var group = state.Groups.FirstOrDefault(x => x.Id == action.Id);
+
+        return group is null ? state : WithGroups(state, state.Groups.Remove(group));
+    }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerRemoveGroupFilter(FilterGroupState state, RemoveGroupFilterAction action)
     {
         var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
 
@@ -45,17 +53,28 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static FilterGroupState ReducerRemoveGroup(FilterGroupState state, RemoveGroupAction action)
+    public static FilterGroupState ReducerSetGroup(FilterGroupState state, SetGroupAction action)
     {
-        var group = state.Groups.FirstOrDefault(x => x.Id == action.Id);
+        var group = state.Groups.FirstOrDefault(x => x.Id == action.FilterGroup.Id);
 
         if (group is null) { return state; }
 
-        return WithGroups(state, state.Groups.Remove(group));
+        var index = state.Groups.IndexOf(group);
+
+        return WithGroups(
+            state,
+            state.Groups.SetItem(
+                index,
+                group with
+                {
+                    Name = action.FilterGroup.Name,
+                    Filters = action.FilterGroup.Filters,
+                    IsEditing = false
+                }));
     }
 
     [ReducerMethod]
-    public static FilterGroupState ReducerSetFilter(FilterGroupState state, SetFilterAction action)
+    public static FilterGroupState ReducerSetGroupFilter(FilterGroupState state, SetGroupFilterAction action)
     {
         var parent = state.Groups.FirstOrDefault(x => x.Id == action.ParentId);
 
@@ -93,36 +112,6 @@ internal sealed class Reducers
     }
 
     [ReducerMethod]
-    public static FilterGroupState ReducerSetGroup(FilterGroupState state, SetGroupAction action)
-    {
-        var group = state.Groups.FirstOrDefault(x => x.Id == action.FilterGroup.Id);
-
-        if (group is null) { return state; }
-
-        var index = state.Groups.IndexOf(group);
-
-        return WithGroups(
-            state,
-            state.Groups.SetItem(
-                index,
-                group with
-                {
-                    Name = action.FilterGroup.Name,
-                    Filters = action.FilterGroup.Filters,
-                    IsEditing = false
-                }));
-    }
-
-    [ReducerMethod]
-    public static FilterGroupState ReducerToggleFilterExcluded(
-        FilterGroupState state,
-        ToggleFilterExcludedAction action) =>
-        UpdateFilterInGroup(state,
-            action.ParentId,
-            action.Id,
-            filter => filter with { IsExcluded = !filter.IsExcluded });
-
-    [ReducerMethod]
     public static FilterGroupState ReducerToggleGroup(FilterGroupState state, ToggleGroupAction action)
     {
         var group = state.Groups.FirstOrDefault(x => x.Id == action.Id);
@@ -135,6 +124,15 @@ internal sealed class Reducers
             state,
             state.Groups.SetItem(index, group with { IsEditing = !group.IsEditing }));
     }
+
+    [ReducerMethod]
+    public static FilterGroupState ReducerToggleGroupFilterExcluded(
+        FilterGroupState state,
+        ToggleGroupFilterExcludedAction action) =>
+        UpdateFilterInGroup(state,
+            action.ParentId,
+            action.Id,
+            filter => filter with { IsExcluded = !filter.IsExcluded });
 
     private static IReadOnlyDictionary<string, FilterGroupNode> BuildDisplayGroups(
         IEnumerable<SavedFilterGroup> groups)

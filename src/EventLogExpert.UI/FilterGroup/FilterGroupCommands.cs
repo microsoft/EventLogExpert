@@ -16,15 +16,15 @@ internal sealed class FilterGroupCommands(IDispatcher dispatcher) : IFilterGroup
 
     public void LoadGroups() => _dispatcher.Dispatch(new LoadGroupsAction());
 
-    public void RemoveFilter(FilterGroupId parentId, FilterId id) => _dispatcher.Dispatch(new RemoveFilterAction(parentId, id));
+    public void RemoveFilter(FilterGroupId parentId, FilterId id) => _dispatcher.Dispatch(new RemoveGroupFilterAction(parentId, id));
 
     public void RemoveGroup(FilterGroupId id) => _dispatcher.Dispatch(new RemoveGroupAction(id));
 
-    public void SetFilter(FilterGroupId parentId, SavedFilter filter) => _dispatcher.Dispatch(new SetFilterAction(parentId, filter));
+    public void SetFilter(FilterGroupId parentId, SavedFilter filter) => _dispatcher.Dispatch(new SetGroupFilterAction(parentId, filter));
 
     public void SetGroup(SavedFilterGroup group) => _dispatcher.Dispatch(new SetGroupAction(group));
 
-    public void ToggleFilterExcluded(FilterGroupId parentId, FilterId id) => _dispatcher.Dispatch(new ToggleFilterExcludedAction(parentId, id));
+    public void ToggleFilterExcluded(FilterGroupId parentId, FilterId id) => _dispatcher.Dispatch(new ToggleGroupFilterExcludedAction(parentId, id));
 
     public void ToggleGroup(FilterGroupId id) => _dispatcher.Dispatch(new ToggleGroupAction(id));
 }
