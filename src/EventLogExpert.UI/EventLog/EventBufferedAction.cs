@@ -5,4 +5,4 @@ using EventLogExpert.Eventing.Common.Events;
 
 namespace EventLogExpert.UI.EventLog;
 
-internal sealed record AddEventBufferedAction(IReadOnlyList<ResolvedEvent> UpdatedBuffer, bool IsFull);
+internal sealed record EventBufferedAction(IReadOnlyList<ResolvedEvent> UpdatedBuffer, bool IsFull);

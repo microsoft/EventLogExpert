@@ -14,10 +14,6 @@ namespace EventLogExpert.UI.EventLog;
 internal sealed class Reducers
 {
     [ReducerMethod]
-    public static EventLogState ReduceAddEventBuffered(EventLogState state, AddEventBufferedAction action) =>
-        state with { NewEventBuffer = action.UpdatedBuffer, NewEventBufferIsFull = action.IsFull };
-
-    [ReducerMethod]
     public static EventLogState ReduceAddEventSuccess(EventLogState state, AddEventSuccessAction action) =>
         state with { ActiveLogs = action.ActiveLogs };
 
@@ -74,6 +70,10 @@ internal sealed class Reducers
             SelectedEvents = newSelectedEvents
         };
     }
+
+    [ReducerMethod]
+    public static EventLogState ReduceEventBuffered(EventLogState state, EventBufferedAction action) =>
+        state with { NewEventBuffer = action.UpdatedBuffer, NewEventBufferIsFull = action.IsFull };
 
     [ReducerMethod]
     public static EventLogState ReduceLoadEvents(EventLogState state, LoadEventsAction action)

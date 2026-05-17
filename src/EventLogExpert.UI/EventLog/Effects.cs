@@ -102,7 +102,7 @@ internal sealed class Effects(
 
             var full = updatedBuffer.Count >= EventLogState.MaxNewEvents;
 
-            dispatcher.Dispatch(new AddEventBufferedAction(updatedBuffer.AsReadOnly(), full));
+            dispatcher.Dispatch(new EventBufferedAction(updatedBuffer.AsReadOnly(), full));
         }
 
         return Task.CompletedTask;
@@ -1003,7 +1003,7 @@ internal sealed class Effects(
             dispatcher.Dispatch(new AppendTableEventsBatchAction(batched));
         }
 
-        dispatcher.Dispatch(new AddEventBufferedAction([], false));
+        dispatcher.Dispatch(new EventBufferedAction([], false));
     }
 }
 
