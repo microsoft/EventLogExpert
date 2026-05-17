@@ -148,7 +148,7 @@ public sealed class EffectsTests
         var watcherTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         mockLogWatcher.RemoveAllAsync().Returns(watcherTcs.Task);
 
-        var closeTask = effects.HandleCloseAll();
+        var closeTask = effects.HandleCloseAll(mockDispatcher);
 
         Assert.False(closeTask.IsCompleted, "HandleCloseAll must still be awaiting RemoveAllAsync.");
         mockResolverCache.Received(1).ClearAll();
@@ -179,6 +179,8 @@ public sealed class EffectsTests
         mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
         mockServiceScope.ServiceProvider.Returns(Substitute.For<IServiceProvider>());
 
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
         var effects = new Effects(
             mockEventLogState,
             Substitute.For<IFilterService>(),
@@ -189,10 +191,10 @@ public sealed class EffectsTests
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
             Substitute.For<IBannerService>(),
-            Substitute.For<IDispatcher>());
+            mockDispatcher);
 
         // Act
-        await effects.HandleCloseAll();
+        await effects.HandleCloseAll(mockDispatcher);
 
         // Assert
         mockXmlResolver.Received(1).ClearAll();
@@ -202,10 +204,10 @@ public sealed class EffectsTests
     public async Task HandleCloseAll_ShouldRemoveAllLogsAndClearCache()
     {
         // Arrange
-        var (effects, _, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
+        var (effects, mockDispatcher, mockLogWatcher, mockResolverCache, _) = CreateEffectsWithServices();
 
         // Act
-        await effects.HandleCloseAll();
+        await effects.HandleCloseAll(mockDispatcher);
 
         // Assert
         await mockLogWatcher.Received(1).RemoveAllAsync();
