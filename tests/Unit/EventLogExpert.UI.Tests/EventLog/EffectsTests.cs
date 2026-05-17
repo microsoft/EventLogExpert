@@ -1030,6 +1030,16 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
+        // Route CloseLog → HandleCloseLog so the reload's close-completion TCS resolves
+        // quickly. Without this routing, HandleApplyFilter parks on LogCloseTimeout (30s).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
         var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [xmlFilter]));
 
@@ -1038,6 +1048,9 @@ public sealed class EffectsTests
         Assert.True(action.Filter.RequiresXml);
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
         mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
@@ -1335,6 +1348,16 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, mockFilterService) =
             CreateEffectsWithServices(activeLogs: activeLogs);
 
+        // Route CloseLog → HandleCloseLog so the reload-path xmlFilter dispatch resolves
+        // its close-completion TCS quickly (otherwise it parks on LogCloseTimeout for 30s).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
         var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
             [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(999) }
@@ -1373,6 +1396,9 @@ public sealed class EffectsTests
         // The stale run must NOT have dispatched UpdateDisplayedEvents.
         mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
             a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
