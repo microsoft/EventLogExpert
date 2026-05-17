@@ -9,7 +9,7 @@ using System.Runtime.ExceptionServices;
 
 namespace EventLogExpert.UI.Filters;
 
-public sealed class FilterService : IFilterService
+internal sealed class FilterService : IFilterService
 {
     /// <summary>Outer parallelism only kicks in when the combined work justifies the scheduling overhead.</summary>
     private const int OuterParallelTotalEventThreshold = 10_000;

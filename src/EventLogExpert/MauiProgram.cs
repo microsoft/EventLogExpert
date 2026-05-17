@@ -14,12 +14,10 @@ using EventLogExpert.UI.Common.Files;
 using EventLogExpert.UI.Common.Identity;
 using EventLogExpert.UI.Common.Restart;
 using EventLogExpert.UI.Common.Threading;
-using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.DependencyInjection;
 using EventLogExpert.UI.DetailsPane;
-using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.Filters;
@@ -27,8 +25,6 @@ using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Menu;
 using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Update;
-using EventLogExpert.UI.Update.Deployment;
 using Fluxor;
 
 namespace EventLogExpert;
@@ -66,7 +62,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<DebugLogService>();
         builder.Services.AddSingleton<ITraceLogger>(sp => sp.GetRequiredService<DebugLogService>());
         builder.Services.AddSingleton<IFileLogger>(sp => sp.GetRequiredService<DebugLogService>());
-        builder.Services.AddSingleton<ILogWatcherService, LogWatcherService>();
 
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
         builder.Services.AddSingleton(fileLocationOptions);
@@ -84,13 +79,7 @@ public static class MauiProgram
         });
 
         // Build Services
-        builder.Services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
-        builder.Services.AddSingleton<IUpdateService, UpdateService>();
-        builder.Services.AddSingleton<IGitHubService, GitHubService>();
         builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
-        builder.Services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
-        builder.Services.AddSingleton<IDeploymentService, DeploymentService>();
-        builder.Services.AddSingleton<ISettingsService, SettingsService>();
         builder.Services.AddSingleton<DatabaseService>();
         builder.Services.AddSingleton<IDatabaseService>(static provider =>
             provider.GetRequiredService<DatabaseService>());
@@ -117,22 +106,14 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
-        builder.Services.AddSingleton<IAppTitleService, AppTitleService>();
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
         builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
-        builder.Services.AddSingleton<IFilterService, FilterService>();
-        builder.Services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
-        builder.Services.AddSingleton<IModalService, ModalService>();
-        builder.Services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
-        builder.Services.AddSingleton<IMenuService, MenuService>();
         builder.Services.AddSingleton<MauiMenuActionService>();
         builder.Services.AddSingleton<IMenuActionService>(static provider =>
             provider.GetRequiredService<MauiMenuActionService>());
         builder.Services.AddSingleton<KeyboardShortcutService>();
-
-        builder.Services.AddSingleton<IBannerService, BannerService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {

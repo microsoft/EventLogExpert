@@ -5,7 +5,7 @@ using EventLogExpert.UI.Common.Identity;
 
 namespace EventLogExpert.UI.Common.Versioning;
 
-public sealed class CurrentVersionProvider(
+internal sealed class CurrentVersionProvider(
     IPackageVersionProvider packageVersionProvider,
     IWindowsIdentityProvider identityProvider) : ICurrentVersionProvider
 {
