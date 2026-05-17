@@ -321,7 +321,7 @@ internal sealed class Effects(
     }
 
     [EffectMethod(typeof(CloseAllLogsAction))]
-    public async Task HandleCloseAll()
+    public async Task HandleCloseAll(IDispatcher dispatcher)
     {
         _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
 
