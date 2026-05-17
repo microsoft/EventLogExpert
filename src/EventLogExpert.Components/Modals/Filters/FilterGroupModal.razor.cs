@@ -9,15 +9,12 @@ using EventLogExpert.UI.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Modals.Filters;
 
 public sealed partial class FilterGroupModal : ModalBase<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
 
