@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed record RemoveFavoriteFilterAction(string Filter);
+internal sealed record RemoveFavoriteFilterAction(string Filter);

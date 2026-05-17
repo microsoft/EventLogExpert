@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed record AddRecentFilterAction(string Filter);
+internal sealed record AddRecentFilterAction(string Filter);
