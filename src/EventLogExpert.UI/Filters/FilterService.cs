@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Runtime;
 using System.Runtime.ExceptionServices;
