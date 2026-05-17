@@ -2,7 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
+using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-public sealed record LoadGroupsSuccessAction(IEnumerable<SavedFilterGroup> Groups);
+public sealed record LoadGroupsSuccessAction(ImmutableList<SavedFilterGroup> Groups);
