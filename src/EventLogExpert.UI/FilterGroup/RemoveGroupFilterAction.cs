@@ -5,4 +5,4 @@ using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.UI.FilterGroup;
 
-internal sealed record SetFilterAction(FilterGroupId ParentId, SavedFilter Filter);
+internal sealed record RemoveGroupFilterAction(FilterGroupId ParentId, FilterId Id);
