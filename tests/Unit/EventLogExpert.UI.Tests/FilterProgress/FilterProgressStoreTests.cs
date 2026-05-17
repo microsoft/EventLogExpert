@@ -16,7 +16,7 @@ public sealed class FilterProgressStateTests
     }
 }
 
-public sealed class FilterLoadingActionTests
+public sealed class FilterProgressActionTests
 {
     [Fact]
     public void SetFilterProgressAction_ShouldCreateAction()
@@ -27,10 +27,10 @@ public sealed class FilterLoadingActionTests
     }
 }
 
-public sealed class FilterLoadingReducerTests
+public sealed class FilterProgressReducerTests
 {
     [Fact]
-    public void ReduceCloseAll_WhenFilterLoading_ShouldClearLoadingFlag()
+    public void ReduceCloseAll_WhenLoading_ShouldClearLoadingFlag()
     {
         var state = new FilterProgressState { IsLoading = true };
 
@@ -40,7 +40,7 @@ public sealed class FilterLoadingReducerTests
     }
 
     [Fact]
-    public void ReduceCloseAll_WhenNotFilterLoading_ShouldReturnSameState()
+    public void ReduceCloseAll_WhenNotLoading_ShouldReturnSameState()
     {
         var state = new FilterProgressState { IsLoading = false };
 
@@ -50,7 +50,7 @@ public sealed class FilterLoadingReducerTests
     }
 
     [Fact]
-    public void ReduceSetFilterProgress_WithDifferentValue_ShouldFlagFilterLoading()
+    public void ReduceSetFilterProgress_WithDifferentValue_ShouldFlagLoading()
     {
         var state = new FilterProgressState { IsLoading = false };
 
