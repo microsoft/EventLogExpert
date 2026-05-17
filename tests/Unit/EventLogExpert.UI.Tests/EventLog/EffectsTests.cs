@@ -49,7 +49,7 @@ public sealed class EffectsTests
         await effects.HandleAddEvent(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddEventBufferedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventBufferedAction>(a =>
             a.IsFull == true && a.UpdatedBuffer.Count == EventLogState.MaxNewEvents));
     }
 
@@ -71,7 +71,7 @@ public sealed class EffectsTests
         await effects.HandleAddEvent(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddEventBufferedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventBufferedAction>(a =>
             a.UpdatedBuffer.Count == 1 && a.UpdatedBuffer[0] == newEvent));
     }
 
@@ -389,7 +389,7 @@ public sealed class EffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Any<AddEventSuccessAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddEventBufferedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventBufferedAction>(a =>
             a.UpdatedBuffer.Count == 0 && a.IsFull == false));
     }
 
@@ -417,7 +417,7 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Any<AddEventSuccessAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AppendTableEventsBatchAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddEventBufferedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<EventBufferedAction>(a =>
             a.UpdatedBuffer.Count == 0 && a.IsFull == false));
     }
 
