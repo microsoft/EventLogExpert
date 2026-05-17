@@ -5,10 +5,10 @@ using EventLogExpert.Components.Filters.Base;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.FilterPane;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 

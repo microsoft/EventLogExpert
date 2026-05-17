@@ -1,7 +1,7 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.AppTitle;
+using EventLogExpert.Runtime.Common.AppTitle;
 
 namespace EventLogExpert.Services;
 

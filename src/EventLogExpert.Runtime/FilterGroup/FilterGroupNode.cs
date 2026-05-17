@@ -1,0 +1,13 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+using EventLogExpert.Filtering.Persistence;
+
+namespace EventLogExpert.Runtime.FilterGroup;
+
+public sealed record FilterGroupNode
+{
+    public Dictionary<string, FilterGroupNode> ChildNodes { get; init; } = [];
+
+    public List<SavedFilterGroup> Groups { get; init; } = [];
+}

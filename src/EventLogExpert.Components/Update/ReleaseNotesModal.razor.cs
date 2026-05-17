@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI.Common.Markdown;
-using EventLogExpert.UI.Update.ReleaseNotes;
+using EventLogExpert.Runtime.Common.Markdown;
+using EventLogExpert.Runtime.Update.ReleaseNotes;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Update;

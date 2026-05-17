@@ -3,8 +3,8 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Database;
+using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Database;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Database;

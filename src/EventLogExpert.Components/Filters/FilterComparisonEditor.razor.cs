@@ -4,7 +4,7 @@
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.EventData;
-using EventLogExpert.UI.EventLog;
+using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;

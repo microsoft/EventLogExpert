@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Alerts;
+using EventLogExpert.Runtime.Alerts;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 

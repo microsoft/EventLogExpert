@@ -3,9 +3,9 @@
 
 using EventLogExpert.Components.Base;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
