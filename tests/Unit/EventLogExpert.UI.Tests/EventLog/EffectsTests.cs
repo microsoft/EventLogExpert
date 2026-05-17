@@ -1012,7 +1012,7 @@ public sealed class EffectsTests
         mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
             a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
 
-        // SetFilterLoading(false) was dispatched by the fresh run; the stale run's finally was
+        // SetFilterProgressAction(false) was dispatched by the fresh run; the stale run's finally was
         // suppressed by the generation guard, so we should see exactly one false-dispatch.
         mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
     }
