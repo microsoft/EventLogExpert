@@ -9,7 +9,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.UI.EventLog;
 
-public sealed class LogWatcherService : ILogWatcherService
+internal sealed class LogWatcherService : ILogWatcherService
 {
     private readonly Dictionary<string, string?> _bookmarks = [];
     private readonly ITraceLogger _debugLogger;

@@ -5,7 +5,7 @@ using Windows.ApplicationModel;
 
 namespace EventLogExpert.UI.Common.Versioning;
 
-public sealed class PackageVersionProvider : IPackageVersionProvider
+internal sealed class PackageVersionProvider : IPackageVersionProvider
 {
     public Version GetPackageVersion()
     {

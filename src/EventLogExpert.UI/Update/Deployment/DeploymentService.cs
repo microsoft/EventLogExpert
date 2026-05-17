@@ -12,7 +12,7 @@ using Windows.Management.Deployment;
 
 namespace EventLogExpert.UI.Update.Deployment;
 
-public sealed class DeploymentService(
+internal sealed class DeploymentService(
     ITraceLogger traceLogger,
     IAppTitleService appTitleService,
     IMainThreadService mainThreadService,

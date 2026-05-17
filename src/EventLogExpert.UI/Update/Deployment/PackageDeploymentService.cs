@@ -6,7 +6,7 @@ using Windows.Management.Deployment;
 
 namespace EventLogExpert.UI.Update.Deployment;
 
-public sealed class PackageDeploymentService : IPackageDeploymentService
+internal sealed class PackageDeploymentService : IPackageDeploymentService
 {
     public IAsyncOperationWithProgress<DeploymentResult, DeploymentProgress> AddPackageAsync(
         Uri packageUri,

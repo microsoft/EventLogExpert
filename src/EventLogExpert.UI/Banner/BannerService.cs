@@ -8,7 +8,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.Banner;
 
-public sealed class BannerService : IBannerService
+internal sealed class BannerService : IBannerService
 {
     private readonly IDatabaseService _databaseService;
     private readonly Lock _stateLock = new();
