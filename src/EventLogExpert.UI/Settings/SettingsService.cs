@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.UI.Settings;
 
-public sealed class SettingsService(ISettingsPreferencesProvider preferences) : ISettingsService
+internal sealed class SettingsService(ISettingsPreferencesProvider preferences) : ISettingsService
 {
     private readonly ISettingsPreferencesProvider _preferences = preferences;
 

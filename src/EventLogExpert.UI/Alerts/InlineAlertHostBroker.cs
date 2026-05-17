@@ -5,7 +5,7 @@ using EventLogExpert.UI.Modal;
 
 namespace EventLogExpert.UI.Alerts;
 
-public sealed class InlineAlertHostBroker(IModalService modalService) : IInlineAlertHostBroker
+internal sealed class InlineAlertHostBroker(IModalService modalService) : IInlineAlertHostBroker
 {
     private readonly IModalService _modalService = modalService;
     private readonly Lock _stateLock = new();
