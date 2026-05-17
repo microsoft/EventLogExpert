@@ -14,23 +14,20 @@ namespace EventLogExpert.Filtering;
 ///     <see cref="ImmutableDictionary{TKey,TValue}" /> snapshot reference. Each snapshot change produces a new key, so
 ///     cache entries auto-evict via <see cref="ConditionalWeakTable{TKey,TValue}" />.
 /// </summary>
-public static class EventPropertyItemsCache
+public static class EventPropertyValuesCache
 {
     private static readonly ConditionalWeakTable<
         ImmutableDictionary<string, EventLogData>,
         ConcurrentDictionary<EventProperty, Lazy<ImmutableArray<string>>>> s_cache = new();
-    private static readonly ImmutableArray<string> s_levelItems = [.. Enum.GetNames<SeverityLevel>()];
+    private static readonly ImmutableArray<string> s_levelValues = [.. Enum.GetNames<SeverityLevel>()];
 
-    /// <summary>Test-only hook to clear the snapshot cache between scenarios.</summary>
-    internal static void Clear() => s_cache.Clear();
-
-    public static ImmutableArray<string> GetItems(
+    public static ImmutableArray<string> GetValues(
         ImmutableDictionary<string, EventLogData> activeLogs,
         EventProperty property)
     {
         if (property is EventProperty.Level)
         {
-            return s_levelItems;
+            return s_levelValues;
         }
 
         if (!IsLogDerivedProperty(property))
@@ -46,6 +43,9 @@ public static class EventPropertyItemsCache
             .GetOrAdd(property, f => new Lazy<ImmutableArray<string>>(() => Compute(activeLogs, f)))
             .Value;
     }
+
+    /// <summary>Test-only hook to clear the snapshot cache between scenarios.</summary>
+    internal static void Clear() => s_cache.Clear();
 
     private static ImmutableArray<string> Compute(
         ImmutableDictionary<string, EventLogData> activeLogs,
