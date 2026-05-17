@@ -10,7 +10,7 @@ using System.Globalization;
 
 namespace EventLogExpert.Filtering.Basic;
 
-public static class BasicFilterDecomposer
+internal static class BasicFilterDecomposer
 {
     public static bool TryDecompose(string? filterText, [NotNullWhen(true)] out BasicFilter? structured)
     {
