@@ -1300,7 +1300,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        // Route CloseLog → HandleCloseLog so HandleApplyFilter' await on the close-completion
+        // Route CloseLog → HandleCloseLog so HandleApplyFilter's await on the close-completion
         // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
         // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
         // being swallowed by the discard.
