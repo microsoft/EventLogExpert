@@ -143,7 +143,7 @@ internal sealed class Effects(
             // TODO: WITH-XML logs that aren't reloaded keep their (now-stale) DisplayedEvents
             // slice. A separate follow-up commit should also publish a filter pass for those
             // logs so the UI reflects the new filter without waiting for a live event arrival.
-            await ReloadLogsWithXmlAsync(logsNeedingReload, dispatcher);
+            await ReloadLogsWithXmlAsync(logsNeedingReload, generation, dispatcher);
 
             return;
         }
@@ -153,6 +153,7 @@ internal sealed class Effects(
 
     private async Task ReloadLogsWithXmlAsync(
         List<(EventLogId Id, string Name, LogPathType Type)> logsNeedingReload,
+        long generation,
         IDispatcher dispatcher)
     {
         var reloadNames = logsNeedingReload.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
@@ -233,6 +234,16 @@ internal sealed class Effects(
 
                 long? selectedIdForLog = string.Equals(name, selectedLogName, StringComparison.Ordinal) ? selectedRecordId : null;
                 _pendingSelectionRestore[name] = new PendingSelectionRestore(ids, selectedIdForLog);
+            }
+
+            // Bail if a newer lifecycle action (CloseAll, or a newer ApplyFilter) bumped the
+            // generation while we were parked on the close-completion TCSes. Without this
+            // check, the reopen loop below would re-add logs that the user just closed —
+            // OpenLogAction's reducer treats missing logs as adds.
+            if (Interlocked.Read(ref _filterGeneration) != generation)
+            {
+                _logger.Trace($"{nameof(HandleApplyFilter)}: reload superseded; skipping reopen of {logsNeedingReload.Count} log(s).");
+                return;
             }
 
             foreach (var (_, name, type) in logsNeedingReload)
@@ -324,6 +335,11 @@ internal sealed class Effects(
     public async Task HandleCloseAll(IDispatcher dispatcher)
     {
         _logger.Trace($"{nameof(HandleCloseAll)} requested ({_eventLogState.Value.ActiveLogs.Count} active logs).");
+
+        // Bump generation so any in-flight ReloadLogsWithXmlAsync that is parked on the
+        // close-completion TCSes treats this as a supersede event and skips its reopen
+        // loop (otherwise the reload would re-add logs the user just closed).
+        Interlocked.Increment(ref _filterGeneration);
 
         CancelAllLoads();
 

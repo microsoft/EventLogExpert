@@ -1146,6 +1146,57 @@ public sealed class EffectsTests
     }
 
     [Fact]
+    public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldNotReopenClosedLogs()
+    {
+        // Arrange — pin down that a CloseAll landing WHILE ReloadLogsWithXmlAsync is parked
+        // on the close-completion TCS suppresses the reopen loop. Without the generation
+        // recheck in ReloadLogsWithXmlAsync, the reload would re-add the just-closed logs
+        // because OpenLogAction's reducer treats missing logs as adds.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Gate HandleCloseLog so the reload's close-completion TCS stays unsignaled until
+        // we have a chance to land a CloseAll on the same dispatcher.
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act — start HandleApplyFilter; it parks waiting for the close-completion TCS.
+        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
+
+        // While ReloadLogsWithXmlAsync is parked, simulate a CloseAll landing on the
+        // dispatcher. This must bump _filterGeneration so the parked reload sees itself
+        // as superseded and skips its reopen loop.
+        await effects.HandleCloseAll(mockDispatcher);
+
+        // Release HandleCloseLog → close-completion TCS signals → reload continues.
+        watcherCompletion.SetResult();
+
+        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert — no OpenLogAction was dispatched for the closed log. The CloseLogAction
+        // from the reload itself is fine; only the post-await reopen must be suppressed.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
     public async Task HandleApplyFilter_WhenFilterRequiresXml_ShouldRestoreSelectionAfterReload()
     {
         // Arrange — active log with one previously-selected event (RecordId=42). After the
