@@ -75,7 +75,7 @@ public sealed class FilterGroupStoreTests
         var filterId = FilterId.Create();
 
         // Act
-        var action = new RemoveFilterAction(parentId, filterId);
+        var action = new RemoveGroupFilterAction(parentId, filterId);
 
         // Assert
         Assert.Equal(parentId, action.ParentId);
@@ -103,7 +103,7 @@ public sealed class FilterGroupStoreTests
         var filter = FilterUtils.CreateTestFilter();
 
         // Act
-        var action = new SetFilterAction(parentId, filter);
+        var action = new SetGroupFilterAction(parentId, filter);
 
         // Assert
         Assert.Equal(parentId, action.ParentId);
@@ -131,7 +131,7 @@ public sealed class FilterGroupStoreTests
         var filterId = FilterId.Create();
 
         // Act
-        var action = new ToggleFilterExcludedAction(parentId, filterId);
+        var action = new ToggleGroupFilterExcludedAction(parentId, filterId);
 
         // Assert
         Assert.Equal(parentId, action.ParentId);
@@ -214,7 +214,7 @@ public sealed class FilterGroupStoreTests
         var groupId = state.Groups.First().Id;
         var filter = FilterUtils.CreateTestFilter();
 
-        state = Reducers.ReducerSetFilter(state, new SetFilterAction(groupId, filter));
+        state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, filter));
 
         // Assert
         Assert.Single(state.Groups.First().Filters);
@@ -234,15 +234,15 @@ public sealed class FilterGroupStoreTests
         // Act
         var initialFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue);
 
-        state = Reducers.ReducerSetFilter(state, new SetFilterAction(groupId, initialFilter));
+        state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, initialFilter));
 
         // Assert
         Assert.Equal(HighlightColor.Blue, state.Groups.First().Filters[0].Color);
 
         // Act
         var filterId = state.Groups.First().Filters[0].Id;
-        state = Reducers.ReducerRemoveFilter(state,
-            new RemoveFilterAction(groupId, filterId));
+        state = Reducers.ReducerRemoveGroupFilter(state,
+            new RemoveGroupFilterAction(groupId, filterId));
 
         // Assert
         Assert.Empty(state.Groups.First().Filters);
@@ -295,9 +295,9 @@ public sealed class FilterGroupStoreTests
         var state = new FilterGroupState { Groups = [group] };
 
         // Act
-        state = Reducers.ReducerToggleFilterExcluded(
+        state = Reducers.ReducerToggleGroupFilterExcluded(
             state,
-            new ToggleFilterExcludedAction(group.Id, filter.Id));
+            new ToggleGroupFilterExcludedAction(group.Id, filter.Id));
 
         // Assert
         Assert.True(state.Groups.First().Filters[0].IsExcluded);
@@ -308,9 +308,9 @@ public sealed class FilterGroupStoreTests
             Color = HighlightColor.Red
         };
 
-        state = Reducers.ReducerSetFilter(
+        state = Reducers.ReducerSetGroupFilter(
             state,
-            new SetFilterAction(group.Id, updatedFilter));
+            new SetGroupFilterAction(group.Id, updatedFilter));
 
         // Assert
         Assert.Equal(HighlightColor.Red, state.Groups.First().Filters[0].Color);
@@ -488,10 +488,10 @@ public sealed class FilterGroupStoreTests
         };
 
         var state = new FilterGroupState { Groups = [group] };
-        var action = new RemoveFilterAction(group.Id, filter.Id);
+        var action = new RemoveGroupFilterAction(group.Id, filter.Id);
 
         // Act
-        var newState = Reducers.ReducerRemoveFilter(state, action);
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
         var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
@@ -504,10 +504,10 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var action = new RemoveFilterAction(group.Id, FilterId.Create());
+        var action = new RemoveGroupFilterAction(group.Id, FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerRemoveFilter(state, action);
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
         Assert.Same(state, newState);
@@ -518,10 +518,10 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new RemoveFilterAction(FilterGroupId.Create(), FilterId.Create());
+        var action = new RemoveGroupFilterAction(FilterGroupId.Create(), FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerRemoveFilter(state, action);
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
         Assert.Same(state, newState);
@@ -594,10 +594,10 @@ public sealed class FilterGroupStoreTests
             HighlightColor.Green,
             id: filter.Id);
 
-        var action = new SetFilterAction(group.Id, updatedFilter);
+        var action = new SetGroupFilterAction(group.Id, updatedFilter);
 
         // Act
-        var newState = Reducers.ReducerSetFilter(state, action);
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
 
         // Assert
         var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
@@ -613,10 +613,10 @@ public sealed class FilterGroupStoreTests
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Yellow);
-        var action = new SetFilterAction(group.Id, newFilter);
+        var action = new SetGroupFilterAction(group.Id, newFilter);
 
         // Act
-        var newState = Reducers.ReducerSetFilter(state, action);
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
 
         // Assert
         var resultGroup = newState.Groups.First(g => g.Id == group.Id);
@@ -631,10 +631,10 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new SetFilterAction(FilterGroupId.Create(), FilterUtils.CreateTestFilter());
+        var action = new SetGroupFilterAction(FilterGroupId.Create(), FilterUtils.CreateTestFilter());
 
         // Act
-        var newState = Reducers.ReducerSetFilter(state, action);
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
 
         // Assert
         Assert.Same(state, newState);
@@ -669,9 +669,9 @@ public sealed class FilterGroupStoreTests
             mode: FilterMode.Cached);
 
         // Act
-        var newState = Reducers.ReducerSetFilter(
+        var newState = Reducers.ReducerSetGroupFilter(
             state,
-            new SetFilterAction(group.Id, updatedAsCached));
+            new SetGroupFilterAction(group.Id, updatedAsCached));
 
         // Assert
         var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
@@ -733,10 +733,10 @@ public sealed class FilterGroupStoreTests
         };
 
         var state = new FilterGroupState { Groups = [group] };
-        var action = new ToggleFilterExcludedAction(group.Id, filter.Id);
+        var action = new ToggleGroupFilterExcludedAction(group.Id, filter.Id);
 
         // Act
-        var newState = Reducers.ReducerToggleFilterExcluded(state, action);
+        var newState = Reducers.ReducerToggleGroupFilterExcluded(state, action);
 
         // Assert
         var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
@@ -749,10 +749,10 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var action = new ToggleFilterExcludedAction(group.Id, FilterId.Create());
+        var action = new ToggleGroupFilterExcludedAction(group.Id, FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerToggleFilterExcluded(state, action);
+        var newState = Reducers.ReducerToggleGroupFilterExcluded(state, action);
 
         // Assert
         Assert.Same(state, newState);
@@ -763,10 +763,10 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new ToggleFilterExcludedAction(FilterGroupId.Create(), FilterId.Create());
+        var action = new ToggleGroupFilterExcludedAction(FilterGroupId.Create(), FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerToggleFilterExcluded(state, action);
+        var newState = Reducers.ReducerToggleGroupFilterExcluded(state, action);
 
         // Assert
         Assert.Same(state, newState);
