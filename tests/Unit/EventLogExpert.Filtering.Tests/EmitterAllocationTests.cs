@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Parsing;
 using EventLogExpert.Filtering.Tests.TestUtils;
 
 namespace EventLogExpert.Filtering.Tests;

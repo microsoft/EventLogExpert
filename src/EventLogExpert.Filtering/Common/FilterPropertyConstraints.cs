@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Common;
 
 public static class FilterPropertyConstraints
 {

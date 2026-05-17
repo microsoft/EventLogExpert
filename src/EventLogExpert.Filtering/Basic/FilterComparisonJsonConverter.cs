@@ -1,11 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Common;
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Basic;
 
 internal sealed class FilterComparisonJsonConverter : JsonConverter<FilterComparison>
 {

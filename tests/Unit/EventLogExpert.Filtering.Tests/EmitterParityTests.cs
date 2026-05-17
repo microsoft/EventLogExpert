@@ -2,6 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Parsing;
+using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Filtering.Tests.TestUtils;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 using System.Diagnostics.CodeAnalysis;

@@ -1,13 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Lowering;
 using EventLogExpert.Filtering.Parsing;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Basic;
 
 public static class BasicFilterDecomposer
 {

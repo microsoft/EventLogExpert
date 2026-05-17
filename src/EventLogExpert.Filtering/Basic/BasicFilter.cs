@@ -3,7 +3,7 @@
 
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.Basic;
 
 public sealed record BasicFilter(FilterComparison Comparison, ImmutableList<SubFilter> SubFilters)
 {

@@ -3,8 +3,9 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Common;
 
-namespace EventLogExpert.Filtering;
+namespace EventLogExpert.Filtering.EventData;
 
 public static class EventLogDataQueryExtensions
 {
