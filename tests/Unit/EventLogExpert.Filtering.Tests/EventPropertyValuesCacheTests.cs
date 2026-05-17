@@ -9,11 +9,11 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests;
 
-public sealed class EventPropertyItemsCacheTests : IDisposable
+public sealed class EventPropertyValuesCacheTests : IDisposable
 {
-    public EventPropertyItemsCacheTests() => EventPropertyItemsCache.Clear();
+    public EventPropertyValuesCacheTests() => EventPropertyValuesCache.Clear();
 
-    public void Dispose() => EventPropertyItemsCache.Clear();
+    public void Dispose() => EventPropertyValuesCache.Clear();
 
     [Fact]
     public void GetItems_DifferentSnapshot_RecomputesValues()
@@ -28,8 +28,8 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
             new EventLogData(Constants.LogNameLog2, LogPathType.Channel, [CreateTestEvent(200)]));
 
         // Act
-        var idsA = EventPropertyItemsCache.GetItems(snapshotA, EventProperty.Id);
-        var idsB = EventPropertyItemsCache.GetItems(snapshotB, EventProperty.Id);
+        var idsA = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
+        var idsB = EventPropertyValuesCache.GetValues(snapshotB, EventProperty.Id);
 
         // Assert
         Assert.Equal(["100"], idsA);
@@ -43,7 +43,7 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty;
 
         // Act
-        var items = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Level);
+        var items = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Level);
 
         // Assert
         Assert.Equal(Enum.GetNames<SeverityLevel>(), items);
@@ -65,8 +65,8 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         // Act
-        var ids = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
-        var sources = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Source);
+        var ids = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
+        var sources = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Source);
 
         // Assert
         Assert.Equal(["100", "200", "300"], ids);
@@ -85,8 +85,8 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
         // Act
-        var first = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
-        var second = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Id);
+        var first = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
+        var second = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Id);
 
         // Assert
         Assert.True(first == second, "ImmutableArray instance should be reused for the same snapshot/Property.");
@@ -107,9 +107,9 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
             original with { Events = [CreateTestEvent(300)] });
 
         // Act
-        var idsA = EventPropertyItemsCache.GetItems(snapshotA, EventProperty.Id);
-        var idsB = EventPropertyItemsCache.GetItems(snapshotB, EventProperty.Id);
-        var idsASecond = EventPropertyItemsCache.GetItems(snapshotA, EventProperty.Id);
+        var idsA = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
+        var idsB = EventPropertyValuesCache.GetValues(snapshotB, EventProperty.Id);
+        var idsASecond = EventPropertyValuesCache.GetValues(snapshotA, EventProperty.Id);
 
         // Assert
         Assert.Equal(["100", "200"], idsA);
@@ -127,7 +127,7 @@ public sealed class EventPropertyItemsCacheTests : IDisposable
             new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [CreateTestEvent()]));
 
         // Act
-        var items = EventPropertyItemsCache.GetItems(activeLogs, EventProperty.Description);
+        var items = EventPropertyValuesCache.GetValues(activeLogs, EventProperty.Description);
 
         // Assert
         Assert.Empty(items);
