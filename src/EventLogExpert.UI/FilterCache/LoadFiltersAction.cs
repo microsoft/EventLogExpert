@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed record LoadFiltersAction;
+internal sealed record LoadFiltersAction;

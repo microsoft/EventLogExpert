@@ -6,13 +6,13 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Common.AppTitle;
 using EventLogExpert.UI.EventLog;
+using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.LogTable;
 using EventLogExpert.UI.Settings;
 using Fluxor;
 using System.Collections.Immutable;
 using Application = Microsoft.Maui.Controls.Application;
-using IDispatcher = Fluxor.IDispatcher;
 using Window = Microsoft.Maui.Controls.Window;
 
 namespace EventLogExpert;
@@ -23,7 +23,7 @@ public sealed partial class App : Application
     private readonly ISettingsService _settings;
 
     public App(
-        IDispatcher fluxorDispatcher,
+        IFilterCacheCommands filterCacheCommands,
         ILogTableCommands logTableCommands,
         IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
@@ -40,7 +40,7 @@ public sealed partial class App : Application
         _settings.ThemeChanged += OnThemeChanged;
 
         _mainPage = new MainPage(
-            fluxorDispatcher,
+            filterCacheCommands,
             logTableCommands,
             filterGroupCommands,
             activeLogs,

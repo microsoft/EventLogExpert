@@ -3,4 +3,4 @@
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed record ImportFavoritesAction(List<string> Filters);
+internal sealed record ImportFavoritesAction(List<string> Filters);
