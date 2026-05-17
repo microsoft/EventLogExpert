@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Common.Threading;
+using EventLogExpert.Runtime.Common.Threading;
 
 namespace EventLogExpert.Services;
 

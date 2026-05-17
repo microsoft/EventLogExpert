@@ -4,12 +4,12 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Services;
-using EventLogExpert.UI.Common.AppTitle;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.LogTable;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.Common.AppTitle;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Settings;
 using Fluxor;
 using System.Collections.Immutable;
 using Application = Microsoft.Maui.Controls.Application;

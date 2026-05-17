@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.LogTable;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;

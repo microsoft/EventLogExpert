@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Modal;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Modal;
 using Fluxor.Blazor.Web.Components;
 using Microsoft.AspNetCore.Components;
 

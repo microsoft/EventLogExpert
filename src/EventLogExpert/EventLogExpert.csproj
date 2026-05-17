@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+<Project Sdk="Microsoft.NET.Sdk.Razor">
 
     <PropertyGroup>
         <OutputType>Exe</OutputType>
@@ -60,7 +60,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
+      <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
       <ProjectReference Include="..\EventLogExpert.Components\EventLogExpert.Components.csproj" />
     </ItemGroup>
 

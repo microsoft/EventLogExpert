@@ -4,7 +4,7 @@
 namespace EventLogExpert.Filtering.Tests.TestUtils.Constants;
 
 /// <summary>
-///     Filter expression literals shared across multiple test classes. Mirrors EventLogExpert.UI.Tests'
+///     Filter expression literals shared across multiple test classes. Mirrors EventLogExpert.Runtime.Tests'
 ///     <c>Constants.Filter</c> shape so the parity suite covers the same expressions exercised by upstream UI tests plus
 ///     the formatter shapes and the Advanced free-text variants.
 /// </summary>

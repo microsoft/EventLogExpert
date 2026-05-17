@@ -1,0 +1,11 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.Runtime.Tests.TestUtils.Constants;
+
+public sealed partial class Constants
+{
+    public const string AppName = "EventLogExpert";
+    public const string LogName = "Application";
+    public const string Percentage = "50%";
+}

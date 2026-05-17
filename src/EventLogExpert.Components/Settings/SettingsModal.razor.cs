@@ -2,16 +2,16 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Components.Base;
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Banner;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.Common.Lifecycle;
-using EventLogExpert.UI.Database;
-using EventLogExpert.UI.Database.Upgrade;
-using EventLogExpert.UI.DetailsPane;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.Settings;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.Common.Lifecycle;
+using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.Runtime.DetailsPane;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Settings;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;

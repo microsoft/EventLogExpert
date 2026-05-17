@@ -3,11 +3,11 @@
 
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.UI.Common.Clipboard;
-using EventLogExpert.UI.Common.Files;
-using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.FilterPane;
+using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Files;
+using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.Runtime.FilterPane;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
 

@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.UI.EventLog;
-using EventLogExpert.UI.LogTable;
-using EventLogExpert.UI.StatusBar;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.StatusBar;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;

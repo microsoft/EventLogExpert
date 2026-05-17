@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.UI.Banner;
+using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.Components.Database;

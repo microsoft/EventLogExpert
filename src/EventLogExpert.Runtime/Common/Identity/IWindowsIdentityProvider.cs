@@ -1,0 +1,9 @@
+// // Copyright (c) Microsoft Corporation.
+// // Licensed under the MIT License.
+
+namespace EventLogExpert.Runtime.Common.Identity;
+
+public interface IWindowsIdentityProvider
+{
+    bool IsUserInAdministratorRole();
+}
