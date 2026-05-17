@@ -11,7 +11,7 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
-using EventLogExpert.UI.FilterLoading;
+using EventLogExpert.UI.FilterProgress;
 using EventLogExpert.UI.FilterPane;
 using EventLogExpert.UI.Tests.TestUtils;
 using EventLogExpert.UI.Tests.TestUtils.Constants;
@@ -39,7 +39,7 @@ public sealed class EffectsTests
 
         // Assert
         mockDispatcher.Received().Dispatch(Arg.Any<ApplyFilterAction>());
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
     }
 
     [Fact]
@@ -604,7 +604,7 @@ public sealed class EffectsTests
         await effects.HandleToggleIsEnabled(mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterLoadingAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetFilterProgressAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<ApplyFilterAction>());
     }
 

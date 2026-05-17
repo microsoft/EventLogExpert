@@ -36,7 +36,7 @@
             </button>
         </div>
 
-        @if (FilterLoadingState.Value.IsLoading)
+        @if (FilterProgressState.Value.IsLoading)
         {
             <span class="filter-header-status">
                 [<i aria-label="Loading" class="spinner-border" role="status"></i> Applying Filters]
@@ -83,7 +83,7 @@
                 There are no filters to clear.
             </span>
 
-            @if (HasFilters || FilterLoadingState.Value.IsLoading)
+            @if (HasFilters || FilterProgressState.Value.IsLoading)
             {
                 <span aria-label="@(_isFilterListVisible ? "Filters Expanded" : "Filters Collapsed")"
                     class="menu-toggle"
