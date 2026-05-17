@@ -113,6 +113,13 @@ internal sealed class Effects(
     [EffectMethod]
     public async Task HandleApplyFilter(ApplyFilterAction action, IDispatcher dispatcher)
     {
+        // Snapshot the close-all generation BEFORE any state reads. If CloseAll lands
+        // after this point, the post-await revalidations will see the bump and bail.
+        // Capturing AFTER reading ActiveLogs would let a CloseAll between the read and the
+        // capture pin a stale snapshot to the new generation, defeating the supersession
+        // check entirely.
+        long closeAllGenerationAtStart = Interlocked.Read(ref _closeAllGeneration);
+
         bool newRequiresXml = action.Filter.RequiresXml;
 
         // Identify open logs that lack pre-rendered XML. Disabling/removing an XML filter is a
@@ -133,13 +140,6 @@ internal sealed class Effects(
         // generation here (not only in the filter-only branch) so the reload path is also a
         // valid supersede event.
         long generation = Interlocked.Increment(ref _filterGeneration);
-
-        // Snapshot the close-all generation so ReloadLogsWithXmlAsync can detect a CloseAll
-        // landing while it's parked on the close-completion TCSes — distinct from a newer
-        // ApplyFilter racing in (which only bumps _filterGeneration). The reopen path must
-        // run as long as no CloseAll superseded us; a newer filter is fine because the
-        // reopened logs will pick up the latest AppliedFilter via HandleLoadEvents.
-        long closeAllGenerationAtStart = Interlocked.Read(ref _closeAllGeneration);
 
         if (logsNeedingReload.Count > 0)
         {
@@ -264,9 +264,33 @@ internal sealed class Effects(
                 return;
             }
 
-            foreach (var (_, name, type) in logsNeedingReload)
+            // Re-check the generation BEFORE each dispatch. A CloseAll arriving mid-loop
+            // would otherwise see partially-reopened state: the OpenLogActions dispatched
+            // so far would re-add logs CloseAll just removed. When mid-loop supersession is
+            // detected, dispatch CloseLogAction for the OpenLogs we've already issued so
+            // CloseAll's "no active logs" intent is restored.
+            var reopenedSoFar = new List<(EventLogId Id, string Name)>(logsNeedingReload.Count);
+
+            foreach (var (id, name, type) in logsNeedingReload)
             {
+                if (Interlocked.Read(ref _closeAllGeneration) != closeAllGeneration)
+                {
+                    foreach (var (reopenedId, reopenedName) in reopenedSoFar)
+                    {
+                        dispatcher.Dispatch(new CloseLogAction(reopenedId, reopenedName));
+                    }
+
+                    foreach (var (_, restoreName, _) in logsNeedingReload)
+                    {
+                        _pendingSelectionRestore.TryRemove(restoreName, out _);
+                    }
+
+                    _logger.Trace($"{nameof(HandleApplyFilter)}: reload superseded by CloseAll mid-reopen; dispatched CloseLog for {reopenedSoFar.Count} just-reopened log(s) and cleared pending selection restore.");
+                    return;
+                }
+
                 dispatcher.Dispatch(new OpenLogAction(name, type));
+                reopenedSoFar.Add((id, name));
             }
         }
         finally
