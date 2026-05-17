@@ -19,7 +19,6 @@ using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage;
 using DataPackageOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation;
 using DragEventArgs = Microsoft.Maui.Controls.DragEventArgs;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert;
 
@@ -35,7 +34,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
     private bool _disposed;
 
     public MainPage(
-        IDispatcher fluxorDispatcher,
+        IFilterCacheCommands filterCacheCommands,
         ILogTableCommands logTableCommands,
         IFilterGroupCommands filterGroupCommands,
         IStateSelection<EventLogState, ImmutableDictionary<string, EventLogData>> activeLogs,
@@ -58,7 +57,7 @@ public sealed partial class MainPage : ContentPage, IDisposable
         _settings.ThemeChanged += OnThemeChanged;
 
         logTableCommands.LoadColumns();
-        fluxorDispatcher.Dispatch(new LoadFiltersAction());
+        filterCacheCommands.LoadFilters();
         filterGroupCommands.LoadGroups();
 
         _ = ProcessCommandLine();

@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.UI.FilterCache;
 
-public sealed class Effects(IFilterCachePreferencesProvider preferencesProvider, IState<FilterCacheState> state)
+internal sealed class Effects(IFilterCachePreferencesProvider preferencesProvider, IState<FilterCacheState> state)
 {
     private const int MaxRecentFilterCount = 20;
 

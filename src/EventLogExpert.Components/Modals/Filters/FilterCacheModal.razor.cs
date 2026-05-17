@@ -8,7 +8,6 @@ using EventLogExpert.UI.FilterCache;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Modals.Filters;
 
@@ -16,11 +15,11 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
-
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
+
+    [Inject] private IFilterCacheCommands FilterCacheCommands { get; init; } = null!;
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
 
@@ -58,7 +57,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
 
             if (filters is null) { return; }
 
-            Dispatcher.Dispatch(new ImportFavoritesAction(filters));
+            FilterCacheCommands.ImportFavorites(filters);
         }
         catch (Exception ex)
         {
@@ -68,8 +67,7 @@ public sealed partial class FilterCacheModal : ModalBase<bool>
         }
     }
 
-    private void AddFavorite(string filter) => Dispatcher.Dispatch(new AddFavoriteFilterAction(filter));
+    private void AddFavorite(string filter) => FilterCacheCommands.AddFavoriteFilter(filter);
 
-    private void RemoveFavorite(string filter) =>
-        Dispatcher.Dispatch(new RemoveFavoriteFilterAction(filter));
+    private void RemoveFavorite(string filter) => FilterCacheCommands.RemoveFavoriteFilter(filter);
 }
