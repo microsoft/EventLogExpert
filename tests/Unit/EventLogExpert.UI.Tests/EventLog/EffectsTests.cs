@@ -701,7 +701,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleApplyFilter_FilterBranch_ShouldBracketDisplayedEventsUpdateWithFilterLoading()
+    public async Task HandleApplyFilter_FilterBranch_ShouldBracketDisplayedEventsUpdateWithFilterProgress()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -722,7 +722,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterLoading()
+    public async Task HandleApplyFilter_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterProgress()
     {
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -1018,7 +1018,7 @@ public sealed class EffectsTests
     }
 
     [Fact]
-    public async Task HandleApplyFilter_ReloadBranch_ShouldClearStaleFilterLoadingSpinner()
+    public async Task HandleApplyFilter_ReloadBranch_ShouldClearStaleFilterProgressSpinner()
     {
         // The reload path must dispatch SetFilterProgressAction(false) to clear any spinner
         // left over from a superseded filter-only run. Without this clear, the reload's
