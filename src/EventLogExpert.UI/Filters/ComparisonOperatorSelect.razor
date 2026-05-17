@@ -1,0 +1,18 @@
+@namespace EventLogExpert.UI.Filters
+
+<ValueSelect AriaLabel="@(AriaLabelledBy is null ? AriaLabel ?? "Comparison" : null)"
+    AriaLabelledBy="@AriaLabelledBy"
+    CssClass="@CssClass"
+    T="ComparisonKind"
+    ToStringFunc="@(KindLabel)"
+    Value="Current"
+    ValueChanged="HandleKindChanged">
+    <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.Equals" />
+    <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.Contains" />
+    <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.NotEqual" />
+    <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.NotContains" />
+    @if (SupportsMany)
+    {
+        <ValueSelectItem T="ComparisonKind" Value="ComparisonKind.MultiSelect" />
+    }
+</ValueSelect>

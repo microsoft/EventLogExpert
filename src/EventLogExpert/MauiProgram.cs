@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Components.Alerts;
+using EventLogExpert.UI.Alerts;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Services;
 using EventLogExpert.Runtime.Alerts;

@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Components.DebugLog;
-using EventLogExpert.Components.Settings;
-using EventLogExpert.Components.Update;
+using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.Settings;
+using EventLogExpert.UI.Update;
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
