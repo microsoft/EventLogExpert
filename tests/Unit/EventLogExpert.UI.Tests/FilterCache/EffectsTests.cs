@@ -305,7 +305,7 @@ public sealed class EffectsTests
             Constants.FilterLevelEqualsError
         };
 
-        var action = new ImportFavoritesAction(filtersToImport);
+        var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
         await effects.HandleImportFavorites(action, mockDispatcher);
@@ -326,7 +326,7 @@ public sealed class EffectsTests
             existingFavorites);
 
         var filtersToImport = new List<string> { Constants.FilterLevelEqualsError };
-        var action = new ImportFavoritesAction(filtersToImport);
+        var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
         await effects.HandleImportFavorites(action, mockDispatcher);
@@ -356,7 +356,7 @@ public sealed class EffectsTests
             Constants.FilterSourceContainsTest
         };
 
-        var action = new ImportFavoritesAction(filtersToImport);
+        var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
         await effects.HandleImportFavorites(action, mockDispatcher);
@@ -382,7 +382,7 @@ public sealed class EffectsTests
             Constants.FilterSourceContainsTest
         };
 
-        var action = new ImportFavoritesAction(filtersToImport);
+        var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
         await effects.HandleImportFavorites(action, mockDispatcher);
@@ -411,7 +411,7 @@ public sealed class EffectsTests
             Constants.FilterLevelEqualsError
         };
 
-        var action = new ImportFavoritesAction(filtersToImport);
+        var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
         await effects.HandleImportFavorites(action, mockDispatcher);

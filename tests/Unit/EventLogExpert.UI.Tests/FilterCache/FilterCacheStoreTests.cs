@@ -70,7 +70,7 @@ public sealed class FilterCacheStoreTests
         var filters = new List<string> { Constants.FilterIdEquals100, Constants.FilterIdEquals200 };
 
         // Act
-        var action = new ImportFavoritesAction(filters);
+        var action = new ImportFavoritesAction([.. filters]);
 
         // Assert
         Assert.Equal(2, action.Filters.Count);

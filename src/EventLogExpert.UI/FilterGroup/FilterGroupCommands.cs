@@ -12,7 +12,7 @@ internal sealed class FilterGroupCommands(IDispatcher dispatcher) : IFilterGroup
 
     public void AddGroup(SavedFilterGroup? group = null) => _dispatcher.Dispatch(new AddGroupAction(group));
 
-    public void ImportGroups(IEnumerable<SavedFilterGroup> groups) => _dispatcher.Dispatch(new ImportGroupsAction(groups));
+    public void ImportGroups(IEnumerable<SavedFilterGroup> groups) => _dispatcher.Dispatch(new ImportGroupsAction([.. groups]));
 
     public void LoadGroups() => _dispatcher.Dispatch(new LoadGroupsAction());
 

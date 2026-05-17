@@ -29,7 +29,7 @@ internal sealed class Effects(
         var widths = BuildWidths();
         var order = BuildOrder();
 
-        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns, widths, order));
+        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns.ToImmutableDictionary(), widths.ToImmutableDictionary(), order));
 
         return Task.CompletedTask;
     }
@@ -59,7 +59,7 @@ internal sealed class Effects(
 
         var widths = new Dictionary<ColumnName, int>(_columnDefaults.ColumnWidths);
 
-        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns, widths, _columnDefaults.ColumnOrder));
+        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns.ToImmutableDictionary(), widths.ToImmutableDictionary(), _columnDefaults.ColumnOrder));
 
         return Task.CompletedTask;
     }
@@ -92,7 +92,7 @@ internal sealed class Effects(
         var widths = BuildWidths();
         var order = BuildOrder();
 
-        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns, widths, order));
+        dispatcher.Dispatch(new LoadColumnsCompletedAction(columns.ToImmutableDictionary(), widths.ToImmutableDictionary(), order));
 
         return Task.CompletedTask;
     }
