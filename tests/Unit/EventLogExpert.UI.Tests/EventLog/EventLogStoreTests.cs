@@ -111,7 +111,7 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
-    public void EventLogAction_SetFilters_ShouldStoreFilter()
+    public void EventLogAction_ApplyFilter_ShouldStoreFilter()
     {
         // Arrange
         var filter = new Filter(null, []);
