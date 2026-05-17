@@ -1,11 +1,21 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Common.AppTitle;
+using EventLogExpert.UI.Common.Versioning;
 using EventLogExpert.UI.EventLog;
 using EventLogExpert.UI.FilterCache;
 using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
+using EventLogExpert.UI.Filters;
 using EventLogExpert.UI.LogTable;
+using EventLogExpert.UI.Menu;
+using EventLogExpert.UI.Modal;
+using EventLogExpert.UI.Settings;
+using EventLogExpert.UI.Update;
+using EventLogExpert.UI.Update.Deployment;
 using Microsoft.Extensions.DependencyInjection;
 using Effects = EventLogExpert.UI.EventLog.Effects;
 
@@ -27,14 +37,35 @@ public static class UiServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
 
+        // Command facades.
         services.AddSingleton<IEventLogCommands, EventLogCommands>();
         services.AddSingleton<IFilterCacheCommands, FilterCacheCommands>();
-        services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<IFilterGroupCommands, FilterGroupCommands>();
+        services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<ILogTableCommands, LogTableCommands>();
+
+        // UI capabilities.
         services.AddSingleton<IHighlightSelector, HighlightSelector>();
         services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
         services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<Effects>());
+
+        // Application services.
+        services.AddSingleton<IAppTitleService, AppTitleService>();
+        services.AddSingleton<IBannerService, BannerService>();
+        services.AddSingleton<IFilterService, FilterService>();
+        services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
+        services.AddSingleton<ILogWatcherService, LogWatcherService>();
+        services.AddSingleton<IMenuService, MenuService>();
+        services.AddSingleton<IModalService, ModalService>();
+        services.AddSingleton<ISettingsService, SettingsService>();
+
+        // Update + deployment services.
+        services.AddSingleton<ICurrentVersionProvider, CurrentVersionProvider>();
+        services.AddSingleton<IDeploymentService, DeploymentService>();
+        services.AddSingleton<IGitHubService, GitHubService>();
+        services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
+        services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
+        services.AddSingleton<IUpdateService, UpdateService>();
 
         return services;
     }

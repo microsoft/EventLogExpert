@@ -10,7 +10,7 @@ using EventLogExpert.UI.Update.ReleaseNotes;
 
 namespace EventLogExpert.UI.Update;
 
-public sealed class UpdateService(
+internal sealed class UpdateService(
     ICurrentVersionProvider versionProvider,
     IAppTitleService appTitleService,
     IGitHubService githubService,

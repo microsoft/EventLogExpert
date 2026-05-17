@@ -3,7 +3,7 @@
 
 namespace EventLogExpert.UI.Menu;
 
-public sealed class MenuService : IMenuService
+internal sealed class MenuService : IMenuService
 {
     private readonly Lock _stateLock = new();
 

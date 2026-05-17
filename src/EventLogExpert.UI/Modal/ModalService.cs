@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Modal;
 
-public sealed class ModalService : IModalService
+internal sealed class ModalService : IModalService
 {
     private readonly Lock _stateLock = new();
 

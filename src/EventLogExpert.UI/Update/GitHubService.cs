@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace EventLogExpert.UI.Update;
 
-public sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogger) : IGitHubService
+internal sealed class GitHubService(HttpClient httpClient, ITraceLogger traceLogger) : IGitHubService
 {
     private readonly HttpClient _httpClient = httpClient;
     private readonly ITraceLogger _traceLogger = traceLogger;

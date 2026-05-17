@@ -6,7 +6,7 @@ using System.Text;
 
 namespace EventLogExpert.UI.Common.AppTitle;
 
-public sealed class AppTitleService(
+internal sealed class AppTitleService(
     ICurrentVersionProvider versionProvider,
     ITitleProvider titleProvider) : IAppTitleService
 {
