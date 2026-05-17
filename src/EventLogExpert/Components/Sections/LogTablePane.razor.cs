@@ -22,7 +22,6 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Sections;
 
@@ -70,8 +69,6 @@ public sealed partial class LogTablePane
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
     [Inject] private ILogTableColumnDefaultsProvider ColumnDefaults { get; init; } = null!;
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 

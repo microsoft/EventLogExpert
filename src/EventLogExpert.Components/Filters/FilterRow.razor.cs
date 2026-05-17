@@ -11,7 +11,6 @@ using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.UI.FilterPane;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
-using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Components.Filters;
 
@@ -62,8 +61,6 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
             return result;
         }
     }
-
-    [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
 
