@@ -59,10 +59,6 @@ public static class MauiProgram
         });
 
         // Core Services
-        builder.Services.AddSingleton<DebugLogService>();
-        builder.Services.AddSingleton<ITraceLogger>(sp => sp.GetRequiredService<DebugLogService>());
-        builder.Services.AddSingleton<IFileLogger>(sp => sp.GetRequiredService<DebugLogService>());
-
         var fileLocationOptions = new FileLocationOptions(FileSystem.AppDataDirectory);
         builder.Services.AddSingleton(fileLocationOptions);
         Directory.CreateDirectory(fileLocationOptions.DatabasePath);
@@ -80,13 +76,8 @@ public static class MauiProgram
 
         // Build Services
         builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
-        builder.Services.AddSingleton<DatabaseService>();
-        builder.Services.AddSingleton<IDatabaseService>(static provider =>
-            provider.GetRequiredService<DatabaseService>());
 
         // Provider Services
-        builder.Services.AddSingleton<IActiveDatabasePathsProvider>(static provider =>
-            provider.GetRequiredService<DatabaseService>());
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();
