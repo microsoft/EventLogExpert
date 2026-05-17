@@ -47,7 +47,7 @@ public sealed class EffectsTests
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddFavoriteFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddFavoriteFilterSuccessAction>());
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class EffectsTests
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 2 &&
             x.Filters.Contains(Constants.FilterIdEquals100) &&
             x.Filters.Contains(Constants.FilterIdEquals200)));
@@ -91,11 +91,11 @@ public sealed class EffectsTests
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 1 &&
             x.Filters.Contains(Constants.FilterIdEquals100)));
 
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterSuccessAction>(x =>
             x.Filters.Count() == 1 &&
             !x.Filters.Contains(Constants.FilterIdEquals100) &&
             x.Filters.Contains(Constants.FilterLevelEqualsError)));
@@ -107,7 +107,7 @@ public sealed class EffectsTests
     [Fact]
     public async Task HandleAddFavoriteFilter_WhenFilterNotInRecent_ShouldNotDispatchRecentAction()
     {
-        // Arrange — recent untouched, so we shouldn't dispatch a no-op AddRecentFilterCompletedAction.
+        // Arrange — recent untouched, so we shouldn't dispatch a no-op AddRecentFilterSuccessAction.
         var existingRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
@@ -119,7 +119,7 @@ public sealed class EffectsTests
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -177,7 +177,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -195,7 +195,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -213,7 +213,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -228,7 +228,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -246,7 +246,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterSuccessAction>(x =>
             x.Filters.Count() == 2));
     }
 
@@ -262,7 +262,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<AddRecentFilterSuccessAction>());
     }
 
     [Fact]
@@ -284,7 +284,7 @@ public sealed class EffectsTests
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterCompletedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterSuccessAction>(a =>
             a.Filters.Count() == 20 &&
             !a.Filters.Contains("Filter1") &&
             a.Filters.Contains("NewFilter")));
@@ -311,7 +311,7 @@ public sealed class EffectsTests
         await effects.HandleImportFavorites(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(a =>
             a.Filters.Count == 2 &&
             a.Filters.Contains(Constants.FilterLevelEqualsError)));
     }
@@ -362,7 +362,7 @@ public sealed class EffectsTests
         await effects.HandleImportFavorites(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 3 &&
             x.Filters.Contains(Constants.FilterSourceContainsTest)));
     }
@@ -388,7 +388,7 @@ public sealed class EffectsTests
         await effects.HandleImportFavorites(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 3 &&
             x.Filters.Contains(Constants.FilterIdEquals100) &&
             x.Filters.Contains(Constants.FilterLevelEqualsError) &&
@@ -417,7 +417,7 @@ public sealed class EffectsTests
         await effects.HandleImportFavorites(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterCompletedAction>(a =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(a =>
             a.Filters.Count == 2 &&
             a.Filters.Contains("Id == 100") &&
             a.Filters.Contains(Constants.FilterLevelEqualsError)));
@@ -453,7 +453,7 @@ public sealed class EffectsTests
         await effects.HandleLoadFilters(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<LoadFiltersCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<LoadFiltersSuccessAction>(x =>
             x.FavoriteFilters.Count == 2 &&
             x.RecentFilters.Count() == 1 &&
             x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
@@ -480,7 +480,7 @@ public sealed class EffectsTests
         await effects.HandleLoadFilters(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<LoadFiltersCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<LoadFiltersSuccessAction>(x =>
             x.FavoriteFilters.Count == 0 &&
             !x.RecentFilters.Any()));
     }
@@ -533,7 +533,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterSuccessAction>(x =>
             x.FavoriteFilters.Count == 1 &&
             !x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
             x.RecentFilters.Count() == 1 &&
@@ -555,7 +555,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFavoriteFilterCompletedAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<RemoveFavoriteFilterSuccessAction>());
     }
 
     [Fact]
@@ -578,7 +578,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterSuccessAction>(x =>
             x.FavoriteFilters.Count == 1 &&
             !x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
             x.RecentFilters.Count() == 2 &&
@@ -607,7 +607,7 @@ public sealed class EffectsTests
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
 
         // Assert
-        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterCompletedAction>(x =>
+        mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterSuccessAction>(x =>
             x.FavoriteFilters.Count == 0 &&
             x.RecentFilters.Count() == 20 &&
             !x.RecentFilters.Contains("Filter1") &&
