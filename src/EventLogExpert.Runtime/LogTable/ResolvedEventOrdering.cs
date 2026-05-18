@@ -97,53 +97,6 @@ internal static class ResolvedEventOrdering
             };
 
     internal static IReadOnlyList<ResolvedEvent> MergeSorted(
-        IReadOnlyList<IReadOnlyList<ResolvedEvent>> sortedLists,
-        ColumnName orderBy,
-        bool isDescending)
-    {
-        switch (sortedLists.Count)
-        {
-            case 0: return [];
-            case 1: return sortedLists[0];
-        }
-
-        int totalCount = 0;
-
-        foreach (var list in sortedLists) { totalCount += list.Count; }
-
-        if (totalCount == 0) { return []; }
-
-        var comparer = GetComparer(orderBy, isDescending);
-        var result = new List<ResolvedEvent>(totalCount);
-        var heap = new PriorityQueue<int, ResolvedEvent>(
-            sortedLists.Count,
-            Comparer<ResolvedEvent>.Create(comparer));
-        var positions = new int[sortedLists.Count];
-
-        for (int listIndex = 0; listIndex < sortedLists.Count; listIndex++)
-        {
-            if (sortedLists[listIndex].Count <= 0) { continue; }
-
-            heap.Enqueue(listIndex, sortedLists[listIndex][0]);
-            positions[listIndex] = 1;
-        }
-
-        while (heap.TryDequeue(out int sourceListIndex, out ResolvedEvent? currentEvent))
-        {
-            result.Add(currentEvent);
-
-            int nextPosition = positions[sourceListIndex];
-
-            if (nextPosition >= sortedLists[sourceListIndex].Count) { continue; }
-
-            heap.Enqueue(sourceListIndex, sortedLists[sourceListIndex][nextPosition]);
-            positions[sourceListIndex] = nextPosition + 1;
-        }
-
-        return result.AsReadOnly();
-    }
-
-    internal static IReadOnlyList<ResolvedEvent> MergeSorted(
         IReadOnlyList<ResolvedEvent> existing,
         IReadOnlyList<ResolvedEvent> batch,
         ColumnName? orderBy,

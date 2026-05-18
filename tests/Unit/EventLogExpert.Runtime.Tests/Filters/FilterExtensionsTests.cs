@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.Filters;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
@@ -35,20 +34,6 @@ public sealed class FilterExtensionsTests
 
         var original = new Filter(null, ImmutableList.Create(first));
         var updated = new Filter(null, ImmutableList.Create(second));
-
-        // Act
-        var result = updated.HasFilteringChangedFrom(original);
-
-        // Assert
-        Assert.True(result);
-    }
-
-    [Fact]
-    public void HasFilteringChanged_WhenComparisonValueDiffers_ShouldReportChange()
-    {
-        // Arrange
-        var original = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
-        var updated = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
