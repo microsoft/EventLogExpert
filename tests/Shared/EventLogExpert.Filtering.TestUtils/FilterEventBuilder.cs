@@ -5,11 +5,11 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using System.Security.Principal;
 
-namespace EventLogExpert.Runtime.Tests.TestUtils;
+namespace EventLogExpert.Filtering.TestUtils;
 
-internal static class EventUtils
+public static class FilterEventBuilder
 {
-    internal static ResolvedEvent CreateTestEvent(
+    public static ResolvedEvent CreateTestEvent(
         int id = 1,
         string source = "TestSource",
         string level = "Information",

@@ -1,17 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+using EventLogExpert.Filtering.TestUtils.Constants;
+
+namespace EventLogExpert.Filtering.Tests;
 
 public sealed class FilterCompilerTests
 {
     [Fact]
     public void IsValid_WhenExpressionIsInvalid_ShouldReturnFalseWithError()
     {
-        var valid = FilterCompiler.IsValid(Constants.FilterInvalidProperty, out var error);
+        var valid = FilterCompiler.IsValid(FilterTestConstants.FilterInvalidProperty, out var error);
 
         Assert.False(valid);
         Assert.False(string.IsNullOrEmpty(error));
@@ -19,12 +20,12 @@ public sealed class FilterCompilerTests
 
     [Fact]
     public void IsValid_WhenExpressionIsValid_ShouldReturnTrue() =>
-        Assert.True(FilterCompiler.IsValid(Constants.FilterIdEquals100, out _));
+        Assert.True(FilterCompiler.IsValid(FilterTestConstants.FilterIdEquals100, out _));
 
     [Fact]
     public void TryCompile_WhenExpressionDoesNotReferenceXml_ShouldNotRequireXml()
     {
-        var success = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _);
+        var success = FilterCompiler.TryCompile(FilterTestConstants.FilterIdEquals100, out var compiled, out _);
 
         Assert.True(success);
         Assert.NotNull(compiled);
@@ -34,7 +35,7 @@ public sealed class FilterCompilerTests
     [Fact]
     public void TryCompile_WhenExpressionIsInvalid_ShouldReturnFalseWithError()
     {
-        var success = FilterCompiler.TryCompile(Constants.FilterInvalidProperty, out var compiled, out var error);
+        var success = FilterCompiler.TryCompile(FilterTestConstants.FilterInvalidProperty, out var compiled, out var error);
 
         Assert.False(success);
         Assert.Null(compiled);
@@ -57,14 +58,14 @@ public sealed class FilterCompilerTests
     [Fact]
     public void TryCompile_WhenExpressionIsValid_ShouldReturnCompiledFilter()
     {
-        var success = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out var error);
+        var success = FilterCompiler.TryCompile(FilterTestConstants.FilterIdEquals100, out var compiled, out var error);
 
         Assert.True(success);
         Assert.NotNull(compiled);
         Assert.Null(error);
 
-        var matching = EventUtils.CreateTestEvent(100);
-        var nonMatching = EventUtils.CreateTestEvent(200);
+        var matching = FilterEventBuilder.CreateTestEvent(100);
+        var nonMatching = FilterEventBuilder.CreateTestEvent(200);
 
         Assert.True(compiled.Predicate(matching));
         Assert.False(compiled.Predicate(nonMatching));
@@ -73,7 +74,7 @@ public sealed class FilterCompilerTests
     [Fact]
     public void TryCompile_WhenExpressionReferencesXml_ShouldReportRequiresXml()
     {
-        var success = FilterCompiler.TryCompile(Constants.FilterXmlContainsData, out var compiled, out _);
+        var success = FilterCompiler.TryCompile(FilterTestConstants.FilterXmlContainsData, out var compiled, out _);
 
         Assert.True(success);
         Assert.NotNull(compiled);

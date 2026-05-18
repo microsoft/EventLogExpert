@@ -6,6 +6,8 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.FilterPane;
@@ -18,13 +20,13 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenCandidateAdded_ReturnsDifferentKey()
     {
         // Arrange
-        var first = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var first = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
-        var second = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var second = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             HighlightColor.Blue,
             true);
 
@@ -38,13 +40,13 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenCandidatesReordered_ReturnsDifferentKey()
     {
         // Arrange — GetHighlight is first-match-wins, so order is load-bearing.
-        var first = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var first = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
-        var second = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var second = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             HighlightColor.Blue,
             true);
 
@@ -58,8 +60,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenColorChangesWithinDefinedRange_ReturnsDifferentKey()
     {
         // Arrange
-        var red = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var red = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -75,8 +77,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenColorMovesOutOfDefinedRange_ReturnsDifferentKey()
     {
         // Arrange
-        var defined = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var defined = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -92,13 +94,13 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenCompiledReferenceDiffers_ReturnsDifferentKey()
     {
         // Arrange — hash uses RuntimeHelpers.GetHashCode (reference identity).
-        var first = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var first = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
-        var second = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var second = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -113,8 +115,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenIdenticalFilters_ReturnsSameKey()
     {
         // Arrange
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -130,8 +132,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenIsEnabledToggled_ReturnsDifferentKey()
     {
         // Arrange
-        var enabled = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var enabled = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -147,8 +149,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenIsExcludedToggled_ReturnsDifferentKey()
     {
         // Arrange
-        var included = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var included = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -164,8 +166,8 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenNonHighlightFieldsChange_ReturnsSameKey()
     {
         // Arrange
-        var original = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var original = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -186,17 +188,17 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenSkippedFilterFieldsChange_ReturnsSameKey()
     {
         // Arrange
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
-        var disabledOriginal = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var disabledOriginal = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             HighlightColor.Blue);
 
-        var disabledWithDifferentCompiled = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals999,
+        var disabledWithDifferentCompiled = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals999,
             HighlightColor.Green);
 
         // Act + Assert
@@ -211,16 +213,16 @@ public sealed class HighlightSelectorTests
     public void ComputeHighlightKey_WhenSkippedFiltersReorderedAroundCandidate_ReturnsSameKey()
     {
         // Arrange
-        var disabledA = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var disabledA = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red);
 
-        var disabledB = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var disabledB = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             HighlightColor.Blue);
 
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals999,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals999,
             HighlightColor.Green,
             true);
 
@@ -235,12 +237,12 @@ public sealed class HighlightSelectorTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterUtils.CreateTestFilter(
-                Constants.FilterIdEquals100,
+            FilterFixtures.CreateTestFilter(
+                FilterTestConstants.FilterIdEquals100,
                 HighlightColor.Red,
                 true),
-            FilterUtils.CreateTestFilter(
-                Constants.FilterLevelEqualsError,
+            FilterFixtures.CreateTestFilter(
+                FilterTestConstants.FilterLevelEqualsError,
                 HighlightColor.Yellow,
                 true));
 
@@ -264,8 +266,8 @@ public sealed class HighlightSelectorTests
     public void Select_ShouldPreserveHighlightColorNoneCandidates()
     {
         // Arrange — None is enum-defined; the GetHighlight loop no-ops it later.
-        var noneColored = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var noneColored = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             true);
 
@@ -283,8 +285,8 @@ public sealed class HighlightSelectorTests
     public void Select_ShouldReturnEnabledNonExcludedCompiledColoredFilters()
     {
         // Arrange
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -302,8 +304,8 @@ public sealed class HighlightSelectorTests
     public void Select_ShouldSkipDisabledFilters()
     {
         // Arrange
-        var disabled = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var disabled = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red);
 
         var state = new FilterPaneState { Filters = ImmutableList.Create(disabled) };
@@ -319,8 +321,8 @@ public sealed class HighlightSelectorTests
     public void Select_ShouldSkipExcludedFilters()
     {
         // Arrange
-        var excluded = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var excluded = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true,
             true);
@@ -360,8 +362,8 @@ public sealed class HighlightSelectorTests
     public void Select_ShouldSkipFiltersWithUndefinedColor()
     {
         // Arrange
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -380,8 +382,8 @@ public sealed class HighlightSelectorTests
     public void Select_WhenFilterPaneDisabled_ShouldStillReturnEnabledColoredIncludeFilters()
     {
         // Arrange
-        var keeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var keeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red,
             true);
 
@@ -416,23 +418,23 @@ public sealed class HighlightSelectorTests
     public void Select_WithMixedFilterList_ShouldReturnOnlyQualifyingCandidates()
     {
         // Arrange
-        var disabled = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var disabled = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Red);
 
-        var excluded = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var excluded = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             HighlightColor.Blue,
             true,
             true);
 
-        var firstKeeper = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals999,
+        var firstKeeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals999,
             HighlightColor.Green,
             true);
 
-        var secondKeeper = FilterUtils.CreateTestFilter(
-            Constants.FilterLevelEqualsError,
+        var secondKeeper = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterLevelEqualsError,
             HighlightColor.Yellow,
             true);
 

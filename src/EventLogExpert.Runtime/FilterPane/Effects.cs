@@ -7,7 +7,6 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
-using EventLogExpert.Runtime.Filters;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.FilterPane;

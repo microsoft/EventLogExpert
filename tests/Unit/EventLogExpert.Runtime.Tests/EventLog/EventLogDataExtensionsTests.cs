@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils;
 
 namespace EventLogExpert.Runtime.Tests.EventLog;
@@ -131,8 +132,8 @@ public sealed class EventLogDataExtensionsTests
         // Events are stored newest-first (sorted by RecordId descending in production).
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(timeCreated: newest),
-            EventUtils.CreateTestEvent(timeCreated: oldest)
+            FilterEventBuilder.CreateTestEvent(timeCreated: newest),
+            FilterEventBuilder.CreateTestEvent(timeCreated: oldest)
         };
 
         return new EventLogData(name, LogPathType.Channel, events);

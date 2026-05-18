@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Runtime;
 
-namespace EventLogExpert.Runtime.Filters;
+namespace EventLogExpert.Filtering.Services;
 
 public interface IFilterService
 {

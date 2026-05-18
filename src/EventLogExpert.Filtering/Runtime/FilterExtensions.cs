@@ -3,9 +3,9 @@
 
 using EventLogExpert.Filtering.Runtime;
 
-namespace EventLogExpert.Runtime.Filters;
+namespace EventLogExpert.Filtering.Runtime;
 
-internal static class FilterExtensions
+public static class FilterExtensions
 {
     extension(Filter filter)
     {

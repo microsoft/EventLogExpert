@@ -6,10 +6,11 @@ using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+using EventLogExpert.Filtering.TestUtils.Constants;
+
+namespace EventLogExpert.Filtering.Tests.Drafts;
 
 public sealed class FilterDraftModelTests
 {
@@ -23,14 +24,14 @@ public sealed class FilterDraftModelTests
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
                 MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100
+                Value = FilterTestConstants.FilterValue100
             },
             []);
 
         var original = new SavedFilter
         {
-            ComparisonText = Constants.FilterIdEquals100,
-            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
+            ComparisonText = FilterTestConstants.FilterIdEquals100,
+            Compiled = FilterCompiler.TryCompile(FilterTestConstants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
             BasicFilter = staleBasic,
             Mode = FilterMode.Advanced,
             IsEnabled = true
@@ -55,22 +56,22 @@ public sealed class FilterDraftModelTests
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
                 MatchMode = MatchMode.Many,
-                Values = [Constants.FilterValue100, Constants.FilterValue1000]
+                Values = [FilterTestConstants.FilterValue100, FilterTestConstants.FilterValue1000]
             },
             []);
 
-        var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
+        var original = FilterFixtures.CreateTestFilter(basicFilter: basicFilter);
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
         draft.Comparison.Values.Clear();
-        draft.Comparison.Values.Add(Constants.FilterValue500);
+        draft.Comparison.Values.Add(FilterTestConstants.FilterValue500);
 
         // Assert
         Assert.NotNull(original.BasicFilter);
         Assert.Equal(2, original.BasicFilter.Comparison.Values.Count);
-        Assert.Equal(Constants.FilterValue100, original.BasicFilter.Comparison.Values[0]);
+        Assert.Equal(FilterTestConstants.FilterValue100, original.BasicFilter.Comparison.Values[0]);
     }
 
     [Fact]
@@ -83,8 +84,8 @@ public sealed class FilterDraftModelTests
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
                 MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100,
-                Values = [Constants.FilterValue100, Constants.FilterValue1000]
+                Value = FilterTestConstants.FilterValue100,
+                Values = [FilterTestConstants.FilterValue100, FilterTestConstants.FilterValue1000]
             },
             [
                 new SubFilter(
@@ -98,14 +99,14 @@ public sealed class FilterDraftModelTests
                     true)
             ]);
 
-        var original = FilterUtils.CreateTestFilter(basicFilter: basicFilter);
+        var original = FilterFixtures.CreateTestFilter(basicFilter: basicFilter);
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
 
         // Assert
         Assert.Equal(EventProperty.Id, draft.Comparison.Property);
-        Assert.Equal(Constants.FilterValue100, draft.Comparison.Value);
+        Assert.Equal(FilterTestConstants.FilterValue100, draft.Comparison.Value);
         Assert.Equal(2, draft.Comparison.Values.Count);
 
         Assert.Single(draft.SubFilters);
@@ -118,7 +119,7 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_PreservesId()
     {
         // Arrange
-        var original = FilterUtils.CreateTestFilter();
+        var original = FilterFixtures.CreateTestFilter();
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
@@ -137,11 +138,11 @@ public sealed class FilterDraftModelTests
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
                 MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100
+                Value = FilterTestConstants.FilterValue100
             },
             []);
 
-        var original = FilterUtils.CreateTestFilter(
+        var original = FilterFixtures.CreateTestFilter(
             color: HighlightColor.Blue,
             basicFilter: basicFilter,
             isEnabled: true,
@@ -155,7 +156,7 @@ public sealed class FilterDraftModelTests
         Assert.Equal(FilterMode.Basic, draft.Mode);
         Assert.True(draft.IsEnabled);
         Assert.True(draft.IsExcluded);
-        Assert.Equal(Constants.FilterIdEquals100, draft.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, draft.ComparisonText);
     }
 
     [Fact]
@@ -164,8 +165,8 @@ public sealed class FilterDraftModelTests
         // Arrange
         var original = new SavedFilter
         {
-            ComparisonText = Constants.FilterIdEquals100,
-            Compiled = FilterCompiler.TryCompile(Constants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
+            ComparisonText = FilterTestConstants.FilterIdEquals100,
+            Compiled = FilterCompiler.TryCompile(FilterTestConstants.FilterIdEquals100, out var compiled, out _) ? compiled : null,
             BasicFilter = null,
             Mode = FilterMode.Advanced,
             IsEnabled = true
@@ -187,7 +188,7 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_DoesNotShareValuesListWithDraft()
     {
         // Arrange
-        var draft = FilterUtils.CreateTestFilterDraft(
+        var draft = FilterFixtures.CreateTestFilterDraft(
             comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
@@ -210,13 +211,13 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_ProducesImmutableSourceMatchingEditorState()
     {
         // Arrange
-        var draft = FilterUtils.CreateTestFilterDraft(
+        var draft = FilterFixtures.CreateTestFilterDraft(
             comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Id,
                 Operator = ComparisonOperator.Equals,
                 MatchMode = MatchMode.Single,
-                Value = Constants.FilterValue100
+                Value = FilterTestConstants.FilterValue100
             },
             subFilters:
             [
@@ -238,7 +239,7 @@ public sealed class FilterDraftModelTests
 
         // Assert
         Assert.Equal(EventProperty.Id, source.Comparison.Property);
-        Assert.Equal(Constants.FilterValue100, source.Comparison.Value);
+        Assert.Equal(FilterTestConstants.FilterValue100, source.Comparison.Value);
         Assert.Single(source.SubFilters);
         Assert.True(source.SubFilters[0].JoinWithAny);
         Assert.Equal(EventProperty.Level, source.SubFilters[0].Comparison.Property);

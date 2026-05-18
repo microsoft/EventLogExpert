@@ -4,10 +4,11 @@
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+namespace EventLogExpert.Filtering.Tests.Persistence;
 
 public sealed class SavedFilterGroupJsonShapeTests
 {
@@ -16,7 +17,7 @@ public sealed class SavedFilterGroupJsonShapeTests
     {
         // Arrange — build via the serializer so the test isn't sensitive to JSON-escaping of the embedded
         // backslash separator in the group Name.
-        var original = new SavedFilterGroup { Name = Constants.FilterGroupName, Filters = [] };
+        var original = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName, Filters = [] };
         string json = JsonSerializer.Serialize(original);
 
         // Act
@@ -24,7 +25,7 @@ public sealed class SavedFilterGroupJsonShapeTests
 
         // Assert
         Assert.NotNull(restored);
-        Assert.Equal(Constants.FilterGroupName, restored.Name);
+        Assert.Equal(FilterTestConstants.FilterGroupName, restored.Name);
         Assert.Empty(restored.Filters);
     }
 
@@ -36,10 +37,10 @@ public sealed class SavedFilterGroupJsonShapeTests
         // this dispatch, F16d's type move could silently break the nested wire shape.
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters =
             [
-                SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic)!
+                SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: FilterMode.Basic)!
             ]
         };
 
@@ -55,7 +56,7 @@ public sealed class SavedFilterGroupJsonShapeTests
         Assert.NotNull(restored);
         Assert.Single(restored.Filters);
         Assert.Equal(FilterMode.Basic, restored.Filters[0].Mode);
-        Assert.Equal(Constants.FilterIdEquals100, restored.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, restored.Filters[0].ComparisonText);
     }
 
     [Fact]
@@ -64,7 +65,7 @@ public sealed class SavedFilterGroupJsonShapeTests
         // Arrange
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [],
             IsEditing = true
         };
@@ -85,7 +86,7 @@ public sealed class SavedFilterGroupJsonShapeTests
     {
         // Arrange — DisplayName is derived (last \\-separated segment of Name) and JsonIgnore'd. Reload must
         // reconstitute the same DisplayName from the persisted Name.
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
         string json = JsonSerializer.Serialize(group);
@@ -93,7 +94,7 @@ public sealed class SavedFilterGroupJsonShapeTests
 
         // Assert
         Assert.NotNull(restored);
-        Assert.Equal(Constants.FilterGroupName, restored.Name);
-        Assert.Equal(Constants.FilterGroupDisplayName, restored.DisplayName);
+        Assert.Equal(FilterTestConstants.FilterGroupName, restored.Name);
+        Assert.Equal(FilterTestConstants.FilterGroupDisplayName, restored.DisplayName);
     }
 }

@@ -5,13 +5,13 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using static EventLogExpert.Runtime.Tests.TestUtils.Constants.Constants;
+using static EventLogExpert.Filtering.TestUtils.Constants.FilterTestConstants;
 
-namespace EventLogExpert.Runtime.Tests.TestUtils;
+namespace EventLogExpert.Filtering.TestUtils;
 
-internal static class FilterUtils
+public static class FilterFixtures
 {
-    internal static SavedFilter CreateTestFilter(
+    public static SavedFilter CreateTestFilter(
         string comparisonValue = FilterIdEquals100,
         HighlightColor color = HighlightColor.None,
         bool isEnabled = false,
@@ -29,7 +29,7 @@ internal static class FilterUtils
             basicFilter is not null ? FilterMode.Basic : mode) ??
         throw new InvalidOperationException($"Test filter expression failed to compile: '{comparisonValue}'");
 
-    internal static FilterDraft CreateTestFilterDraft(
+    public static FilterDraft CreateTestFilterDraft(
         FilterId? id = null,
         string comparisonText = FilterIdEquals100,
         FilterMode mode = FilterMode.Advanced,

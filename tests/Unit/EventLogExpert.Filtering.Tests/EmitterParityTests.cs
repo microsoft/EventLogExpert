@@ -6,6 +6,7 @@ using EventLogExpert.Filtering.Parsing;
 using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Filtering.Tests.TestUtils;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq.Dynamic.Core;
 using System.Linq.Expressions;
@@ -19,7 +20,7 @@ public sealed class EmitterParityTests
 
     public static IEnumerable<object[]> ParityCases() =>
         from filter in ParityFilters()
-        from index in Enumerable.Range(0, EventUtils.All.Count)
+        from index in Enumerable.Range(0, FilterTestFixtures.All.Count)
         select new object[] { filter, index };
 
     [Theory]
@@ -34,7 +35,7 @@ public sealed class EmitterParityTests
         Assert.True(dynamicOk, $"Dynamic.Core failed to compile '{filter}': {dynamicError}");
         Assert.True(emitterOk, $"Emitter failed to compile '{filter}': {emitterError}");
 
-        var evt = EventUtils.All[eventIndex];
+        var evt = FilterTestFixtures.All[eventIndex];
         var dynamicResult = dynamicCompiled!.Predicate(evt);
         var emitterResult = emitterCompiled!.Predicate(evt);
 
@@ -84,58 +85,58 @@ public sealed class EmitterParityTests
 
     private static IEnumerable<string> ParityFilters() =>
     [
-        Constants.FilterIdEquals100,
-        Constants.FilterIdEquals100QuotedRhs,
-        Constants.FilterIdEquals200,
-        Constants.FilterIdGreaterThan100,
-        Constants.FilterIdLessThan100,
-        Constants.FilterIdGreaterThanOrEqual100,
-        Constants.FilterIdLessThanOrEqual100,
-        Constants.FilterIdNotEquals100,
-        Constants.FilterIdEquals100AndLevelError,
-        Constants.FilterIdEquals100Or200,
-        Constants.FilterLevelEqualsError,
-        Constants.FilterComputerNameEqualsServer01,
-        Constants.FilterSourceEqualsTestSource,
-        Constants.FilterSourceContainsTest,
-        Constants.FilterSourceContainsTestOic,
-        Constants.FilterDescriptionContainsErrorOccurred,
-        Constants.FilterTaskCategoryContainsSecurity,
-        Constants.FilterXmlContainsData,
-        Constants.FilterIdMultiEquals,
-        Constants.FilterLevelMultiEquals,
-        Constants.FilterSourceMultiEquals,
-        Constants.FilterKeywordsEqualsAudit,
-        Constants.FilterKeywordsContainsAudit,
-        Constants.FilterKeywordsAnyOfAuditOrSystem,
-        Constants.FilterUserIdEqualsLocalSystem,
-        Constants.FilterUserIdNotEqualsLocalSystem,
-        Constants.FilterUserIdContainsService,
-        Constants.FilterUserIdNotContainsService,
-        Constants.FilterTwoConditionAnd,
-        Constants.FilterThreeConditionAnd,
-        Constants.FilterFourConditionAnd,
-        Constants.FilterThreeConditionOr,
-        Constants.FilterFourConditionOr,
-        Constants.FilterParenthesizedMix,
-        Constants.FilterNot,
-        Constants.FilterActivityIdEqualsZero,
-        Constants.FilterActivityIdContains,
-        Constants.FilterRecordIdEquals,
-        Constants.FilterProcessIdEquals,
-        Constants.FilterThreadIdEquals,
-        Constants.FilterPerfWerSystemErrorReporting,
-        Constants.FilterPerfUser32,
-        Constants.FilterPerfEventLog,
-        Constants.FilterPerfApplicationError,
-        Constants.FilterPerfKernelPower,
-        Constants.FilterPerfResourceExhaustion,
-        Constants.FilterPerfSystemStart,
-        Constants.FilterDescriptionEqualsBackslash,
-        Constants.FilterDescriptionEqualsQuote,
-        Constants.FilterDescriptionEqualsTab,
-        Constants.FilterDescriptionEqualsNewline,
-        Constants.FilterDescriptionEqualsCarriageReturn
+        FilterTestConstants.FilterIdEquals100,
+        FilterTestConstants.FilterIdEquals100QuotedRhs,
+        FilterTestConstants.FilterIdEquals200,
+        FilterTestConstants.FilterIdGreaterThan100,
+        FilterTestConstants.FilterIdLessThan100,
+        FilterTestConstants.FilterIdGreaterThanOrEqual100,
+        FilterTestConstants.FilterIdLessThanOrEqual100,
+        FilterTestConstants.FilterIdNotEquals100,
+        FilterTestConstants.FilterIdEquals100AndLevelError,
+        FilterTestConstants.FilterIdEquals100Or200,
+        FilterTestConstants.FilterLevelEqualsError,
+        FilterTestConstants.FilterComputerNameEqualsServer01,
+        FilterTestConstants.FilterSourceEqualsTestSource,
+        FilterTestConstants.FilterSourceContainsTest,
+        FilterTestConstants.FilterSourceContainsTestOic,
+        FilterTestConstants.FilterDescriptionContainsErrorOccurred,
+        FilterTestConstants.FilterTaskCategoryContainsSecurity,
+        FilterTestConstants.FilterXmlContainsData,
+        FilterTestConstants.FilterIdMultiEquals,
+        FilterTestConstants.FilterLevelMultiEquals,
+        FilterTestConstants.FilterSourceMultiEquals,
+        FilterTestConstants.FilterKeywordsEqualsAudit,
+        FilterTestConstants.FilterKeywordsContainsAudit,
+        FilterTestConstants.FilterKeywordsAnyOfAuditOrSystem,
+        FilterTestConstants.FilterUserIdEqualsLocalSystem,
+        FilterTestConstants.FilterUserIdNotEqualsLocalSystem,
+        FilterTestConstants.FilterUserIdContainsService,
+        FilterTestConstants.FilterUserIdNotContainsService,
+        FilterTestConstants.FilterTwoConditionAnd,
+        FilterTestConstants.FilterThreeConditionAnd,
+        FilterTestConstants.FilterFourConditionAnd,
+        FilterTestConstants.FilterThreeConditionOr,
+        FilterTestConstants.FilterFourConditionOr,
+        FilterTestConstants.FilterParenthesizedMix,
+        FilterTestConstants.FilterNot,
+        FilterTestConstants.FilterActivityIdEqualsZero,
+        FilterTestConstants.FilterActivityIdContains,
+        FilterTestConstants.FilterRecordIdEquals,
+        FilterTestConstants.FilterProcessIdEquals,
+        FilterTestConstants.FilterThreadIdEquals,
+        FilterTestConstants.FilterPerfWerSystemErrorReporting,
+        FilterTestConstants.FilterPerfUser32,
+        FilterTestConstants.FilterPerfEventLog,
+        FilterTestConstants.FilterPerfApplicationError,
+        FilterTestConstants.FilterPerfKernelPower,
+        FilterTestConstants.FilterPerfResourceExhaustion,
+        FilterTestConstants.FilterPerfSystemStart,
+        FilterTestConstants.FilterDescriptionEqualsBackslash,
+        FilterTestConstants.FilterDescriptionEqualsQuote,
+        FilterTestConstants.FilterDescriptionEqualsTab,
+        FilterTestConstants.FilterDescriptionEqualsNewline,
+        FilterTestConstants.FilterDescriptionEqualsCarriageReturn
     ];
 
     /// <summary>

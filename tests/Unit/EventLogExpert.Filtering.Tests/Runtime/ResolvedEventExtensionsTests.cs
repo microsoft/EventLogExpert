@@ -3,11 +3,11 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Runtime.Filters;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+using EventLogExpert.Filtering.TestUtils.Constants;
+
+namespace EventLogExpert.Filtering.Tests.Runtime;
 
 public sealed class ResolvedEventExtensionsTests
 {
@@ -15,7 +15,7 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesDateFilter_WhenAfterIsAfterBefore_ShouldFailDateConstraint()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100,
+        var @event = FilterEventBuilder.CreateTestEvent(100,
             timeCreated: new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
 
         var dateFilter = new DateFilter
@@ -37,7 +37,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var eventTime = DateTime.Now.AddYears(-10);
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: eventTime);
 
         var dateFilter = new DateFilter
         {
@@ -57,7 +57,7 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesDateFilter_WhenDateFilterIsNull_ShouldNotConstrainEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
 
         // Act
         var result = @event.MatchesDateFilter(null);
@@ -71,7 +71,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var eventTime = DateTime.Now.AddDays(2);
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: eventTime);
 
         var dateFilter = new DateFilter
         {
@@ -91,7 +91,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var eventTime = DateTime.Now.AddDays(-2);
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: eventTime);
 
         var dateFilter = new DateFilter
         {
@@ -111,7 +111,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var boundaryTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: boundaryTime);
 
         var dateFilter = new DateFilter
         {
@@ -131,7 +131,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var boundaryTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: boundaryTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: boundaryTime);
 
         var dateFilter = new DateFilter
         {
@@ -170,7 +170,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         var eventTime = DateTime.Now;
-        var @event = EventUtils.CreateTestEvent(100, timeCreated: eventTime);
+        var @event = FilterEventBuilder.CreateTestEvent(100, timeCreated: eventTime);
 
         var dateFilter = new DateFilter
         {
@@ -189,12 +189,12 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenAnyIncludeFilterMatches_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(200);
+        var @event = FilterEventBuilder.CreateTestEvent(200);
 
         var filters = new List<SavedFilter>
         {
-            CreateFilter(Constants.FilterIdEquals100),
-            CreateFilter(Constants.FilterIdEquals200)
+            CreateFilter(FilterTestConstants.FilterIdEquals100),
+            CreateFilter(FilterTestConstants.FilterIdEquals200)
         };
 
         // Act
@@ -209,7 +209,7 @@ public sealed class ResolvedEventExtensionsTests
     {
         // Arrange
         ResolvedEvent? @event = null;
-        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
+        var filters = new List<SavedFilter> { CreateFilter(FilterTestConstants.FilterIdEquals100) };
 
         // Act
         var result = @event.MatchesFilters(filters);
@@ -222,8 +222,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenExcludedFilterDoesNotMatch_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100, true);
+        var @event = FilterEventBuilder.CreateTestEvent(200);
+        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100, true);
         var filters = new List<SavedFilter> { filter };
 
         // Act
@@ -237,8 +237,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenExcludedFilterMatches_ShouldExcludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
-        var filter = CreateFilter(Constants.FilterIdEquals100, true);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
+        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100, true);
         var filters = new List<SavedFilter> { filter };
 
         // Act
@@ -252,7 +252,7 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenFilterListIsEmpty_ShouldIncludeAllEvents()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
         var filters = new List<SavedFilter>();
 
         // Act
@@ -266,9 +266,9 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenIncludeAndExcludeFilters_ExcludeTakesPriority()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100, level: Constants.EventLevelError);
-        var includeFilter = CreateFilter(Constants.FilterIdEquals100);
-        var excludeFilter = CreateFilter(Constants.FilterLevelEqualsError, true);
+        var @event = FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError);
+        var includeFilter = CreateFilter(FilterTestConstants.FilterIdEquals100);
+        var excludeFilter = CreateFilter(FilterTestConstants.FilterLevelEqualsError, true);
         var filters = new List<SavedFilter> { includeFilter, excludeFilter };
 
         // Act
@@ -282,8 +282,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenIncludeFilterDoesNotMatch_ShouldExcludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(200);
-        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
+        var @event = FilterEventBuilder.CreateTestEvent(200);
+        var filters = new List<SavedFilter> { CreateFilter(FilterTestConstants.FilterIdEquals100) };
 
         // Act
         var result = @event.MatchesFilters(filters);
@@ -296,11 +296,11 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenIncludeFilterHasNullCompiled_ShouldSkipNullCompiledFilter()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
         var filters = new List<SavedFilter>
         {
             SavedFilter.Empty,
-            CreateFilter(Constants.FilterIdEquals100)
+            CreateFilter(FilterTestConstants.FilterIdEquals100)
         };
 
         // Act
@@ -314,8 +314,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenIncludeFilterMatches_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
-        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterIdEquals100) };
+        var @event = FilterEventBuilder.CreateTestEvent(100);
+        var filters = new List<SavedFilter> { CreateFilter(FilterTestConstants.FilterIdEquals100) };
 
         // Act
         var result = @event.MatchesFilters(filters);
@@ -328,11 +328,11 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenIncludeMatchesAndExcludeDoesNot_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
         var filters = new List<SavedFilter>
         {
-            CreateFilter(Constants.FilterIdEquals100),
-            CreateFilter(Constants.FilterIdEquals200, true)
+            CreateFilter(FilterTestConstants.FilterIdEquals100),
+            CreateFilter(FilterTestConstants.FilterIdEquals200, true)
         };
 
         // Act
@@ -346,11 +346,11 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenMultipleExcludesAndNoneMatch_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(300);
+        var @event = FilterEventBuilder.CreateTestEvent(300);
         var filters = new List<SavedFilter>
         {
-            CreateFilter(Constants.FilterIdEquals100, true),
-            CreateFilter(Constants.FilterIdEquals200, true)
+            CreateFilter(FilterTestConstants.FilterIdEquals100, true),
+            CreateFilter(FilterTestConstants.FilterIdEquals200, true)
         };
 
         // Act
@@ -364,11 +364,11 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenMultipleExcludesAndOneMatches_ShouldExcludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
         var filters = new List<SavedFilter>
         {
-            CreateFilter(Constants.FilterIdEquals100, true),
-            CreateFilter(Constants.FilterIdEquals200, true)
+            CreateFilter(FilterTestConstants.FilterIdEquals100, true),
+            CreateFilter(FilterTestConstants.FilterIdEquals200, true)
         };
 
         // Act
@@ -382,12 +382,12 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenNoIncludeFilterMatches_ShouldExcludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(300);
+        var @event = FilterEventBuilder.CreateTestEvent(300);
 
         var filters = new List<SavedFilter>
         {
-            CreateFilter(Constants.FilterIdEquals100),
-            CreateFilter(Constants.FilterIdEquals200)
+            CreateFilter(FilterTestConstants.FilterIdEquals100),
+            CreateFilter(FilterTestConstants.FilterIdEquals200)
         };
 
         // Act
@@ -401,8 +401,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenOnlyExcludeFiltersExist_ShouldNotRequireIncludeMatch()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(200);
-        var filter = CreateFilter(Constants.FilterIdEquals100, true);
+        var @event = FilterEventBuilder.CreateTestEvent(200);
+        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100, true);
         var filters = new List<SavedFilter> { filter };
 
         // Act
@@ -416,7 +416,7 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenOnlyFilterHasNullCompiled_ShouldIncludeEvent()
     {
         // Arrange
-        var @event = EventUtils.CreateTestEvent(100);
+        var @event = FilterEventBuilder.CreateTestEvent(100);
         var filters = new List<SavedFilter> { SavedFilter.Empty };
 
         // Act
@@ -430,8 +430,8 @@ public sealed class ResolvedEventExtensionsTests
     public void MatchesFilters_WhenXmlFilterDoesNotMatch_ShouldExcludeEvent()
     {
         // Arrange
-        var eventWithoutXml = EventUtils.CreateTestEvent(100);
-        var xmlContainsDataFilter = CreateFilter(Constants.FilterXmlContainsData);
+        var eventWithoutXml = FilterEventBuilder.CreateTestEvent(100);
+        var xmlContainsDataFilter = CreateFilter(FilterTestConstants.FilterXmlContainsData);
         var filters = new List<SavedFilter> { xmlContainsDataFilter };
 
         // Act
@@ -442,5 +442,5 @@ public sealed class ResolvedEventExtensionsTests
     }
 
     private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
-        FilterUtils.CreateTestFilter(expression, isExcluded: isExcluded);
+        FilterFixtures.CreateTestFilter(expression, isExcluded: isExcluded);
 }

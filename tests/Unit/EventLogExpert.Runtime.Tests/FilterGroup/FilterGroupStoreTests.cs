@@ -8,6 +8,8 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 
 namespace EventLogExpert.Runtime.Tests.FilterGroup;
 
@@ -17,14 +19,14 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_AddGroup_WithGroup_ShouldStoreGroup()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
         var action = new AddGroupAction(group);
 
         // Assert
         Assert.NotNull(action.FilterGroup);
-        Assert.Equal(Constants.FilterGroupName, action.FilterGroup.Name);
+        Assert.Equal(FilterTestConstants.FilterGroupName, action.FilterGroup.Name);
     }
 
     [Fact]
@@ -43,8 +45,8 @@ public sealed class FilterGroupStoreTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         // Act
@@ -58,7 +60,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_LoadGroupsSuccess_ShouldStoreGroups()
     {
         // Arrange
-        var groups = new List<SavedFilterGroup> { new() { Name = Constants.FilterGroupName } };
+        var groups = new List<SavedFilterGroup> { new() { Name = FilterTestConstants.FilterGroupName } };
 
         // Act
         var action = new LoadGroupsSuccessAction([.. groups]);
@@ -100,7 +102,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var parentId = FilterGroupId.Create();
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         // Act
         var action = new SetGroupFilterAction(parentId, filter);
@@ -114,7 +116,7 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupAction_SetGroup_ShouldStoreGroup()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
         var action = new SetGroupAction(group);
@@ -166,13 +168,13 @@ public sealed class FilterGroupStoreTests
     public void FilterGroupModel_DisplayName_ShouldReturnLastSegment()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
         var displayName = group.DisplayName;
 
         // Assert
-        Assert.Equal(Constants.FilterGroupDisplayName, displayName);
+        Assert.Equal(FilterTestConstants.FilterGroupDisplayName, displayName);
     }
 
     [Fact]
@@ -204,7 +206,7 @@ public sealed class FilterGroupStoreTests
         var state = new FilterGroupState();
 
         // Act
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         state = Reducers.ReducerAddGroup(state, new AddGroupAction(group));
 
         // Assert
@@ -212,7 +214,7 @@ public sealed class FilterGroupStoreTests
 
         // Act
         var groupId = state.Groups.First().Id;
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, filter));
 
@@ -227,12 +229,12 @@ public sealed class FilterGroupStoreTests
         var state = new FilterGroupState();
 
         // Act
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         state = Reducers.ReducerAddGroup(state, new AddGroupAction(group));
         var groupId = state.Groups.First().Id;
 
         // Act
-        var initialFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue);
+        var initialFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
 
         state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, initialFilter));
 
@@ -262,8 +264,8 @@ public sealed class FilterGroupStoreTests
 
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested },
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested },
             new() { Name = "TestSection\\AnotherGroup" }
         };
 
@@ -274,21 +276,21 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.NotEmpty(state.DisplayGroups);
-        Assert.True(state.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
-        var sectionNode = state.DisplayGroups[Constants.FilterGroupSection];
+        Assert.True(state.DisplayGroups.ContainsKey(FilterTestConstants.FilterGroupSection));
+        var sectionNode = state.DisplayGroups[FilterTestConstants.FilterGroupSection];
         Assert.Equal(2, sectionNode.Groups.Count);
-        Assert.True(sectionNode.ChildNodes.ContainsKey(Constants.FilterGroupSubSection));
+        Assert.True(sectionNode.ChildNodes.ContainsKey(FilterTestConstants.FilterGroupSubSection));
     }
 
     [Fact]
     public void IntegrationTest_FilterManipulation()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [filter]
         };
 
@@ -324,8 +326,8 @@ public sealed class FilterGroupStoreTests
 
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         // Act
@@ -352,7 +354,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var action = new AddGroupAction(group);
 
         // Act
@@ -361,7 +363,7 @@ public sealed class FilterGroupStoreTests
         // Assert
         Assert.Single(newState.Groups);
         Assert.NotEmpty(newState.DisplayGroups);
-        Assert.True(newState.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
+        Assert.True(newState.DisplayGroups.ContainsKey(FilterTestConstants.FilterGroupSection));
     }
 
     [Fact]
@@ -369,7 +371,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var action = new AddGroupAction(group);
 
         // Act
@@ -377,7 +379,7 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.Single(newState.Groups);
-        Assert.Equal(Constants.FilterGroupName, newState.Groups.First().Name);
+        Assert.Equal(FilterTestConstants.FilterGroupName, newState.Groups.First().Name);
     }
 
     [Fact]
@@ -398,12 +400,12 @@ public sealed class FilterGroupStoreTests
     public void ReducerImportGroups_ShouldAddMultipleGroups()
     {
         // Arrange
-        var existingGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var existingGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = new FilterGroupState { Groups = [existingGroup] };
 
         var newGroups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupNameNested },
+            new() { Name = FilterTestConstants.FilterGroupNameNested },
             new() { Name = "Another\\Group" }
         };
 
@@ -424,8 +426,8 @@ public sealed class FilterGroupStoreTests
 
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         var action = new LoadGroupsSuccessAction([.. groups]);
@@ -435,7 +437,7 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.NotEmpty(newState.DisplayGroups);
-        Assert.True(newState.DisplayGroups.ContainsKey(Constants.FilterGroupSection));
+        Assert.True(newState.DisplayGroups.ContainsKey(FilterTestConstants.FilterGroupSection));
     }
 
     [Fact]
@@ -447,8 +449,8 @@ public sealed class FilterGroupStoreTests
 
         var newGroups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         var action = new LoadGroupsSuccessAction([.. newGroups]);
@@ -479,11 +481,11 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroupFilter_ShouldRemoveFilterFromGroup()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [filter]
         };
 
@@ -502,7 +504,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroupFilter_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var action = new RemoveGroupFilterAction(group.Id, FilterId.Create());
 
@@ -531,7 +533,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroup_ShouldRebuildDisplayGroupsAtomically()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = Reducers.ReducerAddGroup(
             new FilterGroupState(),
             new AddGroupAction(group));
@@ -548,8 +550,8 @@ public sealed class FilterGroupStoreTests
     public void ReducerRemoveGroup_ShouldRemoveGroup()
     {
         // Arrange
-        var group1 = new SavedFilterGroup { Name = Constants.FilterGroupName };
-        var group2 = new SavedFilterGroup { Name = Constants.FilterGroupNameNested };
+        var group1 = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
+        var group2 = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupNameNested };
         var state = new FilterGroupState { Groups = [group1, group2] };
         var action = new RemoveGroupAction(group1.Id);
 
@@ -579,18 +581,18 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetGroupFilter_ShouldUpdateFilter()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [filter]
         };
 
         var state = new FilterGroupState { Groups = [group] };
 
-        var updatedFilter = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals100,
+        var updatedFilter = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.Green,
             id: filter.Id);
 
@@ -610,9 +612,9 @@ public sealed class FilterGroupStoreTests
     public void ReducerSetGroupFilter_WhenFilterNotFound_ShouldAppendFilter()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Yellow);
+        var newFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Yellow);
         var action = new SetGroupFilterAction(group.Id, newFilter);
 
         // Act
@@ -631,7 +633,7 @@ public sealed class FilterGroupStoreTests
     {
         // Arrange
         var state = new FilterGroupState();
-        var action = new SetGroupFilterAction(FilterGroupId.Create(), FilterUtils.CreateTestFilter());
+        var action = new SetGroupFilterAction(FilterGroupId.Create(), FilterFixtures.CreateTestFilter());
 
         // Act
         var newState = Reducers.ReducerSetGroupFilter(state, action);
@@ -654,18 +656,18 @@ public sealed class FilterGroupStoreTests
             },
             []);
 
-        var initial = FilterUtils.CreateTestFilter(basicFilter: basicFilter,
+        var initial = FilterFixtures.CreateTestFilter(basicFilter: basicFilter,
             mode: FilterMode.Basic);
 
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [initial]
         };
 
         var state = new FilterGroupState { Groups = [group] };
 
-        var updatedAsCached = FilterUtils.CreateTestFilter(id: initial.Id,
+        var updatedAsCached = FilterFixtures.CreateTestFilter(id: initial.Id,
             mode: FilterMode.Cached);
 
         // Act
@@ -690,8 +692,8 @@ public sealed class FilterGroupStoreTests
 
         var updatedGroup = group with
         {
-            Name = Constants.FilterGroupName,
-            Filters = [FilterUtils.CreateTestFilter()]
+            Name = FilterTestConstants.FilterGroupName,
+            Filters = [FilterFixtures.CreateTestFilter()]
         };
 
         var action = new SetGroupAction(updatedGroup);
@@ -701,7 +703,7 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         var resultGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.Equal(Constants.FilterGroupName, resultGroup.Name);
+        Assert.Equal(FilterTestConstants.FilterGroupName, resultGroup.Name);
         Assert.Single(resultGroup.Filters);
         Assert.False(resultGroup.IsEditing);
     }
@@ -724,11 +726,11 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleGroupFilterExcluded_ShouldToggleIsExcluded()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter(isExcluded: false);
+        var filter = FilterFixtures.CreateTestFilter(isExcluded: false);
 
         var group = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters = [filter]
         };
 
@@ -747,7 +749,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleGroupFilterExcluded_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
         var action = new ToggleGroupFilterExcludedAction(group.Id, FilterId.Create());
 
@@ -776,7 +778,7 @@ public sealed class FilterGroupStoreTests
     public void ReducerToggleGroup_ShouldToggleIsEditing()
     {
         // Arrange
-        var group = new SavedFilterGroup { Name = Constants.FilterGroupName, IsEditing = false };
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName, IsEditing = false };
         var state = new FilterGroupState { Groups = [group] };
         var action = new ToggleGroupAction(group.Id);
 

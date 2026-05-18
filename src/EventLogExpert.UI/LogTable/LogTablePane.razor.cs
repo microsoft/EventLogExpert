@@ -12,7 +12,7 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Filters;
+using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;

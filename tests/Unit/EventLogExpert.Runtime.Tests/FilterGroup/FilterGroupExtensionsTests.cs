@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.FilterGroup;
@@ -15,15 +16,15 @@ public sealed class FilterGroupExtensionsTests
     {
         // Arrange
         var dictionary = ImmutableDictionary<string, FilterGroupNode>.Empty;
-        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
-        var groupNames = Constants.FilterGroupName.Split('\\');
+        var filterGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
+        var groupNames = FilterTestConstants.FilterGroupName.Split('\\');
 
         // Act
         var result = dictionary.AddFilterGroup(groupNames, filterGroup);
 
         // Assert
         Assert.Single(result);
-        Assert.True(result.ContainsKey(Constants.FilterGroupSection));
+        Assert.True(result.ContainsKey(FilterTestConstants.FilterGroupSection));
     }
 
     [Fact]
@@ -31,16 +32,16 @@ public sealed class FilterGroupExtensionsTests
     {
         // Arrange
         var dictionary = ImmutableDictionary<string, FilterGroupNode>.Empty;
-        var filterGroup1 = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var filterGroup1 = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var filterGroup2 = new SavedFilterGroup { Name = "TestSection\\AnotherGroup" };
 
         // Act
-        dictionary = dictionary.AddFilterGroup(Constants.FilterGroupName.Split('\\'), filterGroup1);
+        dictionary = dictionary.AddFilterGroup(FilterTestConstants.FilterGroupName.Split('\\'), filterGroup1);
         dictionary = dictionary.AddFilterGroup("TestSection\\AnotherGroup".Split('\\'), filterGroup2);
 
         // Assert
         Assert.Single(dictionary);
-        Assert.Equal(2, dictionary[Constants.FilterGroupSection].Groups.Count);
+        Assert.Equal(2, dictionary[FilterTestConstants.FilterGroupSection].Groups.Count);
     }
 
     [Fact]
@@ -48,10 +49,10 @@ public sealed class FilterGroupExtensionsTests
     {
         // Arrange
         var dictionary = ImmutableDictionary<string, FilterGroupNode>.Empty;
-        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var filterGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
-        var result = dictionary.AddFilterGroup(Constants.FilterGroupName.Split('\\'), filterGroup);
+        var result = dictionary.AddFilterGroup(FilterTestConstants.FilterGroupName.Split('\\'), filterGroup);
 
         // Assert
         Assert.NotSame(dictionary, result);
@@ -97,15 +98,15 @@ public sealed class FilterGroupExtensionsTests
     {
         // Arrange
         var dictionary = ImmutableDictionary<string, FilterGroupNode>.Empty;
-        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupNameNested };
-        var groupNames = Constants.FilterGroupNameNested.Split('\\');
+        var filterGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupNameNested };
+        var groupNames = FilterTestConstants.FilterGroupNameNested.Split('\\');
 
         // Act
         dictionary = dictionary.AddFilterGroup(groupNames, filterGroup);
 
         // Assert
-        Assert.True(dictionary.ContainsKey(Constants.FilterGroupSection));
-        Assert.True(dictionary[Constants.FilterGroupSection].ChildNodes.ContainsKey(Constants.FilterGroupSubSection));
+        Assert.True(dictionary.ContainsKey(FilterTestConstants.FilterGroupSection));
+        Assert.True(dictionary[FilterTestConstants.FilterGroupSection].ChildNodes.ContainsKey(FilterTestConstants.FilterGroupSubSection));
     }
 
     [Fact]

@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using System.Security.Principal;
 
@@ -15,8 +16,8 @@ public sealed class ResolvedEventOrderingTests
     {
         var existing = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         }.AsReadOnly();
         var batch = new List<ResolvedEvent>().AsReadOnly();
 
@@ -30,13 +31,13 @@ public sealed class ResolvedEventOrderingTests
     {
         var existing = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(400),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(400),
+            FilterEventBuilder.CreateTestEvent(200)
         }.AsReadOnly();
         var batch = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(100)
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(100)
         }.AsReadOnly();
 
         var result = ResolvedEventOrdering.MergeSorted(existing, batch, ColumnName.EventId, true);
@@ -50,9 +51,9 @@ public sealed class ResolvedEventOrderingTests
         var existing = new List<ResolvedEvent>().AsReadOnly();
         var batch = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         }.AsReadOnly();
 
         var result = ResolvedEventOrdering.MergeSorted(existing, batch, ColumnName.EventId, false);
@@ -68,13 +69,13 @@ public sealed class ResolvedEventOrderingTests
     {
         var existing = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(300)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(300)
         }.AsReadOnly();
         var batch = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(200),
-            EventUtils.CreateTestEvent(400)
+            FilterEventBuilder.CreateTestEvent(200),
+            FilterEventBuilder.CreateTestEvent(400)
         }.AsReadOnly();
 
         var result = ResolvedEventOrdering.MergeSorted(existing, batch, ColumnName.EventId, false);
@@ -85,8 +86,8 @@ public sealed class ResolvedEventOrderingTests
     [Fact]
     public void MergeSorted_WhenKeysTie_ShouldPlaceExistingBeforeBatchForStability()
     {
-        var existingA = EventUtils.CreateTestEvent(100, recordId: 10);
-        var batchB = EventUtils.CreateTestEvent(100, recordId: 11);
+        var existingA = FilterEventBuilder.CreateTestEvent(100, recordId: 10);
+        var batchB = FilterEventBuilder.CreateTestEvent(100, recordId: 11);
 
         var existing = new List<ResolvedEvent> { existingA }.AsReadOnly();
         var batch = new List<ResolvedEvent> { batchB }.AsReadOnly();
@@ -103,13 +104,13 @@ public sealed class ResolvedEventOrderingTests
     {
         var existing = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(computerName: "Alpha"),
-            EventUtils.CreateTestEvent(computerName: "Charlie")
+            FilterEventBuilder.CreateTestEvent(computerName: "Alpha"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Charlie")
         }.AsReadOnly();
         var batch = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(computerName: "Bravo"),
-            EventUtils.CreateTestEvent(computerName: "Delta")
+            FilterEventBuilder.CreateTestEvent(computerName: "Bravo"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Delta")
         }.AsReadOnly();
 
         var result = ResolvedEventOrdering.MergeSorted(existing, batch, ColumnName.ComputerName, false);
@@ -122,13 +123,13 @@ public sealed class ResolvedEventOrderingTests
     {
         var existing = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         }.AsReadOnly();
         var batch = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(400)
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(400)
         }.AsReadOnly();
 
         var result = ResolvedEventOrdering.MergeSorted(existing, batch, ColumnName.EventId, false);
@@ -141,9 +142,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(computerName: "Server02"),
-            EventUtils.CreateTestEvent(computerName: null!),
-            EventUtils.CreateTestEvent(computerName: "Server01")
+            FilterEventBuilder.CreateTestEvent(computerName: "Server02"),
+            FilterEventBuilder.CreateTestEvent(computerName: null!),
+            FilterEventBuilder.CreateTestEvent(computerName: "Server01")
         };
 
         var result = events.SortEvents(ColumnName.ComputerName);
@@ -159,9 +160,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         // Act
@@ -191,15 +192,15 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         var result = events.SortEvents(ColumnName.EventId);
 
         events.Clear();
-        events.Add(EventUtils.CreateTestEvent(999));
+        events.Add(FilterEventBuilder.CreateTestEvent(999));
 
         Assert.Equal(3, result.Count);
         Assert.Equal(100, result[0].Id);
@@ -212,9 +213,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(keywords: ["BKeyword"]),
-            EventUtils.CreateTestEvent(),
-            EventUtils.CreateTestEvent(keywords: ["AKeyword"])
+            FilterEventBuilder.CreateTestEvent(keywords: ["BKeyword"]),
+            FilterEventBuilder.CreateTestEvent(),
+            FilterEventBuilder.CreateTestEvent(keywords: ["AKeyword"])
         };
 
         var result = events.SortEvents(ColumnName.Keywords);
@@ -230,9 +231,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(recordId: 3),
-            EventUtils.CreateTestEvent(recordId: 1),
-            EventUtils.CreateTestEvent(recordId: 2)
+            FilterEventBuilder.CreateTestEvent(recordId: 3),
+            FilterEventBuilder.CreateTestEvent(recordId: 1),
+            FilterEventBuilder.CreateTestEvent(recordId: 2)
         };
 
         // Act
@@ -250,9 +251,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(recordId: 1),
-            EventUtils.CreateTestEvent(recordId: 3),
-            EventUtils.CreateTestEvent(recordId: 2)
+            FilterEventBuilder.CreateTestEvent(recordId: 1),
+            FilterEventBuilder.CreateTestEvent(recordId: 3),
+            FilterEventBuilder.CreateTestEvent(recordId: 2)
         };
 
         // Act
@@ -274,9 +275,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(activityId: guid3),
-            EventUtils.CreateTestEvent(activityId: guid1),
-            EventUtils.CreateTestEvent(activityId: guid2)
+            FilterEventBuilder.CreateTestEvent(activityId: guid3),
+            FilterEventBuilder.CreateTestEvent(activityId: guid1),
+            FilterEventBuilder.CreateTestEvent(activityId: guid2)
         };
 
         // Act
@@ -297,9 +298,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(activityId: guid1),
-            EventUtils.CreateTestEvent(activityId: guid3),
-            EventUtils.CreateTestEvent(activityId: guid2)
+            FilterEventBuilder.CreateTestEvent(activityId: guid1),
+            FilterEventBuilder.CreateTestEvent(activityId: guid3),
+            FilterEventBuilder.CreateTestEvent(activityId: guid2)
         };
 
         var result = events.SortEvents(ColumnName.ActivityId, true);
@@ -315,9 +316,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(computerName: "Server03"),
-            EventUtils.CreateTestEvent(computerName: "Server01"),
-            EventUtils.CreateTestEvent(computerName: "Server02")
+            FilterEventBuilder.CreateTestEvent(computerName: "Server03"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Server01"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Server02")
         };
 
         // Act
@@ -334,9 +335,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(computerName: "Server01"),
-            EventUtils.CreateTestEvent(computerName: "Server03"),
-            EventUtils.CreateTestEvent(computerName: "Server02")
+            FilterEventBuilder.CreateTestEvent(computerName: "Server01"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Server03"),
+            FilterEventBuilder.CreateTestEvent(computerName: "Server02")
         };
 
         var result = events.SortEvents(ColumnName.ComputerName, true);
@@ -353,9 +354,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(timeCreated: baseTime.AddHours(2)),
-            EventUtils.CreateTestEvent(timeCreated: baseTime),
-            EventUtils.CreateTestEvent(timeCreated: baseTime.AddHours(1))
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime.AddHours(2)),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime.AddHours(1))
         };
 
         // Act
@@ -374,9 +375,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(timeCreated: baseTime),
-            EventUtils.CreateTestEvent(timeCreated: baseTime.AddHours(2)),
-            EventUtils.CreateTestEvent(timeCreated: baseTime.AddHours(1))
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime.AddHours(2)),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime.AddHours(1))
         };
 
         var result = events.SortEvents(ColumnName.DateAndTime, true);
@@ -392,9 +393,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300),
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(300),
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         // Act
@@ -412,9 +413,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(keywords: ["Zebra"]),
-            EventUtils.CreateTestEvent(keywords: ["Apple"]),
-            EventUtils.CreateTestEvent(keywords: ["Mango"])
+            FilterEventBuilder.CreateTestEvent(keywords: ["Zebra"]),
+            FilterEventBuilder.CreateTestEvent(keywords: ["Apple"]),
+            FilterEventBuilder.CreateTestEvent(keywords: ["Mango"])
         };
 
         // Act
@@ -431,9 +432,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(keywords: ["Apple"]),
-            EventUtils.CreateTestEvent(keywords: ["Zebra"]),
-            EventUtils.CreateTestEvent(keywords: ["Mango"])
+            FilterEventBuilder.CreateTestEvent(keywords: ["Apple"]),
+            FilterEventBuilder.CreateTestEvent(keywords: ["Zebra"]),
+            FilterEventBuilder.CreateTestEvent(keywords: ["Mango"])
         };
 
         var result = events.SortEvents(ColumnName.Keywords, true);
@@ -449,9 +450,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(level: "Warning"),
-            EventUtils.CreateTestEvent(level: "Error"),
-            EventUtils.CreateTestEvent(level: "Information")
+            FilterEventBuilder.CreateTestEvent(level: "Warning"),
+            FilterEventBuilder.CreateTestEvent(level: "Error"),
+            FilterEventBuilder.CreateTestEvent(level: "Information")
         };
 
         // Act
@@ -468,9 +469,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(level: "Information"),
-            EventUtils.CreateTestEvent(level: "Warning"),
-            EventUtils.CreateTestEvent(level: "Error")
+            FilterEventBuilder.CreateTestEvent(level: "Information"),
+            FilterEventBuilder.CreateTestEvent(level: "Warning"),
+            FilterEventBuilder.CreateTestEvent(level: "Error")
         };
 
         var result = events.SortEvents(ColumnName.Level, true);
@@ -486,9 +487,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(logName: "System"),
-            EventUtils.CreateTestEvent(logName: "Application"),
-            EventUtils.CreateTestEvent(logName: "Security")
+            FilterEventBuilder.CreateTestEvent(logName: "System"),
+            FilterEventBuilder.CreateTestEvent(logName: "Application"),
+            FilterEventBuilder.CreateTestEvent(logName: "Security")
         };
 
         // Act
@@ -505,9 +506,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(logName: "Application"),
-            EventUtils.CreateTestEvent(logName: "System"),
-            EventUtils.CreateTestEvent(logName: "Security")
+            FilterEventBuilder.CreateTestEvent(logName: "Application"),
+            FilterEventBuilder.CreateTestEvent(logName: "System"),
+            FilterEventBuilder.CreateTestEvent(logName: "Security")
         };
 
         var result = events.SortEvents(ColumnName.Log, true);
@@ -523,9 +524,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(processId: 300),
-            EventUtils.CreateTestEvent(processId: 100),
-            EventUtils.CreateTestEvent(processId: 200)
+            FilterEventBuilder.CreateTestEvent(processId: 300),
+            FilterEventBuilder.CreateTestEvent(processId: 100),
+            FilterEventBuilder.CreateTestEvent(processId: 200)
         };
 
         // Act
@@ -542,9 +543,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(processId: 100),
-            EventUtils.CreateTestEvent(processId: 300),
-            EventUtils.CreateTestEvent(processId: 200)
+            FilterEventBuilder.CreateTestEvent(processId: 100),
+            FilterEventBuilder.CreateTestEvent(processId: 300),
+            FilterEventBuilder.CreateTestEvent(processId: 200)
         };
 
         var result = events.SortEvents(ColumnName.ProcessId, true);
@@ -560,9 +561,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(source: "ZSource"),
-            EventUtils.CreateTestEvent(source: "ASource"),
-            EventUtils.CreateTestEvent(source: "MSource")
+            FilterEventBuilder.CreateTestEvent(source: "ZSource"),
+            FilterEventBuilder.CreateTestEvent(source: "ASource"),
+            FilterEventBuilder.CreateTestEvent(source: "MSource")
         };
 
         // Act
@@ -579,9 +580,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(source: "ASource"),
-            EventUtils.CreateTestEvent(source: "ZSource"),
-            EventUtils.CreateTestEvent(source: "MSource")
+            FilterEventBuilder.CreateTestEvent(source: "ASource"),
+            FilterEventBuilder.CreateTestEvent(source: "ZSource"),
+            FilterEventBuilder.CreateTestEvent(source: "MSource")
         };
 
         var result = events.SortEvents(ColumnName.Source, true);
@@ -597,9 +598,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(taskCategory: "ZCategory"),
-            EventUtils.CreateTestEvent(taskCategory: "ACategory"),
-            EventUtils.CreateTestEvent(taskCategory: "MCategory")
+            FilterEventBuilder.CreateTestEvent(taskCategory: "ZCategory"),
+            FilterEventBuilder.CreateTestEvent(taskCategory: "ACategory"),
+            FilterEventBuilder.CreateTestEvent(taskCategory: "MCategory")
         };
 
         // Act
@@ -616,9 +617,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(taskCategory: "ACategory"),
-            EventUtils.CreateTestEvent(taskCategory: "ZCategory"),
-            EventUtils.CreateTestEvent(taskCategory: "MCategory")
+            FilterEventBuilder.CreateTestEvent(taskCategory: "ACategory"),
+            FilterEventBuilder.CreateTestEvent(taskCategory: "ZCategory"),
+            FilterEventBuilder.CreateTestEvent(taskCategory: "MCategory")
         };
 
         var result = events.SortEvents(ColumnName.TaskCategory, true);
@@ -634,9 +635,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(threadId: 30),
-            EventUtils.CreateTestEvent(threadId: 10),
-            EventUtils.CreateTestEvent(threadId: 20)
+            FilterEventBuilder.CreateTestEvent(threadId: 30),
+            FilterEventBuilder.CreateTestEvent(threadId: 10),
+            FilterEventBuilder.CreateTestEvent(threadId: 20)
         };
 
         // Act
@@ -653,9 +654,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(threadId: 10),
-            EventUtils.CreateTestEvent(threadId: 30),
-            EventUtils.CreateTestEvent(threadId: 20)
+            FilterEventBuilder.CreateTestEvent(threadId: 10),
+            FilterEventBuilder.CreateTestEvent(threadId: 30),
+            FilterEventBuilder.CreateTestEvent(threadId: 20)
         };
 
         var result = events.SortEvents(ColumnName.ThreadId, true);
@@ -674,9 +675,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(userId: sid3),
-            EventUtils.CreateTestEvent(userId: sid1),
-            EventUtils.CreateTestEvent(userId: sid2)
+            FilterEventBuilder.CreateTestEvent(userId: sid3),
+            FilterEventBuilder.CreateTestEvent(userId: sid1),
+            FilterEventBuilder.CreateTestEvent(userId: sid2)
         };
 
         var result = events.SortEvents(ColumnName.User);
@@ -695,9 +696,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(userId: sid1),
-            EventUtils.CreateTestEvent(userId: sid3),
-            EventUtils.CreateTestEvent(userId: sid2)
+            FilterEventBuilder.CreateTestEvent(userId: sid1),
+            FilterEventBuilder.CreateTestEvent(userId: sid3),
+            FilterEventBuilder.CreateTestEvent(userId: sid2)
         };
 
         var result = events.SortEvents(ColumnName.User, true);
@@ -711,7 +712,7 @@ public sealed class ResolvedEventOrderingTests
     public void SortEvents_WhenSingleItem_ShouldReturnSingleItem()
     {
         // Arrange
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
         // Act
         var result = events.SortEvents(ColumnName.EventId);
@@ -726,9 +727,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(source: "apple"),
-            EventUtils.CreateTestEvent(source: "Apple"),
-            EventUtils.CreateTestEvent(source: "Banana")
+            FilterEventBuilder.CreateTestEvent(source: "apple"),
+            FilterEventBuilder.CreateTestEvent(source: "Apple"),
+            FilterEventBuilder.CreateTestEvent(source: "Banana")
         };
 
         var result = events.SortEvents(ColumnName.Source);
@@ -743,9 +744,9 @@ public sealed class ResolvedEventOrderingTests
     {
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(taskCategory: "BCategory"),
-            EventUtils.CreateTestEvent(taskCategory: null!),
-            EventUtils.CreateTestEvent(taskCategory: "ACategory")
+            FilterEventBuilder.CreateTestEvent(taskCategory: "BCategory"),
+            FilterEventBuilder.CreateTestEvent(taskCategory: null!),
+            FilterEventBuilder.CreateTestEvent(taskCategory: "ACategory")
         };
 
         var result = events.SortEvents(ColumnName.TaskCategory);
@@ -763,9 +764,9 @@ public sealed class ResolvedEventOrderingTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 3),
-            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 1),
-            EventUtils.CreateTestEvent(timeCreated: baseTime, recordId: 2)
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime, recordId: 3),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime, recordId: 1),
+            FilterEventBuilder.CreateTestEvent(timeCreated: baseTime, recordId: 2)
         };
 
         // Act
@@ -783,9 +784,9 @@ public sealed class ResolvedEventOrderingTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, recordId: 1),
-            EventUtils.CreateTestEvent(100, recordId: 3),
-            EventUtils.CreateTestEvent(100, recordId: 2)
+            FilterEventBuilder.CreateTestEvent(100, recordId: 1),
+            FilterEventBuilder.CreateTestEvent(100, recordId: 3),
+            FilterEventBuilder.CreateTestEvent(100, recordId: 2)
         };
 
         // Act

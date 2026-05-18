@@ -5,16 +5,17 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+using EventLogExpert.Filtering.TestUtils.Constants;
+
+namespace EventLogExpert.Filtering.Tests.Drafts;
 
 public sealed class FilterDraftModeTests
 {
     [Fact]
     public void ApplyModeSwitch_AdvancedToBasic_DecomposableText_HydratesStructure()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -31,7 +32,7 @@ public sealed class FilterDraftModeTests
         var draft = new FilterDraft
         {
             Mode = FilterMode.Advanced,
-            ComparisonText = Constants.FilterComputerNameEqualsServer01
+            ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
         };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
@@ -51,13 +52,13 @@ public sealed class FilterDraftModeTests
         var draft = new FilterDraft
         {
             Mode = FilterMode.Basic,
-            ComparisonText = Constants.FilterComputerNameEqualsServer01
+            ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
         };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
         Assert.Equal(FilterMode.Advanced, draft.Mode);
-        Assert.Equal(Constants.FilterComputerNameEqualsServer01, draft.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterComputerNameEqualsServer01, draft.ComparisonText);
     }
 
     [Fact]
@@ -122,18 +123,18 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void ApplyModeSwitch_CachedToAdvanced_PreservesText()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
         Assert.Equal(FilterMode.Advanced, draft.Mode);
-        Assert.Equal(Constants.FilterIdEquals100, draft.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, draft.ComparisonText);
     }
 
     [Fact]
     public void ApplyModeSwitch_CachedToBasic_DecomposableText_HydratesStructure()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -231,7 +232,7 @@ public sealed class FilterDraftModeTests
     {
         // L4b intent guard: even when the text decomposes cleanly, an Advanced-mode draft saves as Advanced.
         // The row reopens on the Advanced surface on next edit, no silent surface flip.
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
 
@@ -340,7 +341,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void TryBuildSavedFilter_CachedMode_WithText_ProducesCachedSavedFilter()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
 
@@ -353,7 +354,7 @@ public sealed class FilterDraftModeTests
     [Fact]
     public void WouldLoseDataSwitchingTo_AdvancedToBasic_DecomposableText_IsFalse()
     {
-        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Basic));
     }
@@ -364,7 +365,7 @@ public sealed class FilterDraftModeTests
         var draft = new FilterDraft
         {
             Mode = FilterMode.Advanced,
-            ComparisonText = Constants.FilterComputerNameEqualsServer01
+            ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
         };
 
         Assert.True(draft.WouldLoseDataSwitchingTo(FilterMode.Basic));
@@ -394,7 +395,7 @@ public sealed class FilterDraftModeTests
         var draft = new FilterDraft
         {
             Mode = FilterMode.Basic,
-            ComparisonText = Constants.FilterComputerNameEqualsServer01
+            ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
         };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Advanced));
@@ -447,7 +448,7 @@ public sealed class FilterDraftModeTests
         var draft = new FilterDraft
         {
             Mode = FilterMode.Basic,
-            ComparisonText = Constants.FilterComputerNameEqualsServer01
+            ComparisonText = FilterTestConstants.FilterComputerNameEqualsServer01
         };
 
         Assert.True(draft.WouldLoseDataSwitchingTo(FilterMode.Cached));
@@ -477,7 +478,7 @@ public sealed class FilterDraftModeTests
     public void WouldLoseDataSwitchingTo_CachedToAdvanced_IsFalse()
     {
         // Cached → Advanced is loss-free: the text is preserved verbatim as the Advanced expression.
-        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = Constants.FilterIdEquals100 };
+        var draft = new FilterDraft { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Advanced));
     }

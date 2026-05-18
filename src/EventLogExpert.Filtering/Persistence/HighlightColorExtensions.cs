@@ -1,11 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Persistence;
 using System.Reflection;
 using System.Runtime.Serialization;
 
-namespace EventLogExpert.Runtime.Filters;
+namespace EventLogExpert.Filtering.Persistence;
 
 public static class HighlightColorExtensions
 {

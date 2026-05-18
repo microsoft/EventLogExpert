@@ -5,9 +5,9 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
 
-namespace EventLogExpert.Runtime.Filters;
+namespace EventLogExpert.Filtering.Runtime;
 
-internal static class ResolvedEventExtensions
+public static class ResolvedEventExtensions
 {
     extension(ResolvedEvent? @event)
     {

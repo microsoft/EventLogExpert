@@ -4,12 +4,13 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Runtime.Filters;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.TestUtils;
+
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+namespace EventLogExpert.Filtering.Tests.Services;
 
 public sealed class FilterServiceTests
 {
@@ -29,8 +30,8 @@ public sealed class FilterServiceTests
         // Arrange — two logs sharing the same Id (record-copy preserves Id).
         // logs.Count == 2 + IsFilteringEnabled false routes through the sequential path.
         var filterService = CreateFilterService();
-        var original = new EventLogData("Log1", LogPathType.Channel, [EventUtils.CreateTestEvent(100)]);
-        var duplicate = original with { Name = "Log2", Events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(200) }.AsReadOnly() };
+        var original = new EventLogData("Log1", LogPathType.Channel, [FilterEventBuilder.CreateTestEvent(100)]);
+        var duplicate = original with { Name = "Log2", Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly() };
 
         Assert.Equal(original.Id, duplicate.Id);
 
@@ -53,10 +54,10 @@ public sealed class FilterServiceTests
         var filter = new Filter(dateFilter, []);
 
         var log1Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
         var log2Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
         var original = new EventLogData("Log1", LogPathType.Channel, log1Events);
@@ -97,11 +98,11 @@ public sealed class FilterServiceTests
         var filter = new Filter(dateFilter, []);
 
         var log1Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         var log2Events = Enumerable.Range(0, 6_000)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
         var logData = new List<EventLogData>
@@ -132,14 +133,14 @@ public sealed class FilterServiceTests
 
         var log1Events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
-            EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
+            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
+            FilterEventBuilder.CreateTestEvent(200, level: FilterTestConstants.EventLevelInformation)
         };
 
         var log2Events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
-            EventUtils.CreateTestEvent(300, level: Constants.EventLevelError)
+            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
+            FilterEventBuilder.CreateTestEvent(300, level: FilterTestConstants.EventLevelError)
         };
 
         var logData = new List<EventLogData>
@@ -164,8 +165,8 @@ public sealed class FilterServiceTests
         // avoid spinning up parallel work for a no-op filter.
         var filterService = CreateFilterService();
 
-        var log1Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
-        var log2Events = Enumerable.Range(0, 6_000).Select(i => EventUtils.CreateTestEvent(i)).ToList();
+        var log1Events = Enumerable.Range(0, 6_000).Select(i => FilterEventBuilder.CreateTestEvent(i)).ToList();
+        var log2Events = Enumerable.Range(0, 6_000).Select(i => FilterEventBuilder.CreateTestEvent(i)).ToList();
 
         var logData = new List<EventLogData>
         {
@@ -191,8 +192,8 @@ public sealed class FilterServiceTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         var logData = new List<EventLogData>
@@ -223,7 +224,7 @@ public sealed class FilterServiceTests
 
         // Create events: half before cutoff, half after
         var events = Enumerable.Range(0, eventCount)
-            .Select(i => EventUtils.CreateTestEvent(
+            .Select(i => FilterEventBuilder.CreateTestEvent(
                 i,
                 timeCreated: baseTime.AddMinutes(i),
                 recordId: i))
@@ -255,12 +256,12 @@ public sealed class FilterServiceTests
 
         // Small collection (sequential path)
         var smallEvents = Enumerable.Range(0, 100)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         // Large collection (PLINQ path) with the same first 100 events
         var largeEvents = Enumerable.Range(0, 15_000)
-            .Select(i => EventUtils.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
 
         // Act
@@ -284,9 +285,9 @@ public sealed class FilterServiceTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200),
-            EventUtils.CreateTestEvent(300)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200),
+            FilterEventBuilder.CreateTestEvent(300)
         };
 
         var filter = new Filter(null, []);
@@ -668,8 +669,8 @@ public sealed class FilterServiceTests
 
         var matchingEvent = property switch
         {
-            EventProperty.Description => EventUtils.CreateTestEvent(description: rawValue),
-            EventProperty.Source => EventUtils.CreateTestEvent(source: rawValue),
+            EventProperty.Description => FilterEventBuilder.CreateTestEvent(description: rawValue),
+            EventProperty.Source => FilterEventBuilder.CreateTestEvent(source: rawValue),
             _ => throw new ArgumentOutOfRangeException(nameof(property))
         };
 

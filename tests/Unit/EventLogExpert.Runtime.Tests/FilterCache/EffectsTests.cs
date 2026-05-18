@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -15,20 +16,20 @@ public sealed class EffectsTests
     public async Task HandleAddFavoriteFilter_ShouldPersistToPreferences()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var action = new AddFavoriteFilterAction(Constants.FilterLevelEqualsError);
+        var action = new AddFavoriteFilterAction(FilterTestConstants.FilterLevelEqualsError);
 
         // Act
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
 
         // Assert
         var _ = mockPreferencesProvider.Received(1).FavoriteFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            x.Contains(Constants.FilterIdEquals100) &&
-            x.Contains(Constants.FilterLevelEqualsError) &&
+            x.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Contains(FilterTestConstants.FilterLevelEqualsError) &&
             x.Count() == 2);
     }
 
@@ -36,12 +37,12 @@ public sealed class EffectsTests
     public async Task HandleAddFavoriteFilter_WhenFilterAlreadyExists_ShouldNotDispatch()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new AddFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
@@ -54,12 +55,12 @@ public sealed class EffectsTests
     public async Task HandleAddFavoriteFilter_WhenFilterDoesNotExist_ShouldAddToFavorites()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals200);
+        var action = new AddFavoriteFilterAction(FilterTestConstants.FilterIdEquals200);
 
         // Act
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
@@ -67,8 +68,8 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 2 &&
-            x.Filters.Contains(Constants.FilterIdEquals100) &&
-            x.Filters.Contains(Constants.FilterIdEquals200)));
+            x.Filters.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Filters.Contains(FilterTestConstants.FilterIdEquals200)));
     }
 
     [Fact]
@@ -78,14 +79,14 @@ public sealed class EffectsTests
         // the same string from Recent so the cached-filter dropdown doesn't show it twice.
         var existingFavorites = ImmutableList<string>.Empty;
         var existingRecent = ImmutableQueue.Create(
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError);
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites,
             existingRecent);
 
-        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new AddFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
@@ -93,27 +94,27 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 1 &&
-            x.Filters.Contains(Constants.FilterIdEquals100)));
+            x.Filters.Contains(FilterTestConstants.FilterIdEquals100)));
 
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddRecentFilterSuccessAction>(x =>
             x.Filters.Count() == 1 &&
-            !x.Filters.Contains(Constants.FilterIdEquals100) &&
-            x.Filters.Contains(Constants.FilterLevelEqualsError)));
+            !x.Filters.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Filters.Contains(FilterTestConstants.FilterLevelEqualsError)));
 
         _ = mockPreferencesProvider.Received(1).RecentFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            !x.Contains(Constants.FilterIdEquals100));
+            !x.Contains(FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
     public async Task HandleAddFavoriteFilter_WhenFilterNotInRecent_ShouldNotDispatchRecentAction()
     {
         // Arrange — recent untouched, so we shouldn't dispatch a no-op AddRecentFilterSuccessAction.
-        var existingRecent = ImmutableQueue.Create(Constants.FilterLevelEqualsError);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterLevelEqualsError);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             recentFilters: existingRecent);
 
-        var action = new AddFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new AddFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleAddFavoriteFilter(action, mockDispatcher);
@@ -126,20 +127,20 @@ public sealed class EffectsTests
     public async Task HandleAddRecentFilter_ShouldPersistToPreferences()
     {
         // Arrange
-        var existingRecent = ImmutableQueue.Create(Constants.FilterIdEquals100);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             recentFilters: existingRecent);
 
-        var action = new AddRecentFilterAction(Constants.FilterLevelEqualsError);
+        var action = new AddRecentFilterAction(FilterTestConstants.FilterLevelEqualsError);
 
         // Act
         await effects.HandleAddRecentFilter(action, mockDispatcher);
 
         // Assert
         var _ = mockPreferencesProvider.Received(1).RecentFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            x.Contains(Constants.FilterIdEquals100) &&
-            x.Contains(Constants.FilterLevelEqualsError) &&
+            x.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Contains(FilterTestConstants.FilterLevelEqualsError) &&
             x.Count() == 2);
     }
 
@@ -147,12 +148,12 @@ public sealed class EffectsTests
     public async Task HandleAddRecentFilter_WhenFilterAlreadyExists_ShouldNotDispatch()
     {
         // Arrange
-        var existingRecent = ImmutableQueue.Create(Constants.FilterIdEquals100);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             recentFilters: existingRecent);
 
-        var action = new AddRecentFilterAction(Constants.FilterIdEquals100);
+        var action = new AddRecentFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleAddRecentFilter(action, mockDispatcher);
@@ -166,12 +167,12 @@ public sealed class EffectsTests
     {
         // Symmetric to the Favorite-eviction rule: a filter already in Favorites shouldn't get
         // duplicated into Recent (e.g., when re-applying a favorite filter through the row).
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var action = new AddRecentFilterAction(Constants.FilterIdEquals100);
+        var action = new AddRecentFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleAddRecentFilter(action, mockDispatcher);
@@ -235,12 +236,12 @@ public sealed class EffectsTests
     public async Task HandleAddRecentFilter_WhenFilterIsNew_ShouldAddToRecent()
     {
         // Arrange
-        var existingRecent = ImmutableQueue.Create(Constants.FilterIdEquals100);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             recentFilters: existingRecent);
 
-        var action = new AddRecentFilterAction(Constants.FilterLevelEqualsError);
+        var action = new AddRecentFilterAction(FilterTestConstants.FilterLevelEqualsError);
 
         // Act
         await effects.HandleAddRecentFilter(action, mockDispatcher);
@@ -302,7 +303,7 @@ public sealed class EffectsTests
         var filtersToImport = new List<string>
         {
             "ID == 100",
-            Constants.FilterLevelEqualsError
+            FilterTestConstants.FilterLevelEqualsError
         };
 
         var action = new ImportFavoritesAction([.. filtersToImport]);
@@ -313,19 +314,19 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(a =>
             a.Filters.Count == 2 &&
-            a.Filters.Contains(Constants.FilterLevelEqualsError)));
+            a.Filters.Contains(FilterTestConstants.FilterLevelEqualsError)));
     }
 
     [Fact]
     public async Task HandleImportFavorites_ShouldPersistToPreferences()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var filtersToImport = new List<string> { Constants.FilterLevelEqualsError };
+        var filtersToImport = new List<string> { FilterTestConstants.FilterLevelEqualsError };
         var action = new ImportFavoritesAction([.. filtersToImport]);
 
         // Act
@@ -333,8 +334,8 @@ public sealed class EffectsTests
 
         // Assert
         var _ = mockPreferencesProvider.Received(1).FavoriteFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            x.Contains(Constants.FilterIdEquals100) &&
-            x.Contains(Constants.FilterLevelEqualsError) &&
+            x.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Contains(FilterTestConstants.FilterLevelEqualsError) &&
             x.Count() == 2);
     }
 
@@ -343,17 +344,17 @@ public sealed class EffectsTests
     {
         // Arrange
         var existingFavorites = ImmutableList.Create(
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError);
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
         var filtersToImport = new List<string>
         {
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError,
-            Constants.FilterSourceContainsTest
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError,
+            FilterTestConstants.FilterSourceContainsTest
         };
 
         var action = new ImportFavoritesAction([.. filtersToImport]);
@@ -364,22 +365,22 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 3 &&
-            x.Filters.Contains(Constants.FilterSourceContainsTest)));
+            x.Filters.Contains(FilterTestConstants.FilterSourceContainsTest)));
     }
 
     [Fact]
     public async Task HandleImportFavorites_WhenFiltersAreNew_ShouldAddAll()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
         var filtersToImport = new List<string>
         {
-            Constants.FilterLevelEqualsError,
-            Constants.FilterSourceContainsTest
+            FilterTestConstants.FilterLevelEqualsError,
+            FilterTestConstants.FilterSourceContainsTest
         };
 
         var action = new ImportFavoritesAction([.. filtersToImport]);
@@ -390,9 +391,9 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(x =>
             x.Filters.Count == 3 &&
-            x.Filters.Contains(Constants.FilterIdEquals100) &&
-            x.Filters.Contains(Constants.FilterLevelEqualsError) &&
-            x.Filters.Contains(Constants.FilterSourceContainsTest)));
+            x.Filters.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Filters.Contains(FilterTestConstants.FilterLevelEqualsError) &&
+            x.Filters.Contains(FilterTestConstants.FilterSourceContainsTest)));
     }
 
     [Fact]
@@ -408,7 +409,7 @@ public sealed class EffectsTests
         {
             "Id == 100",
             "ID == 100",
-            Constants.FilterLevelEqualsError
+            FilterTestConstants.FilterLevelEqualsError
         };
 
         var action = new ImportFavoritesAction([.. filtersToImport]);
@@ -420,7 +421,7 @@ public sealed class EffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Is<AddFavoriteFilterSuccessAction>(a =>
             a.Filters.Count == 2 &&
             a.Filters.Contains("Id == 100") &&
-            a.Filters.Contains(Constants.FilterLevelEqualsError)));
+            a.Filters.Contains(FilterTestConstants.FilterLevelEqualsError)));
     }
 
     [Fact]
@@ -429,13 +430,13 @@ public sealed class EffectsTests
         // Arrange
         var favoritesPreference = new List<string>
         {
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError
         };
 
         var recentPreference = new List<string>
         {
-            Constants.FilterSourceContainsTest
+            FilterTestConstants.FilterSourceContainsTest
         };
 
         var mockPreferencesProvider = Substitute.For<IFilterCachePreferencesProvider>();
@@ -456,9 +457,9 @@ public sealed class EffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadFiltersSuccessAction>(x =>
             x.FavoriteFilters.Count == 2 &&
             x.RecentFilters.Count() == 1 &&
-            x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
-            x.FavoriteFilters.Contains(Constants.FilterLevelEqualsError) &&
-            x.RecentFilters.Contains(Constants.FilterSourceContainsTest)));
+            x.FavoriteFilters.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.FavoriteFilters.Contains(FilterTestConstants.FilterLevelEqualsError) &&
+            x.RecentFilters.Contains(FilterTestConstants.FilterSourceContainsTest)));
     }
 
     [Fact]
@@ -490,27 +491,27 @@ public sealed class EffectsTests
     {
         // Arrange
         var existingFavorites = ImmutableList.Create(
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError);
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError);
 
-        var existingRecent = ImmutableQueue.Create(Constants.FilterSourceContainsTest);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterSourceContainsTest);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites,
             existingRecent);
 
-        var action = new RemoveFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new RemoveFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
 
         // Assert
         _ = mockPreferencesProvider.Received(1).FavoriteFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            !x.Contains(Constants.FilterIdEquals100) &&
-            x.Contains(Constants.FilterLevelEqualsError));
+            !x.Contains(FilterTestConstants.FilterIdEquals100) &&
+            x.Contains(FilterTestConstants.FilterLevelEqualsError));
 
         _ = mockPreferencesProvider.Received(1).RecentFiltersPreference = Arg.Is<IEnumerable<string>>(x =>
-            x.Contains(Constants.FilterIdEquals100));
+            x.Contains(FilterTestConstants.FilterIdEquals100));
     }
 
     [Fact]
@@ -518,16 +519,16 @@ public sealed class EffectsTests
     {
         // Arrange
         var existingFavorites = ImmutableList.Create(
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError);
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError);
 
-        var existingRecent = ImmutableQueue.Create(Constants.FilterIdEquals100);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites,
             existingRecent);
 
-        var action = new RemoveFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new RemoveFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
@@ -535,21 +536,21 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterSuccessAction>(x =>
             x.FavoriteFilters.Count == 1 &&
-            !x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
+            !x.FavoriteFilters.Contains(FilterTestConstants.FilterIdEquals100) &&
             x.RecentFilters.Count() == 1 &&
-            x.RecentFilters.Contains(Constants.FilterIdEquals100)));
+            x.RecentFilters.Contains(FilterTestConstants.FilterIdEquals100)));
     }
 
     [Fact]
     public async Task HandleRemoveFavoriteFilter_WhenFilterNotInFavorites_ShouldNotDispatch()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites);
 
-        var action = new RemoveFavoriteFilterAction(Constants.FilterLevelEqualsError);
+        var action = new RemoveFavoriteFilterAction(FilterTestConstants.FilterLevelEqualsError);
 
         // Act
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
@@ -563,16 +564,16 @@ public sealed class EffectsTests
     {
         // Arrange
         var existingFavorites = ImmutableList.Create(
-            Constants.FilterIdEquals100,
-            Constants.FilterLevelEqualsError);
+            FilterTestConstants.FilterIdEquals100,
+            FilterTestConstants.FilterLevelEqualsError);
 
-        var existingRecent = ImmutableQueue.Create(Constants.FilterSourceContainsTest);
+        var existingRecent = ImmutableQueue.Create(FilterTestConstants.FilterSourceContainsTest);
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(
             existingFavorites,
             existingRecent);
 
-        var action = new RemoveFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new RemoveFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
@@ -580,16 +581,16 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<RemoveFavoriteFilterSuccessAction>(x =>
             x.FavoriteFilters.Count == 1 &&
-            !x.FavoriteFilters.Contains(Constants.FilterIdEquals100) &&
+            !x.FavoriteFilters.Contains(FilterTestConstants.FilterIdEquals100) &&
             x.RecentFilters.Count() == 2 &&
-            x.RecentFilters.Contains(Constants.FilterIdEquals100)));
+            x.RecentFilters.Contains(FilterTestConstants.FilterIdEquals100)));
     }
 
     [Fact]
     public async Task HandleRemoveFavoriteFilter_WhenRecentIsFull_ShouldDequeueOldest()
     {
         // Arrange
-        var existingFavorites = ImmutableList.Create(Constants.FilterIdEquals100);
+        var existingFavorites = ImmutableList.Create(FilterTestConstants.FilterIdEquals100);
 
         var filters = Enumerable.Range(1, 20)
             .Select(i => $"Filter{i}")
@@ -601,7 +602,7 @@ public sealed class EffectsTests
             existingFavorites,
             existingRecent);
 
-        var action = new RemoveFavoriteFilterAction(Constants.FilterIdEquals100);
+        var action = new RemoveFavoriteFilterAction(FilterTestConstants.FilterIdEquals100);
 
         // Act
         await effects.HandleRemoveFavoriteFilter(action, mockDispatcher);
@@ -611,7 +612,7 @@ public sealed class EffectsTests
             x.FavoriteFilters.Count == 0 &&
             x.RecentFilters.Count() == 20 &&
             !x.RecentFilters.Contains("Filter1") &&
-            x.RecentFilters.Contains(Constants.FilterIdEquals100)));
+            x.RecentFilters.Contains(FilterTestConstants.FilterIdEquals100)));
     }
 
     private static (Effects effects, IDispatcher mockDispatcher, IFilterCachePreferencesProvider mockPreferencesProvider) CreateEffects(
