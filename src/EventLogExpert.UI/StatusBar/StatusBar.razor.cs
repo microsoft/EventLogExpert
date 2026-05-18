@@ -11,7 +11,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Components.Sections;
+namespace EventLogExpert.UI.StatusBar;
 
 public sealed partial class StatusBar
 {

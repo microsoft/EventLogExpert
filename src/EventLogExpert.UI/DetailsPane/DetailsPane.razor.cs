@@ -14,7 +14,7 @@ using Microsoft.JSInterop;
 using System.Xml;
 using System.Xml.Linq;
 
-namespace EventLogExpert.Components.Sections;
+namespace EventLogExpert.UI.DetailsPane;
 
 public sealed partial class DetailsPane
 {
