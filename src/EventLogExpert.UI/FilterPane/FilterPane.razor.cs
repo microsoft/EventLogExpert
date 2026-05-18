@@ -23,7 +23,7 @@ using Microsoft.JSInterop;
 using FilterGroupState = EventLogExpert.Runtime.FilterGroup.FilterGroupState;
 using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
 
-namespace EventLogExpert.Components.Sections;
+namespace EventLogExpert.UI.FilterPane;
 
 public sealed partial class FilterPane : IDisposable
 {
