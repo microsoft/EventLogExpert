@@ -9,6 +9,8 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.EventLog;
@@ -23,8 +25,8 @@ public sealed class EventLogStoreTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         // Act - Buffer events
@@ -56,7 +58,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_SelectEvent_DefaultFlags_ShouldBeFalse()
     {
         // Arrange
-        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100);
 
         // Act
         var action = new SelectEventAction(selectedEvent);
@@ -70,7 +72,7 @@ public sealed class EventLogStoreTests
     public void EventLogAction_SelectEvent_ShouldStoreEventAndSelectionFlags()
     {
         // Arrange
-        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100);
 
         // Act
         var action = new SelectEventAction(selectedEvent, true, true);
@@ -87,8 +89,8 @@ public sealed class EventLogStoreTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         // Act
@@ -129,7 +131,7 @@ public sealed class EventLogStoreTests
         // Arrange
         var name = Constants.LogNameTestLog;
         var type = LogPathType.Channel;
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
         // Act
         var logData = new EventLogData(name, type, events);
@@ -146,9 +148,9 @@ public sealed class EventLogStoreTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
@@ -158,8 +160,8 @@ public sealed class EventLogStoreTests
 
         // Assert
         Assert.Equal(2, values.Count);
-        Assert.Contains(Constants.FilterValue100, values);
-        Assert.Contains(Constants.FilterValue200, values);
+        Assert.Contains(FilterTestConstants.FilterValue100, values);
+        Assert.Contains(FilterTestConstants.FilterValue200, values);
     }
 
     [Fact]
@@ -181,9 +183,9 @@ public sealed class EventLogStoreTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200),
-            EventUtils.CreateTestEvent(300, Constants.EventSourceOtherSource)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200),
+            FilterEventBuilder.CreateTestEvent(300, FilterTestConstants.EventSourceOtherSource)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
@@ -199,7 +201,7 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetEventValues_ForUnknownField_ShouldReturnEmpty()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [EventUtils.CreateTestEvent(100)]);
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [FilterEventBuilder.CreateTestEvent(100)]);
 
         // Act
         var values = logData.GetEventValues((EventProperty)999).ToList();
@@ -257,9 +259,9 @@ public sealed class EventLogStoreTests
         var logData = state.ActiveLogs[Constants.LogNameTestLog];
 
         var events = ImmutableArray.Create(
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200),
-            EventUtils.CreateTestEvent(300)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200),
+            FilterEventBuilder.CreateTestEvent(300)
         );
 
         // Act - Load events
@@ -387,8 +389,8 @@ public sealed class EventLogStoreTests
         var state = new EventLogState
         {
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData),
-            SelectedEvents = [EventUtils.CreateTestEvent(100)],
-            NewEventBuffer = [EventUtils.CreateTestEvent(200)],
+            SelectedEvents = [FilterEventBuilder.CreateTestEvent(100)],
+            NewEventBuffer = [FilterEventBuilder.CreateTestEvent(200)],
             NewEventBufferIsFull = true
         };
 
@@ -406,7 +408,7 @@ public sealed class EventLogStoreTests
     public void ReduceCloseAll_ShouldClearSelectedEvent()
     {
         // Arrange
-        var first = EventUtils.CreateTestEvent(100);
+        var first = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [first], SelectedEvent = first };
 
         // Act
@@ -423,15 +425,15 @@ public sealed class EventLogStoreTests
         var eventForLog1 = new ResolvedEvent(Constants.LogNameLog1, LogPathType.Channel)
         {
             Id = 100,
-            Source = Constants.EventSourceTestSource,
-            Level = Constants.EventLevelInformation
+            Source = FilterTestConstants.EventSourceTestSource,
+            Level = FilterTestConstants.EventLevelInformation
         };
 
         var eventForLog2 = new ResolvedEvent(Constants.LogNameLog2, LogPathType.Channel)
         {
             Id = 200,
-            Source = Constants.EventSourceTestSource,
-            Level = Constants.EventLevelInformation
+            Source = FilterTestConstants.EventSourceTestSource,
+            Level = FilterTestConstants.EventLevelInformation
         };
 
         var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
@@ -485,8 +487,8 @@ public sealed class EventLogStoreTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         var action = new EventBufferedAction(events, true);
@@ -504,7 +506,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var state = new EventLogState { NewEventBufferIsFull = true };
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var action = new EventBufferedAction(events, false);
 
         // Act
@@ -525,7 +527,7 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100), FilterEventBuilder.CreateTestEvent(200));
 
         var action = new LoadEventsAction(logData, events);
 
@@ -533,7 +535,7 @@ public sealed class EventLogStoreTests
         var newState = Reducers.ReduceLoadEvents(state, action);
 
         // ImmutableArray is inherently isolated — creating a new one doesn't affect the state
-        var extendedEvents = events.Add(EventUtils.CreateTestEvent(300));
+        var extendedEvents = events.Add(FilterEventBuilder.CreateTestEvent(300));
 
         // Assert - state should not reflect the extension
         Assert.Equal(2, newState.ActiveLogs[Constants.LogNameTestLog].Events.Count);
@@ -551,7 +553,7 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100), EventUtils.CreateTestEvent(200));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100), FilterEventBuilder.CreateTestEvent(200));
 
         var action = new LoadEventsAction(logData, events);
 
@@ -573,7 +575,7 @@ public sealed class EventLogStoreTests
 
         // Create stale logData with a new ID (simulating a previous load instance)
         var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act — stale LoadEvents with mismatched ID
         var newState = Reducers.ReduceLoadEvents(state, new LoadEventsAction(staleLogData, events));
@@ -595,7 +597,7 @@ public sealed class EventLogStoreTests
             new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
 
         var logData = state.ActiveLogs[Constants.LogNameTestLog];
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act — LoadEvents with matching ID
         var newState = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logData, events));
@@ -610,7 +612,7 @@ public sealed class EventLogStoreTests
         // Arrange — no logs open
         var state = new EventLogState();
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act — stale LoadEvents arrives for a closed log
         var newState = Reducers.ReduceLoadEvents(state, new LoadEventsAction(logData, events));
@@ -630,7 +632,7 @@ public sealed class EventLogStoreTests
             new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
 
         var staleLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act — stale partial with mismatched ID
         var newState = Reducers.ReduceLoadEventsPartial(state,
@@ -649,7 +651,7 @@ public sealed class EventLogStoreTests
         // Arrange — no logs open
         var state = new EventLogState();
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var events = ImmutableArray.Create(EventUtils.CreateTestEvent(100));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100));
 
         // Act
         var newState = Reducers.ReduceLoadEventsPartial(state,
@@ -715,8 +717,8 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvent_OnToggleOff_ShouldKeepSelectedEvent()
     {
         // Arrange — Explorer-style: toggling off a row leaves the cursor on it.
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
         var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = first };
         var action = new SelectEventAction(second, true);
 
@@ -732,8 +734,8 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvent_ShouldSetSelectedEventOnAdd()
     {
         // Arrange
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
         var state = new EventLogState { SelectedEvents = [first], SelectedEvent = first };
         var action = new SelectEventAction(second, true);
 
@@ -750,7 +752,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange
         var state = new EventLogState();
-        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100);
         var action = new SelectEventAction(selectedEvent);
 
         // Act
@@ -765,9 +767,9 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvent_WhenMultiSelect_ShouldAddToExisting()
     {
         // Arrange
-        var existingEvent = EventUtils.CreateTestEvent(100);
+        var existingEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
-        var newEvent = EventUtils.CreateTestEvent(200);
+        var newEvent = FilterEventBuilder.CreateTestEvent(200);
         var action = new SelectEventAction(newEvent, true);
 
         // Act
@@ -783,7 +785,7 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvent_WhenMultiSelectAndEventAlreadySelected_ShouldRemoveEvent()
     {
         // Arrange
-        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [selectedEvent] };
         var action = new SelectEventAction(selectedEvent, true);
 
@@ -798,9 +800,9 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvent_WhenNotMultiSelect_ShouldReplaceExisting()
     {
         // Arrange
-        var existingEvent = EventUtils.CreateTestEvent(100);
+        var existingEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
-        var newEvent = EventUtils.CreateTestEvent(200);
+        var newEvent = FilterEventBuilder.CreateTestEvent(200);
         var action = new SelectEventAction(newEvent);
 
         // Act
@@ -817,7 +819,7 @@ public sealed class EventLogStoreTests
     {
         // Arrange — ShouldStaySelected (right-click on an already-selected row)
         // moves the focus cursor to that row but doesn't change the selection list.
-        var selectedEvent = EventUtils.CreateTestEvent(100);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [selectedEvent], SelectedEvent = null };
         var action = new SelectEventAction(selectedEvent, false, true);
 
@@ -834,8 +836,8 @@ public sealed class EventLogStoreTests
     {
         // Arrange — simulates post-reload state where SelectedEvents holds a
         // stale reference and the user clicks a value-equal new instance.
-        var staleReference = EventUtils.CreateTestEvent(100, recordId: 5);
-        var freshReference = EventUtils.CreateTestEvent(100, recordId: 5);
+        var staleReference = FilterEventBuilder.CreateTestEvent(100, recordId: 5);
+        var freshReference = FilterEventBuilder.CreateTestEvent(100, recordId: 5);
         var state = new EventLogState { SelectedEvents = [staleReference] };
         var action = new SelectEventAction(freshReference, true);
 
@@ -853,13 +855,13 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvents_ShouldAddNewEventsOnly()
     {
         // Arrange
-        var existingEvent = EventUtils.CreateTestEvent(100);
+        var existingEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
 
         var newEvents = new List<ResolvedEvent>
         {
             existingEvent,                  // Already selected
-            EventUtils.CreateTestEvent(200) // New
+            FilterEventBuilder.CreateTestEvent(200) // New
         };
 
         var action = new SelectEventsAction(newEvents);
@@ -875,9 +877,9 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvents_ShouldPreserveSelectedEventIfStillPresent()
     {
         // Arrange
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
-        var third = EventUtils.CreateTestEvent(300);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
+        var third = FilterEventBuilder.CreateTestEvent(300);
         var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = second };
         var action = new SelectEventsAction([second, third]);
 
@@ -892,7 +894,7 @@ public sealed class EventLogStoreTests
     public void ReduceSelectEvents_WhenAllEventsAlreadySelected_ShouldNotAddDuplicates()
     {
         // Arrange
-        var existingEvent = EventUtils.CreateTestEvent(100);
+        var existingEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
         var action = new SelectEventsAction([existingEvent]);
 
@@ -909,8 +911,8 @@ public sealed class EventLogStoreTests
         // Arrange — additive SelectEvents with a null active event (the prior
         // selection had no focus) falls back to the last incoming event so the
         // restore path leaves the user with something focused.
-        var second = EventUtils.CreateTestEvent(200);
-        var third = EventUtils.CreateTestEvent(300);
+        var second = FilterEventBuilder.CreateTestEvent(200);
+        var third = FilterEventBuilder.CreateTestEvent(300);
         var state = new EventLogState { SelectedEvents = [], SelectedEvent = null };
         var action = new SelectEventsAction([second, third]);
 
@@ -939,11 +941,11 @@ public sealed class EventLogStoreTests
     public void ReduceSetSelectedEvents_ShouldReplaceSelectionPreservingOrder()
     {
         // Arrange
-        var existingEvent = EventUtils.CreateTestEvent(100);
+        var existingEvent = FilterEventBuilder.CreateTestEvent(100);
         var state = new EventLogState { SelectedEvents = [existingEvent] };
-        var first = EventUtils.CreateTestEvent(200);
-        var second = EventUtils.CreateTestEvent(300);
-        var third = EventUtils.CreateTestEvent(400);
+        var first = FilterEventBuilder.CreateTestEvent(200);
+        var second = FilterEventBuilder.CreateTestEvent(300);
+        var third = FilterEventBuilder.CreateTestEvent(400);
         var action = new SetSelectedEventsAction([first, second, third], third);
 
         // Act
@@ -962,9 +964,9 @@ public sealed class EventLogStoreTests
     public void ReduceSetSelectedEvents_ShouldSetSelectedEventIndependentOfMembership()
     {
         // Arrange — active is not required to be a member of selection.
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
-        var notInSelection = EventUtils.CreateTestEvent(300);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
+        var notInSelection = FilterEventBuilder.CreateTestEvent(300);
         var state = new EventLogState();
         var action = new SetSelectedEventsAction([first, second], notInSelection);
 
@@ -980,8 +982,8 @@ public sealed class EventLogStoreTests
     public void ReduceSetSelectedEvents_WhenInputContainsDuplicates_ShouldDistinctByReference()
     {
         // Arrange
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
         var state = new EventLogState();
         var action = new SetSelectedEventsAction([first, second, first], first);
 
@@ -998,7 +1000,7 @@ public sealed class EventLogStoreTests
     public void ReduceSetSelectedEvents_WhenInputIsEmpty_ShouldClearSelection()
     {
         // Arrange
-        var state = new EventLogState { SelectedEvents = [EventUtils.CreateTestEvent(100)] };
+        var state = new EventLogState { SelectedEvents = [FilterEventBuilder.CreateTestEvent(100)] };
         var action = new SetSelectedEventsAction([], null);
 
         // Act
@@ -1012,8 +1014,8 @@ public sealed class EventLogStoreTests
     public void ReduceSetSelectedEvents_WhenOnlySelectedEventChanged_ShouldUpdateOnlySelectedEvent()
     {
         // Arrange
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
         var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = first };
         var action = new SetSelectedEventsAction([first, second], second);
 
@@ -1031,8 +1033,8 @@ public sealed class EventLogStoreTests
         // Arrange — EventTable.ShouldRender uses ReferenceEquals on
         // SelectedEvents to short-circuit re-renders, so the reducer must
         // return the same state when selection content is unchanged.
-        var first = EventUtils.CreateTestEvent(100);
-        var second = EventUtils.CreateTestEvent(200);
+        var first = FilterEventBuilder.CreateTestEvent(100);
+        var second = FilterEventBuilder.CreateTestEvent(200);
         var state = new EventLogState { SelectedEvents = [first, second], SelectedEvent = second };
         var action = new SetSelectedEventsAction([first, second], second);
 

@@ -5,10 +5,11 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+namespace EventLogExpert.Filtering.Tests.Persistence;
 
 public sealed class SavedFilterTests
 {
@@ -24,7 +25,7 @@ public sealed class SavedFilterTests
     public void JsonRoundTrip_BasicShape_PreservesBasicFilter()
     {
         // Act
-        var original = SavedFilter.TryCreate(Constants.FilterIdEquals100AndLevelError, mode: FilterMode.Basic);
+        var original = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100AndLevelError, mode: FilterMode.Basic);
 
         // Assert
         Assert.NotNull(original);
@@ -59,7 +60,7 @@ public sealed class SavedFilterTests
     {
         // Act
         var original = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             color: HighlightColor.Yellow,
             mode: FilterMode.Cached);
 
@@ -82,7 +83,7 @@ public sealed class SavedFilterTests
 
         Assert.Equal(FilterMode.Cached, restored.Mode);
         Assert.Null(restored.BasicFilter);
-        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, restored.ComparisonText);
     }
 
     [Fact]
@@ -113,7 +114,7 @@ public sealed class SavedFilterTests
             $$"""
             {
               "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
               "IsExcluded": false,
               "FilterType": "Advanced",
               "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
@@ -135,7 +136,7 @@ public sealed class SavedFilterTests
         // Arrange
         const string BrokenBasic =
             $$"""
-            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
+            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
             """;
 
         // Act
@@ -144,7 +145,7 @@ public sealed class SavedFilterTests
         // Assert
         Assert.NotNull(restored);
 
-        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, restored.ComparisonText);
         Assert.NotNull(restored.BasicFilter);
         Assert.Equal(EventProperty.Id, restored.BasicFilter.Comparison.Property);
         Assert.Equal("100", restored.BasicFilter.Comparison.Value);
@@ -172,7 +173,7 @@ public sealed class SavedFilterTests
         // Arrange
         const string LegacyJson =
             $$"""
-            { "Color": 2, "Comparison": { "Value": "{{Constants.FilterIdEquals100}}" }, "IsExcluded": true }
+            { "Color": 2, "Comparison": { "Value": "{{FilterTestConstants.FilterIdEquals100}}" }, "IsExcluded": true }
             """;
 
         // Act
@@ -181,7 +182,7 @@ public sealed class SavedFilterTests
         // Assert
         Assert.NotNull(model);
 
-        Assert.Equal(Constants.FilterIdEquals100, model.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, model.ComparisonText);
         Assert.NotNull(model.Compiled);
         Assert.True(model.IsExcluded);
         Assert.True(model.IsEnabled);
@@ -211,7 +212,7 @@ public sealed class SavedFilterTests
         // Arrange
         const string AdvancedJson =
             $$"""
-            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false, "Mode": "Advanced" }
+            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "Mode": "Advanced" }
             """;
 
         // Act
@@ -220,7 +221,7 @@ public sealed class SavedFilterTests
         // Assert
         Assert.NotNull(restored);
 
-        Assert.Equal(Constants.FilterIdEquals100, restored.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, restored.ComparisonText);
         Assert.NotNull(restored.Compiled);
         Assert.True(restored.IsEnabled);
         Assert.Null(restored.BasicFilter);
@@ -233,7 +234,7 @@ public sealed class SavedFilterTests
         // Arrange
         const string LegacyAdvancedJson =
             $$"""
-            { "Color": 0, "ComparisonText": "{{Constants.FilterIdEquals100}}", "IsExcluded": false }
+            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false }
             """;
 
         // Act
@@ -248,7 +249,7 @@ public sealed class SavedFilterTests
             $$"""
             {
               "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
               "IsExcluded": false,
               "BasicFilter": { "Comparison": { "Property": 0, "Operator": 0, "MatchMode": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
             }
@@ -268,7 +269,7 @@ public sealed class SavedFilterTests
     {
         // Act
         var original = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             color: HighlightColor.Blue,
             isExcluded: true);
 
@@ -300,7 +301,7 @@ public sealed class SavedFilterTests
     {
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             false,
             null,
@@ -329,7 +330,7 @@ public sealed class SavedFilterTests
 
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             false,
             stale,
@@ -356,7 +357,7 @@ public sealed class SavedFilterTests
 
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             false,
             stale,
@@ -386,7 +387,7 @@ public sealed class SavedFilterTests
 
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterComputerNameEqualsServer01,
+            FilterTestConstants.FilterComputerNameEqualsServer01,
             HighlightColor.None,
             false,
             stale,
@@ -403,7 +404,7 @@ public sealed class SavedFilterTests
     {
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             false,
             null,
@@ -421,7 +422,7 @@ public sealed class SavedFilterTests
     {
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterComputerNameEqualsServer01,
+            FilterTestConstants.FilterComputerNameEqualsServer01,
             HighlightColor.None,
             false,
             null,
@@ -429,7 +430,7 @@ public sealed class SavedFilterTests
 
         // Assert
         Assert.Null(model.BasicFilter);
-        Assert.Equal(Constants.FilterComputerNameEqualsServer01, model.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterComputerNameEqualsServer01, model.ComparisonText);
         Assert.Equal(FilterMode.Basic, model.Mode);
     }
 
@@ -449,7 +450,7 @@ public sealed class SavedFilterTests
 
         // Act
         var model = SavedFilter.LoadFromPersisted(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             HighlightColor.None,
             false,
             stale,
@@ -504,7 +505,7 @@ public sealed class SavedFilterTests
     public void TryCreate_AdvancedMode_DecomposableText_DoesNotAutoDecompose()
     {
         // Act
-        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100);
+        var model = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100);
 
         // Assert
         Assert.NotNull(model);
@@ -527,7 +528,7 @@ public sealed class SavedFilterTests
             []);
 
         // Act
-        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100, basicFilter, mode: FilterMode.Basic);
+        var model = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, basicFilter, mode: FilterMode.Basic);
 
         // Assert
         Assert.NotNull(model);
@@ -553,14 +554,14 @@ public sealed class SavedFilterTests
 
         // Assert
         Assert.Throws<ArgumentException>(() =>
-            SavedFilter.TryCreate(Constants.FilterIdEquals100, basicFilter, mode: mode));
+            SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, basicFilter, mode: mode));
     }
 
     [Fact]
     public void TryCreate_BasicMode_NoBasicFilterProvided_DecomposableText_AutoDecomposes()
     {
         // Act
-        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
+        var model = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: FilterMode.Basic);
 
         // Assert
         Assert.NotNull(model);
@@ -574,7 +575,7 @@ public sealed class SavedFilterTests
     public void TryCreate_NoBasicFilterProvided_NonDecomposableText_BasicFilterStaysNull()
     {
         // Act
-        var model = SavedFilter.TryCreate(Constants.FilterComputerNameEqualsServer01);
+        var model = SavedFilter.TryCreate(FilterTestConstants.FilterComputerNameEqualsServer01);
 
         // Assert
         Assert.NotNull(model);
@@ -599,7 +600,7 @@ public sealed class SavedFilterTests
 
         // Act
         var model = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             basicFilter,
             HighlightColor.Red,
             true,
@@ -620,11 +621,11 @@ public sealed class SavedFilterTests
     public void TryCreate_WhenExpressionCompiles_ReturnsModelWithCompiledArtifact()
     {
         // Act
-        var model = SavedFilter.TryCreate(Constants.FilterIdEquals100);
+        var model = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100);
 
         // Assert
         Assert.NotNull(model);
-        Assert.Equal(Constants.FilterIdEquals100, model.ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, model.ComparisonText);
         Assert.NotNull(model.Compiled);
         Assert.False(model.Compiled.RequiresXml);
     }

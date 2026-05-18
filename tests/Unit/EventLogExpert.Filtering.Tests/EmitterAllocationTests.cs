@@ -35,7 +35,7 @@ public sealed class EmitterAllocationTests
     {
         Assert.True(FilterParser.TryCompile(filter, out var compiled, out var error), error);
 
-        var bytes = AllocationUtils.MeasurePredicateAllocations(compiled.Predicate, EventUtils.FullyPopulated);
+        var bytes = AllocationUtils.MeasurePredicateAllocations(compiled.Predicate, FilterTestFixtures.FullyPopulated);
 
         Assert.Equal(0, bytes);
     }

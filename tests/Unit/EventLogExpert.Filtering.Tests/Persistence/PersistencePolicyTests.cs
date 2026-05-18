@@ -5,11 +5,12 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+namespace EventLogExpert.Filtering.Tests.Persistence;
 
 public sealed partial class PersistencePolicyTests
 {
@@ -94,7 +95,7 @@ public sealed partial class PersistencePolicyTests
     public void SavedFilter_BasicMode_Json_ContainsLiteralBasicFilterKey()
     {
         // Arrange
-        var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
+        var filter = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: FilterMode.Basic);
         Assert.NotNull(filter);
         Assert.NotNull(filter.BasicFilter);
 
@@ -114,7 +115,7 @@ public sealed partial class PersistencePolicyTests
             $$"""
             {
               "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
               "IsExcluded": false,
               "Mode": "Basic",
               "BasicFilter": {
@@ -142,7 +143,7 @@ public sealed partial class PersistencePolicyTests
     public void SavedFilter_ModeJson_IsStringValuedForEveryMode(FilterMode mode, string expectedFragment)
     {
         // Arrange
-        var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: mode);
+        var filter = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: mode);
         Assert.NotNull(filter);
 
         // Act
@@ -163,7 +164,7 @@ public sealed partial class PersistencePolicyTests
             $$"""
             {
               "Color": 0,
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
               "IsExcluded": false,
               "Mode": {{numericMode}}
             }
@@ -185,7 +186,7 @@ public sealed partial class PersistencePolicyTests
             $$"""
             {
               "Color": "LightRed",
-              "ComparisonText": "{{Constants.FilterIdEquals100}}",
+              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
               "IsExcluded": false,
               "Mode": "Advanced"
             }
@@ -205,7 +206,7 @@ public sealed partial class PersistencePolicyTests
     public void SavedFilter_Write_NonBasicMode_OmitsBasicFilterKey(FilterMode mode)
     {
         // Arrange
-        var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: mode);
+        var filter = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: mode);
         Assert.NotNull(filter);
         Assert.Null(filter.BasicFilter);
 
@@ -220,7 +221,7 @@ public sealed partial class PersistencePolicyTests
     public void SavedFilter_Write_OmitsJsonIgnoredProperties()
     {
         // Arrange
-        var filter = SavedFilter.TryCreate(Constants.FilterIdEquals100, mode: FilterMode.Basic);
+        var filter = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100, mode: FilterMode.Basic);
         Assert.NotNull(filter);
 
         // Act
@@ -237,7 +238,7 @@ public sealed partial class PersistencePolicyTests
     {
         // Arrange
         var filter = SavedFilter.TryCreate(
-            Constants.FilterIdEquals100,
+            FilterTestConstants.FilterIdEquals100,
             color: HighlightColor.Blue,
             mode: FilterMode.Advanced);
 

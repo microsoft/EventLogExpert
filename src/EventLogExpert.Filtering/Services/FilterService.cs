@@ -6,7 +6,7 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Runtime;
 using System.Runtime.ExceptionServices;
 
-namespace EventLogExpert.Runtime.Filters;
+namespace EventLogExpert.Filtering.Services;
 
 internal sealed class FilterService : IFilterService
 {

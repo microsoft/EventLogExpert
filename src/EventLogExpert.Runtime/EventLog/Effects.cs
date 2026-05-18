@@ -12,7 +12,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Lifecycle;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.FilterProgress;
-using EventLogExpert.Runtime.Filters;
+using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
 using Fluxor;

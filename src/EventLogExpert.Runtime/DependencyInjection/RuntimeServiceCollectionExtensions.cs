@@ -13,7 +13,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Filters;
+using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -51,7 +51,6 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<DebugLogService>();
         services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
         services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());
-        services.AddSingleton<IFilterService, FilterService>();
         services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
         services.AddSingleton<ILogWatcherService, LogWatcherService>();
         services.AddSingleton<IMenuService, MenuService>();

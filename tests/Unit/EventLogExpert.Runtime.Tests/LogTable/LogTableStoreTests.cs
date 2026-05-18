@@ -7,6 +7,8 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;
@@ -131,7 +133,7 @@ public sealed class LogTableStoreTests
     {
         // Arrange
         var logId = EventLogId.Create();
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
 
         var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
@@ -154,8 +156,8 @@ public sealed class LogTableStoreTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         // Act
@@ -204,8 +206,8 @@ public sealed class LogTableStoreTests
         // Act - Update table with events
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         state = Reducers.ReduceUpdateTable(state, new UpdateTableAction(logData.Id, events));
@@ -268,7 +270,7 @@ public sealed class LogTableStoreTests
 
         var firstBatch = new List<ResolvedEvent>
         {
-            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = Constants.EventComputerServer01 }
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = FilterTestConstants.EventComputerServer01 }
         };
 
         state = Reducers.ReduceAppendTableEvents(
@@ -277,7 +279,7 @@ public sealed class LogTableStoreTests
 
         var secondBatch = new List<ResolvedEvent>
         {
-            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer02 }
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer02 }
         };
 
         // Act — second batch with a different ComputerName must not overwrite the latched value
@@ -287,7 +289,7 @@ public sealed class LogTableStoreTests
 
         // Assert — ComputerName latches to the first non-empty observed value
         var table = state.EventTables.First(t => t.Id == logData.Id);
-        Assert.Equal(Constants.EventComputerServer01, table.ComputerName);
+        Assert.Equal(FilterTestConstants.EventComputerServer01, table.ComputerName);
     }
 
     [Fact]
@@ -301,7 +303,7 @@ public sealed class LogTableStoreTests
         var batch = new List<ResolvedEvent>
         {
             new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = string.Empty },
-            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer01 }
+            new(Constants.LogNameTestLog, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer01 }
         };
 
         // Act
@@ -311,7 +313,7 @@ public sealed class LogTableStoreTests
 
         // Assert — reducer scans past the empty leading event and latches the first non-empty value
         var table = state.EventTables.First(t => t.Id == logData.Id);
-        Assert.Equal(Constants.EventComputerServer01, table.ComputerName);
+        Assert.Equal(FilterTestConstants.EventComputerServer01, table.ComputerName);
     }
 
     [Fact]
@@ -473,8 +475,8 @@ public sealed class LogTableStoreTests
 
         var initialEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, recordId: 1),
-            EventUtils.CreateTestEvent(200, recordId: 2)
+            FilterEventBuilder.CreateTestEvent(100, recordId: 1),
+            FilterEventBuilder.CreateTestEvent(200, recordId: 2)
         };
 
         state = Reducers.ReduceAppendTableEvents(
@@ -483,8 +485,8 @@ public sealed class LogTableStoreTests
 
         var deltaEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300, recordId: 3),
-            EventUtils.CreateTestEvent(400, recordId: 4)
+            FilterEventBuilder.CreateTestEvent(300, recordId: 3),
+            FilterEventBuilder.CreateTestEvent(400, recordId: 4)
         };
 
         var action = new AppendTableEventsAction(logData.Id, deltaEvents);
@@ -511,7 +513,7 @@ public sealed class LogTableStoreTests
 
         var action = new AppendTableEventsAction(
             logData.Id,
-            new List<ResolvedEvent> { EventUtils.CreateTestEvent(100, recordId: 1) });
+            new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100, recordId: 1) });
 
         // Act
         var newState = Reducers.ReduceAppendTableEvents(state, action);
@@ -532,8 +534,8 @@ public sealed class LogTableStoreTests
 
         var initialEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, recordId: 10),
-            EventUtils.CreateTestEvent(200, recordId: 20)
+            FilterEventBuilder.CreateTestEvent(100, recordId: 10),
+            FilterEventBuilder.CreateTestEvent(200, recordId: 20)
         };
 
         state = Reducers.ReduceAppendTableEvents(
@@ -543,8 +545,8 @@ public sealed class LogTableStoreTests
         // Append events with record IDs that should sort between and after existing
         var deltaEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(300, recordId: 5),
-            EventUtils.CreateTestEvent(400, recordId: 15)
+            FilterEventBuilder.CreateTestEvent(300, recordId: 5),
+            FilterEventBuilder.CreateTestEvent(400, recordId: 15)
         };
 
         var action = new AppendTableEventsAction(logData.Id, deltaEvents);
@@ -573,7 +575,7 @@ public sealed class LogTableStoreTests
 
         var action = new AppendTableEventsAction(
             unknownLogId,
-            new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) });
+            new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) });
 
         // Act
         var newState = Reducers.ReduceAppendTableEvents(state, action);
@@ -702,7 +704,7 @@ public sealed class LogTableStoreTests
         var revealedEvents = new List<ResolvedEvent>
         {
             new(Constants.LogNameLog1, LogPathType.Channel) { Id = 10, RecordId = 1, ComputerName = string.Empty },
-            new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = Constants.EventComputerServer01 }
+            new(Constants.LogNameLog1, LogPathType.Channel) { Id = 11, RecordId = 2, ComputerName = FilterTestConstants.EventComputerServer01 }
         };
 
         var activeLogs = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
@@ -717,7 +719,7 @@ public sealed class LogTableStoreTests
 
         // Assert — UpdateDisplayedEvents also latches ComputerName, not just the append paths
         var updatedTable = newState.EventTables.First(t => t.Id == logData.Id);
-        Assert.Equal(Constants.EventComputerServer01, updatedTable.ComputerName);
+        Assert.Equal(FilterTestConstants.EventComputerServer01, updatedTable.ComputerName);
     }
 
     [Fact]
@@ -778,8 +780,8 @@ public sealed class LogTableStoreTests
 
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(200)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200)
         };
 
         var action = new UpdateTableAction(logData.Id, events);
@@ -929,7 +931,7 @@ public sealed class LogTableStoreTests
         // Arrange — empty state, no tables
         var state = new LogTableState();
         var staleLogId = EventLogId.Create();
-        var events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var action = new UpdateTableAction(staleLogId, events);
 
         // Act — stale UpdateTable for a non-existent table

@@ -15,7 +15,6 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Filters;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
@@ -48,7 +47,6 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IBannerService))]
     [InlineData(typeof(IDatabaseService))]
     [InlineData(typeof(IActiveDatabasePathsProvider))]
-    [InlineData(typeof(IFilterService))]
     [InlineData(typeof(IInlineAlertHostBroker))]
     [InlineData(typeof(ILogWatcherService))]
     [InlineData(typeof(IMenuService))]

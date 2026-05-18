@@ -8,6 +8,8 @@ using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.FilterPane;
@@ -61,7 +63,7 @@ public sealed class FilterPaneActionTests
     public void AddFilterAction_WithFilter_ShouldCreateAction()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         // Act
         var action = new AddFilterAction(filter);
@@ -74,7 +76,7 @@ public sealed class FilterPaneActionTests
     public void ApplyFilterGroupAction_ShouldCreateAction()
     {
         // Arrange
-        var filterGroup = new SavedFilterGroup { Name = Constants.FilterGroupName };
+        var filterGroup = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
 
         // Act
         var action = new ApplyFilterGroupAction(filterGroup);
@@ -110,17 +112,17 @@ public sealed class FilterPaneActionTests
     public void SaveFilterGroupAction_ShouldCreateAction()
     {
         // Arrange + Act
-        var action = new SaveFilterGroupAction(Constants.FilterGroupName);
+        var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
 
         // Assert
-        Assert.Equal(Constants.FilterGroupName, action.Name);
+        Assert.Equal(FilterTestConstants.FilterGroupName, action.Name);
     }
 
     [Fact]
     public void SetFilterAction_ShouldCreateAction()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         // Act
         var action = new SetFilterAction(filter);
@@ -209,7 +211,7 @@ public sealed class FilterPaneReducerTests
     {
         // Arrange
         var state = new FilterPaneState();
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
         var action = new AddFilterAction(filter);
 
         // Act
@@ -224,7 +226,7 @@ public sealed class FilterPaneReducerTests
     {
         // Arrange
         var state = new FilterPaneState();
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
         var action = new AddFilterAction(filter);
 
         // Act
@@ -255,7 +257,7 @@ public sealed class FilterPaneReducerTests
         {
             Filters =
             [
-                FilterUtils.CreateTestFilter(basicFilter: basicFilter)
+                FilterFixtures.CreateTestFilter(basicFilter: basicFilter)
             ]
         };
 
@@ -280,7 +282,7 @@ public sealed class FilterPaneReducerTests
         {
             Filters =
             [
-                FilterUtils.CreateTestFilter(isExcluded: true)
+                FilterFixtures.CreateTestFilter(isExcluded: true)
             ]
         };
 
@@ -299,13 +301,13 @@ public sealed class FilterPaneReducerTests
     public void ReduceApplyFilterGroup_WithDuplicateFilter_ShouldSkipDuplicate()
     {
         // Arrange
-        var existingFilter = FilterUtils.CreateTestFilter();
+        var existingFilter = FilterFixtures.CreateTestFilter();
 
         var state = new FilterPaneState { Filters = [existingFilter] };
 
         var filterGroup = new SavedFilterGroup
         {
-            Filters = [FilterUtils.CreateTestFilter()]
+            Filters = [FilterFixtures.CreateTestFilter()]
         };
 
         var action = new ApplyFilterGroupAction(filterGroup);
@@ -342,7 +344,7 @@ public sealed class FilterPaneReducerTests
         {
             Filters =
             [
-                FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Red)
+                FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red)
             ]
         };
 
@@ -353,7 +355,7 @@ public sealed class FilterPaneReducerTests
 
         // Assert
         Assert.Single(result.Filters);
-        Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
         Assert.Equal(HighlightColor.Red, result.Filters[0].Color);
         Assert.True(result.Filters[0].IsEnabled);
     }
@@ -362,7 +364,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceApplyFilterGroup_WithSameComparisonButDifferentExclusion_ShouldKeepBoth()
     {
         // Arrange
-        var existingInclude = FilterUtils.CreateTestFilter();
+        var existingInclude = FilterFixtures.CreateTestFilter();
 
         var state = new FilterPaneState { Filters = [existingInclude] };
 
@@ -370,7 +372,7 @@ public sealed class FilterPaneReducerTests
         {
             Filters =
             [
-                FilterUtils.CreateTestFilter(isExcluded: true)
+                FilterFixtures.CreateTestFilter(isExcluded: true)
             ]
         };
 
@@ -391,7 +393,7 @@ public sealed class FilterPaneReducerTests
         // Arrange
         var state = new FilterPaneState
         {
-            Filters = [FilterUtils.CreateTestFilter(), FilterUtils.CreateTestFilter()],
+            Filters = [FilterFixtures.CreateTestFilter(), FilterFixtures.CreateTestFilter()],
             IsEnabled = false
         };
 
@@ -407,7 +409,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceRemoveFilter_WithInvalidFilter_ShouldReturnOriginalState()
     {
         // Arrange
-        var state = new FilterPaneState { Filters = [FilterUtils.CreateTestFilter()] };
+        var state = new FilterPaneState { Filters = [FilterFixtures.CreateTestFilter()] };
         var action = new RemoveFilterAction(FilterId.Create());
 
         // Act
@@ -421,7 +423,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceRemoveFilter_WithValidFilter_ShouldRemoveFilter()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
         var state = new FilterPaneState { Filters = [filter] };
         var action = new RemoveFilterAction(filter.Id);
 
@@ -436,11 +438,11 @@ public sealed class FilterPaneReducerTests
     public void ReduceSetFilter_ShouldReplaceFilter()
     {
         // Arrange
-        var originalFilter = FilterUtils.CreateTestFilter();
+        var originalFilter = FilterFixtures.CreateTestFilter();
 
         var state = new FilterPaneState { Filters = [originalFilter] };
 
-        var updatedFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200, id: originalFilter.Id);
+        var updatedFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200, id: originalFilter.Id);
 
         var action = new SetFilterAction(updatedFilter);
 
@@ -449,17 +451,17 @@ public sealed class FilterPaneReducerTests
 
         // Assert
         Assert.Single(result.Filters);
-        Assert.Equal(Constants.FilterIdEquals200, result.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals200, result.Filters[0].ComparisonText);
     }
 
     [Fact]
     public void ReduceSetFilter_WhenIdFound_ShouldNotDuplicate()
     {
         // Arrange
-        var existing = FilterUtils.CreateTestFilter();
+        var existing = FilterFixtures.CreateTestFilter();
         var state = new FilterPaneState { Filters = [existing] };
 
-        var replacement = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200, id: existing.Id);
+        var replacement = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200, id: existing.Id);
 
         var action = new SetFilterAction(replacement);
 
@@ -469,20 +471,20 @@ public sealed class FilterPaneReducerTests
         // Assert
         Assert.Single(result.Filters);
         Assert.Equal(existing.Id, result.Filters[0].Id);
-        Assert.Equal(Constants.FilterIdEquals200, result.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals200, result.Filters[0].ComparisonText);
     }
 
     [Fact]
     public void ReduceSetFilter_WhenIdFound_ShouldReplaceInPlaceWithoutReordering()
     {
         // Arrange
-        var first = FilterUtils.CreateTestFilter();
-        var middle = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
-        var last = FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError);
+        var first = FilterFixtures.CreateTestFilter();
+        var middle = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
+        var last = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError);
 
         var state = new FilterPaneState { Filters = [first, middle, last] };
 
-        var replacement = FilterUtils.CreateTestFilter(Constants.FilterIdGreaterThan100, id: middle.Id);
+        var replacement = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdGreaterThan100, id: middle.Id);
 
         var action = new SetFilterAction(replacement);
 
@@ -491,19 +493,19 @@ public sealed class FilterPaneReducerTests
 
         // Assert
         Assert.Equal(3, result.Filters.Count);
-        Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
-        Assert.Equal(Constants.FilterIdGreaterThan100, result.Filters[1].ComparisonText);
-        Assert.Equal(Constants.FilterLevelEqualsError, result.Filters[2].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdGreaterThan100, result.Filters[1].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterLevelEqualsError, result.Filters[2].ComparisonText);
     }
 
     [Fact]
     public void ReduceSetFilter_WhenIdNotFound_ShouldAppend()
     {
         // Arrange
-        var existing = FilterUtils.CreateTestFilter();
+        var existing = FilterFixtures.CreateTestFilter();
         var state = new FilterPaneState { Filters = [existing] };
 
-        var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
+        var newFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
         var action = new SetFilterAction(newFilter);
 
         // Act
@@ -511,8 +513,8 @@ public sealed class FilterPaneReducerTests
 
         // Assert
         Assert.Equal(2, result.Filters.Count);
-        Assert.Equal(Constants.FilterIdEquals100, result.Filters[0].ComparisonText);
-        Assert.Equal(Constants.FilterIdEquals200, result.Filters[1].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals100, result.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals200, result.Filters[1].ComparisonText);
     }
 
     [Fact]
@@ -589,7 +591,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceToggleFilterEnabled_ShouldToggleIsEnabled()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter(isEnabled: false);
+        var filter = FilterFixtures.CreateTestFilter(isEnabled: false);
         var state = new FilterPaneState { Filters = [filter] };
         var action = new ToggleFilterEnabledAction(filter.Id);
 
@@ -604,7 +606,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceToggleFilterEnabled_WithInvalidId_ShouldNotModifyFilters()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var filter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var state = new FilterPaneState { Filters = [filter] };
         var action = new ToggleFilterEnabledAction(FilterId.Create());
 
@@ -619,7 +621,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceToggleFilterExcluded_ShouldToggleIsExcluded()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter(isExcluded: false);
+        var filter = FilterFixtures.CreateTestFilter(isExcluded: false);
         var state = new FilterPaneState { Filters = [filter] };
         var action = new ToggleFilterExcludedAction(filter.Id);
 
@@ -634,7 +636,7 @@ public sealed class FilterPaneReducerTests
     public void ReduceToggleFilterExcluded_WithInvalidId_ShouldNotModifyFilters()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter(isExcluded: false);
+        var filter = FilterFixtures.CreateTestFilter(isExcluded: false);
         var state = new FilterPaneState { Filters = [filter] };
         var action = new ToggleFilterExcludedAction(FilterId.Create());
 
@@ -669,8 +671,8 @@ public sealed class FilterPaneIntegrationTests
         {
             Filters =
             [
-                FilterUtils.CreateTestFilter(),
-                FilterUtils.CreateTestFilter(Constants.FilterIdEquals200)
+                FilterFixtures.CreateTestFilter(),
+                FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200)
             ],
             FilteredDateRange = new DateFilter { After = DateTime.UtcNow },
             IsEnabled = false
@@ -690,7 +692,7 @@ public sealed class FilterPaneIntegrationTests
     {
         // Arrange
         var state = new FilterPaneState();
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
 
         // Act + Assert (one assertion per state transition)
         state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter));
@@ -750,12 +752,12 @@ public sealed class FilterPaneIntegrationTests
         var state = new FilterPaneState();
         var filterGroup = new SavedFilterGroup
         {
-            Name = Constants.FilterGroupName,
+            Name = FilterTestConstants.FilterGroupName,
             Filters =
             [
-                FilterUtils.CreateTestFilter(),
-                FilterUtils.CreateTestFilter(Constants.FilterIdEquals200),
-                FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError)
+                FilterFixtures.CreateTestFilter(),
+                FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200),
+                FilterFixtures.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError)
             ]
         };
 
@@ -773,11 +775,11 @@ public sealed class FilterPaneIntegrationTests
     public void ImmutableCollections_ShouldPreserveImmutability()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
         var originalFilters = ImmutableList<SavedFilter>.Empty.Add(filter);
         var state = new FilterPaneState { Filters = originalFilters };
 
-        var newFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
+        var newFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
 
         // Act
         var newState = Reducers.ReduceAddFilter(state, new AddFilterAction(newFilter));
@@ -793,9 +795,9 @@ public sealed class FilterPaneIntegrationTests
     {
         // Arrange
         var state = new FilterPaneState();
-        var filter1 = FilterUtils.CreateTestFilter();
-        var filter2 = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
-        var filter3 = FilterUtils.CreateTestFilter(Constants.FilterLevelEqualsError);
+        var filter1 = FilterFixtures.CreateTestFilter();
+        var filter2 = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
+        var filter3 = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError);
 
         // Act
         state = Reducers.ReduceAddFilter(state, new AddFilterAction(filter1));
@@ -816,11 +818,11 @@ public sealed class FilterPaneIntegrationTests
     public void SetFilter_ShouldReplaceExistingFilterWithSameId()
     {
         // Arrange
-        var filter = FilterUtils.CreateTestFilter();
+        var filter = FilterFixtures.CreateTestFilter();
         var state = new FilterPaneState { Filters = [filter] };
 
-        var updatedFilter = FilterUtils.CreateTestFilter(
-            Constants.FilterIdEquals200,
+        var updatedFilter = FilterFixtures.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals200,
             isEnabled: false,
             id: filter.Id);
 
@@ -829,7 +831,7 @@ public sealed class FilterPaneIntegrationTests
 
         // Assert
         Assert.Single(state.Filters);
-        Assert.Equal(Constants.FilterIdEquals200, state.Filters[0].ComparisonText);
+        Assert.Equal(FilterTestConstants.FilterIdEquals200, state.Filters[0].ComparisonText);
         Assert.False(state.Filters[0].IsEnabled);
     }
 }

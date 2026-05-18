@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 
@@ -40,11 +41,11 @@ public sealed class EventLogDataTests
         var original = new EventLogData(
             Constants.LogNameTestLog,
             LogPathType.Channel,
-            [EventUtils.CreateTestEvent()]);
+            [FilterEventBuilder.CreateTestEvent()]);
 
         // Act
         var step1 = original with { Name = Constants.LogNameLog2 };
-        var step2 = step1 with { Events = new List<ResolvedEvent> { EventUtils.CreateTestEvent(2) }.AsReadOnly() };
+        var step2 = step1 with { Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(2) }.AsReadOnly() };
         var step3 = step2 with { Type = LogPathType.File };
 
         // Assert
@@ -60,9 +61,9 @@ public sealed class EventLogDataTests
         var original = new EventLogData(
             Constants.LogNameTestLog,
             LogPathType.Channel,
-            [EventUtils.CreateTestEvent()]);
+            [FilterEventBuilder.CreateTestEvent()]);
 
-        var newEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(2) };
+        var newEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(2) };
 
         // Act
         var mutated = original with { Events = newEvents.AsReadOnly() };

@@ -12,11 +12,13 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterProgress;
-using EventLogExpert.Runtime.Filters;
+using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -34,7 +36,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var existingBuffer = Enumerable.Range(0, EventLogState.MaxNewEvents - 1)
-            .Select(i => EventUtils.CreateTestEvent(i, logName: Constants.LogNameTestLog))
+            .Select(i => FilterEventBuilder.CreateTestEvent(i, logName: Constants.LogNameTestLog))
             .ToList();
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
@@ -42,7 +44,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher) = CreateEffects(false, activeLogs, existingBuffer);
 
-        var newEvent = EventUtils.CreateTestEvent(1000, logName: Constants.LogNameTestLog);
+        var newEvent = FilterEventBuilder.CreateTestEvent(1000, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
 
         // Act
@@ -64,7 +66,7 @@ public sealed class EffectsTests
             false,
             activeLogs);
 
-        var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
 
         // Act
@@ -89,7 +91,7 @@ public sealed class EffectsTests
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(new List<ResolvedEvent>());
 
-        var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
 
         // Act
@@ -112,7 +114,7 @@ public sealed class EffectsTests
             true,
             activeLogs);
 
-        var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
 
         // Act
@@ -130,7 +132,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var (effects, mockDispatcher) = CreateEffects();
-        var newEvent = EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog);
+        var newEvent = FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog);
         var action = new AddEventAction(newEvent);
 
         // Act
@@ -346,8 +348,8 @@ public sealed class EffectsTests
     {
         // Arrange
         var events = ImmutableArray.Create(
-            EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
-            EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
+            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
+            FilterEventBuilder.CreateTestEvent(200, level: FilterTestConstants.EventLevelInformation)
         );
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
@@ -369,8 +371,8 @@ public sealed class EffectsTests
         // Arrange
         var bufferedEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog),
-            EventUtils.CreateTestEvent(200, logName: Constants.LogNameTestLog)
+            FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog),
+            FilterEventBuilder.CreateTestEvent(200, logName: Constants.LogNameTestLog)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
@@ -401,7 +403,7 @@ public sealed class EffectsTests
         // Arrange
         var bufferedEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
+            FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
@@ -427,12 +429,12 @@ public sealed class EffectsTests
     public async Task HandleLoadNewEvents_WhenBufferSpansMultipleLogs_ShouldGroupIntoSingleBatch()
     {
         // Arrange
-        // EventUtils.CreateTestEvent always sets OwningLog="TestLog"; override via `with` to span 2 logs.
+        // FilterEventBuilder.CreateTestEvent always sets OwningLog="TestLog"; override via `with` to span 2 logs.
         var bufferedEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100) with { OwningLog = Constants.LogNameApplication },
-            EventUtils.CreateTestEvent(200) with { OwningLog = Constants.LogNameTestLog },
-            EventUtils.CreateTestEvent(300) with { OwningLog = Constants.LogNameApplication }
+            FilterEventBuilder.CreateTestEvent(100) with { OwningLog = Constants.LogNameApplication },
+            FilterEventBuilder.CreateTestEvent(200) with { OwningLog = Constants.LogNameTestLog },
+            FilterEventBuilder.CreateTestEvent(300) with { OwningLog = Constants.LogNameApplication }
         };
 
         var applicationLog = new EventLogData(Constants.LogNameApplication, LogPathType.Channel, []);
@@ -660,7 +662,7 @@ public sealed class EffectsTests
         // Arrange
         var bufferedEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
+            FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
 
         var (effects, mockDispatcher) = CreateEffects(newEventBuffer: bufferedEvents);
@@ -679,7 +681,7 @@ public sealed class EffectsTests
         // Arrange
         var bufferedEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, logName: Constants.LogNameTestLog)
+            FilterEventBuilder.CreateTestEvent(100, logName: Constants.LogNameTestLog)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
@@ -708,7 +710,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var filter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var filter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [filter]));
 
         await effects.HandleApplyFilter(action, mockDispatcher);
@@ -734,7 +736,7 @@ public sealed class EffectsTests
             .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>()))
             .Do(_ => throw new InvalidOperationException("boom"));
 
-        var filter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var filter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [filter]));
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -751,7 +753,7 @@ public sealed class EffectsTests
         // Arrange — log closes (ActiveLogs.Remove) while the filter task is running. The
         // post-filter dispatch must omit the closed log's slice. (The reducer also skips
         // unknown log ids, but checking at the effect keeps the dispatch minimal.)
-        var snapshotEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
 
         var snapshotState = new EventLogState
@@ -783,7 +785,7 @@ public sealed class EffectsTests
                 return filterResult;
             });
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
 
         // Act
@@ -800,7 +802,7 @@ public sealed class EffectsTests
         // Arrange — single open log; live event arrives during the first filter pass (Events ref
         // changes). The new filter must be re-applied to the post-mutation rows in a single retry
         // pass so the user sees the filter applied to the updated row set, not stale rows.
-        var snapshotEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
 
         var snapshotState = new EventLogState
@@ -813,8 +815,8 @@ public sealed class EffectsTests
 
         var liveTailEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(101)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(101)
         };
 
         var postLiveTailState = snapshotState with
@@ -847,7 +849,7 @@ public sealed class EffectsTests
                 },
                 _ => pass2Result);
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
 
         // Act
@@ -886,11 +888,11 @@ public sealed class EffectsTests
             AppliedFilter = new Filter(null, [])
         };
 
-        var pass1MutationEvents = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) };
+        var pass1MutationEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
         var pass2MutationEvents = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100),
-            EventUtils.CreateTestEvent(101)
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(101)
         };
 
         var afterPass1State = snapshotState with
@@ -934,7 +936,7 @@ public sealed class EffectsTests
                     return pass2Result;
                 });
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
 
         // Act
@@ -960,19 +962,19 @@ public sealed class EffectsTests
 
         var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(999) }
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
         };
 
         var freshResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(100) }
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) }
         };
 
         var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
-        var freshFilterModel = FilterUtils.CreateTestFilter(isEnabled: true);
+        var staleFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
+        var freshFilterModel = FilterFixtures.CreateTestFilter(isEnabled: true);
 
         var staleFilter = new Filter(null, [staleFilterModel]);
         var freshFilter = new Filter(null, [freshFilterModel]);
@@ -983,7 +985,7 @@ public sealed class EffectsTests
             {
                 var filter = callInfo.Arg<Filter>();
 
-                if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == Constants.FilterIdEquals999)
+                if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == FilterTestConstants.FilterIdEquals999)
                 {
                     staleStarted.TrySetResult(true);
                     staleGate.Task.GetAwaiter().GetResult();
@@ -1040,7 +1042,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var action = new ApplyFilterAction(new Filter(null, [xmlFilter]));
 
         await effects.HandleApplyFilter(action, mockDispatcher);
@@ -1059,8 +1061,8 @@ public sealed class EffectsTests
         // Arrange
         var events = new List<ResolvedEvent>
         {
-            EventUtils.CreateTestEvent(100, level: Constants.EventLevelError),
-            EventUtils.CreateTestEvent(200, level: Constants.EventLevelInformation)
+            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
+            FilterEventBuilder.CreateTestEvent(200, level: FilterTestConstants.EventLevelInformation)
         };
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
@@ -1092,7 +1094,7 @@ public sealed class EffectsTests
 
         var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
 
-        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var filter = new Filter(null, [nonXmlFilter]);
         var action = new ApplyFilterAction(filter);
 
@@ -1134,7 +1136,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
 
         // Act — start HandleApplyFilter; it must remain pending until watcherCompletion fires.
@@ -1183,7 +1185,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
 
         // Act — start HandleApplyFilter; it parks waiting for the close-completion TCS.
@@ -1235,7 +1237,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter1 = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter1 = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter1 = new Filter(null, [xmlFilter1]);
 
         // Act — start the first ApplyFilter; it parks waiting for the close-completion TCS.
@@ -1247,7 +1249,7 @@ public sealed class EffectsTests
         // ApplyFilterAndPublishAsync path (no reload needed) — but it still bumps
         // _filterGeneration at the top of HandleApplyFilter. It must NOT bump
         // _closeAllGeneration, so the parked first reload should still reopen its log.
-        var nonXmlFilter = FilterUtils.CreateTestFilter(isEnabled: true);
+        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
         var filter2 = new Filter(null, [nonXmlFilter]);
         await effects.HandleApplyFilter(new ApplyFilterAction(filter2), mockDispatcher);
 
@@ -1311,7 +1313,7 @@ public sealed class EffectsTests
                 }
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
 
         // Act
@@ -1338,7 +1340,7 @@ public sealed class EffectsTests
         // Without this cleanup, a later manual reopen of the same log name would consume
         // stale selection state from the canceled reload (HandleLoadEvents reads
         // _pendingSelectionRestore unconditionally on each load).
-        var selectedEvent = EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
 
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
@@ -1388,7 +1390,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
 
         // Act — start ApplyFilter; it writes the pending selection restore entry (selected
@@ -1407,7 +1409,7 @@ public sealed class EffectsTests
         // there, no SetSelectedEvents dispatch occurs.
         var reopenLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var reloadedEvents = ImmutableArray.Create(
-            EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog));
+            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog));
         await effects.HandleLoadEvents(new LoadEventsAction(reopenLogData, reloadedEvents), mockDispatcher);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetSelectedEventsAction>());
@@ -1424,7 +1426,7 @@ public sealed class EffectsTests
         var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
 
-        var selectedEvent = EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
 
         var mockEventLogState = Substitute.For<IState<EventLogState>>();
 
@@ -1475,7 +1477,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
 
         // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
@@ -1484,8 +1486,8 @@ public sealed class EffectsTests
         // Act 2: Simulate the subsequent LoadEvents that the new OpenLog produces. The
         // reloaded events include the previously-selected RecordId=42 plus an unrelated one.
         var reloadedEvents = ImmutableArray.Create(
-            EventUtils.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog),
-            EventUtils.CreateTestEvent(200, recordId: 99, logName: Constants.LogNameTestLog));
+            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog),
+            FilterEventBuilder.CreateTestEvent(200, recordId: 99, logName: Constants.LogNameTestLog));
 
         await effects.HandleLoadEvents(new LoadEventsAction(logData, reloadedEvents), mockDispatcher);
 
@@ -1518,7 +1520,7 @@ public sealed class EffectsTests
                 closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
             });
 
-        var xmlFilter = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var filter = new Filter(null, [xmlFilter]);
         var action = new ApplyFilterAction(filter);
 
@@ -1566,16 +1568,16 @@ public sealed class EffectsTests
 
         var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
         {
-            [logData.Id] = new List<ResolvedEvent> { EventUtils.CreateTestEvent(999) }
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
         };
 
         var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var staleFilterModel = FilterUtils.CreateTestFilter(Constants.FilterIdEquals999, isEnabled: true);
+        var staleFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
         var staleFilter = new Filter(null, [staleFilterModel]);
 
-        var xmlFilterModel = FilterUtils.CreateTestFilter(Constants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
         var xmlFilter = new Filter(null, [xmlFilterModel]);
 
         mockFilterService
@@ -1672,7 +1674,7 @@ public sealed class EffectsTests
             var mockEventResolver = Substitute.For<IEventResolver>();
 
             mockEventResolver.ResolveEvent(Arg.Any<EventRecord>())
-                .Returns(_ => EventUtils.CreateTestEvent(100));
+                .Returns(_ => FilterEventBuilder.CreateTestEvent(100));
 
             mockServiceProvider.GetService(typeof(IEventResolver)).Returns(mockEventResolver);
         }
@@ -1726,7 +1728,7 @@ public sealed class EffectsTests
         var mockEventResolver = Substitute.For<IEventResolver>();
 
         mockEventResolver.ResolveEvent(Arg.Any<EventRecord>())
-            .Returns(_ => EventUtils.CreateTestEvent(100));
+            .Returns(_ => FilterEventBuilder.CreateTestEvent(100));
 
         mockServiceProvider.GetService(typeof(IEventResolver)).Returns(mockEventResolver);
 

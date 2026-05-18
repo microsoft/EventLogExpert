@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Runtime.Filters;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils;
+
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Runtime.Tests.Filters;
+namespace EventLogExpert.Filtering.Tests.Runtime;
 
 public sealed class FilterExtensionsTests
 {
@@ -15,8 +15,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenArgsSwapped_ShouldReportSameChange()
     {
         // Arrange
-        var first = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
-        var second = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
+        var first = new Filter(null, ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100)));
+        var second = new Filter(null, ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals200)));
 
         // Act
         var forward = first.HasFilteringChangedFrom(second);
@@ -58,8 +58,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenComparisonTextChanges_ShouldReportChange()
     {
         // Arrange
-        var first = FilterUtils.CreateTestFilter();
-        var second = FilterUtils.CreateTestFilter(Constants.FilterIdEquals200);
+        var first = FilterFixtures.CreateTestFilter();
+        var second = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
 
         var original = new Filter(null, ImmutableList.Create(first));
         var updated = new Filter(null, ImmutableList.Create(second));
@@ -123,11 +123,11 @@ public sealed class FilterExtensionsTests
         // Arrange
         var original = new Filter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+            ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100)));
 
         var updated = new Filter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+            ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100)));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -140,8 +140,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenFilterOrderSwaps_ShouldReportChange()
     {
         // Arrange
-        var first = CreateFilter(Constants.FilterIdEquals100);
-        var second = CreateFilter(Constants.FilterIdEquals200);
+        var first = CreateFilter(FilterTestConstants.FilterIdEquals100);
+        var second = CreateFilter(FilterTestConstants.FilterIdEquals200);
 
         var original = new Filter(null, ImmutableList.Create(first, second));
         var updated = new Filter(null, ImmutableList.Create(second, first));
@@ -158,7 +158,7 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var original = new Filter(null, []);
-        var filter = CreateFilter(Constants.FilterIdEquals100);
+        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100);
         var updated = new Filter(null, [filter]);
 
         // Act
@@ -172,7 +172,7 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenFiltersRemoved_ShouldReportChange()
     {
         // Arrange
-        var filter = CreateFilter(Constants.FilterIdEquals100);
+        var filter = CreateFilter(FilterTestConstants.FilterIdEquals100);
         var original = new Filter(null, [filter]);
         var updated = new Filter(null, []);
 
@@ -189,11 +189,11 @@ public sealed class FilterExtensionsTests
         // Arrange
         var original = new Filter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+            ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100)));
 
         var updated = new Filter(
             null,
-            ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100, true)));
+            ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100, true)));
 
         // Act
         var result = updated.HasFilteringChangedFrom(original);
@@ -206,8 +206,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenOnlyColorDiffers_ShouldReportNoChange()
     {
         // Arrange
-        var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Red);
-        var blueFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Blue);
+        var redFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red);
+        var blueFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
 
         var original = new Filter(null, ImmutableList.Create(redFilter));
         var updated = new Filter(null, ImmutableList.Create(blueFilter));
@@ -255,7 +255,7 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenSameFilters_ShouldReportNoChange()
     {
         // Arrange
-        var filters = ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100));
+        var filters = ImmutableList.Create(CreateFilter(FilterTestConstants.FilterIdEquals100));
         var original = new Filter(null, filters);
         var updated = new Filter(null, filters);
 
@@ -271,7 +271,7 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = true };
-        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var savedFilter = CreateFilter(FilterTestConstants.FilterIdEquals100);
         var filter = new Filter(dateFilter, [savedFilter]);
 
         // Act
@@ -300,7 +300,7 @@ public sealed class FilterExtensionsTests
     {
         // Arrange
         var dateFilter = new DateFilter { IsEnabled = false };
-        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var savedFilter = CreateFilter(FilterTestConstants.FilterIdEquals100);
         var filter = new Filter(dateFilter, [savedFilter]);
 
         // Act
@@ -328,7 +328,7 @@ public sealed class FilterExtensionsTests
     public void IsFilteringEnabled_WhenNoDateFilterAndFiltersExist_ShouldBeEnabled()
     {
         // Arrange
-        var savedFilter = CreateFilter(Constants.FilterIdEquals100);
+        var savedFilter = CreateFilter(FilterTestConstants.FilterIdEquals100);
         var filter = new Filter(null, [savedFilter]);
 
         // Act
@@ -352,5 +352,5 @@ public sealed class FilterExtensionsTests
     }
 
     private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
-        FilterUtils.CreateTestFilter(expression, isExcluded: isExcluded);
+        FilterFixtures.CreateTestFilter(expression, isExcluded: isExcluded);
 }

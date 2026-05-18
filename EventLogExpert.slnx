@@ -31,5 +31,6 @@
   </Folder>
   <Folder Name="/tests/Shared/">
     <Project Path="tests/Shared/EventLogExpert.Eventing.TestUtils/EventLogExpert.Eventing.TestUtils.csproj" />
+    <Project Path="tests/Shared/EventLogExpert.Filtering.TestUtils/EventLogExpert.Filtering.TestUtils.csproj" />
   </Folder>
 </Solution>

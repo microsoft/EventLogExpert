@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests;
@@ -229,7 +230,7 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenNotWrapsBareComparison_RefusesAsAdvancedOnly()
     {
         // Formatter emits NotEqual directly as `!=`, not `!(... == ...)`. Reject the negated shape.
-        var ok = BasicFilterDecomposer.TryDecompose(Constants.FilterNot, out var decomposed);
+        var ok = BasicFilterDecomposer.TryDecompose(FilterTestConstants.FilterNot, out var decomposed);
 
         Assert.False(ok);
         Assert.Null(decomposed);
@@ -272,7 +273,7 @@ public sealed class BasicFilterDecomposerTests
     public void TryDecompose_WhenParenthesizedOrGroupAtFront_RefusesAsAdvancedOnly()
     {
         // (A || B) && C parses as And(Or(A,B), C) — Or appears as an And-leaf. Decomposer rejects.
-        var ok = BasicFilterDecomposer.TryDecompose(Constants.FilterParenthesizedMix, out var decomposed);
+        var ok = BasicFilterDecomposer.TryDecompose(FilterTestConstants.FilterParenthesizedMix, out var decomposed);
 
         Assert.False(ok);
         Assert.Null(decomposed);
@@ -291,10 +292,10 @@ public sealed class BasicFilterDecomposerTests
     }
 
     [Theory]
-    [InlineData(Constants.FilterIdGreaterThan100)]
-    [InlineData(Constants.FilterIdLessThan100)]
-    [InlineData(Constants.FilterIdGreaterThanOrEqual100)]
-    [InlineData(Constants.FilterIdLessThanOrEqual100)]
+    [InlineData(FilterTestConstants.FilterIdGreaterThan100)]
+    [InlineData(FilterTestConstants.FilterIdLessThan100)]
+    [InlineData(FilterTestConstants.FilterIdGreaterThanOrEqual100)]
+    [InlineData(FilterTestConstants.FilterIdLessThanOrEqual100)]
     public void TryDecompose_WhenRelationalOperator_RefusesAsAdvancedOnly(string filter)
     {
         var ok = BasicFilterDecomposer.TryDecompose(filter, out var decomposed);

@@ -4,6 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 
@@ -17,7 +18,7 @@ public sealed class EffectsTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName }
+            new() { Name = FilterTestConstants.FilterGroupName }
         };
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(groups);
@@ -27,7 +28,7 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(x =>
-            x.Count() == 1 && x.Any(y => y.Name == Constants.FilterGroupName));
+            x.Count() == 1 && x.Any(y => y.Name == FilterTestConstants.FilterGroupName));
     }
 
     [Fact]
@@ -52,8 +53,8 @@ public sealed class EffectsTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(groups);
@@ -72,8 +73,8 @@ public sealed class EffectsTests
         // Arrange
         var savedGroups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested }
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested }
         };
 
         var mockPreferencesProvider = Substitute.For<IFilterGroupPreferencesProvider>();
@@ -91,8 +92,8 @@ public sealed class EffectsTests
         // Assert
         mockDispatcher.Received(1).Dispatch(Arg.Is<LoadGroupsSuccessAction>(x =>
             x.Groups.Count() == 2 &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupName) &&
-            x.Groups.Any(g => g.Name == Constants.FilterGroupNameNested)));
+            x.Groups.Any(g => g.Name == FilterTestConstants.FilterGroupName) &&
+            x.Groups.Any(g => g.Name == FilterTestConstants.FilterGroupNameNested)));
     }
 
     [Fact]
@@ -122,7 +123,7 @@ public sealed class EffectsTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName }
+            new() { Name = FilterTestConstants.FilterGroupName }
         };
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(groups);
@@ -141,7 +142,7 @@ public sealed class EffectsTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName }
+            new() { Name = FilterTestConstants.FilterGroupName }
         };
 
         var (effects, mockDispatcher, mockPreferencesProvider) = CreateEffects(groups);
@@ -151,7 +152,7 @@ public sealed class EffectsTests
 
         // Assert
         _ = mockPreferencesProvider.Received(1).SavedFiltersPreference = Arg.Is<IEnumerable<SavedFilterGroup>>(g =>
-            g.Any(x => x.Name == Constants.FilterGroupName));
+            g.Any(x => x.Name == FilterTestConstants.FilterGroupName));
     }
 
     [Fact]
@@ -160,8 +161,8 @@ public sealed class EffectsTests
         // Arrange
         var groups = new List<SavedFilterGroup>
         {
-            new() { Name = Constants.FilterGroupName },
-            new() { Name = Constants.FilterGroupNameNested },
+            new() { Name = FilterTestConstants.FilterGroupName },
+            new() { Name = FilterTestConstants.FilterGroupNameNested },
             new() { Name = "Third Group" }
         };
 

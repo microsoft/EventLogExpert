@@ -40,8 +40,8 @@ public sealed class EmitterRequiresXmlTests
             error);
 
         Assert.True(compiled.RequiresXml);
-        Assert.True(compiled.Predicate(EventUtils.FullyPopulated));
-        Assert.False(compiled.Predicate(EventUtils.NoNullables));
+        Assert.True(compiled.Predicate(FilterTestFixtures.FullyPopulated));
+        Assert.False(compiled.Predicate(FilterTestFixtures.NoNullables));
     }
 
     [Theory]

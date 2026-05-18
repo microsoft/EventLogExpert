@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
 using System.Security.Principal;
-using static EventLogExpert.Filtering.Tests.TestUtils.Constants.Constants;
+using static EventLogExpert.Filtering.TestUtils.Constants.FilterTestConstants;
 
 namespace EventLogExpert.Filtering.Tests.TestUtils;
 
@@ -13,7 +13,7 @@ namespace EventLogExpert.Filtering.Tests.TestUtils;
 ///     covers a distinct combination of populated / null nullable fields and Keywords cardinality so the parity matrix
 ///     observes both the "match" and the "no match" branches of every emitter shape.
 /// </summary>
-internal static class EventUtils
+internal static class FilterTestFixtures
 {
     public static readonly Guid FixedActivityId = new("11111111-2222-3333-4444-555555555555");
     public static readonly DateTime FixedTimestamp = new(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc);
