@@ -15,7 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
 using NSubstitute;
 
-namespace EventLogExpert.UI.Tests;
+namespace EventLogExpert.UI.Tests.Banner;
 
 public sealed class BannerHostTests : BunitContext
 {
