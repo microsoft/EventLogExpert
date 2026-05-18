@@ -12,7 +12,23 @@ namespace EventLogExpert.Runtime.Tests.Filters;
 public sealed class FilterExtensionsTests
 {
     [Fact]
-    public void HasFilteringChanged_WhenBothEmpty_ShouldReportNoChange()
+    public void HasFilteringChangedFrom_WhenArgsSwapped_ShouldReportSameChange()
+    {
+        // Arrange
+        var first = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100)));
+        var second = new Filter(null, ImmutableList.Create(CreateFilter(Constants.FilterIdEquals200)));
+
+        // Act
+        var forward = first.HasFilteringChangedFrom(second);
+        var reverse = second.HasFilteringChangedFrom(first);
+
+        // Assert
+        Assert.True(forward);
+        Assert.Equal(forward, reverse);
+    }
+
+    [Fact]
+    public void HasFilteringChangedFrom_WhenBothEmpty_ShouldReportNoChange()
     {
         // Arrange
         var original = new Filter(null, []);
@@ -26,7 +42,20 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenComparisonTextChanges_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenBothSnapshotsAreDefault_ShouldReportNoChange()
+    {
+        // Arrange
+        var defaultFilter = default(Filter);
+
+        // Act
+        var result = defaultFilter.HasFilteringChangedFrom(default);
+
+        // Assert
+        Assert.False(result);
+    }
+
+    [Fact]
+    public void HasFilteringChangedFrom_WhenComparisonTextChanges_ShouldReportChange()
     {
         // Arrange
         var first = FilterUtils.CreateTestFilter();
@@ -43,7 +72,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterAdded_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenDateFilterAdded_ShouldReportChange()
     {
         // Arrange
         var original = new Filter(null, []);
@@ -58,7 +87,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterRangeChanges_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenDateFilterRangeChanges_ShouldReportChange()
     {
         // Arrange
         var dateFilter1 = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
@@ -74,7 +103,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenDateFilterRemoved_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenDateFilterRemoved_ShouldReportChange()
     {
         // Arrange
         var dateFilter = new DateFilter { After = DateTime.Now.AddDays(-1), Before = DateTime.Now };
@@ -89,7 +118,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenEquivalentFiltersFromDifferentInstances_ShouldReportNoChange()
+    public void HasFilteringChangedFrom_WhenEquivalentFiltersFromDifferentInstances_ShouldReportNoChange()
     {
         // Arrange
         var original = new Filter(
@@ -108,7 +137,24 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenFiltersAdded_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenFilterOrderSwaps_ShouldReportChange()
+    {
+        // Arrange
+        var first = CreateFilter(Constants.FilterIdEquals100);
+        var second = CreateFilter(Constants.FilterIdEquals200);
+
+        var original = new Filter(null, ImmutableList.Create(first, second));
+        var updated = new Filter(null, ImmutableList.Create(second, first));
+
+        // Act
+        var result = updated.HasFilteringChangedFrom(original);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void HasFilteringChangedFrom_WhenFiltersAdded_ShouldReportChange()
     {
         // Arrange
         var original = new Filter(null, []);
@@ -123,7 +169,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenFiltersRemoved_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenFiltersRemoved_ShouldReportChange()
     {
         // Arrange
         var filter = CreateFilter(Constants.FilterIdEquals100);
@@ -138,7 +184,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenIsExcludedDiffers_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenIsExcludedDiffers_ShouldReportChange()
     {
         // Arrange
         var original = new Filter(
@@ -157,7 +203,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenOnlyColorDiffers_ShouldReportNoChange()
+    public void HasFilteringChangedFrom_WhenOnlyColorDiffers_ShouldReportNoChange()
     {
         // Arrange
         var redFilter = FilterUtils.CreateTestFilter(Constants.FilterIdEquals100, HighlightColor.Red);
@@ -174,7 +220,7 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenOnlyDateFilterIsEnabledToggles_ShouldReportChange()
+    public void HasFilteringChangedFrom_WhenOnlyDateFilterIsEnabledToggles_ShouldReportChange()
     {
         // Arrange
         var bounds = (After: DateTime.Now.AddDays(-1), Before: DateTime.Now);
@@ -191,7 +237,22 @@ public sealed class FilterExtensionsTests
     }
 
     [Fact]
-    public void HasFilteringChanged_WhenSameFilters_ShouldReportNoChange()
+    public void HasFilteringChangedFrom_WhenOnlyOneSnapshotIsDefault_ShouldReportChange()
+    {
+        // Arrange
+        var initialized = new Filter(null, []);
+
+        // Act
+        var forward = initialized.HasFilteringChangedFrom(default);
+        var reverse = default(Filter).HasFilteringChangedFrom(initialized);
+
+        // Assert
+        Assert.True(forward);
+        Assert.True(reverse);
+    }
+
+    [Fact]
+    public void HasFilteringChangedFrom_WhenSameFilters_ShouldReportNoChange()
     {
         // Arrange
         var filters = ImmutableList.Create(CreateFilter(Constants.FilterIdEquals100));
