@@ -137,16 +137,16 @@ internal sealed class Reducers
     private static IReadOnlyDictionary<string, FilterGroupNode> BuildDisplayGroups(
         IEnumerable<SavedFilterGroup> groups)
     {
-        Dictionary<string, FilterGroupNode> displayGroups = [];
+        var displayGroups = ImmutableDictionary<string, FilterGroupNode>.Empty;
 
         foreach (var group in groups)
         {
             var folders = group.Name.Split('\\');
 
-            displayGroups.AddFilterGroup(folders, group);
+            displayGroups = displayGroups.AddFilterGroup(folders, group);
         }
 
-        return displayGroups.AsReadOnly();
+        return displayGroups;
     }
 
     private static IReadOnlyList<SavedFilter> ReplaceFilterById(
