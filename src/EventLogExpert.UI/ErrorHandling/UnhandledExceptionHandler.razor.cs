@@ -6,7 +6,7 @@ using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
-namespace EventLogExpert.UI.Banner;
+namespace EventLogExpert.UI.ErrorHandling;
 
 public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
 {
