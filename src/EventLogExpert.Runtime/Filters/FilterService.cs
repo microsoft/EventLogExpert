@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Runtime;
 using System.Runtime.ExceptionServices;
 
@@ -80,9 +79,6 @@ internal sealed class FilterService : IFilterService
             .ToList()
             .AsReadOnly();
     }
-
-    public bool TryFormat(BasicFilter basicFilter, out string comparison) =>
-        BasicFilterFormatter.TryFormat(basicFilter, out comparison);
 
     private static IReadOnlyList<ResolvedEvent> FilterEventsSequential(
         IEnumerable<ResolvedEvent> events,
