@@ -13,7 +13,6 @@ using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.DependencyInjection;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
@@ -22,6 +21,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using Fluxor;
+using Fluxor.DependencyInjection;
 
 namespace EventLogExpert;
 
@@ -89,7 +89,7 @@ public static class MauiProgram
 
         // UI Services
         builder.Services.AddEventLogFiltering();
-        builder.Services.RegisterUiLibrary();
+        builder.Services.AddEventLogRuntime();
 
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();
