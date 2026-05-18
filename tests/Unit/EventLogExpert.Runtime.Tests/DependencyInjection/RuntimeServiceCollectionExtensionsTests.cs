@@ -11,7 +11,6 @@ using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
-using EventLogExpert.Runtime.DependencyInjection;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
@@ -29,7 +28,7 @@ using NSubstitute;
 
 namespace EventLogExpert.Runtime.Tests.DependencyInjection;
 
-public sealed class UiServiceCollectionExtensionsTests
+public sealed class RuntimeServiceCollectionExtensionsTests
 {
     [Theory]
     // Command facades.
@@ -42,9 +41,9 @@ public sealed class UiServiceCollectionExtensionsTests
     [InlineData(typeof(IHighlightSelector))]
     [InlineData(typeof(ILogTableColumnDefaultsProvider))]
     // ILogReloadCoordinator omitted — it forwards to the Fluxor-registered Effects type,
-    // which is auto-registered by AddFluxor (not by RegisterUiLibrary). Production wiring
+    // which is auto-registered by AddFluxor (not by AddEventLogRuntime). Production wiring
     // covers it; here it would require also bootstrapping Fluxor scanning in the test.
-    // Application services (moved out of MauiProgram into RegisterUiLibrary).
+    // Application services (moved out of MauiProgram into AddEventLogRuntime).
     [InlineData(typeof(IAppTitleService))]
     [InlineData(typeof(IBannerService))]
     [InlineData(typeof(IDatabaseService))]
@@ -62,15 +61,15 @@ public sealed class UiServiceCollectionExtensionsTests
     [InlineData(typeof(IPackageDeploymentService))]
     [InlineData(typeof(IPackageVersionProvider))]
     [InlineData(typeof(IUpdateService))]
-    public async Task RegisterUiLibrary_ShouldResolveHostFacingAbstraction(Type serviceType)
+    public async Task AddEventLogRuntime_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
         // Arrange
         var services = new ServiceCollection();
 
         // Dependencies the host normally provides (IDispatcher comes from Fluxor; the
-        // others are concrete options/identity/IO surfaces that RegisterUiLibrary doesn't
+        // others are concrete options/identity/IO surfaces that AddEventLogRuntime doesn't
         // own). Substituting them keeps this smoke test focused on the wiring inside
-        // RegisterUiLibrary while letting the dependency-injection container actually
+        // AddEventLogRuntime while letting the dependency-injection container actually
         // build each registered service.
         services.AddSingleton(Substitute.For<IDispatcher>());
         services.AddSingleton(Substitute.For<IAlertDialogService>());
@@ -85,7 +84,7 @@ public sealed class UiServiceCollectionExtensionsTests
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
         services.AddSingleton<HttpClient>();
 
-        services.RegisterUiLibrary();
+        services.AddEventLogRuntime();
         await using var provider = services.BuildServiceProvider();
 
         // Act

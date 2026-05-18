@@ -20,24 +20,13 @@ using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
-using Microsoft.Extensions.DependencyInjection;
 using Effects = EventLogExpert.Runtime.EventLog.Effects;
 
-namespace EventLogExpert.Runtime.DependencyInjection;
+namespace Microsoft.Extensions.DependencyInjection;
 
-/// <summary>
-///     Composition-root extension for registering the UI library's host-facing intent and capability APIs. Lets the
-///     MAUI head consume <see cref="EventLogExpert.Runtime" /> without needing <c>InternalsVisibleTo</c> on its internal facade
-///     implementations.
-/// </summary>
-public static class UiServiceCollectionExtensions
+public static class RuntimeServiceCollectionExtensions
 {
-    /// <summary>
-    ///     Registers the public host-facing intent and capability APIs exposed by <see cref="EventLogExpert.Runtime" />.
-    ///     Implementations are <c>internal sealed</c> per least-privilege; this extension is the only public entry point for
-    ///     the host to wire them up.
-    /// </summary>
-    public static IServiceCollection RegisterUiLibrary(this IServiceCollection services)
+    public static IServiceCollection AddEventLogRuntime(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
 
