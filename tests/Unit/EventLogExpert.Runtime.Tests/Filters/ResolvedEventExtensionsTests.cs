@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.Filters;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
@@ -12,6 +11,27 @@ namespace EventLogExpert.Runtime.Tests.Filters;
 
 public sealed class ResolvedEventExtensionsTests
 {
+    [Fact]
+    public void MatchesDateFilter_WhenAfterIsAfterBefore_ShouldFailDateConstraint()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(100,
+            timeCreated: new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc));
+
+        var dateFilter = new DateFilter
+        {
+            IsEnabled = true,
+            After = new DateTime(2024, 1, 2, 0, 0, 0, DateTimeKind.Utc),
+            Before = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
+        };
+
+        // Act
+        var result = @event.MatchesDateFilter(dateFilter);
+
+        // Assert
+        Assert.False(result);
+    }
+
     [Fact]
     public void MatchesDateFilter_WhenDateFilterDisabled_ShouldNotConstrainEvent()
     {
@@ -273,6 +293,24 @@ public sealed class ResolvedEventExtensionsTests
     }
 
     [Fact]
+    public void MatchesFilters_WhenIncludeFilterHasNullCompiled_ShouldSkipNullCompiledFilter()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(100);
+        var filters = new List<SavedFilter>
+        {
+            SavedFilter.Empty,
+            CreateFilter(Constants.FilterIdEquals100)
+        };
+
+        // Act
+        var result = @event.MatchesFilters(filters);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
     public void MatchesFilters_WhenIncludeFilterMatches_ShouldIncludeEvent()
     {
         // Arrange
@@ -284,6 +322,60 @@ public sealed class ResolvedEventExtensionsTests
 
         // Assert
         Assert.True(result);
+    }
+
+    [Fact]
+    public void MatchesFilters_WhenIncludeMatchesAndExcludeDoesNot_ShouldIncludeEvent()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(100);
+        var filters = new List<SavedFilter>
+        {
+            CreateFilter(Constants.FilterIdEquals100),
+            CreateFilter(Constants.FilterIdEquals200, true)
+        };
+
+        // Act
+        var result = @event.MatchesFilters(filters);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void MatchesFilters_WhenMultipleExcludesAndNoneMatch_ShouldIncludeEvent()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(300);
+        var filters = new List<SavedFilter>
+        {
+            CreateFilter(Constants.FilterIdEquals100, true),
+            CreateFilter(Constants.FilterIdEquals200, true)
+        };
+
+        // Act
+        var result = @event.MatchesFilters(filters);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void MatchesFilters_WhenMultipleExcludesAndOneMatches_ShouldExcludeEvent()
+    {
+        // Arrange
+        var @event = EventUtils.CreateTestEvent(100);
+        var filters = new List<SavedFilter>
+        {
+            CreateFilter(Constants.FilterIdEquals100, true),
+            CreateFilter(Constants.FilterIdEquals200, true)
+        };
+
+        // Act
+        var result = @event.MatchesFilters(filters);
+
+        // Assert
+        Assert.False(result);
     }
 
     [Fact]
@@ -321,14 +413,29 @@ public sealed class ResolvedEventExtensionsTests
     }
 
     [Fact]
-    public void MatchesFilters_WhenXmlFilterDoesNotMatch_ShouldExcludeEvent()
+    public void MatchesFilters_WhenOnlyFilterHasNullCompiled_ShouldIncludeEvent()
     {
         // Arrange
         var @event = EventUtils.CreateTestEvent(100);
-        var filters = new List<SavedFilter> { CreateFilter(Constants.FilterXmlContainsData) };
+        var filters = new List<SavedFilter> { SavedFilter.Empty };
 
         // Act
         var result = @event.MatchesFilters(filters);
+
+        // Assert
+        Assert.True(result);
+    }
+
+    [Fact]
+    public void MatchesFilters_WhenXmlFilterDoesNotMatch_ShouldExcludeEvent()
+    {
+        // Arrange
+        var eventWithoutXml = EventUtils.CreateTestEvent(100);
+        var xmlContainsDataFilter = CreateFilter(Constants.FilterXmlContainsData);
+        var filters = new List<SavedFilter> { xmlContainsDataFilter };
+
+        // Act
+        var result = eventWithoutXml.MatchesFilters(filters);
 
         // Assert
         Assert.False(result);

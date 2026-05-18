@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.Events;
+using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.TestUtils;
 
@@ -21,6 +22,7 @@ internal static class EventUtils
         Guid? activityId = null,
         int? processId = null,
         int? threadId = null,
+        SecurityIdentifier? userId = null,
         IReadOnlyList<string>? keywords = null) =>
         new("TestLog", LogPathType.Channel)
         {
@@ -36,6 +38,7 @@ internal static class EventUtils
             ActivityId = activityId,
             ProcessId = processId,
             ThreadId = threadId,
+            UserId = userId,
             Keywords = keywords ?? []
         };
 }
