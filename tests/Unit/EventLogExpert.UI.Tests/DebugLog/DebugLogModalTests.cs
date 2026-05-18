@@ -21,7 +21,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using TestContext = Xunit.TestContext;
 
-namespace EventLogExpert.UI.Tests.Modals;
+namespace EventLogExpert.UI.Tests.DebugLog;
 
 public sealed class DebugLogModalTests : BunitContext
 {
