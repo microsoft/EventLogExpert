@@ -8,7 +8,7 @@ using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.Components.Sections;
+namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTabBar
 {

@@ -23,7 +23,7 @@ using Microsoft.JSInterop;
 using System.Collections.Immutable;
 using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
 
-namespace EventLogExpert.Components.Sections;
+namespace EventLogExpert.UI.LogTable;
 
 public sealed partial class LogTablePane
 {
