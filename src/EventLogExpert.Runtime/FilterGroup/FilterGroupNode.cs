@@ -1,13 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using System.Collections.Immutable;
+
 using EventLogExpert.Filtering.Persistence;
 
 namespace EventLogExpert.Runtime.FilterGroup;
 
 public sealed record FilterGroupNode
 {
-    public Dictionary<string, FilterGroupNode> ChildNodes { get; init; } = [];
+    public ImmutableDictionary<string, FilterGroupNode> ChildNodes { get; init; } =
+        ImmutableDictionary<string, FilterGroupNode>.Empty;
 
-    public List<SavedFilterGroup> Groups { get; init; } = [];
+    public ImmutableList<SavedFilterGroup> Groups { get; init; } = ImmutableList<SavedFilterGroup>.Empty;
 }
