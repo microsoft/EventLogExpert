@@ -13,7 +13,7 @@ namespace EventLogExpert.UI.Filters;
 /// </summary>
 public sealed partial class ComparisonOperatorSelect
 {
-    public enum ComparisonKind
+    internal enum ComparisonKind
     {
         Equals,
         Contains,

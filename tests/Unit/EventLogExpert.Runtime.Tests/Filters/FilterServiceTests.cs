@@ -4,9 +4,6 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.Filters;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
@@ -312,7 +309,7 @@ public sealed class FilterServiceTests
         MatchMode.Single,
         "Test",
         "Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
-    public void TryParse_WhenContainsOperator_ShouldGenerateCorrectComparison(
+    public void TryFormat_WhenContainsOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
         ComparisonOperator op,
         MatchMode card,
@@ -320,11 +317,10 @@ public sealed class FilterServiceTests
         string expectedComparison)
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -332,10 +328,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenEmptyValueAndSingleMatchMode_ShouldReturnFalse()
+    public void TryFormat_WhenEmptyValueAndSingleMatchMode_ShouldReturnFalse()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Id,
             ComparisonOperator.Equals,
@@ -343,7 +338,7 @@ public sealed class FilterServiceTests
             null);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -351,10 +346,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenEmptyValuesAndManyMatchMode_ShouldReturnFalse()
+    public void TryFormat_WhenEmptyValuesAndManyMatchMode_ShouldReturnFalse()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Id,
             ComparisonOperator.Equals,
@@ -362,7 +356,7 @@ public sealed class FilterServiceTests
             null);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -373,7 +367,7 @@ public sealed class FilterServiceTests
     [InlineData(EventProperty.Id, ComparisonOperator.Equals, MatchMode.Single, "100", "Id == \"100\"")]
     [InlineData(EventProperty.Level, ComparisonOperator.Equals, MatchMode.Single, "Error", "Level == \"Error\"")]
     [InlineData(EventProperty.Source, ComparisonOperator.Equals, MatchMode.Single, "TestSource", "Source == \"TestSource\"")]
-    public void TryParse_WhenEqualsOperator_ShouldGenerateCorrectComparison(
+    public void TryFormat_WhenEqualsOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
         ComparisonOperator op,
         MatchMode card,
@@ -381,11 +375,10 @@ public sealed class FilterServiceTests
         string expectedComparison)
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -393,10 +386,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenFieldIsXml_ShouldReturnTrue()
+    public void TryFormat_WhenFieldIsXml_ShouldReturnTrue()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Xml,
             ComparisonOperator.Contains,
@@ -404,7 +396,7 @@ public sealed class FilterServiceTests
             "test");
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -412,10 +404,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenIdToStringContains_ShouldGenerateCorrectComparison()
+    public void TryFormat_WhenIdToStringContains_ShouldGenerateCorrectComparison()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Id,
             ComparisonOperator.Contains,
@@ -423,7 +414,7 @@ public sealed class FilterServiceTests
             "10");
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -431,10 +422,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenKeywordsEquals_ShouldGenerateAnyComparison()
+    public void TryFormat_WhenKeywordsEquals_ShouldGenerateAnyComparison()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Keywords,
             ComparisonOperator.Equals,
@@ -442,7 +432,7 @@ public sealed class FilterServiceTests
             "Audit Success");
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -451,10 +441,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenMultiSelectWithValues_ShouldGenerateContainsComparison()
+    public void TryFormat_WhenMultiSelectWithValues_ShouldGenerateContainsComparison()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Level,
             ComparisonOperator.Equals,
@@ -463,7 +452,7 @@ public sealed class FilterServiceTests
             ["Error", "Warning"]);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -483,7 +472,7 @@ public sealed class FilterServiceTests
         MatchMode.Single,
         "Test",
         "!Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
-    public void TryParse_WhenNotContainsOperator_ShouldGenerateCorrectComparison(
+    public void TryFormat_WhenNotContainsOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
         ComparisonOperator op,
         MatchMode card,
@@ -491,11 +480,10 @@ public sealed class FilterServiceTests
         string expectedComparison)
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -505,7 +493,7 @@ public sealed class FilterServiceTests
     [Theory]
     [InlineData(EventProperty.Id, ComparisonOperator.NotEqual, MatchMode.Single, "100", "Id != \"100\"")]
     [InlineData(EventProperty.Level, ComparisonOperator.NotEqual, MatchMode.Single, "Error", "Level != \"Error\"")]
-    public void TryParse_WhenNotEqualOperator_ShouldGenerateCorrectComparison(
+    public void TryFormat_WhenNotEqualOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
         ComparisonOperator op,
         MatchMode card,
@@ -513,11 +501,10 @@ public sealed class FilterServiceTests
         string expectedComparison)
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, value);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -525,10 +512,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenQuotesInValue_ShouldEscapeQuotes()
+    public void TryFormat_WhenQuotesInValue_ShouldEscapeQuotes()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.Description,
             ComparisonOperator.Contains,
@@ -536,7 +522,7 @@ public sealed class FilterServiceTests
             "test\"value");
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -544,10 +530,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
+    public void TryFormat_WhenSubFiltersExist_ShouldAppendSubFilterComparison()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -569,7 +554,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -578,10 +563,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenSubFilterWithCompareAny_ShouldUseOrOperator()
+    public void TryFormat_WhenSubFilterWithCompareAny_ShouldUseOrOperator()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -603,7 +587,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -611,10 +595,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenSubFilterWithoutCompareAny_ShouldUseAndOperator()
+    public void TryFormat_WhenSubFilterWithoutCompareAny_ShouldUseAndOperator()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -636,7 +619,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -644,10 +627,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WhenUserIdEquals_ShouldIncludeNullCheck()
+    public void TryFormat_WhenUserIdEquals_ShouldIncludeNullCheck()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(
             EventProperty.UserId,
             ComparisonOperator.Equals,
@@ -655,7 +637,7 @@ public sealed class FilterServiceTests
             "S-1-5-21");
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -668,16 +650,15 @@ public sealed class FilterServiceTests
     [InlineData(EventProperty.Description, ComparisonOperator.Contains, MatchMode.Single, "line one\r\nline two")]
     [InlineData(EventProperty.Description, ComparisonOperator.Equals, MatchMode.Single, "She wrote: \"yes\\no\".")]
     [InlineData(EventProperty.Source, ComparisonOperator.Equals, MatchMode.Single, "Source\"With\"Quotes")]
-    public void TryParse_WhenValueHasSpecialCharacters_GeneratesParsableExpressionThatRoundTrips(
+    public void TryFormat_WhenValueHasSpecialCharacters_GeneratesParsableExpressionThatRoundTrips(
         EventProperty property,
         ComparisonOperator op,
         MatchMode card,
         string rawValue)
     {
-        var filterService = CreateFilterService();
         var source = CreateBasicFilter(property, op, card, rawValue);
 
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         Assert.True(result);
 
@@ -697,10 +678,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenMainInvalid_ShouldReturnFalseEvenWithValidSubFilters()
+    public void TryFormat_WithBasicFilter_WhenMainInvalid_ShouldReturnFalseEvenWithValidSubFilters()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -722,7 +702,7 @@ public sealed class FilterServiceTests
             ]);
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.False(result);
@@ -730,10 +710,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenMainOnly_ShouldMatchFilterModelOutput()
+    public void TryFormat_WithBasicFilter_WhenMainOnly_ShouldMatchFilterModelOutput()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -744,7 +723,7 @@ public sealed class FilterServiceTests
             },
             []);
 
-        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
+        var sourceResult = BasicFilterFormatter.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -752,10 +731,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenMultiSelectKeywords_ShouldEmitAnyContainsExpression()
+    public void TryFormat_WithBasicFilter_WhenMultiSelectKeywords_ShouldEmitAnyContainsExpression()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -767,7 +745,7 @@ public sealed class FilterServiceTests
             []);
 
         // Act
-        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
+        var sourceResult = BasicFilterFormatter.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -777,10 +755,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
+    public void TryFormat_WithBasicFilter_WhenMultiSelectNonKeywords_ShouldEmitContainsToStringExpression()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -792,7 +769,7 @@ public sealed class FilterServiceTests
             []);
 
         // Act
-        var sourceResult = filterService.TryFormat(source, out var sourceComparison);
+        var sourceResult = BasicFilterFormatter.TryFormat(source, out var sourceComparison);
 
         // Assert
         Assert.True(sourceResult);
@@ -802,20 +779,18 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenSourceIsNull_ShouldThrowArgumentNullException()
+    public void TryFormat_WithBasicFilter_WhenSourceIsNull_ShouldThrowArgumentNullException()
     {
         // Arrange
-        var filterService = CreateFilterService();
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => filterService.TryFormat(null!, out _));
+        Assert.Throws<ArgumentNullException>(() => BasicFilterFormatter.TryFormat(null!, out _));
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenSubFilterInvalid_ShouldSkipWithoutOrphanedJoinOperator()
+    public void TryFormat_WithBasicFilter_WhenSubFilterInvalid_ShouldSkipWithoutOrphanedJoinOperator()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -848,7 +823,7 @@ public sealed class FilterServiceTests
         var expected = "Id == \"100\" && Source == \"Kernel\"";
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);
@@ -857,10 +832,9 @@ public sealed class FilterServiceTests
     }
 
     [Fact]
-    public void TryParse_WithBasicFilter_WhenSubFiltersPresent_ShouldUseExactJoinOrdering()
+    public void TryFormat_WithBasicFilter_WhenSubFiltersPresent_ShouldUseExactJoinOrdering()
     {
         // Arrange
-        var filterService = CreateFilterService();
         var source = new BasicFilter(
             new FilterComparison
             {
@@ -895,7 +869,7 @@ public sealed class FilterServiceTests
             " && Source.Contains(\"Kernel\", StringComparison.OrdinalIgnoreCase)";
 
         // Act
-        var result = filterService.TryFormat(source, out var comparison);
+        var result = BasicFilterFormatter.TryFormat(source, out var comparison);
 
         // Assert
         Assert.True(result);

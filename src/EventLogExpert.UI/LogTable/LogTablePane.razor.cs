@@ -336,7 +336,7 @@ public sealed partial class LogTablePane
             },
             []);
 
-        if (!FilterService.TryFormat(basicFilter, out var comparisonString)) { return; }
+        if (!BasicFilterFormatter.TryFormat(basicFilter, out var comparisonString)) { return; }
 
         var filter = SavedFilter.TryCreate(
             comparisonString,
