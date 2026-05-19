@@ -9,7 +9,7 @@ using EventLogExpert.Filtering.EventData;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.EventData;
 
 public sealed class EventPropertyValuesCacheTests : IDisposable
 {

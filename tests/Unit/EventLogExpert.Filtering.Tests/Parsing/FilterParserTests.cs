@@ -1,15 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Parsing;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Parsing;
 
 public sealed class FilterParserTests
 {
     [Theory]
-    // Bare equality on string properties (formatter and Advanced)
     [InlineData("Source == \"TestSource\"")]
     [InlineData("ComputerName == \"SERVER01\"")]
     [InlineData("Level == \"Error\"")]
@@ -17,9 +15,8 @@ public sealed class FilterParserTests
     [InlineData("TaskCategory == \"System\"")]
     [InlineData("Description == \"An error occurred\"")]
     [InlineData("Xml == \"<x/>\"")]
-    // Bare inequality
     [InlineData("Source != \"TestSource\"")]
-    // Numeric properties (formatter emits string-quoted; Dynamic.Core coerces)
+    // Numeric properties — string-quoted RHS coerces to int at lower time.
     [InlineData("Id == \"100\"")]
     [InlineData("Id == 100")]
     [InlineData("Id != 100")]
@@ -31,7 +28,7 @@ public sealed class FilterParserTests
     [InlineData("ThreadId == 8")]
     [InlineData("RecordId == 1234567890123")]
     [InlineData("ActivityId == \"00000000-0000-0000-0000-000000000000\"")]
-    // Contains shapes (formatter always emits OIC; Advanced may omit)
+    // Contains — both default and OrdinalIgnoreCase argument shapes are accepted.
     [InlineData("Source.Contains(\"Test\", StringComparison.OrdinalIgnoreCase)")]
     [InlineData("Source.Contains(\"Test\")")]
     [InlineData("Description.Contains(\"error occurred\")")]
@@ -39,32 +36,27 @@ public sealed class FilterParserTests
     [InlineData("xml.Contains(\"data\")")]
     [InlineData("Id.ToString().Contains(\"1\", StringComparison.OrdinalIgnoreCase)")]
     [InlineData("ActivityId.ToString().Contains(\"abc\", StringComparison.OrdinalIgnoreCase)")]
-    // Boolean composition
     [InlineData("Id == 100 && Level == \"Error\"")]
     [InlineData("Id == 100 || Id == 200")]
     [InlineData("(Id == 100 || Id == 200) && Level == \"Error\"")]
     [InlineData("!(Source == \"X\")")]
     [InlineData("Source == \"A\" || Source == \"B\" || Source == \"C\"")]
-    // Multi-equals (Many) shapes from formatter
     [InlineData("(new[] {\"100\", \"200\"}).Contains(Id.ToString())")]
     [InlineData("(new[] {\"Error\", \"Warning\"}).Contains(Level.ToString())")]
     [InlineData("(new[] {\"A\", \"B\"}).Contains(Source)")]
     [InlineData("(new[] {\"X\"}).Contains(ComputerName)")]
-    // Keywords.Any shapes from formatter
     [InlineData("Keywords.Any(e => string.Equals(e, \"audit\", StringComparison.OrdinalIgnoreCase))")]
     [InlineData("Keywords.Any(e => e.Contains(\"audit\", StringComparison.OrdinalIgnoreCase))")]
     [InlineData("Keywords.Any(e => (new[] {\"audit\", \"system\"}).Contains(e))")]
     [InlineData("!Keywords.Any(e => string.Equals(e, \"audit\", StringComparison.OrdinalIgnoreCase))")]
     [InlineData("!Keywords.Any(e => e.Contains(\"audit\", StringComparison.OrdinalIgnoreCase))")]
-    // UserId 4-shape formatter output
+    // UserId — the formatter emits 4 distinct guarded shapes the parser must accept.
     [InlineData("UserId != null && UserId.Value == \"S-1-5-18\"")]
     [InlineData("UserId != null && UserId.Value != \"S-1-5-18\"")]
     [InlineData("UserId != null && UserId.Value.Contains(\"5-18\", StringComparison.OrdinalIgnoreCase)")]
     [InlineData("UserId != null && !UserId.Value.Contains(\"5-18\", StringComparison.OrdinalIgnoreCase)")]
-    // Identifier case-insensitivity (parity with Dynamic.Core)
     [InlineData("source == \"X\"")]
     [InlineData("SOURCE == \"X\"")]
-    // Escape sequences in string literals
     [InlineData("Description == \"line1\\nline2\"")]
     [InlineData("Description == \"tab\\there\"")]
     [InlineData("Description == \"a\\\\b\"")]
@@ -80,9 +72,7 @@ public sealed class FilterParserTests
     [Fact]
     public void TryValidate_HandlesMultilineFormatterOutput()
     {
-        // Legacy on-disk Basic filters were persisted with CRLF between sub-conditions (the old
-        // BasicFilterFormatter emitted AppendLine). The tokenizer treats CRLF as whitespace so the
-        // legacy shape still loads cleanly even though the current formatter joins inline.
+        // Legacy on-disk Basic filters used CRLF between sub-conditions; CRLF is treated as whitespace.
         var filter = "Id == 100\r\n && Level == \"Error\"";
 
         var ok = FilterParser.TryValidate(filter, out var error);
@@ -93,7 +83,6 @@ public sealed class FilterParserTests
     [Fact]
     public void TryValidate_PrecedenceMatchesCSharp()
     {
-        // && binds tighter than ||, so this is (A) || (B && C) — must validate as one big OR.
         var filter = "Id == 1 || Id == 2 && Level == \"Error\"";
 
         var ok = FilterParser.TryValidate(filter, out var error);
@@ -117,7 +106,7 @@ public sealed class FilterParserTests
     [Fact]
     public void TryValidate_RejectsExcessiveArrayLiteralLength()
     {
-        // 257 array elements exceeds MaxArrayElements=256.
+        // 257 elements exceeds ParseLimits.MaxArrayElements (256).
         var elements = string.Join(", ", Enumerable.Range(0, 257).Select(i => $"\"{i}\""));
         var filter = $"(new[] {{{elements}}}).Contains(Source)";
 
@@ -130,7 +119,7 @@ public sealed class FilterParserTests
     [Fact]
     public void TryValidate_RejectsExcessiveParseDepth()
     {
-        // 64 nested parens around a trivial comparison exceeds MaxParseDepth=32.
+        // 64 nested parens exceeds ParseLimits.MaxParseDepth (32).
         var depth = 64;
         var filter = new string('(', depth) + "Id == 1" + new string(')', depth);
 
@@ -164,36 +153,26 @@ public sealed class FilterParserTests
     }
 
     [Theory]
-    // Unknown property
     [InlineData("InvalidProperty == 100")]
-    // RHS not a literal
     [InlineData("Id == invalid")]
     [InlineData("Source == Description")]
-    // Numeric coercion failure
     [InlineData("Id == \"not-a-number\"")]
     [InlineData("ActivityId == \"not-a-guid\"")]
     [InlineData("RecordId == \"abc\"")]
-    // Unsupported method on string property
     [InlineData("Source.StartsWith(\"X\")")]
     [InlineData("Source.EndsWith(\"X\")")]
     [InlineData("Source.IndexOf(\"X\") > 0")]
-    // Wrong StringComparison value
     [InlineData("Source.Contains(\"x\", StringComparison.Ordinal)")]
     [InlineData("Source.Contains(\"x\", StringComparison.CurrentCulture)")]
-    // Keywords.Any with unsupported lambda body
     [InlineData("Keywords.Any(e => e.StartsWith(\"X\"))")]
     [InlineData("Keywords.Any(e => e == \"X\")")]
-    // Bare property reference (no operator)
     [InlineData("Source")]
     [InlineData("Id")]
-    // Mismatched parens / syntax errors
     [InlineData("(Id == 100")]
     [InlineData("Id == 100 &&")]
     [InlineData("&& Id == 100")]
     [InlineData("Id ===  100")]
-    // Empty array
     [InlineData("(new[] {}).Contains(Source)")]
-    // Property as RHS of comparison
     [InlineData("\"X\" == Source")]
     public void TryValidate_RejectsUnsupportedShapes(string filter)
     {

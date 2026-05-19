@@ -51,7 +51,7 @@ internal static class Emitter
     {
         var conditions = FlattenAndChain(node).Select(EmitNode).ToArray();
 
-        // Specialize 2 / 3 condition chains: one closure invocation followed by inline short-circuit && (per N-D4).
+        // Specialize 2- and 3-condition chains: closure invocation plus inline short-circuit &&.
         return conditions.Length switch
         {
             2 => e => conditions[0](e) && conditions[1](e),
@@ -75,9 +75,6 @@ internal static class Emitter
             return EmitNullComparison(node.Field, node.Op);
         }
 
-        // String literals route through ToString-form comparison so the formatter shape `Id == "100"` and the
-        // free-text shape `Id.ToString() == "100"` both behave like Dynamic.Core: ordinal string equality on the
-        // field rendered to invariant text. For pure string fields this collapses to a direct getter compare.
         if (node.Literal.Kind == TypedLiteralKind.String)
         {
             return EmitStringFormComparison(node.Field, node.Op, node.Literal.StringValue!);
@@ -457,7 +454,6 @@ internal static class Emitter
                 return EmitNullableNullCheck(static e => e.UserId is not null, op);
             case ResolvedEventField.Id:
             case ResolvedEventField.TimeCreated:
-                // Value types that can never be null. Equality with null is constant per-event.
                 return op switch
                 {
                     FilterBinaryOperator.Equal => static _ => false,
@@ -471,8 +467,7 @@ internal static class Emitter
             case ResolvedEventField.Source:
             case ResolvedEventField.TaskCategory:
             case ResolvedEventField.Xml:
-                // ResolvedEvent string properties default to string.Empty and the shipped writer paths never
-                // assign null. Match Dynamic.Core's reference-compare semantics: never equal to null.
+                // ResolvedEvent string properties default to string.Empty and writer paths never assign null.
                 return op switch
                 {
                     FilterBinaryOperator.Equal => static _ => false,
@@ -548,9 +543,7 @@ internal static class Emitter
     private static Func<ResolvedEvent, bool> EmitUserIdStringCompare(FilterBinaryOperator op, string value) =>
         op switch
         {
-            // The lowerer's UserId-guarded shape collapses `UserId != null && UserId.Value == "x"` so the runtime
-            // null-check belongs to the emitter; without the guard the predicate is always false (matches
-            // Dynamic.Core, which would NRE on `UserId.Value` against a null UserId).
+            // Lowerer-paired null guard: bare `UserId.Value` access would NRE without it.
             FilterBinaryOperator.Equal => e => e.UserId is not null
                 && string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
             FilterBinaryOperator.NotEqual => e => e.UserId is not null

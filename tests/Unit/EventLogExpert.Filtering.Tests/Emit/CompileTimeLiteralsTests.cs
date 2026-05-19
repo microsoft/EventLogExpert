@@ -3,14 +3,8 @@
 
 using EventLogExpert.Filtering.Emit;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Emit;
 
-/// <summary>
-///     Direct tests of the internal <see cref="CompileTimeLiterals" /> helpers. Coercion runs once at compile time so
-///     the per-event hot path performs raw typed comparisons; a regression that fails to drop unparseable values would
-///     re-introduce the per-event coercion cost the emitter exists to eliminate, and a regression that mis-parses a valid
-///     value would cause silent false negatives at runtime against the Dynamic.Core baseline.
-/// </summary>
 public sealed class CompileTimeLiteralsTests
 {
     [Fact]

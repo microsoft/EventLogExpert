@@ -4,14 +4,14 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Parsing;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Lowering;
 
 public sealed class PropertyResolverSchemaTests
 {
     /// <summary>
-    ///     Properties on <see cref="ResolvedEvent" /> that the filter grammar deliberately does not surface. If a new
-    ///     property is added to <c>ResolvedEvent</c>, this test fails until either (a) the property is added to
-    ///     <c>PropertyResolver</c>, or (b) it is added here with a comment explaining why it is not filterable.
+    ///     <see cref="ResolvedEvent" /> properties the filter grammar deliberately does not surface. If a new property is
+    ///     added to <c>ResolvedEvent</c>, this test fails until it is either wired into <c>PropertyResolver</c> or added here
+    ///     with a one-line justification.
     /// </summary>
     private static readonly HashSet<string> s_notFilterable =
     [
@@ -33,8 +33,8 @@ public sealed class PropertyResolverSchemaTests
         {
             if (s_notFilterable.Contains(property.Name)) { continue; }
 
-            // Use the .ToString() comparison shape because it normalizes every property type to a string compare,
-            // sidestepping per-type literal coercion concerns. This is purely a property-name resolution check.
+            // ToString() form normalizes every property type to a string compare so this asserts property-name
+            // resolution only, independent of per-type literal coercion.
             var ok = FilterParser.TryValidate($"{property.Name}.ToString() == \"x\"", out _);
 
             if (!ok)

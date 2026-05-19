@@ -3,7 +3,6 @@
 
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
@@ -58,8 +57,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenComparisonTextChanges_ShouldReportChange()
     {
         // Arrange
-        var first = FilterFixtures.CreateTestFilter();
-        var second = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
+        var first = FilterBuilder.CreateTestFilter();
+        var second = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals200);
 
         var original = new Filter(null, ImmutableList.Create(first));
         var updated = new Filter(null, ImmutableList.Create(second));
@@ -206,8 +205,8 @@ public sealed class FilterExtensionsTests
     public void HasFilteringChangedFrom_WhenOnlyColorDiffers_ShouldReportNoChange()
     {
         // Arrange
-        var redFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red);
-        var blueFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
+        var redFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Red);
+        var blueFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
 
         var original = new Filter(null, ImmutableList.Create(redFilter));
         var updated = new Filter(null, ImmutableList.Create(blueFilter));
@@ -352,5 +351,5 @@ public sealed class FilterExtensionsTests
     }
 
     private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
-        FilterFixtures.CreateTestFilter(expression, isExcluded: isExcluded);
+        FilterBuilder.CreateTestFilter(expression, isExcluded: isExcluded);
 }

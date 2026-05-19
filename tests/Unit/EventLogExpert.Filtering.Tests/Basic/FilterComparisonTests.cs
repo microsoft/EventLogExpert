@@ -4,7 +4,7 @@
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class FilterComparisonTests
 {

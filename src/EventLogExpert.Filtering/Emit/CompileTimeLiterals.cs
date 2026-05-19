@@ -6,11 +6,8 @@ using System.Globalization;
 namespace EventLogExpert.Filtering.Emit;
 
 /// <summary>
-///     Compile-time helpers that turn raw lowered string values into emit-ready CLR-typed arrays. Done once at
-///     compile time so the per-event hot path performs raw typed comparisons with no per-event coercion (per N-D4 / N-D6).
-///     Values that cannot coerce to the target CLR type are dropped — they could never match at runtime through the
-///     Dynamic.Core baseline either, since string equality between e.g. <c>"abc"</c> and <c>e.Id.ToString()</c> never
-///     succeeds for any integer.
+///     Coerces lowered string values into typed CLR arrays once at compile time, so per-event predicates skip
+///     re-coercion. Unparseable values are dropped — they could never match against a typed field at runtime.
 /// </summary>
 internal static class CompileTimeLiterals
 {

@@ -1,21 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using System.Collections.Immutable;
 using System.Text.Json;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class SubFilterJsonConverterTests
 {
     [Fact]
     public void JsonRoundTrip_AsPartOfBasicFilter_DispatchesThroughConverterForLegacySubFilters()
     {
-        // BasicFilter has no custom converter — it serializes via STJ defaults. STJ must still dispatch each
-        // ImmutableList<SubFilter> element through the [JsonConverter] attribute on SubFilter, so a persisted
-        // BasicFilter with legacy "Data" subfilters survives the rename end-to-end.
+        // BasicFilter has no custom converter; STJ must still dispatch each ImmutableList<SubFilter> element
+        // through SubFilter's [JsonConverter] so legacy "Data" subfilters survive a BasicFilter-level read.
         const string LegacyBasicJson =
             """
             {
@@ -97,8 +94,7 @@ public sealed class SubFilterJsonConverterTests
     [Fact]
     public void JsonRoundTrip_LegacyDataKey_ReadsAsComparison()
     {
-        // Pre-F11 persistence used the positional record param name "Data" as the JSON key. Renaming the param
-        // to Comparison would silently null-out the criterion data without legacy-aware reads.
+        // Legacy persistence used the positional record param name "Data" as the JSON key for what is now Comparison.
         const string LegacyJson =
             """
             { "Data": { "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "Value": "100", "Values": [] }, "JoinWithAny": false }
@@ -115,8 +111,8 @@ public sealed class SubFilterJsonConverterTests
     [Fact]
     public void JsonRoundTrip_LegacyDataKeyWithLegacyConditionShape_ReadsBothLayers()
     {
-        // Worst-case legacy persistence: both the SubFilter wrapper and the inner FilterComparison use legacy
-        // keys (Data + Category/Evaluator). The composed converter dispatch must hydrate both layers.
+        // Both wrapper (Data) and inner (Category/Evaluator) are legacy; the composed converter dispatch
+        // must hydrate both layers in a single deserialize pass.
         const string LegacyJson =
             """
             { "Data": { "Category": 0, "Evaluator": 0, "Value": "200", "Values": [] }, "JoinWithAny": true }

@@ -1,21 +1,18 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using System.Collections.Immutable;
 using System.Text.Json;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class FilterComparisonJsonConverterTests
 {
     [Fact]
     public void EventProperty_MemberCount_IsFrozenAcrossF16()
     {
-        // Act + Assert — pairs with the per-ordinal theory above: a new EventProperty value or a removal would
-        // leave the theory passing while still corrupting legacy reads for the missing ordinal. This guard forces
-        // a deliberate Theory update.
+        // Pairs with the per-ordinal Read_LegacyCategoryKey theory: adding or removing an EventProperty
+        // value would leave that theory passing while still corrupting legacy reads for the missing ordinal.
         Assert.Equal(11, Enum.GetValues<EventProperty>().Length);
     }
 
@@ -143,8 +140,7 @@ public sealed class FilterComparisonJsonConverterTests
     [Fact]
     public void Read_ModernMatchModeAndLegacyEvaluatorMultiSelect_ModernMatchModeWins()
     {
-        // Arrange — Evaluator=MultiSelect would imply MatchMode.Many, but modern MatchMode=Single must take
-        // precedence regardless of JSON key order (matchModeSet flag).
+        // Arrange
         const string ModernFirst =
             """{ "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "Evaluator": "MultiSelect", "Values": [] }""";
 
@@ -165,8 +161,7 @@ public sealed class FilterComparisonJsonConverterTests
     [Fact]
     public void Read_ModernOperatorAndLegacyEvaluator_ModernOperatorWins()
     {
-        // Arrange — when both modern and legacy keys are present, the converter sets the flag on modern read so
-        // legacy Evaluator does NOT overwrite it. Verified for Operator/MatchMode (operatorSet/matchModeSet flags).
+        // Arrange
         const string ModernFirst =
             """{ "Property": "Id", "Operator": "Contains", "MatchMode": "Single", "Evaluator": "Equals", "Values": [] }""";
 
@@ -187,7 +182,7 @@ public sealed class FilterComparisonJsonConverterTests
     [Fact]
     public void Read_UnknownProperty_IsSkipped()
     {
-        // Arrange — guards against future field additions failing legacy reads. Unknown keys must be tolerated.
+        // Arrange
         const string JsonWithUnknown =
             """{ "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "FutureField": { "nested": true }, "Value": "100", "Values": [] }""";
 
@@ -232,7 +227,7 @@ public sealed class FilterComparisonJsonConverterTests
         // Act
         string json = JsonSerializer.Serialize(comparison);
 
-        // Assert — modern keys use CLR enum names; legacy aliases must be absent.
+        // Assert
         Assert.Contains("\"Property\":\"Id\"", json);
         Assert.Contains("\"Operator\":\"Equals\"", json);
         Assert.Contains("\"MatchMode\":\"Single\"", json);

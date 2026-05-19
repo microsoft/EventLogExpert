@@ -1,13 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Filtering.TestUtils;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests.Drafts;
@@ -60,7 +56,7 @@ public sealed class FilterDraftModelTests
             },
             []);
 
-        var original = FilterFixtures.CreateTestFilter(basicFilter: basicFilter);
+        var original = FilterBuilder.CreateTestFilter(basicFilter: basicFilter);
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
@@ -99,7 +95,7 @@ public sealed class FilterDraftModelTests
                     true)
             ]);
 
-        var original = FilterFixtures.CreateTestFilter(basicFilter: basicFilter);
+        var original = FilterBuilder.CreateTestFilter(basicFilter: basicFilter);
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
@@ -119,7 +115,7 @@ public sealed class FilterDraftModelTests
     public void FromSavedFilter_PreservesId()
     {
         // Arrange
-        var original = FilterFixtures.CreateTestFilter();
+        var original = FilterBuilder.CreateTestFilter();
 
         // Act
         var draft = FilterDraft.FromSavedFilter(original);
@@ -142,7 +138,7 @@ public sealed class FilterDraftModelTests
             },
             []);
 
-        var original = FilterFixtures.CreateTestFilter(
+        var original = FilterBuilder.CreateTestFilter(
             color: HighlightColor.Blue,
             basicFilter: basicFilter,
             isEnabled: true,
@@ -188,7 +184,7 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_DoesNotShareValuesListWithDraft()
     {
         // Arrange
-        var draft = FilterFixtures.CreateTestFilterDraft(
+        var draft = FilterBuilder.CreateTestFilterDraft(
             comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Level,
@@ -211,7 +207,7 @@ public sealed class FilterDraftModelTests
     public void ToBasicFilter_ProducesImmutableSourceMatchingEditorState()
     {
         // Arrange
-        var draft = FilterFixtures.CreateTestFilterDraft(
+        var draft = FilterBuilder.CreateTestFilterDraft(
             comparison: new FilterComparisonDraft
             {
                 Property = EventProperty.Id,
