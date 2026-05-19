@@ -20,7 +20,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: 10.x
+        global-json-file: global.json
     - name: Restore workloads
       run: dotnet workload restore EventLogExpert.slnx
     - name: Restore dependencies
