@@ -4,7 +4,6 @@
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.TestUtils;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests.Runtime;
@@ -442,5 +441,5 @@ public sealed class ResolvedEventExtensionsTests
     }
 
     private static SavedFilter CreateFilter(string expression, bool isExcluded = false) =>
-        FilterFixtures.CreateTestFilter(expression, isExcluded: isExcluded);
+        FilterBuilder.CreateTestFilter(expression, isExcluded: isExcluded);
 }

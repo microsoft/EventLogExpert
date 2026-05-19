@@ -9,7 +9,7 @@ using static EventLogExpert.Filtering.TestUtils.Constants.FilterTestConstants;
 
 namespace EventLogExpert.Filtering.TestUtils;
 
-public static class FilterFixtures
+public static class FilterBuilder
 {
     public static SavedFilter CreateTestFilter(
         string comparisonValue = FilterIdEquals100,

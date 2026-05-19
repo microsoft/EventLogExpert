@@ -5,7 +5,7 @@ using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class BasicFilterFormatterTests
 {

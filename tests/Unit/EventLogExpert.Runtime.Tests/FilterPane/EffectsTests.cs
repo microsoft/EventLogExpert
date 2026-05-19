@@ -4,19 +4,15 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
-using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Runtime.Tests.TestUtils;
+using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
-using EventLogExpert.Filtering.TestUtils;
-using EventLogExpert.Filtering.TestUtils.Constants;
 using Fluxor;
 using NSubstitute;
 using System.Collections.Immutable;
@@ -31,7 +27,7 @@ public sealed class EffectsTests
     public async Task HandleAddFilter_WhenComparisonValueExists_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter(isEnabled: true);
+        var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new AddFilterAction(filterModel);
@@ -68,7 +64,7 @@ public sealed class EffectsTests
     public async Task HandleAddFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter(basicFilter: CreateBasicFilter());
+        var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -85,7 +81,7 @@ public sealed class EffectsTests
     public async Task HandleAddFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter();
+        var filterModel = FilterBuilder.CreateTestFilter();
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new AddFilterAction(filterModel);
@@ -146,7 +142,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(
+            FilterBuilder.CreateTestFilter(
                 FilterTestConstants.FilterIdEquals100,
                 HighlightColor.Red,
                 isExcluded: true));
@@ -170,7 +166,7 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(
+            FilterBuilder.CreateTestFilter(
                 FilterTestConstants.FilterIdEquals100,
                 HighlightColor.Blue,
                 isExcluded: false));
@@ -207,8 +203,8 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue),
-            FilterFixtures.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError, HighlightColor.Red));
+            FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue),
+            FilterBuilder.CreateTestFilter(FilterTestConstants.FilterLevelEqualsError, HighlightColor.Red));
 
         var (effects, mockDispatcher) = CreateEffects(filters: filters);
         var action = new SaveFilterGroupAction(FilterTestConstants.FilterGroupName);
@@ -226,7 +222,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilter_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter(isEnabled: true);
+        var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
@@ -242,7 +238,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilter_WhenFilterHasBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter(basicFilter: CreateBasicFilter());
+        var filterModel = FilterBuilder.CreateTestFilter(basicFilter: CreateBasicFilter());
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -259,7 +255,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilter_WhenFilterHasNoBasicFilter_ShouldAddToRecentFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter();
+        var filterModel = FilterBuilder.CreateTestFilter();
 
         var (effects, mockDispatcher) = CreateEffects();
         var action = new SetFilterAction(filterModel);
@@ -452,7 +448,7 @@ public sealed class EffectsTests
     public async Task HandleSetFilterDateRangeSuccess_ShouldUpdateEventTableFilters()
     {
         // Arrange
-        var filterModel = FilterFixtures.CreateTestFilter(isEnabled: true);
+        var filterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
 
         var (effects, mockDispatcher) = CreateEffects(true, ImmutableList.Create(filterModel));
         var action = new SetFilterAction(filterModel);
@@ -527,11 +523,11 @@ public sealed class EffectsTests
     {
         // Arrange
         var paneFilters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(isEnabled: true,
+            FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
 
         var appliedFilters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(isEnabled: true,
+            FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false));
 
         var (effects, mockDispatcher) = CreateEffects(
@@ -551,9 +547,9 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(isEnabled: true,
+            FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
-            FilterFixtures.CreateTestFilter(
+            FilterBuilder.CreateTestFilter(
                 FilterTestConstants.FilterLevelEqualsError,
                 isEnabled: true,
                 isExcluded: true));
@@ -574,9 +570,9 @@ public sealed class EffectsTests
     {
         // Arrange
         var filters = ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(isEnabled: true,
+            FilterBuilder.CreateTestFilter(isEnabled: true,
                 isExcluded: false),
-            FilterFixtures.CreateTestFilter(
+            FilterBuilder.CreateTestFilter(
                 FilterTestConstants.FilterLevelEqualsError,
                 isEnabled: false,
                 isExcluded: false));
@@ -654,5 +650,5 @@ public sealed class EffectsTests
 
     private static ImmutableList<SavedFilter> CreateSingleEnabledFilters() =>
         ImmutableList.Create(
-            FilterFixtures.CreateTestFilter(isEnabled: true));
+            FilterBuilder.CreateTestFilter(isEnabled: true));
 }

@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Filtering.TestUtils;
 
 namespace EventLogExpert.Filtering.Tests.Runtime;
@@ -12,8 +11,8 @@ public sealed class RequiresXmlTests
     public void Filter_RequiresXml_WhenAllFiltersAreNonXml_ShouldBeFalse()
     {
         // Arrange
-        var filter1 = FilterFixtures.CreateTestFilter();
-        var filter2 = FilterFixtures.CreateTestFilter("Source == \"app\"");
+        var filter1 = FilterBuilder.CreateTestFilter();
+        var filter2 = FilterBuilder.CreateTestFilter("Source == \"app\"");
         var filter = new Filter(null, [filter1, filter2]);
 
         // Act + Assert
@@ -24,8 +23,8 @@ public sealed class RequiresXmlTests
     public void Filter_RequiresXml_WhenAnyFilterRequiresXml_ShouldBeTrue()
     {
         // Arrange
-        var nonXml = FilterFixtures.CreateTestFilter();
-        var xml = FilterFixtures.CreateTestFilter("Xml.Contains(\"x\")");
+        var nonXml = FilterBuilder.CreateTestFilter();
+        var xml = FilterBuilder.CreateTestFilter("Xml.Contains(\"x\")");
         var filter = new Filter(null, [nonXml, xml]);
 
         // Act + Assert

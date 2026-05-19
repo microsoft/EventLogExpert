@@ -4,14 +4,8 @@
 using EventLogExpert.Filtering.Parsing;
 using EventLogExpert.Filtering.Tests.TestUtils;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Emit;
 
-/// <summary>
-///     The emitter's <c>RequiresXml</c> flag drives whether the eventing layer pre-renders <c>ResolvedEvent.Xml</c>
-///     for the entire stream — a non-trivial extra cost we want to avoid when no filter touches XML. These tests pin the
-///     flag's contract independently of the parity suite (which would catch a mismatch between Dynamic.Core and the
-///     emitter, but not a regression where both started returning the wrong value).
-/// </summary>
 public sealed class EmitterRequiresXmlTests
 {
     [Theory]

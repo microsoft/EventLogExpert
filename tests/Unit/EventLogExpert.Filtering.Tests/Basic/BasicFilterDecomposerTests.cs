@@ -1,19 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
-using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Basic;
 
 public sealed class BasicFilterDecomposerTests
 {
     public static IEnumerable<object[]> ManyValueRoundTrips() =>
-        // BasicFilterFormatter ignores Operator for Many (treats it as Equals-Any-Of). Restrict the
-        // cross-product to (Equals, Many) — the only Many shape the formatter and decomposer agree on.
         from property in EachBasicFilterProperty()
         where property is not EventProperty.Description
             and not EventProperty.Xml
@@ -32,7 +27,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenActivityIdNotContainsNestedInSubFilterChain_ReconstructsEquivalentBasicFilter()
     {
-        // Pins NotContains-on-nullable-Guid reconstruction in a non-leading subfilter position.
         var original = new BasicFilter(
             Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
@@ -73,7 +67,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenComparisonAgainstNullLiteral_RefusesUnencodableNull()
     {
-        // BasicFilter has no encoding for null comparisons; reject any literal-null shape.
         var ok = BasicFilterDecomposer.TryDecompose("Source == null", out var decomposed);
 
         Assert.False(ok);
@@ -83,7 +76,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenContainsLacksOrdinalIgnoreCase_RefusesAsAdvancedOnly()
     {
-        // Formatter always emits OIC; case-sensitive Contains is Advanced-only.
         var ok = BasicFilterDecomposer.TryDecompose("Source.Contains(\"Test\")", out var decomposed);
 
         Assert.False(ok);
@@ -104,8 +96,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenIdLiteralIsZeroPaddedString_NormalizesValueToCanonicalInt()
     {
-        // Documents the Lowerer typed-coercion contract: "001" coerces to int 1, then re-stringifies as "1".
-        // The decomposer therefore yields a BasicFilter whose canonical formatter output omits the padding.
         var ok = BasicFilterDecomposer.TryDecompose("Id == \"001\"", out var decomposed);
 
         Assert.True(ok);
@@ -143,9 +133,8 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenKeywordsAppearsInGenericComparisonShape_RefusesAsAdvancedOnly()
     {
-        // The formatter never emits `Keywords == "X"` directly — it always wraps Keywords in `Keywords.Any(...)`.
-        // The decomposer must refuse so an Advanced filter author's `Keywords == "X"` is not silently re-encoded
-        // into `Keywords.Any(string.Equals(...))` with different semantics.
+        // Formatter wraps Keywords in `Keywords.Any(...)`; refusing the generic shape prevents silent
+        // re-encoding into different semantics on round-trip.
         var ok = BasicFilterDecomposer.TryDecompose("Keywords == \"Audit\"", out var decomposed);
 
         Assert.False(ok);
@@ -155,8 +144,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenKeywordsAppearsInGenericContainsShape_RefusesAsAdvancedOnly()
     {
-        // The formatter emits Keywords Contains as `Keywords.Any(e => e.Contains(...))`, never as
-        // `Keywords.ToString().Contains(...)`. Refuse so the vocabulary stays closed.
         var ok = BasicFilterDecomposer.TryDecompose(
             "Keywords.ToString().Contains(\"Audit\", StringComparison.OrdinalIgnoreCase)",
             out var decomposed);
@@ -168,8 +155,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenKeywordsAppearsInGenericMultiEqualsShape_RefusesAsAdvancedOnly()
     {
-        // The formatter emits Keywords Many as `Keywords.Any(e => (new[]{...}).Contains(e))`, never as
-        // `(new[]{...}).Contains(Keywords)`. Refuse the latter so the round-trip vocabulary stays closed.
         var ok = BasicFilterDecomposer.TryDecompose(
             "(new[] {\"Audit\", \"System\"}).Contains(Keywords)",
             out var decomposed);
@@ -181,7 +166,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenKeywordsNotContainsAppearsAfterOrJoin_ReconstructsMixedJoinSequence()
     {
-        // Pins JoinWithAny=true reconstruction for the negated-Keywords subfilter shape after an OR boundary.
         var original = new BasicFilter(
             Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
@@ -214,7 +198,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenMixedAndOrChain_ReconstructsMixedJoinSequence()
     {
-        // Layout: A AND B OR C AND D — i.e., (A && B) || (C && D).
         var original = new BasicFilter(
             Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [
@@ -229,7 +212,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenNotWrapsBareComparison_RefusesAsAdvancedOnly()
     {
-        // Formatter emits NotEqual directly as `!=`, not `!(... == ...)`. Reject the negated shape.
         var ok = BasicFilterDecomposer.TryDecompose(FilterTestConstants.FilterNot, out var decomposed);
 
         Assert.False(ok);
@@ -272,7 +254,7 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenParenthesizedOrGroupAtFront_RefusesAsAdvancedOnly()
     {
-        // (A || B) && C parses as And(Or(A,B), C) — Or appears as an And-leaf. Decomposer rejects.
+        // Parser yields And(Or(A,B), C) — the leading Or-leaf is outside the BasicFilter vocabulary.
         var ok = BasicFilterDecomposer.TryDecompose(FilterTestConstants.FilterParenthesizedMix, out var decomposed);
 
         Assert.False(ok);
@@ -347,8 +329,6 @@ public sealed class BasicFilterDecomposerTests
     [Fact]
     public void TryDecompose_WhenUserIdGuardAppearsAfterOtherCondition_ReconstructsTrailingUserIdSubFilter()
     {
-        // The formatter emits UserId as a 2-AND template; this used to fail to lower when the UserId guard
-        // appeared in any position other than the top of an AndNode. The L2 lowerer extension fixes that.
         var original = new BasicFilter(
             Comparison(EventProperty.Id, ComparisonOperator.Equals, "100"),
             [new SubFilter(Comparison(EventProperty.UserId, ComparisonOperator.Equals, "S-1-5-18"), false)]);
@@ -409,10 +389,10 @@ public sealed class BasicFilterDecomposerTests
         Assert.Equal(expected.Operator, actual.Operator);
         Assert.Equal(expected.MatchMode, actual.MatchMode);
 
-        // Single mode normalizes typed-field strings (e.g., "001" -> "1"); accept either canonical form.
+        // Typed fields canonicalize Single-mode values (e.g., "001" → "1").
         Assert.Equal(expected.Value, actual.Value);
 
-        // ImmutableList<T> uses reference equality in record equality; assert sequence equality directly.
+        // ImmutableList<T> equality is reference-based on records; compare sequences directly.
         Assert.Equal<IEnumerable<string>>(expected.Values, actual.Values);
     }
 
@@ -483,10 +463,8 @@ public sealed class BasicFilterDecomposerTests
 
     private static bool SupportsSingleValueRoundTrip(EventProperty property, ComparisonOperator op)
     {
-        // Pre-existing formatter <-> lowerer asymmetry: the formatter emits `ProcessId.Contains(...)` for
-        // ProcessId/ThreadId Contains/NotContains (no `.ToString()`), but the lowerer's Contains-on-string branch
-        // only matches when the property resolves to a string. End-to-end this combination has never been
-        // representable; the decomposer correctly rejects it. Out of scope for L2 to widen the lowerer.
+        // Formatter / lowerer asymmetry on ProcessId / ThreadId Contains: formatter emits a Contains-on-string
+        // shape the lowerer's Contains-on-string branch never matches, so the round-trip is not representable.
         if (op is ComparisonOperator.Contains or ComparisonOperator.NotContains
             && property is EventProperty.ProcessId or EventProperty.ThreadId)
         {

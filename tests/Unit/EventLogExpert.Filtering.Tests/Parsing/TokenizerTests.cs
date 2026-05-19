@@ -3,12 +3,12 @@
 
 using EventLogExpert.Filtering.Parsing;
 
-namespace EventLogExpert.Filtering.Tests;
+namespace EventLogExpert.Filtering.Tests.Parsing;
 
 /// <summary>
-///     Direct tests of the internal <see cref="Tokenizer" /> covering boundary cases the public
-///     <see cref="FilterParser.TryValidate" /> suite cannot easily reach: error message position, the exact ceiling at
-///     <see cref="ParseLimits.MaxStringLiteralLength" />, and the position offsets we depend on for diagnostics.
+///     Direct <see cref="Tokenizer" /> tests for boundary cases the public <see cref="FilterParser.TryValidate" />
+///     suite cannot easily reach: error-message positions, the exact <see cref="ParseLimits.MaxStringLiteralLength" />
+///     ceiling, and the position offsets diagnostics depend on.
 /// </summary>
 public sealed class TokenizerTests
 {

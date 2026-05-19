@@ -1,15 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.FilterGroup;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Runtime.FilterGroup;
 
 namespace EventLogExpert.Runtime.Tests.FilterGroup;
 
@@ -70,21 +65,6 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_RemoveGroupFilter_ShouldStoreParentIdAndFilterId()
-    {
-        // Arrange
-        var parentId = FilterGroupId.Create();
-        var filterId = FilterId.Create();
-
-        // Act
-        var action = new RemoveGroupFilterAction(parentId, filterId);
-
-        // Assert
-        Assert.Equal(parentId, action.ParentId);
-        Assert.Equal(filterId, action.Id);
-    }
-
-    [Fact]
     public void FilterGroupAction_RemoveGroup_ShouldStoreId()
     {
         // Arrange
@@ -98,18 +78,18 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_SetGroupFilter_ShouldStoreParentIdAndFilter()
+    public void FilterGroupAction_RemoveGroupFilter_ShouldStoreParentIdAndFilterId()
     {
         // Arrange
         var parentId = FilterGroupId.Create();
-        var filter = FilterFixtures.CreateTestFilter();
+        var filterId = FilterId.Create();
 
         // Act
-        var action = new SetGroupFilterAction(parentId, filter);
+        var action = new RemoveGroupFilterAction(parentId, filterId);
 
         // Assert
         Assert.Equal(parentId, action.ParentId);
-        Assert.Equal(filter, action.Filter);
+        Assert.Equal(filterId, action.Id);
     }
 
     [Fact]
@@ -126,18 +106,18 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void FilterGroupAction_ToggleGroupFilterExcluded_ShouldStoreParentIdAndFilterId()
+    public void FilterGroupAction_SetGroupFilter_ShouldStoreParentIdAndFilter()
     {
         // Arrange
         var parentId = FilterGroupId.Create();
-        var filterId = FilterId.Create();
+        var filter = FilterBuilder.CreateTestFilter();
 
         // Act
-        var action = new ToggleGroupFilterExcludedAction(parentId, filterId);
+        var action = new SetGroupFilterAction(parentId, filter);
 
         // Assert
         Assert.Equal(parentId, action.ParentId);
-        Assert.Equal(filterId, action.Id);
+        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]
@@ -151,6 +131,21 @@ public sealed class FilterGroupStoreTests
 
         // Assert
         Assert.Equal(groupId, action.Id);
+    }
+
+    [Fact]
+    public void FilterGroupAction_ToggleGroupFilterExcluded_ShouldStoreParentIdAndFilterId()
+    {
+        // Arrange
+        var parentId = FilterGroupId.Create();
+        var filterId = FilterId.Create();
+
+        // Act
+        var action = new ToggleGroupFilterExcludedAction(parentId, filterId);
+
+        // Assert
+        Assert.Equal(parentId, action.ParentId);
+        Assert.Equal(filterId, action.Id);
     }
 
     [Fact]
@@ -214,7 +209,7 @@ public sealed class FilterGroupStoreTests
 
         // Act
         var groupId = state.Groups.First().Id;
-        var filter = FilterFixtures.CreateTestFilter();
+        var filter = FilterBuilder.CreateTestFilter();
 
         state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, filter));
 
@@ -234,7 +229,7 @@ public sealed class FilterGroupStoreTests
         var groupId = state.Groups.First().Id;
 
         // Act
-        var initialFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
+        var initialFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Blue);
 
         state = Reducers.ReducerSetGroupFilter(state, new SetGroupFilterAction(groupId, initialFilter));
 
@@ -286,7 +281,7 @@ public sealed class FilterGroupStoreTests
     public void IntegrationTest_FilterManipulation()
     {
         // Arrange
-        var filter = FilterFixtures.CreateTestFilter();
+        var filter = FilterBuilder.CreateTestFilter();
 
         var group = new SavedFilterGroup
         {
@@ -478,58 +473,6 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerRemoveGroupFilter_ShouldRemoveFilterFromGroup()
-    {
-        // Arrange
-        var filter = FilterFixtures.CreateTestFilter();
-
-        var group = new SavedFilterGroup
-        {
-            Name = FilterTestConstants.FilterGroupName,
-            Filters = [filter]
-        };
-
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new RemoveGroupFilterAction(group.Id, filter.Id);
-
-        // Act
-        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
-
-        // Assert
-        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.Empty(updatedGroup.Filters);
-    }
-
-    [Fact]
-    public void ReducerRemoveGroupFilter_WhenFilterNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new RemoveGroupFilterAction(group.Id, FilterId.Create());
-
-        // Act
-        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
-    public void ReducerRemoveGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new RemoveGroupFilterAction(FilterGroupId.Create(), FilterId.Create());
-
-        // Act
-        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
     public void ReducerRemoveGroup_ShouldRebuildDisplayGroupsAtomically()
     {
         // Arrange
@@ -578,10 +521,10 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
-    public void ReducerSetGroupFilter_ShouldUpdateFilter()
+    public void ReducerRemoveGroupFilter_ShouldRemoveFilterFromGroup()
     {
         // Arrange
-        var filter = FilterFixtures.CreateTestFilter();
+        var filter = FilterBuilder.CreateTestFilter();
 
         var group = new SavedFilterGroup
         {
@@ -590,97 +533,43 @@ public sealed class FilterGroupStoreTests
         };
 
         var state = new FilterGroupState { Groups = [group] };
-
-        var updatedFilter = FilterFixtures.CreateTestFilter(
-            FilterTestConstants.FilterIdEquals100,
-            HighlightColor.Green,
-            id: filter.Id);
-
-        var action = new SetGroupFilterAction(group.Id, updatedFilter);
+        var action = new RemoveGroupFilterAction(group.Id, filter.Id);
 
         // Act
-        var newState = Reducers.ReducerSetGroupFilter(state, action);
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
         var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.Single(updatedGroup.Filters);
-        var resultFilter = updatedGroup.Filters[0];
-        Assert.Equal(HighlightColor.Green, resultFilter.Color);
+        Assert.Empty(updatedGroup.Filters);
     }
 
     [Fact]
-    public void ReducerSetGroupFilter_WhenFilterNotFound_ShouldAppendFilter()
+    public void ReducerRemoveGroupFilter_WhenFilterNotFound_ShouldReturnSameState()
     {
         // Arrange
         var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
         var state = new FilterGroupState { Groups = [group] };
-        var newFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Yellow);
-        var action = new SetGroupFilterAction(group.Id, newFilter);
+        var action = new RemoveGroupFilterAction(group.Id, FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerSetGroupFilter(state, action);
-
-        // Assert
-        var resultGroup = newState.Groups.First(g => g.Id == group.Id);
-
-        Assert.Single(resultGroup.Filters);
-        Assert.Equal(newFilter.Id, resultGroup.Filters[0].Id);
-        Assert.Equal(HighlightColor.Yellow, resultGroup.Filters[0].Color);
-    }
-
-    [Fact]
-    public void ReducerSetGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new SetGroupFilterAction(FilterGroupId.Create(), FilterFixtures.CreateTestFilter());
-
-        // Act
-        var newState = Reducers.ReducerSetGroupFilter(state, action);
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
         Assert.Same(state, newState);
     }
 
     [Fact]
-    public void ReducerSetGroupFilter_WhenModeChanges_ShouldPersistNewMode()
+    public void ReducerRemoveGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
     {
         // Arrange
-        var basicFilter = new BasicFilter(
-            new FilterComparison
-            {
-                Property = EventProperty.Id,
-                Operator = ComparisonOperator.Equals,
-                MatchMode = MatchMode.Single,
-                Value = "100"
-            },
-            []);
-
-        var initial = FilterFixtures.CreateTestFilter(basicFilter: basicFilter,
-            mode: FilterMode.Basic);
-
-        var group = new SavedFilterGroup
-        {
-            Name = FilterTestConstants.FilterGroupName,
-            Filters = [initial]
-        };
-
-        var state = new FilterGroupState { Groups = [group] };
-
-        var updatedAsCached = FilterFixtures.CreateTestFilter(id: initial.Id,
-            mode: FilterMode.Cached);
+        var state = new FilterGroupState();
+        var action = new RemoveGroupFilterAction(FilterGroupId.Create(), FilterId.Create());
 
         // Act
-        var newState = Reducers.ReducerSetGroupFilter(
-            state,
-            new SetGroupFilterAction(group.Id, updatedAsCached));
+        var newState = Reducers.ReducerRemoveGroupFilter(state, action);
 
         // Assert
-        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        var resultFilter = updatedGroup.Filters.Single();
-
-        Assert.Equal(FilterMode.Cached, resultFilter.Mode);
-        Assert.Null(resultFilter.BasicFilter);
+        Assert.Same(state, newState);
     }
 
     [Fact]
@@ -693,7 +582,7 @@ public sealed class FilterGroupStoreTests
         var updatedGroup = group with
         {
             Name = FilterTestConstants.FilterGroupName,
-            Filters = [FilterFixtures.CreateTestFilter()]
+            Filters = [FilterBuilder.CreateTestFilter()]
         };
 
         var action = new SetGroupAction(updatedGroup);
@@ -723,10 +612,146 @@ public sealed class FilterGroupStoreTests
     }
 
     [Fact]
+    public void ReducerSetGroupFilter_ShouldUpdateFilter()
+    {
+        // Arrange
+        var filter = FilterBuilder.CreateTestFilter();
+
+        var group = new SavedFilterGroup
+        {
+            Name = FilterTestConstants.FilterGroupName,
+            Filters = [filter]
+        };
+
+        var state = new FilterGroupState { Groups = [group] };
+
+        var updatedFilter = FilterBuilder.CreateTestFilter(
+            FilterTestConstants.FilterIdEquals100,
+            HighlightColor.Green,
+            id: filter.Id);
+
+        var action = new SetGroupFilterAction(group.Id, updatedFilter);
+
+        // Act
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
+
+        // Assert
+        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
+        Assert.Single(updatedGroup.Filters);
+        var resultFilter = updatedGroup.Filters[0];
+        Assert.Equal(HighlightColor.Green, resultFilter.Color);
+    }
+
+    [Fact]
+    public void ReducerSetGroupFilter_WhenFilterNotFound_ShouldAppendFilter()
+    {
+        // Arrange
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName };
+        var state = new FilterGroupState { Groups = [group] };
+        var newFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals100, HighlightColor.Yellow);
+        var action = new SetGroupFilterAction(group.Id, newFilter);
+
+        // Act
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
+
+        // Assert
+        var resultGroup = newState.Groups.First(g => g.Id == group.Id);
+
+        Assert.Single(resultGroup.Filters);
+        Assert.Equal(newFilter.Id, resultGroup.Filters[0].Id);
+        Assert.Equal(HighlightColor.Yellow, resultGroup.Filters[0].Color);
+    }
+
+    [Fact]
+    public void ReducerSetGroupFilter_WhenGroupNotFound_ShouldReturnSameState()
+    {
+        // Arrange
+        var state = new FilterGroupState();
+        var action = new SetGroupFilterAction(FilterGroupId.Create(), FilterBuilder.CreateTestFilter());
+
+        // Act
+        var newState = Reducers.ReducerSetGroupFilter(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
+    public void ReducerSetGroupFilter_WhenModeChanges_ShouldPersistNewMode()
+    {
+        // Arrange
+        var basicFilter = new BasicFilter(
+            new FilterComparison
+            {
+                Property = EventProperty.Id,
+                Operator = ComparisonOperator.Equals,
+                MatchMode = MatchMode.Single,
+                Value = "100"
+            },
+            []);
+
+        var initial = FilterBuilder.CreateTestFilter(basicFilter: basicFilter,
+            mode: FilterMode.Basic);
+
+        var group = new SavedFilterGroup
+        {
+            Name = FilterTestConstants.FilterGroupName,
+            Filters = [initial]
+        };
+
+        var state = new FilterGroupState { Groups = [group] };
+
+        var updatedAsCached = FilterBuilder.CreateTestFilter(id: initial.Id,
+            mode: FilterMode.Cached);
+
+        // Act
+        var newState = Reducers.ReducerSetGroupFilter(
+            state,
+            new SetGroupFilterAction(group.Id, updatedAsCached));
+
+        // Assert
+        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
+        var resultFilter = updatedGroup.Filters.Single();
+
+        Assert.Equal(FilterMode.Cached, resultFilter.Mode);
+        Assert.Null(resultFilter.BasicFilter);
+    }
+
+    [Fact]
+    public void ReducerToggleGroup_ShouldToggleIsEditing()
+    {
+        // Arrange
+        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName, IsEditing = false };
+        var state = new FilterGroupState { Groups = [group] };
+        var action = new ToggleGroupAction(group.Id);
+
+        // Act
+        var newState = Reducers.ReducerToggleGroup(state, action);
+
+        // Assert
+        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
+        Assert.True(updatedGroup.IsEditing);
+    }
+
+    [Fact]
+    public void ReducerToggleGroup_WhenGroupNotFound_ShouldReturnSameState()
+    {
+        // Arrange
+        var state = new FilterGroupState();
+        var action = new ToggleGroupAction(FilterGroupId.Create());
+
+        // Act
+        var newState = Reducers.ReducerToggleGroup(state, action);
+
+        // Assert
+        Assert.Same(state, newState);
+    }
+
+    [Fact]
     public void ReducerToggleGroupFilterExcluded_ShouldToggleIsExcluded()
     {
         // Arrange
-        var filter = FilterFixtures.CreateTestFilter(isExcluded: false);
+        var filter = FilterBuilder.CreateTestFilter(isExcluded: false);
 
         var group = new SavedFilterGroup
         {
@@ -769,36 +794,6 @@ public sealed class FilterGroupStoreTests
 
         // Act
         var newState = Reducers.ReducerToggleGroupFilterExcluded(state, action);
-
-        // Assert
-        Assert.Same(state, newState);
-    }
-
-    [Fact]
-    public void ReducerToggleGroup_ShouldToggleIsEditing()
-    {
-        // Arrange
-        var group = new SavedFilterGroup { Name = FilterTestConstants.FilterGroupName, IsEditing = false };
-        var state = new FilterGroupState { Groups = [group] };
-        var action = new ToggleGroupAction(group.Id);
-
-        // Act
-        var newState = Reducers.ReducerToggleGroup(state, action);
-
-        // Assert
-        var updatedGroup = newState.Groups.First(g => g.Id == group.Id);
-        Assert.True(updatedGroup.IsEditing);
-    }
-
-    [Fact]
-    public void ReducerToggleGroup_WhenGroupNotFound_ShouldReturnSameState()
-    {
-        // Arrange
-        var state = new FilterGroupState();
-        var action = new ToggleGroupAction(FilterGroupId.Create());
-
-        // Act
-        var newState = Reducers.ReducerToggleGroup(state, action);
 
         // Assert
         Assert.Same(state, newState);

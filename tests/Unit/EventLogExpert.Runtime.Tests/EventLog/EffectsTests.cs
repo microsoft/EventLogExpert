@@ -7,23 +7,20 @@ using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.TestUtils;
+using EventLogExpert.Filtering.TestUtils.Constants;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterProgress;
-using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
-using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
-using EventLogExpert.Filtering.TestUtils;
-using EventLogExpert.Filtering.TestUtils.Constants;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Collections.Immutable;
-using CloseAllLogsAction = EventLogExpert.Runtime.Common.Lifecycle.CloseAllLogsAction;
 using CloseLogAction = EventLogExpert.Runtime.EventLog.CloseLogAction;
 using Effects = EventLogExpert.Runtime.EventLog.Effects;
 
@@ -87,7 +84,6 @@ public sealed class EffectsTests
         var (effects, mockDispatcher, _, _, mockFilterService) =
             CreateEffectsWithServices(true, activeLogs);
 
-        // Mock the filter to drop everything (simulate "no events match the active filter").
         mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
             .Returns(new List<ResolvedEvent>());
 
@@ -140,6 +136,913 @@ public sealed class EffectsTests
 
         // Assert - No dispatches should occur
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<object>());
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_ShouldBracketDisplayedEventsUpdateWithFilterProgress()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var filter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [filter]));
+
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        Received.InOrder(() =>
+        {
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+            mockDispatcher.Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
+            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        });
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterProgress()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        mockFilterService
+            .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>()))
+            .Do(_ => throw new InvalidOperationException("boom"));
+
+        var filter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [filter]));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => effects.HandleApplyFilter(action, mockDispatcher));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_WhenLogClosedDuringFilter_ShouldOmitStaleSliceFromDispatch()
+    {
+        // Arrange — log closes (ActiveLogs.Remove) while the filter task is running. The
+        // post-filter dispatch must omit the closed log's slice. (The reducer also skips
+        // unknown log ids, but checking at the effect keeps the dispatch minimal.)
+        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var postCloseState = snapshotState with
+        {
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var filterResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [snapshotData.Id] = snapshotEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(_ =>
+            {
+                volatileState = postCloseState;
+                return filterResult;
+            });
+
+        var nonXmlFilter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert — dispatched UpdateDisplayedEvents has no entry for the closed log id.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_WhenLogEventsChangeDuringFilter_ShouldRefilterFromCurrentState()
+    {
+        // Arrange — single open log; live event arrives during the first filter pass (Events ref
+        // changes). The new filter must be re-applied to the post-mutation rows in a single retry
+        // pass so the user sees the filter applied to the updated row set, not stale rows.
+        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var liveTailEvents = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(101)
+        };
+
+        var postLiveTailState = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = liveTailEvents })
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [snapshotData.Id] = snapshotEvents
+        };
+
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [snapshotData.Id] = liveTailEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(
+                _ =>
+                {
+                    volatileState = postLiveTailState;
+                    return pass1Result;
+                },
+                _ => pass2Result);
+
+        var nonXmlFilter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert — FilterActiveLogs ran twice; the second call received the post-mutation
+        // EventLogData (proves pass 2 actually re-filtered from current state, not from the
+        // pass-1 snapshot). Dispatch contains the re-filtered slice, not the stale pass-1 result.
+        mockFilterService.Received(2).FilterActiveLogs(
+            Arg.Any<IEnumerable<EventLogData>>(),
+            Arg.Any<Filter>());
+
+        mockFilterService.Received(1).FilterActiveLogs(
+            Arg.Is<IEnumerable<EventLogData>>(logs => logs.Any(l => ReferenceEquals(l.Events, liveTailEvents))),
+            Arg.Any<Filter>());
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => a.ActiveLogs.ContainsKey(snapshotData.Id)
+                && ReferenceEquals(a.ActiveLogs[snapshotData.Id], liveTailEvents)));
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_WhenLogStillStaleAfterRetry_ShouldOmitStaleSliceFromDispatch()
+    {
+        // Arrange — events change during pass 1 AND again during pass 2. Single-retry semantics
+        // mean the pass-2 result is still stale; the slice must be omitted so the reducer's
+        // preserve-omitted fallback keeps the existing rows (avoids losing live events).
+        var snapshotEvents = new List<ResolvedEvent>();
+        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
+
+        var snapshotState = new EventLogState
+        {
+            ContinuouslyUpdate = false,
+            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
+            NewEventBuffer = [],
+            AppliedFilter = new Filter(null, [])
+        };
+
+        var pass1MutationEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
+        var pass2MutationEvents = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(101)
+        };
+
+        var afterPass1State = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = pass1MutationEvents })
+        };
+
+        var afterPass2State = snapshotState with
+        {
+            ActiveLogs = snapshotState.ActiveLogs.SetItem(
+                Constants.LogNameTestLog,
+                snapshotData with { Events = pass2MutationEvents })
+        };
+
+        EventLogState volatileState = snapshotState;
+
+        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [snapshotData.Id] = []
+        };
+
+        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [snapshotData.Id] = pass1MutationEvents
+        };
+
+        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
+
+        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(
+                _ =>
+                {
+                    volatileState = afterPass1State;
+                    return pass1Result;
+                },
+                _ =>
+                {
+                    volatileState = afterPass2State;
+                    return pass2Result;
+                });
+
+        var nonXmlFilter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert — both filter passes ran; dispatch omits the still-stale log id.
+        mockFilterService.Received(2).FilterActiveLogs(
+            Arg.Any<IEnumerable<EventLogData>>(),
+            Arg.Any<Filter>());
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_FilterBranch_WhenSupersededByNewerFilter_ShouldDropStaleResults()
+    {
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
+        };
+
+        var freshResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) }
+        };
+
+        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var staleFilterModel = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
+        var freshFilterModel = FilterBuilder.CreateTestFilter(isEnabled: true);
+
+        var staleFilter = new Filter(null, [staleFilterModel]);
+        var freshFilter = new Filter(null, [freshFilterModel]);
+
+        mockFilterService
+            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(callInfo =>
+            {
+                var filter = callInfo.Arg<Filter>();
+
+                if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == FilterTestConstants.FilterIdEquals999)
+                {
+                    staleStarted.TrySetResult(true);
+                    staleGate.Task.GetAwaiter().GetResult();
+                    return staleResult;
+                }
+
+                return freshResult;
+            });
+
+        // Start the stale filter and wait until it is parked inside FilterActiveLogs.
+        var staleTask = effects.HandleApplyFilter(new ApplyFilterAction(staleFilter), mockDispatcher);
+        await staleStarted.Task;
+
+        // While the stale filter is still parked, run the fresh filter to completion. This
+        // bumps _filterGeneration so the stale run will be detected as superseded.
+        await effects.HandleApplyFilter(new ApplyFilterAction(freshFilter), mockDispatcher);
+
+        // Release the stale filter — its post-await checks should now fail the generation guard.
+        staleGate.SetResult(true);
+        await staleTask;
+
+        // Fresh result reached the table; stale result was dropped.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => a.ActiveLogs[logData.Id][0].Id == 100));
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
+
+        // SetFilterProgressAction(false) was dispatched by the fresh run; the stale run's finally was
+        // suppressed by the generation guard, so we should see exactly one false-dispatch.
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_ReloadBranch_ShouldClearStaleFilterProgressSpinner()
+    {
+        // The reload path must dispatch SetFilterProgressAction(false) to clear any spinner
+        // left over from a superseded filter-only run. Without this clear, the reload's
+        // per-table IsLoading takes over the UI but the (stale) filter spinner would appear
+        // stuck. The reload path itself must never dispatch SetFilterProgressAction(true) —
+        // per-table loading covers the close+reopen window.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog → HandleCloseLog so the reload's close-completion TCS resolves
+        // quickly. Without this routing, HandleApplyFilter parks on LogCloseTimeout (30s).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var action = new ApplyFilterAction(new Filter(null, [xmlFilter]));
+
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        Assert.True(action.Filter.RequiresXml);
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_ShouldFilterAndDispatchUpdate()
+    {
+        // Arrange
+        var events = new List<ResolvedEvent>
+        {
+            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
+            FilterEventBuilder.CreateTestEvent(200, level: FilterTestConstants.EventLevelInformation)
+        };
+
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var filter = new Filter(null, []);
+        var action = new ApplyFilterAction(filter);
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert
+        mockFilterService.Received(1).FilterActiveLogs(
+            Arg.Any<IEnumerable<EventLogData>>(),
+            filter);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenCloseAllArrivesMidReopenLoop_ShouldDispatchCloseLogForJustReopenedLogs()
+    {
+        // Arrange — pin down the per-iteration revalidation in the reopen loop. With two
+        // logs needing reload, hook the FIRST OpenLogAction dispatch to land CloseAll
+        // before the second iteration. The loop must:
+        //   (1) detect the supersession on iteration 2,
+        //   (2) dispatch CloseLogAction for the log it already reopened on iteration 1,
+        //   (3) NOT dispatch the second OpenLog,
+        //   (4) clear pending selection restore for both logs in the reload set.
+        // Without per-iteration revalidation, both OpenLogs would land and re-add the logs
+        // the user just closed.
+        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
+        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
+            .Add(Constants.LogNameLog1, logData1)
+            .Add(Constants.LogNameLog2, logData2);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        // Hook the FIRST OpenLogAction dispatch to land CloseAll synchronously, which bumps
+        // _closeAllGeneration before the loop's next iteration check.
+        var openLogCount = 0;
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<OpenLogAction>()))
+            .Do(_ =>
+            {
+                openLogCount++;
+
+                if (openLogCount == 1)
+                {
+                    // Run HandleCloseAll synchronously inside the dispatch hook so the next
+                    // loop iteration sees the bumped _closeAllGeneration.
+                    effects.HandleCloseAll(mockDispatcher).GetAwaiter().GetResult();
+                }
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act
+        await effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        // Assert — exactly one OpenLog dispatched (the second iteration bailed). A CloseLog
+        // for the first-reopened log must have been dispatched as cleanup. The original two
+        // CloseLog dispatches (reload-path close+await) plus the cleanup CloseLog = 3 total
+        // CloseLog dispatches for these two log names.
+        mockDispatcher.Received(1).Dispatch(Arg.Any<OpenLogAction>());
+
+        // The cleanup CloseLog targets the log we already reopened (Log1).
+        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == Constants.LogNameLog1));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldClearPendingSelectionRestoreEntries()
+    {
+        // Arrange — pin down that when CloseAll supersedes a reload, the
+        // _pendingSelectionRestore entries the reload wrote are cleared before bail-out.
+        // Without this cleanup, a later manual reopen of the same log name would consume
+        // stale selection state from the canceled reload (HandleLoadEvents reads
+        // _pendingSelectionRestore unconditionally on each load).
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
+
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = activeLogs,
+            SelectedEvents = [selectedEvent],
+            AppliedFilter = new Filter(null, [])
+        });
+
+        var mockFilterService = Substitute.For<IFilterService>();
+        var mockLogWatcher = Substitute.For<ILogWatcherService>();
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+        mockLogWatcher.RemoveAllAsync().Returns(Task.CompletedTask);
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(Substitute.For<IServiceProvider>());
+
+        var mockDatabaseService = Substitute.For<IDatabaseService>();
+        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        var effects = new Effects(
+            mockEventLogState,
+            mockFilterService,
+            Substitute.For<ITraceLogger>(),
+            mockLogWatcher,
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory,
+            mockDatabaseService,
+            Substitute.For<IBannerService>(),
+            mockDispatcher);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act — start ApplyFilter; it writes the pending selection restore entry (selected
+        // event has RecordId=42), then parks waiting for close-completion.
+        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        // Land CloseAll while the reload is parked.
+        await effects.HandleCloseAll(mockDispatcher);
+
+        watcherCompletion.SetResult();
+        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert — a subsequent HandleLoadEvents for the same log name must find NO pending
+        // selection restore entry (otherwise selection would be restored from the canceled
+        // reload). HandleLoadEvents consumes the entry via TryRemove; if the entry isn't
+        // there, no SetSelectedEvents dispatch occurs.
+        var reopenLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var reloadedEvents = ImmutableArray.Create(
+            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog));
+        await effects.HandleLoadEvents(new LoadEventsAction(reopenLogData, reloadedEvents), mockDispatcher);
+
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetSelectedEventsAction>());
+
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldNotReopenClosedLogs()
+    {
+        // Arrange — pin down that a CloseAll landing WHILE ReloadLogsWithXmlAsync is parked
+        // on the close-completion TCS suppresses the reopen loop. Without the generation
+        // recheck in ReloadLogsWithXmlAsync, the reload would re-add the just-closed logs
+        // because OpenLogAction's reducer treats missing logs as adds.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Gate HandleCloseLog so the reload's close-completion TCS stays unsignaled until
+        // we have a chance to land a CloseAll on the same dispatcher.
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act — start HandleApplyFilter; it parks waiting for the close-completion TCS.
+        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
+
+        // While ReloadLogsWithXmlAsync is parked, simulate a CloseAll landing on the
+        // dispatcher. This bumps _closeAllGeneration so the parked reload sees itself
+        // as superseded and skips its reopen loop.
+        await effects.HandleCloseAll(mockDispatcher);
+
+        // Release HandleCloseLog → close-completion TCS signals → reload continues.
+        watcherCompletion.SetResult();
+
+        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert — no OpenLogAction was dispatched for the closed log. The CloseLogAction
+        // from the reload itself is fine; only the post-await reopen must be suppressed.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenFilterDoesNotRequireXml_ShouldNotReloadLogs()
+    {
+        // Arrange — single active log + non-XML filter (Id-based). RequiresXml should be false,
+        // so HandleApplyFilter should fall through to UpdateDisplayedEvents and never close/open logs.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var nonXmlFilter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var filter = new Filter(null, [nonXmlFilter]);
+        var action = new ApplyFilterAction(filter);
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert — UpdateDisplayedEvents path; no Close/Open dispatches.
+        Assert.False(filter.RequiresXml);
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<CloseLogAction>());
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
+        mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenFilterRequiresXml_AwaitsCloseCompletionBeforeReturning()
+    {
+        // Arrange — RemoveLogAsync is gated by a controlled TCS so HandleCloseLog cannot
+        // complete until the test signals it. HandleCloseLog clears _pendingSelectionRestore
+        // for the log name AFTER awaiting the watcher, then signals the close-completion
+        // TCS in its finally block. HandleApplyFilter must await that close-completion TCS
+        // before populating _pendingSelectionRestore — otherwise the in-flight close wipes
+        // the freshly-written entry. This test pins down the ordering invariant.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+
+        // Capture each routed close so any fault in HandleCloseLog surfaces before the test
+        // ends (the discarded `_ = effects.HandleCloseLog(...)` would otherwise let a fault
+        // be silently observed by the finalizer).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act — start HandleApplyFilter; it must remain pending until watcherCompletion fires.
+        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        // Assert — task is blocked because HandleCloseLog can't finish until RemoveLogAsync
+        // returns. Without the close-completion await in HandleApplyFilter, the task would
+        // already be completed (it would have written the restore map and returned).
+        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
+
+        // Release HandleCloseLog → finally block signals the close-completion TCS.
+        watcherCompletion.SetResult();
+
+        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // OpenLog should now have been dispatched (only happens after the close await).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenFilterRequiresXml_ShouldRestoreSelectionAfterReload()
+    {
+        // Arrange — active log with one previously-selected event (RecordId=42). After the
+        // XML filter triggers a reload, HandleLoadEvents should consume the pending restore
+        // entry and dispatch SelectEvents with the matching event from the new event set.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
+
+        var mockEventLogState = Substitute.For<IState<EventLogState>>();
+
+        mockEventLogState.Value.Returns(new EventLogState
+        {
+            ActiveLogs = activeLogs,
+            SelectedEvents = [selectedEvent],
+            AppliedFilter = new Filter(null, [])
+        });
+
+        var mockFilterService = Substitute.For<IFilterService>();
+
+        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
+            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
+
+        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
+        var mockServiceScope = Substitute.For<IServiceScope>();
+        var mockServiceProvider = Substitute.For<IServiceProvider>();
+
+        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
+        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
+
+        var effects = new Effects(
+            mockEventLogState,
+            mockFilterService,
+            Substitute.For<ITraceLogger>(),
+            Substitute.For<ILogWatcherService>(),
+            Substitute.For<IEventResolverCache>(),
+            Substitute.For<IEventXmlResolver>(),
+            mockServiceScopeFactory,
+            Substitute.For<IDatabaseService>(),
+            Substitute.For<IBannerService>(),
+            Substitute.For<IDispatcher>());
+
+        var mockDispatcher = Substitute.For<IDispatcher>();
+
+        // Route CloseLog dispatches into HandleCloseLog so the close-completion TCSes
+        // get signaled. HandleCloseLog clears _pendingSelectionRestore for the log name as
+        // part of its async cleanup; HandleApplyFilter must await the close before writing
+        // the restore map. Without this routing the await would hit LogCloseTimeout (30s).
+        // Capture the routed tasks so any fault in HandleCloseLog surfaces at the end of
+        // the test instead of being swallowed by the discard.
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+
+        // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
+        await effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
+
+        // Act 2: Simulate the subsequent LoadEvents that the new OpenLog produces. The
+        // reloaded events include the previously-selected RecordId=42 plus an unrelated one.
+        var reloadedEvents = ImmutableArray.Create(
+            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog),
+            FilterEventBuilder.CreateTestEvent(200, recordId: 99, logName: Constants.LogNameTestLog));
+
+        await effects.HandleLoadEvents(new LoadEventsAction(logData, reloadedEvents), mockDispatcher);
+
+        // Assert — SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<SetSelectedEventsAction>(a =>
+            a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenFilterRequiresXmlAndLogLacksXml_ShouldCloseAndReopenLog()
+    {
+        // Arrange — active log has not been loaded with XML, so it must be re-read.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog → HandleCloseLog so HandleApplyFilter's await on the close-completion
+        // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
+        // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
+        // being swallowed by the discard.
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter = new Filter(null, [xmlFilter]);
+        var action = new ApplyFilterAction(filter);
+
+        // Act
+        await effects.HandleApplyFilter(action, mockDispatcher);
+
+        // Assert
+        Assert.True(filter.RequiresXml);
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
+
+        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
+
+        // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenNewerApplyFilterRacesReload_ShouldStillReopenClosedLogs()
+    {
+        // Arrange — pin down that a newer ApplyFilter racing in while ReloadLogsWithXmlAsync
+        // is parked must NOT cause the parked reload to skip its reopen. The newer filter
+        // only bumps _filterGeneration; only CloseAll bumps _closeAllGeneration. Without
+        // that distinction, the round-2 guard treated any generation bump as supersession
+        // and left the user's logs closed (the newer ApplyFilter sees empty ActiveLogs
+        // because the CloseLog reducer already removed them, finds nothing to reload, and
+        // returns).
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
+
+        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
+
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var xmlFilter1 = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var filter1 = new Filter(null, [xmlFilter1]);
+
+        // Act — start the first ApplyFilter; it parks waiting for the close-completion TCS.
+        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter1), mockDispatcher);
+
+        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
+
+        // Race a NEWER ApplyFilter in. Use a non-XML filter so it goes through the fast
+        // ApplyFilterAndPublishAsync path (no reload needed) — but it still bumps
+        // _filterGeneration at the top of HandleApplyFilter. It must NOT bump
+        // _closeAllGeneration, so the parked first reload should still reopen its log.
+        var nonXmlFilter = FilterBuilder.CreateTestFilter(isEnabled: true);
+        var filter2 = new Filter(null, [nonXmlFilter]);
+        await effects.HandleApplyFilter(new ApplyFilterAction(filter2), mockDispatcher);
+
+        // Release the parked HandleCloseLog so the first reload can proceed.
+        watcherCompletion.SetResult();
+
+        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        // Assert — OpenLog WAS dispatched for the closed log by the first reload (which
+        // would not have happened if the round-2 guard had treated filter2's _filterGeneration
+        // bump as supersession).
+        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
+            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
+    }
+
+    [Fact]
+    public async Task HandleApplyFilter_WhenReloadSupersedesFilterOnly_ShouldDropFilterOnlyResults()
+    {
+        // A reload-path ApplyFilter must invalidate any in-flight filter-only run. The
+        // Fluxor reducer for this action runs synchronously before this effect, so the
+        // older run is now working against a stale filter — its UpdateDisplayedEvents
+        // result must not land on top of the new applied filter.
+        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
+        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
+
+        var (effects, mockDispatcher, _, _, mockFilterService) =
+            CreateEffectsWithServices(activeLogs: activeLogs);
+
+        // Route CloseLog → HandleCloseLog so the reload-path xmlFilter dispatch resolves
+        // its close-completion TCS quickly (otherwise it parks on LogCloseTimeout for 30s).
+        var closeTasks = new List<Task>();
+        mockDispatcher
+            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
+            .Do(callInfo =>
+            {
+                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
+            });
+
+        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
+        {
+            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
+        };
+
+        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var staleFilterModel = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
+        var staleFilter = new Filter(null, [staleFilterModel]);
+
+        var xmlFilterModel = FilterBuilder.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
+        var xmlFilter = new Filter(null, [xmlFilterModel]);
+
+        mockFilterService
+            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
+            .Returns(callInfo =>
+            {
+                staleStarted.TrySetResult(true);
+                staleGate.Task.GetAwaiter().GetResult();
+                return staleResult;
+            });
+
+        // Start the filter-only run and wait until it is parked inside FilterActiveLogs.
+        var staleTask = effects.HandleApplyFilter(new ApplyFilterAction(staleFilter), mockDispatcher);
+        await staleStarted.Task;
+
+        // While the filter-only run is parked, run the reload-path filter (XML). This must
+        // bump _filterGeneration so the parked run is detected as superseded.
+        await effects.HandleApplyFilter(new ApplyFilterAction(xmlFilter), mockDispatcher);
+
+        // Release the parked filter; the post-await check should now fail the generation guard.
+        staleGate.SetResult(true);
+        await staleTask;
+
+        // The stale run must NOT have dispatched UpdateDisplayedEvents.
+        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
+            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
+
+        // Surface any HandleCloseLog faults before exiting the test.
+        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
@@ -448,7 +1351,6 @@ public sealed class EffectsTests
             activeLogs: activeLogs,
             newEventBuffer: bufferedEvents);
 
-        // Capture the dispatched batch for inspection.
         AppendTableEventsBatchAction? captured = null;
 
         mockDispatcher
@@ -700,913 +1602,6 @@ public sealed class EffectsTests
         mockDispatcher.Received(1).Dispatch(Arg.Any<AppendTableEventsBatchAction>());
         mockDispatcher.Received(1).Dispatch(Arg.Any<AddEventSuccessAction>());
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_ShouldBracketDisplayedEventsUpdateWithFilterProgress()
-    {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var filter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [filter]));
-
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        Received.InOrder(() =>
-        {
-            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
-            mockDispatcher.Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-            mockDispatcher.Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
-        });
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenFilterServiceThrows_ShouldStillClearFilterProgress()
-    {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, mockFilterService) =
-            CreateEffectsWithServices(activeLogs: activeLogs);
-
-        mockFilterService
-            .When(x => x.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>()))
-            .Do(_ => throw new InvalidOperationException("boom"));
-
-        var filter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [filter]));
-
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => effects.HandleApplyFilter(action, mockDispatcher));
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenLogClosedDuringFilter_ShouldOmitStaleSliceFromDispatch()
-    {
-        // Arrange — log closes (ActiveLogs.Remove) while the filter task is running. The
-        // post-filter dispatch must omit the closed log's slice. (The reducer also skips
-        // unknown log ids, but checking at the effect keeps the dispatch minimal.)
-        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
-        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
-
-        var snapshotState = new EventLogState
-        {
-            ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
-            NewEventBuffer = [],
-            AppliedFilter = new Filter(null, [])
-        };
-
-        var postCloseState = snapshotState with
-        {
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty
-        };
-
-        EventLogState volatileState = snapshotState;
-
-        var filterResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [snapshotData.Id] = snapshotEvents
-        };
-
-        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
-
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
-            .Returns(_ =>
-            {
-                volatileState = postCloseState;
-                return filterResult;
-            });
-
-        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert — dispatched UpdateDisplayedEvents has no entry for the closed log id.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenLogEventsChangeDuringFilter_ShouldRefilterFromCurrentState()
-    {
-        // Arrange — single open log; live event arrives during the first filter pass (Events ref
-        // changes). The new filter must be re-applied to the post-mutation rows in a single retry
-        // pass so the user sees the filter applied to the updated row set, not stale rows.
-        var snapshotEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
-        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
-
-        var snapshotState = new EventLogState
-        {
-            ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
-            NewEventBuffer = [],
-            AppliedFilter = new Filter(null, [])
-        };
-
-        var liveTailEvents = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(100),
-            FilterEventBuilder.CreateTestEvent(101)
-        };
-
-        var postLiveTailState = snapshotState with
-        {
-            ActiveLogs = snapshotState.ActiveLogs.SetItem(
-                Constants.LogNameTestLog,
-                snapshotData with { Events = liveTailEvents })
-        };
-
-        EventLogState volatileState = snapshotState;
-
-        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [snapshotData.Id] = snapshotEvents
-        };
-
-        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [snapshotData.Id] = liveTailEvents
-        };
-
-        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
-
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
-            .Returns(
-                _ =>
-                {
-                    volatileState = postLiveTailState;
-                    return pass1Result;
-                },
-                _ => pass2Result);
-
-        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert — FilterActiveLogs ran twice; the second call received the post-mutation
-        // EventLogData (proves pass 2 actually re-filtered from current state, not from the
-        // pass-1 snapshot). Dispatch contains the re-filtered slice, not the stale pass-1 result.
-        mockFilterService.Received(2).FilterActiveLogs(
-            Arg.Any<IEnumerable<EventLogData>>(),
-            Arg.Any<Filter>());
-
-        mockFilterService.Received(1).FilterActiveLogs(
-            Arg.Is<IEnumerable<EventLogData>>(logs => logs.Any(l => ReferenceEquals(l.Events, liveTailEvents))),
-            Arg.Any<Filter>());
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => a.ActiveLogs.ContainsKey(snapshotData.Id)
-                && ReferenceEquals(a.ActiveLogs[snapshotData.Id], liveTailEvents)));
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenLogStillStaleAfterRetry_ShouldOmitStaleSliceFromDispatch()
-    {
-        // Arrange — events change during pass 1 AND again during pass 2. Single-retry semantics
-        // mean the pass-2 result is still stale; the slice must be omitted so the reducer's
-        // preserve-omitted fallback keeps the existing rows (avoids losing live events).
-        var snapshotEvents = new List<ResolvedEvent>();
-        var snapshotData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, snapshotEvents);
-
-        var snapshotState = new EventLogState
-        {
-            ContinuouslyUpdate = false,
-            ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, snapshotData),
-            NewEventBuffer = [],
-            AppliedFilter = new Filter(null, [])
-        };
-
-        var pass1MutationEvents = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) };
-        var pass2MutationEvents = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(100),
-            FilterEventBuilder.CreateTestEvent(101)
-        };
-
-        var afterPass1State = snapshotState with
-        {
-            ActiveLogs = snapshotState.ActiveLogs.SetItem(
-                Constants.LogNameTestLog,
-                snapshotData with { Events = pass1MutationEvents })
-        };
-
-        var afterPass2State = snapshotState with
-        {
-            ActiveLogs = snapshotState.ActiveLogs.SetItem(
-                Constants.LogNameTestLog,
-                snapshotData with { Events = pass2MutationEvents })
-        };
-
-        EventLogState volatileState = snapshotState;
-
-        var pass1Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [snapshotData.Id] = []
-        };
-
-        var pass2Result = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [snapshotData.Id] = pass1MutationEvents
-        };
-
-        var (effects, mockDispatcher, mockFilterService) = CreateEffectsWithMutableState(() => volatileState);
-
-        mockFilterService.FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
-            .Returns(
-                _ =>
-                {
-                    volatileState = afterPass1State;
-                    return pass1Result;
-                },
-                _ =>
-                {
-                    volatileState = afterPass2State;
-                    return pass2Result;
-                });
-
-        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [nonXmlFilter]));
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert — both filter passes ran; dispatch omits the still-stale log id.
-        mockFilterService.Received(2).FilterActiveLogs(
-            Arg.Any<IEnumerable<EventLogData>>(),
-            Arg.Any<Filter>());
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => !a.ActiveLogs.ContainsKey(snapshotData.Id)));
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_FilterBranch_WhenSupersededByNewerFilter_ShouldDropStaleResults()
-    {
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, mockFilterService) =
-            CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
-        };
-
-        var freshResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(100) }
-        };
-
-        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var staleFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
-        var freshFilterModel = FilterFixtures.CreateTestFilter(isEnabled: true);
-
-        var staleFilter = new Filter(null, [staleFilterModel]);
-        var freshFilter = new Filter(null, [freshFilterModel]);
-
-        mockFilterService
-            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
-            .Returns(callInfo =>
-            {
-                var filter = callInfo.Arg<Filter>();
-
-                if (filter.Filters.Count > 0 && filter.Filters[0].ComparisonText == FilterTestConstants.FilterIdEquals999)
-                {
-                    staleStarted.TrySetResult(true);
-                    staleGate.Task.GetAwaiter().GetResult();
-                    return staleResult;
-                }
-
-                return freshResult;
-            });
-
-        // Start the stale filter and wait until it is parked inside FilterActiveLogs.
-        var staleTask = effects.HandleApplyFilter(new ApplyFilterAction(staleFilter), mockDispatcher);
-        await staleStarted.Task;
-
-        // While the stale filter is still parked, run the fresh filter to completion. This
-        // bumps _filterGeneration so the stale run will be detected as superseded.
-        await effects.HandleApplyFilter(new ApplyFilterAction(freshFilter), mockDispatcher);
-
-        // Release the stale filter — its post-await checks should now fail the generation guard.
-        staleGate.SetResult(true);
-        await staleTask;
-
-        // Fresh result reached the table; stale result was dropped.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => a.ActiveLogs[logData.Id][0].Id == 100));
-
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
-
-        // SetFilterProgressAction(false) was dispatched by the fresh run; the stale run's finally was
-        // suppressed by the generation guard, so we should see exactly one false-dispatch.
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_ReloadBranch_ShouldClearStaleFilterProgressSpinner()
-    {
-        // The reload path must dispatch SetFilterProgressAction(false) to clear any spinner
-        // left over from a superseded filter-only run. Without this clear, the reload's
-        // per-table IsLoading takes over the UI but the (stale) filter spinner would appear
-        // stuck. The reload path itself must never dispatch SetFilterProgressAction(true) —
-        // per-table loading covers the close+reopen window.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        // Route CloseLog → HandleCloseLog so the reload's close-completion TCS resolves
-        // quickly. Without this routing, HandleApplyFilter parks on LogCloseTimeout (30s).
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var action = new ApplyFilterAction(new Filter(null, [xmlFilter]));
-
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        Assert.True(action.Filter.RequiresXml);
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetFilterProgressAction>(a => !a.IsLoading));
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<SetFilterProgressAction>(a => a.IsLoading));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_ShouldFilterAndDispatchUpdate()
-    {
-        // Arrange
-        var events = new List<ResolvedEvent>
-        {
-            FilterEventBuilder.CreateTestEvent(100, level: FilterTestConstants.EventLevelError),
-            FilterEventBuilder.CreateTestEvent(200, level: FilterTestConstants.EventLevelInformation)
-        };
-
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, events);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, mockFilterService) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var filter = new Filter(null, []);
-        var action = new ApplyFilterAction(filter);
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert
-        mockFilterService.Received(1).FilterActiveLogs(
-            Arg.Any<IEnumerable<EventLogData>>(),
-            filter);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenFilterDoesNotRequireXml_ShouldNotReloadLogs()
-    {
-        // Arrange — single active log + non-XML filter (Id-based). RequiresXml should be false,
-        // so HandleApplyFilter should fall through to UpdateDisplayedEvents and never close/open logs.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var filter = new Filter(null, [nonXmlFilter]);
-        var action = new ApplyFilterAction(filter);
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert — UpdateDisplayedEvents path; no Close/Open dispatches.
-        Assert.False(filter.RequiresXml);
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<CloseLogAction>());
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
-        mockDispatcher.Received(1).Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenFilterRequiresXml_AwaitsCloseCompletionBeforeReturning()
-    {
-        // Arrange — RemoveLogAsync is gated by a controlled TCS so HandleCloseLog cannot
-        // complete until the test signals it. HandleCloseLog clears _pendingSelectionRestore
-        // for the log name AFTER awaiting the watcher, then signals the close-completion
-        // TCS in its finally block. HandleApplyFilter must await that close-completion TCS
-        // before populating _pendingSelectionRestore — otherwise the in-flight close wipes
-        // the freshly-written entry. This test pins down the ordering invariant.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
-
-        // Capture each routed close so any fault in HandleCloseLog surfaces before the test
-        // ends (the discarded `_ = effects.HandleCloseLog(...)` would otherwise let a fault
-        // be silently observed by the finalizer).
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-
-        // Act — start HandleApplyFilter; it must remain pending until watcherCompletion fires.
-        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
-
-        // Assert — task is blocked because HandleCloseLog can't finish until RemoveLogAsync
-        // returns. Without the close-completion await in HandleApplyFilter, the task would
-        // already be completed (it would have written the restore map and returned).
-        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
-
-        // Release HandleCloseLog → finally block signals the close-completion TCS.
-        watcherCompletion.SetResult();
-
-        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // OpenLog should now have been dispatched (only happens after the close await).
-        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldNotReopenClosedLogs()
-    {
-        // Arrange — pin down that a CloseAll landing WHILE ReloadLogsWithXmlAsync is parked
-        // on the close-completion TCS suppresses the reopen loop. Without the generation
-        // recheck in ReloadLogsWithXmlAsync, the reload would re-add the just-closed logs
-        // because OpenLogAction's reducer treats missing logs as adds.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        // Gate HandleCloseLog so the reload's close-completion TCS stays unsignaled until
-        // we have a chance to land a CloseAll on the same dispatcher.
-        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
-
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-
-        // Act — start HandleApplyFilter; it parks waiting for the close-completion TCS.
-        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
-
-        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
-
-        // While ReloadLogsWithXmlAsync is parked, simulate a CloseAll landing on the
-        // dispatcher. This bumps _closeAllGeneration so the parked reload sees itself
-        // as superseded and skips its reopen loop.
-        await effects.HandleCloseAll(mockDispatcher);
-
-        // Release HandleCloseLog → close-completion TCS signals → reload continues.
-        watcherCompletion.SetResult();
-
-        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // Assert — no OpenLogAction was dispatched for the closed log. The CloseLogAction
-        // from the reload itself is fine; only the post-await reopen must be suppressed.
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<OpenLogAction>());
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenNewerApplyFilterRacesReload_ShouldStillReopenClosedLogs()
-    {
-        // Arrange — pin down that a newer ApplyFilter racing in while ReloadLogsWithXmlAsync
-        // is parked must NOT cause the parked reload to skip its reopen. The newer filter
-        // only bumps _filterGeneration; only CloseAll bumps _closeAllGeneration. Without
-        // that distinction, the round-2 guard treated any generation bump as supersession
-        // and left the user's logs closed (the newer ApplyFilter sees empty ActiveLogs
-        // because the CloseLog reducer already removed them, finds nothing to reload, and
-        // returns).
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
-
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter1 = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter1 = new Filter(null, [xmlFilter1]);
-
-        // Act — start the first ApplyFilter; it parks waiting for the close-completion TCS.
-        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter1), mockDispatcher);
-
-        Assert.False(applyFilterTask.IsCompleted, "HandleApplyFilter must wait for HandleCloseLog before populating the restore map.");
-
-        // Race a NEWER ApplyFilter in. Use a non-XML filter so it goes through the fast
-        // ApplyFilterAndPublishAsync path (no reload needed) — but it still bumps
-        // _filterGeneration at the top of HandleApplyFilter. It must NOT bump
-        // _closeAllGeneration, so the parked first reload should still reopen its log.
-        var nonXmlFilter = FilterFixtures.CreateTestFilter(isEnabled: true);
-        var filter2 = new Filter(null, [nonXmlFilter]);
-        await effects.HandleApplyFilter(new ApplyFilterAction(filter2), mockDispatcher);
-
-        // Release the parked HandleCloseLog so the first reload can proceed.
-        watcherCompletion.SetResult();
-
-        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // Assert — OpenLog WAS dispatched for the closed log by the first reload (which
-        // would not have happened if the round-2 guard had treated filter2's _filterGeneration
-        // bump as supersession).
-        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenCloseAllArrivesMidReopenLoop_ShouldDispatchCloseLogForJustReopenedLogs()
-    {
-        // Arrange — pin down the per-iteration revalidation in the reopen loop. With two
-        // logs needing reload, hook the FIRST OpenLogAction dispatch to land CloseAll
-        // before the second iteration. The loop must:
-        //   (1) detect the supersession on iteration 2,
-        //   (2) dispatch CloseLogAction for the log it already reopened on iteration 1,
-        //   (3) NOT dispatch the second OpenLog,
-        //   (4) clear pending selection restore for both logs in the reload set.
-        // Without per-iteration revalidation, both OpenLogs would land and re-add the logs
-        // the user just closed.
-        var logData1 = new EventLogData(Constants.LogNameLog1, LogPathType.Channel, []);
-        var logData2 = new EventLogData(Constants.LogNameLog2, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty
-            .Add(Constants.LogNameLog1, logData1)
-            .Add(Constants.LogNameLog2, logData2);
-
-        var (effects, mockDispatcher, mockLogWatcher, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        // Hook the FIRST OpenLogAction dispatch to land CloseAll synchronously, which bumps
-        // _closeAllGeneration before the loop's next iteration check.
-        var openLogCount = 0;
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<OpenLogAction>()))
-            .Do(_ =>
-            {
-                openLogCount++;
-
-                if (openLogCount == 1)
-                {
-                    // Run HandleCloseAll synchronously inside the dispatch hook so the next
-                    // loop iteration sees the bumped _closeAllGeneration.
-                    effects.HandleCloseAll(mockDispatcher).GetAwaiter().GetResult();
-                }
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-
-        // Act
-        await effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
-
-        // Assert — exactly one OpenLog dispatched (the second iteration bailed). A CloseLog
-        // for the first-reopened log must have been dispatched as cleanup. The original two
-        // CloseLog dispatches (reload-path close+await) plus the cleanup CloseLog = 3 total
-        // CloseLog dispatches for these two log names.
-        mockDispatcher.Received(1).Dispatch(Arg.Any<OpenLogAction>());
-
-        // The cleanup CloseLog targets the log we already reopened (Log1).
-        mockDispatcher.Received().Dispatch(Arg.Is<CloseLogAction>(a => a.LogName == Constants.LogNameLog1));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenCloseAllSupersedesReload_ShouldClearPendingSelectionRestoreEntries()
-    {
-        // Arrange — pin down that when CloseAll supersedes a reload, the
-        // _pendingSelectionRestore entries the reload wrote are cleared before bail-out.
-        // Without this cleanup, a later manual reopen of the same log name would consume
-        // stale selection state from the canceled reload (HandleLoadEvents reads
-        // _pendingSelectionRestore unconditionally on each load).
-        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
-
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var mockEventLogState = Substitute.For<IState<EventLogState>>();
-
-        mockEventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = activeLogs,
-            SelectedEvents = [selectedEvent],
-            AppliedFilter = new Filter(null, [])
-        });
-
-        var mockFilterService = Substitute.For<IFilterService>();
-        var mockLogWatcher = Substitute.For<ILogWatcherService>();
-        var watcherCompletion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        mockLogWatcher.RemoveLogAsync(Arg.Any<string>()).Returns(watcherCompletion.Task);
-        mockLogWatcher.RemoveAllAsync().Returns(Task.CompletedTask);
-
-        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
-        var mockServiceScope = Substitute.For<IServiceScope>();
-        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
-        mockServiceScope.ServiceProvider.Returns(Substitute.For<IServiceProvider>());
-
-        var mockDatabaseService = Substitute.For<IDatabaseService>();
-        mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
-        var effects = new Effects(
-            mockEventLogState,
-            mockFilterService,
-            Substitute.For<ITraceLogger>(),
-            mockLogWatcher,
-            Substitute.For<IEventResolverCache>(),
-            Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory,
-            mockDatabaseService,
-            Substitute.For<IBannerService>(),
-            mockDispatcher);
-
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-
-        // Act — start ApplyFilter; it writes the pending selection restore entry (selected
-        // event has RecordId=42), then parks waiting for close-completion.
-        var applyFilterTask = effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
-
-        // Land CloseAll while the reload is parked.
-        await effects.HandleCloseAll(mockDispatcher);
-
-        watcherCompletion.SetResult();
-        await applyFilterTask.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
-
-        // Assert — a subsequent HandleLoadEvents for the same log name must find NO pending
-        // selection restore entry (otherwise selection would be restored from the canceled
-        // reload). HandleLoadEvents consumes the entry via TryRemove; if the entry isn't
-        // there, no SetSelectedEvents dispatch occurs.
-        var reopenLogData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var reloadedEvents = ImmutableArray.Create(
-            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog));
-        await effects.HandleLoadEvents(new LoadEventsAction(reopenLogData, reloadedEvents), mockDispatcher);
-
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetSelectedEventsAction>());
-
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenFilterRequiresXml_ShouldRestoreSelectionAfterReload()
-    {
-        // Arrange — active log with one previously-selected event (RecordId=42). After the
-        // XML filter triggers a reload, HandleLoadEvents should consume the pending restore
-        // entry and dispatch SelectEvents with the matching event from the new event set.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var selectedEvent = FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog);
-
-        var mockEventLogState = Substitute.For<IState<EventLogState>>();
-
-        mockEventLogState.Value.Returns(new EventLogState
-        {
-            ActiveLogs = activeLogs,
-            SelectedEvents = [selectedEvent],
-            AppliedFilter = new Filter(null, [])
-        });
-
-        var mockFilterService = Substitute.For<IFilterService>();
-
-        mockFilterService.GetFilteredEvents(Arg.Any<IEnumerable<ResolvedEvent>>(), Arg.Any<Filter>())
-            .Returns(callInfo => callInfo.Arg<IEnumerable<ResolvedEvent>>().ToList());
-
-        var mockServiceScopeFactory = Substitute.For<IServiceScopeFactory>();
-        var mockServiceScope = Substitute.For<IServiceScope>();
-        var mockServiceProvider = Substitute.For<IServiceProvider>();
-
-        mockServiceScopeFactory.CreateScope().Returns(mockServiceScope);
-        mockServiceScope.ServiceProvider.Returns(mockServiceProvider);
-
-        var effects = new Effects(
-            mockEventLogState,
-            mockFilterService,
-            Substitute.For<ITraceLogger>(),
-            Substitute.For<ILogWatcherService>(),
-            Substitute.For<IEventResolverCache>(),
-            Substitute.For<IEventXmlResolver>(),
-            mockServiceScopeFactory,
-            Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>(),
-            Substitute.For<IDispatcher>());
-
-        var mockDispatcher = Substitute.For<IDispatcher>();
-
-        // Route CloseLog dispatches into HandleCloseLog so the close-completion TCSes
-        // get signaled. HandleCloseLog clears _pendingSelectionRestore for the log name as
-        // part of its async cleanup; HandleApplyFilter must await the close before writing
-        // the restore map. Without this routing the await would hit LogCloseTimeout (30s).
-        // Capture the routed tasks so any fault in HandleCloseLog surfaces at the end of
-        // the test instead of being swallowed by the discard.
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-
-        // Act 1: Apply the XML filter — populates _pendingSelectionRestore for "TestLog".
-        await effects.HandleApplyFilter(new ApplyFilterAction(filter), mockDispatcher);
-
-        // Act 2: Simulate the subsequent LoadEvents that the new OpenLog produces. The
-        // reloaded events include the previously-selected RecordId=42 plus an unrelated one.
-        var reloadedEvents = ImmutableArray.Create(
-            FilterEventBuilder.CreateTestEvent(100, recordId: 42, logName: Constants.LogNameTestLog),
-            FilterEventBuilder.CreateTestEvent(200, recordId: 99, logName: Constants.LogNameTestLog));
-
-        await effects.HandleLoadEvents(new LoadEventsAction(logData, reloadedEvents), mockDispatcher);
-
-        // Assert — SetSelectedEvents dispatched with exactly the restored event (RecordId=42).
-        mockDispatcher.Received(1).Dispatch(Arg.Is<SetSelectedEventsAction>(a =>
-            a.SelectedEvents.Count() == 1 && a.SelectedEvents.First().RecordId == 42));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenFilterRequiresXmlAndLogLacksXml_ShouldCloseAndReopenLog()
-    {
-        // Arrange — active log has not been loaded with XML, so it must be re-read.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, _) = CreateEffectsWithServices(activeLogs: activeLogs);
-
-        // Route CloseLog → HandleCloseLog so HandleApplyFilter's await on the close-completion
-        // TCS resolves quickly (otherwise it hits LogCloseTimeout, 30s). Capture the routed
-        // tasks so any fault in HandleCloseLog surfaces at the end of the test instead of
-        // being swallowed by the discard.
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var xmlFilter = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var filter = new Filter(null, [xmlFilter]);
-        var action = new ApplyFilterAction(filter);
-
-        // Act
-        await effects.HandleApplyFilter(action, mockDispatcher);
-
-        // Assert
-        Assert.True(filter.RequiresXml);
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<CloseLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogId == logData.Id));
-
-        mockDispatcher.Received(1).Dispatch(Arg.Is<OpenLogAction>(a =>
-            a.LogName == Constants.LogNameTestLog && a.LogPathType == LogPathType.Channel));
-
-        // Reload path returns early — no UpdateDisplayedEvents until LoadEvents fires.
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Any<UpdateDisplayedEventsAction>());
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
-    }
-
-    [Fact]
-    public async Task HandleApplyFilter_WhenReloadSupersedesFilterOnly_ShouldDropFilterOnlyResults()
-    {
-        // A reload-path ApplyFilter must invalidate any in-flight filter-only run. The
-        // Fluxor reducer for this action runs synchronously before this effect, so the
-        // older run is now working against a stale filter — its UpdateDisplayedEvents
-        // result must not land on top of the new applied filter.
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, []);
-        var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData);
-
-        var (effects, mockDispatcher, _, _, mockFilterService) =
-            CreateEffectsWithServices(activeLogs: activeLogs);
-
-        // Route CloseLog → HandleCloseLog so the reload-path xmlFilter dispatch resolves
-        // its close-completion TCS quickly (otherwise it parks on LogCloseTimeout for 30s).
-        var closeTasks = new List<Task>();
-        mockDispatcher
-            .When(d => d.Dispatch(Arg.Any<CloseLogAction>()))
-            .Do(callInfo =>
-            {
-                closeTasks.Add(effects.HandleCloseLog(callInfo.Arg<CloseLogAction>(), mockDispatcher));
-            });
-
-        var staleResult = new Dictionary<EventLogId, IReadOnlyList<ResolvedEvent>>
-        {
-            [logData.Id] = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(999) }
-        };
-
-        var staleGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var staleStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        var staleFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterIdEquals999, isEnabled: true);
-        var staleFilter = new Filter(null, [staleFilterModel]);
-
-        var xmlFilterModel = FilterFixtures.CreateTestFilter(FilterTestConstants.FilterXmlContainsData, isEnabled: true);
-        var xmlFilter = new Filter(null, [xmlFilterModel]);
-
-        mockFilterService
-            .FilterActiveLogs(Arg.Any<IEnumerable<EventLogData>>(), Arg.Any<Filter>())
-            .Returns(callInfo =>
-            {
-                staleStarted.TrySetResult(true);
-                staleGate.Task.GetAwaiter().GetResult();
-                return staleResult;
-            });
-
-        // Start the filter-only run and wait until it is parked inside FilterActiveLogs.
-        var staleTask = effects.HandleApplyFilter(new ApplyFilterAction(staleFilter), mockDispatcher);
-        await staleStarted.Task;
-
-        // While the filter-only run is parked, run the reload-path filter (XML). This must
-        // bump _filterGeneration so the parked run is detected as superseded.
-        await effects.HandleApplyFilter(new ApplyFilterAction(xmlFilter), mockDispatcher);
-
-        // Release the parked filter; the post-await check should now fail the generation guard.
-        staleGate.SetResult(true);
-        await staleTask;
-
-        // The stale run must NOT have dispatched UpdateDisplayedEvents.
-        mockDispatcher.DidNotReceive().Dispatch(Arg.Is<UpdateDisplayedEventsAction>(
-            a => a.ActiveLogs.ContainsKey(logData.Id) && a.ActiveLogs[logData.Id].Any(e => e.Id == 999)));
-
-        // Surface any HandleCloseLog faults before exiting the test.
-        await Task.WhenAll(closeTasks);
     }
 
     [Fact]
