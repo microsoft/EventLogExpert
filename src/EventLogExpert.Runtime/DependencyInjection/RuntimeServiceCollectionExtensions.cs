@@ -26,6 +26,12 @@ namespace Microsoft.Extensions.DependencyInjection;
 
 public static class RuntimeServiceCollectionExtensions
 {
+    /// <summary>
+    ///     Registers the runtime tier's services. Callers MUST also call <see cref="FilteringServiceCollectionExtensions.AddEventLogFiltering" />
+    ///     before resolving the resulting provider — the runtime tier's Fluxor-scanned <c>EventLog.Effects</c> class
+    ///     depends on <c>IFilterService</c>, which is owned by the filtering tier. Omitting it produces a hard-to-diagnose
+    ///     DI resolution failure at the first action dispatch.
+    /// </summary>
     public static IServiceCollection AddEventLogRuntime(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
