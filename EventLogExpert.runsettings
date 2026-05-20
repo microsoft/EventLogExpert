@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Default filter excludes integration tests; see tests/Integration/README.md. -->
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>FullyQualifiedName!~.IntegrationTests.</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>

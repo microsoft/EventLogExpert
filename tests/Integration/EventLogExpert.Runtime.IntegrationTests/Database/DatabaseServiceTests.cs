@@ -15,6 +15,8 @@ namespace EventLogExpert.Runtime.IntegrationTests.Database;
 
 public sealed class DatabaseServiceTests : IDisposable
 {
+    private const int LinkedCtsPropagationDelayMs = 250;
+
     private readonly List<DatabaseService> _services = [];
     private readonly string _testDirectory;
 
@@ -627,6 +629,9 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(1, service.QueuedBatchCount);
 
         var disposeTask = service.DisposeAsync().AsTask();
+
+        // UpgradeBatchStartedEventArgs exposes Cancel() but not the linked CTS Token.
+        await Task.Delay(LinkedCtsPropagationDelayMs, TestContext.Current.CancellationToken);
 
         release.Set();
         await disposeTask;

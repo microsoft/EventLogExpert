@@ -1,0 +1,51 @@
+x-base: &base
+  image: mcr.microsoft.com/dotnet/sdk:10.0-windowsservercore-ltsc2022
+  user: ContainerAdministrator
+  isolation: hyperv
+  working_dir: C:/src
+  entrypoint:
+    - powershell.exe
+    - -NoProfile
+    - -ExecutionPolicy
+    - Bypass
+    - -File
+    - C:/src/docker/integration-tests-entrypoint.ps1
+  environment:
+    NUGET_PACKAGES: C:/nuget-packages
+    EVENTLOG_CONTAINER: "1"
+  volumes:
+    - type: bind
+      source: .
+      target: C:/src
+    - type: volume
+      source: nuget-packages
+      target: C:/nuget-packages
+    - type: volume
+      source: build-artifacts
+      target: C:/build/artifacts
+
+services:
+  eventing:
+    <<: *base
+    command:
+      - tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj
+      - --logger
+      - "trx;LogFileName=eventing.trx"
+
+  runtime:
+    <<: *base
+    command:
+      - tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj
+      - --logger
+      - "trx;LogFileName=runtime.trx"
+
+  eventdbtool:
+    <<: *base
+    command:
+      - tests/Integration/EventLogExpert.EventDbTool.IntegrationTests/EventLogExpert.EventDbTool.IntegrationTests.csproj
+      - --logger
+      - "trx;LogFileName=eventdbtool.trx"
+
+volumes:
+  nuget-packages:
+  build-artifacts:
