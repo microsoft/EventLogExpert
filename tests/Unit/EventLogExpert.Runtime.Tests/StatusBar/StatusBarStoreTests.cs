@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Common.Lifecycle;
 using EventLogExpert.Runtime.StatusBar;
+using CloseAllLogsAction = EventLogExpert.Runtime.EventLog.CloseAllLogsAction;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.StatusBar;

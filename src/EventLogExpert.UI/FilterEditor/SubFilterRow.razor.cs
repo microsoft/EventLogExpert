@@ -1,12 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Filters.Base;
+using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Filters;
+namespace EventLogExpert.UI.FilterEditor;
 
 public sealed partial class SubFilterRow : FilterRowBase<SubFilterDraft>
 {

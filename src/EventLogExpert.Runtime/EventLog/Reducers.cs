@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.Common.Lifecycle;
+using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 

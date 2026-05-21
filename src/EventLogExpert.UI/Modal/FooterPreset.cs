@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.UI.Base;
+namespace EventLogExpert.UI.Modal;
 
 public enum FooterPreset
 {

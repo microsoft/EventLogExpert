@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Base;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;

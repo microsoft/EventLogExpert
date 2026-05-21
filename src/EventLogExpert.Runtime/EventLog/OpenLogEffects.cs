@@ -8,7 +8,7 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Banner;
-using EventLogExpert.Runtime.Common.Lifecycle;
+using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
