@@ -34,7 +34,7 @@ public sealed class EventResolverTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
             // Act & Assert
-            using (var resolver = new EventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory()))
             {
                 Assert.NotNull(resolver);
             }
@@ -53,7 +53,7 @@ public sealed class EventResolverTests
         dbCollection.ActiveDatabases.Returns(ImmutableList<string>.Empty);
 
         // Act
-        using var resolver = new EventResolver(dbCollection);
+        using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         // Assert
         Assert.NotNull(resolver);
@@ -100,7 +100,7 @@ public sealed class EventResolverTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new EventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
             var eventRecord = new EventRecord
             {
                 ProviderName = Constants.TestProviderName,
@@ -153,7 +153,7 @@ public sealed class EventResolverTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            var resolver = new EventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
             var eventRecord = EventUtils.CreateBasicEvent();
 
             // Act
@@ -256,7 +256,7 @@ public sealed class EventResolverTests
 
             // Act
             Exception? exception;
-            using (var resolver = new EventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory()))
             {
                 exception = Record.Exception(() => resolver.LoadProviderDetails(eventRecord));
             }
@@ -373,7 +373,7 @@ public sealed class EventResolverTests
 
             // Act
             ResolvedEvent displayEvent;
-            using (var resolver = new EventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory()))
             {
                 displayEvent = resolver.ResolveEvent(eventRecord);
             }
@@ -441,7 +441,7 @@ public sealed class EventResolverTests
             ResolvedEvent dbDisplayEvent;
             ResolvedEvent unknownDisplayEvent;
 
-            using (var resolver = new EventResolver(dbCollection))
+            using (var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory()))
             {
                 var dbEventRecord = new EventRecord
                 {
@@ -558,7 +558,7 @@ public sealed class EventResolverTests
                 localEvent = localResolver.ResolveEvent(eventRecord);
             }
 
-            using (var databaseResolver = new EventResolver(dbCollection))
+            using (var databaseResolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory()))
             {
                 databaseEvent = databaseResolver.ResolveEvent(eventRecord);
             }
