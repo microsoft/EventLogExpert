@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <SingleProject>true</SingleProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.Eventing.IntegrationTests" />
+  </ItemGroup>
+
+</Project>
