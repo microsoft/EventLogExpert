@@ -34,7 +34,7 @@ public sealed partial class PersistencePolicyTests
     }
 
     [Fact]
-    public void FilterMode_MemberNames_AreFrozenAcrossF16()
+    public void FilterMode_MemberNames_AreFrozenForWireCompatibility()
     {
         // Act + Assert
         Assert.Equal("Basic", nameof(FilterMode.Basic));
@@ -46,7 +46,7 @@ public sealed partial class PersistencePolicyTests
     }
 
     [Fact]
-    public void HighlightColor_MemberCount_IsFrozenAcrossF16()
+    public void HighlightColor_MemberCount_IsFrozenForWireCompatibility()
     {
         // Act + Assert
         Assert.Equal(28, Enum.GetValues<HighlightColor>().Length);
@@ -81,7 +81,7 @@ public sealed partial class PersistencePolicyTests
     [InlineData(HighlightColor.LightPink, 25)]
     [InlineData(HighlightColor.Pink, 26)]
     [InlineData(HighlightColor.DarkPink, 27)]
-    public void HighlightColor_OrdinalValue_IsFrozenAcrossF16(HighlightColor member, int expectedOrdinal)
+    public void HighlightColor_OrdinalValue_IsFrozenForWireCompatibility(HighlightColor member, int expectedOrdinal)
     {
         // Act + Assert
         Assert.Equal(expectedOrdinal, (int)member);
@@ -249,7 +249,7 @@ public sealed partial class PersistencePolicyTests
     }
 
     [Fact]
-    public void SavedFiltersStorageKey_LiteralValue_IsFrozenAcrossF16()
+    public void SavedFiltersStorageKey_LiteralValue_IsFrozenForWireCompatibility()
     {
         // Arrange
         string preferencesProviderPath = ResolveRepoRelativePath(
