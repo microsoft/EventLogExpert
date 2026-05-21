@@ -1,11 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -113,17 +109,17 @@ public sealed partial class PersistencePolicyTests
         // Arrange
         const string PersistedJson =
             $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "Mode": "Basic",
-              "BasicFilter": {
-                "Comparison": { "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "Value": "100", "Values": [] },
-                "SubFilters": []
+              {
+                "Color": 0,
+                "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
+                "IsExcluded": false,
+                "Mode": "Basic",
+                "BasicFilter": {
+                  "Comparison": { "Property": "Id", "Operator": "Equals", "MatchMode": "Single", "Value": "100", "Values": [] },
+                  "SubFilters": []
+                }
               }
-            }
-            """;
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(PersistedJson);
@@ -162,13 +158,13 @@ public sealed partial class PersistencePolicyTests
         // Arrange
         string json =
             $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "Mode": {{numericMode}}
-            }
-            """;
+              {
+                "Color": 0,
+                "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
+                "IsExcluded": false,
+                "Mode": {{numericMode}}
+              }
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(json);
@@ -184,13 +180,13 @@ public sealed partial class PersistencePolicyTests
         // Arrange
         const string Json =
             $$"""
-            {
-              "Color": "LightRed",
-              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "Mode": "Advanced"
-            }
-            """;
+              {
+                "Color": "LightRed",
+                "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
+                "IsExcluded": false,
+                "Mode": "Advanced"
+              }
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(Json);
@@ -259,8 +255,9 @@ public sealed partial class PersistencePolicyTests
         string preferencesProviderPath = ResolveRepoRelativePath(
             "src",
             "EventLogExpert",
-            "Services",
-            "PreferencesProvider.cs");
+            "Adapters",
+            "Settings",
+            "FilterGroupPreferencesAdapter.cs");
 
         string source = File.ReadAllText(preferencesProviderPath);
 
