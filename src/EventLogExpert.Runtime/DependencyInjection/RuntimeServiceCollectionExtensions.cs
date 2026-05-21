@@ -13,24 +13,22 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Filtering.Services;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.Runtime.Update.Deployment;
-using Effects = EventLogExpert.Runtime.EventLog.Effects;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
 public static class RuntimeServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers the runtime tier's services. Callers MUST also call <see cref="FilteringServiceCollectionExtensions.AddEventLogFiltering" />
-    ///     before resolving the resulting provider — the runtime tier's Fluxor-scanned <c>EventLog.Effects</c> class
-    ///     depends on <c>IFilterService</c>, which is owned by the filtering tier. Omitting it produces a hard-to-diagnose
-    ///     DI resolution failure at the first action dispatch.
+    ///     Registers the runtime tier's services. Callers MUST also call AddEventLogFiltering before resolving the
+    ///     resulting provider — the runtime tier's Fluxor-scanned effect classes depend on <c>IFilterService</c>, which is
+    ///     owned by the filtering tier. Omitting it produces a hard-to-diagnose DI resolution failure at the first action
+    ///     dispatch.
     /// </summary>
     public static IServiceCollection AddEventLogRuntime(this IServiceCollection services)
     {
@@ -43,10 +41,15 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IFilterPaneCommands, FilterPaneCommands>();
         services.AddSingleton<ILogTableCommands, LogTableCommands>();
 
+        // Shared coordination state for EventLog effects classes.
+        services.AddSingleton<LogCloseCoordinator>();
+        services.AddSingleton<EventLogConcurrencyState>();
+
         // UI capabilities.
         services.AddSingleton<IHighlightSelector, HighlightSelector>();
         services.AddSingleton<ILogTableColumnDefaultsProvider, ColumnDefaults>();
-        services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<Effects>());
+        services.AddSingleton<DatabaseCoordinationEffects>();
+        services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<DatabaseCoordinationEffects>());
 
         // Application services.
         services.AddSingleton<IAppTitleService, AppTitleService>();
