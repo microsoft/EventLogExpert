@@ -155,33 +155,55 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         var obsoleteDbs = new List<string>();
         var newLookups = new List<IProviderDetailsLookup>();
 
-        foreach (var file in databasesToLoad)
+        try
         {
-            if (!File.Exists(file))
+            foreach (var file in databasesToLoad)
             {
-                throw new FileNotFoundException(file);
+                if (!File.Exists(file))
+                {
+                    throw new FileNotFoundException(file);
+                }
+
+                var lookup = _lookupFactory!.Create(file, Logger);
+
+                try
+                {
+                    var state = lookup.IsUpgradeNeeded();
+
+                    if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+                    {
+                        unknownDbs.Add(file);
+                        lookup.Dispose();
+
+                        continue;
+                    }
+
+                    if (state.NeedsUpgrade)
+                    {
+                        obsoleteDbs.Add(file);
+                        lookup.Dispose();
+
+                        continue;
+                    }
+
+                    newLookups.Add(lookup);
+                }
+                catch
+                {
+                    lookup.Dispose();
+
+                    throw;
+                }
             }
-
-            var lookup = _lookupFactory!.Create(file, Logger);
-            var state = lookup.IsUpgradeNeeded();
-
-            if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+        }
+        catch
+        {
+            foreach (var lookup in newLookups)
             {
-                unknownDbs.Add(file);
                 lookup.Dispose();
-
-                continue;
             }
 
-            if (state.NeedsUpgrade)
-            {
-                obsoleteDbs.Add(file);
-                lookup.Dispose();
-
-                continue;
-            }
-
-            newLookups.Add(lookup);
+            throw;
         }
 
         _providerLookups = [.. newLookups];
