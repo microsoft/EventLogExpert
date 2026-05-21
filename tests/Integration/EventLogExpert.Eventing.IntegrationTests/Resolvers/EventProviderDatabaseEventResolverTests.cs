@@ -28,7 +28,7 @@ public sealed class EventResolverDatabaseTests
         // This will throw FileNotFoundException, but we can still check logging
         try
         {
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
         }
         catch (FileNotFoundException)
         {
@@ -49,7 +49,7 @@ public sealed class EventResolverDatabaseTests
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        using var resolver = new EventResolver(dbCollection, logger: logger);
+        using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
         // Assert
         logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("EventResolver")));
@@ -65,7 +65,7 @@ public sealed class EventResolverDatabaseTests
 
         // Act
         var exception = Assert.Throws<FileNotFoundException>(() =>
-            new EventResolver(dbCollection));
+            new EventResolver(dbCollection, factory: new ProviderDbContextFactory()));
 
         // Assert
         Assert.Contains(nonExistentPath, exception.Message);
@@ -89,7 +89,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
             // Act
-            using var resolver = new EventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             // Assert
             Assert.NotNull(resolver);
@@ -106,7 +106,7 @@ public sealed class EventResolverDatabaseTests
         // Arrange
         var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         // Act & Assert
         resolver.Dispose();
@@ -134,7 +134,7 @@ public sealed class EventResolverDatabaseTests
 
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
-            var resolver = new EventResolver(dbCollection);
+            var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             var exceptions = new ConcurrentBag<Exception>();
 
@@ -185,7 +185,7 @@ public sealed class EventResolverDatabaseTests
         // Arrange
         var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var exceptions = new ConcurrentBag<Exception>();
 
@@ -212,7 +212,7 @@ public sealed class EventResolverDatabaseTests
         // Arrange
         var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var eventRecord = new EventRecord
         {
@@ -233,7 +233,7 @@ public sealed class EventResolverDatabaseTests
         // Arrange
         var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
         dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var eventRecord = EventUtils.CreateBasicEvent();
 
@@ -283,7 +283,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
             var eventRecord = new EventRecord
             {
@@ -326,7 +326,7 @@ public sealed class EventResolverDatabaseTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
 
-            using var resolver = new EventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             // Act
             var exception = Record.Exception(() =>
@@ -382,7 +382,7 @@ public sealed class EventResolverDatabaseTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
-            using var resolver = new EventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             // Act
             var exception = Record.Exception(() =>
@@ -429,7 +429,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
             var eventRecord = new EventRecord
             {
@@ -477,7 +477,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
             var eventRecord = new EventRecord
             {
@@ -521,7 +521,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
             var eventRecord = new EventRecord
             {
@@ -570,7 +570,7 @@ public sealed class EventResolverDatabaseTests
             var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
-            using var resolver = new EventResolver(dbCollection);
+            using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             var eventRecord1 = new EventRecord { ProviderName = "Provider1", Id = 1000 };
             var eventRecord2 = new EventRecord { ProviderName = "Provider2", Id = 2000 };
@@ -618,7 +618,7 @@ public sealed class EventResolverDatabaseTests
             dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
-            using var resolver = new EventResolver(dbCollection, logger: logger);
+            using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
 
             var eventRecord = new EventRecord
             {
@@ -648,7 +648,7 @@ public sealed class EventResolverDatabaseTests
         var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
         dbCollection.ActiveDatabases.Returns([]);
 
-        using var resolver = new EventResolver(dbCollection);
+        using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var eventRecord = new EventRecord
         {
