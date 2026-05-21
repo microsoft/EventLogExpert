@@ -4,13 +4,10 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Common;
-using EventLogExpert.Filtering.Runtime;
-using EventLogExpert.Runtime.EventLog;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.EventLog;
@@ -201,7 +198,9 @@ public sealed class EventLogStoreTests
     public void EventLogData_GetEventValues_ForUnknownField_ShouldReturnEmpty()
     {
         // Arrange
-        var logData = new EventLogData(Constants.LogNameTestLog, LogPathType.Channel, [FilterEventBuilder.CreateTestEvent(100)]);
+        var logData = new EventLogData(Constants.LogNameTestLog,
+            LogPathType.Channel,
+            [FilterEventBuilder.CreateTestEvent(100)]);
 
         // Act
         var values = logData.GetEventValues((EventProperty)999).ToList();
@@ -527,7 +526,8 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100), FilterEventBuilder.CreateTestEvent(200));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200));
 
         var action = new LoadEventsAction(logData, events);
 
@@ -553,7 +553,8 @@ public sealed class EventLogStoreTests
             ActiveLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameTestLog, logData)
         };
 
-        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100), FilterEventBuilder.CreateTestEvent(200));
+        var events = ImmutableArray.Create(FilterEventBuilder.CreateTestEvent(100),
+            FilterEventBuilder.CreateTestEvent(200));
 
         var action = new LoadEventsAction(logData, events);
 
@@ -684,6 +685,7 @@ public sealed class EventLogStoreTests
         // active log (drag/drop, command line, recent menu) cannot replace its EventLogData
         // (which would invalidate ongoing loads and reset the user's events).
         var state = new EventLogState();
+
         state = Reducers.ReduceOpenLog(state,
             new OpenLogAction(Constants.LogNameTestLog, LogPathType.Channel));
 
@@ -860,7 +862,7 @@ public sealed class EventLogStoreTests
 
         var newEvents = new List<ResolvedEvent>
         {
-            existingEvent,                  // Already selected
+            existingEvent,                          // Already selected
             FilterEventBuilder.CreateTestEvent(200) // New
         };
 

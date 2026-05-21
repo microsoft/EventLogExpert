@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Parsing;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Filtering;

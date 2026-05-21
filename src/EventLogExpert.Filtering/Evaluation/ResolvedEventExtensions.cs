@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 
-namespace EventLogExpert.Filtering.Runtime;
+namespace EventLogExpert.Filtering.Evaluation;
 
 public static class ResolvedEventExtensions
 {

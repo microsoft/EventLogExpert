@@ -6,7 +6,7 @@ using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
@@ -21,7 +21,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using FilterGroupState = EventLogExpert.Runtime.FilterGroup.FilterGroupState;
-using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
+using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.FilterPane;
 
