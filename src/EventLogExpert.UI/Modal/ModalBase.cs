@@ -6,7 +6,7 @@ using EventLogExpert.Runtime.Modal;
 using Fluxor.Blazor.Web.Components;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Base;
+namespace EventLogExpert.UI.Modal;
 
 /// <summary>
 ///     Base for modals shown via <see cref="IModalService" />. Owns the per-show id handshake with the service and

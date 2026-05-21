@@ -4,7 +4,7 @@
 using EventLogExpert.Runtime.Common.Display;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Base;
+namespace EventLogExpert.UI.Inputs;
 
 public abstract class InputComponent<T> : ComponentBase
 {

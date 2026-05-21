@@ -5,7 +5,7 @@ using EventLogExpert.Filtering.Drafts;
 using EventLogExpert.Filtering.Persistence;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Filters;
+namespace EventLogExpert.UI.FilterEditor;
 
 /// <summary>
 ///     Reusable chrome for filter rows: handles the color picker, saved-state value display, action buttons, and
