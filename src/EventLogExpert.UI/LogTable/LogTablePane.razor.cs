@@ -7,12 +7,12 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
@@ -21,7 +21,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 using System.Collections.Immutable;
-using FilterMode = EventLogExpert.Filtering.Runtime.FilterMode;
+using FilterMode = EventLogExpert.Filtering.Evaluation.FilterMode;
 
 namespace EventLogExpert.UI.LogTable;
 

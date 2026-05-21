@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 
-namespace EventLogExpert.Filtering.Runtime;
+namespace EventLogExpert.Filtering.Evaluation;
 
 public static class FilterExtensions
 {

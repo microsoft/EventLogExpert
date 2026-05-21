@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Lowering;
-using EventLogExpert.Filtering.Runtime;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
@@ -84,15 +84,21 @@ internal static class Emitter
         {
             ResolvedEventField.Id => EmitIntComparison(static e => e.Id, node.Op, node.Literal.IntValue),
             ResolvedEventField.ProcessId => EmitNullableIntComparison(
-                static e => e.ProcessId, node.Op, node.Literal.IntValue),
+                static e => e.ProcessId,
+                node.Op,
+                node.Literal.IntValue),
             ResolvedEventField.ThreadId => EmitNullableIntComparison(
-                static e => e.ThreadId, node.Op, node.Literal.IntValue),
+                static e => e.ThreadId,
+                node.Op,
+                node.Literal.IntValue),
             ResolvedEventField.RecordId => EmitNullableLongComparison(
                 static e => e.RecordId,
                 node.Op,
                 node.Literal.Kind == TypedLiteralKind.Long ? node.Literal.LongValue : node.Literal.IntValue),
             ResolvedEventField.ActivityId => EmitNullableGuidComparison(
-                static e => e.ActivityId, node.Op, node.Literal.GuidValue),
+                static e => e.ActivityId,
+                node.Op,
+                node.Literal.GuidValue),
             _ => throw new EmitException(
                 $"Field '{node.Field}' cannot be compared to a {node.Literal.Kind} literal.")
         };
@@ -106,10 +112,9 @@ internal static class Emitter
         return node.Field switch
         {
             ResolvedEventField.Id => e => e.Id.ToString(CultureInfo.InvariantCulture).Contains(needle, comparison),
-            ResolvedEventField.ActivityId => e => e.ActivityId.HasValue
-                && e.ActivityId.Value.ToString().Contains(needle, comparison),
-            ResolvedEventField.UserId => e => e.UserId is not null
-                && e.UserId.Value.Contains(needle, comparison),
+            ResolvedEventField.ActivityId => e =>
+                e.ActivityId.HasValue && e.ActivityId.Value.ToString().Contains(needle, comparison),
+            ResolvedEventField.UserId => e => e.UserId is not null && e.UserId.Value.Contains(needle, comparison),
             ResolvedEventField.ComputerName => e => e.ComputerName.Contains(needle, comparison),
             ResolvedEventField.Description => e => e.Description.Contains(needle, comparison),
             ResolvedEventField.Level => e => e.Level.Contains(needle, comparison),
@@ -375,6 +380,7 @@ internal static class Emitter
         if (node.Operand is ContainsNode { Field: ResolvedEventField.UserId } userIdContains)
         {
             var needle = userIdContains.Needle;
+
             var comparison = userIdContains.IgnoreCase
                 ? StringComparison.OrdinalIgnoreCase
                 : StringComparison.Ordinal;
@@ -516,17 +522,22 @@ internal static class Emitter
             ResolvedEventField.Xml => EmitDirectStringCompare(static e => e.Xml, op, value),
             ResolvedEventField.UserId => EmitUserIdStringCompare(op, value),
             ResolvedEventField.Id => EmitIntegerStringCompare(
-                static e => e.Id.ToString(CultureInfo.InvariantCulture), op, value),
+                static e => e.Id.ToString(CultureInfo.InvariantCulture),
+                op,
+                value),
             ResolvedEventField.ProcessId => EmitIntegerStringCompare(
-                static e => e.ProcessId.HasValue ? e.ProcessId.Value.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                static e => e.ProcessId.HasValue ? e.ProcessId.Value.ToString(CultureInfo.InvariantCulture) :
+                    string.Empty,
                 op,
                 value),
             ResolvedEventField.ThreadId => EmitIntegerStringCompare(
-                static e => e.ThreadId.HasValue ? e.ThreadId.Value.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                static e => e.ThreadId.HasValue ? e.ThreadId.Value.ToString(CultureInfo.InvariantCulture) :
+                    string.Empty,
                 op,
                 value),
             ResolvedEventField.RecordId => EmitIntegerStringCompare(
-                static e => e.RecordId.HasValue ? e.RecordId.Value.ToString(CultureInfo.InvariantCulture) : string.Empty,
+                static e => e.RecordId.HasValue ? e.RecordId.Value.ToString(CultureInfo.InvariantCulture) :
+                    string.Empty,
                 op,
                 value),
             ResolvedEventField.ActivityId => EmitIntegerStringCompare(
@@ -544,10 +555,10 @@ internal static class Emitter
         op switch
         {
             // Lowerer-paired null guard: bare `UserId.Value` access would NRE without it.
-            FilterBinaryOperator.Equal => e => e.UserId is not null
-                && string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
-            FilterBinaryOperator.NotEqual => e => e.UserId is not null
-                && !string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
+            FilterBinaryOperator.Equal => e =>
+                e.UserId is not null && string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
+            FilterBinaryOperator.NotEqual => e =>
+                e.UserId is not null && !string.Equals(e.UserId.Value, value, StringComparison.Ordinal),
             _ => throw new EmitException($"Operator '{op}' is not supported on UserId.")
         };
 

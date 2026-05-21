@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Events;
 
-namespace EventLogExpert.Filtering.Runtime;
+namespace EventLogExpert.Filtering.Evaluation;
 
 /// <summary>
 ///     Immutable compiled artifact: the runnable predicate plus the cached XML-access flag used to decide whether

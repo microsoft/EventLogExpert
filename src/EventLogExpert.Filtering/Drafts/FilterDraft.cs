@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Basic;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Filtering.Drafts;
@@ -73,7 +73,8 @@ public sealed class FilterDraft
                 ClearStructure();
                 break;
             case FilterMode.Basic:
-                if (!string.IsNullOrEmpty(ComparisonText) && BasicFilterDecomposer.TryDecompose(ComparisonText, out var decomposed))
+                if (!string.IsNullOrEmpty(ComparisonText) &&
+                    BasicFilterDecomposer.TryDecompose(ComparisonText, out var decomposed))
                 {
                     HydrateStructure(decomposed);
                 }
@@ -92,14 +93,13 @@ public sealed class FilterDraft
                     // WouldLoseDataSwitchingTo returned true and the user accepted the prompt). When neither
                     // formatter produces text — empty structure or all sub-filters unprintable — fall back to the
                     // existing ComparisonText (preserves the degraded-persisted-Basic recovery surface).
-                    if (HasMeaningfulStructure
-                        && BasicFilterFormatter.TryFormat(ToBasicFilter(), true, out var strict))
+                    if (HasMeaningfulStructure && BasicFilterFormatter.TryFormat(ToBasicFilter(), true, out var strict))
                     {
                         ComparisonText = strict;
                     }
-                    else if (HasMeaningfulStructure
-                        && BasicFilterFormatter.TryFormat(ToBasicFilter(), false, out var lenient)
-                        && !string.IsNullOrEmpty(lenient))
+                    else if (HasMeaningfulStructure &&
+                        BasicFilterFormatter.TryFormat(ToBasicFilter(), false, out var lenient) &&
+                        !string.IsNullOrEmpty(lenient))
                     {
                         ComparisonText = lenient;
                     }
