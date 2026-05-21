@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Evaluation;
-using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 using System.Collections.Immutable;
 
@@ -112,9 +111,6 @@ internal sealed class Reducers
     public static EventLogState ReduceOpenLog(EventLogState state, OpenLogAction action) =>
         // Idempotent: re-opening an already-active log is a no-op so callers (menu, drag/drop, command line,
         // SettingsModal.ReloadOpenLogs, effects) don't need to coordinate to avoid ImmutableDictionary.Add throwing.
-        // TODO: HandleOpenLog effect still runs for every dispatched OpenLog action, so a duplicate dispatch can
-        // start a second background load for the same EventLogData.Id and overwrite _logCts[id]. The reducer no-op
-        // prevents the throw but the effect-level dedup is a separate hardening worth tackling next.
         state.ActiveLogs.ContainsKey(action.LogName)
             ? state
             : state with

@@ -9,7 +9,7 @@ namespace EventLogExpert.Filtering.Tests.Basic;
 public sealed class FilterComparisonJsonConverterTests
 {
     [Fact]
-    public void EventProperty_MemberCount_IsFrozenAcrossF16()
+    public void EventProperty_MemberCount_IsFrozenForWireCompatibility()
     {
         // Pairs with the per-ordinal Read_LegacyCategoryKey theory: adding or removing an EventProperty
         // value would leave that theory passing while still corrupting legacy reads for the missing ordinal.

@@ -18,7 +18,8 @@ public sealed class DisplayConverter<T, U>
             return GetFunc(value);
         }
         catch
-        { // TODO: Log Error
+        {
+            // ignored
         }
 
         return default;
@@ -33,7 +34,8 @@ public sealed class DisplayConverter<T, U>
             return SetFunc(value);
         }
         catch
-        { // TODO: Log Error
+        {
+            // ignored
         }
 
         return default;
