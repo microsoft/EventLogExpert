@@ -1,9 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 
-namespace EventLogExpert.Eventing.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase;
 
 internal static class ProviderDetailsMerger
 {

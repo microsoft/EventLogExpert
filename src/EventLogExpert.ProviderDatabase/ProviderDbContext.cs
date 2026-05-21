@@ -2,12 +2,13 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using System.Data;
 using System.Data.Common;
 
-namespace EventLogExpert.Eventing.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase;
 
 public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 {
@@ -103,7 +104,7 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
                         hasParametersColumn = true;
                     }
                     else if (string.Equals(columnName,
-                        nameof(Providers.ProviderDetails.ResolvedFromOwningPublisher),
+                        nameof(Eventing.Providers.ProviderDetails.ResolvedFromOwningPublisher),
                         StringComparison.Ordinal))
                     {
                         hasResolvedColumn = true;
@@ -334,7 +335,7 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         {
             var columnName = indexInfoReader["name"]?.ToString();
 
-            if (!string.Equals(columnName, nameof(Providers.ProviderDetails.ProviderName), StringComparison.Ordinal))
+            if (!string.Equals(columnName, nameof(Eventing.Providers.ProviderDetails.ProviderName), StringComparison.Ordinal))
             {
                 continue;
             }
@@ -352,7 +353,7 @@ public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
         for (var i = 0; i < reader.FieldCount; i++)
         {
             if (!string.Equals(reader.GetName(i),
-                nameof(Providers.ProviderDetails.ResolvedFromOwningPublisher),
+                nameof(Eventing.Providers.ProviderDetails.ResolvedFromOwningPublisher),
                 StringComparison.Ordinal))
             {
                 continue;

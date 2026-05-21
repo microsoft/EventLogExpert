@@ -1,11 +1,11 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.IO.Compression;
 using System.Text.Json;
 
-namespace EventLogExpert.Eventing.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase;
 
 internal sealed class CompressedJsonValueConverter<T>() : ValueConverter<T, byte[]>(v => ConvertToCompressedJson(v),
     v => ConvertFromCompressedJson(v))

@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
+using EventLogExpert.ProviderDatabase;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 using System.Text.RegularExpressions;
@@ -59,6 +59,7 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         createDatabaseCommand.SetAction(result =>
         {
             using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
+
             new CreateDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
                 .CreateDatabase(
                     result.GetRequiredValue(fileArgument),

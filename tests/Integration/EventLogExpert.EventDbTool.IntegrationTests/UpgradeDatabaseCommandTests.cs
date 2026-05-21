@@ -4,6 +4,7 @@
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.ProviderDatabase;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;

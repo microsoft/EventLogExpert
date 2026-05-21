@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Alerts;
-using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.Services;
+using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -21,6 +20,8 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Services;
+using EventLogExpert.UI.Alerts;
 using Fluxor;
 using Fluxor.DependencyInjection;
 
@@ -100,8 +101,10 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
         builder.Services.AddSingleton<MauiMenuActionService>();
+
         builder.Services.AddSingleton<IMenuActionService>(static provider =>
             provider.GetRequiredService<MauiMenuActionService>());
+
         builder.Services.AddSingleton<KeyboardShortcutService>();
 
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
@@ -119,6 +122,7 @@ public static class MauiProgram
                 async parameters =>
                 {
                     string? result = await modalService.Show<PromptModal, string>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value));
+
                     return result ?? string.Empty;
                 });
         });

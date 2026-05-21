@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.ProviderDatabase;
 using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Runtime.IntegrationTests.TestUtils;

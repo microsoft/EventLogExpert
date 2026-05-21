@@ -2,8 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 
-namespace EventLogExpert.Eventing.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase;
 
 public sealed class ProviderDbContextFactory : IProviderDetailsLookupFactory
 {

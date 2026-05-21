@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using Microsoft.EntityFrameworkCore;
 using System.Data.Common;

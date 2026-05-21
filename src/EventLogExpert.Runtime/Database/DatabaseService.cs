@@ -4,6 +4,7 @@
 using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database.Upgrade;
 using Microsoft.Data.Sqlite;
