@@ -9,7 +9,7 @@ using System.Data.Common;
 
 namespace EventLogExpert.Eventing.ProviderDatabase;
 
-public sealed class ProviderDbContext : DbContext
+public sealed class ProviderDbContext : DbContext, IProviderDetailsLookup
 {
     private readonly ITraceLogger? _logger;
     private readonly bool _readOnly;
@@ -28,6 +28,11 @@ public sealed class ProviderDbContext : DbContext
         Path = path;
         _readOnly = readOnly;
 
+        if (readOnly)
+        {
+            ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
+        }
+
         if (ensureCreated)
         {
             Database.EnsureCreated();
@@ -39,6 +44,9 @@ public sealed class ProviderDbContext : DbContext
     public DbSet<ProviderDetails> ProviderDetails { get; set; }
 
     private string Path { get; }
+
+    public ProviderDetails? FindProvider(string providerName) =>
+        ProviderDetails.FirstOrDefault(p => p.ProviderName == providerName);
 
     public ProviderDatabaseSchemaState IsUpgradeNeeded()
     {

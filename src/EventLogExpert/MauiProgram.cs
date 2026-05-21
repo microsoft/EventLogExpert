@@ -3,6 +3,7 @@
 
 using EventLogExpert.UI.Alerts;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Services;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
@@ -74,6 +75,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
 
         // Provider Services
+        builder.Services.AddSingleton<IProviderDetailsLookupFactory, ProviderDbContextFactory>();
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();

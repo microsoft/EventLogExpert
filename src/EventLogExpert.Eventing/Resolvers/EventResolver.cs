@@ -7,7 +7,6 @@ using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
-using Microsoft.EntityFrameworkCore;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
@@ -20,20 +19,31 @@ namespace EventLogExpert.Eventing.Resolvers;
 public sealed class EventResolver : EventResolverBase, IEventResolver
 {
     private readonly Lock _databaseAccessLock = new();
+    private readonly IProviderDetailsLookupFactory? _lookupFactory;
     private readonly ConcurrentDictionary<string, bool> _providerFromNonLocal = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, Lazy<bool>> _resolutionGates = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails =
+        new(StringComparer.OrdinalIgnoreCase);
 
-    private ImmutableArray<ProviderDbContext> _dbContexts = [];
+    private ImmutableArray<IProviderDetailsLookup> _providerLookups = [];
     private ImmutableArray<string> _metadataPaths = [];
 
     public EventResolver(
         IActiveDatabasePathsProvider? dbCollection = null,
         IEventResolverCache? cache = null,
-        ITraceLogger? logger = null) : base(cache, logger)
+        ITraceLogger? logger = null,
+        IProviderDetailsLookupFactory? factory = null) : base(cache, logger)
     {
+        _lookupFactory = factory;
+
         if (dbCollection is not null && !dbCollection.ActiveDatabases.IsEmpty)
         {
+            if (factory is null)
+            {
+                throw new InvalidOperationException(
+                    $"An {nameof(IProviderDetailsLookupFactory)} is required when active database paths are provided.");
+            }
+
             LoadDatabases(dbCollection.ActiveDatabases);
         }
 
@@ -91,19 +101,19 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
     {
         if (!disposing) { return; }
 
-        ImmutableArray<ProviderDbContext> contextsToDispose;
+        ImmutableArray<IProviderDetailsLookup> lookupsToDispose;
 
         using (_databaseAccessLock.EnterScope())
         {
             if (IsDisposed) { return; }
 
-            contextsToDispose = _dbContexts;
-            _dbContexts = [];
+            lookupsToDispose = _providerLookups;
+            _providerLookups = [];
         }
 
-        foreach (var context in contextsToDispose)
+        foreach (var lookup in lookupsToDispose)
         {
-            context.Dispose();
+            lookup.Dispose();
         }
 
         base.Dispose(disposing);
@@ -133,17 +143,17 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
             Logger?.Debug($"  {databasePath}");
         }
 
-        foreach (var context in _dbContexts)
+        foreach (var lookup in _providerLookups)
         {
-            context.Dispose();
+            lookup.Dispose();
         }
 
-        _dbContexts = [];
+        _providerLookups = [];
 
         var databasesToLoad = DatabasePathSorter.Sort(databasePaths);
         var unknownDbs = new List<string>();
         var obsoleteDbs = new List<string>();
-        var newContexts = new List<ProviderDbContext>();
+        var newLookups = new List<IProviderDetailsLookup>();
 
         foreach (var file in databasesToLoad)
         {
@@ -152,13 +162,13 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
                 throw new FileNotFoundException(file);
             }
 
-            var providerDb = new ProviderDbContext(file, readOnly: true, ensureCreated: false, Logger);
-            var state = providerDb.IsUpgradeNeeded();
+            var lookup = _lookupFactory!.Create(file, Logger);
+            var state = lookup.IsUpgradeNeeded();
 
             if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
             {
                 unknownDbs.Add(file);
-                providerDb.Dispose();
+                lookup.Dispose();
 
                 continue;
             }
@@ -166,25 +176,24 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
             if (state.NeedsUpgrade)
             {
                 obsoleteDbs.Add(file);
-                providerDb.Dispose();
+                lookup.Dispose();
 
                 continue;
             }
 
-            providerDb.ChangeTracker.QueryTrackingBehavior = QueryTrackingBehavior.NoTracking;
-            newContexts.Add(providerDb);
+            newLookups.Add(lookup);
         }
 
-        _dbContexts = [.. newContexts];
+        _providerLookups = [.. newLookups];
 
         if (unknownDbs.Count <= 0 && obsoleteDbs.Count <= 0) { return; }
 
-        foreach (var db in _dbContexts)
+        foreach (var lookup in _providerLookups)
         {
-            db.Dispose();
+            lookup.Dispose();
         }
 
-        _dbContexts = [];
+        _providerLookups = [];
 
         var messageParts = new List<string>();
 
@@ -205,7 +214,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
 
     private void RemoveGateIfSame(string providerName, Lazy<bool> gate) =>
         ((ICollection<KeyValuePair<string, Lazy<bool>>>)_resolutionGates)
-            .Remove(new KeyValuePair<string, Lazy<bool>>(providerName, gate));
+        .Remove(new KeyValuePair<string, Lazy<bool>>(providerName, gate));
 
     private void ResolveFromLocalProvider(string providerName)
     {
@@ -221,7 +230,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         // Snapshot fields once so the resolution chain sees a consistent view even if
         // SetMetadataPaths/LoadDatabases reassigns the immutable arrays mid-flight.
         var metadataPaths = _metadataPaths;
-        var dbContexts = _dbContexts;
+        var providerLookups = _providerLookups;
 
         // 1. Try MTA locale metadata files (primary source for exported logs)
         if (metadataPaths.Length > 0 && TryResolveFromMta(providerName, metadataPaths))
@@ -230,13 +239,14 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         }
 
         // 2. Try provider databases
-        if (dbContexts.Length > 0 && TryResolveFromDatabase(providerName))
+        if (providerLookups.Length > 0 && TryResolveFromDatabase(providerName))
         {
             return true;
         }
 
         // 3. Fall back to local providers
         ResolveFromLocalProvider(providerName);
+
         return true;
     }
 
@@ -246,13 +256,13 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         {
             ObjectDisposedException.ThrowIf(IsDisposed, this);
 
-            foreach (var dbContext in _dbContexts)
+            foreach (var lookup in _providerLookups)
             {
-                var details = dbContext.ProviderDetails.FirstOrDefault(p => p.ProviderName == providerName);
+                var details = lookup.FindProvider(providerName);
 
                 if (details is null) { continue; }
 
-                Logger?.Debug($"Resolved {providerName} from database {dbContext.Name}.");
+                Logger?.Debug($"Resolved {providerName} from database {lookup.Name}.");
                 ProviderDetails.TryAdd(providerName, details);
                 _providerFromNonLocal.TryAdd(providerName, true);
 
