@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.Common.Lifecycle;
+using EventLogExpert.Runtime.EventLog;
 using Fluxor;
 
 namespace EventLogExpert.Runtime.FilterProgress;

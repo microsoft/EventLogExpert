@@ -5,7 +5,7 @@ using EventLogExpert.Runtime.Alerts;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
-namespace EventLogExpert.UI.Base;
+namespace EventLogExpert.UI.Modal;
 
 public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 {

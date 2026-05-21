@@ -3,7 +3,7 @@
 
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Filters.Base;
+namespace EventLogExpert.UI.FilterEditor;
 
 /// <summary>Generic base for filter rows: stable DOM <see cref="Id" /> and a typed <see cref="Value" />.</summary>
 public abstract class FilterRowBase<TValue> : ComponentBase
