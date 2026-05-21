@@ -4,7 +4,7 @@
 using EventLogExpert.Filtering.Persistence;
 using System.Collections.Immutable;
 
-namespace EventLogExpert.Filtering.Runtime;
+namespace EventLogExpert.Filtering.Evaluation;
 
 public readonly record struct FilterSnapshot(string Value, bool IsExcluded);
 

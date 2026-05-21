@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.Compilation;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EventLogExpert.Filtering.Tests.DependencyInjection;

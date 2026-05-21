@@ -4,9 +4,8 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.TestUtils;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Collections.Immutable;
 
@@ -31,7 +30,11 @@ public sealed class FilterServiceTests
         // logs.Count == 2 + IsFilteringEnabled false routes through the sequential path.
         var filterService = CreateFilterService();
         var original = new EventLogData("Log1", LogPathType.Channel, [FilterEventBuilder.CreateTestEvent(100)]);
-        var duplicate = original with { Name = "Log2", Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly() };
+
+        var duplicate = original with
+        {
+            Name = "Log2", Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly()
+        };
 
         Assert.Equal(original.Id, duplicate.Id);
 
@@ -56,8 +59,10 @@ public sealed class FilterServiceTests
         var log1Events = Enumerable.Range(0, 6_000)
             .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i), recordId: i))
             .ToList();
+
         var log2Events = Enumerable.Range(0, 6_000)
-            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .Select(i =>
+                FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
         var original = new EventLogData("Log1", LogPathType.Channel, log1Events);
@@ -102,7 +107,8 @@ public sealed class FilterServiceTests
             .ToList();
 
         var log2Events = Enumerable.Range(0, 6_000)
-            .Select(i => FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
+            .Select(i =>
+                FilterEventBuilder.CreateTestEvent(i, timeCreated: baseTime.AddMinutes(i + 1_000), recordId: i + 6_000))
             .ToList();
 
         var logData = new List<EventLogData>
@@ -111,8 +117,13 @@ public sealed class FilterServiceTests
             new("Log2", LogPathType.Channel, log2Events)
         };
 
-        var expectedLog1 = log1Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
-        var expectedLog2 = log2Events.Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000)).ToList();
+        var expectedLog1 = log1Events
+            .Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000))
+            .ToList();
+
+        var expectedLog2 = log2Events
+            .Where(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(20_000))
+            .ToList();
 
         // Act
         var result = filterService.FilterActiveLogs(logData, filter);
@@ -238,7 +249,9 @@ public sealed class FilterServiceTests
         var result = filterService.GetFilteredEvents(events, filter);
 
         // Assert — should return only events at or after the cutoff
-        var expectedCount = events.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(eventCount));
+        var expectedCount =
+            events.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(eventCount));
+
         Assert.Equal(expectedCount, result.Count);
         Assert.All(result, e => Assert.True(e.TimeCreated >= cutoff));
     }
@@ -269,7 +282,9 @@ public sealed class FilterServiceTests
         var largeResult = filterService.GetFilteredEvents(largeEvents, filter);
 
         // Assert — small result should match the first 100 events' filtered subset
-        var expectedSmallCount = smallEvents.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(200));
+        var expectedSmallCount =
+            smallEvents.Count(e => e.TimeCreated >= cutoff && e.TimeCreated <= baseTime.AddMinutes(200));
+
         Assert.Equal(expectedSmallCount, smallResult.Count);
 
         // Large result should include the same events as small result (plus more from the larger set)
@@ -367,7 +382,11 @@ public sealed class FilterServiceTests
     [Theory]
     [InlineData(EventProperty.Id, ComparisonOperator.Equals, MatchMode.Single, "100", "Id == \"100\"")]
     [InlineData(EventProperty.Level, ComparisonOperator.Equals, MatchMode.Single, "Error", "Level == \"Error\"")]
-    [InlineData(EventProperty.Source, ComparisonOperator.Equals, MatchMode.Single, "TestSource", "Source == \"TestSource\"")]
+    [InlineData(EventProperty.Source,
+        ComparisonOperator.Equals,
+        MatchMode.Single,
+        "TestSource",
+        "Source == \"TestSource\"")]
     public void TryFormat_WhenEqualsOperator_ShouldGenerateCorrectComparison(
         EventProperty property,
         ComparisonOperator op,
@@ -750,6 +769,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(sourceResult);
+
         Assert.Equal(
             "Keywords.Any(e => (new[] {\"Audit Success\", \"Audit Failure\"}).Contains(e))",
             sourceComparison);
@@ -774,6 +794,7 @@ public sealed class FilterServiceTests
 
         // Assert
         Assert.True(sourceResult);
+
         Assert.Equal(
             "(new[] {\"Error\", \"Warning\"}).Contains(Level.ToString())",
             sourceComparison);

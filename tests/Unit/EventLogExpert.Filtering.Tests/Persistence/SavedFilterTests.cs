@@ -1,11 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 using System.Text.Json;
 
@@ -25,7 +21,8 @@ public sealed class SavedFilterTests
     public void JsonRoundTrip_BasicShape_PreservesBasicFilter()
     {
         // Act
-        var original = SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100AndLevelError, mode: FilterMode.Basic);
+        var original =
+            SavedFilter.TryCreate(FilterTestConstants.FilterIdEquals100AndLevelError, mode: FilterMode.Basic);
 
         // Assert
         Assert.NotNull(original);
@@ -112,14 +109,14 @@ public sealed class SavedFilterTests
         // Arrange
         const string StaleSource =
             $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "FilterType": "Advanced",
-              "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
-            }
-            """;
+              {
+                "Color": 0,
+                "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
+                "IsExcluded": false,
+                "FilterType": "Advanced",
+                "BasicFilter": { "Comparison": { "Category": 0, "Evaluator": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
+              }
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(StaleSource);
@@ -136,8 +133,8 @@ public sealed class SavedFilterTests
         // Arrange
         const string BrokenBasic =
             $$"""
-            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
-            """;
+              { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "FilterType": "Basic" }
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(BrokenBasic);
@@ -173,8 +170,8 @@ public sealed class SavedFilterTests
         // Arrange
         const string LegacyJson =
             $$"""
-            { "Color": 2, "Comparison": { "Value": "{{FilterTestConstants.FilterIdEquals100}}" }, "IsExcluded": true }
-            """;
+              { "Color": 2, "Comparison": { "Value": "{{FilterTestConstants.FilterIdEquals100}}" }, "IsExcluded": true }
+              """;
 
         // Act
         var model = JsonSerializer.Deserialize<SavedFilter>(LegacyJson);
@@ -212,8 +209,8 @@ public sealed class SavedFilterTests
         // Arrange
         const string AdvancedJson =
             $$"""
-            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "Mode": "Advanced" }
-            """;
+              { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false, "Mode": "Advanced" }
+              """;
 
         // Act
         var restored = JsonSerializer.Deserialize<SavedFilter>(AdvancedJson);
@@ -234,8 +231,8 @@ public sealed class SavedFilterTests
         // Arrange
         const string LegacyAdvancedJson =
             $$"""
-            { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false }
-            """;
+              { "Color": 0, "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}", "IsExcluded": false }
+              """;
 
         // Act
         var advanced = JsonSerializer.Deserialize<SavedFilter>(LegacyAdvancedJson);
@@ -247,13 +244,13 @@ public sealed class SavedFilterTests
 
         const string LegacyBasicJson =
             $$"""
-            {
-              "Color": 0,
-              "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
-              "IsExcluded": false,
-              "BasicFilter": { "Comparison": { "Property": 0, "Operator": 0, "MatchMode": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
-            }
-            """;
+              {
+                "Color": 0,
+                "ComparisonText": "{{FilterTestConstants.FilterIdEquals100}}",
+                "IsExcluded": false,
+                "BasicFilter": { "Comparison": { "Property": 0, "Operator": 0, "MatchMode": 0, "Value": "100", "Values": [] }, "SubFilters": [] }
+              }
+              """;
 
         // Act
         var basicMode = JsonSerializer.Deserialize<SavedFilter>(LegacyBasicJson);
@@ -588,6 +585,7 @@ public sealed class SavedFilterTests
     {
         // Arrange
         var id = FilterId.Create();
+
         var basicFilter = new BasicFilter(
             new FilterComparison
             {

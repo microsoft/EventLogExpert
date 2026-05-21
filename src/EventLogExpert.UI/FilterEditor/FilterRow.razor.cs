@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.FilterEditor;
 using EventLogExpert.Filtering.Drafts;
+using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Runtime;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;

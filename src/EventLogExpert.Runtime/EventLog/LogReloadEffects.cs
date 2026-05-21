@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Services;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using IDispatcher = Fluxor.IDispatcher;

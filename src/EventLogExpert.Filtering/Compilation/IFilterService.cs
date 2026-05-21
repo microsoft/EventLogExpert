@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Runtime;
+using EventLogExpert.Filtering.Evaluation;
 
-namespace EventLogExpert.Filtering.Services;
+namespace EventLogExpert.Filtering.Compilation;
 
 public interface IFilterService
 {
