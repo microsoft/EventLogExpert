@@ -20,6 +20,7 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.Adapters.Settings;
 using EventLogExpert.Services;
 using EventLogExpert.UI.Alerts;
 using Fluxor;
@@ -82,13 +83,12 @@ public static class MauiProgram
         builder.Services.AddTransient<IEventResolver, EventResolver>();
 
         // Preference Providers
-        builder.Services.AddSingleton<PreferencesProvider>();
-        builder.Services.AddSingleton<ILogTablePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
-        builder.Services.AddSingleton<IFilterGroupPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
-        builder.Services.AddSingleton<IFilterCachePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
-        builder.Services.AddSingleton<ISettingsPreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
-        builder.Services.AddSingleton<IDetailsPanePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
-        builder.Services.AddSingleton<IDatabasePreferencesProvider>(static sp => sp.GetRequiredService<PreferencesProvider>());
+        builder.Services.AddSingleton<ILogTablePreferencesProvider, LogTablePreferencesAdapter>();
+        builder.Services.AddSingleton<IFilterGroupPreferencesProvider, FilterGroupPreferencesAdapter>();
+        builder.Services.AddSingleton<IFilterCachePreferencesProvider, FilterCachePreferencesAdapter>();
+        builder.Services.AddSingleton<ISettingsPreferencesProvider, SettingsPreferencesAdapter>();
+        builder.Services.AddSingleton<IDetailsPanePreferencesProvider, DetailsPanePreferencesAdapter>();
+        builder.Services.AddSingleton<IDatabasePreferencesProvider, DatabasePreferencesAdapter>();
 
         // UI Services
         builder.Services.AddEventLogFiltering();
