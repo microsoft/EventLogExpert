@@ -9,12 +9,12 @@ internal sealed class CurrentVersionProvider(
     IPackageVersionProvider packageVersionProvider,
     IWindowsIdentityProvider identityProvider) : ICurrentVersionProvider
 {
-    private readonly IWindowsIdentityProvider _identityProvider = identityProvider;
+    private readonly Lazy<bool> _isAdmin = new(identityProvider.IsUserInAdministratorRole);
     private readonly IPackageVersionProvider _packageVersionProvider = packageVersionProvider;
 
     public Version CurrentVersion => _packageVersionProvider.GetPackageVersion();
 
-    public bool IsAdmin => _identityProvider.IsUserInAdministratorRole();
+    public bool IsAdmin => _isAdmin.Value;
 
     public bool IsDevBuild => CurrentVersion.Major <= 1;
 
