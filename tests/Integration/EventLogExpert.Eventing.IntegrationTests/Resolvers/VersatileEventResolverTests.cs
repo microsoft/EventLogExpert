@@ -4,7 +4,7 @@
 using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
