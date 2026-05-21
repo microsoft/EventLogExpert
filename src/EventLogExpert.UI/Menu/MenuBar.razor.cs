@@ -126,9 +126,13 @@ public sealed partial class MenuBar : IDisposable
             MenuItem.Item("Folder", () => Actions.OpenFolderAsync(combineLog)),
             MenuItem.SubMenu("Live",
             [
-                MenuItem.Item(LogChannelNames.ApplicationLog, () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog)),
-                MenuItem.Item(LogChannelNames.SystemLog, () => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, combineLog)),
-                MenuItem.Item(LogChannelNames.SecurityLog, () => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, combineLog), isEnabled: isAdmin),
+                MenuItem.Item(LogChannelNames.ApplicationLog,
+                    () => Actions.OpenLiveLogAsync(LogChannelNames.ApplicationLog, combineLog)),
+                MenuItem.Item(LogChannelNames.SystemLog,
+                    () => Actions.OpenLiveLogAsync(LogChannelNames.SystemLog, combineLog)),
+                MenuItem.Item(LogChannelNames.SecurityLog,
+                    () => Actions.OpenLiveLogAsync(LogChannelNames.SecurityLog, combineLog),
+                    isEnabled: isAdmin),
                 MenuItem.AsyncSubMenu(
                     "Other Logs",
                     async () => BuildOtherLogsTree(await Actions.GetOtherLogNamesAsync(), combineLog, isAdmin)),
@@ -149,7 +153,10 @@ public sealed partial class MenuBar : IDisposable
 
             var log = path[^1];
             var logIsEnabled = isAdmin || !LogChannelNames.AdminOnlyLiveChannels.Contains(logName);
-            var logMenuItem = MenuItem.Item(log, () => Actions.OpenLiveLogAsync(logName, combineLog), isEnabled: logIsEnabled);
+
+            var logMenuItem = MenuItem.Item(log,
+                () => Actions.OpenLiveLogAsync(logName, combineLog),
+                isEnabled: logIsEnabled);
 
             if (path.Count == 1)
             {
@@ -185,7 +192,12 @@ public sealed partial class MenuBar : IDisposable
         return rootChildren;
     }
 
-    private IReadOnlyList<MenuItem> BuildTools() => [MenuItem.Item("Settings", () => Actions.OpenSettingsAsync()),];
+    private IReadOnlyList<MenuItem> BuildTools() =>
+    [
+        MenuItem.Item("Manage Databases", () => Actions.OpenSettingsAsync()),
+        MenuItem.Separator(),
+        MenuItem.Item("Settings", () => Actions.OpenSettingsAsync()),
+    ];
 
     private List<TopLevel> BuildTopLevel() =>
     [
@@ -209,7 +221,8 @@ public sealed partial class MenuBar : IDisposable
                 Actions.ToggleShowAllEvents,
                 "Ctrl+H",
                 !isFilterEnabled),
-            MenuItem.Item("Load New Events", Actions.LoadNewEvents), MenuItem.Item(
+            MenuItem.Item("Load New Events", Actions.LoadNewEvents),
+            MenuItem.Item(
                 "Continuously Update",
                 () => Actions.SetContinuouslyUpdate(!isContinuouslyUpdating),
                 isChecked: isContinuouslyUpdating),
@@ -257,6 +270,7 @@ public sealed partial class MenuBar : IDisposable
         {
             ActiveBar = null;
             MenuService.Close();
+
             return;
         }
 
