@@ -12,6 +12,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
     <ProjectReference Include="..\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
+    <ProjectReference Include="..\EventLogExpert.ProviderDatabase\EventLogExpert.ProviderDatabase.csproj" />
   </ItemGroup>
 
   <ItemGroup>
