@@ -202,7 +202,8 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenSqliteFileWithoutProviderDetailsTable_ShouldClassifyAsUnrecognizedSchema()
+    public async Task
+        ClassifyEntriesAsync_WhenSqliteFileWithoutProviderDetailsTable_ShouldClassifyAsUnrecognizedSchema()
     {
         // A valid SQLite file that lacks the ProviderDetails table is not one of our schemas
         // (V1/V2/V3/V4). Without quarantine, EventResolver would later crash on
@@ -232,7 +233,8 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV3BakAppearsBetweenClassifications_ShouldUpdateBackupExistsAndRaiseEntriesChanged()
+    public async Task
+        ClassifyEntriesAsync_WhenV3BakAppearsBetweenClassifications_ShouldUpdateBackupExistsAndRaiseEntriesChanged()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
@@ -486,8 +488,9 @@ public sealed class DatabaseServiceTests : IDisposable
 
         Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.DeleteEntryWithBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+
         Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         release.Set();
@@ -519,8 +522,8 @@ public sealed class DatabaseServiceTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await service.DeleteEntryWithBackupAsync(Constants.TestDb1, cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await service.DeleteEntryWithBackupAsync(Constants.TestDb1, cts.Token));
 
         Assert.True(File.Exists(Path.Combine(databasePath, Constants.TestDb1)));
     }
@@ -531,8 +534,8 @@ public sealed class DatabaseServiceTests : IDisposable
         CreateDatabaseDirectory();
         var service = CreateDatabaseService();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.DeleteEntryWithBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await service.DeleteEntryWithBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -607,7 +610,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         service.UpgradeBatchProgress += (_, args) =>
         {
-            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            if (args.Phase == UpgradePhase.BackingUp &&
+                string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
             {
                 inFlight.Set();
                 release.Wait(TimeSpan.FromSeconds(10));
@@ -757,6 +761,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Directory.CreateDirectory(sourceDir);
 
         var zipPath = Path.Combine(sourceDir, "import.zip");
+
         CreateZipWithEntries(zipPath,
         [
             (Constants.TestDb1, "db1"),
@@ -1021,6 +1026,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var sourceDir = Path.Combine(_testDirectory, "source");
         Directory.CreateDirectory(sourceDir);
         var zipPath = Path.Combine(sourceDir, "import.zip");
+
         CreateZipWithEntries(zipPath,
         [
             (Constants.TestDb1, "would-overwrite-if-not-skipped"),
@@ -1260,6 +1266,7 @@ public sealed class DatabaseServiceTests : IDisposable
         // Logger throws on every Warn — simulates debug.log being locked. Without SafeLog the
         // per-entry catch would propagate, faulting the worker before statuses are applied.
         var throwingLogger = Substitute.For<ITraceLogger>();
+
         throwingLogger.When(logger => logger.Warning(Arg.Any<WarningLogHandler>()))
             .Do(_ => throw new IOException("simulated log file lock"));
 
@@ -1287,6 +1294,7 @@ public sealed class DatabaseServiceTests : IDisposable
         using var subscriberAttached = new ManualResetEventSlim(false);
 
         var throwingLogger = Substitute.For<ITraceLogger>();
+
         throwingLogger.When(logger => logger.Warning(Arg.Any<WarningLogHandler>()))
             .Do(_ =>
             {
@@ -1381,7 +1389,8 @@ public sealed class DatabaseServiceTests : IDisposable
 
         service.UpgradeBatchProgress += (_, args) =>
         {
-            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            if (args.Phase == UpgradePhase.BackingUp &&
+                string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
             {
                 inFlight.Set();
                 release.Wait(TimeSpan.FromSeconds(10));
@@ -1400,6 +1409,7 @@ public sealed class DatabaseServiceTests : IDisposable
             [Constants.TestDb2],
             UpgradeProgressScope.Background,
             TestContext.Current.CancellationToken);
+
         var thirdBatch = service.UpgradeBatchAsync(
             [Constants.TestDb3],
             UpgradeProgressScope.Background,
@@ -1524,8 +1534,9 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
         // Act + Assert
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.RemoveAsync(Constants.TestDb1, cancellationToken: TestContext.Current.CancellationToken));
+
         Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         release.Set();
@@ -1546,8 +1557,8 @@ public sealed class DatabaseServiceTests : IDisposable
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
 
         // Act + Assert
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            () => service.RemoveAsync(Constants.TestDb1, cancellationToken: cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            service.RemoveAsync(Constants.TestDb1, cancellationToken: cts.Token));
 
         Assert.True(File.Exists(dbPath));
         Assert.Single(service.Entries);
@@ -1610,6 +1621,7 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.False(disabledEntry.IsEnabled);
 
         var prepareInvoked = false;
+
         Task PrepareCallback(CancellationToken ct)
         {
             prepareInvoked = true;
@@ -1632,7 +1644,7 @@ public sealed class DatabaseServiceTests : IDisposable
     {
         // Arrange — verifies the 4-phase ordering: disable → prepare-callback → file delete.
         // Track phase order via a shared list. The callback observes IsEnabled (must already
-        // be false) and confirms the file still exists (Phase 3 hasn't run yet).
+        // be false) and confirms the file still exists (Step 3 hasn't run yet).
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
 
@@ -1652,6 +1664,7 @@ public sealed class DatabaseServiceTests : IDisposable
         {
             var current = service.Entries.SingleOrDefault(e =>
                 string.Equals(e.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase));
+
             observations.Add(("prepare", current?.IsEnabled ?? false, File.Exists(dbPath)));
             return Task.CompletedTask;
         }
@@ -1662,8 +1675,8 @@ public sealed class DatabaseServiceTests : IDisposable
             PrepareCallback,
             TestContext.Current.CancellationToken);
 
-        // Assert — prepare callback observed IsEnabled=false (Phase 1 ran first) and the
-        // file still present (Phase 3 had not yet run).
+        // Assert — prepare callback observed IsEnabled=false (Step 1 ran first) and the
+        // file still present (Step 3 had not yet run).
         var observation = Assert.Single(observations);
         Assert.False(observation.IsEnabled);
         Assert.True(observation.FileExists);
@@ -1676,7 +1689,7 @@ public sealed class DatabaseServiceTests : IDisposable
     [Fact]
     public async Task RemoveAsync_WhenEntryEnabled_RaisesEntriesChangedTwice_OncePerPhaseMutation()
     {
-        // Arrange — Phase 1 (disable) and Phase 4 (RemoveAt) should each fire EntriesChanged.
+        // Arrange — Step 1 (disable) and Step 4 (RemoveAt) should each fire EntriesChanged.
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
         var service = CreateDatabaseService();
@@ -1702,14 +1715,14 @@ public sealed class DatabaseServiceTests : IDisposable
         var service = CreateDatabaseService();
 
         // Act + Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RemoveAsync("does-not-exist.db", cancellationToken: TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.RemoveAsync("does-not-exist.db", cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task RemoveAsync_WhenPrepareCallbackThrows_RestoresIsEnabled_AndRethrows()
     {
-        // Arrange — Phase 2 failure must roll back Phase 1. The entry should remain in
+        // Arrange — Step 2 failure must roll back Step 1. The entry should remain in
         // Entries with IsEnabled restored to true so the caller can retry.
         var databasePath = CreateDatabaseDirectory();
         CreateDatabaseFile(databasePath, Constants.TestDb1);
@@ -1723,11 +1736,10 @@ public sealed class DatabaseServiceTests : IDisposable
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
 
         // Act
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RemoveAsync(
-                Constants.TestDb1,
-                _ => throw new InvalidOperationException("prepare boom"),
-                TestContext.Current.CancellationToken));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => service.RemoveAsync(
+            Constants.TestDb1,
+            _ => throw new InvalidOperationException("prepare boom"),
+            TestContext.Current.CancellationToken));
 
         // Assert
         Assert.Equal("prepare boom", ex.Message);
@@ -1781,8 +1793,9 @@ public sealed class DatabaseServiceTests : IDisposable
 
         Assert.True(inFlight.Wait(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.RestoreFromBackupAsync(Constants.TestDb1, TestContext.Current.CancellationToken));
+
         Assert.Contains("another operation is in progress", ex.Message, StringComparison.OrdinalIgnoreCase);
 
         release.Set();
@@ -1825,8 +1838,8 @@ public sealed class DatabaseServiceTests : IDisposable
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAsync<OperationCanceledException>(
-            async () => await service.RestoreFromBackupAsync(Constants.TestDb1, cts.Token));
+        await Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await service.RestoreFromBackupAsync(Constants.TestDb1, cts.Token));
 
         Assert.True(File.Exists(bakPath));
     }
@@ -1837,12 +1850,13 @@ public sealed class DatabaseServiceTests : IDisposable
         CreateDatabaseDirectory();
         var service = CreateDatabaseService();
 
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await service.RestoreFromBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await service.RestoreFromBackupAsync("does-not-exist.db", TestContext.Current.CancellationToken));
     }
 
     [Fact]
-    public async Task RestoreFromBackupAsync_WhenMainIsV4AndBackupIsV3_RestoresMainDeletesSidecarsAndBackup_StatusBecomesUpgradeRequired()
+    public async Task
+        RestoreFromBackupAsync_WhenMainIsV4AndBackupIsV3_RestoresMainDeletesSidecarsAndBackup_StatusBecomesUpgradeRequired()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
@@ -1965,11 +1979,10 @@ public sealed class DatabaseServiceTests : IDisposable
         var service = CreateDatabaseService();
         await service.DisposeAsync();
 
-        await Assert.ThrowsAsync<ObjectDisposedException>(
-            () => service.UpgradeBatchAsync(
-                [Constants.TestDb1],
-                UpgradeProgressScope.Background,
-                TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => service.UpgradeBatchAsync(
+            [Constants.TestDb1],
+            UpgradeProgressScope.Background,
+            TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -2311,13 +2324,16 @@ public sealed class DatabaseServiceTests : IDisposable
             lock (startedBatchIds)
             {
                 startedBatchIds.Add(args.BatchId);
-                startedTimes.Add(new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc).AddTicks(Environment.TickCount64));
+
+                startedTimes.Add(
+                    new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc).AddTicks(Environment.TickCount64));
             }
         };
 
         service.UpgradeBatchProgress += (_, args) =>
         {
-            if (args.Phase == UpgradePhase.BackingUp && string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
+            if (args.Phase == UpgradePhase.BackingUp &&
+                string.Equals(args.FileName, Constants.TestDb1, StringComparison.OrdinalIgnoreCase))
             {
                 firstBackingUp.Set();
                 releaseFirst.Wait(TimeSpan.FromSeconds(10));
@@ -2403,7 +2419,9 @@ public sealed class DatabaseServiceTests : IDisposable
         return path;
     }
 
-    private DatabaseService CreateDatabaseService(IDatabasePreferencesProvider? preferences = null, ITraceLogger? traceLogger = null)
+    private DatabaseService CreateDatabaseService(
+        IDatabasePreferencesProvider? preferences = null,
+        ITraceLogger? traceLogger = null)
     {
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var prefs = preferences ?? Substitute.For<IDatabasePreferencesProvider>();

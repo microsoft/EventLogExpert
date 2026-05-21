@@ -31,7 +31,7 @@ public sealed class SavedFilterGroupJsonShapeTests
     {
         // Arrange — STJ must dispatch each Filters[i] through the [JsonConverter] on SavedFilter, so a Basic-mode
         // saved filter inside the group keeps its persisted Mode + BasicFilter structure after round-trip. Without
-        // this dispatch, F16d's type move could silently break the nested wire shape.
+        // this dispatch, moving the nested type could silently break the persisted wire shape.
         var group = new SavedFilterGroup
         {
             Name = FilterTestConstants.FilterGroupName,

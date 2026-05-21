@@ -87,7 +87,7 @@ internal sealed class DatabaseRecoveryService(
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // Phase 1: disable the entry so EventResolver can no longer pick this database up
+        // Step 1: disable the entry so EventResolver can no longer pick this database up
         // on its next construction. Capture wasEnabled so we can restore on rollback if a
         // later phase fails.
         var (found, wasEnabled) = _entryStore.SetEnabled(fileName, isEnabled: false, persist: true);
@@ -98,7 +98,7 @@ internal sealed class DatabaseRecoveryService(
                 $"{nameof(DatabaseRecoveryService)}.{nameof(RemoveAsync)}: no entry found with file name '{fileName}'.");
         }
 
-        // Phase 2: let the caller close any open log views before we touch the file.
+        // Step 2: let the caller close any open log views before we touch the file.
         // Always invoked when a callback is supplied — a previously-disabled entry can still
         // be referenced by IEventResolver instances constructed before the disable (e.g., the
         // user disabled this DB and declined the modal-close reload prompt). Those resolvers
@@ -121,7 +121,7 @@ internal sealed class DatabaseRecoveryService(
             }
         }
 
-        // Phase 3: clear the SQLite connection pool and delete the files. Pool clear is
+        // Step 3: clear the SQLite connection pool and delete the files. Pool clear is
         // required so the OS file handles backing the pooled connections are closed; the
         // closed-but-pooled connections still hold the file handle without
         // FILE_SHARE_DELETE on Windows.
@@ -141,7 +141,7 @@ internal sealed class DatabaseRecoveryService(
             throw;
         }
 
-        // Phase 4: drop the entry from the snapshot.
+        // Step 4: drop the entry from the snapshot.
         _entryStore.TryRemoveAndPersist(fileName);
     }
 }
