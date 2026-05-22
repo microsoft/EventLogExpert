@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.Persistence;
-using EventLogExpert.Filtering.Evaluation;
 
 namespace EventLogExpert.Filtering.Evaluation;
 

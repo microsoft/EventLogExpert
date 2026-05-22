@@ -29,14 +29,23 @@ public static class RuntimeServiceCollectionExtensions
     /// <summary>
     ///     Registers the runtime tier's services. Callers MUST also register:
     ///     <list type="bullet">
+    ///         <item>
+    ///             <c>AddFluxor(...)</c> — effect classes and state selectors depend on <c>IDispatcher</c>,
+    ///             <c>IState&lt;T&gt;</c>, etc.
+    ///         </item>
     ///         <item><c>AddEventLogFiltering()</c> — effect classes depend on <c>IFilterService</c>.</item>
-    ///         <item><c>AddEventLogProviderDatabase()</c> — database sub-services depend on <c>IProviderDatabaseMaintenance</c>.</item>
+    ///         <item>
+    ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on
+    ///             <c>IProviderDatabaseMaintenance</c>.
+    ///         </item>
     ///     </list>
-    ///     Omitting either produces a DI resolution failure when the dependent services are first activated.
+    ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
     /// </summary>
     public static IServiceCollection AddEventLogRuntime(this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        AddDatabaseServices(services);
 
         // Command facades.
         services.AddSingleton<IEventLogCommands, EventLogCommands>();
@@ -56,8 +65,6 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<DatabaseCoordinationEffects>());
 
         // Application services.
-        AddDatabaseServices(services);
-
         services.AddSingleton<IAppTitleService, AppTitleService>();
         services.AddSingleton<IBannerService, BannerService>();
         services.AddSingleton<DebugLogService>();
