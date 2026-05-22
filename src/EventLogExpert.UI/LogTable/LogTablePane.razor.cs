@@ -5,7 +5,7 @@ using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
+using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Runtime.Common.Clipboard;

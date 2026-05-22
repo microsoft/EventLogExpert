@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.Basic;
-using EventLogExpert.Filtering.Common;
+using EventLogExpert.Filtering.Common.Filtering;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Filtering.Tests.Basic;

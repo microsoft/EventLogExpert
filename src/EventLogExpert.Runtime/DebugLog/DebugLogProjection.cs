@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Common;
+using EventLogExpert.Filtering.Common.Filtering;
 using Microsoft.Extensions.Logging;
 
 namespace EventLogExpert.Runtime.DebugLog;

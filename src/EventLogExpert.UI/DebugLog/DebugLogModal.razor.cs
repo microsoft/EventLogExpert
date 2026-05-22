@@ -2,7 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.UI.Modal;
-using EventLogExpert.Filtering.Common;
+using EventLogExpert.Filtering.Common.Filtering;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;

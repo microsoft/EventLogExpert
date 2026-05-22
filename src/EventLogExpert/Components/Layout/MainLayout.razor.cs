@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Services;
+using EventLogExpert.Adapters.Input;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
