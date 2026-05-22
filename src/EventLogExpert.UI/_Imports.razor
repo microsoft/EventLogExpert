@@ -1,42 +1,29 @@
+@* Framework *@
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.Web.Virtualization
-@using EventLogExpert.UI.Alerts
-@using EventLogExpert.UI.Banner
-@using EventLogExpert.UI.Database
-@using EventLogExpert.UI.DebugLog
-@using EventLogExpert.UI.FilterCache
-@using EventLogExpert.UI.FilterGroup
-@using EventLogExpert.UI.FilterEditor
-@using EventLogExpert.UI.Inputs
-@using EventLogExpert.UI.Menu
-@using EventLogExpert.UI.Modal
-@using EventLogExpert.UI.Settings
-@using EventLogExpert.UI.Update
-@using EventLogExpert.Runtime.Common.Display
-@using EventLogExpert.Runtime.Common.Files
-@using EventLogExpert.Runtime.Banner
-@using EventLogExpert.Runtime.Alerts
-@using EventLogExpert.Runtime.Settings
-@using EventLogExpert.Runtime.Menu
-@using EventLogExpert.Runtime.Database
-@using EventLogExpert.Runtime.Database.Upgrade
-@using EventLogExpert.Runtime.Update
 
+@* Fluxor *@
 @using Fluxor
 @using Fluxor.Blazor.Web.Components
 
-@using EventLogExpert.Filtering
-@using EventLogExpert.Filtering.Basic
+@* Filtering (Razor component types) *@
 @using EventLogExpert.Filtering.Common.Filtering
 @using EventLogExpert.Filtering.Drafts
-@using EventLogExpert.Filtering.EventData
-@using EventLogExpert.Filtering.Persistence
 @using EventLogExpert.Filtering.Evaluation
-@using EventLogExpert.Eventing.Common.EventLogs
-@using EventLogExpert.Runtime.LogTable
-@using EventLogExpert.Runtime.EventLog
-@using EventLogExpert.Runtime.FilterCache
+@using EventLogExpert.Filtering.Persistence
+
+@* Runtime (Razor component types) *@
+@using EventLogExpert.Runtime.Banner
+@using EventLogExpert.Runtime.Common.Display
+@using EventLogExpert.Runtime.Database
 @using EventLogExpert.Runtime.FilterGroup
-@using EventLogExpert.Runtime.FilterPane
+@using EventLogExpert.Runtime.LogTable
+@using EventLogExpert.Runtime.Settings
+
+@* UI (Razor component types) *@
+@using EventLogExpert.UI.Database
+@using EventLogExpert.UI.FilterEditor
+@using EventLogExpert.UI.Inputs
+@using EventLogExpert.UI.Modal

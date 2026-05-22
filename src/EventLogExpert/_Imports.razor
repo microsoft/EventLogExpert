@@ -1,54 +1,65 @@
+@* Framework *@
 @using System.Net.Http
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.AspNetCore.Components.Routing
 @using Microsoft.AspNetCore.Components.Web
 @using Microsoft.AspNetCore.Components.Web.Virtualization
 @using Microsoft.JSInterop
-@using EventLogExpert
+
+@* Fluxor *@
+@using Fluxor
+@using Fluxor.Blazor.Web.Components
+
+@* Eventing (domain) *@
+@using EventLogExpert.Eventing.Common.EventLogs
+@using EventLogExpert.Eventing.Readers
+
+@* Filtering *@
+@using EventLogExpert.Filtering
+@using EventLogExpert.Filtering.Basic
+@using EventLogExpert.Filtering.Common.Filtering
+@using EventLogExpert.Filtering.Drafts
+@using EventLogExpert.Filtering.Evaluation
+@using EventLogExpert.Filtering.EventData
+@using EventLogExpert.Filtering.Persistence
+
+@* Runtime *@
+@using EventLogExpert.Runtime
+@using EventLogExpert.Runtime.Alerts
+@using EventLogExpert.Runtime.Banner
+@using EventLogExpert.Runtime.Common.Display
+@using EventLogExpert.Runtime.Common.Files
+@using EventLogExpert.Runtime.Database
+@using EventLogExpert.Runtime.Database.Upgrade
+@using EventLogExpert.Runtime.EventLog
+@using EventLogExpert.Runtime.FilterCache
+@using EventLogExpert.Runtime.FilterGroup
+@using EventLogExpert.Runtime.FilterPane
+@using EventLogExpert.Runtime.LogTable
+@using EventLogExpert.Runtime.Menu
+@using EventLogExpert.Runtime.Settings
+@using EventLogExpert.Runtime.Update
+
+@* UI *@
 @using EventLogExpert.UI
 @using EventLogExpert.UI.Alerts
 @using EventLogExpert.UI.Banner
 @using EventLogExpert.UI.Database
 @using EventLogExpert.UI.DebugLog
+@using EventLogExpert.UI.DetailsPane
 @using EventLogExpert.UI.ErrorHandling
 @using EventLogExpert.UI.FilterCache
-@using EventLogExpert.UI.FilterGroup
 @using EventLogExpert.UI.FilterEditor
+@using EventLogExpert.UI.FilterGroup
+@using EventLogExpert.UI.FilterPane
 @using EventLogExpert.UI.Inputs
-@using EventLogExpert.Components.Layout
+@using EventLogExpert.UI.LogTable
 @using EventLogExpert.UI.Menu
 @using EventLogExpert.UI.Modal
-@using EventLogExpert.UI.DetailsPane
-@using EventLogExpert.UI.FilterPane
-@using EventLogExpert.UI.LogTable
-@using EventLogExpert.UI.StatusBar
 @using EventLogExpert.UI.Settings
+@using EventLogExpert.UI.StatusBar
 @using EventLogExpert.UI.Update
-@using EventLogExpert.Eventing.Readers
-@using EventLogExpert.Runtime
-@using EventLogExpert.Runtime.Common.Display
-@using EventLogExpert.Runtime.Common.Files
-@using EventLogExpert.Runtime.Banner
-@using EventLogExpert.Runtime.Alerts
-@using EventLogExpert.Runtime.Settings
-@using EventLogExpert.Runtime.Menu
-@using EventLogExpert.Runtime.Database
-@using EventLogExpert.Runtime.Database.Upgrade
-@using EventLogExpert.Runtime.Update
 
-@using Fluxor
-@using Fluxor.Blazor.Web.Components
-
-@using EventLogExpert.Filtering
-@using EventLogExpert.Filtering.Basic
-@using EventLogExpert.Filtering.Common.Filtering
-@using EventLogExpert.Filtering.Drafts
-@using EventLogExpert.Filtering.EventData
-@using EventLogExpert.Filtering.Persistence
-@using EventLogExpert.Filtering.Evaluation
-@using EventLogExpert.Eventing.Common.EventLogs
-@using EventLogExpert.Runtime.LogTable
-@using EventLogExpert.Runtime.EventLog
-@using EventLogExpert.Runtime.FilterCache
-@using EventLogExpert.Runtime.FilterGroup
-@using EventLogExpert.Runtime.FilterPane
+@* App (composition root) *@
+@using EventLogExpert
+@using EventLogExpert.Components.Layout
