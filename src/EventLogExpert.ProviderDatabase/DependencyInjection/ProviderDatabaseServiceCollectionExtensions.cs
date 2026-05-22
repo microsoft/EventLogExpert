@@ -10,6 +10,8 @@ public static class ProviderDatabaseServiceCollectionExtensions
 {
     public static IServiceCollection AddEventLogProviderDatabase(this IServiceCollection services)
     {
+        ArgumentNullException.ThrowIfNull(services);
+
         services.AddSingleton<IProviderDetailsLookupFactory, ProviderDbContextFactory>();
         services.AddSingleton<IProviderDatabaseMaintenance, ProviderDatabaseMaintenance>();
 

@@ -47,7 +47,7 @@ jobs:
         if ($projects.Count -eq 0) { throw 'No integration test projects found under tests/Integration.' }
         $failed = $false
         foreach ($project in $projects) {
-          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal
+          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal -p:RunSettingsFilePath=""
           if ($LASTEXITCODE -ne 0) { $failed = $true }
         }
         if ($failed) { throw 'One or more integration test projects failed.' }

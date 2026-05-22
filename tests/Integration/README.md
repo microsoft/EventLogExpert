@@ -1,30 +1,42 @@
 # Integration tests
 
-## Default behavior — integration tests fail without a container
+## Default behavior — integration tests are excluded by the solution runsettings filter
 
-Integration tests require the `EVENTLOG_CONTAINER` environment variable to be set.
-Each integration test project has an assembly-level `ContainerRequiredFixture` that
-throws `InvalidOperationException` when the variable is missing. This prevents
-`EventLogWatcherTests` from writing ~33 test events to your local Application
-event log and ensures all integration tests run in an isolated environment.
+The solution-level `EventLogExpert.runsettings` (applied via `Directory.Build.props`) excludes
+tests whose `FullyQualifiedName` contains `.IntegrationTests.`. This means:
 
-Running "Run All Tests" in Visual Studio Test Explorer will show integration tests
-as **failed** with the message:
+- **VS Test Explorer "Run All Tests"** skips integration tests entirely — they do not appear as
+  failed or passed; they are filtered out before discovery.
+- **`dotnet test` without overrides** also excludes them.
 
-> Integration tests must run in a container. Use './scripts/run-integration-tests.ps1'
-> or set EVENTLOG_CONTAINER=1 for explicit local execution.
+To actually run integration tests, you must override the runsettings filter (the script and
+Docker Compose commands below do this automatically).
+
+Each integration test project also has an assembly-level `ContainerRequiredFixture` that
+throws `InvalidOperationException` when the `EVENTLOG_CONTAINER` environment variable is
+missing. This is the **second gate** — even if the runsettings filter is bypassed, the fixture
+ensures tests fail loudly rather than silently polluting your local Application event log.
 
 ### To run integration tests
 
-Use the provided script, which handles Docker daemon mode switching automatically:
+Use the provided script, which handles Docker daemon mode switching automatically.
+The script runs all services defined in `compose.yml` (eventing, runtime, eventdbtool):
 
 ```powershell
-# Run all integration test suites in Windows containers
-./scripts/run-integration-tests.ps1
+# Run all container-gated suites
+./scripts/run-tests.ps1
 
 # Run a specific suite
-./scripts/run-integration-tests.ps1 -Suite eventing
-./scripts/run-integration-tests.ps1 -Suite runtime,eventdbtool
+./scripts/run-tests.ps1 -Suite eventing
+./scripts/run-tests.ps1 -Suite runtime,eventdbtool
+```
+
+Integration test projects that do not require a Windows container (e.g., ProviderDatabase)
+are not in `compose.yml` and should be run directly:
+
+```powershell
+$env:EVENTLOG_CONTAINER = "1"
+dotnet test tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/ -p:RunSettingsFilePath=""
 ```
 
 The script detects the current Docker daemon mode, switches to Windows containers
@@ -42,8 +54,11 @@ Or opt in on host explicitly (accepts event log pollution):
 
 ```powershell
 $env:EVENTLOG_CONTAINER = "1"
-dotnet test tests/Integration/EventLogExpert.Eventing.IntegrationTests/
+dotnet test tests/Integration/EventLogExpert.Eventing.IntegrationTests/ -p:RunSettingsFilePath=""
 ```
+
+The `-p:RunSettingsFilePath=""` override is required because `Directory.Build.props` applies
+a runsettings filter that excludes integration tests by default.
 
 CI workflows set `EVENTLOG_CONTAINER=1` and run the full suite on ephemeral runners.
 

@@ -11,8 +11,8 @@ public sealed class ContainerRequiredFixture
             Environment.GetEnvironmentVariable("EVENTLOG_CONTAINER")))
         {
             throw new InvalidOperationException(
-                "Integration tests require the EVENTLOG_CONTAINER env var. " +
-                "Run via scripts/run-integration-tests.ps1 or set the var manually.");
+                "Integration tests require EVENTLOG_CONTAINER to be set. " +
+                "Set the variable and run: dotnet test tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/ -p:RunSettingsFilePath=\"\"");
         }
     }
 }

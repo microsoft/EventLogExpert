@@ -3,9 +3,11 @@
 
 using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DebugLog;
@@ -25,10 +27,12 @@ namespace Microsoft.Extensions.DependencyInjection;
 public static class RuntimeServiceCollectionExtensions
 {
     /// <summary>
-    ///     Registers the runtime tier's services. Callers MUST also call AddEventLogFiltering before resolving the
-    ///     resulting provider — the runtime tier's Fluxor-scanned effect classes depend on <c>IFilterService</c>, which is
-    ///     owned by the filtering tier. Omitting it produces a hard-to-diagnose DI resolution failure at the first action
-    ///     dispatch.
+    ///     Registers the runtime tier's services. Callers MUST also register:
+    ///     <list type="bullet">
+    ///         <item><c>AddEventLogFiltering()</c> — effect classes depend on <c>IFilterService</c>.</item>
+    ///         <item><c>AddEventLogProviderDatabase()</c> — database sub-services depend on <c>IProviderDatabaseMaintenance</c>.</item>
+    ///     </list>
+    ///     Omitting either produces a DI resolution failure when the dependent services are first activated.
     /// </summary>
     public static IServiceCollection AddEventLogRuntime(this IServiceCollection services)
     {
@@ -52,11 +56,10 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<ILogReloadCoordinator>(static sp => sp.GetRequiredService<DatabaseCoordinationEffects>());
 
         // Application services.
+        AddDatabaseServices(services);
+
         services.AddSingleton<IAppTitleService, AppTitleService>();
         services.AddSingleton<IBannerService, BannerService>();
-        services.AddSingleton<DatabaseService>();
-        services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
-        services.AddSingleton<IActiveDatabasePathsProvider>(static sp => sp.GetRequiredService<DatabaseService>());
         services.AddSingleton<DebugLogService>();
         services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
         services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());
@@ -75,5 +78,35 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IUpdateService, UpdateService>();
 
         return services;
+    }
+
+    private static void AddDatabaseServices(IServiceCollection services)
+    {
+        services.AddSingleton<DatabaseEntryStore>(static sp =>
+        {
+            var store = new DatabaseEntryStore(
+                sp.GetRequiredService<FileLocationOptions>(),
+                sp.GetRequiredService<IDatabasePreferencesProvider>(),
+                sp.GetRequiredService<ITraceLogger>());
+
+            store.Refresh();
+
+            return store;
+        });
+
+        services.AddSingleton<DatabaseClassificationService>();
+
+        services.AddSingleton<DatabaseUpgradeService>(static sp => new DatabaseUpgradeService(
+            sp.GetRequiredService<DatabaseEntryStore>(),
+            sp.GetRequiredService<DatabaseClassificationService>().InitialClassificationTask,
+            sp.GetRequiredService<IProviderDatabaseMaintenance>(),
+            sp.GetRequiredService<ITraceLogger>()));
+
+        services.AddSingleton<DatabaseImportService>();
+        services.AddSingleton<DatabaseRecoveryService>();
+
+        services.AddSingleton<DatabaseService>();
+        services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
+        services.AddSingleton<IActiveDatabasePathsProvider>(static sp => sp.GetRequiredService<DatabaseService>());
     }
 }

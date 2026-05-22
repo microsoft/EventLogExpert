@@ -7,11 +7,11 @@ public sealed class ContainerRequiredFixture
 {
     public ContainerRequiredFixture()
     {
-        if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("EVENTLOG_CONTAINER")))
+        if (string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("EVENTLOG_CONTAINER")))
         {
             throw new InvalidOperationException(
-                "Integration tests must run in a container. " +
-                "Use './scripts/run-integration-tests.ps1' or set EVENTLOG_CONTAINER=1 for explicit local execution.");
+                "Integration tests require EVENTLOG_CONTAINER to be set. " +
+                "Use scripts/run-tests.ps1 (recommended — runs in a container) or set the variable manually for host execution.");
         }
     }
 }

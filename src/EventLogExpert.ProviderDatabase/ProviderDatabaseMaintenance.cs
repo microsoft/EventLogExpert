@@ -40,8 +40,10 @@ internal sealed class ProviderDatabaseMaintenance(ITraceLogger? logger = null) :
 
     public void WalCheckpoint(string databasePath)
     {
-        using (var connection = new SqliteConnection($"Data Source={databasePath}"))
+        try
         {
+            using var connection = new SqliteConnection($"Data Source={databasePath}");
+
             connection.Open();
 
             using var cmd = connection.CreateCommand();
@@ -49,8 +51,10 @@ internal sealed class ProviderDatabaseMaintenance(ITraceLogger? logger = null) :
             cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
             cmd.ExecuteNonQuery();
         }
-
-        SqliteConnection.ClearAllPools();
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+        }
     }
 
     public void PrepareForFileDeletion() => SqliteConnection.ClearAllPools();

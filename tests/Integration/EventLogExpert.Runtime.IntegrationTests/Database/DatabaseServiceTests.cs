@@ -2,13 +2,14 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
-using EventLogExpert.ProviderDatabase;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.IntegrationTests.TestUtils;
 using EventLogExpert.Runtime.IntegrationTests.TestUtils.Constants;
 using Microsoft.Data.Sqlite;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.IO.Compression;
 
@@ -18,6 +19,8 @@ public sealed class DatabaseServiceTests : IDisposable
 {
     private const int LinkedCtsPropagationDelayMs = 250;
 
+    private readonly IProviderDatabaseMaintenance _maintenance;
+    private readonly ServiceProvider _maintenanceProvider;
     private readonly List<DatabaseService> _services = [];
     private readonly string _testDirectory;
 
@@ -25,6 +28,12 @@ public sealed class DatabaseServiceTests : IDisposable
     {
         _testDirectory = Path.Combine(Path.GetTempPath(), $"DatabaseServiceTests_{Guid.NewGuid()}");
         Directory.CreateDirectory(_testDirectory);
+
+        var services = new ServiceCollection();
+        services.AddSingleton(Substitute.For<ITraceLogger>());
+        services.AddEventLogProviderDatabase();
+        _maintenanceProvider = services.BuildServiceProvider();
+        _maintenance = _maintenanceProvider.GetRequiredService<IProviderDatabaseMaintenance>();
     }
 
     [Fact]
@@ -565,8 +574,6 @@ public sealed class DatabaseServiceTests : IDisposable
 
     public void Dispose()
     {
-        // Dispose all services first so the consumer task halts and any in-flight upgrade rolls
-        // back BEFORE we tear down the temp directory underneath it.
         foreach (var service in _services)
         {
             try
@@ -579,9 +586,8 @@ public sealed class DatabaseServiceTests : IDisposable
             }
         }
 
-        // SQLite connections opened during ClassifyEntriesAsync are pooled; on Windows the pool
-        // keeps the file handle open after `Database.CloseConnection`, blocking the recursive
-        // delete below. Drop all pools before cleanup.
+        _maintenanceProvider.Dispose();
+
         SqliteConnection.ClearAllPools();
 
         if (Directory.Exists(_testDirectory))
@@ -1309,7 +1315,28 @@ public sealed class DatabaseServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
-        var service = new DatabaseService(fileLocationOptions, prefs, new ProviderDatabaseMaintenance(throwingLogger), throwingLogger);
+        var maintenance = _maintenance;
+        var entryStore = new DatabaseEntryStore(fileLocationOptions, prefs, throwingLogger);
+        entryStore.Refresh();
+
+        var classification =
+            new DatabaseClassificationService(entryStore, fileLocationOptions, maintenance, throwingLogger);
+
+        var upgrade = new DatabaseUpgradeService(entryStore,
+            classification.InitialClassificationTask,
+            maintenance,
+            throwingLogger);
+
+        var import =
+            new DatabaseImportService(entryStore, classification, upgrade, fileLocationOptions, throwingLogger);
+
+        var recovery = new DatabaseRecoveryService(entryStore,
+            classification,
+            fileLocationOptions,
+            maintenance,
+            throwingLogger);
+
+        var service = new DatabaseService(entryStore, classification, upgrade, import, recovery);
         Assert.Single(service.Entries);
         service.EntriesChanged += (_, _) => throw new InvalidOperationException("subscriber fault");
         subscriberAttached.Set();
@@ -2433,13 +2460,24 @@ public sealed class DatabaseServiceTests : IDisposable
         }
 
         var logger = traceLogger ?? Substitute.For<ITraceLogger>();
-        var service = new DatabaseService(fileLocationOptions, prefs, new ProviderDatabaseMaintenance(logger), logger);
+        var maintenance = _maintenance;
+        var entryStore = new DatabaseEntryStore(fileLocationOptions, prefs, logger);
+        entryStore.Refresh();
+        var classification = new DatabaseClassificationService(entryStore, fileLocationOptions, maintenance, logger);
+
+        var upgrade =
+            new DatabaseUpgradeService(entryStore, classification.InitialClassificationTask, maintenance, logger);
+
+        var import = new DatabaseImportService(entryStore, classification, upgrade, fileLocationOptions, logger);
+
+        var recovery =
+            new DatabaseRecoveryService(entryStore, classification, fileLocationOptions, maintenance, logger);
+
+        var service = new DatabaseService(entryStore, classification, upgrade, import, recovery);
         _services.Add(service);
 
-        // Block until ctor-initiated classification finishes so tests observe a stable post-classification
-        // state. Tests that need to observe pre-classification state (e.g., InitialClassificationTask
-        // contract tests) construct DatabaseService directly. Safe to block synchronously here because
-        // ClassifyEntriesAsync runs on Task.Run worker threads and does not capture a sync context.
+        // Block until classification finishes so tests observe a stable post-classification
+        // state. Tests that need to observe pre-classification state construct the chain directly.
         service.InitialClassificationTask.GetAwaiter().GetResult();
         return service;
     }
