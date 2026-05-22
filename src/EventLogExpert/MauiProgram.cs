@@ -1,6 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Adapters.ClipboardAdapter;
+using EventLogExpert.Adapters.FilePickerAdapter;
+using EventLogExpert.Adapters.FileSave;
+using EventLogExpert.Adapters.Identity;
+using EventLogExpert.Adapters.Input;
+using EventLogExpert.Adapters.Lifecycle;
+using EventLogExpert.Adapters.Menu;
+using EventLogExpert.Adapters.Settings;
+using EventLogExpert.Adapters.Threading;
+using EventLogExpert.Adapters.Window;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
@@ -18,8 +28,6 @@ using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
-using EventLogExpert.Adapters.Settings;
-using EventLogExpert.Services;
 using EventLogExpert.UI.Alerts;
 using Fluxor;
 using Fluxor.DependencyInjection;
