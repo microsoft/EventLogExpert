@@ -31,14 +31,13 @@
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/EventLogExpert.EventDbTool.IntegrationTests/EventLogExpert.EventDbTool.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.Filtering.IntegrationTests/EventLogExpert.Filtering.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/EventLogExpert.ProviderDatabase.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.UI.IntegrationTests/EventLogExpert.UI.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Shared/">
     <Project Path="tests/Shared/EventLogExpert.Eventing.TestUtils/EventLogExpert.Eventing.TestUtils.csproj" />
     <Project Path="tests/Shared/EventLogExpert.Filtering.TestUtils/EventLogExpert.Filtering.TestUtils.csproj" />
-    <Project Path="tests/Shared/EventLogExpert.ProviderDatabase.TestUtils/EventLogExpert.ProviderDatabase.TestUtils.csproj" />
-    <Project Path="tests/Shared/EventLogExpert.Runtime.TestUtils/EventLogExpert.Runtime.TestUtils.csproj" />
-    <Project Path="tests/Shared/EventLogExpert.UI.TestUtils/EventLogExpert.UI.TestUtils.csproj" />
   </Folder>
 </Solution>
