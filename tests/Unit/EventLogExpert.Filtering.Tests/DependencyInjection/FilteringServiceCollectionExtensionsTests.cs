@@ -12,12 +12,19 @@ public sealed class FilteringServiceCollectionExtensionsTests
     [InlineData(typeof(IFilterService))]
     public void AddEventLogFiltering_ShouldResolveHostFacingAbstraction(Type serviceType)
     {
+        // Arrange
         var services = new ServiceCollection();
         services.AddEventLogFiltering();
-        using var provider = services.BuildServiceProvider();
 
-        var resolved = provider.GetService(serviceType);
+        using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
 
+        using var scope = provider.CreateScope();
+
+        // Act
+        var resolved = scope.ServiceProvider.GetService(serviceType);
+
+        // Assert
         Assert.NotNull(resolved);
     }
 }

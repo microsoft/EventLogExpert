@@ -25,8 +25,8 @@ public interface IProviderDatabaseMaintenance
     void PerformUpgrade(string databasePath);
 
     /// <summary>
-    ///     Executes <c>PRAGMA wal_checkpoint(TRUNCATE)</c> on the database and flushes all SQLite connection pools. The
-    ///     checkpoint + pool flush are a single atomic operation.
+    ///     Executes <c>PRAGMA wal_checkpoint(TRUNCATE)</c> on the database, then flushes all SQLite connection pools. Both
+    ///     operations are performed together so that the temporary connection opened for the checkpoint does not remain pooled.
     /// </summary>
     void WalCheckpoint(string databasePath);
 
