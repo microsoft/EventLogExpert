@@ -194,8 +194,6 @@ public sealed partial class MenuBar : IDisposable
 
     private IReadOnlyList<MenuItem> BuildTools() =>
     [
-        MenuItem.Item("Manage Databases", () => Actions.OpenSettingsAsync()),
-        MenuItem.Separator(),
         MenuItem.Item("Settings", () => Actions.OpenSettingsAsync()),
     ];
 

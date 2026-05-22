@@ -1745,14 +1745,14 @@ public sealed class EffectsTests
         IDispatcher dispatcher)
     {
         var closeCoordinator = new LogCloseCoordinator();
-        var ConcurrencyState = new EventLogConcurrencyState();
+        var concurrencyState = new EventLogConcurrencyState();
 
         var filtering = new FilteringEffects(
             eventLogState,
             filterService,
             logger,
             closeCoordinator,
-            ConcurrencyState);
+            concurrencyState);
 
         var openLog = new OpenLogEffects(
             eventLogState,
@@ -1764,7 +1764,7 @@ public sealed class EffectsTests
             databaseService,
             bannerService,
             closeCoordinator,
-            ConcurrencyState);
+            concurrencyState);
 
         var logReload = new LogReloadEffects(
             eventLogState,
@@ -1783,7 +1783,7 @@ public sealed class EffectsTests
             logReload,
             databaseCoordination,
             closeCoordinator,
-            ConcurrencyState);
+            concurrencyState);
     }
 
     private static (EffectsHarness effects, IDispatcher mockDispatcher) CreateEffects(

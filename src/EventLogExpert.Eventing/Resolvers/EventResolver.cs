@@ -24,9 +24,9 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
     private readonly ConcurrentDictionary<string, Lazy<bool>> _resolutionGates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails =
         new(StringComparer.OrdinalIgnoreCase);
-
-    private ImmutableArray<IProviderDetailsLookup> _providerLookups = [];
+    
     private ImmutableArray<string> _metadataPaths = [];
+    private ImmutableArray<IProviderDetailsLookup> _providerLookups = [];
 
     public EventResolver(
         IActiveDatabasePathsProvider? dbCollection = null,
@@ -261,7 +261,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         }
 
         // 2. Try provider databases
-        if (providerLookups.Length > 0 && TryResolveFromDatabase(providerName))
+        if (providerLookups.Length > 0 && TryResolveFromDatabase(providerName, providerLookups))
         {
             return true;
         }
@@ -272,13 +272,13 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
         return true;
     }
 
-    private bool TryResolveFromDatabase(string providerName)
+    private bool TryResolveFromDatabase(string providerName, ImmutableArray<IProviderDetailsLookup> lookups)
     {
         using (_databaseAccessLock.EnterScope())
         {
             ObjectDisposedException.ThrowIf(IsDisposed, this);
 
-            foreach (var lookup in _providerLookups)
+            foreach (var lookup in lookups)
             {
                 var details = lookup.FindProvider(providerName);
 
