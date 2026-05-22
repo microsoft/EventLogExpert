@@ -3,6 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database.Upgrade;
 using System.Collections.Immutable;
@@ -27,16 +28,22 @@ internal sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsPr
     public DatabaseService(
         FileLocationOptions fileLocationOptions,
         IDatabasePreferencesProvider preferences,
+        IProviderDatabaseMaintenance maintenance,
         ITraceLogger traceLogger)
     {
         _entryStore = new DatabaseEntryStore(fileLocationOptions, preferences, traceLogger);
         _entryStore.Refresh();
 
-        _classificationService = new DatabaseClassificationService(_entryStore, fileLocationOptions, traceLogger);
+        _classificationService = new DatabaseClassificationService(
+            _entryStore,
+            fileLocationOptions,
+            maintenance,
+            traceLogger);
 
         _upgradeService = new DatabaseUpgradeService(
             _entryStore,
             _classificationService.InitialClassificationTask,
+            maintenance,
             traceLogger);
 
         _importService = new DatabaseImportService(
@@ -50,6 +57,7 @@ internal sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsPr
             _entryStore,
             _classificationService,
             fileLocationOptions,
+            maintenance,
             traceLogger);
     }
 

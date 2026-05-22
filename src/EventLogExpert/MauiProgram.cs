@@ -1,9 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Eventing.Resolvers;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -77,7 +75,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IApplicationRestartService, WindowsApplicationRestartService>();
 
         // Provider Services
-        builder.Services.AddSingleton<IProviderDetailsLookupFactory, ProviderDbContextFactory>();
+        builder.Services.AddEventLogProviderDatabase();
         builder.Services.AddSingleton<IEventResolverCache, EventResolverCache>();
         builder.Services.AddSingleton<IEventXmlResolver, EventXmlResolver>();
         builder.Services.AddTransient<IEventResolver, EventResolver>();

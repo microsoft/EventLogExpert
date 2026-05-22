@@ -10,11 +10,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\..\Shared\EventLogExpert.Filtering.TestUtils\EventLogExpert.Filtering.TestUtils.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.ProviderDatabase\EventLogExpert.ProviderDatabase.csproj" />
+    <ProjectReference Include="..\..\Shared\EventLogExpert.Eventing.TestUtils\EventLogExpert.Eventing.TestUtils.csproj" />
   </ItemGroup>
 
 </Project>

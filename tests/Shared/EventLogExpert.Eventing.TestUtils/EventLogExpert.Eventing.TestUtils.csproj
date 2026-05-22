@@ -6,7 +6,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
-    <ProjectReference Include="..\..\..\src\EventLogExpert.ProviderDatabase\EventLogExpert.ProviderDatabase.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
   </ItemGroup>
 
 </Project>

@@ -2,11 +2,10 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.TestUtils;
 
-namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase.Tests.ProviderDatabase;
 
 public sealed class ProviderDetailsMergerTests
 {
@@ -16,6 +15,7 @@ public sealed class ProviderDetailsMergerTests
     public void MergeCaseInsensitiveDuplicates_DeduplicatesIdenticalMessages()
     {
         var msg = EventUtils.CreateMessageModel("Same-Provider", 100, "duplicate-text", shortId: 100);
+
         var rows = new List<ProviderDetails>
         {
             EventUtils.CreateProvider("Same-Provider", messages: [msg]),
@@ -50,18 +50,21 @@ public sealed class ProviderDetailsMergerTests
     {
         var rows = new List<ProviderDetails>
         {
-            EventUtils.CreateProvider("Same-Provider", events:
-            [
-                EventUtils.CreateEventModel(100, description: "first", logName: "App")
-            ]),
-            EventUtils.CreateProvider("same-provider", events:
-            [
-                EventUtils.CreateEventModel(100, description: "second", logName: "App")
-            ])
+            EventUtils.CreateProvider("Same-Provider",
+                events:
+                [
+                    EventUtils.CreateEventModel(100, description: "first", logName: "App")
+                ]),
+            EventUtils.CreateProvider("same-provider",
+                events:
+                [
+                    EventUtils.CreateEventModel(100, description: "second", logName: "App")
+                ])
         };
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("Event", ex.Reason);
     }
 
@@ -76,6 +79,7 @@ public sealed class ProviderDetailsMergerTests
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("Keywords", ex.Reason);
         Assert.Contains("first", ex.Reason);
         Assert.Contains("second", ex.Reason);
@@ -86,18 +90,21 @@ public sealed class ProviderDetailsMergerTests
     {
         var rows = new List<ProviderDetails>
         {
-            EventUtils.CreateProvider("Same-Provider", messages:
-            [
-                EventUtils.CreateMessageModel("Same-Provider", 1, "first", shortId: 1)
-            ]),
-            EventUtils.CreateProvider("same-provider", messages:
-            [
-                EventUtils.CreateMessageModel("same-provider", 1, "second", shortId: 1)
-            ])
+            EventUtils.CreateProvider("Same-Provider",
+                messages:
+                [
+                    EventUtils.CreateMessageModel("Same-Provider", 1, "first", shortId: 1)
+                ]),
+            EventUtils.CreateProvider("same-provider",
+                messages:
+                [
+                    EventUtils.CreateMessageModel("same-provider", 1, "second", shortId: 1)
+                ])
         };
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("Message", ex.Reason);
     }
 
@@ -112,6 +119,7 @@ public sealed class ProviderDetailsMergerTests
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("Opcodes", ex.Reason);
     }
 
@@ -126,6 +134,7 @@ public sealed class ProviderDetailsMergerTests
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("Tasks", ex.Reason);
     }
 
@@ -185,6 +194,7 @@ public sealed class ProviderDetailsMergerTests
 
         var ex = Assert.Throws<DatabaseUpgradeException>(() =>
             ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath));
+
         Assert.Contains("ResolvedFromOwningPublisher", ex.Reason);
     }
 
@@ -238,14 +248,16 @@ public sealed class ProviderDetailsMergerTests
     {
         var rows = new List<ProviderDetails>
         {
-            EventUtils.CreateProvider("Same-Provider", events:
-            [
-                EventUtils.CreateEventModel(100, description: "desc", logName: "App", keywords: [1, 2, 3])
-            ]),
-            EventUtils.CreateProvider("same-provider", events:
-            [
-                EventUtils.CreateEventModel(100, description: "desc", logName: "App", keywords: [3, 2, 1])
-            ])
+            EventUtils.CreateProvider("Same-Provider",
+                events:
+                [
+                    EventUtils.CreateEventModel(100, description: "desc", logName: "App", keywords: [1, 2, 3])
+                ]),
+            EventUtils.CreateProvider("same-provider",
+                events:
+                [
+                    EventUtils.CreateEventModel(100, description: "desc", logName: "App", keywords: [3, 2, 1])
+                ])
         };
 
         var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath);
@@ -259,14 +271,16 @@ public sealed class ProviderDetailsMergerTests
     {
         var rows = new List<ProviderDetails>
         {
-            EventUtils.CreateProvider("Same-Provider", messages:
-            [
-                EventUtils.CreateMessageModel("Same-Provider", 1, "shared", shortId: 1, tag: "TagA")
-            ]),
-            EventUtils.CreateProvider("same-provider", messages:
-            [
-                EventUtils.CreateMessageModel("same-provider", 1, "shared", shortId: 1, tag: "TagB")
-            ])
+            EventUtils.CreateProvider("Same-Provider",
+                messages:
+                [
+                    EventUtils.CreateMessageModel("Same-Provider", 1, "shared", shortId: 1, tag: "TagA")
+                ]),
+            EventUtils.CreateProvider("same-provider",
+                messages:
+                [
+                    EventUtils.CreateMessageModel("same-provider", 1, "shared", shortId: 1, tag: "TagB")
+                ])
         };
 
         var merged = ProviderDetailsMerger.MergeCaseInsensitiveDuplicates(rows, TestDatabasePath);
