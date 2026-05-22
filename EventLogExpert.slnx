@@ -4,8 +4,10 @@
   </Configurations>
   <Folder Name="/Solution Items/">
     <File Path=".editorconfig" />
+    <File Path="compose.yml" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
+    <File Path="EventLogExpert.runsettings" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/EventLogExpert/EventLogExpert.csproj">
