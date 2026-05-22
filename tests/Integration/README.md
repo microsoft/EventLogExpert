@@ -1,27 +1,36 @@
 # Integration tests
 
-## Default behavior — integration tests are excluded from "Run All Tests"
+## Default behavior — integration tests fail without a container
 
-Integration tests are excluded from Visual Studio Test Explorer's "Run All Tests"
-and bare `dotnet test` by default. The `EventLogExpert.runsettings` file at the
-repo root filters out any test whose fully-qualified name contains the literal
-namespace segment `.IntegrationTests.` (matching every test under
-`tests/Integration/EventLogExpert.*.IntegrationTests/`). This prevents
+Integration tests require the `EVENTLOG_CONTAINER` environment variable to be set.
+Each integration test project has an assembly-level `ContainerRequiredFixture` that
+throws `InvalidOperationException` when the variable is missing. This prevents
 `EventLogWatcherTests` from writing ~33 test events to your local Application
-event log every time you run the test suite.
+event log and ensures all integration tests run in an isolated environment.
 
-Unit-test classes that happen to be named `*IntegrationTests` (for example
-`FilterPaneIntegrationTests` and `StatusBarIntegrationTests` under
-`tests/Unit/EventLogExpert.Runtime.Tests`) are **not** excluded — the filter
-matches the dotted namespace segment, not any substring of the name.
+Running "Run All Tests" in Visual Studio Test Explorer will show integration tests
+as **failed** with the message:
 
-The solution uses `xunit.v3.mtp-off` (VSTest mode, not Microsoft.Testing.Platform)
-so that VS Test Explorer honors the `.runsettings` `<TestCaseFilter>`.
+> Integration tests must run in a container. Use './scripts/run-integration-tests.ps1'
+> or set EVENTLOG_CONTAINER=1 for explicit local execution.
 
-### To run integration tests locally
+### To run integration tests
 
-Use Docker Compose to run them inside a Windows container, where event log
-writes are isolated from your host:
+Use the provided script, which handles Docker daemon mode switching automatically:
+
+```powershell
+# Run all integration test suites in Windows containers
+./scripts/run-integration-tests.ps1
+
+# Run a specific suite
+./scripts/run-integration-tests.ps1 -Suite eventing
+./scripts/run-integration-tests.ps1 -Suite runtime,eventdbtool
+```
+
+The script detects the current Docker daemon mode, switches to Windows containers
+if needed, runs the tests via `docker compose`, then restores the original mode.
+
+Or run Docker Compose directly:
 
 ```powershell
 docker compose run --rm eventing
@@ -32,11 +41,11 @@ docker compose run --rm eventdbtool
 Or opt in on host explicitly (accepts event log pollution):
 
 ```powershell
-dotnet test tests/Integration/EventLogExpert.Eventing.IntegrationTests/ -p:RunSettingsFilePath=
+$env:EVENTLOG_CONTAINER = "1"
+dotnet test tests/Integration/EventLogExpert.Eventing.IntegrationTests/
 ```
 
-CI workflows pass `-p:RunSettingsFilePath=` to override the filter and run the
-full suite on ephemeral runners.
+CI workflows set `EVENTLOG_CONTAINER=1` and run the full suite on ephemeral runners.
 
 ## Why this directory has a `compose.yml` at the repo root
 

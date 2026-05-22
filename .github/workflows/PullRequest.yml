@@ -40,12 +40,14 @@ jobs:
         if ($failed) { throw 'One or more unit test projects failed.' }
     - name: Test (integration)
       shell: pwsh
+      env:
+        EVENTLOG_CONTAINER: "1"
       run: |
         $projects = @(Get-ChildItem tests/Integration -Filter *.csproj -Recurse)
         if ($projects.Count -eq 0) { throw 'No integration test projects found under tests/Integration.' }
         $failed = $false
         foreach ($project in $projects) {
-          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal -p:RunSettingsFilePath=
+          dotnet test $project.FullName -c Release --no-build --no-restore --verbosity normal
           if ($LASTEXITCODE -ne 0) { $failed = $true }
         }
         if ($failed) { throw 'One or more integration test projects failed.' }
