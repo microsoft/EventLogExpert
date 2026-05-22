@@ -85,10 +85,14 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton<HttpClient>();
 
         services.AddEventLogRuntime();
-        await using var provider = services.BuildServiceProvider();
+
+        await using var provider = services.BuildServiceProvider(
+            new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
+
+        await using var scope = provider.CreateAsyncScope();
 
         // Act
-        var resolved = provider.GetService(serviceType);
+        var resolved = scope.ServiceProvider.GetService(serviceType);
 
         // Assert
         Assert.NotNull(resolved);

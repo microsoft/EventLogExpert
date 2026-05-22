@@ -2,9 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Databases;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database.Upgrade;
 using System.Collections.Immutable;
 
@@ -12,54 +9,24 @@ namespace EventLogExpert.Runtime.Database;
 
 /// <summary>
 ///     Thin façade that composes the database sub-services (entry store, classification, upgrade, import, recovery)
-///     and forwards every <see cref="IDatabaseService" /> member to the appropriate sub-service. Only the upgrade service
-///     is disposable.
+///     and forwards every <see cref="IDatabaseService" /> member to the appropriate sub-service. Sub-services are
+///     DI-managed singletons; disposal forwards to <see cref="DatabaseUpgradeService" /> (idempotent — safe for
+///     both explicit disposal and DI container shutdown).
 /// </summary>
-internal sealed class DatabaseService : IDatabaseService, IActiveDatabasePathsProvider
+internal sealed class DatabaseService(
+    DatabaseEntryStore entryStore,
+    DatabaseClassificationService classificationService,
+    DatabaseUpgradeService upgradeService,
+    DatabaseImportService importService,
+    DatabaseRecoveryService recoveryService) : IDatabaseService, IActiveDatabasePathsProvider
 {
     public const string UpgradeBackupSuffix = DatabaseFileOperations.UpgradeBackupSuffix;
 
-    private readonly DatabaseClassificationService _classificationService;
-    private readonly DatabaseEntryStore _entryStore;
-    private readonly DatabaseImportService _importService;
-    private readonly DatabaseRecoveryService _recoveryService;
-    private readonly DatabaseUpgradeService _upgradeService;
-
-    public DatabaseService(
-        FileLocationOptions fileLocationOptions,
-        IDatabasePreferencesProvider preferences,
-        IProviderDatabaseMaintenance maintenance,
-        ITraceLogger traceLogger)
-    {
-        _entryStore = new DatabaseEntryStore(fileLocationOptions, preferences, traceLogger);
-        _entryStore.Refresh();
-
-        _classificationService = new DatabaseClassificationService(
-            _entryStore,
-            fileLocationOptions,
-            maintenance,
-            traceLogger);
-
-        _upgradeService = new DatabaseUpgradeService(
-            _entryStore,
-            _classificationService.InitialClassificationTask,
-            maintenance,
-            traceLogger);
-
-        _importService = new DatabaseImportService(
-            _entryStore,
-            _classificationService,
-            _upgradeService,
-            fileLocationOptions,
-            traceLogger);
-
-        _recoveryService = new DatabaseRecoveryService(
-            _entryStore,
-            _classificationService,
-            fileLocationOptions,
-            maintenance,
-            traceLogger);
-    }
+    private readonly DatabaseClassificationService _classificationService = classificationService;
+    private readonly DatabaseEntryStore _entryStore = entryStore;
+    private readonly DatabaseImportService _importService = importService;
+    private readonly DatabaseRecoveryService _recoveryService = recoveryService;
+    private readonly DatabaseUpgradeService _upgradeService = upgradeService;
 
     public event EventHandler? EntriesChanged
     {

@@ -16,5 +16,4 @@
   <ItemGroup>
     <InternalsVisibleTo Include="EventLogExpert.ProviderDatabase.Tests" />
     <InternalsVisibleTo Include="EventLogExpert.ProviderDatabase.IntegrationTests" />
-    <InternalsVisibleTo Include="EventLogExpert.Runtime.IntegrationTests" />
   </ItemGroup></Project>
