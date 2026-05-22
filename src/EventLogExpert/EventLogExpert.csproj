@@ -60,6 +60,7 @@
     </ItemGroup>
 
     <ItemGroup>
+      <ProjectReference Include="..\EventLogExpert.ProviderDatabase\EventLogExpert.ProviderDatabase.csproj" />
       <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
       <ProjectReference Include="..\EventLogExpert.UI\EventLogExpert.UI.csproj" />
     </ItemGroup>

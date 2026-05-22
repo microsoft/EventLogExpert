@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
@@ -1308,7 +1309,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var fileLocationOptions = new FileLocationOptions(_testDirectory);
         var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
-        var service = new DatabaseService(fileLocationOptions, prefs, throwingLogger);
+        var service = new DatabaseService(fileLocationOptions, prefs, new ProviderDatabaseMaintenance(throwingLogger), throwingLogger);
         Assert.Single(service.Entries);
         service.EntriesChanged += (_, _) => throw new InvalidOperationException("subscriber fault");
         subscriberAttached.Set();
@@ -2432,7 +2433,7 @@ public sealed class DatabaseServiceTests : IDisposable
         }
 
         var logger = traceLogger ?? Substitute.For<ITraceLogger>();
-        var service = new DatabaseService(fileLocationOptions, prefs, logger);
+        var service = new DatabaseService(fileLocationOptions, prefs, new ProviderDatabaseMaintenance(logger), logger);
         _services.Add(service);
 
         // Block until ctor-initiated classification finishes so tests observe a stable post-classification

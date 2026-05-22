@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Databases;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -74,6 +75,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<IApplicationRestartService>());
         services.AddSingleton(Substitute.For<ISettingsPreferencesProvider>());
         services.AddSingleton(Substitute.For<IDatabasePreferencesProvider>());
+        services.AddSingleton(Substitute.For<IProviderDatabaseMaintenance>());
         services.AddSingleton(Substitute.For<ITitleProvider>());
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());

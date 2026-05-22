@@ -11,7 +11,7 @@ public static class SqliteTestDb
     /// <summary>Deletes a SQLite test database file with retries, after first releasing pooled SqliteConnection handles.</summary>
     /// <remarks>
     ///     <para>
-    ///         <see cref="EventLogExpert.Eventing.ProviderDatabase.ProviderDbContext" /> uses EF Core's default pooled
+    ///         ProviderDbContext uses EF Core's default pooled
     ///         SqliteConnection. Without <see cref="SqliteConnection.ClearAllPools" /> the pooled handle still owns the file
     ///         after the context is disposed and <see cref="File.Delete" /> hits a sharing violation.
     ///     </para>

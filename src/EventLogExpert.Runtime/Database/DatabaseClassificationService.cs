@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
 
 namespace EventLogExpert.Runtime.Database;
@@ -12,15 +11,18 @@ internal sealed class DatabaseClassificationService
 {
     private readonly DatabaseEntryStore _entryStore;
     private readonly FileLocationOptions _fileLocationOptions;
+    private readonly IProviderDatabaseMaintenance _maintenance;
     private readonly ITraceLogger _traceLogger;
 
     public DatabaseClassificationService(
         DatabaseEntryStore entryStore,
         FileLocationOptions fileLocationOptions,
+        IProviderDatabaseMaintenance maintenance,
         ITraceLogger traceLogger)
     {
         _entryStore = entryStore;
         _fileLocationOptions = fileLocationOptions;
+        _maintenance = maintenance;
         _traceLogger = traceLogger;
         InitialClassificationTask = StartInitialClassificationAsync();
     }
@@ -36,7 +38,9 @@ internal sealed class DatabaseClassificationService
         var statuses = await Task.Run(
                 () =>
                 {
-                    var perFile = new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase);
+                    var perFile =
+                        new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer
+                            .OrdinalIgnoreCase);
 
                     foreach (var entry in snapshot)
                     {
@@ -51,13 +55,7 @@ internal sealed class DatabaseClassificationService
                                 continue;
                             }
 
-                            using var context = new ProviderDbContext(
-                                entry.FullPath,
-                                readOnly: false,
-                                ensureCreated: false,
-                                logger: _traceLogger);
-
-                            var state = context.IsUpgradeNeeded();
+                            var state = _maintenance.CheckSchemaState(entry.FullPath);
                             var status = MapSchemaVersionToStatus(state.CurrentVersion);
                             var backupExists = ProbeOrCleanupBackup(entry, status);
 

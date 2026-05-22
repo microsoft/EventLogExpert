@@ -1,12 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.TestUtils;
 using System.Text;
 using System.Text.Json;
 
-namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase.Tests.ProviderDatabase;
 
 public sealed class CompressedJsonValueConverterTests
 {
@@ -132,7 +131,9 @@ public sealed class CompressedJsonValueConverterTests
 
         // Act
         var compressed = CompressedJsonValueConverter<NestedCompressionTestData>.ConvertToCompressedJson(originalData);
-        var decompressed = CompressedJsonValueConverter<NestedCompressionTestData>.ConvertFromCompressedJson(compressed);
+
+        var decompressed =
+            CompressedJsonValueConverter<NestedCompressionTestData>.ConvertFromCompressedJson(compressed);
 
         // Assert
         Assert.NotNull(decompressed);
@@ -169,7 +170,9 @@ public sealed class CompressedJsonValueConverterTests
 
         // Act
         var compressed = CompressedJsonValueConverter<List<CompressionTestData>>.ConvertToCompressedJson(originalList);
-        var decompressed = CompressedJsonValueConverter<List<CompressionTestData>>.ConvertFromCompressedJson(compressed);
+
+        var decompressed =
+            CompressedJsonValueConverter<List<CompressionTestData>>.ConvertFromCompressedJson(compressed);
 
         // Assert
         Assert.NotNull(decompressed);

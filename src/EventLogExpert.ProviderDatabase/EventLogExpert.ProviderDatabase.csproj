@@ -10,9 +10,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
-    <InternalsVisibleTo Include="EventLogExpert.Eventing.IntegrationTests" />
+    <InternalsVisibleTo Include="EventLogExpert.ProviderDatabase.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.ProviderDatabase.IntegrationTests" />
+    <InternalsVisibleTo Include="EventLogExpert.Runtime.IntegrationTests" />
   </ItemGroup></Project>

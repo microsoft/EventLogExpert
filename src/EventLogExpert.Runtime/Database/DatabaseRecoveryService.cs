@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Eventing.ProviderDatabase;
 using EventLogExpert.Runtime.Common.Files;
-using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Runtime.Database;
 
@@ -11,11 +11,13 @@ internal sealed class DatabaseRecoveryService(
     DatabaseEntryStore entryStore,
     DatabaseClassificationService classificationService,
     FileLocationOptions fileLocationOptions,
+    IProviderDatabaseMaintenance maintenance,
     ITraceLogger traceLogger)
 {
     private readonly DatabaseClassificationService _classificationService = classificationService;
     private readonly DatabaseEntryStore _entryStore = entryStore;
     private readonly FileLocationOptions _fileLocationOptions = fileLocationOptions;
+    private readonly IProviderDatabaseMaintenance _maintenance = maintenance;
     private readonly ITraceLogger _traceLogger = traceLogger;
 
     public async Task<bool> DeleteEntryWithBackupAsync(string fileName, CancellationToken cancellationToken = default)
@@ -127,7 +129,7 @@ internal sealed class DatabaseRecoveryService(
         // FILE_SHARE_DELETE on Windows.
         try
         {
-            SqliteConnection.ClearAllPools();
+            _maintenance.PrepareForFileDeletion();
 
             DatabaseFileOperations.DeleteDatabaseFiles(_fileLocationOptions.DatabasePath, fileName);
         }

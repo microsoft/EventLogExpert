@@ -3,8 +3,6 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.ProviderDatabase;
-using Microsoft.Data.Sqlite;
 
 namespace EventLogExpert.Runtime.Database;
 
@@ -88,32 +86,15 @@ internal static class DatabaseFileOperations
         }
     }
 
-    public static void WalCheckpoint(string dbPath)
-    {
-        using (var connection = new SqliteConnection($"Data Source={dbPath}"))
-        {
-            connection.Open();
-
-            using var cmd = connection.CreateCommand();
-
-            cmd.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
-            cmd.ExecuteNonQuery();
-        }
-
-        SqliteConnection.ClearAllPools();
-    }
-
-    public static bool VerifyEntryReady(string fullPath, ITraceLogger traceLogger)
+    public static bool VerifyEntryReady(
+        string fullPath,
+        IProviderDatabaseMaintenance maintenance,
+        ITraceLogger traceLogger)
     {
         try
         {
-            using var context = new ProviderDbContext(
-                fullPath,
-                readOnly: true,
-                ensureCreated: false,
-                logger: traceLogger);
-
-            return context.IsUpgradeNeeded().CurrentVersion == ProviderDatabaseSchemaVersion.Current;
+            return maintenance.CheckSchemaState(fullPath, readOnly: true).CurrentVersion ==
+                ProviderDatabaseSchemaVersion.Current;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

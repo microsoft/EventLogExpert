@@ -1,10 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 
-namespace EventLogExpert.Eventing.Tests.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase.Tests.ProviderDatabase;
 
 public sealed class ProviderJsonContextTests
 {
