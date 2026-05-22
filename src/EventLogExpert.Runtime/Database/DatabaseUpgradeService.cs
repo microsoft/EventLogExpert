@@ -3,9 +3,7 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Runtime.Database.Upgrade;
-using Microsoft.Data.Sqlite;
 using System.Threading.Channels;
 
 namespace EventLogExpert.Runtime.Database;
@@ -16,6 +14,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly DatabaseEntryStore _entryStore;
     private readonly Task _initialClassificationTask;
+    private readonly IProviderDatabaseMaintenance _maintenance;
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
@@ -26,10 +25,12 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     public DatabaseUpgradeService(
         DatabaseEntryStore entryStore,
         Task initialClassificationTask,
+        IProviderDatabaseMaintenance maintenance,
         ITraceLogger traceLogger)
     {
         _entryStore = entryStore;
         _initialClassificationTask = initialClassificationTask;
+        _maintenance = maintenance;
         _traceLogger = traceLogger;
 
         _consumerTask = Task.Run(ConsumeUpgradeQueueAsync);
@@ -341,7 +342,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                     try
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        DatabaseFileOperations.WalCheckpoint(entry.FullPath);
+                        _maintenance.WalCheckpoint(entry.FullPath);
 
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -379,17 +380,9 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         migrationStarted = true;
 
-                        using (var context = new ProviderDbContext(
-                            entry.FullPath,
-                            readOnly: false,
-                            ensureCreated: false,
-                            logger: _traceLogger))
-                        {
-                            context.PerformUpgradeIfNeeded();
-                        }
+                        _maintenance.PerformUpgrade(entry.FullPath);
 
                         migrationCompleted = true;
-                        SqliteConnection.ClearAllPools();
 
                         _entryStore.SafeRaise(
                             UpgradeBatchProgress,
@@ -397,7 +390,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                             new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.Verifying),
                             nameof(UpgradeBatchProgress));
 
-                        if (!DatabaseFileOperations.VerifyEntryReady(entry.FullPath, _traceLogger))
+                        if (!DatabaseFileOperations.VerifyEntryReady(entry.FullPath, _maintenance, _traceLogger))
                         {
                             throw new InvalidOperationException("Upgrade verification failed");
                         }

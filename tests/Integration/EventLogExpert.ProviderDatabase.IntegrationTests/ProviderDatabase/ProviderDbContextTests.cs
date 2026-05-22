@@ -3,7 +3,6 @@
 
 using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.TestUtils;
 using Microsoft.Data.Sqlite;
@@ -11,7 +10,7 @@ using Microsoft.EntityFrameworkCore;
 using NSubstitute;
 using System.Text;
 
-namespace EventLogExpert.Eventing.IntegrationTests.ProviderDatabase;
+namespace EventLogExpert.ProviderDatabase.IntegrationTests.ProviderDatabase;
 
 public sealed class ProviderDbContextTests : IDisposable
 {
@@ -54,7 +53,10 @@ public sealed class ProviderDbContextTests : IDisposable
         using var verifyConnection = new SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
         verifyConnection.Open();
         using var verifyCmd = verifyConnection.CreateCommand();
-        verifyCmd.CommandText = "SELECT COUNT(*) FROM \"sqlite_master\" WHERE \"type\" = 'table' AND \"name\" = 'ProviderDetails'";
+
+        verifyCmd.CommandText =
+            "SELECT COUNT(*) FROM \"sqlite_master\" WHERE \"type\" = 'table' AND \"name\" = 'ProviderDetails'";
+
         var tableCount = Convert.ToInt32(verifyCmd.ExecuteScalar());
         Assert.Equal(0, tableCount);
     }
@@ -70,7 +72,8 @@ public sealed class ProviderDbContextTests : IDisposable
         using var context = new ProviderDbContext(dbPath, false, logger);
 
         // Assert
-        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Instantiating ProviderDbContext")));
+        logger.Received(1)
+            .Debug(Arg.Is<DebugLogHandler>(h => h.ToString().Contains("Instantiating ProviderDbContext")));
     }
 
     [Fact]
@@ -119,7 +122,9 @@ public sealed class ProviderDbContextTests : IDisposable
         var results = new int[10];
 
         // Act
-        Parallel.For(0, 10, i =>
+        Parallel.For(0,
+            10,
+            i =>
             {
                 try
                 {
@@ -190,10 +195,11 @@ public sealed class ProviderDbContextTests : IDisposable
         var result = context.IsUpgradeNeeded();
 
         // Assert
-        logger.Received(1).Debug(Arg.Is<DebugLogHandler>(h =>
-            h.ToString().Contains(nameof(ProviderDbContext.IsUpgradeNeeded)) &&
-            h.ToString().Contains("currentVersion") &&
-            h.ToString().Contains("needsUpgrade")));
+        logger.Received(1)
+            .Debug(Arg.Is<DebugLogHandler>(h =>
+                h.ToString().Contains(nameof(ProviderDbContext.IsUpgradeNeeded)) &&
+                h.ToString().Contains("currentVersion") &&
+                h.ToString().Contains("needsUpgrade")));
     }
 
     [Fact]
@@ -203,10 +209,12 @@ public sealed class ProviderDbContextTests : IDisposable
         // payload-column uniformity check this would have been misclassified as V3 and the
         // subsequent ReadCompressedRow call would crash on the (byte[]) cast for Messages.
         var dbPath = CreateTempDatabasePath();
+
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
         {
             connection.Open();
             using var cmd = connection.CreateCommand();
+
             cmd.CommandText =
                 "CREATE TABLE \"ProviderDetails\" (" +
                 "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
@@ -216,6 +224,7 @@ public sealed class ProviderDbContextTests : IDisposable
                 "\"Keywords\" BLOB NOT NULL, " +
                 "\"Opcodes\" BLOB NOT NULL, " +
                 "\"Tasks\" BLOB NOT NULL)";
+
             cmd.ExecuteNonQuery();
         }
 
@@ -251,10 +260,12 @@ public sealed class ProviderDbContextTests : IDisposable
         // Messages is BLOB but Parameters is TEXT, which never existed as a real schema and signals
         // either corruption or a foreign / future format.
         var dbPath = CreateTempDatabasePath();
+
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
         {
             connection.Open();
             using var cmd = connection.CreateCommand();
+
             cmd.CommandText =
                 "CREATE TABLE \"ProviderDetails\" (" +
                 "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
@@ -264,6 +275,7 @@ public sealed class ProviderDbContextTests : IDisposable
                 "\"Keywords\" BLOB NOT NULL, " +
                 "\"Opcodes\" BLOB NOT NULL, " +
                 "\"Tasks\" BLOB NOT NULL)";
+
             cmd.ExecuteNonQuery();
         }
 
@@ -346,10 +358,12 @@ public sealed class ProviderDbContextTests : IDisposable
     {
         // Arrange — same unknown shape as the detection test.
         var dbPath = CreateTempDatabasePath();
+
         using (var connection = new SqliteConnection($"Data Source={dbPath}"))
         {
             connection.Open();
             using var cmd = connection.CreateCommand();
+
             cmd.CommandText =
                 "CREATE TABLE \"ProviderDetails\" (" +
                 "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
@@ -359,16 +373,20 @@ public sealed class ProviderDbContextTests : IDisposable
                 "\"Keywords\" BLOB NOT NULL, " +
                 "\"Opcodes\" BLOB NOT NULL, " +
                 "\"Tasks\" BLOB NOT NULL)";
+
             cmd.ExecuteNonQuery();
 
             using var insertCmd = connection.CreateCommand();
+
             insertCmd.CommandText =
                 "INSERT INTO \"ProviderDetails\" VALUES ('Unknown-Row', X'00', '[]', X'00', X'00', X'00', X'00')";
+
             insertCmd.ExecuteNonQuery();
         }
 
         // Act + Assert — distinct error message, file untouched.
         DatabaseUpgradeException? thrown;
+
         using (var context = new ProviderDbContext(dbPath, false))
         {
             thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
@@ -386,10 +404,12 @@ public sealed class ProviderDbContextTests : IDisposable
         // Arrange — V1 row has no Parameters column; payloads are JSON TEXT.
         var dbPath = CreateTempDatabasePath();
         SeedLegacySchema(dbPath, includeParameters: false, parametersType: null, messagesType: "TEXT");
+
         InsertLegacyRow(
             dbPath,
             providerName: "V1Provider",
-            messagesJson: "[{\"ShortId\":1,\"LogLink\":null,\"RawId\":1,\"Tag\":null,\"Template\":null,\"Text\":\"hello\"}]",
+            messagesJson:
+            "[{\"ShortId\":1,\"LogLink\":null,\"RawId\":1,\"Tag\":null,\"Template\":null,\"Text\":\"hello\"}]",
             parametersJson: null,
             eventsJson: "[]",
             keywordsJson: "{}",
@@ -398,6 +418,7 @@ public sealed class ProviderDbContextTests : IDisposable
 
         // Act + Assert — V1 is no longer auto-upgradable; the upgrade fails fast.
         DatabaseUpgradeException? thrown;
+
         using (var context = new ProviderDbContext(dbPath, false))
         {
             thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
@@ -421,11 +442,13 @@ public sealed class ProviderDbContextTests : IDisposable
         // Arrange — V2 row stores Parameters as JSON TEXT.
         var dbPath = CreateTempDatabasePath();
         SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+
         InsertLegacyRow(
             dbPath,
             providerName: "V2Provider",
             messagesJson: "[]",
-            parametersJson: "[{\"ShortId\":2,\"LogLink\":null,\"RawId\":2,\"Tag\":null,\"Template\":null,\"Text\":\"param-text\"}]",
+            parametersJson:
+            "[{\"ShortId\":2,\"LogLink\":null,\"RawId\":2,\"Tag\":null,\"Template\":null,\"Text\":\"param-text\"}]",
             eventsJson: "[]",
             keywordsJson: "{}",
             opcodesJson: "{}",
@@ -433,6 +456,7 @@ public sealed class ProviderDbContextTests : IDisposable
 
         // Act + Assert
         DatabaseUpgradeException? thrown;
+
         using (var context = new ProviderDbContext(dbPath, false))
         {
             thrown = Assert.Throws<DatabaseUpgradeException>(() => context.PerformUpgradeIfNeeded());
@@ -455,6 +479,7 @@ public sealed class ProviderDbContextTests : IDisposable
         // round-tripped to an empty list. Now it must surface the same hard-fail as any other V2 row.
         var dbPath = CreateTempDatabasePath();
         SeedLegacySchema(dbPath, includeParameters: true, parametersType: "TEXT", messagesType: "TEXT");
+
         InsertLegacyRow(
             dbPath,
             providerName: "V2NullParams",
@@ -722,7 +747,12 @@ public sealed class ProviderDbContextTests : IDisposable
 
         var provider = EventUtils.CreateProvider(
             "Special\"Provider'With<>Chars",
-            messages: [EventUtils.CreateMessageModel("Special\"Provider'With<>Chars", 1, "Message with \"quotes\" and 'apostrophes'")]);
+            messages:
+            [
+                EventUtils.CreateMessageModel("Special\"Provider'With<>Chars",
+                    1,
+                    "Message with \"quotes\" and 'apostrophes'")
+            ]);
 
         // Act
         using (var context = new ProviderDbContext(dbPath, false))
@@ -766,6 +796,7 @@ public sealed class ProviderDbContextTests : IDisposable
         using var reader = cmd.ExecuteReader();
 
         var planText = new StringBuilder();
+
         while (reader.Read())
         {
             planText.AppendLine(reader["detail"]?.ToString());
@@ -777,8 +808,8 @@ public sealed class ProviderDbContextTests : IDisposable
         // `SEARCH ... USING INTEGER PRIMARY KEY` variants without anchoring on exact wording across SQLite versions).
         Assert.True(
             plan.Contains("USING INDEX", StringComparison.OrdinalIgnoreCase) ||
-                plan.Contains("USING COVERING INDEX", StringComparison.OrdinalIgnoreCase) ||
-                plan.Contains("USING PRIMARY KEY", StringComparison.OrdinalIgnoreCase),
+            plan.Contains("USING COVERING INDEX", StringComparison.OrdinalIgnoreCase) ||
+            plan.Contains("USING PRIMARY KEY", StringComparison.OrdinalIgnoreCase),
             $"Expected ProviderName lookup to use the PK index, but plan was:\n{plan}");
 
         // And explicitly: the plan must NOT be a table scan.
@@ -790,6 +821,7 @@ public sealed class ProviderDbContextTests : IDisposable
     {
         // Arrange
         var dbPath = CreateTempDatabasePath();
+
         var provider = EventUtils.CreateProvider(
             "ResolvedRoundTrip",
             resolvedFromOwningPublisher: "Owning-Publisher-Name");
@@ -836,6 +868,7 @@ public sealed class ProviderDbContextTests : IDisposable
             "V3-Provider",
             messages: [EventUtils.CreateMessageModel("V3-Provider", 1, "from-v3")],
             keywords: new Dictionary<long, string> { { 1L, "kw" } });
+
         InsertV3Row(dbPath, seeded);
 
         // Act
@@ -1014,6 +1047,7 @@ public sealed class ProviderDbContextTests : IDisposable
             Opcodes = new Dictionary<int, string>(),
             Tasks = new Dictionary<int, string>()
         };
+
         InsertV3Row(dbPath, seeded);
 
         // Act
@@ -1058,11 +1092,13 @@ public sealed class ProviderDbContextTests : IDisposable
 
         // Detect whether the legacy schema includes Parameters; insert the right column list.
         bool hasParameters;
+
         using (var pragma = connection.CreateCommand())
         {
             pragma.CommandText = "PRAGMA table_info(\"ProviderDetails\")";
             using var pr = pragma.ExecuteReader();
             hasParameters = false;
+
             while (pr.Read())
             {
                 if (string.Equals(pr["name"]?.ToString(), "Parameters", StringComparison.Ordinal))
@@ -1074,16 +1110,20 @@ public sealed class ProviderDbContextTests : IDisposable
         }
 
         using var cmd = connection.CreateCommand();
+
         if (hasParameters)
         {
-            cmd.CommandText = "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\", \"Parameters\") " +
-                              "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks, $parameters)";
+            cmd.CommandText =
+                "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\", \"Parameters\") " +
+                "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks, $parameters)";
+
             cmd.Parameters.AddWithValue("$parameters", (object?)parametersJson ?? DBNull.Value);
         }
         else
         {
-            cmd.CommandText = "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\") " +
-                              "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks)";
+            cmd.CommandText =
+                "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\") " +
+                "VALUES ($name, $messages, $events, $keywords, $opcodes, $tasks)";
         }
 
         cmd.Parameters.AddWithValue("$name", providerName);
@@ -1101,16 +1141,31 @@ public sealed class ProviderDbContextTests : IDisposable
         connection.Open();
 
         using var cmd = connection.CreateCommand();
+
         cmd.CommandText =
             "INSERT INTO \"ProviderDetails\" (\"ProviderName\", \"Messages\", \"Parameters\", \"Events\", \"Keywords\", \"Opcodes\", \"Tasks\") " +
             "VALUES ($name, $messages, $parameters, $events, $keywords, $opcodes, $tasks)";
+
         cmd.Parameters.AddWithValue("$name", details.ProviderName);
-        cmd.Parameters.AddWithValue("$messages", CompressedJsonValueConverter<IReadOnlyList<MessageModel>>.ConvertToCompressedJson(details.Messages));
-        cmd.Parameters.AddWithValue("$parameters", CompressedJsonValueConverter<IEnumerable<MessageModel>>.ConvertToCompressedJson(details.Parameters));
-        cmd.Parameters.AddWithValue("$events", CompressedJsonValueConverter<IReadOnlyList<EventModel>>.ConvertToCompressedJson(details.Events));
-        cmd.Parameters.AddWithValue("$keywords", CompressedJsonValueConverter<IDictionary<long, string>>.ConvertToCompressedJson(details.Keywords));
-        cmd.Parameters.AddWithValue("$opcodes", CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Opcodes));
-        cmd.Parameters.AddWithValue("$tasks", CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Tasks));
+
+        cmd.Parameters.AddWithValue("$messages",
+            CompressedJsonValueConverter<IReadOnlyList<MessageModel>>.ConvertToCompressedJson(details.Messages));
+
+        cmd.Parameters.AddWithValue("$parameters",
+            CompressedJsonValueConverter<IEnumerable<MessageModel>>.ConvertToCompressedJson(details.Parameters));
+
+        cmd.Parameters.AddWithValue("$events",
+            CompressedJsonValueConverter<IReadOnlyList<EventModel>>.ConvertToCompressedJson(details.Events));
+
+        cmd.Parameters.AddWithValue("$keywords",
+            CompressedJsonValueConverter<IDictionary<long, string>>.ConvertToCompressedJson(details.Keywords));
+
+        cmd.Parameters.AddWithValue("$opcodes",
+            CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Opcodes));
+
+        cmd.Parameters.AddWithValue("$tasks",
+            CompressedJsonValueConverter<IDictionary<int, string>>.ConvertToCompressedJson(details.Tasks));
+
         cmd.ExecuteNonQuery();
     }
 
@@ -1129,6 +1184,7 @@ public sealed class ProviderDbContextTests : IDisposable
             while (reader.Read())
             {
                 var origin = reader["origin"]?.ToString();
+
                 if (string.Equals(origin, "pk", StringComparison.OrdinalIgnoreCase))
                 {
                     pkIndexName = reader["name"]?.ToString();
@@ -1146,6 +1202,7 @@ public sealed class ProviderDbContextTests : IDisposable
         while (infoReader.Read())
         {
             var name = infoReader["name"]?.ToString();
+
             if (string.Equals(name, nameof(ProviderDetails.ProviderName), StringComparison.Ordinal))
             {
                 return infoReader["coll"]?.ToString() ?? string.Empty;
@@ -1198,6 +1255,7 @@ public sealed class ProviderDbContextTests : IDisposable
         connection.Open();
 
         using var cmd = connection.CreateCommand();
+
         cmd.CommandText =
             "CREATE TABLE \"ProviderDetails\" (" +
             "\"ProviderName\" TEXT NOT NULL CONSTRAINT \"PK_ProviderDetails\" PRIMARY KEY, " +
@@ -1207,6 +1265,7 @@ public sealed class ProviderDbContextTests : IDisposable
             "\"Keywords\" BLOB NOT NULL, " +
             "\"Opcodes\" BLOB NOT NULL, " +
             "\"Tasks\" BLOB NOT NULL)";
+
         cmd.ExecuteNonQuery();
     }
 
