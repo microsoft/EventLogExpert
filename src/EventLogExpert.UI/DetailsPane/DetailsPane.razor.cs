@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Settings;

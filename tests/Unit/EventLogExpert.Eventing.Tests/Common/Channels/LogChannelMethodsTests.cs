@@ -39,19 +39,19 @@ public sealed class LogChannelMethodsTests
     }
 
     [Fact]
-    public void GetMenuPath_WhenMicrosoftWindowsChannel_ShouldExpandToFourSegments()
-    {
-        var path = LogChannelMethods.GetMenuPath("Microsoft-Windows-AAD/Operational");
-
-        Assert.Equal(["Microsoft", "Windows", "AAD", "Operational"], path);
-    }
-
-    [Fact]
     public void GetMenuPath_WhenMicrosoftWindowsChannelHasHyphen_ShouldKeepChannelIntact()
     {
         var path = LogChannelMethods.GetMenuPath("Microsoft-Windows-Kernel-Power/Thermal-Operational");
 
         Assert.Equal(["Microsoft", "Windows", "Kernel-Power", "Thermal-Operational"], path);
+    }
+
+    [Fact]
+    public void GetMenuPath_WhenMicrosoftWindowsChannel_ShouldExpandToFourSegments()
+    {
+        var path = LogChannelMethods.GetMenuPath("Microsoft-Windows-AAD/Operational");
+
+        Assert.Equal(["Microsoft", "Windows", "AAD", "Operational"], path);
     }
 
     [Fact]

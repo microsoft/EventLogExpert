@@ -3,7 +3,7 @@
 
 global using Xunit;
 
-[assembly: AssemblyFixture(typeof(
-    EventLogExpert.Eventing.IntegrationTests.ContainerRequiredFixture))]
-[assembly: AssemblyFixture(typeof(
-    EventLogExpert.Eventing.IntegrationTests.ApplicationLogSeedFixture))]
+using EventLogExpert.Eventing.IntegrationTests;
+
+[assembly: AssemblyFixture(typeof(ContainerRequiredFixture))]
+[assembly: AssemblyFixture(typeof(ApplicationLogSeedFixture))]

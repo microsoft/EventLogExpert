@@ -49,12 +49,12 @@ internal sealed class ColumnDefaults : ILogTableColumnDefaultsProvider
         [ColumnName.User] = 180
     }.ToFrozenDictionary();
 
-    public ImmutableList<ColumnName> EnabledColumns => s_enabledColumns;
-
     public ImmutableList<ColumnName> ColumnOrder => s_order;
 
     public FrozenDictionary<ColumnName, int> ColumnWidths => s_widths;
 
+    public ImmutableList<ColumnName> EnabledColumns => s_enabledColumns;
+
     public int GetColumnWidth(ColumnName column) =>
-        s_widths.TryGetValue(column, out int width) ? width : 100;
+        s_widths.GetValueOrDefault(column, 100);
 }

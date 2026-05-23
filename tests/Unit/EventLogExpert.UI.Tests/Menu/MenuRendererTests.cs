@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.UI.Menu;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Menu;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Tests.Menu;

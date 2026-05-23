@@ -3,16 +3,16 @@
 
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Common.Filtering;
-using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
-using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Settings;
@@ -70,11 +70,11 @@ public sealed partial class LogTablePane
 
     [Inject] private ILogTableColumnDefaultsProvider ColumnDefaults { get; init; } = null!;
 
-    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
-
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
+
+    [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
 
     [Inject] private IFilterService FilterService { get; init; } = null!;
 

@@ -28,9 +28,7 @@
 
         var totalEvents = activeTable.IsCombined ?
             eventLog.ActiveLogs.Sum(l => l.Value.Events.Count) :
-            eventLog.ActiveLogs.TryGetValue(activeTable.LogName, out var activeLogData)
-                ? activeLogData.Events.Count
-                : 0;
+            eventLog.ActiveLogs.TryGetValue(activeTable.LogName, out var activeLogData) ? activeLogData.Events.Count : 0;
 
         var filteredEvents = activeTable.IsCombined ?
             logTable.DisplayedEvents.Count :

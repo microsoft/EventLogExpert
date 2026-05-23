@@ -1,14 +1,40 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Schema;
 
 namespace EventLogExpert.Runtime.Database;
 
 internal static class DatabaseFileOperations
 {
     public const string UpgradeBackupSuffix = ".upgrade.bak";
+
+    public static void DeleteDatabaseFiles(string databasePath, string fileName)
+    {
+        var basePath = Path.Combine(databasePath, fileName);
+
+        File.Delete(basePath + "-journal");
+        File.Delete(basePath + "-wal");
+        File.Delete(basePath + "-shm");
+        File.Delete(basePath + UpgradeBackupSuffix);
+        File.Delete(basePath);
+    }
+
+    public static bool DeleteFilesCore(DatabaseEntry entry, ITraceLogger traceLogger, string callerName)
+    {
+        var mainPath = entry.FullPath;
+
+        if (!TryDeleteFile(mainPath + "-journal", traceLogger, callerName)) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-wal", traceLogger, callerName)) { return false; }
+
+        if (!TryDeleteFile(mainPath + "-shm", traceLogger, callerName)) { return false; }
+
+        return TryDeleteFile(mainPath + UpgradeBackupSuffix, traceLogger, callerName) &&
+            TryDeleteFile(mainPath, traceLogger, callerName);
+    }
 
     public static bool RestoreFilesCore(DatabaseEntry entry, ITraceLogger traceLogger, string callerName)
     {
@@ -44,31 +70,6 @@ internal static class DatabaseFileOperations
         return TryDeleteFile(backupPath, traceLogger, callerName);
     }
 
-    public static bool DeleteFilesCore(DatabaseEntry entry, ITraceLogger traceLogger, string callerName)
-    {
-        var mainPath = entry.FullPath;
-
-        if (!TryDeleteFile(mainPath + "-journal", traceLogger, callerName)) { return false; }
-
-        if (!TryDeleteFile(mainPath + "-wal", traceLogger, callerName)) { return false; }
-
-        if (!TryDeleteFile(mainPath + "-shm", traceLogger, callerName)) { return false; }
-
-        return TryDeleteFile(mainPath + UpgradeBackupSuffix, traceLogger, callerName) &&
-            TryDeleteFile(mainPath, traceLogger, callerName);
-    }
-
-    public static void DeleteDatabaseFiles(string databasePath, string fileName)
-    {
-        var basePath = Path.Combine(databasePath, fileName);
-
-        File.Delete(basePath + "-journal");
-        File.Delete(basePath + "-wal");
-        File.Delete(basePath + "-shm");
-        File.Delete(basePath + UpgradeBackupSuffix);
-        File.Delete(basePath);
-    }
-
     public static bool TryDeleteFile(string path, ITraceLogger traceLogger, string callerName)
     {
         try
@@ -93,8 +94,8 @@ internal static class DatabaseFileOperations
     {
         try
         {
-            return maintenance.CheckSchemaState(fullPath, readOnly: true).CurrentVersion ==
-                ProviderDatabaseSchemaVersion.Current;
+            return maintenance.CheckSchemaState(fullPath, readOnly: true)
+                .CurrentVersion == DatabaseSchemaVersion.Current;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

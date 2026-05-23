@@ -1,6 +1,6 @@
-<Project>  
+<Project>
     <PropertyGroup>
-        <ImplicitUsings>enable</ImplicitUsings>  
+        <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!-- CsWinRT1030 fires for List<T> of any public type because IT could theoretically cross the WinRT ABI in AOT/trimmed scenarios. We never marshal these collections across the ABI, so the warning is benign. -->
@@ -30,7 +30,7 @@
                 <SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'tizen'">6.5</SupportedOSPlatformVersion>
             </PropertyGroup>
         </When>
-        
+
         <Otherwise>
             <PropertyGroup>
                 <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
@@ -39,21 +39,21 @@
     </Choose>
 
     <ItemGroup Condition="'$(IsTestProject)' == 'true'">
-        <PackageReference Include="Microsoft.NET.Test.Sdk" />  
-        <PackageReference Include="NSubstitute" />  
-        <PackageReference Include="NSubstitute.Analyzers.CSharp">  
-            <PrivateAssets>all</PrivateAssets>  
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>  
-        </PackageReference>  
-        <PackageReference Include="xunit.v3.mtp-off" />  
-        <PackageReference Include="xunit.runner.visualstudio">  
-            <PrivateAssets>all</PrivateAssets>  
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>  
-        </PackageReference>  
-        <PackageReference Include="coverlet.collector">  
-            <PrivateAssets>all</PrivateAssets>  
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>  
-        </PackageReference>  
+        <PackageReference Include="Microsoft.NET.Test.Sdk" />
+        <PackageReference Include="NSubstitute" />
+        <PackageReference Include="NSubstitute.Analyzers.CSharp">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="xunit.v3.mtp-off" />
+        <PackageReference Include="xunit.runner.visualstudio">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="coverlet.collector">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+        </PackageReference>
     </ItemGroup>
 
     <PropertyGroup Condition="'$(IsTestProject)' == 'true'">

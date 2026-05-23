@@ -17,10 +17,9 @@ internal sealed class LogCloseCoordinator
     public async Task AcquireCoordinatorLockAsync(CancellationToken cancellationToken = default) =>
         await _logCloseCoordinatorLock.WaitAsync(cancellationToken);
 
-    public void ReleaseCoordinatorLock() => _logCloseCoordinatorLock.Release();
+    public void ClearAllPendingRestore() => _pendingSelectionRestore.Clear();
 
-    public void RegisterCloseCompletion(EventLogId logId, TaskCompletionSource tcs) =>
-        _logCloseCompletions[logId] = tcs;
+    public void ClearPendingRestore(string logName) => _pendingSelectionRestore.TryRemove(logName, out _);
 
     public void CompleteCloseFor(EventLogId logId)
     {
@@ -30,15 +29,16 @@ internal sealed class LogCloseCoordinator
         }
     }
 
-    public void RemoveStrandedCompletion(EventLogId logId) => _logCloseCompletions.TryRemove(logId, out _);
+    public void RegisterCloseCompletion(EventLogId logId, TaskCompletionSource tcs) =>
+        _logCloseCompletions[logId] = tcs;
 
-    public void WritePendingRestore(string logName, PendingSelectionRestore restore) =>
-        _pendingSelectionRestore[logName] = restore;
+    public void ReleaseCoordinatorLock() => _logCloseCoordinatorLock.Release();
+
+    public void RemoveStrandedCompletion(EventLogId logId) => _logCloseCompletions.TryRemove(logId, out _);
 
     public bool TryConsumePendingRestore(string logName, out PendingSelectionRestore? restore) =>
         _pendingSelectionRestore.TryRemove(logName, out restore);
 
-    public void ClearPendingRestore(string logName) => _pendingSelectionRestore.TryRemove(logName, out _);
-
-    public void ClearAllPendingRestore() => _pendingSelectionRestore.Clear();
+    public void WritePendingRestore(string logName, PendingSelectionRestore restore) =>
+        _pendingSelectionRestore[logName] = restore;
 }

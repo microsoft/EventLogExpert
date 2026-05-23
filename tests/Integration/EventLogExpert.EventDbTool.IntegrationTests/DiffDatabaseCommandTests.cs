@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.EventDbTool.Commands;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;

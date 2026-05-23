@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Modal;
 using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterGroup;
+using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;
@@ -16,11 +16,11 @@ public sealed partial class FilterGroupModal : ModalBase<bool>
 {
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
-
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
+
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 

@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
+    <ProjectReference Include="..\..\..\src\EventLogExpert.Provider.Database\EventLogExpert.Provider.Database.csproj" />
   </ItemGroup>
 
   <ItemGroup>

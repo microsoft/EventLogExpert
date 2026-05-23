@@ -4,8 +4,6 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Filtering.Common.Filtering;
-using EventLogExpert.Filtering.EventData;
 using EventLogExpert.Filtering.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 

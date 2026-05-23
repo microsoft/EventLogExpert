@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <SingleProject>true</SingleProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Eventing" />
+    <InternalsVisibleTo Include="EventLogExpert.Provider.Tests" />
+  </ItemGroup>
+
+</Project>

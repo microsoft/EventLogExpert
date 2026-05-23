@@ -15,13 +15,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_AllEmpty_ReturnsEmpty()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Empty(result);
@@ -38,13 +38,13 @@ public sealed class BannerViewSelectorTests
         BannerInfoEntry i2 = BuildInfo();
 
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [e0, e1],
-            attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
-            attentionDismissed: false,
-            backgroundProgress: BuildProgress(),
-            infoBanners: [i0, i1, i2]);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [e0, e1],
+                attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
+                attentionDismissed: false,
+                backgroundProgress: BuildProgress(),
+                infoBanners: [i0, i1, i2]);
 
         // Assert
         Assert.Equal(7, result.Count);
@@ -61,13 +61,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_AttentionDismissed_AttentionExcluded()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [BuildAttention("a.db")],
-            attentionDismissed: true,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [BuildAttention("a.db")],
+                attentionDismissed: true,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Empty(result);
@@ -77,13 +77,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_AttentionEntriesEmpty_AttentionExcluded_RegardlessOfDismissedFlag()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Empty(result);
@@ -93,9 +93,8 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_AttentionEntriesNull_Throws()
     {
         // Act + Assert
-        Assert.Throws<ArgumentNullException>(
-            () => BannerViewSelector.BuildCycle(
-                currentCritical: null,
+        Assert.Throws<ArgumentNullException>(() => BannerViewSelector
+            .BuildCycle(currentCritical: null,
                 errorBanners: [],
                 attentionEntries: null!,
                 attentionDismissed: false,
@@ -107,13 +106,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_CriticalPresent_ReturnsSingleCriticalItem_RegardlessOfOtherSlices()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: new InvalidOperationException("boom"),
-            errorBanners: [BuildError(), BuildError()],
-            attentionEntries: [BuildAttention("a.db")],
-            attentionDismissed: false,
-            backgroundProgress: BuildProgress(),
-            infoBanners: [BuildInfo()]);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: new InvalidOperationException("boom"),
+                errorBanners: [BuildError(), BuildError()],
+                attentionEntries: [BuildAttention("a.db")],
+                attentionDismissed: false,
+                backgroundProgress: BuildProgress(),
+                infoBanners: [BuildInfo()]);
 
         // Assert
         Assert.Single(result);
@@ -126,9 +125,8 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_ErrorBannersNull_Throws()
     {
         // Act + Assert
-        Assert.Throws<ArgumentNullException>(
-            () => BannerViewSelector.BuildCycle(
-                currentCritical: null,
+        Assert.Throws<ArgumentNullException>(() => BannerViewSelector
+            .BuildCycle(currentCritical: null,
                 errorBanners: null!,
                 attentionEntries: [],
                 attentionDismissed: false,
@@ -140,9 +138,8 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_InfoBannersNull_Throws()
     {
         // Act + Assert
-        Assert.Throws<ArgumentNullException>(
-            () => BannerViewSelector.BuildCycle(
-                currentCritical: null,
+        Assert.Throws<ArgumentNullException>(() => BannerViewSelector
+            .BuildCycle(currentCritical: null,
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
@@ -154,13 +151,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_OnlyAttention_ReturnsSingleAttentionItem()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Single(result);
@@ -176,13 +173,13 @@ public sealed class BannerViewSelectorTests
         ErrorBannerEntry e2 = BuildError();
 
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [e0, e1, e2],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [e0, e1, e2],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Equal(3, result.Count);
@@ -199,13 +196,13 @@ public sealed class BannerViewSelectorTests
         BannerInfoEntry i1 = BuildInfo();
 
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: [i0, i1]);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: [i0, i1]);
 
         // Assert
         Assert.Equal(2, result.Count);
@@ -217,13 +214,13 @@ public sealed class BannerViewSelectorTests
     public void BuildCycle_OnlyUpgradeProgress_ReturnsSingleUpgradeProgressItem()
     {
         // Act
-        IReadOnlyList<BannerCycleItem> result = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: BuildProgress(),
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: BuildProgress(),
+                infoBanners: []);
 
         // Assert
         Assert.Single(result);
@@ -239,21 +236,21 @@ public sealed class BannerViewSelectorTests
         ErrorBannerEntry e2 = BuildError();
 
         // Act
-        IReadOnlyList<BannerCycleItem> before = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [e0, e1, e2],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> before = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [e0, e1, e2],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
-        IReadOnlyList<BannerCycleItem> after = BannerViewSelector.BuildCycle(
-            currentCritical: null,
-            errorBanners: [e1, e2],
-            attentionEntries: [],
-            attentionDismissed: false,
-            backgroundProgress: null,
-            infoBanners: []);
+        IReadOnlyList<BannerCycleItem> after = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [e1, e2],
+                attentionEntries: [],
+                attentionDismissed: false,
+                backgroundProgress: null,
+                infoBanners: []);
 
         // Assert
         Assert.Equal(3, before.Count);
@@ -272,9 +269,8 @@ public sealed class BannerViewSelectorTests
         new(BannerId.Create(), "Info Title", "Info Message", BannerSeverity.Info, s_testTime);
 
     private static BannerProgressEntry BuildProgress() =>
-        new(
-            UpgradeBatchId.Create(),
-            UpgradeProgressScope.Background,
+        new(BatchId: UpgradeBatchId.Create(),
+            Scope: UpgradeProgressScope.Background,
             CurrentBatchPosition: 0,
             CurrentBatchSize: 1,
             CurrentEntryName: string.Empty,

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Restart;
@@ -39,7 +39,7 @@ internal sealed class DeploymentService(
 
         var deployment = _packageDeploymentService.AddPackageAsync(
             new Uri(downloadPath),
-            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, ForceTargetAppShutdown: true));
+            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
 
         SetCallbacks(deployment, userInitiated);
     }

@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.StatusBar;
-using CloseAllLogsAction = EventLogExpert.Runtime.EventLog.CloseAllLogsAction;
 using System.Collections.Immutable;
+using CloseAllLogsAction = EventLogExpert.Runtime.EventLog.CloseAllLogsAction;
 
 namespace EventLogExpert.Runtime.Tests.StatusBar;
 

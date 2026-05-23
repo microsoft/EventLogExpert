@@ -3,7 +3,9 @@
 
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;

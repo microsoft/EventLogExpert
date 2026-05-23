@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
@@ -634,7 +635,7 @@ public sealed class BannerServiceTests
 
         // Act + Assert
         var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", actionLabel: actionLabel, action: action));
+            sut.ReportError("Title", "Message", actionLabel, action));
         Assert.Equal(nameof(actionLabel), ex.ParamName);
     }
 
@@ -662,7 +663,7 @@ public sealed class BannerServiceTests
 
         // Act + Assert
         var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", "Resolve", action: action));
+            sut.ReportError("Title", "Message", "Resolve", action));
         Assert.Equal(nameof(action), ex.ParamName);
     }
 
@@ -675,7 +676,7 @@ public sealed class BannerServiceTests
 
         // Act + Assert
         var ex = Assert.Throws<ArgumentException>(() =>
-            sut.ReportError("Title", "Message", actionLabel: actionLabel, () => Task.CompletedTask));
+            sut.ReportError("Title", "Message", actionLabel, () => Task.CompletedTask));
         Assert.Equal(nameof(actionLabel), ex.ParamName);
     }
 
@@ -686,7 +687,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
 
         // Act
-        sut.ReportError("Title", "Message", "   ", action: null);
+        sut.ReportError("Title", "Message", "   ");
 
         // Assert
         Assert.Null(sut.ErrorBanners[0].ActionLabel);
@@ -846,7 +847,7 @@ public sealed class BannerServiceTests
         // Act
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
             databaseService,
-            new UpgradeBatchCompletedEventArgs(batchId, new UpgradeBatchResult([], [], []), wasCancelled: false));
+            new UpgradeBatchCompletedEventArgs(batchId, new UpgradeBatchResult([], [], []), false));
 
         // Assert
         Assert.Null(sut.BackgroundProgress);
@@ -873,7 +874,7 @@ public sealed class BannerServiceTests
         // Act
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
             databaseService,
-            new UpgradeBatchCompletedEventArgs(staleId, new UpgradeBatchResult([], [], []), wasCancelled: false));
+            new UpgradeBatchCompletedEventArgs(staleId, new UpgradeBatchResult([], [], []), false));
 
         // Assert
         Assert.Same(snapshotBefore, sut.BackgroundProgress);
@@ -927,7 +928,7 @@ public sealed class BannerServiceTests
         // Act
         databaseService.UpgradeBatchProgress += Raise.EventWith(
             databaseService,
-            new UpgradeBatchProgressEventArgs(batchId, position: 2, "second.db", UpgradePhase.MigratingSchema));
+            new UpgradeBatchProgressEventArgs(batchId, 2, "second.db", UpgradePhase.MigratingSchema));
 
         // Assert
         Assert.NotNull(sut.BackgroundProgress);
@@ -984,7 +985,7 @@ public sealed class BannerServiceTests
             new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 1, cts));
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
             databaseService,
-            new UpgradeBatchCompletedEventArgs(batchId, new UpgradeBatchResult([], [], []), wasCancelled: false));
+            new UpgradeBatchCompletedEventArgs(batchId, new UpgradeBatchResult([], [], []), false));
 
         // Assert
         Assert.Null(sut.BackgroundProgress);
@@ -1002,7 +1003,7 @@ public sealed class BannerServiceTests
         sut.StateChanged += () => stateChangedCount++;
         var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
-        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, batchSize: 5, cts);
+        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 5, cts);
 
         // Act
         databaseService.UpgradeBatchStarted += Raise.EventWith(databaseService, args);
@@ -1043,7 +1044,7 @@ public sealed class BannerServiceTests
         // Background completed before Settings started.
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
             databaseService,
-            new UpgradeBatchCompletedEventArgs(firstId, new UpgradeBatchResult([], [], []), wasCancelled: false));
+            new UpgradeBatchCompletedEventArgs(firstId, new UpgradeBatchResult([], [], []), false));
         Assert.Null(sut.BackgroundProgress);
         Assert.Null(sut.SettingsProgress);
 
@@ -1063,7 +1064,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
-        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.SettingsTriggered, batchSize: 1, cts);
+        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.SettingsTriggered, 1, cts);
 
         // Act
         databaseService.UpgradeBatchStarted += Raise.EventWith(databaseService, args);

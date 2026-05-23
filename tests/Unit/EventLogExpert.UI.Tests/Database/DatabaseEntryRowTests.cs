@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.UI.Database;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
@@ -116,7 +116,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     public void Render_FileName_AppearsInRow()
     {
         // Arrange
-        var entry = MakeEntry(DatabaseStatus.Ready, fileName: "MyProvider.db");
+        var entry = MakeEntry(DatabaseStatus.Ready, "MyProvider.db");
 
         // Act
         var component = RenderRow(entry);
@@ -260,7 +260,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var entry = MakeEntry(DatabaseStatus.Ready);
 
         // Act
-        var component = RenderRow(entry, isClassificationPending: true);
+        var component = RenderRow(entry, true);
 
         // Assert
         var radios = component.FindAll(".toggle input[type='radio']");
@@ -272,7 +272,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     public void Render_RemoveButton_HasAriaLabel()
     {
         // Arrange
-        var entry = MakeEntry(DatabaseStatus.Ready, fileName: "MyProvider.db");
+        var entry = MakeEntry(DatabaseStatus.Ready, "MyProvider.db");
 
         // Act
         var component = RenderRow(entry);

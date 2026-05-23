@@ -1,9 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Runtime.FilterCache;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Tests.FilterCache;

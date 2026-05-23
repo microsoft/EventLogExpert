@@ -12,7 +12,7 @@ public sealed class MenuServiceTests
     {
         // Arrange
         var service = new MenuService();
-        service.OpenAt(0, 0, BuildItems(), focusFirst: true, captureOpener: false);
+        service.OpenAt(0, 0, BuildItems(), true, false);
 
         // Act
         service.Close();
@@ -113,7 +113,7 @@ public sealed class MenuServiceTests
         var items = BuildItems();
 
         // Act
-        service.OpenAt(50, 75, items, focusFirst: false);
+        service.OpenAt(50, 75, items, false);
 
         // Assert
         Assert.Equal(1, stateChangedCount);
@@ -134,7 +134,7 @@ public sealed class MenuServiceTests
         service.OpenAt(0, 0, BuildItems());
 
         // Act
-        service.OpenAt(0, 0, BuildItems(), focusFirst: true, captureOpener: false);
+        service.OpenAt(0, 0, BuildItems(), true, false);
 
         // Assert
         Assert.False(service.ActiveCaptureOpener);

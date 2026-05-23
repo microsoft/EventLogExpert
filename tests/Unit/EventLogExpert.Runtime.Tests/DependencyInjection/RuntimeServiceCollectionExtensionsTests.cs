@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Databases;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -47,7 +47,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IAppTitleService))]
     [InlineData(typeof(IBannerService))]
     [InlineData(typeof(IDatabaseService))]
-    [InlineData(typeof(IActiveDatabasePathsProvider))]
+    [InlineData(typeof(IActiveDatabases))]
     [InlineData(typeof(IInlineAlertHostBroker))]
     [InlineData(typeof(ILogWatcherService))]
     [InlineData(typeof(IMenuService))]

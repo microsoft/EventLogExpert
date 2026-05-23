@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Filtering.Evaluation;
 using EventLogExpert.Filtering.Compilation;
+using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
@@ -22,10 +22,10 @@ internal sealed class FilteringEffects(
     EventLogConcurrencyState concurrencyState)
 {
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
+    private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterService _filterService = filterService;
     private readonly ITraceLogger _logger = logger;
-    private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
 
     [EffectMethod]
     public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher)

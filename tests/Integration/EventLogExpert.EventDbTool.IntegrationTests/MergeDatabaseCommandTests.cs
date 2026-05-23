@@ -1,9 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.EventDbTool.Commands;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;
@@ -32,7 +34,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, overwriteProviders: false);
+        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("Failed to merge into database") && handler.ToString().Contains(target)));
@@ -50,7 +52,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, overwriteProviders: false);
+        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
@@ -68,7 +70,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, overwriteProviders: false);
+        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));

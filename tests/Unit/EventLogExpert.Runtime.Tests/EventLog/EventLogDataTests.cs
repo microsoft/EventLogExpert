@@ -5,7 +5,6 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Filtering.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 
 namespace EventLogExpert.Runtime.Tests.EventLog;

@@ -11,13 +11,13 @@
     <div class="indent" hidden="@(!_menuState)">
         @foreach ((string name, FilterGroupNode node) in Node.ChildNodes.OrderBy(x => x.Key))
         {
-            <FilterGroupSection Parent="Parent" Name="@name" Node="node" />
+            <FilterGroupSection Name="@name" Node="node" Parent="Parent" />
         }
 
         <div class="flex-column-scroll">
             @foreach (var group in Node.Groups.OrderBy(x => x.Name))
             {
-                <FilterGroup Parent="Parent" Group="group" />
+                <FilterGroup Group="group" Parent="Parent" />
             }
         </div>
     </div>

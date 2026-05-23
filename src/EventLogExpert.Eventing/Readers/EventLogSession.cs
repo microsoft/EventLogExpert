@@ -16,7 +16,7 @@ namespace EventLogExpert.Eventing.Readers;
 ///     are <see cref="SafeHandle" /> instances that clean themselves up via their own finalizers. The singleton is
 ///     intended to live for the application's lifetime.
 /// </remarks>
-public sealed partial class EventLogSession
+public sealed class EventLogSession
 {
     private EventLogSession() { }
 

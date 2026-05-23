@@ -41,6 +41,19 @@ public sealed class EventLogStoreTests
     }
 
     [Fact]
+    public void EventLogAction_ApplyFilter_ShouldStoreFilter()
+    {
+        // Arrange
+        var filter = new Filter(null, []);
+
+        // Act
+        var action = new ApplyFilterAction(filter);
+
+        // Assert
+        Assert.Equal(filter, action.Filter);
+    }
+
+    [Fact]
     public void EventLogAction_OpenLog_WithCancellationToken_ShouldStoreToken()
     {
         // Arrange
@@ -107,19 +120,6 @@ public sealed class EventLogStoreTests
         // Assert
         Assert.True(actionTrue.ContinuouslyUpdate);
         Assert.False(actionFalse.ContinuouslyUpdate);
-    }
-
-    [Fact]
-    public void EventLogAction_ApplyFilter_ShouldStoreFilter()
-    {
-        // Arrange
-        var filter = new Filter(null, []);
-
-        // Act
-        var action = new ApplyFilterAction(filter);
-
-        // Assert
-        Assert.Equal(filter, action.Filter);
     }
 
     [Fact]

@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;

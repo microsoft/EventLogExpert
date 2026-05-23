@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Tests.TestUtils;
 using EventLogExpert.Runtime.Update;
 using NSubstitute;

@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.EventDbTool.Commands;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;
@@ -23,7 +25,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: null, skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, null, null, null);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the extension is wrong.");
@@ -46,7 +48,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: "ZZZ_NoMatch_ZZZ", skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, "ZZZ_NoMatch_ZZZ", null);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when zero providers were resolved.");
@@ -65,7 +67,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: "[unclosed", skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, null, "[unclosed", null);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the filter is invalid.");
@@ -91,7 +93,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, null);
 
         // Assert
         Assert.True(File.Exists(path));
@@ -126,7 +128,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: skipSource);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, skipSource);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
@@ -155,7 +157,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: skipSource);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, skipSource);
 
         // Assert
         Assert.True(File.Exists(path));
@@ -178,11 +180,11 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         DatabaseTestUtils.CreateV4Database(source,
             DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
 
-        var missingSkipSource = DatabaseTestUtils.CreateTempPath(".db");
+        var missingSkipSource = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: missingSkipSource);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, missingSkipSource);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
@@ -195,11 +197,11 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     {
         // Arrange
         var path = CreateTempPath();
-        var missingSource = DatabaseTestUtils.CreateTempPath(".db");
+        var missingSource = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: missingSource, filter: null, skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, missingSource, null, null);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the source is missing.");
@@ -221,7 +223,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, filter: null, skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, null);
 
         // Assert
         Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
@@ -249,7 +251,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source: null, filter: null, skipProvidersInFile: null);
+        new CreateDatabaseCommand(logger).CreateDatabase(path, null, null, null);
 
         // Assert
         Assert.Equal(sentinel, File.ReadAllBytes(path));

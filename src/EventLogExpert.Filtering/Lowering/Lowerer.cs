@@ -111,6 +111,19 @@ internal static class Lowerer
         return values;
     }
 
+    private static void FlattenAnd(SyntaxNode node, List<SyntaxNode> acc)
+    {
+        if (node is BinarySyntax { Op: TokenKind.AndAnd } and)
+        {
+            FlattenAnd(and.Left, acc);
+            FlattenAnd(and.Right, acc);
+        }
+        else
+        {
+            acc.Add(node);
+        }
+    }
+
     private static bool IsCaseInsensitiveMatch(string left, string right) =>
         string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 
@@ -174,6 +187,49 @@ internal static class Lowerer
             default:
                 throw new LowerException($"Unsupported expression at position {node.Position}.");
         }
+    }
+
+    private static SemanticNode LowerAndChain(BinarySyntax andNode)
+    {
+        var flat = new List<SyntaxNode>();
+        FlattenAnd(andNode, flat);
+
+        var lowered = new List<SemanticNode>(flat.Count);
+        var i = 0;
+
+        while (i < flat.Count)
+        {
+            if (i + 1 < flat.Count
+                && flat[i] is BinarySyntax { Op: TokenKind.NotEq } notEq
+                && IsNullCheckOnIdentifier(notEq, "UserId")
+                && TryLowerUserIdRhs(flat[i + 1], out var collapsed))
+            {
+                lowered.Add(collapsed);
+                i += 2;
+
+                continue;
+            }
+
+            lowered.Add(Lower(flat[i]));
+            i++;
+        }
+
+        if (lowered.Count == 0)
+        {
+            // Defensive: the caller pattern-matches AndAnd so FlattenAnd produces >= 2 entries and the loop
+            // above produces >= 1 lowered entry. Surfacing this as LowerException keeps TryLower's catch
+            // contract intact (the file-header decomposer claim "Never throws on malformed input").
+            throw new LowerException($"Internal: AND chain flattened to no lowered nodes (position {andNode.Position}).");
+        }
+
+        var result = lowered[0];
+
+        for (var k = 1; k < lowered.Count; k++)
+        {
+            result = new AndNode(result, lowered[k]);
+        }
+
+        return result;
     }
 
     private static SemanticNode LowerComparison(BinarySyntax bin)
@@ -357,69 +413,6 @@ internal static class Lowerer
             default:
                 throw new LowerException(
                     $"Left-hand side of comparison must be a property reference (position {position}).");
-        }
-    }
-
-    /// <summary>
-    ///     Flattens an AND chain, peephole-merges adjacent <c>UserId != null</c> + UserId-value-template pairs anywhere in
-    ///     the chain (the formatter emits this template even when other AND clauses surround it — see
-    ///     <see cref="BasicFilterFormatter" /> UserId rows), then rebuilds the chain as a left-associative
-    ///     <see cref="AndNode" /> tree. Aligns with the closure emitter's always-null-guard for UserId comparisons (so the
-    ///     decomposer sees a single semantic node per UserId condition regardless of position).
-    /// </summary>
-    private static SemanticNode LowerAndChain(BinarySyntax andNode)
-    {
-        var flat = new List<SyntaxNode>();
-        FlattenAnd(andNode, flat);
-
-        var lowered = new List<SemanticNode>(flat.Count);
-        var i = 0;
-
-        while (i < flat.Count)
-        {
-            if (i + 1 < flat.Count
-                && flat[i] is BinarySyntax { Op: TokenKind.NotEq } notEq
-                && IsNullCheckOnIdentifier(notEq, "UserId")
-                && TryLowerUserIdRhs(flat[i + 1], out var collapsed))
-            {
-                lowered.Add(collapsed);
-                i += 2;
-
-                continue;
-            }
-
-            lowered.Add(Lower(flat[i]));
-            i++;
-        }
-
-        if (lowered.Count == 0)
-        {
-            // Defensive: the caller pattern-matches AndAnd so FlattenAnd produces >= 2 entries and the loop
-            // above produces >= 1 lowered entry. Surfacing this as LowerException keeps TryLower's catch
-            // contract intact (the file-header decomposer claim "Never throws on malformed input").
-            throw new LowerException($"Internal: AND chain flattened to no lowered nodes (position {andNode.Position}).");
-        }
-
-        var result = lowered[0];
-
-        for (var k = 1; k < lowered.Count; k++)
-        {
-            result = new AndNode(result, lowered[k]);
-        }
-
-        return result;
-    }
-
-    private static void FlattenAnd(SyntaxNode node, List<SyntaxNode> acc)
-    {
-        if (node is BinarySyntax { Op: TokenKind.AndAnd } and)
-        {
-            FlattenAnd(and.Left, acc);
-            FlattenAnd(and.Right, acc);
-        }
-        else
-        {
-            acc.Add(node);
         }
     }
 

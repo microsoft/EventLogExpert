@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database.Upgrade;
 using System.Collections.Immutable;
@@ -10,17 +10,56 @@ using System.IO.Compression;
 namespace EventLogExpert.Runtime.Database;
 
 internal sealed class DatabaseImportService(
-    DatabaseEntryStore entryStore,
+    DatabaseRegistry registry,
     DatabaseClassificationService classificationService,
     DatabaseUpgradeService upgradeService,
     FileLocationOptions fileLocationOptions,
     ITraceLogger traceLogger)
 {
     private readonly DatabaseClassificationService _classificationService = classificationService;
-    private readonly DatabaseEntryStore _entryStore = entryStore;
     private readonly FileLocationOptions _fileLocationOptions = fileLocationOptions;
+    private readonly DatabaseRegistry _registry = registry;
     private readonly ITraceLogger _traceLogger = traceLogger;
     private readonly DatabaseUpgradeService _upgradeService = upgradeService;
+
+    public async Task<IReadOnlyList<string>> EnumerateZipDbEntryNamesAsync(
+        string sourceZipPath,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(sourceZipPath);
+
+        ZipArchive archive;
+
+        try
+        {
+            archive = await ZipFile.OpenReadAsync(sourceZipPath, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _traceLogger.Warning(
+                $"{nameof(DatabaseImportService)}.{nameof(EnumerateZipDbEntryNamesAsync)} failed to open '{sourceZipPath}': {ex}");
+
+            return [];
+        }
+
+        await using (archive)
+        {
+            var names = new List<string>();
+
+            foreach (var entry in archive.Entries)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                if (string.IsNullOrEmpty(entry.Name)) { continue; }
+
+                if (!Path.GetExtension(entry.Name).Equals(".db", StringComparison.OrdinalIgnoreCase)) { continue; }
+
+                names.Add(entry.Name);
+            }
+
+            return names;
+        }
+    }
 
     public async Task<ImportResult> ImportAsync(
         IEnumerable<string> sourceFilePaths,
@@ -48,7 +87,7 @@ internal sealed class DatabaseImportService(
 
         Directory.CreateDirectory(_fileLocationOptions.DatabasePath);
 
-        var existingFileNames = _entryStore.Entries
+        var existingFileNames = _registry.Entries
             .Select(entry => entry.FileName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -89,7 +128,7 @@ internal sealed class DatabaseImportService(
                 {
                     var destinationPath = Path.Join(_fileLocationOptions.DatabasePath, fileName);
 
-                    using (_entryStore.ReserveFileOperation(fileName, nameof(ImportAsync)))
+                    using (_registry.ReserveFileOperation(fileName, nameof(ImportAsync)))
                     {
                         File.Copy(sourceFilePath, destinationPath, true);
                     }
@@ -114,9 +153,9 @@ internal sealed class DatabaseImportService(
             return new ImportResult(importedCount, failures, []);
         }
 
-        _entryStore.MarkFreshlyImportedDisabled(freshlyImportedNames);
+        _registry.MarkFreshlyImportedDisabled(freshlyImportedNames);
 
-        _entryStore.Refresh();
+        _registry.Refresh();
 
         try
         {
@@ -132,7 +171,7 @@ internal sealed class DatabaseImportService(
 
         var importedSet = importedNames.ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var upgradeNeeded = _entryStore.Entries
+        var upgradeNeeded = _registry.Entries
             .Where(entry => importedSet.Contains(entry.FileName) && entry.Status == DatabaseStatus.UpgradeRequired)
             .Select(entry => entry.FileName)
             .ToList();
@@ -153,45 +192,6 @@ internal sealed class DatabaseImportService(
             .ToList();
 
         return new ImportResult(importedCount, failures, upgradeFailures);
-    }
-
-    public async Task<IReadOnlyList<string>> EnumerateZipDbEntryNamesAsync(
-        string sourceZipPath,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentException.ThrowIfNullOrEmpty(sourceZipPath);
-
-        ZipArchive archive;
-
-        try
-        {
-            archive = await ZipFile.OpenReadAsync(sourceZipPath, cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            _traceLogger.Warning(
-                $"{nameof(DatabaseImportService)}.{nameof(EnumerateZipDbEntryNamesAsync)} failed to open '{sourceZipPath}': {ex}");
-
-            return [];
-        }
-
-        await using (archive)
-        {
-            var names = new List<string>();
-
-            foreach (var entry in archive.Entries)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (string.IsNullOrEmpty(entry.Name)) { continue; }
-
-                if (!Path.GetExtension(entry.Name).Equals(".db", StringComparison.OrdinalIgnoreCase)) { continue; }
-
-                names.Add(entry.Name);
-            }
-
-            return names;
-        }
     }
 
     private async Task<(int Imported, IReadOnlyList<ImportFailure> Failures, IReadOnlyList<string> ImportedNames)>
@@ -237,7 +237,7 @@ internal sealed class DatabaseImportService(
 
                 try
                 {
-                    using (_entryStore.ReserveFileOperation(entry.Name, nameof(ImportZipAsync)))
+                    using (_registry.ReserveFileOperation(entry.Name, nameof(ImportZipAsync)))
                     {
                         await using (var entryStream = await entry.OpenAsync(cancellationToken))
                         {

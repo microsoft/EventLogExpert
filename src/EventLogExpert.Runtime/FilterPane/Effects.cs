@@ -2,8 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
 using EventLogExpert.Runtime.FilterGroup;

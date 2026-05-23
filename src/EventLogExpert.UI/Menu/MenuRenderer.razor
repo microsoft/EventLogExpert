@@ -71,7 +71,7 @@
 
                     @if (hasChildren && isOpen)
                     {
-                        <div class="submenu" @ref="_submenuElement" @onclick:stopPropagation>
+                        <div class="submenu" @onclick:stopPropagation @ref="_submenuElement">
                             @if (_resolvedChildren is null)
                             {
                                 <ul aria-busy="true"
@@ -80,7 +80,7 @@
                                     class="menu-list"
                                     role="menu">
                                     <li aria-disabled="true"
-                                        class="menu-item disabled"
+                                        class="disabled menu-item"
                                         role="menuitem"
                                         tabindex="-1">
                                         <span class="menu-check"></span>

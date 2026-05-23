@@ -33,7 +33,8 @@ public sealed class FilterServiceTests
 
         var duplicate = original with
         {
-            Name = "Log2", Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly()
+            Name = "Log2",
+            Events = new List<ResolvedEvent> { FilterEventBuilder.CreateTestEvent(200) }.AsReadOnly()
         };
 
         Assert.Equal(original.Id, duplicate.Id);

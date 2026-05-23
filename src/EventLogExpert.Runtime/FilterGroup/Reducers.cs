@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Persistence;
 using Fluxor;
 using System.Collections.Immutable;

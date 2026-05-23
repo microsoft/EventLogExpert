@@ -9,58 +9,17 @@ namespace EventLogExpert.Filtering.Tests.Lowering;
 public sealed class LowererUserIdChainTests
 {
     [Fact]
-    public void TryLower_WhenUserIdGuardIsStandaloneAnd_CollapsesToSingleComparison()
+    public void TryLower_WhenStrayUserIdNullCheckLacksValueTemplate_StillLowersAsRawNotEqualNull()
     {
-        var lowered = LowerOrThrow("UserId != null && UserId.Value == \"S-1-5-18\"");
-
-        var cmp = Assert.IsType<ComparisonNode>(lowered);
-        Assert.Equal(ResolvedEventField.UserId, cmp.Field);
-        Assert.Equal(FilterBinaryOperator.Equal, cmp.Op);
-        Assert.Equal(TypedLiteralKind.String, cmp.Literal.Kind);
-        Assert.Equal("S-1-5-18", cmp.Literal.StringValue);
-    }
-
-    [Fact]
-    public void TryLower_WhenUserIdGuardFollowsOtherCondition_CollapsesToTwoNodeAnd()
-    {
-        var lowered = LowerOrThrow("Id == 100 && UserId != null && UserId.Value == \"S-1-5-18\"");
+        // No peephole match, so `UserId != null` lowers as a regular comparison against the null literal.
+        var lowered = LowerOrThrow("Id == 100 && UserId != null");
 
         var top = Assert.IsType<AndNode>(lowered);
-        var idCmp = Assert.IsType<ComparisonNode>(top.Left);
-        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
+        Assert.IsType<ComparisonNode>(top.Left);
         var userIdCmp = Assert.IsType<ComparisonNode>(top.Right);
         Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
-        Assert.Equal("S-1-5-18", userIdCmp.Literal.StringValue);
-    }
-
-    [Fact]
-    public void TryLower_WhenUserIdGuardPrecedesOtherCondition_CollapsesToTwoNodeAnd()
-    {
-        var lowered = LowerOrThrow("UserId != null && UserId.Value == \"S-1-5-18\" && Id == 100");
-
-        var top = Assert.IsType<AndNode>(lowered);
-        var userIdCmp = Assert.IsType<ComparisonNode>(top.Left);
-        Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
-        var idCmp = Assert.IsType<ComparisonNode>(top.Right);
-        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
-    }
-
-    [Fact]
-    public void TryLower_WhenUserIdGuardSurroundedByOtherConditions_CollapsesAtCorrectPosition()
-    {
-        var lowered = LowerOrThrow(
-            "Id == 100 && UserId != null && UserId.Value == \"S-1-5-18\" && Source == \"X\"");
-
-        // Left-assoc rebuild: ((Id, UserId), Source).
-        var top = Assert.IsType<AndNode>(lowered);
-        var sourceCmp = Assert.IsType<ComparisonNode>(top.Right);
-        Assert.Equal(ResolvedEventField.Source, sourceCmp.Field);
-
-        var inner = Assert.IsType<AndNode>(top.Left);
-        var idCmp = Assert.IsType<ComparisonNode>(inner.Left);
-        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
-        var userIdCmp = Assert.IsType<ComparisonNode>(inner.Right);
-        Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
+        Assert.Equal(FilterBinaryOperator.NotEqual, userIdCmp.Op);
+        Assert.Equal(TypedLiteralKind.Null, userIdCmp.Literal.Kind);
     }
 
     [Fact]
@@ -109,17 +68,58 @@ public sealed class LowererUserIdChainTests
     }
 
     [Fact]
-    public void TryLower_WhenStrayUserIdNullCheckLacksValueTemplate_StillLowersAsRawNotEqualNull()
+    public void TryLower_WhenUserIdGuardFollowsOtherCondition_CollapsesToTwoNodeAnd()
     {
-        // No peephole match, so `UserId != null` lowers as a regular comparison against the null literal.
-        var lowered = LowerOrThrow("Id == 100 && UserId != null");
+        var lowered = LowerOrThrow("Id == 100 && UserId != null && UserId.Value == \"S-1-5-18\"");
 
         var top = Assert.IsType<AndNode>(lowered);
-        Assert.IsType<ComparisonNode>(top.Left);
+        var idCmp = Assert.IsType<ComparisonNode>(top.Left);
+        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
         var userIdCmp = Assert.IsType<ComparisonNode>(top.Right);
         Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
-        Assert.Equal(FilterBinaryOperator.NotEqual, userIdCmp.Op);
-        Assert.Equal(TypedLiteralKind.Null, userIdCmp.Literal.Kind);
+        Assert.Equal("S-1-5-18", userIdCmp.Literal.StringValue);
+    }
+
+    [Fact]
+    public void TryLower_WhenUserIdGuardIsStandaloneAnd_CollapsesToSingleComparison()
+    {
+        var lowered = LowerOrThrow("UserId != null && UserId.Value == \"S-1-5-18\"");
+
+        var cmp = Assert.IsType<ComparisonNode>(lowered);
+        Assert.Equal(ResolvedEventField.UserId, cmp.Field);
+        Assert.Equal(FilterBinaryOperator.Equal, cmp.Op);
+        Assert.Equal(TypedLiteralKind.String, cmp.Literal.Kind);
+        Assert.Equal("S-1-5-18", cmp.Literal.StringValue);
+    }
+
+    [Fact]
+    public void TryLower_WhenUserIdGuardPrecedesOtherCondition_CollapsesToTwoNodeAnd()
+    {
+        var lowered = LowerOrThrow("UserId != null && UserId.Value == \"S-1-5-18\" && Id == 100");
+
+        var top = Assert.IsType<AndNode>(lowered);
+        var userIdCmp = Assert.IsType<ComparisonNode>(top.Left);
+        Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
+        var idCmp = Assert.IsType<ComparisonNode>(top.Right);
+        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
+    }
+
+    [Fact]
+    public void TryLower_WhenUserIdGuardSurroundedByOtherConditions_CollapsesAtCorrectPosition()
+    {
+        var lowered = LowerOrThrow(
+            "Id == 100 && UserId != null && UserId.Value == \"S-1-5-18\" && Source == \"X\"");
+
+        // Left-assoc rebuild: ((Id, UserId), Source).
+        var top = Assert.IsType<AndNode>(lowered);
+        var sourceCmp = Assert.IsType<ComparisonNode>(top.Right);
+        Assert.Equal(ResolvedEventField.Source, sourceCmp.Field);
+
+        var inner = Assert.IsType<AndNode>(top.Left);
+        var idCmp = Assert.IsType<ComparisonNode>(inner.Left);
+        Assert.Equal(ResolvedEventField.Id, idCmp.Field);
+        var userIdCmp = Assert.IsType<ComparisonNode>(inner.Right);
+        Assert.Equal(ResolvedEventField.UserId, userIdCmp.Field);
     }
 
     private static SemanticNode LowerOrThrow(string filter)

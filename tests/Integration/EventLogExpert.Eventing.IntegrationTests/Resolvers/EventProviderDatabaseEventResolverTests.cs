@@ -1,13 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Databases;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.ProviderDatabase;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Provider.Resolution;
+using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
@@ -20,8 +21,8 @@ public sealed class EventResolverDatabaseTests
     public void Constructor_WithLogger_ShouldLogDatabasePaths()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([Constants.NonExistentDatabaseFullPath]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([Constants.NonExistentDatabaseFullPath]);
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
@@ -44,8 +45,8 @@ public sealed class EventResolverDatabaseTests
     public void Constructor_WithLogger_ShouldLogInstantiation()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
@@ -60,8 +61,8 @@ public sealed class EventResolverDatabaseTests
     {
         // Arrange
         string nonExistentPath = Path.Combine(Path.GetTempPath(), $"NonExistent_{Guid.NewGuid()}.db");
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns(ImmutableList.Create(nonExistentPath));
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns(ImmutableList.Create(nonExistentPath));
 
         // Act
         var exception = Assert.Throws<FileNotFoundException>(() =>
@@ -85,8 +86,8 @@ public sealed class EventResolverDatabaseTests
                 context.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
 
             // Act
             using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
@@ -104,8 +105,8 @@ public sealed class EventResolverDatabaseTests
     public void Dispose_CalledMultipleTimes_ShouldNotThrow()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
         var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         // Act & Assert
@@ -132,8 +133,8 @@ public sealed class EventResolverDatabaseTests
                 await context.SaveChangesAsync(TestContext.Current.CancellationToken);
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
             var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
             var exceptions = new ConcurrentBag<Exception>();
@@ -183,8 +184,8 @@ public sealed class EventResolverDatabaseTests
     public void Dispose_MultipleConcurrentDisposeCalls_ShouldHandleThreadSafely()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
         var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var exceptions = new ConcurrentBag<Exception>();
@@ -210,8 +211,8 @@ public sealed class EventResolverDatabaseTests
     public void Dispose_ThenLoadProviderDetails_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
         var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
         var eventRecord = new EventRecord
@@ -228,28 +229,11 @@ public sealed class EventResolverDatabaseTests
     }
 
     [Fact]
-    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
-    {
-        // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
-        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
-
-        var eventRecord = EventUtils.CreateBasicEvent();
-
-        // Act
-        resolver.Dispose();
-
-        // Assert
-        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
-    }
-
-    [Fact]
     public void Dispose_ThenResolveEventViaBaseReference_ShouldThrowObjectDisposedException()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
         EventResolver resolver = new(dbCollection);
 
         // Type as base class to verify override (not 'new') is used
@@ -262,6 +246,23 @@ public sealed class EventResolverDatabaseTests
 
         // Assert - This should throw because ResolveEvent is overridden, not hidden with 'new'
         Assert.Throws<ObjectDisposedException>(() => baseResolver.ResolveEvent(eventRecord));
+    }
+
+    [Fact]
+    public void Dispose_ThenResolveEvent_ShouldThrowObjectDisposedException()
+    {
+        // Arrange
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
+        var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
+
+        var eventRecord = EventUtils.CreateBasicEvent();
+
+        // Act
+        resolver.Dispose();
+
+        // Assert
+        Assert.Throws<ObjectDisposedException>(() => resolver.ResolveEvent(eventRecord));
     }
 
     [Fact]
@@ -279,8 +280,8 @@ public sealed class EventResolverDatabaseTests
                 context.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
             using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
@@ -323,8 +324,8 @@ public sealed class EventResolverDatabaseTests
                 context.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
 
             using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
@@ -379,8 +380,8 @@ public sealed class EventResolverDatabaseTests
                 context2.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
             using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
@@ -425,8 +426,8 @@ public sealed class EventResolverDatabaseTests
                 context.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
             using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
@@ -473,8 +474,8 @@ public sealed class EventResolverDatabaseTests
                 context2.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
             using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
@@ -517,8 +518,8 @@ public sealed class EventResolverDatabaseTests
                 context.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath));
             var logger = Substitute.For<ITraceLogger>();
 
             using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
@@ -567,8 +568,8 @@ public sealed class EventResolverDatabaseTests
                 context2.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath1, dbPath2));
 
             using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 
@@ -614,8 +615,8 @@ public sealed class EventResolverDatabaseTests
                 context2.SaveChanges();
             }
 
-            var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-            dbCollection.ActiveDatabases.Returns(ImmutableList.Create(dbPath1, dbPath2));
+            var dbCollection = Substitute.For<IActiveDatabases>();
+            dbCollection.Paths.Returns(ImmutableList.Create(dbPath1, dbPath2));
             var logger = Substitute.For<ITraceLogger>();
 
             using var resolver = new EventResolver(dbCollection, logger: logger, factory: new ProviderDbContextFactory());
@@ -645,8 +646,8 @@ public sealed class EventResolverDatabaseTests
     public void LoadProviderDetails_WithUnknownProvider_ShouldAddEmptyDetails()
     {
         // Arrange
-        var dbCollection = Substitute.For<IActiveDatabasePathsProvider>();
-        dbCollection.ActiveDatabases.Returns([]);
+        var dbCollection = Substitute.For<IActiveDatabases>();
+        dbCollection.Paths.Returns([]);
 
         using var resolver = new EventResolver(dbCollection, factory: new ProviderDbContextFactory());
 

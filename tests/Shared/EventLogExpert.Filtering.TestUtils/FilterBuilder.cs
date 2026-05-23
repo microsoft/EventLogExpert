@@ -3,8 +3,8 @@
 
 using EventLogExpert.Filtering.Basic;
 using EventLogExpert.Filtering.Drafts;
-using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
 using static EventLogExpert.Filtering.TestUtils.Constants.FilterTestConstants;
 
 namespace EventLogExpert.Filtering.TestUtils;

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <SingleProject>true</SingleProject>
+    <AssemblyName>EventLogExpert.Provider.Database</AssemblyName>
+    <RootNamespace>EventLogExpert.ProviderDatabase</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Provider\EventLogExpert.Provider.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.Provider.Database.Tests" />
+    <InternalsVisibleTo Include="EventLogExpert.Provider.Database.IntegrationTests" />
+  </ItemGroup>
+</Project>

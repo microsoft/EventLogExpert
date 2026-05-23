@@ -2,14 +2,15 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.UI.Banner;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.UI.Banner;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;

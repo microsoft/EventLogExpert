@@ -60,7 +60,7 @@ public sealed class EventLogWatcherTests
         var bookmark = reader.LastBookmark;
 
         // Act
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark, renderXml: false);
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark);
 
         // Assert
         Assert.NotNull(watcher);
@@ -143,20 +143,6 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
-    public void Dispose_WhenCalled_ShouldUnsubscribe()
-    {
-        // Arrange
-        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        watcher.Enabled = true;
-
-        // Act
-        watcher.Dispose();
-
-        // Assert
-        Assert.False(watcher.Enabled);
-    }
-
-    [Fact]
     public void Dispose_WhenCalledFromHandler_ShouldThrowInvalidOperationException()
     {
         // Arrange
@@ -209,6 +195,20 @@ public sealed class EventLogWatcherTests
         watcher.Dispose();
         watcher.Dispose();
         watcher.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_WhenCalled_ShouldUnsubscribe()
+    {
+        // Arrange
+        var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Enabled = true;
+
+        // Act
+        watcher.Dispose();
+
+        // Assert
+        Assert.False(watcher.Enabled);
     }
 
     [Fact]
@@ -270,7 +270,7 @@ public sealed class EventLogWatcherTests
         using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
 
         // Act
-        var tasks = new List<Task>(capacity: 100);
+        var tasks = new List<Task>(100);
         var ct = TestContext.Current.CancellationToken;
 
         for (int i = 0; i < 50; i++)
@@ -287,20 +287,6 @@ public sealed class EventLogWatcherTests
 
         // Assert: timeout regression-tests the RegisteredWaitHandle race.
         await allDone.WaitAsync(TimeSpan.FromSeconds(30), ct);
-    }
-
-    [Fact]
-    public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
-    {
-        // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-        watcher.Enabled = true;
-
-        // Act
-        watcher.Enabled = false;
-
-        // Assert
-        Assert.False(watcher.Enabled);
     }
 
     [Fact]
@@ -359,6 +345,20 @@ public sealed class EventLogWatcherTests
     }
 
     [Fact]
+    public void Enabled_WhenSetToFalse_ShouldUnsubscribe()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+        watcher.Enabled = true;
+
+        // Act
+        watcher.Enabled = false;
+
+        // Assert
+        Assert.False(watcher.Enabled);
+    }
+
+    [Fact]
     public void Enabled_WhenSetToSameValue_ShouldNotThrow()
     {
         // Arrange
@@ -368,19 +368,6 @@ public sealed class EventLogWatcherTests
         // Act & Assert
         watcher.Enabled = false;
         Assert.False(watcher.Enabled);
-    }
-
-    [Fact]
-    public void Enabled_WhenSetToTrue_ShouldSubscribe()
-    {
-        // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
-
-        // Act
-        watcher.Enabled = true;
-
-        // Assert
-        Assert.True(watcher.Enabled);
     }
 
     [Fact]
@@ -416,6 +403,19 @@ public sealed class EventLogWatcherTests
         watcher.Enabled = true;
 
         // Act - Setting to true when already true is a no-op (switch case doesn't match)
+        watcher.Enabled = true;
+
+        // Assert
+        Assert.True(watcher.Enabled);
+    }
+
+    [Fact]
+    public void Enabled_WhenSetToTrue_ShouldSubscribe()
+    {
+        // Arrange
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
+
+        // Act
         watcher.Enabled = true;
 
         // Assert
@@ -939,7 +939,7 @@ public sealed class EventLogWatcherTests
         reader.TryGetEvents(out _, 1);
         var bookmark = reader.LastBookmark;
 
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark, renderXml: false);
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, bookmark);
         int eventCount = 0;
         var eventReceived = new ManualResetEventSlim(false);
 
@@ -1035,7 +1035,7 @@ public sealed class EventLogWatcherTests
     {
         // Arrange
         var invalidBookmark = "InvalidBookmarkString";
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, invalidBookmark, renderXml: false);
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, invalidBookmark);
 
         // Act
         var ex = Record.Exception(() => watcher.Enabled = true);
@@ -1116,7 +1116,7 @@ public sealed class EventLogWatcherTests
     public void EventRecordWritten_WithRenderXmlFalse_ShouldNotIncludeXml()
     {
         // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, renderXml: false);
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
 
@@ -1146,7 +1146,7 @@ public sealed class EventLogWatcherTests
     public void EventRecordWritten_WithRenderXmlTrue_ShouldIncludeXml()
     {
         // Arrange
-        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, renderXml: true);
+        using var watcher = new EventLogWatcher(Constants.ApplicationLogName, true);
         EventRecord? capturedEvent = null;
         var eventReceived = new ManualResetEventSlim(false);
 

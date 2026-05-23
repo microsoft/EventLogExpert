@@ -2,7 +2,6 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Filtering.TestUtils;
-
 using EventLogExpert.Filtering.TestUtils.Constants;
 
 namespace EventLogExpert.Filtering.Tests;
