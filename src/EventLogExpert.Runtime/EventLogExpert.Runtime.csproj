@@ -10,6 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
     <ProjectReference Include="..\EventLogExpert.Filtering\EventLogExpert.Filtering.csproj" />
   </ItemGroup>

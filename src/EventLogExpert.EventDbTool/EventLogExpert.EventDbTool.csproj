@@ -13,8 +13,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
-    <ProjectReference Include="..\EventLogExpert.Provider.Database\EventLogExpert.Provider.Database.csproj" />
+    <ProjectReference Include="..\EventLogExpert.DatabaseTools\EventLogExpert.DatabaseTools.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
   </ItemGroup>
 
 </Project>

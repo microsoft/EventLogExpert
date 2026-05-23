@@ -1,22 +1,23 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
 public sealed class DiffDatabaseCommandTests : IDisposable
 {
     private readonly List<string> _tempPaths = [];
 
     [Fact]
-    public void DiffDatabase_PreservesResolvedFromOwningPublisher()
+    public async Task DiffDatabase_PreservesResolvedFromOwningPublisher()
     {
         // Arrange — first source has Shared, second source has Shared and Second.
         // The diff output should contain only Second, with its ResolvedFromOwningPublisher value
@@ -38,12 +39,12 @@ public sealed class DiffDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+        await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.True(File.Exists(output), "Diff should have created the output database.");
 
-        using var verify = new ProviderDbContext(output, readOnly: true, ensureCreated: false);
+        await using var verify = new ProviderDbContext(output, readOnly: true, ensureCreated: false);
         var rows = verify.ProviderDetails.ToList();
         var copied = Assert.Single(rows);
         Assert.Equal(Constants.SecondProviderName, copied.ProviderName);
@@ -51,7 +52,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void DiffDatabase_WithObsoleteSecondSource_AbortsWithoutCreatingOutput()
+    public async Task DiffDatabase_WithObsoleteSecondSource_AbortsWithoutCreatingOutput()
     {
         // Arrange — V3 schema in second source. Diff aborts on stale-but-known schema too.
         var first = CreateTempDb();
@@ -67,7 +68,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+        await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(output), "Diff must not create an output database when a source is obsolete.");
@@ -76,7 +77,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void DiffDatabase_WithUnknownFirstSource_AbortsWithoutCreatingOutput()
+    public async Task DiffDatabase_WithUnknownFirstSource_AbortsWithoutCreatingOutput()
     {
         // Arrange — without the upfront ValidateSourceSchemas check, the schema-rejected first
         // source would silently yield zero providers, the second source's full contents would be
@@ -95,7 +96,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new DiffDatabaseCommand(logger).DiffDatabase(first, second, output);
+        await new DiffDatabaseOperation(new DiffDatabaseRequest(first, second, output)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(output), "Diff must not create an output database when a source is invalid.");

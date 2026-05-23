@@ -1,16 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
 
 namespace EventLogExpert.EventDbTool.Commands;
 
-public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
+public sealed class DiffDatabaseCommand
 {
     public static Command GetCommand()
     {
@@ -44,92 +43,19 @@ public class DiffDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
         diffDatabaseCommand.Arguments.Add(newDbArgument);
         diffDatabaseCommand.Options.Add(verboseOption);
 
-        diffDatabaseCommand.SetAction(action =>
+        diffDatabaseCommand.SetAction(async action =>
         {
-            using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
-            new DiffDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
-                .DiffDatabase(
-                    action.GetRequiredValue(firstArgument),
-                    action.GetRequiredValue(secondArgument),
-                    action.GetRequiredValue(newDbArgument));
+            await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
+            var logger = sp.GetRequiredService<ITraceLogger>();
+
+            var request = new DiffDatabaseRequest(
+                action.GetRequiredValue(firstArgument),
+                action.GetRequiredValue(secondArgument),
+                action.GetRequiredValue(newDbArgument));
+
+            await new DiffDatabaseOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return diffDatabaseCommand;
-    }
-
-    internal void DiffDatabase(string firstSource, string secondSource, string newDb)
-    {
-        if (!ProviderSource.TryValidate(firstSource, Logger)) { return; }
-
-        if (!ProviderSource.TryValidate(secondSource, Logger)) { return; }
-
-        if (!ProviderSource.ValidateSourceSchemas(firstSource, Logger)) { return; }
-
-        if (!ProviderSource.ValidateSourceSchemas(secondSource, Logger)) { return; }
-
-        if (File.Exists(newDb))
-        {
-            Logger.Error($"File already exists: {newDb}");
-
-            return;
-        }
-
-        if (!string.Equals(Path.GetExtension(newDb), ".db", StringComparison.OrdinalIgnoreCase))
-        {
-            Logger.Error($"New db path must have a .db extension.");
-
-            return;
-        }
-
-        var firstProviderNames = new HashSet<string>(
-            ProviderSource.LoadProviderNames(firstSource, Logger),
-            StringComparer.OrdinalIgnoreCase);
-
-        var providersCopied = new List<ProviderDetails>();
-
-        // Pass firstProviderNames as the skip set so providers present in the first source are
-        // never resolved from the second source's metadata path. This is especially important when
-        // the second source is .evtx+MTA, where each provider triggers an expensive load.
-        Logger.Information($"Skipping up to {firstProviderNames.Count} provider name(s) from the second source that also appear in the first source.");
-
-        // Defer creating the DbContext (and therefore the .db file on disk) until at least one
-        // provider is actually about to be persisted. This prevents leaving an empty database
-        // behind when the second source yields no new providers.
-        ProviderDbContext? newDbContext = null;
-
-        try
-        {
-            foreach (var details in ProviderSource.LoadProviders(secondSource, Logger, filter: null, skipProviderNames: firstProviderNames))
-            {
-                Logger.Information($"Copying {details.ProviderName} because it is present in second source but not first.");
-
-                newDbContext ??= new ProviderDbContext(newDb, false, Logger);
-
-                newDbContext.ProviderDetails.Add(details);
-
-                providersCopied.Add(details);
-            }
-
-            if (newDbContext is null)
-            {
-                Logger.Warning($"No providers in the second source are missing from the first. Database was not created.");
-                return;
-            }
-
-            newDbContext.SaveChanges();
-
-            Logger.Information($"Providers copied to new database:");
-            Logger.Information($"");
-            LogProviderDetailHeader(providersCopied.Select(p => p.ProviderName));
-
-            foreach (var provider in providersCopied)
-            {
-                LogProviderDetails(provider);
-            }
-        }
-        finally
-        {
-            newDbContext?.Dispose();
-        }
     }
 }

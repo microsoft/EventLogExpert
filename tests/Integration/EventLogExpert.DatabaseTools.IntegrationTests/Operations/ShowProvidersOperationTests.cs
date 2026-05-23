@@ -1,14 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
+using System.Text.RegularExpressions;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
 public sealed class ShowCommandTests : IDisposable
 {
@@ -23,34 +25,15 @@ public sealed class ShowCommandTests : IDisposable
     }
 
     [Fact]
-    public void ShowProviderInfo_WhenFilterRegexInvalid_LogsErrorAndReturns()
-    {
-        // Arrange — pass a source so we never hit the local-machine path (non-deterministic).
-        var source = CreateTempPath();
-        DatabaseTestUtils.CreateV4Database(source,
-            DatabaseTestUtils.BuildProviderDetails(Constants.FirstProviderName));
-
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new ShowCommand(logger).ShowProviderInfo(source, "[unclosed");
-
-        // Assert
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Invalid --filter regex")));
-        logger.DidNotReceive().Information(Arg.Any<InformationLogHandler>());
-        logger.DidNotReceive().Warning(Arg.Any<WarningLogHandler>());
-    }
-
-    [Fact]
-    public void ShowProviderInfo_WhenSourceDoesNotExist_LogsErrorAndDoesNotReadAnything()
+    public async Task ShowProviderInfo_WhenSourceDoesNotExist_LogsErrorAndDoesNotReadAnything()
     {
         // Arrange
         var missing = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(missing, null);
+        await new ShowProvidersOperation(new ShowProvidersRequest(missing, null))
+            .ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
@@ -59,7 +42,7 @@ public sealed class ShowCommandTests : IDisposable
     }
 
     [Fact]
-    public void ShowProviderInfo_WhenSourceFilterMatchesNoProviders_LogsNoProvidersWarningOnly()
+    public async Task ShowProviderInfo_WhenSourceFilterMatchesNoProviders_LogsNoProvidersWarningOnly()
     {
         // Arrange — source has providers but the filter matches none. The "no providers found"
         // message is the contract for "your filter is too narrow" UX, distinct from "source missing".
@@ -71,7 +54,8 @@ public sealed class ShowCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(source, "ZZZ_NoMatch_ZZZ");
+        await new ShowProvidersOperation(new ShowProvidersRequest(source, new Regex("ZZZ_NoMatch_ZZZ", RegexOptions.IgnoreCase)))
+            .ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
@@ -83,7 +67,7 @@ public sealed class ShowCommandTests : IDisposable
     }
 
     [Fact]
-    public void ShowProviderInfo_WhenSourceHasProviders_LogsHeaderAndOneRowPerProvider()
+    public async Task ShowProviderInfo_WhenSourceHasProviders_LogsHeaderAndOneRowPerProvider()
     {
         // Arrange — two providers. We assert that the header appears exactly once and a row for
         // each provider name appears, locking in the streaming "header + per-provider row" output
@@ -96,7 +80,8 @@ public sealed class ShowCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(source, null);
+        await new ShowProvidersOperation(new ShowProvidersRequest(source, null))
+            .ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         logger.Received(1).Information(Arg.Is<InformationLogHandler>(h =>

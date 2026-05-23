@@ -2,20 +2,19 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Models;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.EventDbTool.ProviderSources;
+namespace EventLogExpert.Eventing.PublisherMetadata;
 
 /// <summary>
 ///     Loads <see cref="ProviderDetails" /> from an exported .evtx log paired with its sibling LocaleMetaData/*.MTA
 ///     files. Provider names are discovered by reading the .evtx events, and the MTA files are used as the only metadata
 ///     source (no registry/DLL fallback).
 /// </summary>
-internal static class MtaProviderSource
+public static class MtaProviderSource
 {
     /// <summary>
     ///     Reads <paramref name="evtxPath" /> and returns the distinct provider names referenced by its event records.
@@ -24,8 +23,8 @@ internal static class MtaProviderSource
     public static IReadOnlyList<string> DiscoverProviderNames(
         string evtxPath,
         ITraceLogger logger,
-        string? filter = null) =>
-        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : DiscoverProviderNamesCore(evtxPath, logger, regex);
+        Regex? regex = null) =>
+        DiscoverProviderNamesCore(evtxPath, logger, regex);
 
     /// <summary>
     ///     Returns the sibling LocaleMetaData/*.MTA files for <paramref name="evtxPath" />, or an empty array if none are
@@ -86,23 +85,17 @@ internal static class MtaProviderSource
     ///     resolved from any MTA file are skipped with a warning so callers never persist empty placeholder providers (which
     ///     would defeat the "no local fallback" guarantee when the resulting database is consumed later).
     /// </summary>
+    /// <param name="evtxPath">Path to the exported .evtx file.</param>
+    /// <param name="logger">Trace logger for diagnostics.</param>
+    /// <param name="regex">Optional case-insensitive regex applied to provider names; null means no filtering.</param>
+    /// <param name="skipProviderNames">Optional set of provider names to skip before MTA resolution.</param>
+    /// <param name="seen">Optional set tracking already-loaded provider names across multiple source files (de-dup).</param>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string evtxPath,
         ITraceLogger logger,
-        string? filter = null) =>
-        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] :
-            LoadProvidersCore(evtxPath, logger, regex, null, null);
-
-    /// <summary>
-    ///     Internal overload used by <see cref="ProviderSource" /> so name-based filtering and the de-dup <c>seen</c> set
-    ///     are applied BEFORE the expensive MTA resolution per provider.
-    /// </summary>
-    internal static IEnumerable<ProviderDetails> LoadProviders(
-        string evtxPath,
-        ITraceLogger logger,
-        Regex? regex,
-        IReadOnlySet<string>? skipProviderNames,
-        HashSet<string>? seen) =>
+        Regex? regex = null,
+        IReadOnlySet<string>? skipProviderNames = null,
+        HashSet<string>? seen = null) =>
         LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen);
 
     private static IReadOnlyList<string> DiscoverProviderNamesCore(

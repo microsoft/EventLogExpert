@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Models;
 using EventLogExpert.Provider.Schema;
@@ -10,14 +11,14 @@ using System.Data.Common;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
-namespace EventLogExpert.EventDbTool.ProviderSources;
+namespace EventLogExpert.DatabaseTools.Sources;
 
 /// <summary>
 ///     Loads <see cref="ProviderDetails" /> from a path that may be a .db file, an exported .evtx file, or a folder.
 ///     When the path is a folder, all top-level *.db files are processed first (sorted), followed by all top-level *.evtx
 ///     files (sorted). Subdirectories are not searched.
 /// </summary>
-internal static class ProviderSource
+public static class ProviderSource
 {
     /// <summary>
     ///     Conservative cap on the number of parameters in a single <c>Where(... Contains)</c> SQL IN clause. SQLite's
@@ -31,13 +32,9 @@ internal static class ProviderSource
 
     /// <summary>
     ///     Returns the distinct provider names available from <paramref name="path" />, applying an optional
-    ///     case-insensitive regex <paramref name="filter" />. Does not load full provider details.
+    ///     case-insensitive regex <paramref name="regex" />. Does not load full provider details.
     /// </summary>
-    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, string? filter = null) =>
-        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] : LoadProviderNames(path, logger, regex);
-
-    /// <inheritdoc cref="LoadProviderNames(string, ITraceLogger, string?)" />
-    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex)
+    public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex = null)
     {
         var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -54,7 +51,7 @@ internal static class ProviderSource
 
     /// <summary>
     ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional case-insensitive
-    ///     regex <paramref name="filter" /> to provider names. When the same provider name appears in multiple source files,
+    ///     regex <paramref name="regex" /> to provider names. When the same provider name appears in multiple source files,
     ///     the first occurrence wins (.db files are processed before .evtx). Provider names contained in
     ///     <paramref name="skipProviderNames" /> are excluded BEFORE details are resolved, so callers using the skip set never
     ///     pay the cost of loading metadata for excluded providers.
@@ -62,16 +59,7 @@ internal static class ProviderSource
     public static IEnumerable<ProviderDetails> LoadProviders(
         string path,
         ITraceLogger logger,
-        string? filter = null,
-        IReadOnlySet<string>? skipProviderNames = null) =>
-        !RegexHelper.TryCreate(filter, logger, out var regex) ? [] :
-            LoadProvidersIterator(path, logger, regex, skipProviderNames);
-
-    /// <inheritdoc cref="LoadProviders(string, ITraceLogger, string?, IReadOnlySet{string}?)" />
-    public static IEnumerable<ProviderDetails> LoadProviders(
-        string path,
-        ITraceLogger logger,
-        Regex? regex,
+        Regex? regex = null,
         IReadOnlySet<string>? skipProviderNames = null) =>
         LoadProvidersIterator(path, logger, regex, skipProviderNames);
 
