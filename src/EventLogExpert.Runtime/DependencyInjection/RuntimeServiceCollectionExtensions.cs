@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Databases;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
@@ -35,8 +35,7 @@ public static class RuntimeServiceCollectionExtensions
     ///         </item>
     ///         <item><c>AddEventLogFiltering()</c> — effect classes depend on <c>IFilterService</c>.</item>
     ///         <item>
-    ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on
-    ///             <c>IProviderDatabaseMaintenance</c>.
+    ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on <c>IProviderDatabaseMaintenance</c>.
     ///         </item>
     ///     </list>
     ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
@@ -89,9 +88,9 @@ public static class RuntimeServiceCollectionExtensions
 
     private static void AddDatabaseServices(IServiceCollection services)
     {
-        services.AddSingleton<DatabaseEntryStore>(static sp =>
+        services.AddSingleton<DatabaseRegistry>(static sp =>
         {
-            var store = new DatabaseEntryStore(
+            var store = new DatabaseRegistry(
                 sp.GetRequiredService<FileLocationOptions>(),
                 sp.GetRequiredService<IDatabasePreferencesProvider>(),
                 sp.GetRequiredService<ITraceLogger>());
@@ -104,7 +103,7 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<DatabaseClassificationService>();
 
         services.AddSingleton<DatabaseUpgradeService>(static sp => new DatabaseUpgradeService(
-            sp.GetRequiredService<DatabaseEntryStore>(),
+            sp.GetRequiredService<DatabaseRegistry>(),
             sp.GetRequiredService<DatabaseClassificationService>().InitialClassificationTask,
             sp.GetRequiredService<IProviderDatabaseMaintenance>(),
             sp.GetRequiredService<ITraceLogger>()));
@@ -114,6 +113,6 @@ public static class RuntimeServiceCollectionExtensions
 
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
-        services.AddSingleton<IActiveDatabasePathsProvider>(static sp => sp.GetRequiredService<DatabaseService>());
+        services.AddSingleton<IActiveDatabases>(static sp => sp.GetRequiredService<DatabaseService>());
     }
 }

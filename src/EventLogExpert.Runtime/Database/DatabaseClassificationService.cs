@@ -1,21 +1,22 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Common.Files;
 
 namespace EventLogExpert.Runtime.Database;
 
 internal sealed class DatabaseClassificationService
 {
-    private readonly DatabaseEntryStore _entryStore;
+    private readonly DatabaseRegistry _entryStore;
     private readonly FileLocationOptions _fileLocationOptions;
     private readonly IProviderDatabaseMaintenance _maintenance;
     private readonly ITraceLogger _traceLogger;
 
     public DatabaseClassificationService(
-        DatabaseEntryStore entryStore,
+        DatabaseRegistry entryStore,
         FileLocationOptions fileLocationOptions,
         IProviderDatabaseMaintenance maintenance,
         ITraceLogger traceLogger)
@@ -65,7 +66,7 @@ internal sealed class DatabaseClassificationService
                         {
                             perFile[entry.FileName] = (DatabaseStatus.ClassificationFailed, false);
 
-                            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+                            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                                 $"{nameof(DatabaseClassificationService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}"));
                         }
                     }
@@ -78,18 +79,14 @@ internal sealed class DatabaseClassificationService
         _entryStore.ApplyClassificationResults(statuses);
     }
 
-    private async Task StartInitialClassificationAsync()
-    {
-        try
+    private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
+        currentVersion switch
         {
-            await ClassifyEntriesAsync(CancellationToken.None).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
-                $"{nameof(DatabaseClassificationService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
-        }
-    }
+            DatabaseSchemaVersion.Current => DatabaseStatus.Ready,
+            3 => DatabaseStatus.UpgradeRequired,
+            1 or 2 => DatabaseStatus.ObsoleteSchema,
+            _ => DatabaseStatus.UnrecognizedSchema,
+        };
 
     private bool ProbeOrCleanupBackup(DatabaseEntry entry, DatabaseStatus status)
     {
@@ -103,7 +100,7 @@ internal sealed class DatabaseClassificationService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+                DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseClassificationService)}.{nameof(ProbeOrCleanupBackup)} probe failed for '{entry.FileName}': {ex}"));
 
                 return true;
@@ -118,7 +115,7 @@ internal sealed class DatabaseClassificationService
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+                DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseClassificationService)}.{nameof(ProbeOrCleanupBackup)} stale .upgrade.bak cleanup failed for '{entry.FileName}': {ex}"));
             }
         }
@@ -126,12 +123,16 @@ internal sealed class DatabaseClassificationService
         return false;
     }
 
-    private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
-        currentVersion switch
+    private async Task StartInitialClassificationAsync()
+    {
+        try
         {
-            ProviderDatabaseSchemaVersion.Current => DatabaseStatus.Ready,
-            3 => DatabaseStatus.UpgradeRequired,
-            1 or 2 => DatabaseStatus.ObsoleteSchema,
-            _ => DatabaseStatus.UnrecognizedSchema,
-        };
+            await ClassifyEntriesAsync(CancellationToken.None).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseClassificationService)}.{nameof(StartInitialClassificationAsync)}: initial classification failed: {ex}"));
+        }
+    }
 }

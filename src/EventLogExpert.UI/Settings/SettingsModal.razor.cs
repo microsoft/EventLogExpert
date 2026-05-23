@@ -1,7 +1,6 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Modal;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
@@ -11,6 +10,7 @@ using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
@@ -40,13 +40,13 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
+    [Inject] private IDetailsPanePreferencesProvider DetailsPanePreferences { get; init; } = null!;
+
     [Inject] private IDispatcher Dispatcher { get; init; } = null!;
 
     [Inject] private IEventLogCommands EventLogCommands { get; init; } = null!;
 
     [Inject] private IState<EventLogState> EventLogState { get; init; } = null!;
-
-    [Inject] private IDetailsPanePreferencesProvider DetailsPanePreferences { get; init; } = null!;
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
@@ -324,7 +324,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         {
             await DatabaseService.RemoveAsync(
                 fileName,
-                prepareForDeletionAsync: ct =>
+                ct =>
                     LogReloadCoordinator.PrepareForDatabaseRemovalAsync(snapshot, ct));
         }
         catch (Exception ex)

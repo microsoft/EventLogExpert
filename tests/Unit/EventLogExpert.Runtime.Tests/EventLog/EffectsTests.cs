@@ -4,12 +4,12 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Filtering.Compilation;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.EventLog;
@@ -1676,62 +1676,6 @@ public sealed class EffectsTests
                 a.LogName == Constants.LogNameLog2 && a.LogPathType == LogPathType.File));
     }
 
-    // Wrapper that bundles the post-split effects classes together with their
-    // shared singletons so existing tests keep their `effects.HandleXxx(...)`
-    // call shape. Each method delegates to the appropriate split class.
-    private sealed class EffectsHarness
-    {
-        public EffectsHarness(
-            FilteringEffects filtering,
-            OpenLogEffects openLog,
-            LogReloadEffects logReload,
-            DatabaseCoordinationEffects databaseCoordination,
-            LogCloseCoordinator closeCoordinator,
-            EventLogConcurrencyState concurrencyState)
-        {
-            Filtering = filtering;
-            OpenLog = openLog;
-            LogReload = logReload;
-            DatabaseCoordination = databaseCoordination;
-            CloseCoordinator = closeCoordinator;
-            ConcurrencyState = concurrencyState;
-        }
-
-        public FilteringEffects Filtering { get; }
-
-        public OpenLogEffects OpenLog { get; }
-
-        public LogReloadEffects LogReload { get; }
-
-        public DatabaseCoordinationEffects DatabaseCoordination { get; }
-
-        public LogCloseCoordinator CloseCoordinator { get; }
-
-        public EventLogConcurrencyState ConcurrencyState { get; }
-
-        public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher) =>
-            Filtering.HandleAddEvent(action, dispatcher);
-
-        public Task HandleApplyFilter(ApplyFilterAction action, IDispatcher dispatcher) =>
-            Filtering.HandleApplyFilter(action, dispatcher);
-
-        public Task HandleSetContinuouslyUpdate(SetContinuouslyUpdateAction action, IDispatcher dispatcher) =>
-            Filtering.HandleSetContinuouslyUpdate(action, dispatcher);
-
-        public Task HandleOpenLog(OpenLogAction action, IDispatcher dispatcher) =>
-            OpenLog.HandleOpenLog(action, dispatcher);
-
-        public Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher) =>
-            OpenLog.HandleCloseLog(action, dispatcher);
-
-        public Task HandleCloseAll(IDispatcher dispatcher) => OpenLog.HandleCloseAll(dispatcher);
-
-        public Task HandleLoadEvents(LoadEventsAction action, IDispatcher dispatcher) =>
-            LogReload.HandleLoadEvents(action, dispatcher);
-
-        public Task HandleLoadNewEvents(IDispatcher dispatcher) => LogReload.HandleLoadNewEvents(dispatcher);
-    }
-
     private static EffectsHarness BuildHarness(
         IState<EventLogState> eventLogState,
         IFilterService filterService,
@@ -2012,5 +1956,51 @@ public sealed class EffectsTests
             mockDispatcher);
 
         return (effects, mockDispatcher, mockLogWatcherService, mockResolverCache, mockFilterService);
+    }
+
+    // Wrapper that bundles the post-split effects classes together with their
+    // shared singletons so existing tests keep their `effects.HandleXxx(...)`
+    // call shape. Each method delegates to the appropriate split class.
+    private sealed class EffectsHarness(
+        FilteringEffects filtering,
+        OpenLogEffects openLog,
+        LogReloadEffects logReload,
+        DatabaseCoordinationEffects databaseCoordination,
+        LogCloseCoordinator closeCoordinator,
+        EventLogConcurrencyState concurrencyState)
+    {
+        public LogCloseCoordinator CloseCoordinator { get; } = closeCoordinator;
+
+        public EventLogConcurrencyState ConcurrencyState { get; } = concurrencyState;
+
+        public DatabaseCoordinationEffects DatabaseCoordination { get; } = databaseCoordination;
+
+        public FilteringEffects Filtering { get; } = filtering;
+
+        public LogReloadEffects LogReload { get; } = logReload;
+
+        public OpenLogEffects OpenLog { get; } = openLog;
+
+        public Task HandleAddEvent(AddEventAction action, IDispatcher dispatcher) =>
+            Filtering.HandleAddEvent(action, dispatcher);
+
+        public Task HandleApplyFilter(ApplyFilterAction action, IDispatcher dispatcher) =>
+            Filtering.HandleApplyFilter(action, dispatcher);
+
+        public Task HandleCloseAll(IDispatcher dispatcher) => OpenLog.HandleCloseAll(dispatcher);
+
+        public Task HandleCloseLog(CloseLogAction action, IDispatcher dispatcher) =>
+            OpenLog.HandleCloseLog(action, dispatcher);
+
+        public Task HandleLoadEvents(LoadEventsAction action, IDispatcher dispatcher) =>
+            LogReload.HandleLoadEvents(action, dispatcher);
+
+        public Task HandleLoadNewEvents(IDispatcher dispatcher) => LogReload.HandleLoadNewEvents(dispatcher);
+
+        public Task HandleOpenLog(OpenLogAction action, IDispatcher dispatcher) =>
+            OpenLog.HandleOpenLog(action, dispatcher);
+
+        public Task HandleSetContinuouslyUpdate(SetContinuouslyUpdateAction action, IDispatcher dispatcher) =>
+            Filtering.HandleSetContinuouslyUpdate(action, dispatcher);
     }
 }

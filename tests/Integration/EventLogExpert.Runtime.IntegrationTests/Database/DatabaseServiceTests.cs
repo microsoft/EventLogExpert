@@ -1,8 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
+using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
@@ -54,7 +55,7 @@ public sealed class DatabaseServiceTests : IDisposable
         service.MarkStatus(Constants.TestDb3, DatabaseStatus.UpgradeRequired);
 
         // Act
-        var activeDatabases = service.ActiveDatabases;
+        var activeDatabases = service.Paths;
 
         // Assert: only TestDb1 (TestDb2 disabled, TestDb3 not ready)
         Assert.Single(activeDatabases);
@@ -208,7 +209,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         // ClassificationFailed must be excluded from ActiveDatabases so the resolver pipeline
         // never tries to open the file.
-        Assert.DoesNotContain(lockedPath, service.ActiveDatabases);
+        Assert.DoesNotContain(lockedPath, service.Paths);
     }
 
     [Fact]
@@ -239,7 +240,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var entry = Assert.Single(service.Entries);
         Assert.Equal(DatabaseStatus.UnrecognizedSchema, entry.Status);
-        Assert.DoesNotContain(dbPath, service.ActiveDatabases);
+        Assert.DoesNotContain(dbPath, service.Paths);
     }
 
     [Fact]
@@ -271,22 +272,6 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV3Schema(dbPath);
-
-        var service = CreateDatabaseService();
-
-        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
-
-        var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
-        Assert.False(entry.BackupExists);
-    }
-
-    [Fact]
     public async Task ClassifyEntriesAsync_WhenV3SchemaWithUpgradeBak_ShouldDetectAsUpgradeRequiredAndBackupExistsTrue()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -307,18 +292,18 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
+    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV4Schema(dbPath);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
 
         var service = CreateDatabaseService();
 
         await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
         Assert.False(entry.BackupExists);
     }
 
@@ -340,6 +325,22 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
         Assert.False(File.Exists(bakPath), "Stale .upgrade.bak must be cleaned up once the main file reaches V4.");
+    }
+
+    [Fact]
+    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
+        Assert.False(entry.BackupExists);
     }
 
     [Fact]
@@ -663,6 +664,25 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        service.Toggle(Constants.TestDb1);
+
+        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(1, secondSubscriberInvocations);
+    }
+
+    [Fact]
     public void Entries_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
     {
         // Arrange
@@ -720,25 +740,6 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
         Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
         Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
-    }
-
-    [Fact]
-    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        CreateDatabaseFile(databasePath, Constants.TestDb1);
-
-        var service = CreateDatabaseService();
-
-        var secondSubscriberInvocations = 0;
-
-        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
-        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
-
-        service.Toggle(Constants.TestDb1);
-
-        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
-        Assert.Equal(1, secondSubscriberInvocations);
     }
 
     [Fact]
@@ -1316,7 +1317,7 @@ public sealed class DatabaseServiceTests : IDisposable
         var prefs = Substitute.For<IDatabasePreferencesProvider>();
         prefs.DisabledDatabasesPreference.Returns([]);
         var maintenance = _maintenance;
-        var entryStore = new DatabaseEntryStore(fileLocationOptions, prefs, throwingLogger);
+        var entryStore = new DatabaseRegistry(fileLocationOptions, prefs, throwingLogger);
         entryStore.Refresh();
 
         var classification =
@@ -2461,7 +2462,7 @@ public sealed class DatabaseServiceTests : IDisposable
 
         var logger = traceLogger ?? Substitute.For<ITraceLogger>();
         var maintenance = _maintenance;
-        var entryStore = new DatabaseEntryStore(fileLocationOptions, prefs, logger);
+        var entryStore = new DatabaseRegistry(fileLocationOptions, prefs, logger);
         entryStore.Refresh();
         var classification = new DatabaseClassificationService(entryStore, fileLocationOptions, maintenance, logger);
 

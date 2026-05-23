@@ -35,18 +35,16 @@ public sealed record MenuItem
     public bool IsDanger { get; init; }
 
     /// <summary>
-    ///     Optional explanation surfaced to assistive tech (and as a hover title) when
-    ///     <see cref="IsEnabled" /> is <c>false</c>. Items with a non-null reason participate in
-    ///     roving focus and type-ahead so keyboard / screen-reader users can discover that the
-    ///     option exists; activation is still blocked. Use for "not available because X" cases
+    ///     Optional explanation surfaced to assistive tech (and as a hover title) when <see cref="IsEnabled" /> is
+    ///     <c>false</c>. Items with a non-null reason participate in roving focus and type-ahead so keyboard / screen-reader
+    ///     users can discover that the option exists; activation is still blocked. Use for "not available because X" cases
     ///     where users need to know the option is there (e.g., "Cached — empty: add filters first").
     /// </summary>
     public string? DisabledReason { get; init; }
 
     /// <summary>
-    ///     True when the item should participate in roving focus / type-ahead. Enabled items are
-    ///     always focusable; disabled items are focusable only when they expose a
-    ///     <see cref="DisabledReason" /> (informative-disabled pattern).
+    ///     True when the item should participate in roving focus / type-ahead. Enabled items are always focusable;
+    ///     disabled items are focusable only when they expose a <see cref="DisabledReason" /> (informative-disabled pattern).
     /// </summary>
     public bool IsFocusable => !IsSeparator && (IsEnabled || DisabledReason is not null);
 

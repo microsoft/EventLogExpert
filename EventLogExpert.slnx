@@ -16,9 +16,11 @@
     <Project Path="src/EventLogExpert.UI/EventLogExpert.UI.csproj" />
     <Project Path="src/EventLogExpert.Runtime/EventLogExpert.Runtime.csproj" />
     <Project Path="src/EventLogExpert.Eventing/EventLogExpert.Eventing.csproj" />
+    <Project Path="src/EventLogExpert.Logging/EventLogExpert.Logging.csproj" />
+    <Project Path="src/EventLogExpert.Provider/EventLogExpert.Provider.csproj" />
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
-    <Project Path="src/EventLogExpert.ProviderDatabase/EventLogExpert.ProviderDatabase.csproj" />
+    <Project Path="src/EventLogExpert.Provider.Database/EventLogExpert.Provider.Database.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
@@ -26,14 +28,15 @@
     <Project Path="tests/Unit/EventLogExpert.Eventing.Tests/EventLogExpert.Eventing.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Runtime.Tests/EventLogExpert.Runtime.Tests.csproj" />
     <Project Path="tests/Unit/EventLogExpert.Filtering.Tests/EventLogExpert.Filtering.Tests.csproj" />
-    <Project Path="tests/Unit/EventLogExpert.ProviderDatabase.Tests/EventLogExpert.ProviderDatabase.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Provider.Database.Tests/EventLogExpert.Provider.Database.Tests.csproj" />
+    <Project Path="tests/Unit/EventLogExpert.Provider.Tests/EventLogExpert.Provider.Tests.csproj" />
   </Folder>
   <Folder Name="/tests/Integration/">
     <Project Path="tests/Integration/EventLogExpert.EventDbTool.IntegrationTests/EventLogExpert.EventDbTool.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Eventing.IntegrationTests/EventLogExpert.Eventing.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Filtering.IntegrationTests/EventLogExpert.Filtering.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
-    <Project Path="tests/Integration/EventLogExpert.ProviderDatabase.IntegrationTests/EventLogExpert.ProviderDatabase.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/EventLogExpert.Provider.Database.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.UI.IntegrationTests/EventLogExpert.UI.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Shared/">

@@ -15,9 +15,9 @@
             tabindex="-1">
             <MenuRenderer InitialFocusIndex="@(MenuService.ActiveFocusFirst ? 0 : -1)"
                 Items="MenuService.ActiveItems"
-                @key="MenuService.ActiveMenuId"
                 OnActivated="HandleActivated"
-                OnNavigateBar="HandleNavigateBar" />
+                OnNavigateBar="HandleNavigateBar"
+                @key="MenuService.ActiveMenuId" />
         </div>
     </div>
 }

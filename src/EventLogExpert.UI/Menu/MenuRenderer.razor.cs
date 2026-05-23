@@ -20,9 +20,8 @@ public sealed partial class MenuRenderer
     private static long s_rendererIdCounter;
 
     private readonly long _rendererId = Interlocked.Increment(ref s_rendererIdCounter);
-
-    private int _focusedIndex = -1;
     private bool _focusOnNextRender;
+    private int _focusedIndex = -1;
     private ElementReference[] _itemElements = [];
     private MenuItem? _openItem;
     private bool _openSubmenuFocusesFirstChild;

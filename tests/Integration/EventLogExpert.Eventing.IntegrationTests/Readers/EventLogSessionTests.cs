@@ -93,6 +93,26 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
+    public void GetLogNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        var session = EventLogSession.GlobalSession;
+
+        // Act
+        var logNames1 = session.GetLogNames().ToList();
+        var logNames2 = session.GetLogNames().ToList();
+
+        // Assert
+        Assert.Equal(logNames1.Count, logNames2.Count);
+
+        // All names from first call should be in second call
+        foreach (var name in logNames1)
+        {
+            Assert.Contains(name, logNames2);
+        }
+    }
+
+    [Fact]
     public void GetLogNames_WhenCalled_AllNamesShouldBeNonEmpty()
     {
         // Arrange
@@ -196,26 +216,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetLogNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var logNames1 = session.GetLogNames().ToList();
-        var logNames2 = session.GetLogNames().ToList();
-
-        // Assert
-        Assert.Equal(logNames1.Count, logNames2.Count);
-
-        // All names from first call should be in second call
-        foreach (var name in logNames1)
-        {
-            Assert.Contains(name, logNames2);
-        }
-    }
-
-    [Fact]
     public async Task GetLogNames_WhenConcurrentAccess_ShouldHandleMultipleThreads()
     {
         // Arrange
@@ -252,6 +252,26 @@ public sealed class EventLogSessionTests
         // Assert
         Assert.NotEmpty(logNames);
         Assert.NotEmpty(providers);
+    }
+
+    [Fact]
+    public void GetProviderNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
+    {
+        // Arrange
+        var session = EventLogSession.GlobalSession;
+
+        // Act
+        var providers1 = session.GetProviderNames();
+        var providers2 = session.GetProviderNames();
+
+        // Assert
+        Assert.Equal(providers1.Count, providers2.Count);
+
+        // All providers from first call should be in second call
+        foreach (var provider in providers1)
+        {
+            Assert.Contains(provider, providers2);
+        }
     }
 
     [Fact]
@@ -330,26 +350,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GetProviderNames_WhenCalledMultipleTimes_ShouldReturnConsistentResults()
-    {
-        // Arrange
-        var session = EventLogSession.GlobalSession;
-
-        // Act
-        var providers1 = session.GetProviderNames();
-        var providers2 = session.GetProviderNames();
-
-        // Assert
-        Assert.Equal(providers1.Count, providers2.Count);
-
-        // All providers from first call should be in second call
-        foreach (var provider in providers1)
-        {
-            Assert.Contains(provider, providers2);
-        }
-    }
-
-    [Fact]
     public async Task GetProviderNames_WhenConcurrentAccess_ShouldHandleMultipleThreads()
     {
         // Arrange
@@ -374,16 +374,6 @@ public sealed class EventLogSessionTests
     }
 
     [Fact]
-    public void GlobalSession_WhenAccessed_ShouldNotBeNull()
-    {
-        // Arrange & Act
-        var session = EventLogSession.GlobalSession;
-
-        // Assert
-        Assert.NotNull(session);
-    }
-
-    [Fact]
     public void GlobalSession_WhenAccessedMultipleTimes_ShouldReturnSameInstance()
     {
         // Arrange & Act
@@ -394,6 +384,16 @@ public sealed class EventLogSessionTests
         Assert.NotNull(session1);
         Assert.NotNull(session2);
         Assert.Same(session1, session2);
+    }
+
+    [Fact]
+    public void GlobalSession_WhenAccessed_ShouldNotBeNull()
+    {
+        // Arrange & Act
+        var session = EventLogSession.GlobalSession;
+
+        // Assert
+        Assert.NotNull(session);
     }
 
     [Fact]

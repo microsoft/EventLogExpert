@@ -3,5 +3,6 @@
 
 global using Xunit;
 
-[assembly: AssemblyFixture(typeof(
-    EventLogExpert.Runtime.IntegrationTests.ContainerRequiredFixture))]
+using EventLogExpert.Runtime.IntegrationTests;
+
+[assembly: AssemblyFixture(typeof(ContainerRequiredFixture))]

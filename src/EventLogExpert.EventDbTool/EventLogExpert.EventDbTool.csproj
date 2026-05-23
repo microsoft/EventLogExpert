@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -14,7 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EventLogExpert.Eventing\EventLogExpert.Eventing.csproj" />
-    <ProjectReference Include="..\EventLogExpert.ProviderDatabase\EventLogExpert.ProviderDatabase.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Provider.Database\EventLogExpert.Provider.Database.csproj" />
   </ItemGroup>
 
 </Project>

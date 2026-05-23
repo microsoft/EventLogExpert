@@ -1,7 +1,9 @@
-﻿// // Copyright (c) Microsoft Corporation.
+// // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.EventDbTool.Commands;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Sinks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.CommandLine;
@@ -15,6 +17,14 @@ internal class Program
         new ServiceCollection()
             .AddSingleton<ITraceLogger>(new TraceLogger(verbose ? LogLevel.Trace : LogLevel.Information))
             .BuildServiceProvider();
+
+    private static bool IsElevated()
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+
+        return new WindowsPrincipal(identity)
+            .IsInRole(WindowsBuiltInRole.Administrator);
+    }
 
     private static async Task<int> Main(string[] args)
     {
@@ -34,13 +44,5 @@ internal class Program
         rootCommand.Subcommands.Add(UpgradeDatabaseCommand.GetCommand());
 
         return await rootCommand.Parse(args).InvokeAsync();
-    }
-
-    private static bool IsElevated()
-    {
-        using var identity = WindowsIdentity.GetCurrent();
-
-        return new WindowsPrincipal(identity)
-            .IsInRole(WindowsBuiltInRole.Administrator);
     }
 }

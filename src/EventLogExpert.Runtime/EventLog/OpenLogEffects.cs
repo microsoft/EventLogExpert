@@ -4,11 +4,10 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
-using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Runtime.StatusBar;
@@ -39,16 +38,16 @@ internal sealed class OpenLogEffects(
 
     private readonly IBannerService _bannerService = bannerService;
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
+    private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly IDatabaseService _databaseService = databaseService;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly Lock _globalCtsLock = new();
     private readonly ConcurrentDictionary<EventLogId, CancellationTokenSource> _logCts = new();
-    private readonly ITraceLogger _logger = logger;
     private readonly ConcurrentDictionary<EventLogId, TaskCompletionSource> _logLoadCompletions = new();
     private readonly ILogWatcherService _logWatcherService = logWatcherService;
+    private readonly ITraceLogger _logger = logger;
     private readonly IEventResolverCache _resolverCache = resolverCache;
     private readonly IServiceScopeFactory _serviceScopeFactory = serviceScopeFactory;
-    private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly IEventXmlResolver _xmlResolver = xmlResolver;
 
     private long _cancelToken;

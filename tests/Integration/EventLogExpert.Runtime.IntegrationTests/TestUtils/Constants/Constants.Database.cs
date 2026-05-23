@@ -17,11 +17,11 @@ public sealed partial class Constants
     public const string Server2 = "Server 2";
     public const string Server20 = "Server 20";
     public const string SimpleDatabase = "SimpleDatabase";
-    public const string Windows10 = "Windows 10";
-    public const string Windows11 = "Windows 11";
 
     // Test database file names
     public const string TestDb1 = "TestDb1.db";
     public const string TestDb2 = "TestDb2.db";
     public const string TestDb3 = "TestDb3.db";
+    public const string Windows10 = "Windows 10";
+    public const string Windows11 = "Windows 11";
 }

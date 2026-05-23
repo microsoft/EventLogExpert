@@ -4,11 +4,10 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Runtime.LogTable;
-using EventLogExpert.Runtime.Tests.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using EventLogExpert.Filtering.TestUtils;
 using EventLogExpert.Filtering.TestUtils.Constants;
+using EventLogExpert.Runtime.LogTable;
+using EventLogExpert.Runtime.Tests.TestUtils.Constants;
 using System.Collections.Immutable;
 using CloseLogAction = EventLogExpert.Runtime.LogTable.CloseLogAction;
 using Reducers = EventLogExpert.Runtime.LogTable.Reducers;

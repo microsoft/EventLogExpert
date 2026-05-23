@@ -102,18 +102,8 @@ public sealed class EventXmlResolver : IEventXmlResolver
         return AwaitLazyAsync(lazy, cancellationToken);
     }
 
-    private static async ValueTask<string> AwaitLazyAsync(Lazy<Task<string>> lazy, CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Caller-side cancel: leave the entry in place so other waiters can observe the result.
-            throw;
-        }
-    }
+    private static async ValueTask<string> AwaitLazyAsync(Lazy<Task<string>> lazy, CancellationToken cancellationToken) =>
+        await lazy.Value.WaitAsync(cancellationToken).ConfigureAwait(false);
 
     private static string DefaultResolveStrategy(string owningLog, long recordId, LogPathType pathType)
     {

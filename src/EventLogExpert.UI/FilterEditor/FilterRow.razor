@@ -103,7 +103,7 @@
     <div class="flex-column">
         @foreach (var item in Filter.SubFilters)
         {
-            <SubFilterRow @key="item.Id" OnRemove="RemoveSubFilter" Value="@item" />
+            <SubFilterRow OnRemove="RemoveSubFilter" Value="@item" @key="item.Id" />
         }
     </div>
 }

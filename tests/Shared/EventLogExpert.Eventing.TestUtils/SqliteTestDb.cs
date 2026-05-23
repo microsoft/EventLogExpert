@@ -11,9 +11,9 @@ public static class SqliteTestDb
     /// <summary>Deletes a SQLite test database file with retries, after first releasing pooled SqliteConnection handles.</summary>
     /// <remarks>
     ///     <para>
-    ///         ProviderDbContext uses EF Core's default pooled
-    ///         SqliteConnection. Without <see cref="SqliteConnection.ClearAllPools" /> the pooled handle still owns the file
-    ///         after the context is disposed and <see cref="File.Delete" /> hits a sharing violation.
+    ///         ProviderDbContext uses EF Core's default pooled SqliteConnection. Without
+    ///         <see cref="SqliteConnection.ClearAllPools" /> the pooled handle still owns the file after the context is
+    ///         disposed and <see cref="File.Delete" /> hits a sharing violation.
     ///     </para>
     ///     <para>
     ///         <see cref="SqliteConnection.ClearAllPools" /> mutates process-wide state, so it must only be called from a
@@ -72,7 +72,8 @@ public static class SqliteTestDb
         {
             try
             {
-                Directory.Delete(path, recursive: true);
+                Directory.Delete(path, true);
+
                 return;
             }
             catch (IOException) when (i < maxAttempts - 1)

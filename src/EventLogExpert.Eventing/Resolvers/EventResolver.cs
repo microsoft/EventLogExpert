@@ -1,12 +1,14 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.Databases;
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
-using EventLogExpert.Eventing.Providers;
+using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Lookup;
+using EventLogExpert.Provider.Models;
+using EventLogExpert.Provider.Resolution;
+using EventLogExpert.Provider.Schema;
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 
@@ -24,19 +26,19 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
     private readonly ConcurrentDictionary<string, Lazy<bool>> _resolutionGates = new(StringComparer.OrdinalIgnoreCase);
     private readonly ConcurrentDictionary<string, ProviderDetails?> _supplementalDetails =
         new(StringComparer.OrdinalIgnoreCase);
-    
+
     private ImmutableArray<string> _metadataPaths = [];
     private ImmutableArray<IProviderDetailsLookup> _providerLookups = [];
 
     public EventResolver(
-        IActiveDatabasePathsProvider? dbCollection = null,
+        IActiveDatabases? dbCollection = null,
         IEventResolverCache? cache = null,
         ITraceLogger? logger = null,
         IProviderDetailsLookupFactory? factory = null) : base(cache, logger)
     {
         _lookupFactory = factory;
 
-        if (dbCollection is not null && !dbCollection.ActiveDatabases.IsEmpty)
+        if (dbCollection is not null && !dbCollection.Paths.IsEmpty)
         {
             if (factory is null)
             {
@@ -44,7 +46,7 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
                     $"An {nameof(IProviderDetailsLookupFactory)} is required when active database paths are provided.");
             }
 
-            LoadDatabases(dbCollection.ActiveDatabases);
+            LoadDatabases(dbCollection.Paths);
         }
 
         Logger?.Debug($"{nameof(EventResolver)} was instantiated.");
@@ -164,13 +166,13 @@ public sealed class EventResolver : EventResolverBase, IEventResolver
                     throw new FileNotFoundException(file);
                 }
 
-                var lookup = _lookupFactory!.Create(file, Logger);
+                var lookup = _lookupFactory!.Create(file);
 
                 try
                 {
                     var state = lookup.IsUpgradeNeeded();
 
-                    if (state.CurrentVersion == ProviderDatabaseSchemaVersion.Unknown)
+                    if (state.CurrentVersion == DatabaseSchemaVersion.Unknown)
                     {
                         unknownDbs.Add(file);
                         lookup.Dispose();

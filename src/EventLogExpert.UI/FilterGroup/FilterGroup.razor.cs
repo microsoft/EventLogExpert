@@ -28,13 +28,13 @@ public sealed partial class FilterGroup
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
-    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
-
-    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
-
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
     [Inject] private IFileSaveService FileSaveService { get; init; } = null!;
+
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
+
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     protected override void OnParametersSet()
     {

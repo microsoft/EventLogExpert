@@ -129,8 +129,8 @@
         <div aria-hidden="true" class="inline-alert-overlay"></div>
 
         <section aria-describedby="@_inlineAlertMessageId"
-            aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
             aria-label="@(string.IsNullOrEmpty(InlineAlert!.Title) ? "Alert" : null)"
+            aria-labelledby="@(string.IsNullOrEmpty(InlineAlert!.Title) ? null : _inlineAlertTitleId)"
             aria-modal="true"
             class="inline-alert"
             role="alertdialog">
@@ -144,9 +144,9 @@
             @if (InlineAlert.IsPrompt)
             {
                 <input aria-label="@(string.IsNullOrEmpty(InlineAlert.Title) ? InlineAlert.Message : InlineAlert.Title)"
-                    class="inline-alert-input"
                     @bind="_inlineAlertPromptValue"
                     @bind:event="oninput"
+                    class="inline-alert-input"
                     @ref="_inlineAlertInputRef"
                     type="text" />
             }

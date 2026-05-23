@@ -9,8 +9,8 @@
         OnAccept="ApplyAsync"
         OnCancel="HandleCancelOrEscAsync"
         OnDialogClosedByUser="HandleCancelOrEscAsync"
-        @ref="_chrome"
-        Title="Database upgrade recovery">
+        Title="Database upgrade recovery"
+        @ref="_chrome">
         <p class="recovery-description">
             @(_entries.Count == 1
                 ? "The following database had its upgrade interrupted."

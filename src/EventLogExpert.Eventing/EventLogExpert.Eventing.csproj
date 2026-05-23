@@ -10,6 +10,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\EventLogExpert.Logging\EventLogExpert.Logging.csproj" />
+    <ProjectReference Include="..\EventLogExpert.Provider\EventLogExpert.Provider.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <InternalsVisibleTo Include="EventLogExpert.Eventing.Tests" />
     <InternalsVisibleTo Include="EventLogExpert.Eventing.IntegrationTests" />
   </ItemGroup>

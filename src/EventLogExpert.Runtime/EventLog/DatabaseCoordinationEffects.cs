@@ -3,7 +3,7 @@
 
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using Fluxor;
 using IDispatcher = Fluxor.IDispatcher;
 

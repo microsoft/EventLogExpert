@@ -29,7 +29,7 @@ public sealed class AlertDialogService(
         ShowAlert(title, message, cancel, AlertPresentation.Auto);
 
     public Task ShowAlert(string title, string message, string cancel, AlertPresentation presentation) =>
-        ShowAlertCore(title, message, accept: null, cancel, presentation);
+        ShowAlertCore(title, message, null, cancel, presentation);
 
     public Task<bool> ShowAlert(string title, string message, string accept, string cancel) =>
         ShowAlert(title, message, accept, cancel, AlertPresentation.Auto);

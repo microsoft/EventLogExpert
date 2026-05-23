@@ -14,7 +14,7 @@ public sealed class EventXmlResolverTests
     {
         var resolver = CreateTrackingResolver(_ => "<xml/>", out var getResolveCallCount);
 
-        var evt = CreateEvent(recordId: 1);
+        var evt = CreateEvent(1);
         await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
         Assert.Equal(1, getResolveCallCount());
 
@@ -31,9 +31,9 @@ public sealed class EventXmlResolverTests
             key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>",
             out var getResolveCallCount);
 
-        var evtA1 = CreateEvent(recordId: 1, owningLog: "A");
-        var evtA2 = CreateEvent(recordId: 2, owningLog: "A");
-        var evtB1 = CreateEvent(recordId: 1, owningLog: "B");
+        var evtA1 = CreateEvent(1, "A");
+        var evtA2 = CreateEvent(2, "A");
+        var evtB1 = CreateEvent(1, "B");
 
         await resolver.GetXmlAsync(evtA1, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtA2, TestContext.Current.CancellationToken);
@@ -59,12 +59,12 @@ public sealed class EventXmlResolverTests
         var resolver = CreateBoundedTrackingResolver(
             key => $"<xml log='{key.OwningLog}' id='{key.RecordId}'/>",
             out var getResolveCallCount,
-            initialCapacity: 2,
-            maxCapacity: 2);
+            2,
+            2);
 
-        var evtA = CreateEvent(recordId: 1, owningLog: "A");
-        var evtB = CreateEvent(recordId: 2, owningLog: "B");
-        var evtC = CreateEvent(recordId: 3, owningLog: "C");
+        var evtA = CreateEvent(1, "A");
+        var evtB = CreateEvent(2, "B");
+        var evtC = CreateEvent(3, "C");
 
         await resolver.GetXmlAsync(evtA, TestContext.Current.CancellationToken);
         await resolver.GetXmlAsync(evtB, TestContext.Current.CancellationToken);
@@ -85,7 +85,7 @@ public sealed class EventXmlResolverTests
     [Fact]
     public async Task GetXmlAsync_ConcurrentRequestsForSameKey_ResolveOnce()
     {
-        using var gate = new ManualResetEventSlim(initialState: false);
+        using var gate = new ManualResetEventSlim(false);
         var resolver = CreateTrackingResolver(
             _ =>
             {
@@ -95,7 +95,7 @@ public sealed class EventXmlResolverTests
             },
             out var getResolveCallCount);
 
-        var evt = CreateEvent(recordId: 7);
+        var evt = CreateEvent(7);
 
         var t1 = resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken).AsTask();
         var t2 = resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken).AsTask();
@@ -114,7 +114,7 @@ public sealed class EventXmlResolverTests
         var resolver = CreateTrackingResolver(
             key => $"<xml id='{key.RecordId}'/>",
             out var getResolveCallCount);
-        var evt = CreateEvent(recordId: 42);
+        var evt = CreateEvent(42);
 
         var first = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
         var second = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
@@ -128,7 +128,7 @@ public sealed class EventXmlResolverTests
     public async Task GetXmlAsync_WhenEventHasPreRenderedXml_ReturnsItWithoutResolving()
     {
         var resolver = CreateTrackingResolver(_ => "should-not-be-called", out var getResolveCallCount);
-        var evt = CreateEvent(recordId: 1) with { Xml = "<pre-rendered/>" };
+        var evt = CreateEvent(1) with { Xml = "<pre-rendered/>" };
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
@@ -140,7 +140,7 @@ public sealed class EventXmlResolverTests
     public async Task GetXmlAsync_WhenOwningLogIsEmpty_ReturnsEmptyWithoutResolving()
     {
         var resolver = CreateTrackingResolver(_ => "x", out var getResolveCallCount);
-        var evt = CreateEvent(recordId: 1, owningLog: string.Empty);
+        var evt = CreateEvent(1, string.Empty);
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
@@ -152,7 +152,7 @@ public sealed class EventXmlResolverTests
     public async Task GetXmlAsync_WhenRecordIdIsNull_ReturnsEmptyWithoutResolving()
     {
         var resolver = CreateTrackingResolver(_ => "x", out var getResolveCallCount);
-        var evt = CreateEvent(recordId: null);
+        var evt = CreateEvent(null);
 
         var result = await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken);
 
@@ -173,7 +173,7 @@ public sealed class EventXmlResolverTests
             },
             out _);
 
-        var evt = CreateEvent(recordId: 99);
+        var evt = CreateEvent(99);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await resolver.GetXmlAsync(evt, TestContext.Current.CancellationToken));

@@ -2,10 +2,10 @@
 // // Licensed under the MIT License.
 
 using Bunit;
-using EventLogExpert.UI.Database;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -47,7 +47,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _bannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
@@ -75,7 +75,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
         _bannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
@@ -90,7 +90,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
@@ -107,7 +107,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
         _bannerService.ClearReceivedCalls();
@@ -129,7 +129,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
         await component.InvokeAsync(() => _capturedRecoveryAction!());
@@ -140,7 +140,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
@@ -160,7 +160,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
 
@@ -175,7 +175,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_Disposed_NoLongerRespondsToEntriesChanged()
     {
         // Arrange
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
 
@@ -184,7 +184,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
 
         // Act
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
@@ -202,7 +202,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
 
@@ -235,7 +235,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         Render<DatabaseRecoveryHost>();
         _bannerService.ClearReceivedCalls();
@@ -259,7 +259,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         Render<DatabaseRecoveryHost>();
 
@@ -267,7 +267,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         var newId = BannerId.Create();
         _nextBannerId = newId;
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
@@ -283,7 +283,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_EntriesChanged_SameBackupSet_DoesNotDismissOrReprompt()
     {
         // Arrange
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         Render<DatabaseRecoveryHost>();
         _bannerService.ClearReceivedCalls();
@@ -307,14 +307,14 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
         Render<DatabaseRecoveryHost>();
 
         // Act
         var newId = BannerId.Create();
         _nextBannerId = newId;
-        _databaseService.Entries.Returns([BuildEntry("b.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("b.db", true)]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
@@ -331,7 +331,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     {
         // Arrange
         _databaseService.Entries.Returns(
-            [BuildEntry("a.db", backupExists: true), BuildEntry("b.db", backupExists: true)]);
+            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
         // Act
         Render<DatabaseRecoveryHost>();
@@ -348,7 +348,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_OnInit_WithBackupExistsEntries_RaisesErrorBanner()
     {
         // Arrange
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         // Act
         Render<DatabaseRecoveryHost>();
@@ -365,7 +365,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public void DatabaseRecoveryHost_OnInit_WithNoBackupExistsEntries_DoesNotRaiseBanner()
     {
         // Arrange
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: false)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", false)]);
 
         // Act
         Render<DatabaseRecoveryHost>();
@@ -382,7 +382,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     public async Task DatabaseRecoveryHost_ResolveActionClicked_OpensDialog()
     {
         // Arrange
-        _databaseService.Entries.Returns([BuildEntry("a.db", backupExists: true)]);
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         var component = Render<DatabaseRecoveryHost>();
 
@@ -400,7 +400,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         new(
             fileName,
             $@"C:\dbs\{fileName}",
-            IsEnabled: false,
+            false,
             DatabaseStatus.UpgradeRequired,
-            BackupExists: backupExists);
+            backupExists);
 }

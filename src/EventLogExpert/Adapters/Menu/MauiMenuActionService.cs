@@ -1,22 +1,22 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.DebugLog;
-using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Update;
 using EventLogExpert.Eventing.Common.Channels;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
-using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Common.Versioning;
+using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
+using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.Settings;
+using EventLogExpert.UI.Update;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Application = Microsoft.Maui.Controls.Application;

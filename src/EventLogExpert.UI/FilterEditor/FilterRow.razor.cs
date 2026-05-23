@@ -61,15 +61,15 @@ public sealed partial class FilterRow : FilterRowBase<SavedFilter?>
         }
     }
 
-    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
-
-    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
-
     private string ErrorMessage { get; set; } = string.Empty;
 
     private FilterDraft? Filter { get; set; }
 
     [Inject] private IState<FilterCacheState> FilterCacheState { get; init; } = null!;
+
+    [Inject] private IFilterGroupCommands FilterGroupCommands { get; init; } = null!;
+
+    [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     private bool IsPending => Value is null && PendingDraft is not null;
 

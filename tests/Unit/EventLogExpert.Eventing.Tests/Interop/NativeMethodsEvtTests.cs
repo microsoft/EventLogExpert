@@ -234,7 +234,7 @@ public sealed class NativeMethodsEvtTests
     public void ConvertVariant_WhenHexInt32_ShouldReturnInt32()
     {
         // Arrange
-        int expectedValue = unchecked((int)0x1234ABCD);
+        int expectedValue = unchecked(0x1234ABCD);
         var variant = CreateVariant(EvtVariantType.HexInt32, expectedValue);
 
         // Act

@@ -1,5 +1,3 @@
-@using EventLogExpert.Filtering.Persistence
-
 @if (!string.IsNullOrEmpty(OuterCssClass))
 {
     <div class="@OuterCssClass">
@@ -32,10 +30,10 @@ else
                     if (!Filter.IsExcluded)
                     {
                         <ValueSelect AriaLabel="Highlight Color"
-                            @bind-Value="Filter.Color"
                             CssClass="input color-dropdown"
                             DataHighlight="@Filter.Color.ToCssName()"
-                            T="HighlightColor">
+                            T="HighlightColor"
+                            @bind-Value="Filter.Color">
                             @foreach (var item in Enum.GetValues<HighlightColor>())
                             {
                                 <ValueSelectItem CssClass="color-dropdown-item"

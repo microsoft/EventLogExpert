@@ -1,8 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Filtering.Parsing;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Parsing;
 using System.Diagnostics.CodeAnalysis;
 
 namespace EventLogExpert.Filtering;

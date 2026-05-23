@@ -12,7 +12,7 @@ public sealed class FilterDraftModeTests
     public void ApplyModeSwitch_AdvancedToBasic_DecomposableText_HydratesStructure()
     {
         var draft = new FilterDraft
-            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -121,7 +121,7 @@ public sealed class FilterDraftModeTests
     public void ApplyModeSwitch_CachedToAdvanced_PreservesText()
     {
         var draft = new FilterDraft
-            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Advanced);
 
@@ -133,7 +133,7 @@ public sealed class FilterDraftModeTests
     public void ApplyModeSwitch_CachedToBasic_DecomposableText_HydratesStructure()
     {
         var draft = new FilterDraft
-            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         draft.ApplyModeSwitch(FilterMode.Basic);
 
@@ -232,7 +232,7 @@ public sealed class FilterDraftModeTests
         // L4b intent guard: even when the text decomposes cleanly, an Advanced-mode draft saves as Advanced.
         // The row reopens on the Advanced surface on next edit, no silent surface flip.
         var draft = new FilterDraft
-            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
 
@@ -342,7 +342,7 @@ public sealed class FilterDraftModeTests
     public void TryBuildSavedFilter_CachedMode_WithText_ProducesCachedSavedFilter()
     {
         var draft = new FilterDraft
-            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         bool ok = draft.TryBuildSavedFilter(out var saved, out string error);
 
@@ -356,7 +356,7 @@ public sealed class FilterDraftModeTests
     public void WouldLoseDataSwitchingTo_AdvancedToBasic_DecomposableText_IsFalse()
     {
         var draft = new FilterDraft
-            { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Advanced, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Basic));
     }
@@ -481,7 +481,7 @@ public sealed class FilterDraftModeTests
     {
         // Cached → Advanced is loss-free: the text is preserved verbatim as the Advanced expression.
         var draft = new FilterDraft
-            { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
+        { Mode = FilterMode.Cached, ComparisonText = FilterTestConstants.FilterIdEquals100 };
 
         Assert.False(draft.WouldLoseDataSwitchingTo(FilterMode.Advanced));
     }

@@ -7,7 +7,7 @@
         aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)" aria-labelledby="@AriaLabelledBy"
         class="@CssClass" data-highlight="@DataHighlight" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
 
-    <div class="dropdown-list" id="@_itemId" role="listbox" aria-multiselectable="@(IsMultiSelect ? "true" : null)" tabindex="-1">
+    <div aria-multiselectable="@(IsMultiSelect ? "true" : null)" class="dropdown-list" id="@_itemId" role="listbox" tabindex="-1">
         <CascadingValue Value="this">
             @ChildContent
         </CascadingValue>

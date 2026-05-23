@@ -5,7 +5,7 @@ using Microsoft.Win32.SafeHandles;
 
 namespace EventLogExpert.Eventing.Interop;
 
-internal sealed partial class EvtHandle : SafeHandleZeroOrMinusOneIsInvalid
+internal sealed class EvtHandle : SafeHandleZeroOrMinusOneIsInvalid
 {
     // Must be public for P/Invoke to work
     public EvtHandle() : base(true) { }

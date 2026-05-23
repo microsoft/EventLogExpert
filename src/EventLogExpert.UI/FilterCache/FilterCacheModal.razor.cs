@@ -1,10 +1,10 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.Modal;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.FilterCache;
+using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using System.Text.Json;

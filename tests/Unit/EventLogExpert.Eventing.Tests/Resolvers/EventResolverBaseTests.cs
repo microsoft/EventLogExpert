@@ -2,12 +2,12 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Interop;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
 using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Eventing.TestUtils.Constants;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Models;
 using NSubstitute;
 using System.Collections.Concurrent;
 
@@ -45,9 +45,9 @@ public sealed class EventResolverBaseTests
         // Arrange - %%1053 is Win32 error 1053 (service timeout)
         // When provider has no parameter files, should fallback to FormatMessage
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Service failed: %%1053",
-            template: """<template><data name="Service" inType="win:UnicodeString"/></template>""",
-            properties: ["TestService"]);
+            "Service failed: %%1053",
+            """<template><data name="Service" inType="win:UnicodeString"/></template>""",
+            ["TestService"]);
 
         // Clear parameters to simulate MTA provider without parameter files
         details.Parameters = [];
@@ -554,15 +554,15 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - template has 3 data elements, only first has outType
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Status: %1, Joined: %2, Licensed: %3",
-            template: """
+            "Status: %1, Joined: %2, Licensed: %3",
+            """
                 <template>
                   <data name="Status" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="Joined" inType="win:Boolean"/>
                   <data name="Licensed" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: ["Enabled", "True", "1"]);
+            ["Enabled", "True", "1"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -582,9 +582,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - template has a <dataSource> tag that should not be counted as <data>
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Value: %1",
-            template: "<template><dataSource name=\"src\"/><data name=\"Value\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>",
-            properties: ["TestValue"]);
+            "Value: %1",
+            "<template><dataSource name=\"src\"/><data name=\"Value\" inType=\"win:UnicodeString\" outType=\"xs:string\"/></template>",
+            ["TestValue"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -673,7 +673,7 @@ public sealed class EventResolverBaseTests
             Tasks = new Dictionary<int, string>()
         };
 
-        var resolver = new SupplementalTestResolver([primaryDetails], supplemental: null);
+        var resolver = new SupplementalTestResolver([primaryDetails], null);
 
         var eventRecord = new EventRecord
         {
@@ -969,14 +969,14 @@ public sealed class EventResolverBaseTests
         // Arrange - first data element has no outType, second has HexInt32
         // Verifies outType alignment isn't shifted when earlier elements lack outType
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Name: %1, Code: %2",
-            template: """
+            "Name: %1, Code: %2",
+            """
                 <template>
                   <data name="Name" inType="win:UnicodeString"/>
                   <data name="Code" inType="win:UInt32" outType="win:HexInt32"/>
                 </template>
                 """,
-            properties: ["TestApp", 255]);
+            ["TestApp", 255]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -995,9 +995,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - Even if outType says hex, string properties should not get "0x" prefix
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Value: %1",
-            template: """<template><data name="Value" inType="win:UnicodeString" outType="win:HexInt32"/></template>""",
-            properties: ["SomeStringValue"]);
+            "Value: %1",
+            """<template><data name="Value" inType="win:UnicodeString" outType="win:HexInt32"/></template>""",
+            ["SomeStringValue"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1015,9 +1015,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Error code: %1",
-            template: "<template><data name=\"ErrorCode\" outType=\"win:HexInt32\"/></template>",
-            properties: [255]);
+            "Error code: %1",
+            "<template><data name=\"ErrorCode\" outType=\"win:HexInt32\"/></template>",
+            [255]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1035,8 +1035,8 @@ public sealed class EventResolverBaseTests
         // Arrange - template has a hidden length field followed by a hex-formatted property.
         // The outType for the property AFTER the hidden field must align correctly.
         var (details, _) = EventUtils.CreateModernEvent(
-            description: "Name: %1, Data: %2, Code: %3",
-            template: """
+            "Name: %1, Data: %2, Code: %3",
+            """
                 <template>
                   <data name="Name" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="__binLength" inType="win:UInt32" outType="xs:unsignedInt"/>
@@ -1044,7 +1044,7 @@ public sealed class EventResolverBaseTests
                   <data name="ErrorCode" inType="win:UInt32" outType="win:HexInt32"/>
                 </template>
                 """,
-            properties: ["TestName", new byte[] { 0xAB, 0xCD }, 255]);
+            ["TestName", new byte[] { 0xAB, 0xCD }, 255]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1073,9 +1073,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - win:HResult with a common error code should resolve dynamically
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Error: %1",
-            template: """<template><data name="Error" inType="win:Int32" outType="win:HResult"/></template>""",
-            properties: [unchecked((int)0x80070005)]);
+            "Error: %1",
+            """<template><data name="Error" inType="win:Int32" outType="win:HResult"/></template>""",
+            [unchecked((int)0x80070005)]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1225,8 +1225,8 @@ public sealed class EventResolverBaseTests
         // by Windows as a length provider, so the event surfaces 3 properties (param1,
         // param2, and the binary blob).
         var (details, _) = EventUtils.CreateModernEvent(
-            description: "Param1: %1, Param2: %2",
-            template: """
+            "Param1: %1, Param2: %2",
+            """
                 <template xmlns="http://schemas.microsoft.com/win/2004/08/events">
                   <data name="param1" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="param2" inType="win:UnicodeString" outType="xs:string"/>
@@ -1234,7 +1234,7 @@ public sealed class EventResolverBaseTests
                   <data name="BinaryData" inType="win:Binary" outType="xs:hexBinary" length="__binLength"/>
                 </template>
                 """,
-            properties: ["Value1", "Value2", new byte[] { 0x01, 0x02 }]);
+            ["Value1", "Value2", new byte[] { 0x01, 0x02 }]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1261,8 +1261,8 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - Same template but EvtRender excluded the length fields (4 properties)
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "The driver %3 failed.\r\nDevice: %1\r\nStatus: %2",
-            template: """
+            "The driver %3 failed.\r\nDevice: %1\r\nStatus: %2",
+            """
                 <template>
                   <data name="DriverNameLength" inType="win:UInt32"/>
                   <data name="DriverName" inType="win:UnicodeString" length="DriverNameLength"/>
@@ -1272,7 +1272,7 @@ public sealed class EventResolverBaseTests
                   <data name="Version" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: ["ROOT\\DEVICE\\0000", (uint)0xC0000365, "\\Driver\\WUDFRd", (uint)0]);
+            ["ROOT\\DEVICE\\0000", 0xC0000365, "\\Driver\\WUDFRd", (uint)0]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1291,8 +1291,8 @@ public sealed class EventResolverBaseTests
         // Arrange - Template has length-provider fields (DriverNameLength, FailureNameLength)
         // but EvtRender includes ALL 6 properties, so outTypes must use the full array.
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "The driver %5 failed to load.\r\nDevice: %2\r\nStatus: %3",
-            template: """
+            "The driver %5 failed to load.\r\nDevice: %2\r\nStatus: %3",
+            """
                 <template>
                   <data name="DriverNameLength" inType="win:UInt32"/>
                   <data name="DriverName" inType="win:UnicodeString" length="DriverNameLength"/>
@@ -1302,7 +1302,7 @@ public sealed class EventResolverBaseTests
                   <data name="Version" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: [(object)(uint)40, "ROOT\\DEVICE\\0000", (uint)0xC0000365, (uint)14, "\\Driver\\WUDFRd", (uint)0]);
+            [(uint)40, "ROOT\\DEVICE\\0000", 0xC0000365, (uint)14, "\\Driver\\WUDFRd", (uint)0]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1419,8 +1419,8 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - template has 5 data elements but event only has 3 properties
         var (details, _) = EventUtils.CreateModernEvent(
-            description: "A: %1, B: %2, C: %3, D: %4, E: %5",
-            template: """
+            "A: %1, B: %2, C: %3, D: %4, E: %5",
+            """
                 <template>
                   <data name="A" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="B" inType="win:UnicodeString" outType="xs:string"/>
@@ -1429,7 +1429,7 @@ public sealed class EventResolverBaseTests
                   <data name="E" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: ["val1", "val2", "val3", "val4", "val5"]);
+            ["val1", "val2", "val3", "val4", "val5"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1457,15 +1457,15 @@ public sealed class EventResolverBaseTests
         // Arrange - Template has 3 elements but event has 2 properties (version mismatch).
         // OutType formatting should be disabled to avoid misalignment.
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Status: %1, Code: %2",
-            template: """
+            "Status: %1, Code: %2",
+            """
                 <template>
                   <data name="Name" inType="win:UnicodeString"/>
                   <data name="Status" inType="win:UInt32" outType="win:HexInt32"/>
                   <data name="Code" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: [(uint)42, (uint)100]);
+            [(uint)42, (uint)100]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1622,9 +1622,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Test event with property: %1",
-            template: "<template><data name=\"Prop1\" outType=\"win:UnicodeString\"/></template>",
-            properties: ["TestValue"]);
+            "Test event with property: %1",
+            "<template><data name=\"Prop1\" outType=\"win:UnicodeString\"/></template>",
+            ["TestValue"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1749,9 +1749,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - minified template with multiple data elements on one line
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "User: %1, Action: %2",
-            template: "<template><data name=\"User\" inType=\"win:UnicodeString\" outType=\"xs:string\"/><data name=\"Action\" inType=\"win:UnicodeString\"/></template>",
-            properties: ["Admin", "Login"]);
+            "User: %1, Action: %2",
+            "<template><data name=\"User\" inType=\"win:UnicodeString\" outType=\"xs:string\"/><data name=\"Action\" inType=\"win:UnicodeString\"/></template>",
+            ["Admin", "Login"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -1836,7 +1836,7 @@ public sealed class EventResolverBaseTests
                 {
                     ProviderName = Constants.TestProviderName,
                     ShortId = 2,
-                    RawId = unchecked((long)(0xC0000002)), // severity 11 = Error
+                    RawId = unchecked(0xC0000002), // severity 11 = Error
                     Text = "Error: %1"
                 }
             ],
@@ -1959,8 +1959,8 @@ public sealed class EventResolverBaseTests
         // Arrange - template has 6 data elements with 2 length-prefixed binary pairs;
         // each length provider is consumed internally, so 4 properties are surfaced.
         var (details, _) = EventUtils.CreateModernEvent(
-            description: "Param1: %1, Param2: %2",
-            template: """
+            "Param1: %1, Param2: %2",
+            """
                 <template>
                   <data name="param1" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="param2" inType="win:UnicodeString" outType="xs:string"/>
@@ -1970,7 +1970,7 @@ public sealed class EventResolverBaseTests
                   <data name="BinaryData2" inType="win:Binary" length="__bin2Length"/>
                 </template>
                 """,
-            properties: ["Value1", "Value2", new byte[] { 0x01 }, new byte[] { 0x02 }]);
+            ["Value1", "Value2", new byte[] { 0x01 }, new byte[] { 0x02 }]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -2038,9 +2038,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - template uses newlines instead of spaces after <data
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "User: %1, Action: %2",
-            template: "<template><data\nname=\"User\"\ninType=\"win:UnicodeString\"\noutType=\"xs:string\"/><data\nname=\"Action\"\ninType=\"win:UnicodeString\"/></template>",
-            properties: ["Admin", "Login"]);
+            "User: %1, Action: %2",
+            "<template><data\nname=\"User\"\ninType=\"win:UnicodeString\"\noutType=\"xs:string\"/><data\nname=\"Action\"\ninType=\"win:UnicodeString\"/></template>",
+            ["Admin", "Login"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -2126,8 +2126,8 @@ public sealed class EventResolverBaseTests
         // Arrange - template has 4 data elements with NO length-prefixed binary pairs
         // and event has 2 properties — this should NOT match
         var (details, _) = EventUtils.CreateModernEvent(
-            description: "A: %1, B: %2, C: %3, D: %4",
-            template: """
+            "A: %1, B: %2, C: %3, D: %4",
+            """
                 <template>
                   <data name="A" inType="win:UnicodeString" outType="xs:string"/>
                   <data name="B" inType="win:UnicodeString" outType="xs:string"/>
@@ -2135,7 +2135,7 @@ public sealed class EventResolverBaseTests
                   <data name="D" inType="win:UInt32"/>
                 </template>
                 """,
-            properties: ["val1", "val2", "val3", "val4"]);
+            ["val1", "val2", "val3", "val4"]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -2163,9 +2163,9 @@ public sealed class EventResolverBaseTests
         const uint unknownCode = 0xDEADBEEF;
 
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Status: %1",
-            template: """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
-            properties: [unknownCode]);
+            "Status: %1",
+            """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
+            [unknownCode]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -2195,9 +2195,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - win:NTStatus outType should resolve STATUS_SUCCESS
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Status: %1",
-            template: """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
-            properties: [(uint)0x00000000]);
+            "Status: %1",
+            """<template><data name="Status" inType="win:UInt32" outType="win:NTStatus"/></template>""",
+            [(uint)0x00000000]);
 
         var resolver = new TestEventResolver([details]);
 
@@ -2298,7 +2298,7 @@ public sealed class EventResolverBaseTests
                 {
                     ProviderName = Constants.TestProviderName,
                     ShortId = 50,
-                    RawId = unchecked((long)0xC0000032), // severity 11=Error
+                    RawId = unchecked(0xC0000032), // severity 11=Error
                     Text = "Error: %1"
                 }
             ],
@@ -2965,7 +2965,7 @@ public sealed class EventResolverBaseTests
                 {
                     ProviderName = Constants.TestProviderName,
                     ShortId = 100,
-                    RawId = unchecked((long)0xC0000064), // Qualifier=0xC000, severity 11=Error
+                    RawId = unchecked(0xC0000064), // Qualifier=0xC000, severity 11=Error
                     Text = "Error: %1"
                 }
             ],
@@ -3310,9 +3310,9 @@ public sealed class EventResolverBaseTests
     {
         // Arrange - template uses tabs instead of spaces after <data
         var (details, eventRecord) = EventUtils.CreateModernEvent(
-            description: "Code: %1",
-            template: "<template><data\tname=\"ErrorCode\"\toutType=\"win:HexInt32\"/></template>",
-            properties: [255]);
+            "Code: %1",
+            "<template><data\tname=\"ErrorCode\"\toutType=\"win:HexInt32\"/></template>",
+            [255]);
 
         var resolver = new TestEventResolver([details]);
 

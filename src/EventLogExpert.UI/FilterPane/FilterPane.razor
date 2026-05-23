@@ -101,14 +101,14 @@
     <div class="filter-group" data-toggle="@MenuState">
         @if (IsDateFilterVisible)
         {
-            <EditForm class="filter-form flex-row" Model="_model">
+            <EditForm Model="_model" class="filter-form flex-row">
                 <span>
                     After:
-                    <InputDate aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                    <InputDate Type="InputDateType.DateTimeLocal" aria-label="After" @bind-Value="_model.After" class="filter-datetime input" disabled="@(!_canEditDate)" />
                 </span>
                 <span>
                     Before:
-                    <InputDate aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" Type="InputDateType.DateTimeLocal" />
+                    <InputDate Type="InputDateType.DateTimeLocal" aria-label="Before" @bind-Value="_model.Before" class="filter-datetime input" disabled="@(!_canEditDate)" />
                 </span>
 
                 @if (_canEditDate)
@@ -195,15 +195,15 @@
 
         @foreach (var item in FilterPaneState.Value.Filters)
         {
-            <FilterRow @key="item.Id" Value="item" />
+            <FilterRow Value="item" @key="item.Id" />
         }
 
         @foreach (var draft in _pendingDrafts)
         {
-            <FilterRow @key="draft.Id"
-                OnPendingDiscard="() => HandlePendingDiscard(draft)"
+            <FilterRow OnPendingDiscard="() => HandlePendingDiscard(draft)"
                 OnPendingSave="filter => HandlePendingSave(draft, filter)"
-                PendingDraft="draft" />
+                PendingDraft="draft"
+                @key="draft.Id" />
         }
     </div>
 </div>

@@ -1,9 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.EventDbTool.Commands;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;
@@ -31,7 +33,7 @@ public sealed class ShowCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(source, filter: "[unclosed");
+        new ShowCommand(logger).ShowProviderInfo(source, "[unclosed");
 
         // Assert
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
@@ -44,11 +46,11 @@ public sealed class ShowCommandTests : IDisposable
     public void ShowProviderInfo_WhenSourceDoesNotExist_LogsErrorAndDoesNotReadAnything()
     {
         // Arrange
-        var missing = DatabaseTestUtils.CreateTempPath(".db");
+        var missing = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(missing, filter: null);
+        new ShowCommand(logger).ShowProviderInfo(missing, null);
 
         // Assert
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
@@ -69,7 +71,7 @@ public sealed class ShowCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(source, filter: "ZZZ_NoMatch_ZZZ");
+        new ShowCommand(logger).ShowProviderInfo(source, "ZZZ_NoMatch_ZZZ");
 
         // Assert
         logger.Received(1).Warning(Arg.Is<WarningLogHandler>(h =>
@@ -94,7 +96,7 @@ public sealed class ShowCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new ShowCommand(logger).ShowProviderInfo(source, filter: null);
+        new ShowCommand(logger).ShowProviderInfo(source, null);
 
         // Assert
         logger.Received(1).Information(Arg.Is<InformationLogHandler>(h =>

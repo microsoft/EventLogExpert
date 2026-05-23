@@ -1,32 +1,32 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Runtime.Common.Files;
 
 namespace EventLogExpert.Runtime.Database;
 
 internal sealed class DatabaseRecoveryService(
-    DatabaseEntryStore entryStore,
+    DatabaseRegistry registry,
     DatabaseClassificationService classificationService,
     FileLocationOptions fileLocationOptions,
     IProviderDatabaseMaintenance maintenance,
     ITraceLogger traceLogger)
 {
     private readonly DatabaseClassificationService _classificationService = classificationService;
-    private readonly DatabaseEntryStore _entryStore = entryStore;
     private readonly FileLocationOptions _fileLocationOptions = fileLocationOptions;
     private readonly IProviderDatabaseMaintenance _maintenance = maintenance;
+    private readonly DatabaseRegistry _registry = registry;
     private readonly ITraceLogger _traceLogger = traceLogger;
 
     public async Task<bool> DeleteEntryWithBackupAsync(string fileName, CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var reservation = _entryStore.ReserveFileOperation(fileName, nameof(DeleteEntryWithBackupAsync));
+        using var reservation = _registry.ReserveFileOperation(fileName, nameof(DeleteEntryWithBackupAsync));
 
-        var entry = _entryStore.LookupEntryOrThrow(fileName, nameof(DeleteEntryWithBackupAsync));
+        var entry = _registry.LookupEntryOrThrow(fileName, nameof(DeleteEntryWithBackupAsync));
 
         var success = await Task.Run(() =>
                 DatabaseFileOperations.DeleteFilesCore(entry, _traceLogger, nameof(DeleteEntryWithBackupAsync)))
@@ -34,34 +34,7 @@ internal sealed class DatabaseRecoveryService(
 
         if (!success) { return false; }
 
-        _entryStore.TryRemoveAndPersist(fileName);
-
-        return true;
-    }
-
-    public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-
-        using var reservation = _entryStore.ReserveFileOperation(fileName, nameof(RestoreFromBackupAsync));
-
-        var entry = _entryStore.LookupEntryOrThrow(fileName, nameof(RestoreFromBackupAsync));
-
-        var success = await Task
-            .Run(() => DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(RestoreFromBackupAsync)))
-            .ConfigureAwait(false);
-
-        if (!success) { return false; }
-
-        try
-        {
-            await _classificationService.ClassifyEntriesAsync(cancellationToken).ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
-                $"{nameof(DatabaseRecoveryService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
-        }
+        _registry.TryRemoveAndPersist(fileName);
 
         return true;
     }
@@ -73,7 +46,7 @@ internal sealed class DatabaseRecoveryService(
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var reservation = _entryStore.ReserveFileOperation(fileName, nameof(RemoveAsync));
+        using var reservation = _registry.ReserveFileOperation(fileName, nameof(RemoveAsync));
 
         // Wait for initial classification so callers don't race with the background scan
         // (which can mutate IsEnabled / Status / BackupExists for this entry mid-flight).
@@ -83,7 +56,7 @@ internal sealed class DatabaseRecoveryService(
         }
         catch (Exception ex)
         {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Trace(
+            DatabaseRegistry.SafeLog(() => _traceLogger.Trace(
                 $"{nameof(DatabaseRecoveryService)}.{nameof(RemoveAsync)}: InitialClassificationTask faulted unexpectedly: {ex}"));
         }
 
@@ -92,7 +65,7 @@ internal sealed class DatabaseRecoveryService(
         // Step 1: disable the entry so EventResolver can no longer pick this database up
         // on its next construction. Capture wasEnabled so we can restore on rollback if a
         // later phase fails.
-        var (found, wasEnabled) = _entryStore.SetEnabled(fileName, isEnabled: false, persist: true);
+        var (found, wasEnabled) = _registry.SetEnabled(fileName, false, true);
 
         if (!found)
         {
@@ -114,10 +87,10 @@ internal sealed class DatabaseRecoveryService(
             }
             catch (Exception ex)
             {
-                DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+                DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                     $"{nameof(DatabaseRecoveryService)}.{nameof(RemoveAsync)}: prepare-for-deletion callback failed: {ex}"));
 
-                _entryStore.RestoreEnabledIfChanged(fileName, wasEnabled);
+                _registry.RestoreEnabledIfChanged(fileName, wasEnabled);
 
                 throw;
             }
@@ -135,15 +108,42 @@ internal sealed class DatabaseRecoveryService(
         }
         catch (Exception ex)
         {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseRecoveryService)}.{nameof(RemoveAsync)}: deleting files for '{fileName}' failed: {ex}"));
 
-            _entryStore.RestoreEnabledIfChanged(fileName, wasEnabled);
+            _registry.RestoreEnabledIfChanged(fileName, wasEnabled);
 
             throw;
         }
 
         // Step 4: drop the entry from the snapshot.
-        _entryStore.TryRemoveAndPersist(fileName);
+        _registry.TryRemoveAndPersist(fileName);
+    }
+
+    public async Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        using var reservation = _registry.ReserveFileOperation(fileName, nameof(RestoreFromBackupAsync));
+
+        var entry = _registry.LookupEntryOrThrow(fileName, nameof(RestoreFromBackupAsync));
+
+        var success = await Task
+            .Run(() => DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(RestoreFromBackupAsync)))
+            .ConfigureAwait(false);
+
+        if (!success) { return false; }
+
+        try
+        {
+            await _classificationService.ClassifyEntriesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseRecoveryService)}.{nameof(RestoreFromBackupAsync)} post-restore classification failed: {ex}"));
+        }
+
+        return true;
     }
 }

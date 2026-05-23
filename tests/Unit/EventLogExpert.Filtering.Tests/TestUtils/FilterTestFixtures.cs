@@ -20,6 +20,16 @@ internal static class FilterTestFixtures
 
     public static readonly SecurityIdentifier LocalSystem = new(LocalSystemSddl);
 
+    public static IReadOnlyList<ResolvedEvent> All =>
+    [
+        FullyPopulated,
+        NoNullables,
+        KernelPower,
+        ApplicationError,
+        WerSystemError,
+        WithEscapes
+    ];
+
     /// <summary>Source=Application Error (perf-snapshot fixture).</summary>
     public static ResolvedEvent ApplicationError { get; } = new("Application", LogPathType.Channel)
     {
@@ -119,17 +129,4 @@ internal static class FilterTestFixtures
         TimeCreated = FixedTimestamp,
         Xml = string.Empty
     };
-
-    // Declared last so that all the per-fixture initializers above have run by the time `All` is initialized.
-    // Otherwise the static-init textual ordering rule yields a list of nulls (and a CS8601 nullable-analysis error
-    // under strict TreatWarningsAsErrors).
-    public static IReadOnlyList<ResolvedEvent> All { get; } =
-    [
-        FullyPopulated,
-        NoNullables,
-        KernelPower,
-        ApplicationError,
-        WerSystemError,
-        WithEscapes
-    ];
 }

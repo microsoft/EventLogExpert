@@ -2,7 +2,9 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
 namespace EventLogExpert.EventDbTool.IntegrationTests;
@@ -36,7 +38,7 @@ public sealed class MtaProviderSourceTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act — invalid pattern is rejected before the evtx is even opened.
-        var providers = MtaProviderSource.DiscoverProviderNames(missing, logger, filter: "[unclosed");
+        var providers = MtaProviderSource.DiscoverProviderNames(missing, logger, "[unclosed");
 
         // Assert
         Assert.Empty(providers);

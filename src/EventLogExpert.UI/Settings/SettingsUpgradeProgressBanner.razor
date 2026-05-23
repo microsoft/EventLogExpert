@@ -1,0 +1,26 @@
+@if (BannerService.SettingsProgress is { } progress)
+{
+    <aside class="settings-upgrade-banner" role="status">
+        <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat"></i>
+
+        @if (string.IsNullOrEmpty(progress.CurrentEntryName))
+        {
+            <span class="banner-message">Preparing upgrade of @progress.CurrentBatchSize @(progress.CurrentBatchSize == 1 ? "database" : "databases")&hellip;</span>
+        }
+        else
+        {
+            <span class="banner-message">Upgrading database @progress.CurrentBatchPosition of @progress.CurrentBatchSize: @progress.CurrentEntryName &mdash; @progress.CurrentPhase</span>
+        }
+
+        @if (progress.QueuedBatchesAfter > 0)
+        {
+            <span class="banner-subtitle">(+@progress.QueuedBatchesAfter @(progress.QueuedBatchesAfter == 1 ? "batch" : "batches") queued)</span>
+        }
+
+        <button class="banner-action button"
+            @onclick="() => OnCancelClickedAsync(progress)"
+            type="button">
+            Cancel
+        </button>
+    </aside>
+}

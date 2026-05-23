@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Common.EventLogs;
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Adapters.Menu;
+using EventLogExpert.Eventing.Common.EventLogs;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;

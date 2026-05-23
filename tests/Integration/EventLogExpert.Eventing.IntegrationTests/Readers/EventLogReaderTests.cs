@@ -47,7 +47,7 @@ public sealed class EventLogReaderTests
     public void Constructor_WhenRenderXml_ShouldNotThrow(bool renderXml)
     {
         // Arrange & Act
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: renderXml);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml);
 
         // Assert
         Assert.NotNull(reader);
@@ -167,10 +167,10 @@ public sealed class EventLogReaderTests
         using var reader = new EventLogReader(fixture.FilePath, LogPathType.File);
 
         // Act
-        bool success1 = reader.TryGetEvents(out var events1, batchSize: 1);
+        bool success1 = reader.TryGetEvents(out var events1, 1);
         string? bookmark1 = reader.LastBookmark;
 
-        bool success2 = reader.TryGetEvents(out var events2, batchSize: 1);
+        bool success2 = reader.TryGetEvents(out var events2, 1);
         string? bookmark2 = reader.LastBookmark;
 
         // Assert
@@ -244,13 +244,28 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
+    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
+    {
+        // Arrange
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
+
+        // Act
+        bool success = reader.TryGetEvents(out var events, 10);
+
+        // Assert
+        Assert.True(success);
+        Assert.NotNull(events);
+        Assert.True(events.Length <= 10);
+    }
+
+    [Fact]
     public void TryGetEvents_WhenBatchSize1_ShouldReturn1Event()
     {
         // Arrange
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 1);
+        bool success = reader.TryGetEvents(out var events, 1);
 
         // Assert
         if (success && events.Length > 0)
@@ -260,28 +275,13 @@ public sealed class EventLogReaderTests
     }
 
     [Fact]
-    public void TryGetEvents_WhenBatchSize10_ShouldReturnUpTo10Events()
-    {
-        // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
-
-        // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 10);
-
-        // Assert
-        Assert.True(success);
-        Assert.NotNull(events);
-        Assert.True(events.Length <= 10);
-    }
-
-    [Fact]
     public void TryGetEvents_WhenBatchSize30_ShouldReturnUpTo30Events()
     {
         // Arrange
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 30);
+        bool success = reader.TryGetEvents(out var events);
 
         // Assert
         Assert.True(success);
@@ -296,8 +296,8 @@ public sealed class EventLogReaderTests
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success1 = reader.TryGetEvents(out var events1, batchSize: 5);
-        bool success2 = reader.TryGetEvents(out var events2, batchSize: 5);
+        bool success1 = reader.TryGetEvents(out var events1, 5);
+        bool success2 = reader.TryGetEvents(out var events2, 5);
 
         // Assert
         Assert.True(success1);
@@ -420,7 +420,7 @@ public sealed class EventLogReaderTests
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 1);
+        bool success = reader.TryGetEvents(out var events, 1);
 
         // Assert
         Assert.True(success);
@@ -471,8 +471,8 @@ public sealed class EventLogReaderTests
         using var reader2 = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success1 = reader1.TryGetEvents(out var events1, batchSize: 5);
-        bool success2 = reader2.TryGetEvents(out var events2, batchSize: 5);
+        bool success1 = reader1.TryGetEvents(out var events1, 5);
+        bool success2 = reader2.TryGetEvents(out var events2, 5);
 
         // Assert
         Assert.True(success1);
@@ -512,7 +512,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlFalse_ShouldNotIncludeXml()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: false);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -533,7 +533,7 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlTrue_ShouldIncludeXml()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, true);
 
         // Act
         bool success = reader.TryGetEvents(out var events);
@@ -552,10 +552,10 @@ public sealed class EventLogReaderTests
     public void TryGetEvents_WhenRenderXmlTrue_XmlShouldBeValidFormat()
     {
         // Arrange
-        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, renderXml: true);
+        using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel, true);
 
         // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 1);
+        bool success = reader.TryGetEvents(out var events, 1);
 
         // Assert
         Assert.True(success);
@@ -576,7 +576,7 @@ public sealed class EventLogReaderTests
         using var reader = new EventLogReader(Constants.ApplicationLogName, LogPathType.Channel);
 
         // Act
-        bool success = reader.TryGetEvents(out var events, batchSize: 0);
+        bool success = reader.TryGetEvents(out var events, 0);
 
         // Assert
         // With batch size 0, should return false or empty array

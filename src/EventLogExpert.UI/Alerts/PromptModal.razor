@@ -1,7 +1,7 @@
 @inherits ModalBase<string>
 
-<ModalChrome AriaLabel="@AriaLabelText"
-    AcceptLabel="OK"
+<ModalChrome AcceptLabel="OK"
+    AriaLabel="@AriaLabelText"
     CancelLabel="Cancel"
     Footer="FooterPreset.AcceptCancel"
     InlineAlert="@CurrentInlineAlert"
@@ -9,14 +9,14 @@
     OnCancel="OnCancelAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
-    @ref="ChromeRef"
-    Title="@Title">
+    Title="@Title"
+    @ref="ChromeRef">
     <ChildContent>
         <p class="alert-modal-message" id="@_messageId">@Message</p>
         <input aria-labelledby="@_messageId"
-            class="alert-modal-input"
             @bind="_value"
             @bind:event="oninput"
+            class="alert-modal-input"
             @ref="_inputRef"
             type="text" />
     </ChildContent>

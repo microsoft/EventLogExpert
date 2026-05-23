@@ -2,9 +2,8 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Eventing.Common.Events;
-using EventLogExpert.Runtime.LogTable;
 using EventLogExpert.Filtering.TestUtils;
-using EventLogExpert.Runtime.Tests.TestUtils;
+using EventLogExpert.Runtime.LogTable;
 using System.Security.Principal;
 
 namespace EventLogExpert.Runtime.Tests.LogTable;

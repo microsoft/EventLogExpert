@@ -75,10 +75,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public bool ShowCloseButton { get; set; }
 
-    /// <summary>Opt the footer-extra slot into a full-width row above the action
-    /// buttons, instead of sharing the row with them. Use when the extra content
-    /// is a label/control pair that should align with the dialog body rather than
-    /// compete with the button row for horizontal space.</summary>
+    /// <summary>
+    ///     Opt the footer-extra slot into a full-width row above the action buttons, instead of sharing the row with
+    ///     them. Use when the extra content is a label/control pair that should align with the dialog body rather than compete
+    ///     with the button row for horizontal space.
+    /// </summary>
     [Parameter] public bool StackFooterExtra { get; set; }
 
     [Parameter] public string? Title { get; set; }

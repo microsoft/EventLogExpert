@@ -1,8 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.ProviderDatabase;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Maintenance;
+using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Database.Upgrade;
 using System.Threading.Channels;
 
@@ -12,9 +13,9 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 {
     private readonly Task _consumerTask;
     private readonly CancellationTokenSource _disposeCts = new();
-    private readonly DatabaseEntryStore _entryStore;
     private readonly Task _initialClassificationTask;
     private readonly IProviderDatabaseMaintenance _maintenance;
+    private readonly DatabaseRegistry _registry;
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
         new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
@@ -23,12 +24,12 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     private int _queuedBatchCount;
 
     public DatabaseUpgradeService(
-        DatabaseEntryStore entryStore,
+        DatabaseRegistry registry,
         Task initialClassificationTask,
         IProviderDatabaseMaintenance maintenance,
         ITraceLogger traceLogger)
     {
-        _entryStore = entryStore;
+        _registry = registry;
         _initialClassificationTask = initialClassificationTask;
         _maintenance = maintenance;
         _traceLogger = traceLogger;
@@ -43,6 +44,39 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     public event EventHandler<UpgradeBatchStartedEventArgs>? UpgradeBatchStarted;
 
     public int QueuedBatchCount => Volatile.Read(ref _queuedBatchCount);
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
+
+        _upgradeQueue.Writer.TryComplete();
+
+        try
+        {
+            await _disposeCts.CancelAsync().ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseUpgradeService)}.{nameof(DisposeAsync)}: cancellation source faulted: {ex}"));
+        }
+
+        try
+        {
+            await _consumerTask.ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on disposal.
+        }
+        catch (Exception ex)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseUpgradeService)}.{nameof(DisposeAsync)}: consumer task faulted: {ex}"));
+        }
+
+        _disposeCts.Dispose();
+    }
 
     public async Task<UpgradeBatchResult> UpgradeBatchAsync(
         IReadOnlyList<string> fileNames,
@@ -71,7 +105,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         var acceptable = new List<DatabaseEntry>(dedupedNames.Count);
         var rejected = new List<UpgradeFailure>();
 
-        var snapshot = _entryStore.SnapshotEntries();
+        var snapshot = _registry.SnapshotEntries();
         var byName = new Dictionary<string, DatabaseEntry>(snapshot.Count, StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in snapshot)
@@ -138,37 +172,20 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         return new UpgradeBatchResult([], acceptable.Select(entry => entry.FileName).ToArray(), rejected);
     }
 
-    public async ValueTask DisposeAsync()
+    private static IReadOnlyList<string> DedupePreservingOrder(IReadOnlyList<string> source)
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) { return; }
+        var seen = new HashSet<string>(source.Count, StringComparer.OrdinalIgnoreCase);
+        var deduped = new List<string>(source.Count);
 
-        _upgradeQueue.Writer.TryComplete();
-
-        try
+        foreach (var item in source)
         {
-            await _disposeCts.CancelAsync().ConfigureAwait(false);
-        }
-        catch (Exception ex)
-        {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
-                $"{nameof(DatabaseUpgradeService)}.{nameof(DisposeAsync)}: cancellation source faulted: {ex}"));
+            if (seen.Add(item))
+            {
+                deduped.Add(item);
+            }
         }
 
-        try
-        {
-            await _consumerTask.ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            // Expected on disposal.
-        }
-        catch (Exception ex)
-        {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
-                $"{nameof(DatabaseUpgradeService)}.{nameof(DisposeAsync)}: consumer task faulted: {ex}"));
-        }
-
-        _disposeCts.Dispose();
+        return deduped;
     }
 
     private async Task ConsumeUpgradeQueueAsync()
@@ -186,12 +203,33 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseUpgradeService)}.{nameof(ConsumeUpgradeQueueAsync)}: consumer faulted: {ex}"));
         }
         finally
         {
             DrainPendingBatches();
+        }
+    }
+
+    private void DrainPendingBatches()
+    {
+        while (_upgradeQueue.Reader.TryRead(out var batch))
+        {
+            Interlocked.Decrement(ref _queuedBatchCount);
+
+            try { batch.BatchCts.Cancel(); }
+            catch (Exception)
+            { /* CTS may already be disposed; cancellation moot. */
+            }
+
+            try { batch.BatchCts.Dispose(); }
+            catch (Exception)
+            { /* Already disposed; ignore. */
+            }
+
+            batch.Tcs.TrySetException(
+                new OperationCanceledException("DatabaseService disposed before batch processed."));
         }
     }
 
@@ -207,7 +245,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
         try
         {
-            _entryStore.SafeRaise(
+            _registry.SafeRaise(
                 UpgradeBatchStarted,
                 this,
                 new UpgradeBatchStartedEventArgs(batch.Id, batch.Scope, batch.Entries.Count, batch.BatchCts),
@@ -270,14 +308,14 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                     var message = ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message;
                     failed.Add(new UpgradeFailure(entry.FileName, message));
 
-                    DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+                    DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                         $"{nameof(DatabaseUpgradeService)}.{nameof(ProcessBatchAsync)}: '{entry.FileName}' upgrade threw: {ex}"));
                 }
             }
 
             var result = new UpgradeBatchResult(succeeded, cancelled, failed);
 
-            _entryStore.SafeRaise(
+            _registry.SafeRaise(
                 UpgradeBatchCompleted,
                 this,
                 new UpgradeBatchCompletedEventArgs(batch.Id, result, wasCancelled),
@@ -287,7 +325,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            DatabaseEntryStore.SafeLog(() => _traceLogger.Warning(
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
                 $"{nameof(DatabaseUpgradeService)}.{nameof(ProcessBatchAsync)}: unhandled batch error: {ex}"));
 
             batch.Tcs.TrySetException(ex);
@@ -309,9 +347,9 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        using var reservation = _entryStore.ReserveFileOperation(fileName, nameof(UpgradeAsync));
+        using var reservation = _registry.ReserveFileOperation(fileName, nameof(UpgradeAsync));
 
-        var entry = _entryStore.LookupEntryOrThrow(fileName, nameof(UpgradeAsync));
+        var entry = _registry.LookupEntryOrThrow(fileName, nameof(UpgradeAsync));
 
         if (entry.Status is not (DatabaseStatus.UpgradeRequired or DatabaseStatus.UpgradeFailed))
         {
@@ -327,7 +365,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
         if (File.Exists(backupPath))
         {
-            _entryStore.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
+            _registry.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
             throw new InvalidOperationException("Recovery required — .upgrade.bak already present");
         }
@@ -346,7 +384,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        _entryStore.SafeRaise(
+                        _registry.SafeRaise(
                             UpgradeBatchProgress,
                             this,
                             new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.BackingUp),
@@ -358,7 +396,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                         }
                         catch (IOException ex) when (File.Exists(backupPath))
                         {
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
+                            _registry.UpdateEntryStatusAndBackup(fileName, entry.Status, true);
 
                             throw new InvalidOperationException(
                                 "Recovery required — .upgrade.bak appeared during backup",
@@ -369,7 +407,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         cancellationToken.ThrowIfCancellationRequested();
 
-                        _entryStore.SafeRaise(
+                        _registry.SafeRaise(
                             UpgradeBatchProgress,
                             this,
                             new UpgradeBatchProgressEventArgs(batchId,
@@ -384,7 +422,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         migrationCompleted = true;
 
-                        _entryStore.SafeRaise(
+                        _registry.SafeRaise(
                             UpgradeBatchProgress,
                             this,
                             new UpgradeBatchProgressEventArgs(batchId, position, fileName, UpgradePhase.Verifying),
@@ -397,13 +435,13 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         if (!DatabaseFileOperations.TryDeleteFile(backupPath, _traceLogger, nameof(UpgradeAsync)))
                         {
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, true);
+                            _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, true);
 
                             throw new UpgradeCleanupFailedException(
                                 "Upgrade succeeded but backup cleanup failed; .upgrade.bak remains on disk");
                         }
 
-                        _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, false);
+                        _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.Ready, false);
                     }
                     catch (UpgradeCleanupFailedException)
                     {
@@ -415,11 +453,11 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
                         if (DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(UpgradeAsync)))
                         {
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeRequired, false);
+                            _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeRequired, false);
                         }
                         else
                         {
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+                            _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
                             throw new UpgradeRollbackFailedException(
                                 $"Cancellation rollback failed for '{fileName}'; .upgrade.bak remains on disk");
@@ -433,25 +471,25 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                         {
                             if (!DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(UpgradeAsync)))
                             {
-                                _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+                                _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
                                 throw new UpgradeRollbackFailedException(
                                     $"Migration failed and rollback also failed for '{fileName}': {(ex is DatabaseUpgradeException dbEx ? dbEx.Reason : ex.Message)}");
                             }
 
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
+                            _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
                         }
                         else if (migrationCompleted)
                         {
                             if (!DatabaseFileOperations.RestoreFilesCore(entry, _traceLogger, nameof(UpgradeAsync)))
                             {
-                                _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
+                                _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, true);
 
                                 throw new UpgradeRollbackFailedException(
                                     $"Verification or cleanup failed and rollback also failed for '{fileName}'");
                             }
 
-                            _entryStore.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
+                            _registry.UpdateEntryStatusAndBackup(fileName, DatabaseStatus.UpgradeFailed, false);
                         }
                         else if (backupCreated)
                         {
@@ -463,43 +501,6 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
                 },
                 cancellationToken)
             .ConfigureAwait(false);
-    }
-
-    private void DrainPendingBatches()
-    {
-        while (_upgradeQueue.Reader.TryRead(out var batch))
-        {
-            Interlocked.Decrement(ref _queuedBatchCount);
-
-            try { batch.BatchCts.Cancel(); }
-            catch (Exception)
-            { /* CTS may already be disposed; cancellation moot. */
-            }
-
-            try { batch.BatchCts.Dispose(); }
-            catch (Exception)
-            { /* Already disposed; ignore. */
-            }
-
-            batch.Tcs.TrySetException(
-                new OperationCanceledException("DatabaseService disposed before batch processed."));
-        }
-    }
-
-    private static IReadOnlyList<string> DedupePreservingOrder(IReadOnlyList<string> source)
-    {
-        var seen = new HashSet<string>(source.Count, StringComparer.OrdinalIgnoreCase);
-        var deduped = new List<string>(source.Count);
-
-        foreach (var item in source)
-        {
-            if (seen.Add(item))
-            {
-                deduped.Add(item);
-            }
-        }
-
-        return deduped;
     }
 
     private sealed class UpgradeCleanupFailedException(string message) : Exception(message);

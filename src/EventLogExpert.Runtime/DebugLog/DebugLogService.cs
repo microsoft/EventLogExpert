@@ -1,7 +1,8 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Settings;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,7 @@ using System.Text;
 
 namespace EventLogExpert.Runtime.DebugLog;
 
-internal sealed partial class DebugLogService : ITraceLogger, IFileLogger, IDisposable
+internal sealed class DebugLogService : ITraceLogger, IFileLogger, IDisposable
 {
     private const long MaxLogSize = 10 * 1024 * 1024;
 

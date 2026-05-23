@@ -139,7 +139,7 @@ public sealed class ReversedListViewTests
         var view = new ReversedListView<string>(new List<string> { "a" });
 
         // Act + Assert
-        Assert.Throws<NotSupportedException>(() => ((IList<string>)view)[0] = "z");
+        Assert.Throws<NotSupportedException>(() => view[0] = "z");
     }
 
     [Fact]

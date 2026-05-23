@@ -1,21 +1,21 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Filtering.Drafts;
-using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Filtering.Evaluation;
+using EventLogExpert.Filtering.Persistence;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Display;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
-using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.FilterPane;
+using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
+using EventLogExpert.UI.FilterCache;
+using EventLogExpert.UI.FilterGroup;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -46,11 +46,11 @@ public sealed partial class FilterPane : IDisposable
 
     [Inject] private IState<FilterGroupState> FilterGroupState { get; init; } = null!;
 
-    [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
-
     [Inject] private IFilterPaneCommands FilterPaneCommands { get; init; } = null!;
 
     [Inject] private IState<FilterPaneState> FilterPaneState { get; init; } = null!;
+
+    [Inject] private IState<FilterProgressState> FilterProgressState { get; init; } = null!;
 
     private bool HasCachedFilters =>
         !FilterCacheState.Value.FavoriteFilters.IsEmpty || !FilterCacheState.Value.RecentFilters.IsEmpty;

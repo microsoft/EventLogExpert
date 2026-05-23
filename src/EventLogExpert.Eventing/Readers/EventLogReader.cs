@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace EventLogExpert.Eventing.Readers;
 
-public sealed partial class EventLogReader(string path, LogPathType pathType, bool renderXml = false) : IDisposable
+public sealed class EventLogReader(string path, LogPathType pathType, bool renderXml = false) : IDisposable
 {
     private readonly Lock _eventLock = new();
     private readonly EvtHandle _handle =

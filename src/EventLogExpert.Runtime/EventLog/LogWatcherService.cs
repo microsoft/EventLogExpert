@@ -1,9 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Eventing.Resolvers;
+using EventLogExpert.Logging.Abstractions;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 

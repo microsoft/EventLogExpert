@@ -3,9 +3,9 @@
 
 using EventLogExpert.Eventing.Common.Events;
 using EventLogExpert.Eventing.Interop;
-using EventLogExpert.Eventing.Logging;
-using EventLogExpert.Eventing.Providers;
 using EventLogExpert.Eventing.Readers;
+using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Provider.Models;
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Security.Principal;
@@ -137,10 +137,7 @@ public partial class EventResolverBase : IDisposable
 
         // Use Interlocked.CompareExchange for atomic check-and-set.
         // Only one thread will successfully change _disposed from 0 to 1.
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
-        {
-            return; // Already disposed by another thread
-        }
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { }
     }
 
     /// <summary>

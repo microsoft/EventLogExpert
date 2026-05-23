@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.Logging;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using System.Collections.Immutable;
@@ -369,12 +369,12 @@ internal sealed class BannerService : IBannerService
         var entry = new BannerProgressEntry(
             args.BatchId,
             args.Scope,
-            CurrentBatchPosition: 0,
-            CurrentBatchSize: args.BatchSize,
-            CurrentEntryName: string.Empty,
-            CurrentPhase: UpgradePhase.BackingUp,
-            QueuedBatchesAfter: _databaseService.QueuedBatchCount,
-            Cancel: args.Cancel);
+            0,
+            args.BatchSize,
+            string.Empty,
+            UpgradePhase.BackingUp,
+            _databaseService.QueuedBatchCount,
+            args.Cancel);
 
         lock (_stateLock)
         {
