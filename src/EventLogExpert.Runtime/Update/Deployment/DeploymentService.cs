@@ -39,7 +39,7 @@ internal sealed class DeploymentService(
 
         var deployment = _packageDeploymentService.AddPackageAsync(
             new Uri(downloadPath),
-            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, DeferRegistrationWhenPackagesAreInUse: true));
+            new PackageDeploymentOptions(ForceUpdateFromAnyVersion: true, ForceTargetAppShutdown: true));
 
         SetCallbacks(deployment, userInitiated);
     }

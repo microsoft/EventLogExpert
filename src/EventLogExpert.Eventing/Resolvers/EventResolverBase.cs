@@ -135,9 +135,8 @@ public partial class EventResolverBase : IDisposable
     {
         if (!disposing) { return; }
 
-        // Use Interlocked.CompareExchange for atomic check-and-set.
-        // Only one thread will successfully change _disposed from 0 to 1.
-        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { }
+        // Atomically guard against double-disposal: only the first caller observes the prior 0.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0) { return; }
     }
 
     /// <summary>
