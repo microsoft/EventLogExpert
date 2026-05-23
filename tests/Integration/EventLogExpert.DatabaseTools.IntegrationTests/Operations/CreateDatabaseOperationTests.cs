@@ -1,15 +1,17 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
+using System.Text.RegularExpressions;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
 public sealed class CreateDatabaseCommandTests : IDisposable
 {
@@ -17,7 +19,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     private readonly List<string> _tempPaths = [];
 
     [Fact]
-    public void CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
+    public async Task CreateDatabase_WhenExtensionNotDb_LogsErrorAndDoesNotCreateFile()
     {
         // Arrange
         var path = DatabaseTestUtils.CreateTempPath(".txt");
@@ -25,7 +27,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, null, null, null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the extension is wrong.");
@@ -34,7 +36,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenFilterMatchesNoProviders_DoesNotLeaveEmptyDatabaseOnDisk()
+    public async Task CreateDatabase_WhenFilterMatchesNoProviders_DoesNotLeaveEmptyDatabaseOnDisk()
     {
         // Arrange — source has First+Second, filter excludes both. The command must not leave an
         // empty .db file behind, because a downstream consumer would read it as "this collection
@@ -48,7 +50,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, "ZZZ_NoMatch_ZZZ", null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, new Regex("ZZZ_NoMatch_ZZZ", RegexOptions.IgnoreCase), null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when zero providers were resolved.");
@@ -60,23 +62,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenFilterRegexInvalid_LogsErrorAndDoesNotCreateFile()
-    {
-        // Arrange
-        var path = CreateTempPath();
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, null, "[unclosed", null);
-
-        // Assert
-        Assert.False(File.Exists(path), "No file should be written when the filter is invalid.");
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Invalid --filter regex")));
-    }
-
-    [Fact]
-    public void CreateDatabase_WhenProviderCountCrossesBatchSize_PersistsEveryProviderWithoutErrors()
+    public async Task CreateDatabase_WhenProviderCountCrossesBatchSize_PersistsEveryProviderWithoutErrors()
     {
         // Arrange — exercises the mid-stream FlushHeaderAndBuffer path: at 100 providers the buffer
         // is flushed, the DbContext is materialized, and subsequent providers are appended in
@@ -93,7 +79,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.True(File.Exists(path));
@@ -109,7 +95,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSkipProvidersInFileExcludesAll_DoesNotLeaveEmptyDatabaseOnDisk()
+    public async Task CreateDatabase_WhenSkipProvidersInFileExcludesAll_DoesNotLeaveEmptyDatabaseOnDisk()
     {
         // Arrange — distinct contract path from the filter case: the skip-source contains every
         // provider in the source, leaving zero to write. The "no empty .db" guarantee must hold
@@ -128,7 +114,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, skipSource);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the skip-set excludes all providers.");
@@ -139,7 +125,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSkipProvidersInFileResolves_ExcludesThoseProvidersFromOutput()
+    public async Task CreateDatabase_WhenSkipProvidersInFileResolves_ExcludesThoseProvidersFromOutput()
     {
         // Arrange — source has First+Second+Shared. Skip-source has Shared. Output must contain
         // First+Second only, exercising the skip-set integration with the streaming write path.
@@ -157,7 +143,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, skipSource);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, skipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.True(File.Exists(path));
@@ -170,7 +156,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSkipProvidersInFileSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
+    public async Task CreateDatabase_WhenSkipProvidersInFileSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
     {
         // Arrange — valid source but invalid skip-source. Validation order matters: a missing skip
         // file must fail BEFORE we begin writing the output database, so an empty stub is never
@@ -184,7 +170,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, missingSkipSource);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, missingSkipSource)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the skip-source is missing.");
@@ -193,7 +179,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
+    public async Task CreateDatabase_WhenSourceDoesNotExist_LogsErrorAndDoesNotCreateFile()
     {
         // Arrange
         var path = CreateTempPath();
@@ -201,7 +187,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, missingSource, null, null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, missingSource, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.False(File.Exists(path), "No file should be written when the source is missing.");
@@ -210,7 +196,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenSourceProvidersResolved_PersistsAllProvidersAndPreservesOwningPublisher()
+    public async Task CreateDatabase_WhenSourceProvidersResolved_PersistsAllProvidersAndPreservesOwningPublisher()
     {
         // Arrange — one provider has ResolvedFromOwningPublisher set; this round-trips through the
         // full streaming write path and we verify the persisted DB matches the source contents.
@@ -223,7 +209,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, source, null, null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, source, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
@@ -242,7 +228,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void CreateDatabase_WhenTargetFileAlreadyExists_LogsErrorAndDoesNotOverwrite()
+    public async Task CreateDatabase_WhenTargetFileAlreadyExists_LogsErrorAndDoesNotOverwrite()
     {
         // Arrange — target file already exists with sentinel bytes; the command must not overwrite or truncate.
         var path = CreateTempPath();
@@ -251,7 +237,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         var logger = Substitute.For<ITraceLogger>();
 
         // Act
-        new CreateDatabaseCommand(logger).CreateDatabase(path, null, null, null);
+        await new CreateDatabaseOperation(new CreateDatabaseRequest(path, null, null, null)).ExecuteAsync(logger, null, CancellationToken.None);
 
         // Assert
         Assert.Equal(sentinel, File.ReadAllBytes(path));

@@ -1,16 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
-using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool.Commands;
 
-public class ShowCommand(ITraceLogger logger) : DbToolCommand(logger)
+public class ShowCommand
 {
     public static Command GetCommand()
     {
@@ -41,57 +40,18 @@ public class ShowCommand(ITraceLogger logger) : DbToolCommand(logger)
         showCommand.Options.Add(filterOption);
         showCommand.Options.Add(verboseOption);
 
-        showCommand.SetAction(action =>
+        showCommand.SetAction(async action =>
         {
-            using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
-            new ShowCommand(sp.GetRequiredService<ITraceLogger>())
-                .ShowProviderInfo(
-                    action.GetValue(sourceArgument),
-                    action.GetValue(filterOption));
+            await using var sp = Program.BuildServiceProvider(action.GetValue(verboseOption));
+            var logger = sp.GetRequiredService<ITraceLogger>();
+
+            if (!RegexHelper.TryCreate(action.GetValue(filterOption), logger, out var regex)) { return; }
+
+            var request = new ShowProvidersRequest(action.GetValue(sourceArgument), regex);
+
+            await new ShowProvidersOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return showCommand;
-    }
-
-    internal void ShowProviderInfo(string? source, string? filter)
-    {
-        if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { return; }
-
-        try
-        {
-            IReadOnlyList<string> providerNames;
-            IEnumerable<ProviderDetails> providers;
-
-            if (source is null)
-            {
-                providerNames = GetLocalProviderNames(regex);
-                providers = LoadLocalProviders(regex);
-            }
-            else
-            {
-                if (!ProviderSource.TryValidate(source, Logger)) { return; }
-
-                providerNames = ProviderSource.LoadProviderNames(source, Logger, regex);
-                providers = ProviderSource.LoadProviders(source, Logger, regex);
-            }
-
-            if (providerNames.Count == 0)
-            {
-                Logger.Warning($"No providers found.");
-
-                return;
-            }
-
-            LogProviderDetailHeader(providerNames);
-
-            foreach (var details in providers)
-            {
-                LogProviderDetails(details);
-            }
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            Logger.Error($"The --filter regex timed out. The pattern may cause catastrophic backtracking.");
-        }
     }
 }

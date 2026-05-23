@@ -1,14 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Provider.Models;
 using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Data.Sqlite;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
+namespace EventLogExpert.Eventing.TestUtils;
 
-internal static class DatabaseTestUtils
+public static class DatabaseTestUtils
 {
     public static ProviderDetails BuildProviderDetails(string name, string? resolvedFromOwningPublisher = null) => new()
     {

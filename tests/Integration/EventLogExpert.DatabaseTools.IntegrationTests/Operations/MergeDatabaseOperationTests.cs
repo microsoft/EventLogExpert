@@ -1,14 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.Eventing.TestUtils;
+using EventLogExpert.Eventing.TestUtils.Constants;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
 public sealed class MergeDatabaseCommandTests : IDisposable
 {
@@ -23,7 +24,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void MergeDatabase_WithCorruptTarget_LogsErrorWithoutThrowing()
+    public async Task MergeDatabase_WithCorruptTarget_LogsErrorWithoutThrowing()
     {
         var source = CreateTempDb();
         var target = CreateTempDb();
@@ -34,14 +35,14 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("Failed to merge into database") && handler.ToString().Contains(target)));
     }
 
     [Fact]
-    public void MergeDatabase_WithEmptyTargetFile_LogsUnrecognizedSchemaWithoutCreatingTables()
+    public async Task MergeDatabase_WithEmptyTargetFile_LogsUnrecognizedSchemaWithoutCreatingTables()
     {
         var source = CreateTempDb();
         var target = CreateTempDb();
@@ -52,14 +53,14 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));
     }
 
     [Fact]
-    public void MergeDatabase_WithUnknownSchemaTarget_LogsErrorWithoutThrowing()
+    public async Task MergeDatabase_WithUnknownSchemaTarget_LogsErrorWithoutThrowing()
     {
         var source = CreateTempDb();
         var target = CreateTempDb();
@@ -70,7 +71,7 @@ public sealed class MergeDatabaseCommandTests : IDisposable
 
         var logger = Substitute.For<ITraceLogger>();
 
-        new MergeDatabaseCommand(logger).MergeDatabase(source, target, false);
+        await new MergeDatabaseOperation(new MergeDatabaseRequest(source, target, false)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(target)));

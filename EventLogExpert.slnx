@@ -21,6 +21,7 @@
     <Project Path="src/EventLogExpert.EventDbTool/EventLogExpert.EventDbTool.csproj" />
     <Project Path="src/EventLogExpert.Filtering/EventLogExpert.Filtering.csproj" />
     <Project Path="src/EventLogExpert.Provider.Database/EventLogExpert.Provider.Database.csproj" />
+    <Project Path="src/EventLogExpert.DatabaseTools/EventLogExpert.DatabaseTools.csproj" />
   </Folder>
   <Folder Name="/tests/Unit/">
     <Project Path="tests/Unit/EventLogExpert.UI.Tests/EventLogExpert.UI.Tests.csproj" />
@@ -37,6 +38,7 @@
     <Project Path="tests/Integration/EventLogExpert.Filtering.IntegrationTests/EventLogExpert.Filtering.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Runtime.IntegrationTests/EventLogExpert.Runtime.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.Provider.Database.IntegrationTests/EventLogExpert.Provider.Database.IntegrationTests.csproj" />
+    <Project Path="tests/Integration/EventLogExpert.DatabaseTools.IntegrationTests/EventLogExpert.DatabaseTools.IntegrationTests.csproj" />
     <Project Path="tests/Integration/EventLogExpert.UI.IntegrationTests/EventLogExpert.UI.IntegrationTests.csproj" />
   </Folder>
   <Folder Name="/tests/Shared/">

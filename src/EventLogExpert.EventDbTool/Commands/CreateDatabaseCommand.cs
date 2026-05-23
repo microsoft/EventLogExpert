@@ -1,17 +1,15 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Provider.Models;
-using EventLogExpert.ProviderDatabase.Context;
 using Microsoft.Extensions.DependencyInjection;
 using System.CommandLine;
-using System.Text.RegularExpressions;
 
 namespace EventLogExpert.EventDbTool.Commands;
 
-public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(logger)
+public sealed class CreateDatabaseCommand
 {
     public static Command GetCommand()
     {
@@ -57,150 +55,22 @@ public sealed class CreateDatabaseCommand(ITraceLogger logger) : DbToolCommand(l
         createDatabaseCommand.Options.Add(skipProvidersInFileOption);
         createDatabaseCommand.Options.Add(verboseOption);
 
-        createDatabaseCommand.SetAction(result =>
+        createDatabaseCommand.SetAction(async result =>
         {
-            using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
+            await using var sp = Program.BuildServiceProvider(result.GetValue(verboseOption));
+            var logger = sp.GetRequiredService<ITraceLogger>();
 
-            new CreateDatabaseCommand(sp.GetRequiredService<ITraceLogger>())
-                .CreateDatabase(
-                    result.GetRequiredValue(fileArgument),
-                    result.GetValue(sourceArgument),
-                    result.GetValue(filterOption),
-                    result.GetValue(skipProvidersInFileOption));
+            if (!RegexHelper.TryCreate(result.GetValue(filterOption), logger, out var regex)) { return; }
+
+            var request = new CreateDatabaseRequest(
+                result.GetRequiredValue(fileArgument),
+                result.GetValue(sourceArgument),
+                regex,
+                result.GetValue(skipProvidersInFileOption));
+
+            await new CreateDatabaseOperation(request).ExecuteAsync(logger, progress: null, CancellationToken.None);
         });
 
         return createDatabaseCommand;
-    }
-
-    internal void CreateDatabase(string path, string? source, string? filter, string? skipProvidersInFile)
-    {
-        if (File.Exists(path))
-        {
-            Logger.Error($"Cannot create database because file already exists: {path}");
-            return;
-        }
-
-        if (!string.Equals(Path.GetExtension(path), ".db", StringComparison.OrdinalIgnoreCase))
-        {
-            Logger.Error($"File extension must be .db.");
-            return;
-        }
-
-        if (!RegexHelper.TryCreate(filter, Logger, out var regex)) { return; }
-
-        if (source is not null && !ProviderSource.TryValidate(source, Logger)) { return; }
-
-        try
-        {
-            HashSet<string> skipProviderNames = new(StringComparer.OrdinalIgnoreCase);
-
-            if (!string.IsNullOrWhiteSpace(skipProvidersInFile))
-            {
-                if (!ProviderSource.TryValidate(skipProvidersInFile, Logger)) { return; }
-
-                foreach (var name in ProviderSource.LoadProviderNames(skipProvidersInFile, Logger))
-                {
-                    skipProviderNames.Add(name);
-                }
-
-                Logger.Information($"Found {skipProviderNames.Count} providers in {skipProvidersInFile}. These will not be included in the new database.");
-            }
-
-            // Stream details directly into the DbContext. For .evtx sources, scanning the file
-            // is expensive, so we deliberately do NOT pre-scan provider names just to size the
-            // log header — that would cause a second full pass over the .evtx. Instead we
-            // buffer the first batch of resolved details, derive the header column width from
-            // those names, then log the header + buffered rows and continue streaming.
-            const int BatchSize = 100;
-            var count = 0;
-            var headerLogged = false;
-            var pendingForHeader = new List<ProviderDetails>(BatchSize);
-
-            // Defer creating the DbContext (and therefore the .db file on disk) until we have
-            // at least one provider to persist. This prevents leaving an empty database behind
-            // when no provider details could be resolved (e.g., .evtx without LocaleMetaData).
-            ProviderDbContext? dbContext = null;
-
-            try
-            {
-                IEnumerable<ProviderDetails> providersToAdd = source is null
-                    ? LoadLocalProviders(regex, skipProviderNames)
-                    : ProviderSource.LoadProviders(source, Logger, regex, skipProviderNames);
-
-                foreach (var details in providersToAdd)
-                {
-                    if (!headerLogged)
-                    {
-                        pendingForHeader.Add(details);
-
-                        if (pendingForHeader.Count < BatchSize) { continue; }
-
-                        FlushHeaderAndBuffer(ref dbContext, path, pendingForHeader, ref count);
-                        headerLogged = true;
-                        continue;
-                    }
-
-                    dbContext ??= new ProviderDbContext(path, false, Logger);
-                    dbContext.ProviderDetails.Add(details);
-                    LogProviderDetails(details);
-                    count++;
-
-                    if (count % BatchSize != 0) { continue; }
-
-                    dbContext.SaveChanges();
-                    dbContext.ChangeTracker.Clear();
-                }
-
-                // Flush any buffered providers when the stream ended before the buffer filled.
-                if (!headerLogged && pendingForHeader.Count > 0)
-                {
-                    FlushHeaderAndBuffer(ref dbContext, path, pendingForHeader, ref count);
-                }
-
-                if (dbContext is null)
-                {
-                    Logger.Warning($"No provider details could be resolved from the source. Database was not created.");
-
-                    return;
-                }
-
-                Logger.Information($"");
-                Logger.Information($"Saving database. Please wait...");
-
-                dbContext.SaveChanges();
-
-                Logger.Information($"Done!");
-            }
-            finally
-            {
-                dbContext?.Dispose();
-            }
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            Logger.Error($"The --filter regex timed out. The pattern may cause catastrophic backtracking.");
-        }
-    }
-
-    private void FlushHeaderAndBuffer(
-        ref ProviderDbContext? dbContext,
-        string path,
-        List<ProviderDetails> buffer,
-        ref int count)
-    {
-        LogProviderDetailHeader(buffer.Select(p => p.ProviderName));
-
-        dbContext ??= new ProviderDbContext(path, false, Logger);
-
-        foreach (var details in buffer)
-        {
-            dbContext.ProviderDetails.Add(details);
-            LogProviderDetails(details);
-            count++;
-        }
-
-        dbContext.SaveChanges();
-        dbContext.ChangeTracker.Clear();
-        buffer.Clear();
     }
 }
