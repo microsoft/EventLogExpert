@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.DatabaseTools;
 using EventLogExpert.Runtime.DebugLog;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterCache;
@@ -82,6 +83,9 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IPackageDeploymentService, PackageDeploymentService>();
         services.AddSingleton<IPackageVersionProvider, PackageVersionProvider>();
         services.AddSingleton<IUpdateService, UpdateService>();
+
+        // DatabaseTools service (CLI-equivalent operations exposed to the UI).
+        services.AddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
         return services;
     }
