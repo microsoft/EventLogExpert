@@ -83,6 +83,10 @@ public sealed partial class LogTabBar
         return count <= 0 ? $"(Empty) {tabName}" : tabName;
     }
 
-    private void SetActiveLog(LogView table) =>
+    private void SetActiveLog(LogView table)
+    {
+        if (table.IsLoading) { return; }
+
         LogTableCommands.SetActiveTable(table.Id);
+    }
 }
