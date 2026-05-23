@@ -87,7 +87,7 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
 
         new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
 
-        using var verify = new ProviderDbContext(dbPath, true);
+        using var verify = new ProviderDbContext(dbPath, readOnly: true, ensureCreated: false);
         var schemaState = verify.IsUpgradeNeeded();
         Assert.False(schemaState.NeedsUpgrade);
         Assert.Equal(DatabaseSchemaVersion.Current, schemaState.CurrentVersion);

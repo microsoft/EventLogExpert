@@ -98,7 +98,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // Assert
         Assert.True(File.Exists(path));
 
-        using var verify = new ProviderDbContext(path, true);
+        using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
         Assert.Equal(ProviderCount, verify.ProviderDetails.Count());
         var firstName = verify.ProviderDetails.OrderBy(r => r.ProviderName).First().ProviderName;
         var lastName = verify.ProviderDetails.OrderBy(r => r.ProviderName).Last().ProviderName;
@@ -162,7 +162,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // Assert
         Assert.True(File.Exists(path));
 
-        using var verify = new ProviderDbContext(path, true);
+        using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
         var names = verify.ProviderDetails.Select(r => r.ProviderName).OrderBy(n => n).ToList();
         Assert.Equal(new[] { Constants.FirstProviderName, Constants.SecondProviderName }, names);
         logger.DidNotReceive().Error(Arg.Any<ErrorLogHandler>());
@@ -228,7 +228,7 @@ public sealed class CreateDatabaseCommandTests : IDisposable
         // Assert
         Assert.True(File.Exists(path), "Output database should be created when providers are resolved.");
 
-        using var verify = new ProviderDbContext(path, true);
+        using var verify = new ProviderDbContext(path, readOnly: true, ensureCreated: false);
         var rows = verify.ProviderDetails.OrderBy(r => r.ProviderName).ToList();
         Assert.Equal(2, rows.Count);
         Assert.Equal(Constants.FirstProviderName, rows[0].ProviderName);
