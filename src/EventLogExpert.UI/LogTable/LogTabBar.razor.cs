@@ -6,6 +6,7 @@ using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.LogTable;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.LogTable;
@@ -81,6 +82,13 @@ public sealed partial class LogTabBar
         int count = _logTableState.EventCountByLog.GetValueOrDefault(table.Id, 0);
 
         return count <= 0 ? $"(Empty) {tabName}" : tabName;
+    }
+
+    private void OnTabKeyDown(KeyboardEventArgs e, LogView table)
+    {
+        if (e.Key != "Enter" && e.Key != " ") { return; }
+
+        SetActiveLog(table);
     }
 
     private void SetActiveLog(LogView table)

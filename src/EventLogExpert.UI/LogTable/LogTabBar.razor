@@ -5,7 +5,7 @@
         @foreach (var table in _sortedTabs)
         {
             <div class="@GetActiveTab(table)" title="@GetTabTooltip(table)">
-                <span role="button" aria-disabled="@table.IsLoading" @onmousedown="() => SetActiveLog(table)">
+                <span role="button" tabindex="@(table.IsLoading ? -1 : 0)" aria-disabled="@table.IsLoading" @onmousedown="() => SetActiveLog(table)" @onkeydown="(e) => OnTabKeyDown(e, table)">
                     @if (table.IsLoading)
                     {
                         <i aria-label="Loading" class="spinner-border" role="status"></i>

@@ -43,7 +43,7 @@ public sealed class DiffDatabaseCommandTests : IDisposable
         // Assert
         Assert.True(File.Exists(output), "Diff should have created the output database.");
 
-        using var verify = new ProviderDbContext(output, true);
+        using var verify = new ProviderDbContext(output, readOnly: true, ensureCreated: false);
         var rows = verify.ProviderDetails.ToList();
         var copied = Assert.Single(rows);
         Assert.Equal(Constants.SecondProviderName, copied.ProviderName);
