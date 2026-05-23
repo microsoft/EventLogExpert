@@ -1,15 +1,16 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.Commands;
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
+using EventLogExpert.DatabaseTools.Contracts;
+using EventLogExpert.DatabaseTools.Operations;
+using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.ProviderDatabase.Context;
 using NSubstitute;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.DatabaseTools.IntegrationTests.Operations;
 
 public sealed class UpgradeDatabaseCommandTests : IDisposable
 {
@@ -24,26 +25,26 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void UpgradeDatabase_WithCorruptFile_LogsErrorWithoutThrowing()
+    public async Task UpgradeDatabase_WithCorruptFile_LogsErrorWithoutThrowing()
     {
         var dbPath = CreateTempDb();
         File.WriteAllBytes(dbPath, [0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07]);
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(dbPath)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("Failed to upgrade database") && handler.ToString().Contains(dbPath)));
     }
 
     [Fact]
-    public void UpgradeDatabase_WithEmptyFile_LogsUnrecognizedSchemaWithoutCreatingTables()
+    public async Task UpgradeDatabase_WithEmptyFile_LogsUnrecognizedSchemaWithoutCreatingTables()
     {
         var dbPath = CreateTempDb();
         File.WriteAllBytes(dbPath, []);
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(dbPath)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(dbPath)));
@@ -54,38 +55,38 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void UpgradeDatabase_WithMissingFile_LogsErrorAndReturns()
+    public async Task UpgradeDatabase_WithMissingFile_LogsErrorAndReturns()
     {
         var missing = DatabaseTestUtils.CreateTempPath();
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(missing);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(missing)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("File not found") && handler.ToString().Contains(missing)));
     }
 
     [Fact]
-    public void UpgradeDatabase_WithUnknownSchema_LogsErrorWithoutThrowing()
+    public async Task UpgradeDatabase_WithUnknownSchema_LogsErrorWithoutThrowing()
     {
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateUnknownShapeDatabase(dbPath);
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(dbPath)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Error(Arg.Is<ErrorLogHandler>(handler =>
             handler.ToString().Contains("unrecognized schema") && handler.ToString().Contains(dbPath)));
     }
 
     [Fact]
-    public void UpgradeDatabase_WithV3Database_UpgradesToCurrentSchema()
+    public async Task UpgradeDatabase_WithV3Database_UpgradesToCurrentSchema()
     {
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateV3Database(dbPath);
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(dbPath)).ExecuteAsync(logger, null, CancellationToken.None);
 
         using var verify = new ProviderDbContext(dbPath, readOnly: true, ensureCreated: false);
         var schemaState = verify.IsUpgradeNeeded();
@@ -94,13 +95,13 @@ public sealed class UpgradeDatabaseCommandTests : IDisposable
     }
 
     [Fact]
-    public void UpgradeDatabase_WithV4Database_LogsNoUpgradeNeeded()
+    public async Task UpgradeDatabase_WithV4Database_LogsNoUpgradeNeeded()
     {
         var dbPath = CreateTempDb();
         DatabaseTestUtils.CreateV4Database(dbPath);
         var logger = Substitute.For<ITraceLogger>();
 
-        new UpgradeDatabaseCommand(logger).UpgradeDatabase(dbPath);
+        await new UpgradeDatabaseOperation(new UpgradeDatabaseRequest(dbPath)).ExecuteAsync(logger, null, CancellationToken.None);
 
         logger.Received().Information(Arg.Is<InformationLogHandler>(handler =>
             handler.ToString().Contains("does not need to be upgraded")));

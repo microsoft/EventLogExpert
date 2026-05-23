@@ -1,7 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-namespace EventLogExpert.EventDbTool.IntegrationTests.TestUtils.Constants;
+namespace EventLogExpert.Eventing.TestUtils.Constants;
 
 public sealed partial class Constants
 {

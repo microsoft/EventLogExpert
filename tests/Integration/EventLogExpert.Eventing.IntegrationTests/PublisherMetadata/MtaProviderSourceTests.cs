@@ -1,13 +1,13 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using EventLogExpert.EventDbTool.IntegrationTests.TestUtils;
-using EventLogExpert.EventDbTool.ProviderSources;
+using EventLogExpert.Eventing.PublisherMetadata;
+using EventLogExpert.Eventing.TestUtils;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Logging.Abstractions.Handlers;
 using NSubstitute;
 
-namespace EventLogExpert.EventDbTool.IntegrationTests;
+namespace EventLogExpert.Eventing.IntegrationTests.PublisherMetadata;
 
 public sealed class MtaProviderSourceTests : IDisposable
 {
@@ -28,25 +28,6 @@ public sealed class MtaProviderSourceTests : IDisposable
         Assert.Empty(providers);
         logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains("Evtx file not found") && h.ToString().Contains(missing)));
-    }
-
-    [Fact]
-    public void DiscoverProviderNames_WhenFilterRegexIsInvalid_LogsErrorReturnsEmpty()
-    {
-        // Arrange
-        var missing = DatabaseTestUtils.CreateTempPath(".evtx");
-        var logger = Substitute.For<ITraceLogger>();
-
-        // Act — invalid pattern is rejected before the evtx is even opened.
-        var providers = MtaProviderSource.DiscoverProviderNames(missing, logger, "[unclosed");
-
-        // Assert
-        Assert.Empty(providers);
-        logger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Invalid --filter regex")));
-        // No "Evtx file not found" should be logged because we short-circuited on the bad regex.
-        logger.DidNotReceive().Error(Arg.Is<ErrorLogHandler>(h =>
-            h.ToString().Contains("Evtx file not found")));
     }
 
     public void Dispose()
