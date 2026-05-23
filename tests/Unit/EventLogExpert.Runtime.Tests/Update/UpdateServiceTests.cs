@@ -55,8 +55,8 @@ public sealed class UpdateServiceTests
             gitHubService: mockGitHubService);
 
         // Act
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
-        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: true);
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: false);
+        await updateService.CheckForUpdates(usePreRelease: false, userInitiated: false);
 
         // Assert
         await mockGitHubService.Received(1).GetReleases();
