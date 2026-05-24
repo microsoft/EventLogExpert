@@ -24,31 +24,31 @@ namespace EventLogExpert.Platforms.Windows;
 /// </remarks>
 internal static class FilePickerHelper
 {
-    public static Task<string?> PickAsync(IReadOnlyList<string> extensions)
+    public static Task<string?> PickAsync(IReadOnlyList<string> extensions, string? title = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickSingleFile(hwnd, extensions));
+        return RunOnStaThreadAsync(() => Win32FileDialog.PickSingleFile(hwnd, extensions, title));
     }
 
-    public static Task<IReadOnlyList<string>> PickMultipleAsync(IReadOnlyList<string> extensions)
+    public static Task<IReadOnlyList<string>> PickMultipleAsync(IReadOnlyList<string> extensions, string? title = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickMultipleFiles(hwnd, extensions));
+        return RunOnStaThreadAsync(() => Win32FileDialog.PickMultipleFiles(hwnd, extensions, title));
     }
 
-    public static Task<string?> PickSaveAsync(IReadOnlyList<string> extensions, string? suggestedFileName = null)
+    public static Task<string?> PickSaveAsync(IReadOnlyList<string> extensions, string? suggestedFileName = null, string? title = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
 
         var hwnd = PickerHostWindow.GetHandle();
 
-        return RunOnStaThreadAsync(() => Win32FileDialog.PickSaveFile(hwnd, extensions, suggestedFileName));
+        return RunOnStaThreadAsync(() => Win32FileDialog.PickSaveFile(hwnd, extensions, suggestedFileName, title));
     }
 
     private static Task<T> RunOnStaThreadAsync<T>(Func<T> func)
