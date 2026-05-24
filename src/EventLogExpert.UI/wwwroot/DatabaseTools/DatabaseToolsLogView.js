@@ -1,19 +1,17 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-// JS module backing DatabaseToolsLogView. Tracks whether the user has scrolled away from the
-// bottom so the C# component can pause auto-scroll and show the "Jump to latest" pill.
+// JS module backing DatabaseToolsLogView. Tracks scroll-pin state for the C# component.
 
 const PIN_TOLERANCE_PX = 4;
 
-// Per-element handler map so detach() can remove the SAME listener we registered, even if
-// the C# component re-attaches after a JS hot-reload or test re-render.
+// Per-element map so detach() removes the SAME listener on re-attach.
 const scrollHandlers = new WeakMap();
 
 export function attach(element, dotNetRef) {
     if (!element || !dotNetRef) { return; }
 
-    // If a prior attach() lingered, remove it first so we don't double-register.
+    // Remove prior listener to avoid double-register.
     detach(element);
 
     let lastPinned = true;
@@ -28,9 +26,7 @@ export function attach(element, dotNetRef) {
 
         if (pinned !== lastPinned) {
             lastPinned = pinned;
-            // invokeMethodAsync returns a Promise that rejects asynchronously when the .NET ref is disposed.
-            // try/catch only catches synchronous throws, so we attach .catch() to the returned promise to
-            // suppress unhandled-rejection noise during component teardown, and detach the listener inside it.
+            // invokeMethodAsync rejects async on disposal; .catch handles teardown + detaches the listener.
             dotNetRef.invokeMethodAsync("OnPinStateChanged", pinned)?.catch(() => {
                 element.removeEventListener("scroll", onScroll);
                 scrollHandlers.delete(element);

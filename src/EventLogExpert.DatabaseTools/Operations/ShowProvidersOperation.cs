@@ -20,8 +20,7 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
-        // Defensive: defaults Regex.InfiniteMatchTimeout means RegexMatchTimeoutException can never fire — recompile
-        // with a 5-second bound so catastrophic backtracking is caught regardless of how the caller built the regex.
+        // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
 
         try
