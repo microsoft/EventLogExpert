@@ -152,7 +152,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
         catch (ObjectDisposedException)
         {
-            // Component was torn down between the _disposed check and the dispatcher call — safe to ignore.
+            // Disposed between _disposed check and dispatch; ignore.
         }
     }
 

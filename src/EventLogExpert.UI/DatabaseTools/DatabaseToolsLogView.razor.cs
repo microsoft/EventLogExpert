@@ -142,7 +142,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
         catch (ObjectDisposedException)
         {
-            // Component was torn down between the _disposed check and the dispatcher call — safe to ignore.
+            // Disposed between _disposed check and dispatch; ignore.
         }
     }
 
@@ -150,8 +150,7 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     {
         if (firstRender)
         {
-            // Inline JS module — exposes scroll helpers + an IntersectionObserver-style pin tracker.
-            // Loaded lazily so non-DbTools sessions don't pay the cost.
+            // Inline JS module: scroll + pin tracker. Loaded lazily.
             _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
                 "import",
                 "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsLogView.js");
@@ -240,7 +239,6 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     private void OnLogScroll(EventArgs _)
     {
-        // JS module reports pin state via OnPinStateChanged; this server-side handler is unused for now
-        // but kept so callers can wire additional behavior in future without re-attaching the @onscroll.
+        // No-op: pin state flows from JS OnPinStateChanged; placeholder for future @onscroll wiring.
     }
 }

@@ -61,8 +61,7 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
             logger.Information($"Found {skipProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
         }
 
-        // Defensive: defaults Regex.InfiniteMatchTimeout means RegexMatchTimeoutException can never fire — recompile
-        // with a 5-second bound so catastrophic backtracking is caught regardless of how the caller built the regex.
+        // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
 
         var count = 0;
@@ -142,6 +141,13 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
         catch (RegexMatchTimeoutException)
         {
             logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
+            CleanupPartialDatabase(logger, ref dbContext, request.TargetPath);
+            return DatabaseToolsOutcome.Failed;
+        }
+        catch (Exception ex)
+        {
+            // Any non-cancellation, non-regex-timeout failure (e.g., EF/SQLite errors mid-save) — no stub .db.
+            logger.Error($"Unexpected error creating database: {ex.Message}");
             CleanupPartialDatabase(logger, ref dbContext, request.TargetPath);
             return DatabaseToolsOutcome.Failed;
         }

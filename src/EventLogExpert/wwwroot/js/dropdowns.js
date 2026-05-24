@@ -17,9 +17,7 @@ window.registerDropdown = (root, dotNetRef) => {
             dropdown.style.left = "";
             dropdown.style.width = "";
 
-            // Notify C# so _isOpen (which Blazor uses to render aria-expanded) follows the JS-driven close.
-            // .catch() on the returned promise handles the case where the .NET ref is disposed mid-call
-            // (invokeMethodAsync surfaces disposal as an async rejection, NOT a sync throw).
+            // Notify C# of JS-driven close. .catch handles disposal race (rejection is async, not sync).
             dotNetRef?.invokeMethodAsync("OnIsOpenChanged", false)?.catch(() => {});
         });
     };
@@ -40,9 +38,7 @@ window.registerDropdown = (root, dotNetRef) => {
         dropdown.setAttribute("data-toggle", "");
         dropdown.setAttribute("aria-hidden", "false");
 
-        // Notify C# so _isOpen (which Blazor uses to render aria-expanded) follows the JS-driven open.
-        // .catch() on the returned promise handles the case where the .NET ref is disposed mid-call
-        // (invokeMethodAsync surfaces disposal as an async rejection, NOT a sync throw).
+        // Notify C# of JS-driven open. .catch handles disposal race (rejection is async, not sync).
         dotNetRef?.invokeMethodAsync("OnIsOpenChanged", true)?.catch(() => {});
 
         scrollToSelectedItem();
