@@ -98,6 +98,7 @@ public sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Operati
         }
         catch (OperationCanceledException)
         {
+            CleanupPartialDatabase(logger, ref newDbContext, request.NewDatabasePath);
             return DatabaseToolsOutcome.Cancelled;
         }
         finally
