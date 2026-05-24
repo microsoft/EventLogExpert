@@ -15,6 +15,8 @@ namespace EventLogExpert.DatabaseTools.Operations;
 /// </summary>
 public sealed class ShowProvidersOperation(ShowProvidersRequest request) : OperationBase, IDatabaseToolsOperation
 {
+    private const int HeaderBatchSize = 100;
+
     public Task<DatabaseToolsOutcome> ExecuteAsync(
         ITraceLogger logger,
         IProgress<DatabaseToolsProgress>? progress,
@@ -23,14 +25,18 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
         // Defensive recompile if input has Regex.InfiniteMatchTimeout (otherwise catch below is dead).
         var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
 
+        // Buffer first batch to size the column widths (mirrors CreateDatabaseOperation). Lives outside
+        // the try so the cancellation arm can flush partial output the user has been waiting on.
+        var headerLogged = false;
+        var pendingForHeader = new List<ProviderDetails>(HeaderBatchSize);
+        var processed = 0;
+
         try
         {
-            IReadOnlyList<string> providerNames;
             IEnumerable<ProviderDetails> providers;
 
             if (string.IsNullOrEmpty(request.SourcePath))
             {
-                providerNames = GetLocalProviderNames(filterRegex);
                 providers = LoadLocalProviders(logger, filterRegex);
             }
             else
@@ -40,35 +46,53 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
                     return Task.FromResult(DatabaseToolsOutcome.Failed);
                 }
 
-                providerNames = ProviderSource.LoadProviderNames(request.SourcePath, logger, filterRegex);
                 providers = ProviderSource.LoadProviders(request.SourcePath, logger, filterRegex);
             }
-
-            if (providerNames.Count == 0)
-            {
-                logger.Warning($"No providers found.");
-
-                return Task.FromResult(DatabaseToolsOutcome.Succeeded);
-            }
-
-            LogProviderDetailHeader(logger, providerNames);
-
-            var processed = 0;
 
             foreach (var details in providers)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                LogProviderDetails(logger, details);
+                if (!headerLogged)
+                {
+                    pendingForHeader.Add(details);
+                    processed++;
+                    progress?.Report(new DatabaseToolsProgress(processed, null, details.ProviderName));
 
+                    if (pendingForHeader.Count < HeaderBatchSize) { continue; }
+
+                    FlushHeaderAndBuffer(logger, pendingForHeader);
+                    headerLogged = true;
+                    pendingForHeader.Clear();
+
+                    continue;
+                }
+
+                LogProviderDetails(logger, details);
                 processed++;
-                progress?.Report(new DatabaseToolsProgress(processed, providerNames.Count, details.ProviderName));
+                progress?.Report(new DatabaseToolsProgress(processed, null, details.ProviderName));
+            }
+
+            if (!headerLogged && pendingForHeader.Count > 0)
+            {
+                FlushHeaderAndBuffer(logger, pendingForHeader);
+            }
+
+            if (processed == 0)
+            {
+                logger.Warning($"No providers found.");
             }
 
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         }
         catch (OperationCanceledException)
         {
+            // Flush buffered providers so the user sees partial output before "[Cancelled]".
+            if (!headerLogged && pendingForHeader.Count > 0)
+            {
+                FlushHeaderAndBuffer(logger, pendingForHeader);
+            }
+
             return Task.FromResult(DatabaseToolsOutcome.Cancelled);
         }
         catch (RegexMatchTimeoutException)
@@ -76,6 +100,16 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
             logger.Error($"The provider-name regex timed out. The pattern may cause catastrophic backtracking.");
 
             return Task.FromResult(DatabaseToolsOutcome.Failed);
+        }
+    }
+
+    private void FlushHeaderAndBuffer(ITraceLogger logger, List<ProviderDetails> buffer)
+    {
+        LogProviderDetailHeader(logger, buffer.Select(p => p.ProviderName));
+
+        foreach (var details in buffer)
+        {
+            LogProviderDetails(logger, details);
         }
     }
 }

@@ -23,6 +23,19 @@ namespace EventLogExpert.UI.DatabaseTools.Tabs;
 public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposable
     where TRequest : class
 {
+    private const int FlushIntervalMs = 50;
+
+    private readonly List<DatabaseToolsLogEntry> _pendingEntries = [];
+    private readonly Lock _pendingLock = new();
+
+    /// <summary>
+    ///     Set to <c>true</c> by <see cref="Dispose" /> when the tab is torn down. Read by <see cref="AppendEntry" /> and
+    ///     <see cref="RunAsync" />'s post-await dispatch to suppress UI work that would land on a disposed renderer.
+    ///     <c>volatile</c> because the Progress sink callback fires on threadpool threads.
+    /// </summary>
+    private volatile bool _disposed;
+    private bool _flushScheduled;
+
     public bool IsRunning { get; protected set; }
 
     [CascadingParameter(Name = "VerboseLogging")] public bool VerboseLogging { get; set; }
@@ -45,13 +58,6 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
-    /// <summary>
-    ///     Set to <c>true</c> by <see cref="Dispose" /> when the tab is torn down. Read by <see cref="AppendEntry" /> and
-    ///     <see cref="RunAsync" />'s post-await dispatch to suppress UI work that would land on a disposed renderer.
-    ///     <c>volatile</c> because the Progress sink callback fires on threadpool threads.
-    /// </summary>
-    private volatile bool _disposed;
-
     /// <summary>Cancels the in-flight operation if any. Safe to call on a torn-down tab.</summary>
     public void CancelIfRunning()
     {
@@ -68,31 +74,45 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
         Cts?.Dispose();
 
+        lock (_pendingLock) { _pendingEntries.Clear(); }
+
         GC.SuppressFinalize(this);
     }
 
     /// <summary>
-    ///     Thread-safe log-entry append. Always re-dispatches to the UI thread via <see cref="InvokeAsync" />. Safe to
-    ///     invoke after <see cref="Dispose" /> — late Progress-sink callbacks (e.g., the operation completing after the
-    ///     user closes the modal) are dropped silently rather than throwing <see cref="ObjectDisposedException" />.
+    ///     Thread-safe log-entry append. Buffers entries on a 50ms flush window so a high-rate operation
+    ///     (Create/Merge/Diff can emit thousands of entries) renders in one batch per window instead of per entry. Safe to
+    ///     invoke after <see cref="Dispose" /> — late Progress-sink callbacks (e.g., the operation completing after the user
+    ///     closes the modal) are dropped silently rather than throwing <see cref="ObjectDisposedException" />.
     /// </summary>
     protected void AppendEntry(DatabaseToolsLogEntry entry)
     {
         if (_disposed) { return; }
 
-        try
+        bool needsSchedule;
+        lock (_pendingLock)
         {
-            _ = InvokeAsync(() =>
+            _pendingEntries.Add(entry);
+            needsSchedule = !_flushScheduled;
+            if (needsSchedule) { _flushScheduled = true; }
+        }
+
+        if (!needsSchedule) { return; }
+
+        // Task.Run forces a threadpool hop so the await Task.Delay continuation runs on a stable SC.
+        // The inner await InvokeAsync then explicitly dispatches to the Blazor renderer for the flush.
+        _ = Task.Run(async () =>
+        {
+            try
             {
+                await Task.Delay(FlushIntervalMs);
+
                 if (_disposed) { return; }
-                LogEntries = LogEntries.Add(entry);
-                StateHasChanged();
-            });
-        }
-        catch (ObjectDisposedException)
-        {
-            // Disposed between _disposed check and dispatch; ignore.
-        }
+
+                await InvokeAsync(FlushPendingEntriesCore);
+            }
+            catch (ObjectDisposedException) { /* Component disposed mid-flush; drop. */ }
+        });
     }
 
     /// <summary>
@@ -135,6 +155,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         if (!IsRunning) { return; }
 
         IsCancelling = true;
+
         try { Cts?.Cancel(); }
         catch (ObjectDisposedException) { }
     }
@@ -144,6 +165,21 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         TRequest request,
         IProgress<DatabaseToolsLogEntry> logSink,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    ///     Forces an immediate flush of buffered entries. Used by <see cref="RunAsync" />'s finally arm so the user sees
+    ///     all entries (including <see cref="AppendOutcome" />'s outcome line) the moment the run completes.
+    /// </summary>
+    protected async Task FlushPendingEntriesAsync()
+    {
+        if (_disposed) { return; }
+
+        try { await InvokeAsync(FlushPendingEntriesCore); }
+        catch
+        {
+            // Terminal cleanup path (RunAsync.finally); swallow all so the original outcome propagates.
+        }
+    }
 
     /// <summary>
     ///     Convenience for tabs that have a Browse… button next to a path field. Returns the picked path (or <c>null</c>
@@ -177,6 +213,12 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         IsCancelling = false;
         Cts = new CancellationTokenSource();
 
+        lock (_pendingLock)
+        {
+            _pendingEntries.Clear();
+            _flushScheduled = false;
+        }
+
         var logSink = new Progress<DatabaseToolsLogEntry>(AppendEntry);
 
         try
@@ -199,8 +241,13 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             IsCancelling = false;
             Cts?.Dispose();
             Cts = null;
+
             if (!_disposed)
             {
+                // Flush before the final StateHasChanged so the outcome line + any tail entries are
+                // visible in the same render as "Run complete".
+                await FlushPendingEntriesAsync();
+
                 try { await InvokeAsync(StateHasChanged); }
                 catch (ObjectDisposedException)
                 {
@@ -208,5 +255,34 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
                 }
             }
         }
+    }
+
+    /// <summary>
+    ///     Drains the pending buffer and renders the accumulated batch. Must be called on the Blazor renderer thread
+    ///     (i.e. via <see cref="ComponentBase.InvokeAsync(System.Action)" />).
+    /// </summary>
+    private void FlushPendingEntriesCore()
+    {
+        if (_disposed) { return; }
+
+        DatabaseToolsLogEntry[] batch;
+
+        lock (_pendingLock)
+        {
+            if (_pendingEntries.Count == 0)
+            {
+                _flushScheduled = false;
+
+                return;
+            }
+
+            batch = _pendingEntries.ToArray();
+            _pendingEntries.Clear();
+            _flushScheduled = false;
+        }
+
+        LogEntries = LogEntries.AddRange(batch);
+
+        StateHasChanged();
     }
 }
