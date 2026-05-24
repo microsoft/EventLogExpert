@@ -14,8 +14,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private readonly HashSet<T> _selectedValues = [];
 
     private ValueSelectItem<T>? _highlightedItem;
+    private bool _isOpen;
     private bool _preventDefault;
     private ElementReference _selectComponent;
+    private DotNetObjectReference<ValueSelect<T>>? _selfRef;
 
     [Parameter] public string? AriaDescribedBy { get; set; }
 
@@ -102,7 +104,11 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    public async Task CloseDropDown() => await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
+    public async Task CloseDropDown()
+    {
+        _isOpen = false;
+        await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
+    }
 
     public async ValueTask DisposeAsync()
     {
@@ -114,11 +120,26 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         {
             // Expected during app shutdown
         }
+
+        _selfRef?.Dispose();
     }
 
     public bool IsItemSelected(T value) => _selectedValues.Contains(value);
 
-    public async Task OpenDropDown() => await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
+    [JSInvokable]
+    public void OnIsOpenChanged(bool isOpen)
+    {
+        if (_isOpen == isOpen) { return; }
+
+        _isOpen = isOpen;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    public async Task OpenDropDown()
+    {
+        _isOpen = true;
+        await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
+    }
 
     public void RemoveItem(ValueSelectItem<T> item)
     {
@@ -164,7 +185,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     {
         if (firstRender)
         {
-            await JSRuntime.InvokeVoidAsync("registerDropdown", _selectComponent);
+            _selfRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("registerDropdown", _selectComponent, _selfRef);
         }
 
         await base.OnAfterRenderAsync(firstRender);
@@ -291,6 +313,9 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    private async Task ToggleDropDownVisibility() =>
+    private async Task ToggleDropDownVisibility()
+    {
+        _isOpen = !_isOpen;
         await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent);
+    }
 }
