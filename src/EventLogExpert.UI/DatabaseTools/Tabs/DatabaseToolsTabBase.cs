@@ -27,12 +27,6 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     private readonly List<DatabaseToolsLogEntry> _pendingEntries = [];
     private readonly Lock _pendingLock = new();
-
-    /// <summary>
-    ///     Set to <c>true</c> by <see cref="Dispose" /> when the tab is torn down. Read by <see cref="AppendEntry" /> and
-    ///     <see cref="RunAsync" />'s post-await dispatch to suppress UI work that would land on a disposed renderer.
-    ///     <c>volatile</c> because the Progress sink callback fires on threadpool threads.
-    /// </summary>
     private volatile bool _disposed;
     private bool _flushScheduled;
 
