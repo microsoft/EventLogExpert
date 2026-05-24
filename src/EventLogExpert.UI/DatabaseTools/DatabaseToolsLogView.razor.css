@@ -48,7 +48,10 @@
     border-left: 1px solid var(--clr-statusbar);
 }
 
-.toolbar-leading:empty + .entry-count {
+/* When the toolbar-leading wrapper is absent (its content was null and the @if in
+   DatabaseToolsLogView.razor elided the element entirely), .entry-count is the first
+   child and shouldn't have a leading separator with nothing to its left to separate from. */
+.database-tools-log-toolbar > .entry-count:first-child {
     padding-left: 0;
     border-left: 0;
 }
