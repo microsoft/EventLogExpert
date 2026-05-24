@@ -21,20 +21,18 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 {
     private readonly DotNetObjectReference<DatabaseToolsLogView> _selfRef;
 
-    private bool _isAutoScrollPinned = true;
-    private IJSObjectReference? _jsModule;
-    private int _lastRenderedCount;
-
-    private ElementReference _logViewRef;
-    private bool _showJumpToLatest;
-
     /// <summary>
     ///     Set to <c>true</c> in <see cref="DisposeAsync" /> before the JS detach is awaited. Read by the
     ///     <see cref="JSInvokable" /> <see cref="OnPinStateChanged" /> callback to suppress UI work that would land on a
-    ///     disposed renderer if the JS scroll event fires between the dispose call and the detach completing.
-    ///     <c>volatile</c> because the JS callback executes on the JS-interop thread.
+    ///     disposed renderer if the JS scroll event fires between the dispose call and the detach completing. <c>volatile</c>
+    ///     because the JS callback executes on the JS-interop thread.
     /// </summary>
     private volatile bool _disposed;
+    private bool _isAutoScrollPinned = true;
+    private IJSObjectReference? _jsModule;
+    private int _lastRenderedCount;
+    private ElementReference _logViewRef;
+    private bool _showJumpToLatest;
 
     public DatabaseToolsLogView() => _selfRef = DotNetObjectReference.Create(this);
 
@@ -127,7 +125,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     public void OnPinStateChanged(bool isPinned)
     {
         if (_disposed) { return; }
-        if (_isAutoScrollPinned == isPinned && _showJumpToLatest != !isPinned) { return; }
+
+        if (_isAutoScrollPinned == isPinned && _showJumpToLatest == !isPinned) { return; }
 
         _isAutoScrollPinned = isPinned;
         _showJumpToLatest = !isPinned;
@@ -161,11 +160,14 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
             return;
         }
 
-        if (Entries.Count > _lastRenderedCount)
+        if (Entries.Count != _lastRenderedCount)
         {
+            // Track shrink (new run resets Entries to empty) and grow uniformly so auto-scroll
+            // re-arms on the next batch of entries after a reset.
+            var grew = Entries.Count > _lastRenderedCount;
             _lastRenderedCount = Entries.Count;
 
-            if (_isAutoScrollPinned && _jsModule is not null)
+            if (grew && _isAutoScrollPinned && _jsModule is not null)
             {
                 try
                 {
