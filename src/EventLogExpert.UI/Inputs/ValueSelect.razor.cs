@@ -110,11 +110,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    public async Task CloseDropDown()
-    {
-        _isOpen = false;
-        await JSRuntime.InvokeVoidAsync("closeDropdown", _selectComponent);
-    }
+    public Task CloseDropDown() => SetOpenStateAsync(false, "closeDropdown");
 
     public async ValueTask DisposeAsync()
     {
@@ -156,11 +152,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    public async Task OpenDropDown()
-    {
-        _isOpen = true;
-        await JSRuntime.InvokeVoidAsync("openDropdown", _selectComponent);
-    }
+    public Task OpenDropDown() => SetOpenStateAsync(true, "openDropdown");
 
     public void RemoveItem(ValueSelectItem<T> item)
     {
@@ -334,9 +326,14 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    private async Task ToggleDropDownVisibility()
+    private async Task SetOpenStateAsync(bool targetState, string jsAction)
     {
-        _isOpen = !_isOpen;
-        await JSRuntime.InvokeVoidAsync("toggleDropdown", _selectComponent);
+        if (_isOpen == targetState) { return; }
+
+        _isOpen = targetState;
+        StateHasChanged();
+        await JSRuntime.InvokeVoidAsync(jsAction, _selectComponent);
     }
+
+    private Task ToggleDropDownVisibility() => SetOpenStateAsync(!_isOpen, "toggleDropdown");
 }
