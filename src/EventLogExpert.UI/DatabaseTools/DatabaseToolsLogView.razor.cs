@@ -167,7 +167,17 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
             var grew = Entries.Count > _lastRenderedCount;
             _lastRenderedCount = Entries.Count;
 
-            if (grew && _isAutoScrollPinned && _jsModule is not null)
+            if (!grew)
+            {
+                // Shrink → new run reset. Re-arm pinned state so the next batch auto-scrolls
+                // regardless of prior-run scroll position; JS pin tracker will re-compute on
+                // the user's next scroll event. StateHasChanged because the render that just
+                // committed drew the pill from the prior-run state.
+                _isAutoScrollPinned = true;
+                _showJumpToLatest = false;
+                StateHasChanged();
+            }
+            else if (_isAutoScrollPinned && _jsModule is not null)
             {
                 try
                 {
