@@ -20,7 +20,7 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickAsync(extensions));
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickAsync(extensions, pickerTitle));
     }
 
     public Task<IReadOnlyList<string>> PickMultipleAsync(
@@ -36,7 +36,7 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickMultipleAsync(extensions));
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickMultipleAsync(extensions, pickerTitle));
     }
 
     public Task<string?> PickSaveAsync(
@@ -53,6 +53,6 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickSaveAsync(extensions, suggestedFileName));
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickSaveAsync(extensions, suggestedFileName, pickerTitle));
     }
 }

@@ -3,11 +3,6 @@ window.registerDropdown = (root, dotNetRef) => {
     const input = root.getElementsByTagName("input")[0];
     const controller = new AbortController();
 
-    // Stored so window.openDropdown / window.closeDropdown (called from C# after C# already set _isOpen) can detect
-    // they don't need to invoke the callback again. Internal mousedown / blur paths DO invoke it (they're the
-    // events that originate in JS and need to notify C#).
-    root._dropdownDotNetRef = dotNetRef;
-
     const closeDropdown = (e, force = false) => {
         const target = e.currentTarget.parentNode;
 
@@ -75,7 +70,6 @@ window.registerDropdown = (root, dotNetRef) => {
 
 window.unregisterDropdown = (root) => {
     root?._dropdownController?.abort();
-    if (root) { root._dropdownDotNetRef = null; }
 };
 
 window.closeDropdown = (root) => {
