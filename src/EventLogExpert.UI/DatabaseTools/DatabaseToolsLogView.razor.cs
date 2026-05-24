@@ -28,6 +28,14 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     private ElementReference _logViewRef;
     private bool _showJumpToLatest;
 
+    /// <summary>
+    ///     Set to <c>true</c> in <see cref="DisposeAsync" /> before the JS detach is awaited. Read by the
+    ///     <see cref="JSInvokable" /> <see cref="OnPinStateChanged" /> callback to suppress UI work that would land on a
+    ///     disposed renderer if the JS scroll event fires between the dispose call and the detach completing.
+    ///     <c>volatile</c> because the JS callback executes on the JS-interop thread.
+    /// </summary>
+    private volatile bool _disposed;
+
     public DatabaseToolsLogView() => _selfRef = DotNetObjectReference.Create(this);
 
     [Parameter] public ImmutableList<DatabaseToolsLogEntry> Entries { get; set; } = ImmutableList<DatabaseToolsLogEntry>.Empty;
@@ -94,6 +102,8 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+
         if (_jsModule is not null)
         {
             try
@@ -116,11 +126,24 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     [JSInvokable]
     public void OnPinStateChanged(bool isPinned)
     {
+        if (_disposed) { return; }
         if (_isAutoScrollPinned == isPinned && _showJumpToLatest != !isPinned) { return; }
 
         _isAutoScrollPinned = isPinned;
         _showJumpToLatest = !isPinned;
-        _ = InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                if (_disposed) { return; }
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was torn down between the _disposed check and the dispatcher call — safe to ignore.
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

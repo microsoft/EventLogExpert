@@ -45,6 +45,13 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     protected DatabaseToolsResult? Outcome { get; set; }
 
+    /// <summary>
+    ///     Set to <c>true</c> by <see cref="Dispose" /> when the tab is torn down. Read by <see cref="AppendEntry" /> and
+    ///     <see cref="RunAsync" />'s post-await dispatch to suppress UI work that would land on a disposed renderer.
+    ///     <c>volatile</c> because the Progress sink callback fires on threadpool threads.
+    /// </summary>
+    private volatile bool _disposed;
+
     /// <summary>Cancels the in-flight operation if any. Safe to call on a torn-down tab.</summary>
     public void CancelIfRunning()
     {
@@ -54,6 +61,8 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
 
     public virtual void Dispose()
     {
+        _disposed = true;
+
         try { Cts?.Cancel(); }
         catch (ObjectDisposedException) { }
 
@@ -62,14 +71,28 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         GC.SuppressFinalize(this);
     }
 
-    /// <summary>Thread-safe log-entry append. Always re-dispatches to the UI thread via <see cref="InvokeAsync" />.</summary>
+    /// <summary>
+    ///     Thread-safe log-entry append. Always re-dispatches to the UI thread via <see cref="InvokeAsync" />. Safe to
+    ///     invoke after <see cref="Dispose" /> — late Progress-sink callbacks (e.g., the operation completing after the
+    ///     user closes the modal) are dropped silently rather than throwing <see cref="ObjectDisposedException" />.
+    /// </summary>
     protected void AppendEntry(DatabaseToolsLogEntry entry)
     {
-        _ = InvokeAsync(() =>
+        if (_disposed) { return; }
+
+        try
         {
-            LogEntries = LogEntries.Add(entry);
-            StateHasChanged();
-        });
+            _ = InvokeAsync(() =>
+            {
+                if (_disposed) { return; }
+                LogEntries = LogEntries.Add(entry);
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Tab was torn down between the _disposed check and the dispatcher call — safe to ignore.
+        }
     }
 
     /// <summary>
@@ -176,7 +199,14 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
             IsCancelling = false;
             Cts?.Dispose();
             Cts = null;
-            await InvokeAsync(StateHasChanged);
+            if (!_disposed)
+            {
+                try { await InvokeAsync(StateHasChanged); }
+                catch (ObjectDisposedException)
+                {
+                    // Tab was torn down between the _disposed check and the dispatcher call — safe to ignore.
+                }
+            }
         }
     }
 }

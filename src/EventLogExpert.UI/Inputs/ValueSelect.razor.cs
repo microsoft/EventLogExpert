@@ -13,6 +13,12 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private readonly List<ValueSelectItem<T>> _items = [];
     private readonly HashSet<T> _selectedValues = [];
 
+    /// <summary>
+    ///     Set to <c>true</c> in <see cref="DisposeAsync" /> before the JS unregister is awaited. Read by the
+    ///     <see cref="JSInvokable" /> <see cref="OnIsOpenChanged" /> callback to suppress state updates that would land on a
+    ///     disposed renderer. <c>volatile</c> because the JS callback executes on the JS-interop thread.
+    /// </summary>
+    private volatile bool _disposed;
     private ValueSelectItem<T>? _highlightedItem;
     private bool _isOpen;
     private bool _preventDefault;
@@ -112,6 +118,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
+
         try
         {
             await JSRuntime.InvokeVoidAsync("unregisterDropdown", _selectComponent);
@@ -129,10 +137,23 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     [JSInvokable]
     public void OnIsOpenChanged(bool isOpen)
     {
+        if (_disposed) { return; }
         if (_isOpen == isOpen) { return; }
 
         _isOpen = isOpen;
-        _ = InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                if (_disposed) { return; }
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component was torn down between the _disposed check and the dispatcher call — safe to ignore.
+        }
     }
 
     public async Task OpenDropDown()
