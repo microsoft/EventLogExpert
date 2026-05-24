@@ -15,7 +15,7 @@
     <ChildContent>
         <CascadingValue Value="_verboseLogging" Name="VerboseLogging">
             <div class="database-tools">
-                <div aria-orientation="vertical" class="database-tools-tabs" role="tablist">
+                <div aria-orientation="vertical" class="database-tools-tabs" role="tablist" @ref="_tablistRef">
                     @foreach (var (tab, label) in s_tabs)
                     {
                         <button aria-controls="@($"db-tabpanel-{tab}")"

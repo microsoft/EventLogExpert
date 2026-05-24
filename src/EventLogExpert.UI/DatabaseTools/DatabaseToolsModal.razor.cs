@@ -5,6 +5,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
@@ -21,9 +22,13 @@ public sealed partial class DatabaseToolsModal
 
     private readonly Dictionary<DatabaseToolsTab, ElementReference> _tabButtonRefs = new();
 
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
     private DatabaseToolsTab _activeTab = DatabaseToolsTab.Show;
     private CreateDatabaseTab? _createTab;
     private DiffDatabasesTab? _diffTab;
+    private IJSObjectReference? _tabKeyModule;
+    private ElementReference _tablistRef;
     private MergeDatabaseTab? _mergeTab;
     private DatabaseToolsTab? _pendingFocusTab;
     private ShowProvidersTab? _showTab;
@@ -38,8 +43,40 @@ public sealed partial class DatabaseToolsModal
         (_diffTab?.IsRunning ?? false) ||
         (_upgradeTab?.IsRunning ?? false);
 
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
+    {
+        if (disposing && _tabKeyModule is not null)
+        {
+            try
+            {
+                await _tabKeyModule.InvokeVoidAsync("detach", _tablistRef);
+                await _tabKeyModule.DisposeAsync();
+            }
+            catch (JSDisconnectedException) { /* Circuit gone — ignore. */ }
+            catch (JSException) { /* Stale module/ref — best-effort teardown. */ }
+            catch (ObjectDisposedException) { /* Already torn down — ignore. */ }
+        }
+
+        await base.DisposeAsyncCore(disposing);
+    }
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (firstRender)
+        {
+            // Inline JS shim: suppresses browser default scrolling on Arrow/Home/End while
+            // keeping Tab/Enter/Space defaults intact for focus + activation.
+            try
+            {
+                _tabKeyModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsModal.js");
+
+                await _tabKeyModule.InvokeVoidAsync("attach", _tablistRef);
+            }
+            catch (JSDisconnectedException) { /* Closed mid-import — ignore. */ }
+        }
+
         if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var elementRef))
         {
             _pendingFocusTab = null;
