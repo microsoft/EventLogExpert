@@ -23,6 +23,8 @@ public interface IMenuActionService
 
     void LoadNewEvents();
 
+    Task OpenDatabaseToolsAsync();
+
     Task OpenDocsAsync();
 
     Task OpenFileAsync(bool combineLog);

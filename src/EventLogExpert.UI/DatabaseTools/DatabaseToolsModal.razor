@@ -1,0 +1,68 @@
+@using EventLogExpert.UI.DatabaseTools.Tabs
+@inherits ModalBase<bool>
+
+<ModalChrome AriaLabel="Database Tools"
+    Footer="FooterPreset.CloseOnly"
+    Height="80%"
+    InlineAlert="@CurrentInlineAlert"
+    OnCancel="OnCancelAsync"
+    OnDialogClosedByUser="HandleDialogClosedByUserAsync"
+    OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
+    @ref="ChromeRef"
+    Width="80%">
+    <ChildContent>
+        <div class="database-tools">
+            <div aria-orientation="vertical" class="database-tools-tabs" role="tablist">
+                @foreach (var (tab, label) in _tabs)
+                {
+                    <button aria-controls="@($"db-tabpanel-{tab}")"
+                        aria-selected="@(tab == _activeTab ? "true" : "false")"
+                        class="@(tab == _activeTab ? "tab active" : "tab")"
+                        id="@($"db-tab-{tab}")"
+                        @onclick="() => SetActiveTab(tab)"
+                        @onkeydown="e => OnTabKeyDown(e, tab)"
+                        role="tab"
+                        tabindex="@(tab == _activeTab ? "0" : "-1")"
+                        type="button">
+                        @label
+                    </button>
+                }
+            </div>
+
+            <div class="database-tools-content">
+                @foreach (var (tab, _) in _tabs)
+                {
+                    <div aria-labelledby="@($"db-tab-{tab}")"
+                        class="@(tab == _activeTab ? "tabpanel active" : "tabpanel")"
+                        id="@($"db-tabpanel-{tab}")"
+                        role="tabpanel"
+                        style="@(tab == _activeTab ? "" : "display: none")">
+                        @switch (tab)
+                        {
+                            case DatabaseToolsTab.Show:
+                                <ShowProvidersTab @ref="_showTab" />
+
+                                break;
+                            case DatabaseToolsTab.Create:
+                                <CreateDatabaseTab @ref="_createTab" />
+
+                                break;
+                            case DatabaseToolsTab.Merge:
+                                <MergeDatabaseTab @ref="_mergeTab" />
+
+                                break;
+                            case DatabaseToolsTab.Diff:
+                                <DiffDatabasesTab @ref="_diffTab" />
+
+                                break;
+                            case DatabaseToolsTab.Upgrade:
+                                <UpgradeDatabaseTab @ref="_upgradeTab" />
+
+                                break;
+                        }
+                    </div>
+                }
+            </div>
+        </div>
+    </ChildContent>
+</ModalChrome>
