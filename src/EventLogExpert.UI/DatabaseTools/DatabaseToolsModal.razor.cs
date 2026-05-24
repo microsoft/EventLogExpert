@@ -22,16 +22,14 @@ public sealed partial class DatabaseToolsModal
 
     private readonly Dictionary<DatabaseToolsTab, ElementReference> _tabButtonRefs = new();
 
-    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
-
     private DatabaseToolsTab _activeTab = DatabaseToolsTab.Show;
     private CreateDatabaseTab? _createTab;
     private DiffDatabasesTab? _diffTab;
-    private IJSObjectReference? _tabKeyModule;
-    private ElementReference _tablistRef;
     private MergeDatabaseTab? _mergeTab;
     private DatabaseToolsTab? _pendingFocusTab;
     private ShowProvidersTab? _showTab;
+    private IJSObjectReference? _tabKeyModule;
+    private ElementReference _tablistRef;
     private UpgradeDatabaseTab? _upgradeTab;
     private bool _verboseLogging;
 
@@ -42,6 +40,8 @@ public sealed partial class DatabaseToolsModal
         (_mergeTab?.IsRunning ?? false) ||
         (_diffTab?.IsRunning ?? false) ||
         (_upgradeTab?.IsRunning ?? false);
+
+    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
@@ -75,6 +75,7 @@ public sealed partial class DatabaseToolsModal
                 await _tabKeyModule.InvokeVoidAsync("attach", _tablistRef);
             }
             catch (JSDisconnectedException) { /* Closed mid-import — ignore. */ }
+            catch (JSException) { /* Stale module/ref — best-effort keyboard nav. */ }
         }
 
         if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var elementRef))
