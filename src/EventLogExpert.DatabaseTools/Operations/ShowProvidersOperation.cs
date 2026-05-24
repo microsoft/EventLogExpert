@@ -20,6 +20,10 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken)
     {
+        // Defensive: defaults Regex.InfiniteMatchTimeout means RegexMatchTimeoutException can never fire — recompile
+        // with a 5-second bound so catastrophic backtracking is caught regardless of how the caller built the regex.
+        var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
+
         try
         {
             IReadOnlyList<string> providerNames;
@@ -27,8 +31,8 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
 
             if (string.IsNullOrEmpty(request.SourcePath))
             {
-                providerNames = GetLocalProviderNames(request.FilterRegex);
-                providers = LoadLocalProviders(logger, request.FilterRegex);
+                providerNames = GetLocalProviderNames(filterRegex);
+                providers = LoadLocalProviders(logger, filterRegex);
             }
             else
             {
@@ -37,8 +41,8 @@ public sealed class ShowProvidersOperation(ShowProvidersRequest request) : Opera
                     return Task.FromResult(DatabaseToolsOutcome.Failed);
                 }
 
-                providerNames = ProviderSource.LoadProviderNames(request.SourcePath, logger, request.FilterRegex);
-                providers = ProviderSource.LoadProviders(request.SourcePath, logger, request.FilterRegex);
+                providerNames = ProviderSource.LoadProviderNames(request.SourcePath, logger, filterRegex);
+                providers = ProviderSource.LoadProviders(request.SourcePath, logger, filterRegex);
             }
 
             if (providerNames.Count == 0)
