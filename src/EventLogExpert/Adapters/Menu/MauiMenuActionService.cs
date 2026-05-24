@@ -14,6 +14,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
+using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.Settings;
 using EventLogExpert.UI.Update;
@@ -137,6 +138,8 @@ public sealed class MauiMenuActionService(
     }
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
+
+    public Task OpenDatabaseToolsAsync() => ShowModalAsync<DatabaseToolsModal>("database tools");
 
     public Task OpenDocsAsync() =>
         OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
