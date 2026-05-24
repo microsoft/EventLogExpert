@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Adapters.ClipboardAdapter;
+using EventLogExpert.Adapters.Elevation;
 using EventLogExpert.Adapters.FilePickerAdapter;
 using EventLogExpert.Adapters.FileSave;
 using EventLogExpert.Adapters.Identity;
@@ -16,6 +17,7 @@ using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Elevation;
 using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Identity;
 using EventLogExpert.Runtime.Common.Restart;
@@ -106,6 +108,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
+        builder.Services.AddSingleton<IElevationService, MauiElevationService>();
         builder.Services.AddSingleton<MauiMenuActionService>();
 
         builder.Services.AddSingleton<IMenuActionService>(static provider =>
