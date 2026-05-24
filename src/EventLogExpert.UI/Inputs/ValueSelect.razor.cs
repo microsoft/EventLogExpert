@@ -17,6 +17,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private bool _preventDefault;
     private ElementReference _selectComponent;
 
+    [Parameter] public string? AriaDescribedBy { get; set; }
+
     [Parameter] public string? AriaLabel { get; set; }
 
     [Parameter] public string? AriaLabelledBy { get; set; }

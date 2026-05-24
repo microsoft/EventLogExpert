@@ -1,2 +1,48 @@
-@* Placeholder until full implementation in step 3.13. *@
-<div class="db-tab-placeholder">Upgrade Database tab — implementation pending.</div>
+@using EventLogExpert.DatabaseTools.Contracts
+@inherits DatabaseToolsTabBase<UpgradeDatabaseRequest>
+
+<div class="db-tab upgrade-database-tab">
+    <div class="db-tab-form">
+        <div class="form-row">
+            <label for="upgrade-db-path">Database (.db)</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="upgrade-db-path-help">Required. Path to the .db whose schema will be upgraded to the current version.</span>
+                <input aria-describedby="upgrade-db-path-help"
+                    class="input target-path"
+                    disabled="@IsRunning"
+                    id="upgrade-db-path"
+                    @oninput="OnDbPathInput"
+                    placeholder="C:\path\to\database.db"
+                    type="text"
+                    value="@_dbPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickDbAsync" type="button">Browse…</button>
+            </div>
+        </div>
+    </div>
+
+    <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="upgrade-database" Outcome="@Outcome">
+        <ToolbarLeadingContent>
+            @if (IsRunning)
+            {
+                @if (IsCancelling)
+                {
+                    <button aria-disabled="true" class="button" disabled type="button">
+                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
+                    </button>
+                }
+                else
+                {
+                    <button class="button button-red" @onclick="CancelRun" type="button">
+                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
+                </button>
+            }
+        </ToolbarLeadingContent>
+    </DatabaseToolsLogView>
+</div>

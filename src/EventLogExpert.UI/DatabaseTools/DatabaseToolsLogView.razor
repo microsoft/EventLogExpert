@@ -1,0 +1,54 @@
+@implements IAsyncDisposable
+
+<div class="database-tools-log-container">
+    <div class="database-tools-log-toolbar">
+        <div class="toolbar-leading">
+            @ToolbarLeadingContent
+        </div>
+
+        <span class="entry-count">@Entries.Count @(Entries.Count == 1 ? "entry" : "entries")</span>
+
+        @if (Outcome is not null)
+        {
+            <span aria-atomic="true" aria-live="@OutcomeChipAriaLive" class="@OutcomeChipCss" role="@OutcomeChipRole">
+                <i aria-hidden="true" class="@OutcomeChipIcon"></i> @OutcomeChipText
+            </span>
+        }
+
+        <div class="toolbar-trailing">
+            <button class="button" disabled="@(Entries.Count == 0)" @onclick="CopyAllAsync" type="button">
+                <i aria-hidden="true" class="bi bi-clipboard"></i> Copy
+            </button>
+
+            <button class="button" disabled="@(Entries.Count == 0)" @onclick="ExportAsync" type="button">
+                <i aria-hidden="true" class="bi bi-download"></i> Export
+            </button>
+
+            @if (_showJumpToLatest)
+            {
+                <button class="button jump-to-latest" @onclick="JumpToLatest" type="button">
+                    <i aria-hidden="true" class="bi bi-arrow-down"></i> Jump to latest
+                </button>
+            }
+        </div>
+    </div>
+
+    <div aria-live="polite"
+        aria-relevant="additions"
+        class="database-tools-log-view"
+        @onscroll="OnLogScroll"
+        @ref="_logViewRef"
+        role="log">
+        <Virtualize Context="entry" Items="Entries" ItemSize="20" OverscanCount="20">
+            <ItemContent>
+                <div class="log-entry @SeverityClass(entry.Level)">
+                    <span class="log-timestamp">@entry.TimestampUtc.ToString("HH:mm:ss.fff")</span>
+                    <span class="log-message" title="@entry.Message">@entry.Message</span>
+                </div>
+            </ItemContent>
+            <EmptyContent>
+                <div class="log-empty log-entry"><span class="log-message">No output.</span></div>
+            </EmptyContent>
+        </Virtualize>
+    </div>
+</div>

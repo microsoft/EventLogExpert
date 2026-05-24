@@ -1,2 +1,121 @@
-@* Placeholder until full implementation in step 3.10. *@
-<div class="db-tab-placeholder">Create Database tab — implementation pending.</div>
+@using EventLogExpert.DatabaseTools.Contracts
+@inherits DatabaseToolsTabBase<CreateDatabaseRequest>
+
+<div class="create-database-tab db-tab">
+    <div class="db-tab-form">
+        <div class="form-row">
+            <label for="create-target-path">Target .db</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="create-target-path-help">Required. Path to a new .db file to create.</span>
+                <input aria-describedby="create-target-path-help"
+                    class="input target-path"
+                    disabled="@IsRunning"
+                    id="create-target-path"
+                    @oninput="OnTargetPathInput"
+                    placeholder="C:\path\to\new-database.db"
+                    type="text"
+                    value="@_targetPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickTargetAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="create-source-path">Source path</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="create-source-path-help">
+                    Optional. Leave empty to use local providers. Accepts a .db or .evtx path; paste a folder path to use a directory.
+                </span>
+                <input aria-describedby="create-source-path-help"
+                    class="input source-path"
+                    disabled="@IsRunning"
+                    id="create-source-path"
+                    @oninput="OnSourcePathInput"
+                    placeholder="Leave empty for local providers, or pick / paste a path"
+                    type="text"
+                    value="@_sourcePath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickSourceAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="create-filter">Filter (regex)</label>
+            <span class="visually-hidden" id="create-filter-help">Optional regular expression. Filters provider names by full match.</span>
+            <input aria-describedby="@(_filterError is null ? "create-filter-help" : "create-filter-help create-filter-error")"
+                aria-invalid="@(_filterError is not null ? "true" : "false")"
+                class="@FilterCssClass"
+                disabled="@IsRunning"
+                id="create-filter"
+                @oninput="OnFilterInput"
+                placeholder="e.g. ^Microsoft-.*"
+                type="text"
+                value="@_filterText" />
+
+            <span class="filter-error" id="create-filter-error" role="alert">
+                @if (_filterError is not null)
+                {
+                    <i aria-hidden="true" class="bi bi-exclamation-triangle"></i>
+                    <span>@_filterError</span>
+                }
+            </span>
+        </div>
+
+        <div class="form-row">
+            <label for="create-skip-path">Skip providers from</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="create-skip-path-help">
+                    Optional. Path to a .db or .evtx whose providers should be excluded from the new database.
+                </span>
+                <input aria-describedby="create-skip-path-help"
+                    class="input skip-path"
+                    disabled="@IsRunning"
+                    id="create-skip-path"
+                    @oninput="OnSkipPathInput"
+                    placeholder="Optional — path to .db or .evtx whose providers are excluded"
+                    type="text"
+                    value="@_skipPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickSkipAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        @if (ShowElevationWarning)
+        {
+            <div class="elevation-warning-slot">
+                <div class="elevation-warning" role="alert">
+                    <i aria-hidden="true" class="bi bi-shield-exclamation"></i>
+                    <span>Running without elevation — some local providers (Security, etc.) will be skipped or return incomplete metadata.</span>
+                    <button class="button" @onclick="RelaunchAsAdminAsync" type="button">Relaunch as Administrator</button>
+                </div>
+                @if (_elevationError is not null)
+                {
+                    <div class="elevation-error" role="alert">@_elevationError</div>
+                }
+            </div>
+        }
+    </div>
+
+    <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="create-database" Outcome="@Outcome">
+        <ToolbarLeadingContent>
+            @if (IsRunning)
+            {
+                @if (IsCancelling)
+                {
+                    <button aria-disabled="true" class="button" disabled type="button">
+                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
+                    </button>
+                }
+                else
+                {
+                    <button class="button button-red" @onclick="CancelRun" type="button">
+                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
+                </button>
+            }
+        </ToolbarLeadingContent>
+    </DatabaseToolsLogView>
+</div>
