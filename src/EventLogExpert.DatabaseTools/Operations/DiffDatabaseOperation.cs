@@ -101,6 +101,13 @@ public sealed class DiffDatabaseOperation(DiffDatabaseRequest request) : Operati
             CleanupPartialDatabase(logger, ref newDbContext, request.NewDatabasePath);
             return DatabaseToolsOutcome.Cancelled;
         }
+        catch (Exception ex)
+        {
+            // Any non-cancellation failure (e.g., EF/SQLite errors mid-save) — no stub .db.
+            logger.Error($"Unexpected error diffing databases: {ex.Message}");
+            CleanupPartialDatabase(logger, ref newDbContext, request.NewDatabasePath);
+            return DatabaseToolsOutcome.Failed;
+        }
         finally
         {
             newDbContext?.Dispose();

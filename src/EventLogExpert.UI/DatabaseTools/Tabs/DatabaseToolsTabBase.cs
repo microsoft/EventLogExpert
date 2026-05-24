@@ -91,7 +91,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
         catch (ObjectDisposedException)
         {
-            // Tab was torn down between the _disposed check and the dispatcher call — safe to ignore.
+            // Disposed between _disposed check and dispatch; ignore.
         }
     }
 
@@ -204,7 +204,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
                 try { await InvokeAsync(StateHasChanged); }
                 catch (ObjectDisposedException)
                 {
-                    // Tab was torn down between the _disposed check and the dispatcher call — safe to ignore.
+                    // Disposed between _disposed check and dispatch; ignore.
                 }
             }
         }

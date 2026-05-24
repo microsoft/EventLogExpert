@@ -25,12 +25,10 @@ namespace EventLogExpert.Platforms.Windows;
 /// </summary>
 internal static partial class Win32FileDialog
 {
-    // Sized to comfortably fit a multi-select buffer (one directory path + many file names). 32K chars = 64 KB on
-    // the stack — well under the default 1 MB stack limit, but big enough that we won't truncate in practice.
+    // 32K char = 64 KB stack: fits typical multi-select (dir + filenames), well under 1 MB stack.
     private const int FileBufferChars = 32 * 1024;
 
-    // Dialog titles are short by convention (Windows shell never sets one longer than ~80 chars). 256 chars is
-    // generous and bounds the stack allocation against pathologically long external input.
+    // 256 chars bounds stack alloc against pathologically long external title input.
     private const int MaxTitleChars = 256;
     private const int OFN_ALLOWMULTISELECT = 0x00000200;
     private const int OFN_DONTADDTORECENT = 0x02000000;
@@ -60,23 +58,27 @@ internal static partial class Win32FileDialog
         CopyNullableTitle(titleBuffer, title);
 
         fixed (char* fileBufferPtr = fileBuffer)
-        fixed (char* filterPtr = filter)
-        fixed (char* titlePtr = titleBuffer)
         {
-            var ofn = BuildOfn(
-                hwndOwner,
-                (IntPtr)filterPtr,
-                (IntPtr)fileBufferPtr,
-                titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                multiSelect: true);
-
-            if (!GetOpenFileNameW(ref ofn))
+            fixed (char* filterPtr = filter)
             {
-                ThrowIfDialogError();
-                return [];
-            }
+                fixed (char* titlePtr = titleBuffer)
+                {
+                    var ofn = BuildOfn(
+                        hwndOwner,
+                        (IntPtr)filterPtr,
+                        (IntPtr)fileBufferPtr,
+                        titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                        multiSelect: true);
 
-            return ParseMultiSelectBuffer(fileBuffer);
+                    if (!GetOpenFileNameW(ref ofn))
+                    {
+                        ThrowIfDialogError();
+                        return [];
+                    }
+
+                    return ParseMultiSelectBuffer(fileBuffer);
+                }
+            }
         }
     }
 
@@ -103,8 +105,7 @@ internal static partial class Win32FileDialog
         fileBuffer.Clear();
         if (!string.IsNullOrEmpty(suggestedFileName))
         {
-            // Leave room for the null terminator; truncate if the caller passed an absurdly long suggestion
-            // (FileBufferChars is 32K; typical suggestions are well under 256, but external input is external input).
+            // Truncate to FileBufferChars-1 to leave room for null terminator on external-input filenames.
             var copyLen = Math.Min(suggestedFileName.Length, FileBufferChars - 1);
             suggestedFileName.AsSpan(0, copyLen).CopyTo(fileBuffer);
         }
@@ -112,8 +113,7 @@ internal static partial class Win32FileDialog
         Span<char> filter = stackalloc char[BuildFilter(default, extensions)];
         BuildFilter(filter, extensions);
 
-        // GetSaveFileNameW auto-appends lpstrDefExt when the user types a filename without an extension.
-        // We strip the leading "." since the API expects just the extension chars.
+        // lpstrDefExt is auto-appended on no-extension input; strip leading dot per Win32 contract.
         var defaultExt = extensions[0].TrimStart('.');
         Span<char> defaultExtBuffer = stackalloc char[defaultExt.Length + 1];
         defaultExt.AsSpan().CopyTo(defaultExtBuffer);
@@ -123,37 +123,43 @@ internal static partial class Win32FileDialog
         CopyNullableTitle(titleBuffer, title);
 
         fixed (char* fileBufferPtr = fileBuffer)
-        fixed (char* filterPtr = filter)
-        fixed (char* defaultExtPtr = defaultExtBuffer)
-        fixed (char* titlePtr = titleBuffer)
         {
-            var ofn = new OpenFileName
+            fixed (char* filterPtr = filter)
             {
-                lStructSize = OpenFileName.NativeSize,
-                hwndOwner = hwndOwner,
-                lpstrFilter = (IntPtr)filterPtr,
-                nFilterIndex = 1,
-                lpstrFile = (IntPtr)fileBufferPtr,
-                nMaxFile = FileBufferChars,
-                lpstrDefExt = (IntPtr)defaultExtPtr,
-                lpstrTitle = titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                Flags = OFN_EXPLORER
-                    | OFN_PATHMUSTEXIST
-                    | OFN_OVERWRITEPROMPT
-                    | OFN_HIDEREADONLY
-                    | OFN_NOREADONLYRETURN
-                    | OFN_NOCHANGEDIR
-                    | OFN_DONTADDTORECENT
-            };
+                fixed (char* defaultExtPtr = defaultExtBuffer)
+                {
+                    fixed (char* titlePtr = titleBuffer)
+                    {
+                        var ofn = new OpenFileName
+                        {
+                            lStructSize = OpenFileName.NativeSize,
+                            hwndOwner = hwndOwner,
+                            lpstrFilter = (IntPtr)filterPtr,
+                            nFilterIndex = 1,
+                            lpstrFile = (IntPtr)fileBufferPtr,
+                            nMaxFile = FileBufferChars,
+                            lpstrDefExt = (IntPtr)defaultExtPtr,
+                            lpstrTitle = titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                            Flags = OFN_EXPLORER
+                                | OFN_PATHMUSTEXIST
+                                | OFN_OVERWRITEPROMPT
+                                | OFN_HIDEREADONLY
+                                | OFN_NOREADONLYRETURN
+                                | OFN_NOCHANGEDIR
+                                | OFN_DONTADDTORECENT
+                        };
 
-            if (!GetSaveFileNameW(ref ofn))
-            {
-                ThrowIfDialogError();
-                return null;
+                        if (!GetSaveFileNameW(ref ofn))
+                        {
+                            ThrowIfDialogError();
+                            return null;
+                        }
+
+                        var path = new string(fileBufferPtr);
+                        return string.IsNullOrEmpty(path) ? null : path;
+                    }
+                }
             }
-
-            var path = new string(fileBufferPtr);
-            return string.IsNullOrEmpty(path) ? null : path;
         }
     }
 
@@ -175,24 +181,28 @@ internal static partial class Win32FileDialog
         CopyNullableTitle(titleBuffer, title);
 
         fixed (char* fileBufferPtr = fileBuffer)
-        fixed (char* filterPtr = filter)
-        fixed (char* titlePtr = titleBuffer)
         {
-            var ofn = BuildOfn(
-                hwndOwner,
-                (IntPtr)filterPtr,
-                (IntPtr)fileBufferPtr,
-                titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
-                multiSelect: false);
-
-            if (!GetOpenFileNameW(ref ofn))
+            fixed (char* filterPtr = filter)
             {
-                ThrowIfDialogError();
-                return null;
-            }
+                fixed (char* titlePtr = titleBuffer)
+                {
+                    var ofn = BuildOfn(
+                        hwndOwner,
+                        (IntPtr)filterPtr,
+                        (IntPtr)fileBufferPtr,
+                        titleBuffer.IsEmpty ? IntPtr.Zero : (IntPtr)titlePtr,
+                        multiSelect: false);
 
-            var path = new string(fileBufferPtr);
-            return string.IsNullOrEmpty(path) ? null : path;
+                    if (!GetOpenFileNameW(ref ofn))
+                    {
+                        ThrowIfDialogError();
+                        return null;
+                    }
+
+                    var path = new string(fileBufferPtr);
+                    return string.IsNullOrEmpty(path) ? null : path;
+                }
+            }
         }
     }
 
@@ -240,12 +250,15 @@ internal static partial class Win32FileDialog
                     | (multiSelect ? OFN_ALLOWMULTISELECT : 0)
         };
 
+    [LibraryImport("Comdlg32.dll", EntryPoint = "CommDlgExtendedError")]
+    private static partial int CommDlgExtendedError();
+
     /// <summary>
     ///     Builds (or measures, when <paramref name="destination" /> is empty) the null-terminated title buffer. Returns
     ///     0 when <paramref name="title" /> is null or empty (the dialog uses its default title in that case — pass
-    ///     IntPtr.Zero for <c>lpstrTitle</c>). Otherwise returns the buffer size needed (clamped title length + 1 for
-    ///     the null terminator). Titles longer than <see cref="MaxTitleChars" /> are silently truncated to bound the
-    ///     stack allocation against external input (mirror of the suggested-filename guard in <see cref="PickSaveFile" />).
+    ///     IntPtr.Zero for <c>lpstrTitle</c>). Otherwise returns the buffer size needed (clamped title length + 1 for the null
+    ///     terminator). Titles longer than <see cref="MaxTitleChars" /> are silently truncated to bound the stack allocation
+    ///     against external input (mirror of the suggested-filename guard in <see cref="PickSaveFile" />).
     /// </summary>
     private static int CopyNullableTitle(Span<char> destination, string? title)
     {
@@ -259,9 +272,6 @@ internal static partial class Win32FileDialog
         destination[titleLen] = '\0';
         return needed;
     }
-
-    [LibraryImport("Comdlg32.dll", EntryPoint = "CommDlgExtendedError")]
-    private static partial int CommDlgExtendedError();
 
     private static int CopyWithNullTerminator(ReadOnlySpan<char> source, Span<char> destination)
     {
