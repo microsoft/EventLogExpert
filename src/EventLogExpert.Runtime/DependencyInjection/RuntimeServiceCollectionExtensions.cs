@@ -85,6 +85,7 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<IUpdateService, UpdateService>();
 
         // DatabaseTools service (CLI-equivalent operations exposed to the UI).
+        services.AddSingleton<IDatabaseToolsOperationFactory, DatabaseToolsOperationFactory>();
         services.AddSingleton<IDatabaseToolsService, DatabaseToolsService>();
 
         return services;
