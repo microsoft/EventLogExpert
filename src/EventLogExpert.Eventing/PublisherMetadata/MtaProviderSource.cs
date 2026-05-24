@@ -87,7 +87,10 @@ public static class MtaProviderSource
     /// </summary>
     /// <param name="evtxPath">Path to the exported .evtx file.</param>
     /// <param name="logger">Trace logger for diagnostics.</param>
-    /// <param name="regex">Optional case-insensitive regex applied to provider names; null means no filtering.</param>
+    /// <param name="regex">
+    ///     Optional regex applied to provider names; case sensitivity follows the caller's
+    ///     <see cref="System.Text.RegularExpressions.RegexOptions" />. Null means no filtering.
+    /// </param>
     /// <param name="skipProviderNames">Optional set of provider names to skip before MTA resolution.</param>
     /// <param name="seen">Optional set tracking already-loaded provider names across multiple source files (de-dup).</param>
     public static IEnumerable<ProviderDetails> LoadProviders(

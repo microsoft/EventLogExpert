@@ -255,9 +255,4 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         }
         catch (JSDisconnectedException) { /* Circuit gone — ignore. */ }
     }
-
-    private void OnLogScroll(EventArgs _)
-    {
-        // No-op: pin state flows from JS OnPinStateChanged; placeholder for future @onscroll wiring.
-    }
 }

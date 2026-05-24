@@ -32,7 +32,8 @@ public static class ProviderSource
 
     /// <summary>
     ///     Returns the distinct provider names available from <paramref name="path" />, applying an optional
-    ///     case-insensitive regex <paramref name="regex" />. Does not load full provider details.
+    ///     <paramref name="regex" /> to filter names. Case sensitivity follows the caller's <see cref="RegexOptions" />. Does
+    ///     not load full provider details.
     /// </summary>
     public static IReadOnlyList<string> LoadProviderNames(string path, ITraceLogger logger, Regex? regex = null)
     {
@@ -50,11 +51,12 @@ public static class ProviderSource
     }
 
     /// <summary>
-    ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional case-insensitive
-    ///     regex <paramref name="regex" /> to provider names. When the same provider name appears in multiple source files,
-    ///     the first occurrence wins (.db files are processed before .evtx). Provider names contained in
-    ///     <paramref name="skipProviderNames" /> are excluded BEFORE details are resolved, so callers using the skip set never
-    ///     pay the cost of loading metadata for excluded providers.
+    ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional
+    ///     <paramref name="regex" /> to filter provider names (case sensitivity follows the caller's
+    ///     <see cref="RegexOptions" />). When the same provider name appears in multiple source files, the first occurrence
+    ///     wins (.db files are processed before .evtx). Provider names contained in <paramref name="skipProviderNames" /> are
+    ///     excluded BEFORE details are resolved, so callers using the skip set never pay the cost of loading metadata for
+    ///     excluded providers.
     /// </summary>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string path,

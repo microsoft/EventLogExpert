@@ -37,7 +37,6 @@
     <div aria-live="polite"
         aria-relevant="additions"
         class="database-tools-log-view"
-        @onscroll="OnLogScroll"
         @ref="_logViewRef"
         role="log">
         <Virtualize Context="entry" Items="Entries" ItemSize="20" OverscanCount="20">
