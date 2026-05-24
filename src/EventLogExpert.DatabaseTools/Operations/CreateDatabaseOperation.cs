@@ -6,6 +6,7 @@ using EventLogExpert.DatabaseTools.Sources;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Models;
 using EventLogExpert.ProviderDatabase.Context;
+using Microsoft.Data.Sqlite;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.Operations;
@@ -128,7 +129,28 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
         }
         catch (OperationCanceledException)
         {
-            // Best-effort cleanup of partial DB file if the context was created but cancellation interrupted.
+            // EF Core's SqliteConnection pool keeps the file handle alive across DbContext.Dispose, so a naive
+            // File.Delete hits a sharing violation on Windows. Mirror the codebase's documented cleanup pattern
+            // (ProviderDatabaseMaintenance.PrepareForFileDeletion / SqliteTestDb.Delete): dispose the context,
+            // clear the pool, THEN delete the partial .db so the user's path is left clean.
+            dbContext?.Dispose();
+            dbContext = null;
+
+            if (File.Exists(request.TargetPath))
+            {
+                SqliteConnection.ClearAllPools();
+
+                try { File.Delete(request.TargetPath); }
+                catch (IOException ex)
+                {
+                    logger.Warning($"Could not delete partial database at {request.TargetPath}: {ex.Message}. Delete manually before next create.");
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    logger.Warning($"Could not delete partial database at {request.TargetPath}: {ex.Message}. Delete manually before next create.");
+                }
+            }
+
             return DatabaseToolsOutcome.Cancelled;
         }
         catch (RegexMatchTimeoutException)

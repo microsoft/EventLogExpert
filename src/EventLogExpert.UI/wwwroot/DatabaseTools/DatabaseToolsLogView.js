@@ -6,8 +6,15 @@
 
 const PIN_TOLERANCE_PX = 4;
 
+// Per-element handler map so detach() can remove the SAME listener we registered, even if
+// the C# component re-attaches after a JS hot-reload or test re-render.
+const scrollHandlers = new WeakMap();
+
 export function attach(element, dotNetRef) {
     if (!element || !dotNetRef) { return; }
+
+    // If a prior attach() lingered, remove it first so we don't double-register.
+    detach(element);
 
     let lastPinned = true;
 
@@ -26,11 +33,22 @@ export function attach(element, dotNetRef) {
             } catch (e) {
                 // .NET ref disposed — drop the listener
                 element.removeEventListener("scroll", onScroll);
+                scrollHandlers.delete(element);
             }
         }
     };
 
     element.addEventListener("scroll", onScroll, { passive: true });
+    scrollHandlers.set(element, onScroll);
+}
+
+export function detach(element) {
+    if (!element) { return; }
+    const onScroll = scrollHandlers.get(element);
+    if (onScroll) {
+        element.removeEventListener("scroll", onScroll);
+        scrollHandlers.delete(element);
+    }
 }
 
 export function scrollToBottom(element) {

@@ -98,6 +98,13 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
         {
             try
             {
+                await _jsModule.InvokeVoidAsync("detach", _logViewRef);
+            }
+            catch (JSDisconnectedException) { /* Circuit gone — listener already implicitly detached. */ }
+            catch (JSException) { /* detach() unavailable in legacy module — best-effort cleanup. */ }
+
+            try
+            {
                 await _jsModule.DisposeAsync();
             }
             catch (JSDisconnectedException) { /* Circuit gone — nothing to clean. */ }

@@ -24,7 +24,6 @@
                             id="@($"db-tab-{tab}")"
                             @onclick="() => SetActiveTab(tab)"
                             @onkeydown="e => OnTabKeyDown(e, tab)"
-                            @onkeydown:preventDefault="@IsArrowOrHomeEnd"
                             @ref="_tabButtonRefs[tab]"
                             role="tab"
                             tabindex="@(tab == _activeTab ? "0" : "-1")"
