@@ -87,7 +87,9 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
 
                     if (pendingForHeader.Count < BatchSize) { continue; }
 
-                    FlushHeaderAndBuffer(logger, ref dbContext, request.TargetPath, pendingForHeader, ref count);
+                    dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                    count += pendingForHeader.Count;
+                    await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
                     headerLogged = true;
                     progress?.Report(new DatabaseToolsProgress(count, null, details.ProviderName));
 
@@ -108,7 +110,9 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
 
             if (!headerLogged && pendingForHeader.Count > 0)
             {
-                FlushHeaderAndBuffer(logger, ref dbContext, request.TargetPath, pendingForHeader, ref count);
+                dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                count += pendingForHeader.Count;
+                await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
             }
 
             if (dbContext is null)
@@ -165,25 +169,21 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
         }
     }
 
-    private void FlushHeaderAndBuffer(
+    private async Task FlushHeaderAndBufferAsync(
         ITraceLogger logger,
-        ref ProviderDbContext? dbContext,
-        string path,
+        ProviderDbContext dbContext,
         List<ProviderDetails> buffer,
-        ref int count)
+        CancellationToken cancellationToken)
     {
         LogProviderDetailHeader(logger, buffer.Select(p => p.ProviderName));
-
-        dbContext ??= new ProviderDbContext(path, false, logger);
 
         foreach (var details in buffer)
         {
             dbContext.ProviderDetails.Add(details);
             LogProviderDetails(logger, details);
-            count++;
         }
 
-        dbContext.SaveChanges();
+        await dbContext.SaveChangesAsync(cancellationToken);
         dbContext.ChangeTracker.Clear();
         buffer.Clear();
     }

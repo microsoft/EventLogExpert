@@ -50,13 +50,13 @@
                 type="text"
                 value="@_filterText" />
 
-            <span class="filter-error" id="create-filter-error" role="alert">
-                @if (_filterError is not null)
-                {
+            @if (_filterError is not null)
+            {
+                <span class="filter-error" id="create-filter-error" role="alert">
                     <i aria-hidden="true" class="bi bi-exclamation-triangle"></i>
                     <span>@_filterError</span>
-                }
-            </span>
+                </span>
+            }
         </div>
 
         <div class="form-row">

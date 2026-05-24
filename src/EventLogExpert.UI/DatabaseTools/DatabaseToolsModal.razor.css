@@ -148,10 +148,6 @@
     min-height: 0;
 }
 
-.tabpanel ::deep .db-tab-form .filter-error:empty {
-    display: none;
-}
-
 .tabpanel ::deep .db-tab-form .checkbox-label {
     grid-column: 2;
     display: inline-flex;
