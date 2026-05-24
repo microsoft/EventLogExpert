@@ -5,6 +5,8 @@ using EventLogExpert.Eventing.PublisherMetadata;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Models;
+using EventLogExpert.ProviderDatabase.Context;
+using Microsoft.Data.Sqlite;
 using System.Text.RegularExpressions;
 
 namespace EventLogExpert.DatabaseTools.Operations;
@@ -18,6 +20,36 @@ namespace EventLogExpert.DatabaseTools.Operations;
 public abstract class OperationBase
 {
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
+
+    /// <summary>
+    ///     Cleans up a partially-created .db file after an operation aborts (cancellation, fatal exception). EF Core's
+    ///     SqliteConnection pool keeps the file handle alive across <c>DbContext.Dispose</c>, so a naive <c>File.Delete</c>
+    ///     hits a sharing violation on Windows. Mirrors the codebase pattern at
+    ///     <c>ProviderDatabaseMaintenance.PrepareForFileDeletion()</c>: dispose context → clear pool → best-effort delete.
+    ///     Sets the ref-context to <c>null</c> after dispose so the calling <c>finally</c> arm's <c>dbContext?.Dispose()</c>
+    ///     is a safe no-op. Best-effort: catches <see cref="IOException" /> and <see cref="UnauthorizedAccessException" />
+    ///     with a logger.Warning so the user has signal if the partial file persists.
+    /// </summary>
+    protected static void CleanupPartialDatabase(
+        ITraceLogger logger,
+        ref ProviderDbContext? dbContext,
+        string targetPath)
+    {
+        dbContext?.Dispose();
+        dbContext = null;
+        if (!File.Exists(targetPath)) { return; }
+
+        SqliteConnection.ClearAllPools();
+        try { File.Delete(targetPath); }
+        catch (IOException ex)
+        {
+            logger.Warning($"Could not delete partial database at {targetPath}: {ex.Message}. Delete manually before next run.");
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            logger.Warning($"Could not delete partial database at {targetPath}: {ex.Message}. Delete manually before next run.");
+        }
+    }
 
     /// <summary>
     ///     Returns the distinct local provider names installed on this machine, optionally filtered by a case-insensitive
