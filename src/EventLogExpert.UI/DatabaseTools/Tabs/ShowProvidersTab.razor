@@ -24,7 +24,7 @@
         <div class="form-row">
             <label for="show-filter">Filter (regex)</label>
             <span class="visually-hidden" id="show-filter-help">
-                Optional regular expression. Filters provider names by full match.
+                Optional regular expression. Provider names containing a match are included; anchor with ^ and $ for a full-string match.
             </span>
             <input aria-describedby="@(_filterError is null ? "show-filter-help" : "show-filter-help show-filter-error")"
                 aria-invalid="@(_filterError is not null ? "true" : "false")"
