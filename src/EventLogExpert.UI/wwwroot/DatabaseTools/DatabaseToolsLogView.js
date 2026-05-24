@@ -28,13 +28,13 @@ export function attach(element, dotNetRef) {
 
         if (pinned !== lastPinned) {
             lastPinned = pinned;
-            try {
-                dotNetRef.invokeMethodAsync("OnPinStateChanged", pinned);
-            } catch (e) {
-                // .NET ref disposed — drop the listener
+            // invokeMethodAsync returns a Promise that rejects asynchronously when the .NET ref is disposed.
+            // try/catch only catches synchronous throws, so we attach .catch() to the returned promise to
+            // suppress unhandled-rejection noise during component teardown, and detach the listener inside it.
+            dotNetRef.invokeMethodAsync("OnPinStateChanged", pinned)?.catch(() => {
                 element.removeEventListener("scroll", onScroll);
                 scrollHandlers.delete(element);
-            }
+            });
         }
     };
 

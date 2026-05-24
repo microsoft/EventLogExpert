@@ -91,7 +91,9 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         {
             DatabaseToolsOutcome.Succeeded => $"Completed in {result.Duration.TotalSeconds:F1}s.",
             DatabaseToolsOutcome.Cancelled => $"[Cancelled after {result.Duration.TotalSeconds:F1}s]",
-            DatabaseToolsOutcome.Failed => $"[Failed: {result.FailureSummary}]",
+            DatabaseToolsOutcome.Failed => string.IsNullOrWhiteSpace(result.FailureSummary)
+                ? "[Failed: see debug log]"
+                : $"[Failed: {result.FailureSummary}]",
             _ => string.Empty
         };
 

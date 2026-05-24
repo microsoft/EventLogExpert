@@ -2,9 +2,10 @@
 
 <div class="database-tools-log-container">
     <div class="database-tools-log-toolbar">
-        <div class="toolbar-leading">
-            @ToolbarLeadingContent
-        </div>
+        @if (ToolbarLeadingContent is not null)
+        {
+            <div class="toolbar-leading">@ToolbarLeadingContent</div>
+        }
 
         <span class="entry-count">@Entries.Count @(Entries.Count == 1 ? "entry" : "entries")</span>
 
