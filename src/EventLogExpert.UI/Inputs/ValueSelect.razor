@@ -2,10 +2,21 @@
 @inherits InputComponent<T>
 
 <div class="dropdown-input" @onkeydown="HandleKeyDown" @onkeydown:preventDefault="_preventDefault" @ref="_selectComponent">
-    <input aria-activedescendant="@HighlightedItem?.ItemId" aria-controls="@_itemId"
+    <input aria-activedescendant="@HighlightedItem?.ItemId"
+        aria-controls="@_itemId"
+        aria-describedby="@AriaDescribedBy"
+        aria-expanded="false"
         aria-haspopup="listbox"
-        aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)" aria-labelledby="@AriaLabelledBy"
-        class="@CssClass" data-highlight="@DataHighlight" @oninput="OnInputChange" readonly="@(!IsInput || IsMultiSelect)" role="combobox" tabindex="0" type="text" value="@DisplayString" />
+        aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)"
+        aria-labelledby="@AriaLabelledBy"
+        class="@CssClass"
+        data-highlight="@DataHighlight"
+        @oninput="OnInputChange"
+        readonly="@(!IsInput || IsMultiSelect)"
+        role="combobox"
+        tabindex="0"
+        type="text"
+        value="@DisplayString" />
 
     <div aria-multiselectable="@(IsMultiSelect ? "true" : null)" class="dropdown-list" id="@_itemId" role="listbox" tabindex="-1">
         <CascadingValue Value="this">

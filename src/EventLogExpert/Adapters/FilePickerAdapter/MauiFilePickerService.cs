@@ -1,10 +1,12 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Runtime.Common.Files;
 
 namespace EventLogExpert.Adapters.FilePickerAdapter;
 
+/// <summary>MAUI adapter that delegates to <see cref="FilePickerHelper" /> for WinUI file picking.</summary>
 public sealed class MauiFilePickerService : IFilePickerService
 {
     public Task<string?> PickAsync(string pickerTitle, IReadOnlyList<string> extensions)
@@ -18,12 +20,7 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync(async () =>
-        {
-            var options = BuildOptions(pickerTitle, extensions);
-            var result = await FilePicker.Default.PickAsync(options);
-            return string.IsNullOrEmpty(result?.FullPath) ? null : result.FullPath;
-        });
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickAsync(extensions));
     }
 
     public Task<IReadOnlyList<string>> PickMultipleAsync(
@@ -39,34 +36,23 @@ public sealed class MauiFilePickerService : IFilePickerService
                 "At least one extension must be supplied.", nameof(extensions));
         }
 
-        return MainThread.InvokeOnMainThreadAsync<IReadOnlyList<string>>(async () =>
-        {
-            var options = BuildOptions(pickerTitle, extensions);
-            var results = await FilePicker.Default.PickMultipleAsync(options) ?? [];
-            var paths = new List<string>();
-
-            foreach (var result in results)
-            {
-                var path = result?.FullPath;
-
-                if (!string.IsNullOrEmpty(path))
-                {
-                    paths.Add(path);
-                }
-            }
-
-            return paths;
-        });
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickMultipleAsync(extensions));
     }
 
-    private static PickOptions BuildOptions(string pickerTitle, IReadOnlyList<string> extensions) =>
-        new()
+    public Task<string?> PickSaveAsync(
+        string pickerTitle,
+        IReadOnlyList<string> extensions,
+        string? suggestedFileName = null)
+    {
+        ArgumentNullException.ThrowIfNull(pickerTitle);
+        ArgumentNullException.ThrowIfNull(extensions);
+
+        if (extensions.Count == 0)
         {
-            PickerTitle = pickerTitle,
-            FileTypes = new FilePickerFileType(
-                new Dictionary<DevicePlatform, IEnumerable<string>>
-                {
-                    { DevicePlatform.WinUI, extensions }
-                })
-        };
+            throw new ArgumentException(
+                "At least one extension must be supplied.", nameof(extensions));
+        }
+
+        return MainThread.InvokeOnMainThreadAsync(() => FilePickerHelper.PickSaveAsync(extensions, suggestedFileName));
+    }
 }

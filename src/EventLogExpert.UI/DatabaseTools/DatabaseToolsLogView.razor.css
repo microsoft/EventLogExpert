@@ -1,0 +1,146 @@
+.database-tools-log-container {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 100%;
+    min-height: 0;
+    border: 1px solid var(--clr-statusbar);
+    border-radius: 4px;
+    background: var(--background-dark);
+    color: var(--text-primary);
+    overflow: hidden;
+}
+
+.database-tools-log-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    background: var(--background-darkgray);
+    border-bottom: 1px solid var(--clr-statusbar);
+    flex: 0 0 auto;
+}
+
+.toolbar-leading {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 0 0 auto;
+}
+
+.toolbar-leading:empty {
+    display: none;
+}
+
+.toolbar-trailing {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+.database-tools-log-toolbar .entry-count {
+    padding-left: 6px;
+    font-size: 0.85em;
+    color: var(--text-secondary);
+    border-left: 1px solid var(--clr-statusbar);
+}
+
+.toolbar-leading:empty + .entry-count {
+    padding-left: 0;
+    border-left: 0;
+}
+
+.outcome-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: .25rem;
+    font-size: 0.85em;
+    border: none;
+    background: var(--background-darkgray);
+    color: var(--text-primary);
+    white-space: nowrap;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.outcome-chip.outcome-succeeded {
+    background: var(--clr-green);
+    color: var(--clr-on-status-fill);
+}
+
+.outcome-chip.outcome-cancelled {
+    background: var(--clr-yellow);
+    color: var(--clr-on-status-fill);
+}
+
+.outcome-chip.outcome-failed {
+    background: var(--clr-red);
+    color: var(--clr-on-status-fill);
+}
+
+.database-tools-log-view {
+    flex: 1 1 0;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 6px 8px;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.4;
+}
+
+.log-entry {
+    display: flex;
+    gap: 8px;
+    padding: 1px 0;
+    min-width: 0;
+    height: 20px;
+    line-height: 20px;
+    align-items: center;
+}
+
+.log-timestamp {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.log-message {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: pre;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.log-trace .log-message {
+    color: var(--text-secondary);
+    opacity: 0.7;
+}
+
+.log-debug .log-message {
+    color: var(--text-secondary);
+}
+
+.log-info .log-message {
+    color: var(--text-primary);
+}
+
+.log-warning .log-message {
+    color: var(--clr-yellow);
+}
+
+.log-error .log-message {
+    color: var(--clr-red);
+}
+
+.log-critical .log-message {
+    color: var(--clr-red);
+    font-weight: 700;
+}

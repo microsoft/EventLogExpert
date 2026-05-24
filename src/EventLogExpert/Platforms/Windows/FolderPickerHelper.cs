@@ -3,7 +3,6 @@
 
 using Windows.Storage;
 using Windows.Storage.Pickers;
-using WinRT.Interop;
 
 namespace EventLogExpert.Platforms.Windows;
 
@@ -22,16 +21,7 @@ internal static class FolderPickerHelper
             FileTypeFilter = { "*" } // Add a wildcard to allow folder selection
         };
 
-        var current = Application.Current;
-        var hostWindow = current?.Windows.Count > 0 ? current.Windows[0] : null;
-
-        if (hostWindow?.Handler?.PlatformView is not MauiWinUIWindow window)
-        {
-            throw new InvalidOperationException(
-                "No MAUI host window is available to present the folder picker.");
-        }
-
-        InitializeWithWindow.Initialize(picker, window.WindowHandle);
+        PickerHostWindow.Initialize(picker);
 
         StorageFolder? folder = await picker.PickSingleFolderAsync();
 

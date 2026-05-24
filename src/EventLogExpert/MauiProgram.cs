@@ -107,6 +107,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<IClipboardService, ClipboardService>();
         builder.Services.AddSingleton<IFileSaveService, MauiFileSaveService>();
         builder.Services.AddSingleton<IFilePickerService, MauiFilePickerService>();
+        builder.Services.AddSingleton<IFolderPickerService, MauiFolderPickerService>();
         builder.Services.AddSingleton<IWindowsIdentityProvider, WindowsIdentityProvider>();
         builder.Services.AddSingleton<IElevationService, MauiElevationService>();
         builder.Services.AddSingleton<MauiMenuActionService>();

@@ -3,13 +3,14 @@
 
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
 public sealed partial class DatabaseToolsModal
 {
-    private static readonly (DatabaseToolsTab Tab, string Label)[] _tabs =
+    private static readonly (DatabaseToolsTab Tab, string Label)[] s_tabs =
     [
         (DatabaseToolsTab.Show, "Show Providers"),
         (DatabaseToolsTab.Create, "Create Database"),
@@ -18,13 +19,17 @@ public sealed partial class DatabaseToolsModal
         (DatabaseToolsTab.Upgrade, "Upgrade Database")
     ];
 
-    private DatabaseToolsTab _activeTab = DatabaseToolsTab.Show;
+    private readonly Dictionary<DatabaseToolsTab, ElementReference> _tabButtonRefs = new();
 
+    private DatabaseToolsTab _activeTab = DatabaseToolsTab.Show;
     private CreateDatabaseTab? _createTab;
     private DiffDatabasesTab? _diffTab;
+    private bool _isArrowOrHomeEnd;
     private MergeDatabaseTab? _mergeTab;
+    private DatabaseToolsTab? _pendingFocusTab;
     private ShowProvidersTab? _showTab;
     private UpgradeDatabaseTab? _upgradeTab;
+    private bool _verboseLogging;
 
     /// <summary>True when any tab is mid-Run (so the modal close path must confirm cancel first).</summary>
     private bool AnyTabIsRunning =>
@@ -33,6 +38,20 @@ public sealed partial class DatabaseToolsModal
         (_mergeTab?.IsRunning ?? false) ||
         (_diffTab?.IsRunning ?? false) ||
         (_upgradeTab?.IsRunning ?? false);
+
+    private bool IsArrowOrHomeEnd => _isArrowOrHomeEnd;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_pendingFocusTab is { } tab && _tabButtonRefs.TryGetValue(tab, out var elementRef))
+        {
+            _pendingFocusTab = null;
+            try { await elementRef.FocusAsync(); }
+            catch { /* Best-effort: element may not be in the DOM yet. */ }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
 
     protected override async Task OnCancelAsync()
     {
@@ -63,20 +82,22 @@ public sealed partial class DatabaseToolsModal
 
     private static DatabaseToolsTab NextTab(DatabaseToolsTab current)
     {
-        var index = Array.FindIndex(_tabs, t => t.Tab == current);
+        var index = Array.FindIndex(s_tabs, t => t.Tab == current);
 
-        return index < _tabs.Length - 1 ? _tabs[index + 1].Tab : _tabs[0].Tab;
+        return index < s_tabs.Length - 1 ? s_tabs[index + 1].Tab : s_tabs[0].Tab;
     }
 
     private static DatabaseToolsTab PrevTab(DatabaseToolsTab current)
     {
-        var index = Array.FindIndex(_tabs, t => t.Tab == current);
+        var index = Array.FindIndex(s_tabs, t => t.Tab == current);
 
-        return index > 0 ? _tabs[index - 1].Tab : _tabs[^1].Tab;
+        return index > 0 ? s_tabs[index - 1].Tab : s_tabs[^1].Tab;
     }
 
     private void OnTabKeyDown(KeyboardEventArgs e, DatabaseToolsTab tab)
     {
+        _isArrowOrHomeEnd = e.Key is "ArrowDown" or "ArrowUp" or "ArrowLeft" or "ArrowRight" or "Home" or "End";
+
         switch (e.Key)
         {
             case "ArrowDown":
@@ -88,13 +109,19 @@ public sealed partial class DatabaseToolsModal
                 SetActiveTab(PrevTab(tab));
                 break;
             case "Home":
-                SetActiveTab(_tabs[0].Tab);
+                SetActiveTab(s_tabs[0].Tab);
                 break;
             case "End":
-                SetActiveTab(_tabs[^1].Tab);
+                SetActiveTab(s_tabs[^1].Tab);
                 break;
         }
     }
 
-    private void SetActiveTab(DatabaseToolsTab tab) => _activeTab = tab;
+    private void SetActiveTab(DatabaseToolsTab tab)
+    {
+        if (_activeTab == tab) { return; }
+
+        _activeTab = tab;
+        _pendingFocusTab = tab;
+    }
 }

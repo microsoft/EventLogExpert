@@ -1,2 +1,85 @@
-@* Placeholder until full implementation in step 3.12. *@
-<div class="db-tab-placeholder">Diff Databases tab — implementation pending.</div>
+@using EventLogExpert.DatabaseTools.Contracts
+@inherits DatabaseToolsTabBase<DiffDatabaseRequest>
+
+<div class="db-tab diff-databases-tab">
+    <div class="db-tab-form">
+        <div class="form-row">
+            <label for="diff-first-path">First source</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="diff-first-path-help">Required. Baseline source. Providers in the second source that also appear here are excluded from the result.</span>
+                <input aria-describedby="diff-first-path-help"
+                    class="input source-path"
+                    disabled="@IsRunning"
+                    id="diff-first-path"
+                    @oninput="OnFirstPathInput"
+                    placeholder="Path to .db or .evtx (paste a folder path to use a directory)"
+                    type="text"
+                    value="@_firstPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickFirstAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="diff-second-path">Second source</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="diff-second-path-help">Required. Providers in this source that are NOT in the first source are copied to the new .db output.</span>
+                <input aria-describedby="diff-second-path-help"
+                    class="input source-path"
+                    disabled="@IsRunning"
+                    id="diff-second-path"
+                    @oninput="OnSecondPathInput"
+                    placeholder="Path to .db or .evtx (paste a folder path to use a directory)"
+                    type="text"
+                    value="@_secondPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickSecondAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label>Result</label>
+            <span aria-label="Result direction" class="direction-row">Providers in second source that are NOT in first source</span>
+        </div>
+
+        <div class="form-row">
+            <label for="diff-new-db">New .db output</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="diff-new-db-help">Required. Path to a new .db file that will receive the providers found only in the second source.</span>
+                <input aria-describedby="diff-new-db-help"
+                    class="input target-path"
+                    disabled="@IsRunning"
+                    id="diff-new-db"
+                    @oninput="OnNewDbPathInput"
+                    placeholder="C:\path\to\new-diff-database.db"
+                    type="text"
+                    value="@_newDbPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickNewDbAsync" type="button">Browse…</button>
+            </div>
+        </div>
+    </div>
+
+    <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="diff-databases" Outcome="@Outcome">
+        <ToolbarLeadingContent>
+            @if (IsRunning)
+            {
+                @if (IsCancelling)
+                {
+                    <button aria-disabled="true" class="button" disabled type="button">
+                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
+                    </button>
+                }
+                else
+                {
+                    <button class="button button-red" @onclick="CancelRun" type="button">
+                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
+                </button>
+            }
+        </ToolbarLeadingContent>
+    </DatabaseToolsLogView>
+</div>
