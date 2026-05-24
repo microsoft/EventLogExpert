@@ -1,2 +1,78 @@
-@* Placeholder until full implementation in step 3.11. *@
-<div class="db-tab-placeholder">Merge Database tab — implementation pending.</div>
+@using EventLogExpert.DatabaseTools.Contracts
+@inherits DatabaseToolsTabBase<MergeDatabaseRequest>
+
+<div class="db-tab merge-database-tab">
+    <div class="db-tab-form">
+        <div class="form-row">
+            <label for="merge-source-path">Source</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="merge-source-path-help">
+                    Required. Path to a .db or .evtx whose providers will be merged into the target.
+                </span>
+                <input aria-describedby="merge-source-path-help"
+                    class="input source-path"
+                    disabled="@IsRunning"
+                    id="merge-source-path"
+                    @oninput="OnSourcePathInput"
+                    placeholder="Path to .db or .evtx (paste a folder path to use a directory)"
+                    type="text"
+                    value="@_sourcePath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickSourceAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="merge-target-path">Target .db</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="merge-target-path-help">Required. Path to the existing target .db that will receive the merged providers.</span>
+                <input aria-describedby="merge-target-path-help"
+                    class="input target-path"
+                    disabled="@IsRunning"
+                    id="merge-target-path"
+                    @oninput="OnTargetPathInput"
+                    placeholder="C:\path\to\existing-database.db"
+                    type="text"
+                    value="@_targetPath" />
+                <button class="button" disabled="@IsRunning" @onclick="PickTargetAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="merge-overwrite-mode" id="merge-overwrite-mode-label">Existing providers</label>
+            <ValueSelect T="bool"
+                AriaLabelledBy="merge-overwrite-mode-label"
+                CssClass="input filter-dropdown overwrite-mode-select"
+                ToStringFunc="@(v => v ? "Overwrite" : "Keep")"
+                @bind-Value="_overwrite">
+                <ValueSelectItem T="bool" Value="false">Keep — skip providers already in target</ValueSelectItem>
+                <ValueSelectItem T="bool" Value="true">Overwrite — replace providers already in target</ValueSelectItem>
+            </ValueSelect>
+        </div>
+    </div>
+
+    <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="merge-database" Outcome="@Outcome">
+        <ToolbarLeadingContent>
+            @if (IsRunning)
+            {
+                @if (IsCancelling)
+                {
+                    <button aria-disabled="true" class="button" disabled type="button">
+                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
+                    </button>
+                }
+                else
+                {
+                    <button class="button button-red" @onclick="CancelRun" type="button">
+                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
+                </button>
+            }
+        </ToolbarLeadingContent>
+    </DatabaseToolsLogView>
+</div>

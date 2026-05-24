@@ -1,11 +1,11 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Runtime.Common.Files;
 using Windows.Storage;
 using Windows.Storage.Pickers;
 using Windows.Storage.Provider;
-using WinRT.Interop;
 
 namespace EventLogExpert.Adapters.FileSave;
 
@@ -30,7 +30,7 @@ public sealed class MauiFileSaveService : IFileSaveService
         {
             var picker = new FileSavePicker
             {
-                SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+                SuggestedStartLocation = PickerLocationId.ComputerFolder,
                 SuggestedFileName = suggestedFileName
             };
 
@@ -39,16 +39,7 @@ public sealed class MauiFileSaveService : IFileSaveService
                 picker.FileTypeChoices.Add(label, [.. extensions]);
             }
 
-            var current = Application.Current;
-            var hostWindow = current?.Windows.Count > 0 ? current.Windows[0] : null;
-
-            if (hostWindow?.Handler?.PlatformView is not MauiWinUIWindow window)
-            {
-                throw new InvalidOperationException(
-                    "No MAUI host window is available to present the Save As dialog.");
-            }
-
-            InitializeWithWindow.Initialize(picker, window.WindowHandle);
+            PickerHostWindow.Initialize(picker);
 
             return await picker.PickSaveFileAsync();
         });

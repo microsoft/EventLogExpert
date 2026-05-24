@@ -2,6 +2,7 @@ dialog {
     height: var(--modal-height, fit-content);
     min-width: var(--modal-min-width, auto);
     max-width: var(--modal-max-width, none);
+    overflow: hidden;
 
     color: var(--clr-lightblue);
     border-color: var(--clr-statusbar);
@@ -22,6 +23,7 @@ dialog:not(:modal) {
     justify-content: space-between;
 
     height: 100%;
+    min-height: 0;
 }
 
 .dialog-header {
@@ -51,8 +53,9 @@ dialog:not(:modal) {
 .dialog-body {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
+    flex: 1 1 0;
     min-height: 0;
+    overflow: hidden;
 }
 
 .inline-alert-overlay {

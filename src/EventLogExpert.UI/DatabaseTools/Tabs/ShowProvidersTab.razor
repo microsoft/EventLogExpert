@@ -1,2 +1,74 @@
-@* Placeholder until full implementation in step 3.9. *@
-<div class="db-tab-placeholder">Show Providers tab — implementation pending.</div>
+@using EventLogExpert.DatabaseTools.Contracts
+@inherits DatabaseToolsTabBase<ShowProvidersRequest>
+
+<div class="db-tab show-providers-tab">
+    <div class="db-tab-form">
+        <div class="form-row">
+            <label for="show-source-path">Source path</label>
+            <div class="path-input-group">
+                <span class="visually-hidden" id="show-source-path-help">
+                    Optional. Leave empty to list local providers. Accepts a .db or .evtx path; paste a folder path to use a directory.
+                </span>
+                <input aria-describedby="show-source-path-help"
+                    @bind-value="_sourcePath"
+                    @bind-value:event="oninput"
+                    class="input source-path"
+                    disabled="@IsRunning"
+                    id="show-source-path"
+                    placeholder="Leave empty for local providers, or pick / paste a path"
+                    type="text" />
+                <button class="button" disabled="@IsRunning" @onclick="PickSourceAsync" type="button">Browse…</button>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <label for="show-filter">Filter (regex)</label>
+            <span class="visually-hidden" id="show-filter-help">
+                Optional regular expression. Filters provider names by full match.
+            </span>
+            <input aria-describedby="@(_filterError is null ? "show-filter-help" : "show-filter-help show-filter-error")"
+                aria-invalid="@(_filterError is not null ? "true" : "false")"
+                class="@FilterCssClass"
+                disabled="@IsRunning"
+                id="show-filter"
+                @oninput="OnFilterInput"
+                placeholder="e.g. ^Microsoft-.*"
+                type="text"
+                value="@_filterText" />
+
+            <span class="filter-error" id="show-filter-error" role="alert">
+                @if (_filterError is not null)
+                {
+                    <i aria-hidden="true" class="bi bi-exclamation-triangle"></i>
+                    <span>@_filterError</span>
+                }
+            </span>
+        </div>
+    </div>
+
+    <DatabaseToolsLogView Entries="@LogEntries" FileNamePrefix="show-providers" Outcome="@Outcome">
+        <ToolbarLeadingContent>
+            @if (IsRunning)
+            {
+                @if (IsCancelling)
+                {
+                    <button aria-disabled="true" class="button" disabled type="button">
+                        <i aria-hidden="true" class="bi bi-hourglass-split"></i> Cancelling…
+                    </button>
+                }
+                else
+                {
+                    <button class="button button-red" @onclick="CancelRun" type="button">
+                        <i aria-hidden="true" class="bi bi-x-circle"></i> Cancel
+                    </button>
+                }
+            }
+            else
+            {
+                <button class="button button-green" disabled="@(!CanRun)" @onclick="RunAsync" type="button">
+                    <i aria-hidden="true" class="bi bi-play-fill"></i> Run
+                </button>
+            }
+        </ToolbarLeadingContent>
+    </DatabaseToolsLogView>
+</div>
