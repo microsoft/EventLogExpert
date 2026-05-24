@@ -15,8 +15,10 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///     <see cref="StreamingTraceLogger" /> bound to the caller-supplied <see cref="IProgress{T}" /> sink so log entries
 ///     stream as they are emitted; catches <see cref="OperationCanceledException" /> and other exceptions to produce an
 ///     explicit <see cref="DatabaseToolsResult" /> rather than propagating into the UI's <see cref="Task" />.
+///     The operation construction is delegated to <see cref="IDatabaseToolsOperationFactory" /> so tests can substitute
+///     a fake factory and exercise this service's real dispatch + result-translation logic.
 /// </summary>
-internal sealed class DatabaseToolsService : IDatabaseToolsService
+internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factory) : IDatabaseToolsService
 {
     public Task<DatabaseToolsResult> CreateAsync(
         CreateDatabaseRequest request,
@@ -24,7 +26,7 @@ internal sealed class DatabaseToolsService : IDatabaseToolsService
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(new CreateDatabaseOperation(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> DiffAsync(
         DiffDatabaseRequest request,
@@ -32,7 +34,7 @@ internal sealed class DatabaseToolsService : IDatabaseToolsService
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(new DiffDatabaseOperation(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> MergeAsync(
         MergeDatabaseRequest request,
@@ -40,7 +42,7 @@ internal sealed class DatabaseToolsService : IDatabaseToolsService
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(new MergeDatabaseOperation(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> ShowAsync(
         ShowProvidersRequest request,
@@ -48,7 +50,7 @@ internal sealed class DatabaseToolsService : IDatabaseToolsService
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(new ShowProvidersOperation(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
 
     public Task<DatabaseToolsResult> UpgradeAsync(
         UpgradeDatabaseRequest request,
@@ -56,7 +58,7 @@ internal sealed class DatabaseToolsService : IDatabaseToolsService
         IProgress<DatabaseToolsProgress>? progress,
         CancellationToken cancellationToken,
         bool verbose = false)
-        => RunAsync(new UpgradeDatabaseOperation(request), logSink, progress, cancellationToken, verbose);
+        => RunAsync(factory.Create(request), logSink, progress, cancellationToken, verbose);
 
     private static async Task<DatabaseToolsResult> RunAsync(
         IDatabaseToolsOperation operation,
