@@ -61,6 +61,10 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
             logger.Information($"Found {skipProviderNames.Count} providers in {request.SkipProvidersInFile}. These will not be included in the new database.");
         }
 
+        // Defensive: defaults Regex.InfiniteMatchTimeout means RegexMatchTimeoutException can never fire — recompile
+        // with a 5-second bound so catastrophic backtracking is caught regardless of how the caller built the regex.
+        var filterRegex = EnsureBoundedTimeout(request.FilterRegex, TimeSpan.FromSeconds(5));
+
         var count = 0;
         var headerLogged = false;
         var pendingForHeader = new List<ProviderDetails>(BatchSize);
@@ -73,8 +77,8 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
         try
         {
             IEnumerable<ProviderDetails> providersToAdd = request.SourcePath is null
-                ? LoadLocalProviders(logger, request.FilterRegex, skipProviderNames)
-                : ProviderSource.LoadProviders(request.SourcePath, logger, request.FilterRegex, skipProviderNames);
+                ? LoadLocalProviders(logger, filterRegex, skipProviderNames)
+                : ProviderSource.LoadProviders(request.SourcePath, logger, filterRegex, skipProviderNames);
 
             foreach (var details in providersToAdd)
             {
