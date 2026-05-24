@@ -22,24 +22,6 @@ public abstract class OperationBase
     private string _providerDetailFormat = "{0, -14} {1, 8} {2, 8} {3, 8} {4, 8} {5, 8} {6, 8}";
 
     /// <summary>
-    ///     Returns a <see cref="Regex" /> with a bounded <see cref="Regex.MatchTimeout" />, so a pathological pattern
-    ///     (e.g., catastrophic backtracking) cannot hang the operation. If <paramref name="regex" /> already has a
-    ///     finite timeout, it is returned as-is. If it has the default <c>Regex.InfiniteMatchTimeout</c>, a fresh
-    ///     <see cref="Regex" /> is compiled from the same pattern/options with <paramref name="defaultTimeout" />.
-    ///     Returns <c>null</c> when input is <c>null</c>. Operations should call this at entry to guarantee any
-    ///     <see cref="RegexMatchTimeoutException" /> catch block is actually reachable, regardless of how the caller
-    ///     constructed the regex.
-    /// </summary>
-    protected static Regex? EnsureBoundedTimeout(Regex? regex, TimeSpan defaultTimeout)
-    {
-        if (regex is null) { return null; }
-
-        return regex.MatchTimeout == Regex.InfiniteMatchTimeout
-            ? new Regex(regex.ToString(), regex.Options, defaultTimeout)
-            : regex;
-    }
-
-    /// <summary>
     ///     Cleans up a partially-created .db file after an operation aborts (cancellation, fatal exception). EF Core's
     ///     SqliteConnection pool keeps the file handle alive across <c>DbContext.Dispose</c>, so a naive <c>File.Delete</c>
     ///     hits a sharing violation on Windows. Mirrors the codebase pattern at
@@ -70,8 +52,26 @@ public abstract class OperationBase
     }
 
     /// <summary>
-    ///     Returns the distinct local provider names installed on this machine, optionally filtered by a case-insensitive
-    ///     regex.
+    ///     Returns a <see cref="Regex" /> with a bounded <see cref="Regex.MatchTimeout" />, so a pathological pattern
+    ///     (e.g., catastrophic backtracking) cannot hang the operation. If <paramref name="regex" /> already has a finite
+    ///     timeout, it is returned as-is. If it has the default <c>Regex.InfiniteMatchTimeout</c>, a fresh
+    ///     <see cref="Regex" /> is compiled from the same pattern/options with <paramref name="defaultTimeout" />. Returns
+    ///     <c>null</c> when input is <c>null</c>. Operations should call this at entry to guarantee any
+    ///     <see cref="RegexMatchTimeoutException" /> catch block is actually reachable, regardless of how the caller
+    ///     constructed the regex.
+    /// </summary>
+    protected static Regex? EnsureBoundedTimeout(Regex? regex, TimeSpan defaultTimeout)
+    {
+        if (regex is null) { return null; }
+
+        return regex.MatchTimeout == Regex.InfiniteMatchTimeout
+            ? new Regex(regex.ToString(), regex.Options, defaultTimeout)
+            : regex;
+    }
+
+    /// <summary>
+    ///     Returns the distinct local provider names installed on this machine, optionally filtered by a
+    ///     <paramref name="regex" /> whose case sensitivity follows the caller's <see cref="RegexOptions" />.
     /// </summary>
     protected static List<string> GetLocalProviderNames(Regex? regex)
     {
