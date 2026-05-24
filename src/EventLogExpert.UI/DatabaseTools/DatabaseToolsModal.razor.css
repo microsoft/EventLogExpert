@@ -191,6 +191,7 @@
     color: var(--clr-red);
 }
 
+.visually-hidden,
 .tabpanel ::deep .visually-hidden {
     position: absolute;
     width: 1px;

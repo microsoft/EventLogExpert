@@ -113,8 +113,10 @@ public sealed class CreateDatabaseOperation(CreateDatabaseRequest request) : Ope
             if (!headerLogged && pendingForHeader.Count > 0)
             {
                 dbContext ??= new ProviderDbContext(request.TargetPath, false, logger);
+                var lastName = pendingForHeader[^1].ProviderName;
                 count += pendingForHeader.Count;
                 await FlushHeaderAndBufferAsync(logger, dbContext, pendingForHeader, cancellationToken);
+                progress?.Report(new DatabaseToolsProgress(count, null, lastName));
             }
 
             if (dbContext is null)

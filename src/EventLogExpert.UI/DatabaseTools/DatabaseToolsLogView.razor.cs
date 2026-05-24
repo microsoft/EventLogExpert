@@ -149,13 +149,20 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
     {
         if (firstRender)
         {
-            // Inline JS module: scroll + pin tracker. Loaded lazily.
-            _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                "import",
-                "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsLogView.js");
+            if (_disposed) { return; }
 
-            await _jsModule.InvokeVoidAsync("attach", _logViewRef, _selfRef);
-            _lastRenderedCount = Entries.Count;
+            // Inline JS module: scroll + pin tracker. Loaded lazily.
+            try
+            {
+                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
+                    "import",
+                    "./_content/EventLogExpert.UI/DatabaseTools/DatabaseToolsLogView.js");
+
+                await _jsModule.InvokeVoidAsync("attach", _logViewRef, _selfRef);
+                _lastRenderedCount = Entries.Count;
+            }
+            catch (JSDisconnectedException) { /* Closed mid-import — ignore. */ }
+            catch (JSException) { /* Stale module/ref — best-effort attach. */ }
 
             return;
         }
