@@ -6,7 +6,6 @@ using EventLogExpert.DatabaseTools.Operations;
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
 
 namespace EventLogExpert.Runtime.Tests.DatabaseTools;
 
@@ -22,7 +21,7 @@ public sealed class DatabaseToolsServiceTests
             logger.Warning($"three");
             return Task.FromResult(DatabaseToolsOutcome.Succeeded);
         });
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
 
         await service.ShowAsync(
@@ -38,13 +37,12 @@ public sealed class DatabaseToolsServiceTests
     [Fact]
     public async Task DurationIsMeasured_AndGreaterThanZero()
     {
-        // The Operation does a small sleep so the elapsed timer captures a non-zero interval.
         var fake = new RecordingOperation(async _ =>
         {
             await Task.Delay(50);
             return DatabaseToolsOutcome.Succeeded;
         });
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
 
         var result = await service.ShowAsync(
@@ -57,7 +55,7 @@ public sealed class DatabaseToolsServiceTests
     public async Task OperationSucceeds_ResultOutcomeMatches_FailureSummaryNull()
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
 
         var result = await service.ShowAsync(
@@ -71,7 +69,7 @@ public sealed class DatabaseToolsServiceTests
     public async Task OperationThrowsException_ResultIsFailed_FailureSummarySet_ErrorLogged()
     {
         var fake = new RecordingOperation(_ => throw new InvalidOperationException("boom"));
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
 
         var result = await service.ShowAsync(
@@ -86,7 +84,7 @@ public sealed class DatabaseToolsServiceTests
     public async Task OperationThrowsOperationCanceledException_ResultIsCancelled()
     {
         var fake = new RecordingOperation(_ => throw new OperationCanceledException());
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
 
         var result = await service.ShowAsync(
@@ -100,7 +98,7 @@ public sealed class DatabaseToolsServiceTests
     public async Task PreCancelledToken_ReturnsCancelled_BeforeOperationInvoked()
     {
         var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
-        var service = new TestableDatabaseToolsService(fake);
+        var (service, _) = CreateSut(showOperation: () => fake);
         var logSink = new ListProgress<DatabaseToolsLogEntry>();
         var cts = new CancellationTokenSource();
         cts.Cancel();
@@ -110,6 +108,140 @@ public sealed class DatabaseToolsServiceTests
 
         Assert.Equal(DatabaseToolsOutcome.Cancelled, result.Outcome);
         Assert.False(fake.WasInvoked, "Operation must not run when token is already cancelled.");
+    }
+
+    [Theory]
+    [InlineData("Show")]
+    [InlineData("Create")]
+    [InlineData("Merge")]
+    [InlineData("Diff")]
+    [InlineData("Upgrade")]
+    public async Task PublicMethod_DispatchesViaCorrectFactoryOverload(string method)
+    {
+        var fake = new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+        var (service, factory) = CreateSut(
+            showOperation: () => fake,
+            createOperation: () => fake,
+            mergeOperation: () => fake,
+            diffOperation: () => fake,
+            upgradeOperation: () => fake);
+        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+
+        switch (method)
+        {
+            case "Show":
+                await service.ShowAsync(new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None);
+                Assert.Equal(1, factory.ShowCallCount);
+                Assert.Equal(0, factory.CreateCallCount + factory.MergeCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
+                break;
+            case "Create":
+                await service.CreateAsync(new CreateDatabaseRequest("target.db", null, null, null), logSink, progress: null, CancellationToken.None);
+                Assert.Equal(1, factory.CreateCallCount);
+                Assert.Equal(0, factory.ShowCallCount + factory.MergeCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
+                break;
+            case "Merge":
+                await service.MergeAsync(new MergeDatabaseRequest("source.db", "target.db", false), logSink, progress: null, CancellationToken.None);
+                Assert.Equal(1, factory.MergeCallCount);
+                Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.DiffCallCount + factory.UpgradeCallCount);
+                break;
+            case "Diff":
+                await service.DiffAsync(new DiffDatabaseRequest("first.db", "second.db", "out.db"), logSink, progress: null, CancellationToken.None);
+                Assert.Equal(1, factory.DiffCallCount);
+                Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.MergeCallCount + factory.UpgradeCallCount);
+                break;
+            case "Upgrade":
+                await service.UpgradeAsync(new UpgradeDatabaseRequest("target.db"), logSink, progress: null, CancellationToken.None);
+                Assert.Equal(1, factory.UpgradeCallCount);
+                Assert.Equal(0, factory.ShowCallCount + factory.CreateCallCount + factory.MergeCallCount + factory.DiffCallCount);
+                break;
+            default: throw new InvalidOperationException($"Unknown method {method}");
+        }
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task VerboseFlag_WiresTraceLevelThroughToLogger(bool verbose)
+    {
+        var fake = new RecordingOperation(logger =>
+        {
+            logger.Trace($"trace-line");
+            logger.Information($"info-line");
+            return Task.FromResult(DatabaseToolsOutcome.Succeeded);
+        });
+        var (service, _) = CreateSut(showOperation: () => fake);
+        var logSink = new ListProgress<DatabaseToolsLogEntry>();
+
+        await service.ShowAsync(
+            new ShowProvidersRequest(null, null), logSink, progress: null, CancellationToken.None, verbose: verbose);
+
+        var traceEntries = logSink.Entries.Where(e => e.Level == LogLevel.Trace).ToList();
+        var infoEntries = logSink.Entries.Where(e => e.Level == LogLevel.Information).ToList();
+
+        if (verbose)
+        {
+            Assert.Single(traceEntries);
+            Assert.Contains("trace-line", traceEntries[0].Message);
+        }
+        else
+        {
+            Assert.Empty(traceEntries);
+        }
+
+        Assert.Single(infoEntries);
+        Assert.Contains("info-line", infoEntries[0].Message);
+    }
+
+    private static (DatabaseToolsService Sut, FakeOperationFactory Factory) CreateSut(
+        Func<IDatabaseToolsOperation>? showOperation = null,
+        Func<IDatabaseToolsOperation>? createOperation = null,
+        Func<IDatabaseToolsOperation>? mergeOperation = null,
+        Func<IDatabaseToolsOperation>? diffOperation = null,
+        Func<IDatabaseToolsOperation>? upgradeOperation = null)
+    {
+        var factory = new FakeOperationFactory
+        {
+            ShowFactory = showOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded)),
+            CreateFactory = createOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded)),
+            MergeFactory = mergeOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded)),
+            DiffFactory = diffOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded)),
+            UpgradeFactory = upgradeOperation ?? (() => new RecordingOperation(DatabaseToolsOutcome.Succeeded))
+        };
+
+        return (new DatabaseToolsService(factory), factory);
+    }
+
+    private sealed class FakeOperationFactory : IDatabaseToolsOperationFactory
+    {
+        public int CreateCallCount { get; private set; }
+
+        public Func<IDatabaseToolsOperation> CreateFactory { get; set; } = () => new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+
+        public int DiffCallCount { get; private set; }
+
+        public Func<IDatabaseToolsOperation> DiffFactory { get; set; } = () => new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+
+        public int MergeCallCount { get; private set; }
+
+        public Func<IDatabaseToolsOperation> MergeFactory { get; set; } = () => new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+
+        public int ShowCallCount { get; private set; }
+
+        public Func<IDatabaseToolsOperation> ShowFactory { get; set; } = () => new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+
+        public int UpgradeCallCount { get; private set; }
+
+        public Func<IDatabaseToolsOperation> UpgradeFactory { get; set; } = () => new RecordingOperation(DatabaseToolsOutcome.Succeeded);
+
+        public IDatabaseToolsOperation Create(ShowProvidersRequest request) { ShowCallCount++; return ShowFactory(); }
+
+        public IDatabaseToolsOperation Create(CreateDatabaseRequest request) { CreateCallCount++; return CreateFactory(); }
+
+        public IDatabaseToolsOperation Create(MergeDatabaseRequest request) { MergeCallCount++; return MergeFactory(); }
+
+        public IDatabaseToolsOperation Create(DiffDatabaseRequest request) { DiffCallCount++; return DiffFactory(); }
+
+        public IDatabaseToolsOperation Create(UpgradeDatabaseRequest request) { UpgradeCallCount++; return UpgradeFactory(); }
     }
 
     private sealed class ListProgress<T> : IProgress<T>
@@ -140,62 +272,6 @@ public sealed class DatabaseToolsServiceTests
         {
             WasInvoked = true;
             return _body(logger);
-        }
-    }
-
-    // ---- Test doubles ----
-
-    private sealed class TestableDatabaseToolsService(IDatabaseToolsOperation operation) : IDatabaseToolsService
-    {
-        public Task<DatabaseToolsResult> CreateAsync(CreateDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-            => InvokeOperation(operation, logSink, progress, cancellationToken, verbose);
-
-        public Task<DatabaseToolsResult> DiffAsync(DiffDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-            => InvokeOperation(operation, logSink, progress, cancellationToken, verbose);
-
-        public Task<DatabaseToolsResult> MergeAsync(MergeDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-            => InvokeOperation(operation, logSink, progress, cancellationToken, verbose);
-
-        public Task<DatabaseToolsResult> ShowAsync(
-            ShowProvidersRequest request,
-            IProgress<DatabaseToolsLogEntry> logSink,
-            IProgress<DatabaseToolsProgress>? progress,
-            CancellationToken cancellationToken,
-            bool verbose = false)
-            => InvokeOperation(operation, logSink, progress, cancellationToken, verbose);
-
-        public Task<DatabaseToolsResult> UpgradeAsync(UpgradeDatabaseRequest request, IProgress<DatabaseToolsLogEntry> logSink, IProgress<DatabaseToolsProgress>? progress, CancellationToken cancellationToken, bool verbose = false)
-            => InvokeOperation(operation, logSink, progress, cancellationToken, verbose);
-
-        private static async Task<DatabaseToolsResult> InvokeOperation(
-            IDatabaseToolsOperation op,
-            IProgress<DatabaseToolsLogEntry> logSink,
-            IProgress<DatabaseToolsProgress>? progress,
-            CancellationToken cancellationToken,
-            bool verbose)
-        {
-            ITraceLogger logger = new StreamingTraceLogger(logSink, verbose ? LogLevel.Trace : LogLevel.Information);
-            var sw = Stopwatch.StartNew();
-            DatabaseToolsOutcome outcome;
-            string? failure = null;
-
-            try
-            {
-                outcome = await Task.Run(() => op.ExecuteAsync(logger, progress, cancellationToken), cancellationToken);
-            }
-            catch (OperationCanceledException)
-            {
-                outcome = DatabaseToolsOutcome.Cancelled;
-            }
-            catch (Exception ex)
-            {
-                outcome = DatabaseToolsOutcome.Failed;
-                failure = ex.Message;
-                logger.Error($"{ex}");
-            }
-
-            sw.Stop();
-            return new DatabaseToolsResult(outcome, failure, sw.Elapsed);
         }
     }
 }
