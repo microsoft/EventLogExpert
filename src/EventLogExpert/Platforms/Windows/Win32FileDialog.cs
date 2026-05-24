@@ -66,18 +66,23 @@ internal static partial class Win32FileDialog
         }
     }
 
-    /// <summary>
-    ///     Returns the picked save destination or <c>null</c> if the user cancelled. The dialog enforces
-    ///     <c>OFN_OVERWRITEPROMPT</c> — user is prompted before overwriting an existing file. The first entry of
-    ///     <paramref name="extensions" /> is used as the default extension appended when the user types a name without one
-    ///     (e.g. typing <c>"my-db"</c> with extensions=[<c>".db"</c>] yields <c>"my-db.db"</c>).
-    /// </summary>
+    /// <summary>Picks a destination for save (returns the path with extension auto-appended; <c>null</c> if cancelled).</summary>
     public static unsafe string? PickSaveFile(
         IntPtr hwndOwner,
         IReadOnlyList<string> extensions,
         string? suggestedFileName = null)
     {
         ArgumentNullException.ThrowIfNull(extensions);
+
+        if (extensions.Count == 0)
+        {
+            throw new ArgumentException("At least one extension is required.", nameof(extensions));
+        }
+
+        if (string.IsNullOrWhiteSpace(extensions[0]))
+        {
+            throw new ArgumentException("The first extension cannot be null or whitespace.", nameof(extensions));
+        }
 
         Span<char> fileBuffer = stackalloc char[FileBufferChars];
         fileBuffer.Clear();
