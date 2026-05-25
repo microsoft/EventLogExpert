@@ -102,6 +102,11 @@ public sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Opera
 
             var providerNamesInTarget = new HashSet<string>(targetMatchingNames, StringComparer.OrdinalIgnoreCase);
 
+            // Wrap the destructive phase (overwrite delete + provider copy) in a transaction so a cancel mid-flight
+            // does not leave the target with permanently-missing providers. The non-overwrite path is also wrapped
+            // so partial copies don't persist on failure — re-running merge produces the intended end state regardless.
+            await using var transaction = await targetContext.Database.BeginTransactionAsync(cancellationToken);
+
             if (targetMatchingNames.Count > 0)
             {
                 logger.Information($"The target database contains {targetMatchingNames.Count} provider row(s) matching {providerNamesInTarget.Count} provider name(s) in the source.");
@@ -148,7 +153,12 @@ public sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Opera
             var copiedCount = 0;
             var pendingBatch = new List<ProviderDetails>(BatchSize);
 
-            foreach (var provider in ProviderSource.LoadProviders(request.SourcePath, logger, regex: null, skipProviderNames: skipForLoad))
+            foreach (var provider in ProviderSource.LoadProviders(
+                request.SourcePath,
+                logger,
+                regex: null,
+                skipProviderNames: skipForLoad,
+                preDiscoveredProviderNames: sourceNamesList))
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
@@ -166,6 +176,10 @@ public sealed class MergeDatabaseOperation(MergeDatabaseRequest request) : Opera
             {
                 copiedCount += await FlushBatchAsync(logger, targetContext, pendingBatch, cancellationToken);
             }
+
+            // Commit only after every delete + insert succeeded. Disposing the transaction without committing
+            // (e.g., on OperationCanceledException or a thrown exception) rolls back the destructive phase.
+            await transaction.CommitAsync(cancellationToken);
 
             logger.Information($"");
             logger.Information($"Copied {copiedCount} provider(s).");
