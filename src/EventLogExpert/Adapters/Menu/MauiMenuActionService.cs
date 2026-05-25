@@ -4,9 +4,9 @@
 using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Readers;
 using EventLogExpert.Logging.Abstractions;
-using EventLogExpert.Platforms.Windows;
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Common.Clipboard;
+using EventLogExpert.Runtime.Common.Files;
 using EventLogExpert.Runtime.Common.Versioning;
 using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.FilterPane;
@@ -42,6 +42,7 @@ public sealed class MauiMenuActionService(
     IUpdateService updateService,
     ICurrentVersionProvider currentVersionProvider,
     ITraceLogger traceLogger,
+    IFolderPickerService folderPickerService,
     IState<EventLogState> eventLogState) : IMenuActionService, IDisposable
 {
     private readonly IClipboardService _clipboardService = clipboardService;
@@ -51,6 +52,7 @@ public sealed class MauiMenuActionService(
     private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
+    private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
     private readonly IModalService _modalService = modalService;
     private readonly ISettingsService _settings = settings;
@@ -157,8 +159,9 @@ public sealed class MauiMenuActionService(
         if (!files.Any()) { return; }
 
         var paths = files
-            .Where(file => file is not null && !string.IsNullOrEmpty(file.FullPath))
-            .Select(file => (file!.FullPath, LogPathType.File))
+            .OfType<FileResult>()
+            .Where(file => !string.IsNullOrEmpty(file.FullPath))
+            .Select(file => (file.FullPath, LogPathType.File))
             .ToList();
 
         await OpenLogsBatchAsync(paths, combineLog);
@@ -170,7 +173,7 @@ public sealed class MauiMenuActionService(
 
         try
         {
-            folderPath = await FolderPickerHelper.PickFolderAsync();
+            folderPath = await _folderPickerService.PickFolderAsync();
         }
         catch (InvalidOperationException ex)
         {

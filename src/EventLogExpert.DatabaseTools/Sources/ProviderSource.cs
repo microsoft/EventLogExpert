@@ -50,20 +50,13 @@ public static class ProviderSource
         return regex is null ? names.ToList() : names.Where(n => regex.IsMatch(n)).ToList();
     }
 
-    /// <summary>
-    ///     Loads <see cref="ProviderDetails" /> from <paramref name="path" />, applying an optional
-    ///     <paramref name="regex" /> to filter provider names (case sensitivity follows the caller's
-    ///     <see cref="RegexOptions" />). When the same provider name appears in multiple source files, the first occurrence
-    ///     wins (.db files are processed before .evtx). Provider names contained in <paramref name="skipProviderNames" /> are
-    ///     excluded BEFORE details are resolved, so callers using the skip set never pay the cost of loading metadata for
-    ///     excluded providers.
-    /// </summary>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string path,
         ITraceLogger logger,
         Regex? regex = null,
-        IReadOnlySet<string>? skipProviderNames = null) =>
-        LoadProvidersIterator(path, logger, regex, skipProviderNames);
+        IReadOnlySet<string>? skipProviderNames = null,
+        IReadOnlyList<string>? preDiscoveredProviderNames = null) =>
+        LoadProvidersIterator(path, logger, regex, skipProviderNames, preDiscoveredProviderNames);
 
     /// <summary>Validates that <paramref name="path" /> exists and has a recognized form.</summary>
     public static bool TryValidate(string path, ITraceLogger logger)
@@ -205,7 +198,8 @@ public static class ProviderSource
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
-        HashSet<string> seen)
+        HashSet<string> seen,
+        IReadOnlyList<string>? preDiscoveredProviderNames = null)
     {
         var ext = Path.GetExtension(file);
 
@@ -267,7 +261,7 @@ public static class ProviderSource
 
         if (string.Equals(ext, EvtxExtension, StringComparison.OrdinalIgnoreCase))
         {
-            return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen);
+            return MtaProviderSource.LoadProviders(file, logger, regex, skipProviderNames, seen, preDiscoveredProviderNames);
         }
 
         logger.Warning($"Skipping unsupported source file: {file}");
@@ -310,13 +304,23 @@ public static class ProviderSource
         string path,
         ITraceLogger logger,
         Regex? regex,
-        IReadOnlySet<string>? skipProviderNames)
+        IReadOnlySet<string>? skipProviderNames,
+        IReadOnlyList<string>? preDiscoveredProviderNames = null)
     {
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var files = EnumerateSourceFiles(path, logger).ToList();
 
-        foreach (var file in EnumerateSourceFiles(path, logger))
+        // preDiscoveredProviderNames optimization only applies for single-file .evtx sources — for folders and .db
+        // sources, name attribution is per-file or not the bottleneck, so we ignore the hint and fall back to per-file
+        // discovery. This keeps the optimization scope-local and safe.
+        var canUsePreDiscovered = preDiscoveredProviderNames is not null
+            && files.Count == 1
+            && string.Equals(Path.GetExtension(files[0]), EvtxExtension, StringComparison.OrdinalIgnoreCase);
+
+        foreach (var file in files)
         {
-            foreach (var details in LoadDetailsFromFile(file, logger, regex, skipProviderNames, seen))
+            var hint = canUsePreDiscovered ? preDiscoveredProviderNames : null;
+            foreach (var details in LoadDetailsFromFile(file, logger, regex, skipProviderNames, seen, hint))
             {
                 yield return details;
             }

@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.DatabaseTools;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using System.Collections.Immutable;
+using System.Diagnostics;
 
 namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
@@ -214,6 +215,7 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
 
         var logSink = new Progress<DatabaseToolsLogEntry>(AppendEntry);
+        var startTimestamp = Stopwatch.GetTimestamp();
 
         try
         {
@@ -223,11 +225,13 @@ public abstract class DatabaseToolsTabBase<TRequest> : ComponentBase, IDisposabl
         }
         catch (Exception ex)
         {
-            Outcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, TimeSpan.Zero);
+            var failedOutcome = new DatabaseToolsResult(DatabaseToolsOutcome.Failed, ex.Message, Stopwatch.GetElapsedTime(startTimestamp));
+            Outcome = failedOutcome;
             AppendEntry(new DatabaseToolsLogEntry(
                 DateTime.UtcNow,
                 LogLevel.Error,
                 $"Unexpected error: {ex.Message}"));
+            AppendOutcome(failedOutcome);
         }
         finally
         {
