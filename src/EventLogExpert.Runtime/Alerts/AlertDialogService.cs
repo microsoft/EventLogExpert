@@ -3,19 +3,20 @@
 
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
+using EventLogExpert.Runtime.Modal;
 
 namespace EventLogExpert.Runtime.Alerts;
 
 public sealed class AlertDialogService(
-    IInlineAlertHostBroker inlineAlertHostBroker,
+    IModalCoordinator modalCoordinator,
     IMainThreadService mainThreadService,
     IBannerService bannerService,
     Func<IReadOnlyDictionary<string, object?>, Task<bool>> openStandaloneAlert,
     Func<IReadOnlyDictionary<string, object?>, Task<string>> openStandalonePrompt) : IAlertDialogService
 {
     private readonly IBannerService _bannerService = bannerService;
-    private readonly IInlineAlertHostBroker _inlineAlertHostBroker = inlineAlertHostBroker;
     private readonly IMainThreadService _mainThreadService = mainThreadService;
+    private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<bool>> _openStandaloneAlert = openStandaloneAlert;
     private readonly Func<IReadOnlyDictionary<string, object?>, Task<string>> _openStandalonePrompt =
         openStandalonePrompt;
@@ -62,7 +63,7 @@ public sealed class AlertDialogService(
     private Task<string> DisplayPromptCore(string title, string message, string? initialValue) =>
         InvokeOnMainThreadAsync(async () =>
         {
-            if (!_inlineAlertHostBroker.TryGet(out var host))
+            if (!_modalCoordinator.TryGetInlineAlertHost(out var host))
             {
                 return await _openStandalonePrompt(new Dictionary<string, object?>
                 {
@@ -74,7 +75,7 @@ public sealed class AlertDialogService(
 
             try
             {
-                InlineAlertResult result = await host!.ShowInlineAlertAsync(
+                InlineAlertResult result = await host.ShowInlineAlertAsync(
                     new InlineAlertRequest(title, message, "OK", "Cancel", true, initialValue),
                     CancellationToken.None);
 
@@ -111,9 +112,9 @@ public sealed class AlertDialogService(
 
         return InvokeOnMainThreadAsync(async () =>
         {
-            bool hostAvailable = _inlineAlertHostBroker.TryGet(out var host);
+            _modalCoordinator.TryGetInlineAlertHost(out var host);
 
-            if (presentation == AlertPresentation.InlineOnly && !hostAvailable)
+            if (presentation == AlertPresentation.InlineOnly && host is null)
             {
                 throw new InvalidOperationException(
                     $"{nameof(AlertPresentation)}.{nameof(AlertPresentation.InlineOnly)} requires an active inline " +
@@ -122,10 +123,10 @@ public sealed class AlertDialogService(
 
             if (presentation == AlertPresentation.PopupOnly)
             {
-                hostAvailable = false;
+                host = null;
             }
 
-            if (!hostAvailable)
+            if (host is null)
             {
                 return await _openStandaloneAlert(new Dictionary<string, object?>
                 {
@@ -138,7 +139,7 @@ public sealed class AlertDialogService(
 
             try
             {
-                InlineAlertResult result = await host!.ShowInlineAlertAsync(
+                InlineAlertResult result = await host.ShowInlineAlertAsync(
                     new InlineAlertRequest(title, message, accept, cancel, false, null),
                     CancellationToken.None);
 

@@ -29,18 +29,18 @@ public sealed class DebugLogModalTests : BunitContext
     private readonly IClipboardService _clipboardService = Substitute.For<IClipboardService>();
     private readonly IFileLogger _fileLogger = Substitute.For<IFileLogger>();
     private readonly IFileSaveService _fileSaveService = Substitute.For<IFileSaveService>();
-    private readonly IInlineAlertHostBroker _inlineAlertHostBroker = Substitute.For<IInlineAlertHostBroker>();
+    private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IModalService _modalService = Substitute.For<IModalService>();
 
     public DebugLogModalTests()
     {
-        _modalService.ActiveModalId.Returns(1L);
+        _modalService.ActiveModalId.Returns(new ModalId(1L));
 
         Services.AddSingleton(_alertDialogService);
         Services.AddSingleton(_clipboardService);
         Services.AddSingleton(_fileLogger);
         Services.AddSingleton(_fileSaveService);
-        Services.AddSingleton(_inlineAlertHostBroker);
+        Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
         Services.AddFluxor(options => options.ScanAssemblies(typeof(DebugLogModal).Assembly));
 

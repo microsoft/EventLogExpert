@@ -120,12 +120,12 @@ public static class MauiProgram
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {
             var modalService = provider.GetRequiredService<IModalService>();
-            var inlineAlertHostBroker = provider.GetRequiredService<IInlineAlertHostBroker>();
+            var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
             var bannerService = provider.GetRequiredService<IBannerService>();
 
             return new AlertDialogService(
-                inlineAlertHostBroker,
+                modalCoordinator,
                 mainThreadService,
                 bannerService,
                 parameters => modalService.Show<AlertModal, bool>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)),
