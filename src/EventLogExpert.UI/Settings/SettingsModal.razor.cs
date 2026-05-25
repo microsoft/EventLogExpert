@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.EventLog;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Modal;
 using Fluxor;
@@ -75,10 +76,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
         await base.DisposeAsyncCore(disposing);
     }
 
-    protected override Task OnCancelAsync() =>
-        IsCloseBlocked
-            ? Task.CompletedTask
-            : base.OnCancelAsync();
+    protected override Task<bool> OnRequestCloseAsync(ModalCloseRequest request) =>
+        Task.FromResult(!IsCloseBlocked);
 
     protected override async Task OnClosingAsync()
     {
