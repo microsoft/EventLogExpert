@@ -16,7 +16,7 @@ public sealed class ModalCoordinatorTests
         // Arrange
         var service = new ModalService();
         using var sut = new ModalCoordinator(service);
-        Task<bool> showTask = sut.PushAsync<DummyModal, bool>();
+        Task<ModalOpenResult<bool>> showTask = sut.PushAsync<DummyModal, bool>();
         ModalId activeId = service.ActiveModalId;
         Assert.NotNull(sut.ActiveSession);
 
@@ -37,7 +37,9 @@ public sealed class ModalCoordinatorTests
         ModalSession? sessionAtResume = await resumeSnapshot.Task;
         Assert.Null(sessionAtResume);
         await observer;
-        Assert.True(await showTask);
+        ModalOpenResult<bool> result = await showTask;
+        Assert.True(result.WasOpened);
+        Assert.True(result.Result);
         Assert.Null(sut.ActiveSession);
     }
 
@@ -113,9 +115,10 @@ public sealed class ModalCoordinatorTests
         using var sut = new ModalCoordinator(service);
 
         // Act
-        Task<bool> firstShow = sut.PushAsync<DummyModal, bool>();
+        Task<ModalOpenResult<bool>> firstShow = sut.PushAsync<DummyModal, bool>();
         ModalId firstId = service.ActiveModalId;
-        Task<bool> secondShow = sut.PushAsync<OtherModal, bool>();
+        sut.RegisterModal(TestRegistration(firstId, _ => Task.FromResult(true)));
+        Task<ModalOpenResult<bool>> secondShow = sut.PushAsync<OtherModal, bool>();
         ModalId secondId = service.ActiveModalId;
 
         // Assert
@@ -123,14 +126,18 @@ public sealed class ModalCoordinatorTests
         Assert.NotNull(sut.ActiveSession);
         Assert.Equal(secondId, sut.ActiveSession.Id);
         Assert.Equal(typeof(OtherModal), sut.ActiveSession.ComponentType);
-        Assert.False(await firstShow);
+        ModalOpenResult<bool> firstResult = await firstShow;
+        Assert.True(firstResult.WasOpened);
+        Assert.False(firstResult.Result);
 
         sut.ForceCloseActive();
-        Assert.False(await secondShow);
+        ModalOpenResult<bool> secondResult = await secondShow;
+        Assert.True(secondResult.WasOpened);
+        Assert.False(secondResult.Result);
     }
 
     [Fact]
-    public void RegisterInlineAlertHost_ActiveId_RegistersAndIsReadable()
+    public void RegisterModal_ActiveId_RegistersAndInlineAlertHostIsReadable()
     {
         // Arrange
         var service = new ModalService();
@@ -140,7 +147,7 @@ public sealed class ModalCoordinatorTests
         var host = Substitute.For<IInlineAlertHost>();
 
         // Act
-        sut.RegisterInlineAlertHost(id, host);
+        sut.RegisterModal(TestRegistration(id, host));
 
         // Assert
         Assert.True(sut.TryGetInlineAlertHost(out var resolved));
@@ -148,7 +155,7 @@ public sealed class ModalCoordinatorTests
     }
 
     [Fact]
-    public void RegisterInlineAlertHost_StaleId_IsNoOp()
+    public void RegisterModal_StaleId_IsNoOp()
     {
         // Arrange
         var service = new ModalService();
@@ -156,7 +163,7 @@ public sealed class ModalCoordinatorTests
         var host = Substitute.For<IInlineAlertHost>();
 
         // Act
-        sut.RegisterInlineAlertHost(new ModalId(999L), host);
+        sut.RegisterModal(TestRegistration(new ModalId(999L), host));
 
         // Assert
         Assert.False(sut.TryGetInlineAlertHost(out _));
@@ -194,7 +201,7 @@ public sealed class ModalCoordinatorTests
         _ = sut.PushAsync<DummyModal, bool>();
         ModalId firstId = service.ActiveModalId;
         var host = Substitute.For<IInlineAlertHost>();
-        sut.RegisterInlineAlertHost(firstId, host);
+        sut.RegisterModal(TestRegistration(firstId, host));
         Assert.True(sut.TryGetInlineAlertHost(out _));
 
         // Act — successor preempts prior; the host is now stale.
@@ -207,24 +214,25 @@ public sealed class ModalCoordinatorTests
     }
 
     [Fact]
-    public void UnregisterInlineAlertHost_MatchingId_ClearsHost()
+    public void UnregisterModal_MatchingId_ClearsRegistration()
     {
         // Arrange
         var service = new ModalService();
         using var sut = new ModalCoordinator(service);
         _ = sut.PushAsync<DummyModal, bool>();
         ModalId id = service.ActiveModalId;
-        sut.RegisterInlineAlertHost(id, Substitute.For<IInlineAlertHost>());
+        sut.RegisterModal(TestRegistration(id, Substitute.For<IInlineAlertHost>()));
 
         // Act
-        sut.UnregisterInlineAlertHost(id);
+        sut.UnregisterModal(id);
 
         // Assert
         Assert.False(sut.TryGetInlineAlertHost(out _));
+        Assert.Null(sut.GetActiveModalScope());
     }
 
     [Fact]
-    public void UnregisterInlineAlertHost_StaleId_IsNoOp()
+    public void UnregisterModal_StaleId_IsNoOp()
     {
         // Arrange
         var service = new ModalService();
@@ -232,15 +240,21 @@ public sealed class ModalCoordinatorTests
         _ = sut.PushAsync<DummyModal, bool>();
         ModalId id = service.ActiveModalId;
         var host = Substitute.For<IInlineAlertHost>();
-        sut.RegisterInlineAlertHost(id, host);
+        sut.RegisterModal(TestRegistration(id, host));
 
         // Act
-        sut.UnregisterInlineAlertHost(new ModalId(id.Value + 99));
+        sut.UnregisterModal(new ModalId(id.Value + 99));
 
         // Assert
         Assert.True(sut.TryGetInlineAlertHost(out var resolved));
         Assert.Same(host, resolved);
     }
+
+    private static ModalRegistration TestRegistration(ModalId id, IInlineAlertHost? host = null, ModalScope scope = ModalScope.Standard) =>
+        new(id, _ => Task.FromResult(true), scope, host);
+
+    private static ModalRegistration TestRegistration(ModalId id, Func<ModalCloseRequest, Task<bool>> requestClose, ModalScope scope = ModalScope.Standard) =>
+        new(id, requestClose, scope, inlineAlertHost: null);
 
     private sealed class DummyModal : IComponent
     {
