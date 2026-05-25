@@ -48,7 +48,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IBannerService))]
     [InlineData(typeof(IDatabaseService))]
     [InlineData(typeof(IActiveDatabases))]
-    [InlineData(typeof(IInlineAlertHostBroker))]
+    [InlineData(typeof(IModalCoordinator))]
     [InlineData(typeof(ILogWatcherService))]
     [InlineData(typeof(IMenuService))]
     [InlineData(typeof(IModalService))]

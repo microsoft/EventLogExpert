@@ -4,6 +4,7 @@
 using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Threading;
+using EventLogExpert.Runtime.Modal;
 using NSubstitute;
 
 namespace EventLogExpert.Runtime.Tests.Alerts;
@@ -18,15 +19,15 @@ public sealed class ModalAlertDialogServiceTests
         host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new InlineAlertResult(true, "typed-value")));
 
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
         });
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -50,15 +51,15 @@ public sealed class ModalAlertDialogServiceTests
         host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new InlineAlertResult(false, null)));
 
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
         });
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -75,12 +76,12 @@ public sealed class ModalAlertDialogServiceTests
     public async Task DisplayPrompt_WhenNoActiveHost_ShouldCallStandalonePromptOpener()
     {
         // Arrange
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         IReadOnlyDictionary<string, object?>? capturedPrompt = null;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -101,15 +102,15 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowAlert_ShouldMarshalThroughMainThreadService()
     {
         // Arrange — capture that MainThread invocation happens before the routing decision runs.
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         var mainThread = Substitute.For<IMainThreadService>();
         mainThread.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
             .Returns(call => ((Func<Task>)call[0])());
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             mainThread,
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(true),
@@ -130,7 +131,7 @@ public sealed class ModalAlertDialogServiceTests
         var mainThread = Substitute.For<IMainThreadService>();
 
         var sut = new AlertDialogService(
-            Substitute.For<IInlineAlertHostBroker>(),
+            Substitute.For<IModalCoordinator>(),
             mainThread,
             bannerService,
             _ => Task.FromResult(false),
@@ -149,11 +150,11 @@ public sealed class ModalAlertDialogServiceTests
     {
         // Arrange
         var bannerService = Substitute.For<IBannerService>();
-        var broker = Substitute.For<IInlineAlertHostBroker>();
+        var coordinator = Substitute.For<IModalCoordinator>();
         var standaloneCalled = false;
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             bannerService,
             _ => { standaloneCalled = true; return Task.FromResult(false); },
@@ -165,18 +166,18 @@ public sealed class ModalAlertDialogServiceTests
         // Assert
         bannerService.Received(1).ReportInfoBanner("Banner Title", "Banner Message", BannerSeverity.Warning);
         Assert.False(standaloneCalled);
-        broker.DidNotReceive().TryGet(out Arg.Any<IInlineAlertHost?>());
+        coordinator.DidNotReceive().TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
 
     [Fact]
     public async Task ShowAlertOneButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
     {
         // Arrange
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -195,8 +196,8 @@ public sealed class ModalAlertDialogServiceTests
         host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new InlineAlertResult(true, null)));
 
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
@@ -204,7 +205,7 @@ public sealed class ModalAlertDialogServiceTests
 
         var standaloneCalled = false;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
@@ -223,8 +224,8 @@ public sealed class ModalAlertDialogServiceTests
     {
         // Arrange
         var host = Substitute.For<IInlineAlertHost>();
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
@@ -232,7 +233,7 @@ public sealed class ModalAlertDialogServiceTests
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
@@ -251,12 +252,12 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowAlertOneButton_WhenNoActiveHost_ShouldCallStandaloneOpener()
     {
         // Arrange
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
@@ -278,7 +279,7 @@ public sealed class ModalAlertDialogServiceTests
     {
         // Arrange
         var sut = new AlertDialogService(
-            Substitute.For<IInlineAlertHostBroker>(),
+            Substitute.For<IModalCoordinator>(),
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -294,11 +295,11 @@ public sealed class ModalAlertDialogServiceTests
     public async Task ShowAlertTwoButton_InlineOnlyNoHost_ThrowsInvalidOperationException()
     {
         // Arrange
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(false);
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(false);
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -314,8 +315,8 @@ public sealed class ModalAlertDialogServiceTests
     {
         // Arrange
         var host = Substitute.For<IInlineAlertHost>();
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
@@ -323,7 +324,7 @@ public sealed class ModalAlertDialogServiceTests
 
         IReadOnlyDictionary<string, object?>? capturedAlert = null;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             parameters => { capturedAlert = parameters; return Task.FromResult(true); },
@@ -348,8 +349,8 @@ public sealed class ModalAlertDialogServiceTests
         host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(new InlineAlertResult(true, null)));
 
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
@@ -357,7 +358,7 @@ public sealed class ModalAlertDialogServiceTests
 
         var standaloneCalled = false;
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => { standaloneCalled = true; return Task.FromResult(false); },
@@ -387,15 +388,15 @@ public sealed class ModalAlertDialogServiceTests
         host.ShowInlineAlertAsync(Arg.Any<InlineAlertRequest>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException<InlineAlertResult>(new TaskCanceledException()));
 
-        var broker = Substitute.For<IInlineAlertHostBroker>();
-        broker.TryGet(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
+        var coordinator = Substitute.For<IModalCoordinator>();
+        coordinator.TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>()).Returns(call =>
         {
             call[0] = host;
             return true;
         });
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             Substitute.For<IBannerService>(),
             _ => Task.FromResult(false),
@@ -416,7 +417,7 @@ public sealed class ModalAlertDialogServiceTests
         var mainThread = Substitute.For<IMainThreadService>();
 
         var sut = new AlertDialogService(
-            Substitute.For<IInlineAlertHostBroker>(),
+            Substitute.For<IModalCoordinator>(),
             mainThread,
             bannerService,
             _ => Task.FromResult(false),
@@ -435,11 +436,11 @@ public sealed class ModalAlertDialogServiceTests
     {
         // Arrange
         var bannerService = Substitute.For<IBannerService>();
-        var broker = Substitute.For<IInlineAlertHostBroker>();
+        var coordinator = Substitute.For<IModalCoordinator>();
         var standaloneCalled = false;
 
         var sut = new AlertDialogService(
-            broker,
+            coordinator,
             PassthroughMainThread(),
             bannerService,
             _ => { standaloneCalled = true; return Task.FromResult(false); },
@@ -451,7 +452,7 @@ public sealed class ModalAlertDialogServiceTests
         // Assert
         bannerService.Received(1).ReportError("Error Title", "Error Message");
         Assert.False(standaloneCalled);
-        broker.DidNotReceive().TryGet(out Arg.Any<IInlineAlertHost?>());
+        coordinator.DidNotReceive().TryGetInlineAlertHost(out Arg.Any<IInlineAlertHost?>());
     }
 
     [Fact]
@@ -462,7 +463,7 @@ public sealed class ModalAlertDialogServiceTests
         Func<Task> action = () => Task.CompletedTask;
 
         var sut = new AlertDialogService(
-            Substitute.For<IInlineAlertHostBroker>(),
+            Substitute.For<IModalCoordinator>(),
             PassthroughMainThread(),
             bannerService,
             _ => Task.FromResult(false),

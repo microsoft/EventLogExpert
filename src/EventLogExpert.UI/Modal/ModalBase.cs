@@ -17,9 +17,9 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     private readonly Lock _inlineAlertLock = new();
 
     private InlineAlertEntry? _activeInlineAlert;
-    private long _modalId;
+    private ModalId _modalId;
 
-    [Inject] internal IInlineAlertHostBroker InlineAlertHostBroker { get; init; } = null!;
+    [Inject] internal IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] internal IModalService ModalService { get; init; } = null!;
 
@@ -31,7 +31,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     public Task CloseAsync() => CompleteAsync(default);
 
     /// <inheritdoc />
-    public Task<InlineAlertResult> ShowInlineAlertAsync(InlineAlertRequest request, CancellationToken cancellationToken)
+    public async Task<InlineAlertResult> ShowInlineAlertAsync(InlineAlertRequest request, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -46,27 +46,27 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         }
 
         // Replace semantics: a stacked alert cancels any prior one.
-        prior?.CancellationRegistration.Dispose();
-        prior?.Tcs.TrySetCanceled();
-
-        // Marshal to dispatcher; callers may be on a background thread.
-        _ = InvokeAsync(StateHasChanged);
-
-        if (!cancellationToken.CanBeCanceled)
+        if (prior is not null)
         {
-            return tcs.Task;
+            await prior.CancellationRegistration.DisposeAsync();
+            prior.Tcs.TrySetCanceled();
         }
 
-        CancellationTokenRegistration registration = cancellationToken.Register(static state =>
-            {
-                var (host, e) = ((ModalBase<TResult> Host, InlineAlertEntry Entry))state!;
-                host.TryClearInlineAlert(e, null, true);
-            },
-            (this, entry));
+        await InvokeAsync(StateHasChanged);
 
-        entry.CancellationRegistration = registration;
+        if (cancellationToken.CanBeCanceled)
+        {
+            CancellationTokenRegistration registration = cancellationToken.Register(static state =>
+                {
+                    var (host, e) = ((ModalBase<TResult> Host, InlineAlertEntry Entry))state!;
+                    host.TryClearInlineAlertFromCallback(e, null, true);
+                },
+                (this, entry));
 
-        return tcs.Task;
+            entry.CancellationRegistration = registration;
+        }
+
+        return await tcs.Task;
     }
 
     protected async Task CompleteAsync(TResult? result)
@@ -94,10 +94,13 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
                 _activeInlineAlert = null;
             }
 
-            pending?.CancellationRegistration.Dispose();
-            pending?.Tcs.TrySetCanceled();
+            if (pending is not null)
+            {
+                await pending.CancellationRegistration.DisposeAsync();
+                pending.Tcs.TrySetCanceled();
+            }
 
-            InlineAlertHostBroker.Unregister(_modalId);
+            ModalCoordinator.UnregisterInlineAlertHost(_modalId);
 
             // Defensive: complete the task if we were torn down without an explicit close path.
             // Stale ids are ignored, so this is a no-op when Complete already ran.
@@ -112,11 +115,21 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     // even when the derived class lives in a different assembly than ModalBase.
     protected Task HandleDialogClosedByUserAsync() => OnCancelAsync();
 
-    protected Task HandleInlineAlertResolvedAsync(InlineAlertResult result)
+    protected async Task HandleInlineAlertResolvedAsync(InlineAlertResult result)
     {
-        TryClearInlineAlert(null, result, false);
+        InlineAlertEntry? cleared;
 
-        return Task.CompletedTask;
+        lock (_inlineAlertLock)
+        {
+            cleared = _activeInlineAlert;
+            _activeInlineAlert = null;
+        }
+
+        if (cleared is null) { return; }
+
+        await cleared.CancellationRegistration.DisposeAsync();
+        cleared.Tcs.TrySetResult(result);
+        await InvokeAsync(StateHasChanged);
     }
 
     protected virtual Task OnAcceptAsync() => CompleteAsync(default);
@@ -134,13 +147,14 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     {
         // Capture the active id so a stale modal can never complete a successor's task.
         _modalId = ModalService.ActiveModalId;
-        InlineAlertHostBroker.Register(_modalId, this);
+        ModalCoordinator.RegisterInlineAlertHost(_modalId, this);
         base.OnInitialized();
     }
 
     protected virtual Task OnSaveAsync() => CompleteAsync(default);
 
-    private void TryClearInlineAlert(InlineAlertEntry? expected, InlineAlertResult? result, bool cancel)
+    // Sync dispose path for the cancellation callback (BCL Action delegate forces sync — see ShowInlineAlertAsync.Register).
+    private void TryClearInlineAlertFromCallback(InlineAlertEntry expected, InlineAlertResult? result, bool cancel)
     {
         InlineAlertEntry? cleared;
 
@@ -148,7 +162,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         {
             if (_activeInlineAlert is null) { return; }
 
-            if (expected is not null && !ReferenceEquals(_activeInlineAlert, expected)) { return; }
+            if (!ReferenceEquals(_activeInlineAlert, expected)) { return; }
 
             cleared = _activeInlineAlert;
             _activeInlineAlert = null;

@@ -16,7 +16,7 @@ internal sealed class ModalService : IModalService
 
     public event Action? StateChanged;
 
-    public long ActiveModalId => Volatile.Read(ref _activeModalId);
+    public ModalId ActiveModalId => new(Volatile.Read(ref _activeModalId));
 
     public IDictionary<string, object?>? ActiveModalParameters { get; private set; }
 
@@ -24,27 +24,36 @@ internal sealed class ModalService : IModalService
 
     public void CancelActive()
     {
+        Action? cancelDelegate = null;
         bool stateChanged = false;
 
         lock (_stateLock)
         {
             if (_cancelActiveDelegate is null) { return; }
 
-            _cancelActiveDelegate.Invoke();
+            cancelDelegate = _cancelActiveDelegate;
             ClearStateLocked();
             stateChanged = true;
         }
 
-        if (stateChanged) { StateChanged?.Invoke(); }
+        try
+        {
+            if (stateChanged) { StateChanged?.Invoke(); }
+        }
+        finally
+        {
+            cancelDelegate?.Invoke();
+        }
     }
 
-    public void Complete<TResult>(long modalId, TResult? result)
+    public void Complete<TResult>(ModalId modalId, TResult? result)
     {
+        TaskCompletionSource<TResult?>? tcsToComplete = null;
         bool stateChanged = false;
 
         lock (_stateLock)
         {
-            if (modalId != _activeModalId) { return; }
+            if (modalId.Value != _activeModalId) { return; }
 
             if (_activeTcs is not TaskCompletionSource<TResult?> tcs)
             {
@@ -53,44 +62,61 @@ internal sealed class ModalService : IModalService
                 return;
             }
 
-            tcs.TrySetResult(result);
+            tcsToComplete = tcs;
             ClearStateLocked();
             stateChanged = true;
         }
 
-        if (stateChanged) { StateChanged?.Invoke(); }
+        try
+        {
+            if (stateChanged) { StateChanged?.Invoke(); }
+        }
+        finally
+        {
+            tcsToComplete?.TrySetResult(result);
+        }
     }
 
     public Task<TResult?> Show<TModal, TResult>(IDictionary<string, object?>? parameters = null)
         where TModal : IComponent
     {
         TaskCompletionSource<TResult?> tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        Action? priorCancelDelegate;
 
         lock (_stateLock)
         {
-            _cancelActiveDelegate?.Invoke();
+            priorCancelDelegate = _cancelActiveDelegate;
 
             _idCounter++;
-            Volatile.Write(ref _activeModalId, _idCounter);
             ActiveModalType = typeof(TModal);
             ActiveModalParameters = parameters;
             _activeTcs = tcs;
             _cancelActiveDelegate = () => tcs.TrySetResult(default);
+            // Publish id LAST: writes preceding a Volatile.Write aren't reordered past it, so
+            // cross-thread readers that observe the new id are guaranteed to see the new state.
+            Volatile.Write(ref _activeModalId, _idCounter);
         }
 
-        StateChanged?.Invoke();
+        try
+        {
+            StateChanged?.Invoke();
+        }
+        finally
+        {
+            priorCancelDelegate?.Invoke();
+        }
+
         return tcs.Task;
     }
 
     private void ClearStateLocked()
     {
-        // Sentinel id 0 < any id issued by Show() (idCounter is pre-incremented), so any stale
-        // modalId fails the equality check in Complete after this clear. The same id change makes
-        // the inline-alert host broker lazily invalidate any host registered against the prior id.
-        Volatile.Write(ref _activeModalId, 0);
         ActiveModalType = null;
         ActiveModalParameters = null;
         _activeTcs = null;
         _cancelActiveDelegate = null;
+        // Publish sentinel id LAST so readers observing id=0 are also guaranteed to see the
+        // cleared type/parameters. Matches the Show() publication-barrier discipline.
+        Volatile.Write(ref _activeModalId, 0);
     }
 }
