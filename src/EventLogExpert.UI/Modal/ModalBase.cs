@@ -28,6 +28,9 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
 
     protected InlineAlertRequest? CurrentInlineAlert => _activeInlineAlert?.Request;
 
+    /// <summary>Override to mark the modal as Critical (rejects cross-modal cancel via the veto pipeline).</summary>
+    protected virtual ModalScope Scope => ModalScope.Standard;
+
     public Task CloseAsync() => CompleteAsync(default);
 
     /// <inheritdoc />
@@ -69,6 +72,17 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         return await tcs.Task;
     }
 
+    // Called by ModalCoordinator. Runs the veto check, then routes to OnCancelAsync (which derived
+    // modals may override for cancel-default-value semantics like PromptModal's string.Empty).
+    internal async Task<bool> RequestCloseAsync(ModalCloseRequest request)
+    {
+        bool accepted = await OnRequestCloseAsync(request);
+
+        if (accepted) { await OnCancelAsync(); }
+
+        return accepted;
+    }
+
     protected async Task CompleteAsync(TResult? result)
     {
         await OnClosingAsync();
@@ -100,7 +114,7 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
                 pending.Tcs.TrySetCanceled();
             }
 
-            ModalCoordinator.UnregisterInlineAlertHost(_modalId);
+            ModalCoordinator.UnregisterModal(_modalId);
 
             // Defensive: complete the task if we were torn down without an explicit close path.
             // Stale ids are ignored, so this is a no-op when Complete already ran.
@@ -110,10 +124,14 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
         await base.DisposeAsyncCore(disposing);
     }
 
-    // Route Esc/native-close through OnCancelAsync so all close paths share the same pipeline.
-    // Protected so derived modals' .razor markup can wire OnDialogClosedByUser="HandleDialogClosedByUserAsync"
-    // even when the derived class lives in a different assembly than ModalBase.
-    protected Task HandleDialogClosedByUserAsync() => OnCancelAsync();
+    /// <summary>UI button (Cancel/Close) entry point — routes through the coordinator's veto pipeline.</summary>
+    protected Task HandleCancelButtonClickAsync() =>
+        ModalCoordinator.RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
+
+    // Route Esc/native-close through the coordinator's veto pipeline. The native dialog handler
+    // can't distinguish Esc from backdrop click, so UserDismiss (generic) is the right reason.
+    protected Task HandleDialogClosedByUserAsync() =>
+        ModalCoordinator.RequestCloseActiveAsync(ModalCloseReason.UserDismiss);
 
     protected async Task HandleInlineAlertResolvedAsync(InlineAlertResult result)
     {
@@ -147,9 +165,18 @@ public abstract class ModalBase<TResult> : FluxorComponent, IInlineAlertHost
     {
         // Capture the active id so a stale modal can never complete a successor's task.
         _modalId = ModalService.ActiveModalId;
-        ModalCoordinator.RegisterInlineAlertHost(_modalId, this);
+        var registration = new ModalRegistration(_modalId, RequestCloseAsync, Scope, this);
+        ModalCoordinator.RegisterModal(registration);
         base.OnInitialized();
     }
+
+    /// <summary>Veto hook for modal close requests. Override to block close conditionally (return <see langword="false" />).</summary>
+    /// <remarks>
+    ///     Calling <see cref="IModalCoordinator.RequestCloseActiveAsync" /> from inside this method is unsupported and
+    ///     will deadlock on the coordinator's in-flight close TCS. Throwing <see cref="OperationCanceledException" />
+    ///     from this method is interpreted by the coordinator as accepting the close.
+    /// </remarks>
+    protected virtual Task<bool> OnRequestCloseAsync(ModalCloseRequest request) => Task.FromResult(true);
 
     protected virtual Task OnSaveAsync() => CompleteAsync(default);
 

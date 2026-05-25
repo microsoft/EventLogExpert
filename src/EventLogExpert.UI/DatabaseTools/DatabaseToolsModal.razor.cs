@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -88,31 +89,33 @@ public sealed partial class DatabaseToolsModal
         await base.OnAfterRenderAsync(firstRender);
     }
 
-    protected override async Task OnCancelAsync()
+    protected override async Task OnClosingAsync()
     {
-        if (AnyTabIsRunning)
-        {
-            var confirm = await ShowInlineAlertAsync(
-                new InlineAlertRequest(
-                    Title: "Operation in progress",
-                    Message: "An operation is running. Cancel and close anyway?",
-                    AcceptLabel: "Cancel and close",
-                    CancelLabel: "Continue running",
-                    IsPrompt: false,
-                    PromptInitialValue: null),
-                CancellationToken.None);
+        // CancelIfRunning is a no-op when not running; safe to call from all close paths.
+        _showTab?.CancelIfRunning();
+        _createTab?.CancelIfRunning();
+        _mergeTab?.CancelIfRunning();
+        _diffTab?.CancelIfRunning();
+        _upgradeTab?.CancelIfRunning();
 
-            if (!confirm.Accepted) { return; }
+        await base.OnClosingAsync();
+    }
 
-            // Best-effort: cancel running tabs before closing.
-            _showTab?.CancelIfRunning();
-            _createTab?.CancelIfRunning();
-            _mergeTab?.CancelIfRunning();
-            _diffTab?.CancelIfRunning();
-            _upgradeTab?.CancelIfRunning();
-        }
+    protected override async Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
+    {
+        if (!AnyTabIsRunning) { return true; }
 
-        await base.OnCancelAsync();
+        var confirm = await ShowInlineAlertAsync(
+            new InlineAlertRequest(
+                Title: "Operation in progress",
+                Message: "An operation is running. Cancel and close anyway?",
+                AcceptLabel: "Cancel and close",
+                CancelLabel: "Continue running",
+                IsPrompt: false,
+                PromptInitialValue: null),
+            CancellationToken.None);
+
+        return confirm.Accepted;
     }
 
     private static DatabaseToolsTab NextTab(DatabaseToolsTab current)

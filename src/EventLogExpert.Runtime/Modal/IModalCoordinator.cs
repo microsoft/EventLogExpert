@@ -18,18 +18,29 @@ public interface IModalCoordinator
 
     void ForceCloseActive();
 
-    Task<TResult?> PushAsync<TModal, TResult>(IDictionary<string, object?>? parameters = null)
-        where TModal : IComponent;
+    /// <summary>Returns the active modal's scope, or <see langword="null" /> if no modal is active.</summary>
+    ModalScope? GetActiveModalScope();
 
     /// <summary>
-    ///     Register <paramref name="host" /> as the inline-alert host for the modal identified by
-    ///     <paramref name="modalId" />. Stale ids are ignored.
+    ///     Opens <typeparamref name="TModal" />. If an active modal exists, asks it to close via the veto pipeline first;
+    ///     if vetoed, returns a result with <see cref="ModalOpenResult{TResult}.WasOpened" /> set to <see langword="false" />.
     /// </summary>
-    void RegisterInlineAlertHost(ModalId modalId, IInlineAlertHost host);
+    Task<ModalOpenResult<TResult>> PushAsync<TModal, TResult>(IDictionary<string, object?>? parameters = null)
+        where TModal : IComponent;
 
-    /// <summary>Returns the registered inline-alert host for the active modal, if any.</summary>
+    /// <summary>Register a modal's close handler, scope, and optional inline-alert host. Stale ids are ignored.</summary>
+    void RegisterModal(ModalRegistration registration);
+
+    /// <summary>
+    ///     Asks the active modal to close. Coalesces concurrent calls; the first verdict wins. Critical-scoped modals
+    ///     reject <see cref="ModalCloseReason.OtherModalActivation" /> immediately, regardless of in-flight state.
+    ///     If a close handler throws <see cref="OperationCanceledException" /> (e.g., from a force-close race), the
+    ///     close is treated as accepted so coalesced awaiters resolve successfully.
+    /// </summary>
+    Task<bool> RequestCloseActiveAsync(ModalCloseReason reason);
+
     bool TryGetInlineAlertHost([NotNullWhen(true)] out IInlineAlertHost? host);
 
-    void UnregisterInlineAlertHost(ModalId modalId);
+    void UnregisterModal(ModalId modalId);
 }
 

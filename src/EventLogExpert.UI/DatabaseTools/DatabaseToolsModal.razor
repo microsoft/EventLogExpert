@@ -7,8 +7,8 @@
     InlineAlert="@CurrentInlineAlert"
     MaxWidth="min(80rem, calc(100vw - 2rem))"
     MinWidth="min(80rem, calc(100vw - 2rem))"
-    OnCancel="OnCancelAsync"
-    OnClose="OnCancelAsync"
+    OnCancel="HandleCancelButtonClickAsync"
+    OnClose="HandleCancelButtonClickAsync"
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
