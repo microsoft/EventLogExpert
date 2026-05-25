@@ -14,7 +14,7 @@ public interface IModalService
     event Action? StateChanged;
 
     /// <summary>Per-show id; use as a <c>@key</c> so reopening produces a fresh component instance.</summary>
-    long ActiveModalId { get; }
+    ModalId ActiveModalId { get; }
 
     IDictionary<string, object?>? ActiveModalParameters { get; }
 
@@ -23,7 +23,7 @@ public interface IModalService
     void CancelActive();
 
     /// <summary>Complete the active modal's task. Stale ids (from replaced modals) are ignored.</summary>
-    void Complete<TResult>(long modalId, TResult? result);
+    void Complete<TResult>(ModalId modalId, TResult? result);
 
     /// <summary>Open a modal. Any prior active modal is canceled (its task completes with default).</summary>
     Task<TResult?> Show<TModal, TResult>(IDictionary<string, object?>? parameters = null)

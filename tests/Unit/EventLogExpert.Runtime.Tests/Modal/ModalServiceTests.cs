@@ -176,7 +176,7 @@ public sealed class ModalServiceTests
         // Assert
         Assert.Equal(typeof(FakeModalA), service.ActiveModalType);
         Assert.Same(parameters, service.ActiveModalParameters);
-        Assert.NotEqual(0, service.ActiveModalId);
+        Assert.NotEqual(ModalId.None, service.ActiveModalId);
         Assert.False(task.IsCompleted);
         Assert.Equal(1, stateChangedCount);
     }

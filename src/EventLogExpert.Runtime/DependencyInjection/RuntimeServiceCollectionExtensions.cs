@@ -4,7 +4,6 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
-using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Files;
@@ -36,7 +35,8 @@ public static class RuntimeServiceCollectionExtensions
     ///         </item>
     ///         <item><c>AddEventLogFiltering()</c> — effect classes depend on <c>IFilterService</c>.</item>
     ///         <item>
-    ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on <c>IProviderDatabaseMaintenance</c>.
+    ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on
+    ///             <c>IProviderDatabaseMaintenance</c>.
     ///         </item>
     ///     </list>
     ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
@@ -70,9 +70,9 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<DebugLogService>();
         services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
         services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());
-        services.AddSingleton<IInlineAlertHostBroker, InlineAlertHostBroker>();
         services.AddSingleton<ILogWatcherService, LogWatcherService>();
         services.AddSingleton<IMenuService, MenuService>();
+        services.AddSingleton<IModalCoordinator, ModalCoordinator>();
         services.AddSingleton<IModalService, ModalService>();
         services.AddSingleton<ISettingsService, SettingsService>();
 
