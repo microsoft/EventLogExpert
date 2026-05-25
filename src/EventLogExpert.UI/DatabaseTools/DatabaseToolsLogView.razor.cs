@@ -21,12 +21,6 @@ public sealed partial class DatabaseToolsLogView : IAsyncDisposable
 {
     private readonly DotNetObjectReference<DatabaseToolsLogView> _selfRef;
 
-    /// <summary>
-    ///     Set to <c>true</c> in <see cref="DisposeAsync" /> before the JS detach is awaited. Read by the
-    ///     <see cref="JSInvokable" /> <see cref="OnPinStateChanged" /> callback to suppress UI work that would land on a
-    ///     disposed renderer if the JS scroll event fires between the dispose call and the detach completing. <c>volatile</c>
-    ///     because the JS callback executes on the JS-interop thread.
-    /// </summary>
     private volatile bool _disposed;
     private bool _isAutoScrollPinned = true;
     private IJSObjectReference? _jsModule;

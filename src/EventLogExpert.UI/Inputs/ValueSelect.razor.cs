@@ -13,11 +13,6 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private readonly List<ValueSelectItem<T>> _items = [];
     private readonly HashSet<T> _selectedValues = [];
 
-    /// <summary>
-    ///     Set to <c>true</c> in <see cref="DisposeAsync" /> before the JS unregister is awaited. Read by the
-    ///     <see cref="JSInvokable" /> <see cref="OnIsOpenChanged" /> callback to suppress state updates that would land on a
-    ///     disposed renderer. <c>volatile</c> because the JS callback executes on the JS-interop thread.
-    /// </summary>
     private volatile bool _disposed;
     private ValueSelectItem<T>? _highlightedItem;
     private bool _isOpen;
@@ -110,7 +105,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    public Task CloseDropDown() => SetOpenStateAsync(false, "closeDropdown");
+    public Task CloseDropDown() => SetOpenStateAsync(false);
 
     public async ValueTask DisposeAsync()
     {
@@ -152,7 +147,7 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    public Task OpenDropDown() => SetOpenStateAsync(true, "openDropdown");
+    public Task OpenDropDown() => SetOpenStateAsync(true);
 
     public void RemoveItem(ValueSelectItem<T> item)
     {
@@ -326,14 +321,16 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
         }
     }
 
-    private async Task SetOpenStateAsync(bool targetState, string jsAction)
+    private async Task SetOpenStateAsync(bool targetState)
     {
         if (_isOpen == targetState) { return; }
 
         _isOpen = targetState;
         StateHasChanged();
+        var jsAction = targetState ? "openDropdown" : "closeDropdown";
+
         await JSRuntime.InvokeVoidAsync(jsAction, _selectComponent);
     }
 
-    private Task ToggleDropDownVisibility() => SetOpenStateAsync(!_isOpen, "toggleDropdown");
+    private Task ToggleDropDownVisibility() => SetOpenStateAsync(!_isOpen);
 }

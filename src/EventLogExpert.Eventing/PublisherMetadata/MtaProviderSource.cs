@@ -79,27 +79,14 @@ public static class MtaProviderSource
         return mtaFiles;
     }
 
-    /// <summary>
-    ///     Discovers provider names from <paramref name="evtxPath" /> and yields a <see cref="ProviderDetails" /> for
-    ///     each that can be resolved exclusively from the sibling LocaleMetaData/*.MTA files. Providers that cannot be
-    ///     resolved from any MTA file are skipped with a warning so callers never persist empty placeholder providers (which
-    ///     would defeat the "no local fallback" guarantee when the resulting database is consumed later).
-    /// </summary>
-    /// <param name="evtxPath">Path to the exported .evtx file.</param>
-    /// <param name="logger">Trace logger for diagnostics.</param>
-    /// <param name="regex">
-    ///     Optional regex applied to provider names; case sensitivity follows the caller's
-    ///     <see cref="System.Text.RegularExpressions.RegexOptions" />. Null means no filtering.
-    /// </param>
-    /// <param name="skipProviderNames">Optional set of provider names to skip before MTA resolution.</param>
-    /// <param name="seen">Optional set tracking already-loaded provider names across multiple source files (de-dup).</param>
     public static IEnumerable<ProviderDetails> LoadProviders(
         string evtxPath,
         ITraceLogger logger,
         Regex? regex = null,
         IReadOnlySet<string>? skipProviderNames = null,
-        HashSet<string>? seen = null) =>
-        LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen);
+        HashSet<string>? seen = null,
+        IReadOnlyList<string>? preDiscoveredProviderNames = null) =>
+        LoadProvidersCore(evtxPath, logger, regex, skipProviderNames, seen, preDiscoveredProviderNames);
 
     private static IReadOnlyList<string> DiscoverProviderNamesCore(
         string evtxPath,
@@ -170,9 +157,14 @@ public static class MtaProviderSource
         ITraceLogger logger,
         Regex? regex,
         IReadOnlySet<string>? skipProviderNames,
-        HashSet<string>? seen)
+        HashSet<string>? seen,
+        IReadOnlyList<string>? preDiscoveredProviderNames = null)
     {
-        var providerNames = DiscoverProviderNamesCore(evtxPath, logger, regex);
+        // Honor the pre-discovered hint when supplied; otherwise re-scan the evtx file. The hint must already
+        // reflect any regex filtering the caller intended — this method does NOT re-apply `regex` to the hint.
+        var providerNames = preDiscoveredProviderNames is { Count: > 0 }
+            ? preDiscoveredProviderNames
+            : DiscoverProviderNamesCore(evtxPath, logger, regex);
 
         if (providerNames.Count == 0) { yield break; }
 

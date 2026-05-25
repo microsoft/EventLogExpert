@@ -71,7 +71,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
         ArgumentNullException.ThrowIfNull(logSink);
 
         ITraceLogger logger = new StreamingTraceLogger(logSink, verbose ? LogLevel.Trace : LogLevel.Information);
-        var stopwatch = Stopwatch.StartNew();
+        var startTimestamp = Stopwatch.GetTimestamp();
 
         DatabaseToolsOutcome outcome;
         string? failureSummary = null;
@@ -92,11 +92,7 @@ internal sealed class DatabaseToolsService(IDatabaseToolsOperationFactory factor
             failureSummary = ex.Message;
             logger.Error($"{ex}");
         }
-        finally
-        {
-            stopwatch.Stop();
-        }
 
-        return new DatabaseToolsResult(outcome, failureSummary, stopwatch.Elapsed);
+        return new DatabaseToolsResult(outcome, failureSummary, Stopwatch.GetElapsedTime(startTimestamp));
     }
 }

@@ -21,12 +21,14 @@ namespace EventLogExpert.Runtime.DatabaseTools;
 ///         strings when the call site is below the threshold, so filtered calls are effectively free.
 ///     </para>
 ///     <para>
-///         Callers MUST pass a thread-safe <see cref="IProgress{T}" /> sink — only the BCL's <see cref="Progress{T}" />
-///         implementation guarantees safe concurrent <c>Report</c> calls. <see cref="DatabaseToolsService" /> always wires
-///         <see cref="Progress{T}" />, which captures the <see cref="SynchronizationContext" /> at construction (the UI
-///         thread when registered from MAUI) and posts callbacks there; off-the-UI-thread callers fall through to the
-///         thread-pool. Custom <see cref="IProgress{T}" /> implementations passed by other callers MUST provide equivalent
-///         thread-safety — this logger does not serialize calls internally.
+///         Callers MUST pass an <see cref="IProgress{T}" /> sink whose concurrency model matches the production
+///         scenario. <see cref="DatabaseToolsService" /> always wires <see cref="Progress{T}" />, which captures the
+///         <see cref="SynchronizationContext" /> at construction (the UI thread when registered from MAUI) and posts
+///         callbacks there — concurrent <c>Report</c> calls from worker threads end up serialized through that SC. If no
+///         <c>SynchronizationContext</c> is captured (e.g. constructed from a thread-pool thread),
+///         <see cref="Progress{T}" /> instead queues each callback on the thread-pool with NO serialization. Custom
+///         <see cref="IProgress{T}" /> implementations passed by other callers MUST provide their own concurrency
+///         discipline — this logger does not serialize calls internally.
 ///     </para>
 /// </remarks>
 internal sealed class StreamingTraceLogger(IProgress<DatabaseToolsLogEntry> sink, LogLevel minimumLevel = LogLevel.Information) : ITraceLogger
