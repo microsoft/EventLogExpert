@@ -3,6 +3,7 @@
 
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Update.ReleaseNotes;
+using EventLogExpert.UI.Database;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
 using EventLogExpert.UI.FilterCache;
@@ -17,6 +18,13 @@ public static class ModalCoordinatorLaunchers
 {
     extension(IModalCoordinator coordinator)
     {
+        public Task<ModalOpenResult<bool>> OpenDatabaseRecoveryAsync()
+        {
+            ArgumentNullException.ThrowIfNull(coordinator);
+
+            return coordinator.PushAsync<DatabaseRecoveryDialog, bool>();
+        }
+
         public Task<ModalOpenResult<bool>> OpenDatabaseToolsAsync()
         {
             ArgumentNullException.ThrowIfNull(coordinator);

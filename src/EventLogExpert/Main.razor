@@ -1,16 +1,11 @@
 ﻿@*
     Application root. The hybrid shell is intentionally non-routed: there are no @page directives anywhere.
     BannerHost lives outside UnhandledExceptionHandler so the error banner survives when child rendering faults.
-    DatabaseRecoveryHost lives INSIDE the handler so any crash in the host or its dialog routes through the
-    critical-error path (UnhandledExceptionHandler -> BannerService.ReportCritical -> BannerHost) instead of
-    bypassing it.
 *@
 <BannerHost />
 
 <UnhandledExceptionHandler>
     <Fluxor.Blazor.Web.StoreInitializer />
-
-    <DatabaseRecoveryHost />
 
     <MainLayout />
 </UnhandledExceptionHandler>
