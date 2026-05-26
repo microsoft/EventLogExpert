@@ -16,10 +16,9 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.Runtime.Update;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DebugLog;
+using EventLogExpert.UI.Modal;
 using EventLogExpert.UI.Settings;
-using EventLogExpert.UI.Update;
 using Fluxor;
-using Microsoft.AspNetCore.Components;
 using Application = Microsoft.Maui.Controls.Application;
 using IDispatcher = Fluxor.IDispatcher;
 
@@ -37,7 +36,7 @@ public sealed class MauiMenuActionService(
     IFilterPaneCommands filterPaneCommands,
     IClipboardService clipboardService,
     IAlertDialogService dialogService,
-    IModalService modalService,
+    IModalCoordinator modalCoordinator,
     ISettingsService settings,
     IUpdateService updateService,
     ICurrentVersionProvider currentVersionProvider,
@@ -54,7 +53,7 @@ public sealed class MauiMenuActionService(
     private readonly IFilterPaneCommands _filterPaneCommands = filterPaneCommands;
     private readonly IFolderPickerService _folderPickerService = folderPickerService;
     private readonly SemaphoreSlim _logNamesLock = new(1, 1);
-    private readonly IModalService _modalService = modalService;
+    private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
     private readonly ITraceLogger _traceLogger = traceLogger;
     private readonly IUpdateService _updateService = updateService;
@@ -141,7 +140,8 @@ public sealed class MauiMenuActionService(
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
 
-    public Task OpenDatabaseToolsAsync() => ShowModalAsync<DatabaseToolsModal>("database tools");
+    public Task OpenDatabaseToolsAsync() =>
+        TryOpenModalAsync(_modalCoordinator.OpenDatabaseToolsAsync, nameof(DatabaseToolsModal));
 
     public Task OpenDocsAsync() =>
         OpenBrowserAsync("https://github.com/microsoft/EventLogExpert/blob/main/docs/Home.md");
@@ -296,7 +296,8 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    public Task<bool> OpenSettingsAsync() => ShowModalAsync<SettingsModal>("settings");
+    public Task<bool> OpenSettingsAsync() =>
+        TryOpenModalAsync(_modalCoordinator.OpenSettingsAsync, nameof(SettingsModal));
 
     public async Task SaveFiltersAsGroupAsync()
     {
@@ -313,7 +314,8 @@ public sealed class MauiMenuActionService(
     public void SetContinuouslyUpdate(bool value) =>
         _eventLogCommands.SetContinuouslyUpdate(value);
 
-    public Task ShowDebugLogsAsync() => ShowModalAsync<DebugLogModal>("debug logs");
+    public Task ShowDebugLogsAsync() =>
+        TryOpenModalAsync(_modalCoordinator.OpenDebugLogsAsync, nameof(DebugLogModal));
 
     public async Task ShowReleaseNotesAsync()
     {
@@ -323,8 +325,7 @@ public sealed class MauiMenuActionService(
 
             if (content is null) { return; }
 
-            await _modalService.Show<ReleaseNotesModal, bool>(
-                new Dictionary<string, object?> { ["Content"] = content.Value });
+            await _modalCoordinator.OpenReleaseNotesAsync(content.Value);
         }
         catch (Exception ex)
         {
@@ -355,18 +356,19 @@ public sealed class MauiMenuActionService(
         }
     }
 
-    private async Task<bool> ShowModalAsync<TModal>(string label)
-        where TModal : IComponent
+    private async Task<bool> TryOpenModalAsync(Func<Task<ModalOpenResult<bool>>> open, string modalName)
     {
         try
         {
-            await _modalService.Show<TModal, bool>();
+            ModalOpenResult<bool> result = await open();
+
+            if (!result.WasOpened) { _traceLogger.Trace($"{modalName} open preempted by an active modal."); }
 
             return true;
         }
         catch (Exception ex)
         {
-            _traceLogger.Error($"Failed to open {label} modal: {ex}");
+            _traceLogger.Error($"Failed to open {modalName}: {ex}");
 
             return false;
         }

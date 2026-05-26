@@ -14,8 +14,7 @@ using EventLogExpert.Runtime.FilterProgress;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
-using EventLogExpert.UI.FilterCache;
-using EventLogExpert.UI.FilterGroup;
+using EventLogExpert.UI.Modal;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -78,7 +77,7 @@ public sealed partial class FilterPane : IDisposable
 
     private string MenuState => HasFilters ? _isFilterListVisible.ToString().ToLower() : "false";
 
-    [Inject] private IModalService ModalService { get; init; } = null!;
+    [Inject] private IModalCoordinator ModalCoordinator { get; init; } = null!;
 
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
@@ -284,7 +283,7 @@ public sealed partial class FilterPane : IDisposable
         StateHasChanged();
     }
 
-    private async Task OpenCachedFiltersModal() => await ModalService.Show<FilterCacheModal, bool>();
+    private Task OpenCachedFiltersModal() => ModalCoordinator.OpenFilterCacheAsync();
 
     private void OpenFilterGroupPicker()
     {
@@ -303,7 +302,7 @@ public sealed partial class FilterPane : IDisposable
         _isFilterListVisible = true;
     }
 
-    private async Task OpenFilterGroupsModal() => await ModalService.Show<FilterGroupModal, bool>();
+    private Task OpenFilterGroupsModal() => ModalCoordinator.OpenFilterGroupAsync();
 
     private void RemoveDateFilter()
     {

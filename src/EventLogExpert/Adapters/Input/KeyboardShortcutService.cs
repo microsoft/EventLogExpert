@@ -15,11 +15,11 @@ namespace EventLogExpert.Adapters.Input;
 /// </summary>
 public sealed class KeyboardShortcutService(
     IMenuActionService actions,
-    IModalService modalService,
+    IModalCoordinator modalCoordinator,
     ISettingsService settings) : IAsyncDisposable
 {
     private readonly IMenuActionService _actions = actions;
-    private readonly IModalService _modalService = modalService;
+    private readonly IModalCoordinator _modalCoordinator = modalCoordinator;
     private readonly ISettingsService _settings = settings;
 
     private IJSRuntime? _jsRuntime;
@@ -75,7 +75,7 @@ public sealed class KeyboardShortcutService(
         if (!ctrl || alt || shift || meta) { return; }
 
         // Modal-gating happens here, not in JS, so a misbehaving (or stale) bridge can't bypass it.
-        if (_modalService.ActiveModalType is not null) { return; }
+        if (_modalCoordinator.ActiveSession is not null) { return; }
 
         switch (code)
         {
