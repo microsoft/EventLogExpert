@@ -41,135 +41,30 @@
 
 @switch (view)
 {
-    case BannerView.Critical when currentCritical is { } critical:
-        <aside class="banner banner-critical" role="alert">
-            <span class="banner-message">An unexpected error occurred: @critical.GetType().Name: @critical.Message</span>
+    case BannerView.Critical when currentCritical != null:
+        <CriticalBanner Critical="currentCritical" />
 
-            <div class="banner-actions">
-                <button class="button" @onclick="OnReloadClickedAsync" @ref="_reloadButtonRef" type="button">
-                    <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Reload
-                </button>
-                <button class="button" @onclick="OnRelaunchClickedAsync" type="button">
-                    <i aria-hidden="true" class="bi bi-power"></i> Relaunch
-                </button>
-                <button class="button" @onclick="() => OnCopyDetailsClickedAsync(critical)" type="button">
-                    <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
-                </button>
-            </div>
-
-            <div class="banner-feedback" role="status">
-                @if (_showCopiedFeedback)
-                {
-                    <span class="banner-chip">Copied</span>
-                }
-                @if (!string.IsNullOrEmpty(_recoveryFailureMessage))
-                {
-                    <span class="banner-subtitle">@_recoveryFailureMessage</span>
-                }
-                @if (!string.IsNullOrEmpty(_restartFailureMessage))
-                {
-                    <span class="banner-subtitle">@_restartFailureMessage</span>
-                }
-            </div>
-        </aside>
         break;
 
     case BannerView.Error when selected != null && selected.IndexWithinSlice < errors.Count:
-    {
-        ErrorBannerEntry entry = errors[selected.IndexWithinSlice];
-        <aside class="banner banner-error" role="alert">
-            <span class="banner-message">@entry.Title: @entry.Message</span>
+        <ErrorBanner CycleNav="cycleNav" Entry="errors[selected.IndexWithinSlice]" />
 
-            @cycleNav
-
-            @if (entry is { ActionLabel: { } actionLabel, Action: { } action })
-            {
-                <button class="banner-action button"
-                    @onclick="() => OnErrorActionClickedAsync(action)"
-                    type="button">
-                    @actionLabel
-                </button>
-            }
-
-            <button aria-label="Dismiss error banner"
-                class="banner-dismiss button"
-                @onclick="() => OnDismissError(entry.Id)"
-                type="button">
-                <i aria-hidden="true" class="bi bi-x"></i>
-            </button>
-        </aside>
         break;
-    }
 
     case BannerView.Attention when attentionEntries.Count > 0:
-    {
-        int attentionCount = attentionEntries.Count;
-        string databasesLabel = attentionCount == 1 ? "database" : "databases";
-        <aside class="banner banner-attention" role="alert">
-            <span class="banner-message">@attentionCount @databasesLabel need attention. Open Settings to enable or remove them.</span>
+        <AttentionBanner AttentionCount="attentionEntries.Count"
+            CycleNav="cycleNav"
+            OnFallbackErrorPosted="HandleFallbackErrorPosted" />
 
-            @cycleNav
-
-            <button class="banner-action button"
-                @onclick="OnOpenSettingsClickedAsync"
-                type="button">
-                Open Settings
-            </button>
-
-            <button aria-label="Dismiss attention banner"
-                class="banner-dismiss button"
-                @onclick="OnDismissAttention"
-                type="button">
-                <i aria-hidden="true" class="bi bi-x"></i>
-            </button>
-        </aside>
         break;
-    }
 
     case BannerView.UpgradeProgress when backgroundProgress is { } progress:
-        <aside class="banner banner-upgrade-progress" role="status">
-            <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat"></i>
+        <UpgradeProgressBanner CycleNav="cycleNav" Progress="progress" />
 
-            @if (string.IsNullOrEmpty(progress.CurrentEntryName))
-            {
-                <span class="banner-message">Preparing upgrade of @progress.CurrentBatchSize @(progress.CurrentBatchSize == 1 ? "database" : "databases")&hellip;</span>
-            }
-            else
-            {
-                <span class="banner-message">Upgrading database @progress.CurrentBatchPosition of @progress.CurrentBatchSize: @progress.CurrentEntryName &mdash; @progress.CurrentPhase</span>
-            }
-
-            @if (progress.QueuedBatchesAfter > 0)
-            {
-                <span class="banner-subtitle">(+@progress.QueuedBatchesAfter @(progress.QueuedBatchesAfter == 1 ? "batch" : "batches") queued)</span>
-            }
-
-            @cycleNav
-
-            <button class="banner-action button"
-                @onclick="() => OnCancelUpgradeClickedAsync(progress)"
-                type="button">
-                Cancel
-            </button>
-        </aside>
         break;
 
-    case BannerView.Info when selected is { } infoItem && infoItem.IndexWithinSlice < infos.Count:
-    {
-        BannerInfoEntry info = infos[infoItem.IndexWithinSlice];
-        string severityClass = info.Severity == BannerSeverity.Warning ? "banner-warning" : "banner-info";
-        <aside class="banner @severityClass" role="status">
-            <span class="banner-message">@info.Title: @info.Message</span>
+    case BannerView.Info when selected != null && selected.IndexWithinSlice < infos.Count:
+        <InfoBanner CycleNav="cycleNav" Entry="infos[selected.IndexWithinSlice]" />
 
-            @cycleNav
-
-            <button aria-label="Dismiss banner"
-                class="banner-dismiss button"
-                @onclick="() => OnDismissInfo(info.Id)"
-                type="button">
-                <i aria-hidden="true" class="bi bi-x"></i>
-            </button>
-        </aside>
         break;
-    }
 }

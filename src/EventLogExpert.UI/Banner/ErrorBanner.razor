@@ -1,0 +1,21 @@
+<aside class="banner banner-error" role="alert">
+    <span class="banner-message">@Entry.Title: @Entry.Message</span>
+
+    @CycleNav
+
+    @if (Entry is { ActionLabel: { } actionLabel, Action: { } action })
+    {
+        <button class="banner-action button"
+            @onclick="() => OnErrorActionClickedAsync(action)"
+            type="button">
+            @actionLabel
+        </button>
+    }
+
+    <button aria-label="Dismiss error banner"
+        class="banner-dismiss button"
+        @onclick="OnDismissError"
+        type="button">
+        <i aria-hidden="true" class="bi bi-x"></i>
+    </button>
+</aside>

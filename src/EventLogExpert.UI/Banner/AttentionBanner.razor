@@ -1,0 +1,18 @@
+<aside class="banner banner-attention" role="alert">
+    <span class="banner-message">@AttentionCount @DatabasesLabel need attention. Open Settings to enable or remove them.</span>
+
+    @CycleNav
+
+    <button class="banner-action button"
+        @onclick="OnOpenSettingsClickedAsync"
+        type="button">
+        Open Settings
+    </button>
+
+    <button aria-label="Dismiss attention banner"
+        class="banner-dismiss button"
+        @onclick="OnDismissAttention"
+        type="button">
+        <i aria-hidden="true" class="bi bi-x"></i>
+    </button>
+</aside>

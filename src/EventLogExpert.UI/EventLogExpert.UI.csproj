@@ -8,4 +8,8 @@
     <ProjectReference Include="..\EventLogExpert.Runtime\EventLogExpert.Runtime.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="EventLogExpert.UI.Tests" />
+  </ItemGroup>
+
 </Project>
