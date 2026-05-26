@@ -11,6 +11,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.Runtime.Menu;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.JSInterop;
@@ -22,21 +23,26 @@ public sealed class BannerHostTests : BunitContext
 {
     private readonly IApplicationRestartService _applicationRestartService =
         Substitute.For<IApplicationRestartService>();
-    private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
+    private readonly IAttentionBannerService _attentionBannerService;
     private readonly IClipboardService _clipboardService = Substitute.For<IClipboardService>();
+    private readonly ICriticalErrorService _criticalErrorService;
+    private readonly IErrorBannerService _errorBannerService;
+    private readonly IInfoBannerService _infoBannerService;
     private readonly IMenuActionService _menuActionService = Substitute.For<IMenuActionService>();
+    private readonly IProgressBannerService _progressBannerService;
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     public BannerHostTests()
     {
-        _bannerService.CurrentCritical.Returns((Exception?)null);
-        _bannerService.ErrorBanners.Returns([]);
-        _bannerService.InfoBanners.Returns([]);
-        _bannerService.AttentionEntries.Returns([]);
-        _bannerService.AttentionDismissed.Returns(false);
-        _bannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
+        Services.AddBannerSubstitutes(out _attentionBannerService, out _progressBannerService, out _criticalErrorService, out _errorBannerService, out _infoBannerService);
 
-        Services.AddSingleton(_bannerService);
+        _criticalErrorService.CurrentCritical.Returns((Exception?)null);
+        _errorBannerService.ErrorBanners.Returns([]);
+        _infoBannerService.InfoBanners.Returns([]);
+        _attentionBannerService.AttentionEntries.Returns([]);
+        _attentionBannerService.AttentionDismissed.Returns(false);
+        _progressBannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
+
         Services.AddSingleton(_applicationRestartService);
         Services.AddSingleton(_clipboardService);
         Services.AddSingleton(_menuActionService);
@@ -48,19 +54,19 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_AttentionDismissClicked_CallsDismissAttention()
     {
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissAttention();
+        _attentionBannerService.Received(1).DismissAttention();
     }
 
     [Fact]
     public void BannerHost_AttentionDismissed_DoesNotRenderAttentionBanner()
     {
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
-        _bannerService.AttentionDismissed.Returns(true);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionDismissed.Returns(true);
 
         var component = Render<BannerHost>();
 
@@ -70,7 +76,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_AttentionEntries_RendersAttentionBannerWithOpenSettingsAndDismiss()
     {
-        _bannerService.AttentionEntries.Returns(
+        _attentionBannerService.AttentionEntries.Returns(
             [BuildDatabaseEntry("a.db"), BuildDatabaseEntry("b.db")]);
 
         var component = Render<BannerHost>();
@@ -84,7 +90,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_AttentionEntriesSingleEntry_UsesSingularDatabaseLabel()
     {
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
 
@@ -99,7 +105,7 @@ public sealed class BannerHostTests : BunitContext
         // Pre-first-tick rendering: BannerService creates the entry with Position=0/EntryName="" before the
         // first per-entry progress event arrives. The "Preparing..." text avoids the misleading
         // "Upgrading database 0 of N: " string in that gap.
-        _bannerService.BackgroundProgress.Returns(
+        _progressBannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
@@ -120,7 +126,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_BackgroundProgressWithEntryName_RendersUpgradeProgressBannerWithCancelButton()
     {
-        _bannerService.BackgroundProgress.Returns(
+        _progressBannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
@@ -144,7 +150,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_BackgroundProgressWithQueuedBatches_RendersQueuedBatchesSubtitle()
     {
-        _bannerService.BackgroundProgress.Returns(
+        _progressBannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
@@ -165,7 +171,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CancelUpgradeClicked_InvokesCancelDelegate()
     {
         int cancelInvocationCount = 0;
-        _bannerService.BackgroundProgress.Returns(
+        _progressBannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
@@ -185,7 +191,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CancelUpgradeThrows_LogsViaTraceLogger_DoesNotPropagate()
     {
-        _bannerService.BackgroundProgress.Returns(
+        _progressBannerService.BackgroundProgress.Returns(
             new BannerProgressEntry(
                 UpgradeBatchId.Create(),
                 UpgradeProgressScope.Background,
@@ -200,7 +206,7 @@ public sealed class BannerHostTests : BunitContext
         await component.Find("aside.banner-upgrade-progress button.banner-action").ClickAsync(new MouseEventArgs());
 
         Assert.Single(component.FindAll("aside.banner-upgrade-progress"));
-        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _criticalErrorService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("cts disposed")));
     }
@@ -209,7 +215,7 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CopyDetailsClicked_CopiesExceptionAndShowsCopiedChip()
     {
         var critical = new InvalidOperationException("kaboom");
-        _bannerService.CurrentCritical.Returns(critical);
+        _criticalErrorService.CurrentCritical.Returns(critical);
 
         var component = Render<BannerHost>();
 
@@ -227,10 +233,10 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_CriticalActive_DoesNotRenderCycleNav_EvenWithOtherSlices()
     {
         // Critical pre-empts the entire cycle — no Prev/Next chevrons should appear.
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
-        _bannerService.ErrorBanners.Returns(
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
 
@@ -243,12 +249,12 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public void BannerHost_CriticalAndErrorAndInfoAllPresent_RendersOnlyCritical()
     {
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
 
-        _bannerService.ErrorBanners.Returns(
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(BannerId.Create(), "Error", "E", null, null, DateTime.UtcNow)]);
 
-        _bannerService.InfoBanners.Returns([
+        _infoBannerService.InfoBanners.Returns([
             new BannerInfoEntry(BannerId.Create(), "Info", "I", BannerSeverity.Info, DateTime.UtcNow)
         ]);
 
@@ -263,7 +269,7 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_CurrentCritical_RendersCriticalBannerWithThreeButtons()
     {
         var critical = new InvalidOperationException("kaboom");
-        _bannerService.CurrentCritical.Returns(critical);
+        _criticalErrorService.CurrentCritical.Returns(critical);
 
         var component = Render<BannerHost>();
 
@@ -282,8 +288,8 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_CycleErrorAndAttention_RendersFirstErrorWithCyclePagination_TwoOfTwo()
     {
         var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([error]);
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _errorBannerService.ErrorBanners.Returns([error]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
 
@@ -296,9 +302,9 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CycleNextAtLast_DisabledAndDoesNotAdvance()
     {
-        _bannerService.ErrorBanners.Returns(
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
         // Advance to last item (index 1).
@@ -318,8 +324,8 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_CycleNextClicked_AdvancesToAttentionItem()
     {
         var error = new ErrorBannerEntry(BannerId.Create(), "Err", "msg", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([error]);
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _errorBannerService.ErrorBanners.Returns([error]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
         await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
@@ -333,9 +339,9 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_CyclePrevAtFirst_DisabledAndDoesNotAdvance()
     {
-        _bannerService.ErrorBanners.Returns(
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(BannerId.Create(), "E", "m", null, null, DateTime.UtcNow)]);
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
         var prev = component.Find("button.banner-cycle-prev");
@@ -358,7 +364,7 @@ public sealed class BannerHostTests : BunitContext
         var e0 = new ErrorBannerEntry(BannerId.Create(), "First", "first message", null, null, DateTime.UtcNow);
         var e1 = new ErrorBannerEntry(BannerId.Create(), "Second", "second message", null, null, DateTime.UtcNow);
         var e2 = new ErrorBannerEntry(BannerId.Create(), "Third", "third message", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([e0, e1, e2]);
+        _errorBannerService.ErrorBanners.Returns([e0, e1, e2]);
 
         var component = Render<BannerHost>();
         // Advance to e1.
@@ -368,8 +374,8 @@ public sealed class BannerHostTests : BunitContext
 
         // Simulate e0 being dismissed externally — IndexWithinSlice for e1/e2 shifts down by one, but EntryId
         // stays stable so selection-by-EntryId still resolves to e1.
-        _bannerService.ErrorBanners.Returns([e1, e2]);
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _errorBannerService.ErrorBanners.Returns([e1, e2]);
+        _errorBannerService.StateChanged += Raise.Event<Action>();
 
         component.WaitForState(() =>
         {
@@ -387,24 +393,24 @@ public sealed class BannerHostTests : BunitContext
     public async Task BannerHost_DismissErrorClicked_CallsDismissErrorWithEntryId()
     {
         var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-error button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissError(entry.Id);
+        _errorBannerService.Received(1).DismissError(entry.Id);
     }
 
     [Fact]
     public async Task BannerHost_DismissInfoClicked_CallsDismissInfoBannerWithEntryId()
     {
         var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
-        _bannerService.InfoBanners.Returns([info]);
+        _infoBannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-info button.banner-dismiss").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissInfoBanner(info.Id);
+        _infoBannerService.Received(1).DismissInfoBanner(info.Id);
     }
 
     [Fact]
@@ -417,7 +423,7 @@ public sealed class BannerHostTests : BunitContext
             "Resolve",
             () => { actionInvocationCount++; return Task.CompletedTask; },
             DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-error button.banner-action").ClickAsync(new MouseEventArgs());
@@ -438,7 +444,7 @@ public sealed class BannerHostTests : BunitContext
             "Resolve",
             () => throw actionException,
             DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
 
@@ -447,7 +453,7 @@ public sealed class BannerHostTests : BunitContext
 
         // Assert — banner stays visible, the critical slot was not populated, and the exception was logged.
         Assert.Single(component.FindAll("aside.banner-error"));
-        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _criticalErrorService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("action boom")));
     }
@@ -461,7 +467,7 @@ public sealed class BannerHostTests : BunitContext
             "Resolve",
             () => Task.CompletedTask,
             DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
 
@@ -473,7 +479,7 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_ErrorBannerWithoutAction_DoesNotRenderActionButton()
     {
         var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
 
@@ -484,7 +490,7 @@ public sealed class BannerHostTests : BunitContext
     public void BannerHost_InfoSeverity_RendersInfoStyledBanner()
     {
         var info = new BannerInfoEntry(BannerId.Create(), "Notice", "Heads up", BannerSeverity.Info, DateTime.UtcNow);
-        _bannerService.InfoBanners.Returns([info]);
+        _infoBannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
 
@@ -498,7 +504,7 @@ public sealed class BannerHostTests : BunitContext
     {
         var first = new ErrorBannerEntry(BannerId.Create(), "First", "First message", null, null, DateTime.UtcNow);
         var second = new ErrorBannerEntry(BannerId.Create(), "Second", "Second message", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([first, second]);
+        _errorBannerService.ErrorBanners.Returns([first, second]);
 
         var component = Render<BannerHost>();
 
@@ -524,7 +530,7 @@ public sealed class BannerHostTests : BunitContext
         // Clicking the action button is itself the user-acknowledgement that they're acting on the items;
         // dismissing immediately means the banner doesn't linger while the modal opens (which can take a
         // perceptible beat). On failure the error banner replaces the attention banner as the visible signal.
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(true));
 
         var component = Render<BannerHost>();
@@ -533,10 +539,10 @@ public sealed class BannerHostTests : BunitContext
         Received.InOrder(
             () =>
             {
-                _bannerService.DismissAttention();
+                _attentionBannerService.DismissAttention();
                 _ = _menuActionService.OpenSettingsAsync();
             });
-        _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
     }
 
     [Fact]
@@ -545,16 +551,16 @@ public sealed class BannerHostTests : BunitContext
         // Dismiss-immediately semantics: the attention banner is gone the instant the user clicked, regardless
         // of outcome. When OpenSettingsAsync returns false (caught internally), surface a recoverable Error so
         // the user knows the click was received but the modal failed to open.
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissAttention();
-        _bannerService.Received(1)
+        _attentionBannerService.Received(1).DismissAttention();
+        _errorBannerService.Received(1)
             .ReportError("Settings", Arg.Is<string>(s => s.Contains("Failed to open settings")));
-        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _criticalErrorService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
     }
 
     [Fact]
@@ -573,14 +579,14 @@ public sealed class BannerHostTests : BunitContext
             null,
             DateTime.UtcNow);
 
-        _bannerService.AttentionEntries.Returns([attention]);
+        _attentionBannerService.AttentionEntries.Returns([attention]);
         _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
-        _bannerService.ReportError("Settings", Arg.Any<string>())
+        _errorBannerService.ReportError("Settings", Arg.Any<string>())
             .Returns(_ =>
             {
                 // Simulate the real BannerService side effect: the new error joins the ErrorBanners list so
                 // the next rebuild has both [Error, Attention] in the cycle.
-                _bannerService.ErrorBanners.Returns([newError]);
+                _errorBannerService.ErrorBanners.Returns([newError]);
                 return newErrorId;
             });
 
@@ -590,7 +596,7 @@ public sealed class BannerHostTests : BunitContext
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
         // Real BannerService raises StateChanged from inside ReportError; the mock does not, so raise it here
         // to drive the re-render that proves _selectedItem was steered to the new error.
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _errorBannerService.StateChanged += Raise.Event<Action>();
 
         component.WaitForState(() => component.FindAll("aside.banner-error").Count > 0);
 
@@ -606,16 +612,16 @@ public sealed class BannerHostTests : BunitContext
         // Per rule 3.9, JSDisconnectedException is expected during teardown and must be caught silently — it
         // does not warrant ReportError surface (the user closed the circuit themselves). The dismiss happened
         // before the await so the attention banner is already gone by the time the throw lands.
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _menuActionService.OpenSettingsAsync()
             .Returns(Task.FromException<bool>(new JSDisconnectedException("circuit gone")));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissAttention();
-        _bannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
-        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _attentionBannerService.Received(1).DismissAttention();
+        _errorBannerService.DidNotReceive().ReportError(Arg.Any<string>(), Arg.Any<string>());
+        _criticalErrorService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
     }
 
     [Fact]
@@ -624,17 +630,17 @@ public sealed class BannerHostTests : BunitContext
         // Defensive path: contract says OpenSettingsAsync catches internally, but a synchronous throw before the
         // first await would still bubble. Must not propagate to ErrorBoundary (which would escalate the visible
         // banner from Attention to Critical). Surface as Error; attention was already dismissed on click.
-        _bannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         var openException = new InvalidOperationException("modal boom");
         _menuActionService.OpenSettingsAsync().Returns(Task.FromException<bool>(openException));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
 
-        _bannerService.Received(1).DismissAttention();
-        _bannerService.Received(1)
+        _attentionBannerService.Received(1).DismissAttention();
+        _errorBannerService.Received(1)
             .ReportError("Settings", Arg.Is<string>(s => s.Contains("modal boom")));
-        _bannerService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
+        _criticalErrorService.DidNotReceive().ReportCritical(Arg.Any<Exception>());
         _traceLogger.Received(1).Error(Arg.Is<ErrorLogHandler>(h =>
             h.ToString().Contains(nameof(BannerHost)) && h.ToString().Contains("modal boom")));
     }
@@ -642,8 +648,8 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RecoveryThrows_ShowsRecoveryFailureSubtitle()
     {
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
-        _bannerService.TryRecoverAsync().Returns(Task.FromException(new InvalidOperationException("recovery failed")));
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _criticalErrorService.TryRecoverAsync().Returns(Task.FromException(new InvalidOperationException("recovery failed")));
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new MouseEventArgs());
@@ -656,7 +662,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RelaunchClicked_InvokesTryRestartAsync()
     {
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _applicationRestartService.TryRestartAsync().Returns(true);
 
         var component = Render<BannerHost>();
@@ -668,7 +674,7 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_RelaunchFails_ShowsRestartFailureSubtitle()
     {
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
         _applicationRestartService.TryRestartAsync().Returns(false);
 
         var component = Render<BannerHost>();
@@ -681,20 +687,20 @@ public sealed class BannerHostTests : BunitContext
     [Fact]
     public async Task BannerHost_ReloadClicked_InvokesTryRecoverAsync()
     {
-        _bannerService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
-        _bannerService.TryRecoverAsync().Returns(Task.CompletedTask);
+        _criticalErrorService.CurrentCritical.Returns(new InvalidOperationException("kaboom"));
+        _criticalErrorService.TryRecoverAsync().Returns(Task.CompletedTask);
 
         var component = Render<BannerHost>();
         await component.Find("aside.banner-critical .banner-actions button:nth-child(1)").ClickAsync(new MouseEventArgs());
 
-        await _bannerService.Received(1).TryRecoverAsync();
+        await _criticalErrorService.Received(1).TryRecoverAsync();
     }
 
     [Fact]
     public void BannerHost_SingleErrorBanner_RendersWithoutPagination()
     {
         var entry = new ErrorBannerEntry(BannerId.Create(), "Database", "Schema invalid", null, null, DateTime.UtcNow);
-        _bannerService.ErrorBanners.Returns([entry]);
+        _errorBannerService.ErrorBanners.Returns([entry]);
 
         var component = Render<BannerHost>();
 
@@ -713,7 +719,7 @@ public sealed class BannerHostTests : BunitContext
             BannerSeverity.Warning,
             DateTime.UtcNow);
 
-        _bannerService.InfoBanners.Returns([info]);
+        _infoBannerService.InfoBanners.Returns([info]);
 
         var component = Render<BannerHost>();
 

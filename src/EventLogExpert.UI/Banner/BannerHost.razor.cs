@@ -27,17 +27,25 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     [Inject] private IApplicationRestartService ApplicationRestartService { get; init; } = null!;
 
-    [Inject] private IBannerService BannerService { get; init; } = null!;
+    [Inject] private IAttentionBannerService AttentionBannerService { get; init; } = null!;
 
     [Inject] private IClipboardService ClipboardService { get; init; } = null!;
 
+    [Inject] private ICriticalErrorService CriticalErrorService { get; init; } = null!;
+
+    [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
+
+    [Inject] private IInfoBannerService InfoBannerService { get; init; } = null!;
+
     [Inject] private IMenuActionService MenuActionService { get; init; } = null!;
+
+    [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     public void Dispose()
     {
-        BannerService.StateChanged -= OnStateChanged;
+        UnsubscribeAll();
         CancellationTokenSource? cts = _copiedFeedbackCts;
         _copiedFeedbackCts = null;
         cts?.Cancel();
@@ -63,7 +71,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     protected override void OnInitialized()
     {
-        BannerService.StateChanged += OnStateChanged;
+        SubscribeAll();
 
         base.OnInitialized();
     }
@@ -140,11 +148,11 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         _selectedItem = _items[_displayedIndex];
     }
 
-    private void OnDismissAttention() => BannerService.DismissAttention();
+    private void OnDismissAttention() => AttentionBannerService.DismissAttention();
 
-    private void OnDismissError(BannerId id) => BannerService.DismissError(id);
+    private void OnDismissError(BannerId id) => ErrorBannerService.DismissError(id);
 
-    private void OnDismissInfo(BannerId id) => BannerService.DismissInfoBanner(id);
+    private void OnDismissInfo(BannerId id) => InfoBannerService.DismissInfoBanner(id);
 
     private async Task OnErrorActionClickedAsync(Func<Task> action)
     {
@@ -160,7 +168,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
     private async Task OnOpenSettingsClickedAsync()
     {
-        BannerService.DismissAttention();
+        AttentionBannerService.DismissAttention();
 
         bool success;
 
@@ -180,7 +188,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         {
             TraceLogger.Error($"{nameof(BannerHost)}.{nameof(OnOpenSettingsClickedAsync)}: open settings threw: {ex}");
 
-            BannerId errorId = BannerService.ReportError("Settings", $"Failed to open settings: {ex.Message}");
+            BannerId errorId = ErrorBannerService.ReportError("Settings", $"Failed to open settings: {ex.Message}");
             _selectedItem = new BannerCycleItem(BannerView.Error, 0, errorId);
 
             return;
@@ -190,7 +198,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         {
             TraceLogger.Error($"{nameof(BannerHost)}.{nameof(OnOpenSettingsClickedAsync)}: open settings returned false");
 
-            BannerId errorId = BannerService.ReportError("Settings", "Failed to open settings; try again from the menu.");
+            BannerId errorId = ErrorBannerService.ReportError("Settings", "Failed to open settings; try again from the menu.");
             _selectedItem = new BannerCycleItem(BannerView.Error, 0, errorId);
         }
     }
@@ -216,7 +224,7 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
 
         try
         {
-            await BannerService.TryRecoverAsync();
+            await CriticalErrorService.TryRecoverAsync();
         }
         catch (Exception ex)
         {
@@ -272,5 +280,23 @@ public sealed partial class BannerHost : ComponentBase, IDisposable
         _selectedItem = items[_displayedIndex];
 
         return (_selectedItem, _selectedItem.View);
+    }
+
+    private void SubscribeAll()
+    {
+        AttentionBannerService.StateChanged += OnStateChanged;
+        ProgressBannerService.StateChanged += OnStateChanged;
+        CriticalErrorService.StateChanged += OnStateChanged;
+        ErrorBannerService.StateChanged += OnStateChanged;
+        InfoBannerService.StateChanged += OnStateChanged;
+    }
+
+    private void UnsubscribeAll()
+    {
+        AttentionBannerService.StateChanged -= OnStateChanged;
+        ProgressBannerService.StateChanged -= OnStateChanged;
+        CriticalErrorService.StateChanged -= OnStateChanged;
+        ErrorBannerService.StateChanged -= OnStateChanged;
+        InfoBannerService.StateChanged -= OnStateChanged;
     }
 }

@@ -29,14 +29,14 @@ internal sealed class OpenLogEffects(
     IEventXmlResolver xmlResolver,
     IServiceScopeFactory serviceScopeFactory,
     IDatabaseService databaseService,
-    IBannerService bannerService,
+    ICriticalErrorService criticalErrorService,
     LogCloseCoordinator closeCoordinator,
     EventLogConcurrencyState concurrencyState)
 {
     private static readonly int s_maxGlobalConcurrency = Math.Max(1, Environment.ProcessorCount - 1);
     private static readonly SemaphoreSlim s_resolutionThrottle = new(s_maxGlobalConcurrency, s_maxGlobalConcurrency);
 
-    private readonly IBannerService _bannerService = bannerService;
+    private readonly ICriticalErrorService _criticalErrorService = criticalErrorService;
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly EventLogConcurrencyState _concurrencyState = concurrencyState;
     private readonly IDatabaseService _databaseService = databaseService;
@@ -183,7 +183,7 @@ internal sealed class OpenLogEffects(
             }
             catch (Exception ex)
             {
-                _bannerService.ReportCritical(ex);
+                _criticalErrorService.ReportCritical(ex);
 
                 return;
             }

@@ -18,7 +18,7 @@ public enum AlertPresentation
     Auto,
 
     /// <summary>
-    ///     Route to <see cref="IBannerService.ReportInfoBanner" /> with <see cref="BannerSeverity.Warning" /> severity.
+    ///     Route to <see cref="IInfoBannerService.ReportInfoBanner" /> with <see cref="BannerSeverity.Warning" /> severity.
     ///     Only valid for one-button overloads (the banner has no accept/cancel pair); using it on a two-button overload
     ///     throws.
     /// </summary>

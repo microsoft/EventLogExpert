@@ -12,7 +12,7 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
 {
     private IDisposable? _recoveryRegistration;
 
-    [Inject] private IBannerService BannerService { get; set; } = null!;
+    [Inject] private ICriticalErrorService CriticalErrorService { get; set; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; set; } = null!;
 
@@ -24,7 +24,7 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
     protected override Task OnErrorAsync(Exception exception)
     {
         TraceLogger.Critical($"Unhandled exception in UI:\r\n{exception}");
-        BannerService.ReportCritical(exception);
+        CriticalErrorService.ReportCritical(exception);
 
         return base.OnErrorAsync(exception);
     }
@@ -33,7 +33,7 @@ public partial class UnhandledExceptionHandler : ErrorBoundary, IDisposable
     {
         base.OnInitialized();
 
-        _recoveryRegistration = BannerService.RegisterRecoveryCallback(RecoverFromBannerAsync);
+        _recoveryRegistration = CriticalErrorService.RegisterRecoveryCallback(RecoverFromBannerAsync);
     }
 
     private Task RecoverFromBannerAsync()

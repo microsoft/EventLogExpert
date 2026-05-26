@@ -1,10 +1,10 @@
 @{
-    Exception? currentCritical = BannerService.CurrentCritical;
-    IReadOnlyList<ErrorBannerEntry> errors = BannerService.ErrorBanners;
-    IReadOnlyList<BannerInfoEntry> infos = BannerService.InfoBanners;
-    IReadOnlyList<DatabaseEntry> attentionEntries = BannerService.AttentionEntries;
-    bool attentionDismissed = BannerService.AttentionDismissed;
-    BannerProgressEntry? backgroundProgress = BannerService.BackgroundProgress;
+    Exception? currentCritical = CriticalErrorService.CurrentCritical;
+    IReadOnlyList<ErrorBannerEntry> errors = ErrorBannerService.ErrorBanners;
+    IReadOnlyList<BannerInfoEntry> infos = InfoBannerService.InfoBanners;
+    IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
+    bool attentionDismissed = AttentionBannerService.AttentionDismissed;
+    BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
 
     (BannerCycleItem? selected, BannerView view) = RebuildItemsAndPickSelected(
         currentCritical,

@@ -11,7 +11,7 @@ public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisp
 {
     private bool _disposed;
 
-    [Inject] private IBannerService BannerService { get; init; } = null!;
+    [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
@@ -21,12 +21,12 @@ public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisp
 
         _disposed = true;
 
-        BannerService.StateChanged -= OnStateChanged;
+        ProgressBannerService.StateChanged -= OnStateChanged;
     }
 
     protected override void OnInitialized()
     {
-        BannerService.StateChanged += OnStateChanged;
+        ProgressBannerService.StateChanged += OnStateChanged;
 
         base.OnInitialized();
     }
