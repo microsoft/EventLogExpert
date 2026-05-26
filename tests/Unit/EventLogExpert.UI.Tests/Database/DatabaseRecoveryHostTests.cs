@@ -1,21 +1,24 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
-using Bunit;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Logging.Abstractions.Handlers;
 using EventLogExpert.Runtime.Banner;
+using EventLogExpert.Runtime.Common.Threading;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Database;
-using Microsoft.AspNetCore.Components.Web;
-using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 
 namespace EventLogExpert.UI.Tests.Database;
 
-public sealed class DatabaseRecoveryHostTests : BunitContext
+public sealed class DatabaseRecoveryHostTests
 {
     private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
+    private readonly IMainThreadService _mainThreadService = Substitute.For<IMainThreadService>();
+    private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     private Func<Task>? _capturedRecoveryAction;
@@ -34,11 +37,18 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
                 Arg.Do<Func<Task>?>(action => _capturedRecoveryAction = action))
             .Returns(_ => _nextBannerId);
 
-        Services.AddSingleton(_bannerService);
-        Services.AddSingleton(_databaseService);
-        Services.AddSingleton(_traceLogger);
+        _mainThreadService.InvokeOnMainThread(Arg.Any<Action>())
+            .Returns(call =>
+            {
+                ((Action)call[0])();
+                return Task.CompletedTask;
+            });
 
-        JSInterop.Mode = JSRuntimeMode.Loose;
+        _mainThreadService.InvokeOnMainThreadAsync(Arg.Any<Func<Task>>())
+            .Returns(async call =>
+            {
+                await ((Func<Task>)call[0])();
+            });
     }
 
     [Fact]
@@ -52,10 +62,10 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
         _bannerService.ClearReceivedCalls();
 
-        // Act
+        // Act — banner disappears externally; host observes via StateChanged, then EntriesChanged for the same set.
         _bannerService.ErrorBanners.Returns([]);
         _bannerService.StateChanged += Raise.Event<Action>();
 
@@ -80,7 +90,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
         _bannerService.ClearReceivedCalls();
 
         _bannerService.ErrorBanners.Returns([]);
@@ -102,56 +112,41 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryHost_DialogDismissed_BannerStillVisible_DoesNotDismissBanner()
+    public async Task DatabaseRecoveryHost_Ctor_DatabasesAlreadyHaveBackups_ReportsBannerImmediately()
     {
         // Arrange
-        var initialId = BannerId.Create();
-        _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
-        _bannerService.ClearReceivedCalls();
-
-        await component.InvokeAsync(() => _capturedRecoveryAction!());
-
-        // Act
-        await component.Find("button:contains('Cancel')").ClickAsync(new MouseEventArgs());
+        // Act — construct host; ctor dispatches EvaluateState immediately to catch pre-existing state.
+        using var host = CreateHost();
+        await Task.Yield();
 
         // Assert
-        Assert.Empty(component.FindAll("dialog"));
-
-        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
+        _bannerService.Received(1).ReportError(
+            "Database upgrade recovery",
+            "1 database needs recovery from interrupted upgrade.",
+            "Resolve",
+            Arg.Any<Func<Task>?>());
     }
 
     [Fact]
-    public async Task DatabaseRecoveryHost_DialogOpen_NewBackupEntryAppears_RefreshesBannerKeepsDialogOpen()
+    public async Task DatabaseRecoveryHost_DialogOpenFails_ReportsCriticalViaBannerService()
     {
         // Arrange
-        var initialId = BannerId.Create();
-        _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
-        await component.InvokeAsync(() => _capturedRecoveryAction!());
+        var openFailure = new InvalidOperationException("coordinator unavailable");
+        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .ThrowsAsync(openFailure);
 
-        Assert.Single(component.FindAll("dialog"));
+        using var host = CreateHost();
+        Assert.NotNull(_capturedRecoveryAction);
 
         // Act
-        var newId = BannerId.Create();
-        _nextBannerId = newId;
-        _databaseService.Entries.Returns(
-            [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
-        _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+        await _capturedRecoveryAction!();
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
-        _bannerService.Received(1).ReportError(
-            "Database upgrade recovery",
-            "2 databases need recovery from interrupted upgrade.",
-            "Resolve",
-            Arg.Any<Func<Task>?>());
-
-        Assert.Single(component.FindAll("dialog"));
+        _bannerService.Received(1).ReportCritical(openFailure);
     }
 
     [Fact]
@@ -162,10 +157,10 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
+        var host = CreateHost();
 
         // Act
-        component.Instance.Dispose();
+        host.Dispose();
 
         // Assert
         _bannerService.Received(1).DismissError(initialId);
@@ -177,9 +172,9 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
+        var host = CreateHost();
 
-        component.Instance.Dispose();
+        host.Dispose();
         _bannerService.ClearReceivedCalls();
 
         // Act
@@ -204,11 +199,11 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
+        var host = CreateHost();
 
         // Act
-        component.Instance.Dispose();
-        component.Instance.Dispose();
+        host.Dispose();
+        host.Dispose();
 
         // Assert
         _bannerService.Received(1).DismissError(initialId);
@@ -220,10 +215,10 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         _databaseService.Entries.Returns([]);
 
-        var component = Render<DatabaseRecoveryHost>();
+        var host = CreateHost();
 
         // Act
-        component.Instance.Dispose();
+        host.Dispose();
 
         // Assert
         _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
@@ -237,7 +232,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
         _bannerService.ClearReceivedCalls();
 
         // Act
@@ -254,6 +249,53 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     }
 
     [Fact]
+    public void DatabaseRecoveryHost_EntriesChanged_DispatchFails_ReportsCritical()
+    {
+        // Arrange
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+
+        var dispatchFailure = new InvalidOperationException("main thread unavailable");
+
+        // Throw exclusively on the EntriesChanged dispatch (ctor's initial dispatch already used the default path).
+        var entriesChangedDispatchCount = 0;
+        _mainThreadService.InvokeOnMainThread(Arg.Any<Action>())
+            .Returns(call =>
+            {
+                entriesChangedDispatchCount++;
+
+                if (entriesChangedDispatchCount > 1)
+                {
+                    return Task.FromException(dispatchFailure);
+                }
+
+                ((Action)call[0])();
+                return Task.CompletedTask;
+            });
+
+        using var host = CreateHost();
+        _bannerService.ClearReceivedCalls();
+
+        // Act
+        _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
+
+        // Assert
+        _bannerService.Received(1).ReportCritical(dispatchFailure);
+    }
+
+    [Fact]
+    public void DatabaseRecoveryHost_EntriesChanged_HandlerThrows_ReportsCritical()
+    {
+        // Arrange — Entries throws when read inside the handler.
+        var handlerFailure = new InvalidOperationException("entries unavailable");
+        _databaseService.Entries.Returns(_ => throw handlerFailure);
+
+        using var host = CreateHost();
+
+        // Assert — ctor's initial DispatchSafely(EvaluateState) already triggered the handler failure path.
+        _bannerService.Received(1).ReportCritical(handlerFailure);
+    }
+
+    [Fact]
     public void DatabaseRecoveryHost_EntriesChanged_NewBackupExistsEntry_DismissesOldBannerAndRaisesNewWithUpdatedCount()
     {
         // Arrange
@@ -261,7 +303,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
 
         // Act
         var newId = BannerId.Create();
@@ -285,7 +327,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
         _bannerService.ClearReceivedCalls();
 
         // Act
@@ -309,7 +351,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _databaseService.Entries.Returns(
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
 
         // Act
         var newId = BannerId.Create();
@@ -334,7 +376,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
             [BuildEntry("a.db", true), BuildEntry("b.db", true)]);
 
         // Act
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
 
         // Assert
         _bannerService.Received(1).ReportError(
@@ -351,7 +393,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         // Act
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
 
         // Assert
         _bannerService.Received(1).ReportError(
@@ -368,7 +410,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
         _databaseService.Entries.Returns([BuildEntry("a.db", false)]);
 
         // Act
-        Render<DatabaseRecoveryHost>();
+        using var host = CreateHost();
 
         // Assert
         _bannerService.DidNotReceive().ReportError(
@@ -379,21 +421,63 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
     }
 
     [Fact]
-    public async Task DatabaseRecoveryHost_ResolveActionClicked_OpensDialog()
+    public async Task DatabaseRecoveryHost_OpenRecoveryDialogAsync_EmptyEntries_DoesNotCallLauncher()
+    {
+        // Arrange — start with backups, then drain them after the banner is reported but before the CTA fires.
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+
+        using var host = CreateHost();
+        Assert.NotNull(_capturedRecoveryAction);
+
+        _databaseService.Entries.Returns([]);
+
+        // Act
+        await _capturedRecoveryAction!();
+
+        // Assert
+        await _modalCoordinator.DidNotReceive().PushAsync<DatabaseRecoveryDialog, bool>(
+            Arg.Any<IDictionary<string, object?>?>());
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryHost_ResolveActionClicked_OpensDialogViaCoordinator()
     {
         // Arrange
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
-        var component = Render<DatabaseRecoveryHost>();
+        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .Returns(new ModalOpenResult<bool>(false, WasOpened: true));
 
+        using var host = CreateHost();
         Assert.NotNull(_capturedRecoveryAction);
-        Assert.Empty(component.FindAll("dialog"));
 
         // Act
-        await component.InvokeAsync(() => _capturedRecoveryAction!());
+        await _capturedRecoveryAction!();
 
         // Assert
-        Assert.Single(component.FindAll("dialog"));
+        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryDialog, bool>(
+            Arg.Any<IDictionary<string, object?>?>());
+    }
+
+    [Fact]
+    public async Task DatabaseRecoveryHost_ResolveActionClicked_WhenPreempted_TracesAndDoesNotThrow()
+    {
+        // Arrange
+        _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
+
+        _modalCoordinator.PushAsync<DatabaseRecoveryDialog, bool>(Arg.Any<IDictionary<string, object?>?>())
+            .Returns(new ModalOpenResult<bool>(false, WasOpened: false));
+
+        using var host = CreateHost();
+        Assert.NotNull(_capturedRecoveryAction);
+
+        // Act
+        await _capturedRecoveryAction!();
+
+        // Assert
+        await _modalCoordinator.Received(1).PushAsync<DatabaseRecoveryDialog, bool>(
+            Arg.Any<IDictionary<string, object?>?>());
+        _traceLogger.Received().Trace(Arg.Any<TraceLogHandler>());
     }
 
     private static DatabaseEntry BuildEntry(string fileName, bool backupExists) =>
@@ -403,4 +487,7 @@ public sealed class DatabaseRecoveryHostTests : BunitContext
             false,
             DatabaseStatus.UpgradeRequired,
             backupExists);
+
+    private DatabaseRecoveryHost CreateHost() =>
+        new(_bannerService, _databaseService, _modalCoordinator, _traceLogger, _mainThreadService);
 }
