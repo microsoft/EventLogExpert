@@ -19,8 +19,8 @@ namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseRecoveryDialogTests : BunitContext
 {
-    private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
+    private readonly IErrorBannerService _errorBannerService = Substitute.For<IErrorBannerService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ModalId _modalId = new(1L);
     private readonly IModalService _modalService = Substitute.For<IModalService>();
@@ -37,7 +37,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
             .When(coordinator => coordinator.RegisterModal(Arg.Any<ModalRegistration>()))
             .Do(call => _capturedRegistration = call.Arg<ModalRegistration>());
 
-        Services.AddSingleton(_bannerService);
+        Services.AddSingleton(_errorBannerService);
         Services.AddSingleton(_databaseService);
         Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_modalService);
@@ -92,7 +92,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database recovery failed",
             "Failed to delete 'a.db'.");
 
@@ -171,7 +171,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database recovery failed",
             "Failed to restore 'a.db' from backup.");
 
@@ -194,7 +194,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -218,7 +218,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         await component.Find("button:contains('Apply')").ClickAsync(new MouseEventArgs());
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database recovery failed",
             "Failed to restore 'a.db' from backup.");
 
@@ -592,7 +592,7 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
         // Assert
         await _databaseService.Received(1).RestoreFromBackupAsync("a.db", Arg.Any<CancellationToken>());
         await _databaseService.DidNotReceive().RestoreFromBackupAsync("b.db", Arg.Any<CancellationToken>());
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),

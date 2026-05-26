@@ -14,41 +14,46 @@ namespace EventLogExpert.UI.Database;
 ///     Coordinates the recovery banner and modal lifecycle in response to
 ///     <see cref="IDatabaseService.EntriesChanged" />. Registered as a singleton and force-instantiated in MauiProgram so
 ///     it begins observing state at startup. Crashes in event handlers route through
-///     <see cref="IBannerService.ReportCritical(Exception)" /> to preserve the original Main.razor placement intent
+///     <see cref="ICriticalErrorService.ReportCritical(Exception)" /> to preserve the original Main.razor placement intent
 ///     (UnhandledExceptionHandler coverage equivalent).
 /// </summary>
 public sealed class DatabaseRecoveryHost : IDisposable
 {
-    private readonly IBannerService _bannerService;
+    private readonly ICriticalErrorService _criticalErrorService;
     private readonly IDatabaseService _databaseService;
+    private readonly IErrorBannerService _errorBannerService;
     private readonly IMainThreadService _mainThreadService;
     private readonly IModalCoordinator _modalCoordinator;
     private readonly ITraceLogger _traceLogger;
+
     private bool _disposed;
     private HashSet<string> _promptedFor = new(StringComparer.OrdinalIgnoreCase);
     private BannerId? _recoveryBannerId;
 
     public DatabaseRecoveryHost(
-        IBannerService bannerService,
+        ICriticalErrorService criticalErrorService,
+        IErrorBannerService errorBannerService,
         IDatabaseService databaseService,
         IModalCoordinator modalCoordinator,
         ITraceLogger traceLogger,
         IMainThreadService mainThreadService)
     {
-        ArgumentNullException.ThrowIfNull(bannerService);
+        ArgumentNullException.ThrowIfNull(criticalErrorService);
+        ArgumentNullException.ThrowIfNull(errorBannerService);
         ArgumentNullException.ThrowIfNull(databaseService);
         ArgumentNullException.ThrowIfNull(modalCoordinator);
         ArgumentNullException.ThrowIfNull(traceLogger);
         ArgumentNullException.ThrowIfNull(mainThreadService);
 
-        _bannerService = bannerService;
+        _criticalErrorService = criticalErrorService;
+        _errorBannerService = errorBannerService;
         _databaseService = databaseService;
         _modalCoordinator = modalCoordinator;
         _traceLogger = traceLogger;
         _mainThreadService = mainThreadService;
 
         _databaseService.EntriesChanged += OnEntriesChanged;
-        _bannerService.StateChanged += OnBannerStateChanged;
+        _errorBannerService.StateChanged += OnBannerStateChanged;
 
         DispatchSafely(EvaluateState);
     }
@@ -59,11 +64,11 @@ public sealed class DatabaseRecoveryHost : IDisposable
 
         _disposed = true;
         _databaseService.EntriesChanged -= OnEntriesChanged;
-        _bannerService.StateChanged -= OnBannerStateChanged;
+        _errorBannerService.StateChanged -= OnBannerStateChanged;
 
         if (_recoveryBannerId is not { } id) { return; }
 
-        _bannerService.DismissError(id);
+        _errorBannerService.DismissError(id);
         _recoveryBannerId = null;
     }
 
@@ -71,7 +76,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
     {
         if (_recoveryBannerId is not { } activeId) { return; }
 
-        _bannerService.DismissError(activeId);
+        _errorBannerService.DismissError(activeId);
         _recoveryBannerId = null;
     }
 
@@ -85,7 +90,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         }
         catch (Exception dispatchEx)
         {
-            _bannerService.ReportCritical(dispatchEx);
+            _criticalErrorService.ReportCritical(dispatchEx);
         }
     }
 
@@ -97,31 +102,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
         }
         catch (Exception dispatchEx)
         {
-            _bannerService.ReportCritical(dispatchEx);
-        }
-    }
-
-    private void SafeInvoke(Action action)
-    {
-        try
-        {
-            action();
-        }
-        catch (Exception handlerEx)
-        {
-            _bannerService.ReportCritical(handlerEx);
-        }
-    }
-
-    private async Task SafeInvokeAsync(Func<Task> asyncAction)
-    {
-        try
-        {
-            await asyncAction();
-        }
-        catch (Exception handlerEx)
-        {
-            _bannerService.ReportCritical(handlerEx);
+            _criticalErrorService.ReportCritical(dispatchEx);
         }
     }
 
@@ -156,7 +137,7 @@ public sealed class DatabaseRecoveryHost : IDisposable
 
         if (_recoveryBannerId is not { } id) { return; }
 
-        if (_bannerService.ErrorBanners.Any(banner => banner.Id == id)) { return; }
+        if (_errorBannerService.ErrorBanners.Any(banner => banner.Id == id)) { return; }
 
         _recoveryBannerId = null;
     }
@@ -186,6 +167,30 @@ public sealed class DatabaseRecoveryHost : IDisposable
             ? "1 database needs recovery from interrupted upgrade."
             : $"{count} databases need recovery from interrupted upgrade.";
 
-        return _bannerService.ReportError("Database upgrade recovery", message, "Resolve", OpenRecoveryDialogAsync);
+        return _errorBannerService.ReportError("Database upgrade recovery", message, "Resolve", OpenRecoveryDialogAsync);
+    }
+
+    private void SafeInvoke(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (Exception handlerEx)
+        {
+            _criticalErrorService.ReportCritical(handlerEx);
+        }
+    }
+
+    private async Task SafeInvokeAsync(Func<Task> asyncAction)
+    {
+        try
+        {
+            await asyncAction();
+        }
+        catch (Exception handlerEx)
+        {
+            _criticalErrorService.ReportCritical(handlerEx);
+        }
     }
 }

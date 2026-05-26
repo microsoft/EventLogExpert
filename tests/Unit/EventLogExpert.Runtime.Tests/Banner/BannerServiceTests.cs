@@ -65,7 +65,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         sut.ReportCritical(new InvalidOperationException("boom"));
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((ICriticalErrorService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.ClearCritical();
@@ -194,7 +194,7 @@ public sealed class BannerServiceTests
         });
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissAttention();
@@ -215,7 +215,7 @@ public sealed class BannerServiceTests
         sut.DismissAttention();
         Assert.True(sut.AttentionDismissed);
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
         var entryB = new DatabaseEntry("b.db", @"c:\dbs\b.db", true, DatabaseStatus.UpgradeRequired);
         databaseService.Entries.Returns(new[] { entryA, entryB });
 
@@ -261,7 +261,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         sut.DismissAttention();
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissAttention();
@@ -280,7 +280,7 @@ public sealed class BannerServiceTests
         sut.ReportError("Second Title", "Second Message");
         BannerId firstId = sut.ErrorBanners[0].Id;
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissError(firstId);
@@ -298,7 +298,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         sut.ReportError("Title", "Message");
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissError(BannerId.Create());
@@ -317,7 +317,7 @@ public sealed class BannerServiceTests
         sut.ReportInfoBanner("Second Title", "Second Message", BannerSeverity.Warning);
         BannerId firstId = sut.InfoBanners[0].Id;
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissInfoBanner(firstId);
@@ -335,7 +335,7 @@ public sealed class BannerServiceTests
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         sut.ReportInfoBanner("Title", "Message", BannerSeverity.Info);
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.DismissInfoBanner(BannerId.Create());
@@ -354,7 +354,7 @@ public sealed class BannerServiceTests
         databaseService.Entries.Returns(new[] { initialEntry });
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
         var readyEntry = initialEntry with { Status = DatabaseStatus.Ready };
         databaseService.Entries.Returns(new[] { readyEntry });
 
@@ -374,7 +374,7 @@ public sealed class BannerServiceTests
         databaseService.Entries.Returns(Array.Empty<DatabaseEntry>());
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
         var newEntry = new DatabaseEntry("new.db", @"c:\dbs\new.db", false, DatabaseStatus.UpgradeRequired);
         databaseService.Entries.Returns(new[] { newEntry });
 
@@ -398,7 +398,7 @@ public sealed class BannerServiceTests
         databaseService.Entries.Returns(new[] { initialEntry });
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
         var updatedEntry = initialEntry with { Status = DatabaseStatus.UpgradeFailed };
         databaseService.Entries.Returns(new[] { updatedEntry });
 
@@ -420,7 +420,7 @@ public sealed class BannerServiceTests
         databaseService.Entries.Returns(new[] { entry });
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IAttentionBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act — same Entries content, just a new EntriesChanged firing.
         databaseService.EntriesChanged += Raise.EventWith(databaseService, EventArgs.Empty);
@@ -439,8 +439,8 @@ public sealed class BannerServiceTests
         var traceLogger = Substitute.For<ITraceLogger>();
         var sut = new BannerService(databaseService, traceLogger);
         bool secondCalled = false;
-        sut.StateChanged += () => throw new InvalidOperationException("boom");
-        sut.StateChanged += () => secondCalled = true;
+        ((IErrorBannerService)sut).StateChanged += () => throw new InvalidOperationException("boom");
+        ((IErrorBannerService)sut).StateChanged += () => secondCalled = true;
 
         // Act — any path that raises StateChanged works; ReportError is the simplest.
         sut.ReportError("title", "message");
@@ -534,7 +534,7 @@ public sealed class BannerServiceTests
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((ICriticalErrorService)sut).StateChanged += () => stateChangedCount++;
         var critical = new InvalidOperationException("boom");
 
         // Act
@@ -551,7 +551,7 @@ public sealed class BannerServiceTests
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((ICriticalErrorService)sut).StateChanged += () => stateChangedCount++;
         var first = new InvalidOperationException("first");
         var second = new InvalidOperationException("second");
 
@@ -580,7 +580,7 @@ public sealed class BannerServiceTests
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IErrorBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.ReportError("Title", "Message");
@@ -700,7 +700,7 @@ public sealed class BannerServiceTests
         // Arrange
         var sut = new BannerService(Substitute.For<IDatabaseService>(), Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IInfoBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         sut.ReportInfoBanner("Title", "Message", BannerSeverity.Warning);
@@ -807,7 +807,7 @@ public sealed class BannerServiceTests
         Task recoverTask = sut.TryRecoverAsync();
         await callbackStarted.Task;
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((ICriticalErrorService)sut).StateChanged += () => stateChangedCount++;
         sut.ReportCritical(new InvalidOperationException("new"));
         callbackCanFinish.SetResult();
         await recoverTask;
@@ -842,7 +842,7 @@ public sealed class BannerServiceTests
             databaseService,
             new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 1, cts));
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
@@ -869,7 +869,7 @@ public sealed class BannerServiceTests
             new UpgradeBatchStartedEventArgs(currentId, UpgradeProgressScope.Background, 1, cts));
         BannerProgressEntry? snapshotBefore = sut.BackgroundProgress;
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         databaseService.UpgradeBatchCompleted += Raise.EventWith(
@@ -923,7 +923,7 @@ public sealed class BannerServiceTests
             databaseService,
             new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 3, cts));
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act
         databaseService.UpgradeBatchProgress += Raise.EventWith(
@@ -954,7 +954,7 @@ public sealed class BannerServiceTests
             new UpgradeBatchStartedEventArgs(currentId, UpgradeProgressScope.Background, 1, cts));
         BannerProgressEntry? snapshotBefore = sut.BackgroundProgress;
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
 
         // Act — stale-id Progress event must not mutate the slot.
         databaseService.UpgradeBatchProgress += Raise.EventWith(
@@ -975,7 +975,7 @@ public sealed class BannerServiceTests
         var databaseService = Substitute.For<IDatabaseService>();
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
         var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
 
@@ -1000,7 +1000,7 @@ public sealed class BannerServiceTests
         databaseService.QueuedBatchCount.Returns(2);
         var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
         int stateChangedCount = 0;
-        sut.StateChanged += () => stateChangedCount++;
+        ((IProgressBannerService)sut).StateChanged += () => stateChangedCount++;
         var batchId = UpgradeBatchId.Create();
         using var cts = new CancellationTokenSource();
         var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 5, cts);

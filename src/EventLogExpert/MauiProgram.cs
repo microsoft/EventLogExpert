@@ -123,12 +123,14 @@ public static class MauiProgram
         {
             var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
-            var bannerService = provider.GetRequiredService<IBannerService>();
+            var errorBannerService = provider.GetRequiredService<IErrorBannerService>();
+            var infoBannerService = provider.GetRequiredService<IInfoBannerService>();
 
             return new AlertDialogService(
                 modalCoordinator,
                 mainThreadService,
-                bannerService,
+                errorBannerService,
+                infoBannerService,
                 async parameters =>
                 {
                     ModalOpenResult<bool> result = await modalCoordinator.PushAsync<AlertModal, bool>(
@@ -147,7 +149,10 @@ public static class MauiProgram
 
         var mauiApp = builder.Build();
 
-        mauiApp.Services.GetRequiredService<IBannerService>();
+        // Force eager construction of BannerService — its ctor subscribes to
+        // IDatabaseService.EntriesChanged + UpgradeBatch* events. Any facet
+        // resolves to the same singleton instance.
+        mauiApp.Services.GetRequiredService<IAttentionBannerService>();
         mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
 
         return mauiApp;

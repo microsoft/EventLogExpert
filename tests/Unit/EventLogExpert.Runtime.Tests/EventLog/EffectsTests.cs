@@ -646,7 +646,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             mockDispatcher);
 
         var closeTasks = new List<Task>();
@@ -860,7 +860,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
@@ -1128,7 +1128,7 @@ public sealed class EffectsTests
             mockXmlResolver,
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             mockDispatcher);
 
         // Act
@@ -1214,7 +1214,7 @@ public sealed class EffectsTests
             mockXmlResolver,
             mockServiceScopeFactory,
             Substitute.For<IDatabaseService>(),
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
@@ -1489,7 +1489,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             Substitute.For<IDispatcher>());
 
         var mockDispatcher = Substitute.For<IDispatcher>();
@@ -1520,12 +1520,12 @@ public sealed class EffectsTests
     public async Task HandleOpenLog_ResolverThrows_CallsReportCritical_DoesNotPropagate()
     {
         // Arrange — resolver factory throws (e.g., DI graph misconfiguration). HandleOpenLog
-        // must surface this as a Reload-tier banner via IBannerService.ReportCritical and
+        // must surface this as a Reload-tier banner via ICriticalErrorService.ReportCritical and
         // return cleanly instead of letting the exception escape the effect.
         var logData = new EventLogData(Constants.LogNameApplication, LogPathType.Channel, []);
         var activeLogs = ImmutableDictionary<string, EventLogData>.Empty.Add(Constants.LogNameApplication, logData);
 
-        var (effects, mockDispatcher, mockServiceProvider, mockBannerService, _) =
+        var (effects, mockDispatcher, mockServiceProvider, mockCriticalErrorService, _) =
             CreateEffectsForOpenLogGuards(activeLogs);
 
         var thrown = new InvalidOperationException("resolver factory failed");
@@ -1537,7 +1537,7 @@ public sealed class EffectsTests
         await effects.HandleOpenLog(action, mockDispatcher);
 
         // Assert — exact exception forwarded to banner; no resolver-status dispatch fired.
-        mockBannerService.Received(1).ReportCritical(thrown);
+        mockCriticalErrorService.Received(1).ReportCritical(thrown);
 
         mockDispatcher.DidNotReceive().Dispatch(Arg.Any<SetResolverStatusAction>());
     }
@@ -1685,7 +1685,7 @@ public sealed class EffectsTests
         IEventXmlResolver xmlResolver,
         IServiceScopeFactory serviceScopeFactory,
         IDatabaseService databaseService,
-        IBannerService bannerService,
+        ICriticalErrorService criticalErrorService,
         IDispatcher dispatcher)
     {
         var closeCoordinator = new LogCloseCoordinator();
@@ -1706,7 +1706,7 @@ public sealed class EffectsTests
             xmlResolver,
             serviceScopeFactory,
             databaseService,
-            bannerService,
+            criticalErrorService,
             closeCoordinator,
             concurrencyState);
 
@@ -1795,7 +1795,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             mockDispatcher);
 
         return (effects, mockDispatcher);
@@ -1804,7 +1804,7 @@ public sealed class EffectsTests
     private static (EffectsHarness effects,
         IDispatcher mockDispatcher,
         IServiceProvider mockServiceProvider,
-        IBannerService mockBannerService,
+        ICriticalErrorService mockCriticalErrorService,
         IDatabaseService mockDatabaseService) CreateEffectsForOpenLogGuards(
             ImmutableDictionary<string, EventLogData> activeLogs)
     {
@@ -1833,7 +1833,7 @@ public sealed class EffectsTests
         var mockDatabaseService = Substitute.For<IDatabaseService>();
         mockDatabaseService.InitialClassificationTask.Returns(Task.CompletedTask);
 
-        var mockBannerService = Substitute.For<IBannerService>();
+        var mockCriticalErrorService = Substitute.For<ICriticalErrorService>();
 
         var mockDispatcher = Substitute.For<IDispatcher>();
 
@@ -1846,10 +1846,10 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            mockBannerService,
+            mockCriticalErrorService,
             mockDispatcher);
 
-        return (effects, mockDispatcher, mockServiceProvider, mockBannerService, mockDatabaseService);
+        return (effects, mockDispatcher, mockServiceProvider, mockCriticalErrorService, mockDatabaseService);
     }
 
     private static (EffectsHarness effects,
@@ -1892,7 +1892,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             mockDispatcher);
 
         return (effects, mockDispatcher, mockFilterService);
@@ -1952,7 +1952,7 @@ public sealed class EffectsTests
             Substitute.For<IEventXmlResolver>(),
             mockServiceScopeFactory,
             mockDatabaseService,
-            Substitute.For<IBannerService>(),
+            Substitute.For<ICriticalErrorService>(),
             mockDispatcher);
 
         return (effects, mockDispatcher, mockLogWatcherService, mockResolverCache, mockFilterService);
