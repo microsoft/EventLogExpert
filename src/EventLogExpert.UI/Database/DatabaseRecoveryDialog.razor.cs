@@ -27,7 +27,7 @@ public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
 
     protected override ModalScope Scope => ModalScope.Critical;
 
-    [Inject] private IBannerService BannerService { get; init; } = null!;
+    [Inject] private IErrorBannerService ErrorBannerService { get; init; } = null!;
 
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
@@ -133,7 +133,7 @@ public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
                         ? $"Failed to restore '{fileName}' from backup."
                         : $"Failed to delete '{fileName}'.";
 
-                    BannerService.ReportError("Database recovery failed", message);
+                    ErrorBannerService.ReportError("Database recovery failed", message);
                 }
             }
         }

@@ -15,15 +15,15 @@ namespace EventLogExpert.UI.Tests.Settings;
 
 public sealed class SettingsUpgradeProgressBannerTests : BunitContext
 {
-    private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
+    private readonly IProgressBannerService _progressBannerService = Substitute.For<IProgressBannerService>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
     public SettingsUpgradeProgressBannerTests()
     {
-        _bannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
-        _bannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
+        _progressBannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
+        _progressBannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
 
-        Services.AddSingleton(_bannerService);
+        Services.AddSingleton(_progressBannerService);
         Services.AddSingleton(_traceLogger);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -33,7 +33,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_BackgroundProgressOnly_RendersNothing()
     {
         // Arrange
-        _bannerService.BackgroundProgress.Returns(BuildProgress(UpgradeProgressScope.Background));
+        _progressBannerService.BackgroundProgress.Returns(BuildProgress(UpgradeProgressScope.Background));
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -47,7 +47,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     {
         // Arrange
         int cancelInvocationCount = 0;
-        _bannerService.SettingsProgress.Returns(BuildProgress(cancel: () => cancelInvocationCount++));
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(cancel: () => cancelInvocationCount++));
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -61,7 +61,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public async Task SettingsUpgradeProgressBanner_CancelThrows_LogsViaTraceLoggerAndDoesNotPropagate()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(
+        _progressBannerService.SettingsProgress.Returns(
             BuildProgress(cancel: () => throw new InvalidOperationException("cts disposed")));
 
         // Act
@@ -93,14 +93,14 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public async Task SettingsUpgradeProgressBanner_DisposeUnsubscribesFromStateChanged()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
+        _progressBannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
 
         var component = Render<SettingsUpgradeProgressBanner>();
         component.Instance.Dispose();
 
         // Act
-        _bannerService.SettingsProgress.Returns(BuildProgress());
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _progressBannerService.SettingsProgress.Returns(BuildProgress());
+        _progressBannerService.StateChanged += Raise.Event<Action>();
 
         await Task.Yield();
 
@@ -112,7 +112,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_QueuedBatchesAfterOne_UsesSingularBatchLabel()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 1));
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 1));
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -127,7 +127,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_QueuedBatchesAfterTwo_UsesPluralBatchesLabel()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 2));
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 2));
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -141,7 +141,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_QueuedBatchesAfterZero_DoesNotRenderSubtitle()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 0));
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(queuedBatchesAfter: 0));
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -154,7 +154,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_SettingsProgressNull_RendersNothing()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
+        _progressBannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
 
         // Act
         var component = Render<SettingsUpgradeProgressBanner>();
@@ -167,7 +167,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_SettingsProgressWithBatchSizeOne_UsesSingularDatabaseLabel()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(
+        _progressBannerService.SettingsProgress.Returns(
             BuildProgress(currentBatchSize: 1, currentEntryName: string.Empty));
 
         // Act
@@ -183,7 +183,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public void SettingsUpgradeProgressBanner_SettingsProgressWithEmptyEntryName_RendersPreparingMessage()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(
+        _progressBannerService.SettingsProgress.Returns(
             BuildProgress(currentBatchSize: 3, currentEntryName: string.Empty));
 
         // Act
@@ -200,7 +200,7 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
         SettingsUpgradeProgressBanner_SettingsProgressWithEntryName_RendersUpgradeProgressBannerWithCancelButton()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns(BuildProgress(
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(
             currentBatchPosition: 2,
             currentBatchSize: 5,
             currentEntryName: "MyDb.evtx",
@@ -222,13 +222,13 @@ public sealed class SettingsUpgradeProgressBannerTests : BunitContext
     public async Task SettingsUpgradeProgressBanner_StateChangedRaised_RerendersWithNewProgress()
     {
         // Arrange
-        _bannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
+        _progressBannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
         var component = Render<SettingsUpgradeProgressBanner>();
         Assert.Empty(component.FindAll("aside.settings-upgrade-banner"));
 
         // Act
-        _bannerService.SettingsProgress.Returns(BuildProgress(currentEntryName: "x.evtx"));
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _progressBannerService.SettingsProgress.Returns(BuildProgress(currentEntryName: "x.evtx"));
+        _progressBannerService.StateChanged += Raise.Event<Action>();
 
         // Assert
         await component.WaitForAssertionAsync(() =>

@@ -8,7 +8,12 @@ using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Banner;
 
-internal sealed class BannerService : IBannerService
+internal sealed class BannerService
+    : IAttentionBannerService,
+        IProgressBannerService,
+        ICriticalErrorService,
+        IErrorBannerService,
+        IInfoBannerService
 {
     private readonly IDatabaseService _databaseService;
     private readonly Lock _stateLock = new();
@@ -35,12 +40,63 @@ internal sealed class BannerService : IBannerService
         _databaseService.UpgradeBatchStarted += OnUpgradeBatchStarted;
         _databaseService.UpgradeBatchProgress += OnUpgradeBatchProgress;
         _databaseService.UpgradeBatchCompleted += OnUpgradeBatchCompleted;
-
         _databaseService.EntriesChanged += OnEntriesChanged;
         OnEntriesChanged(this, EventArgs.Empty);
     }
 
-    public event Action? StateChanged;
+    // The five explicit-interface event accessors below are an unavoidable
+    // 5× duplication: C# does not allow an explicit-interface event accessor
+    // to delegate its add/remove implementation to another helper. The
+    // duplication is intentional and necessary to preserve five distinct
+    // invocation lists on the shared backing-store BannerService instance.
+    // Each accessor synchronizes through `_stateLock` to preserve the
+    // thread-safe add/remove guarantee the compiler-synthesized field-like
+    // event used to provide.
+
+    event Action IAttentionBannerService.StateChanged
+    {
+        add { lock (_stateLock) { AttentionStateChanged += value; } }
+        remove { lock (_stateLock) { AttentionStateChanged -= value; } }
+    }
+
+    event Action ICriticalErrorService.StateChanged
+    {
+        add { lock (_stateLock) { CriticalStateChanged += value; } }
+        remove { lock (_stateLock) { CriticalStateChanged -= value; } }
+    }
+
+    event Action IErrorBannerService.StateChanged
+    {
+        add { lock (_stateLock) { ErrorStateChanged += value; } }
+        remove { lock (_stateLock) { ErrorStateChanged -= value; } }
+    }
+
+    event Action IInfoBannerService.StateChanged
+    {
+        add { lock (_stateLock) { InfoStateChanged += value; } }
+        remove { lock (_stateLock) { InfoStateChanged -= value; } }
+    }
+
+    event Action IProgressBannerService.StateChanged
+    {
+        add { lock (_stateLock) { ProgressStateChanged += value; } }
+        remove { lock (_stateLock) { ProgressStateChanged -= value; } }
+    }
+
+    // Five separate backing delegate fields — one per facet. Each interface's
+    // `event Action StateChanged` is wired through an explicit-interface accessor
+    // below; this guarantees five distinct invocation lists rather than one
+    // shared multicast (which a single `public event Action? StateChanged;`
+    // would silently produce).
+    private event Action? AttentionStateChanged;
+
+    private event Action? CriticalStateChanged;
+
+    private event Action? ErrorStateChanged;
+
+    private event Action? InfoStateChanged;
+
+    private event Action? ProgressStateChanged;
 
     public bool AttentionDismissed
     {
@@ -84,7 +140,7 @@ internal sealed class BannerService : IBannerService
             _currentCritical = null;
         }
 
-        RaiseStateChanged();
+        RaiseCriticalStateChanged();
     }
 
     public void DismissAttention()
@@ -105,7 +161,7 @@ internal sealed class BannerService : IBannerService
 
         if (changed)
         {
-            RaiseStateChanged();
+            RaiseAttentionStateChanged();
         }
     }
 
@@ -122,7 +178,7 @@ internal sealed class BannerService : IBannerService
 
         if (removed)
         {
-            RaiseStateChanged();
+            RaiseErrorStateChanged();
         }
     }
 
@@ -139,7 +195,7 @@ internal sealed class BannerService : IBannerService
 
         if (removed)
         {
-            RaiseStateChanged();
+            RaiseInfoStateChanged();
         }
     }
 
@@ -167,7 +223,7 @@ internal sealed class BannerService : IBannerService
             _currentCritical = ex;
         }
 
-        RaiseStateChanged();
+        RaiseCriticalStateChanged();
     }
 
     public BannerId ReportError(string title, string message, string? actionLabel = null, Func<Task>? action = null)
@@ -191,7 +247,7 @@ internal sealed class BannerService : IBannerService
             _errorBanners = _errorBanners.Add(entry);
         }
 
-        RaiseStateChanged();
+        RaiseErrorStateChanged();
         return entry.Id;
     }
 
@@ -204,7 +260,7 @@ internal sealed class BannerService : IBannerService
             _infoBanners = _infoBanners.Add(entry);
         }
 
-        RaiseStateChanged();
+        RaiseInfoStateChanged();
     }
 
     public async Task TryRecoverAsync()
@@ -236,7 +292,7 @@ internal sealed class BannerService : IBannerService
 
         if (cleared)
         {
-            RaiseStateChanged();
+            RaiseCriticalStateChanged();
         }
     }
 
@@ -295,9 +351,12 @@ internal sealed class BannerService : IBannerService
             }
         }
 
+        // Single raise per OnEntriesChanged invocation — even if both `_attentionEntries`
+        // and `_attentionDismissed` flipped inside the same lock, the Attention facet
+        // observers see exactly one StateChanged. Prevents BannerHost double-render.
         if (stateChanged)
         {
-            RaiseStateChanged();
+            RaiseAttentionStateChanged();
         }
     }
 
@@ -321,7 +380,7 @@ internal sealed class BannerService : IBannerService
 
         if (cleared)
         {
-            RaiseStateChanged();
+            RaiseProgressStateChanged();
         }
     }
 
@@ -360,7 +419,7 @@ internal sealed class BannerService : IBannerService
 
         if (next is not null)
         {
-            RaiseStateChanged();
+            RaiseProgressStateChanged();
         }
     }
 
@@ -381,13 +440,34 @@ internal sealed class BannerService : IBannerService
             AssignProgressSlot(args.Scope, entry);
         }
 
-        RaiseStateChanged();
+        RaiseProgressStateChanged();
     }
 
-    private void RaiseStateChanged()
-    {
-        var handler = StateChanged;
+    // Per-facet raisers — single-line delegations to RaiseSafely. String literals
+    // (not nameof) on the eventName argument so each facet's warning log is
+    // distinguishable: nameof(IXyz.StateChanged) collapses to "StateChanged"
+    // for all five, defeating the diagnostic intent of the split.
+    private void RaiseAttentionStateChanged() =>
+        RaiseSafely(AttentionStateChanged, "IAttentionBannerService.StateChanged");
 
+    private void RaiseCriticalStateChanged() =>
+        RaiseSafely(CriticalStateChanged, "ICriticalErrorService.StateChanged");
+
+    private void RaiseErrorStateChanged() =>
+        RaiseSafely(ErrorStateChanged, "IErrorBannerService.StateChanged");
+
+    private void RaiseInfoStateChanged() =>
+        RaiseSafely(InfoStateChanged, "IInfoBannerService.StateChanged");
+
+    private void RaiseProgressStateChanged() =>
+        RaiseSafely(ProgressStateChanged, "IProgressBannerService.StateChanged");
+
+    // Single shared fault-isolation helper. Each facet's RaiseXxxStateChanged
+    // method is a one-line delegation through here so the foreach + try/catch
+    // shape exists exactly once in the file (catalog rule code-duplication-dry
+    // REPEAT-MISS DISCIPLINE — third occurrence avoided).
+    private void RaiseSafely(Action? handler, string eventName)
+    {
         if (handler is null) { return; }
 
         foreach (var subscriber in handler.GetInvocationList())
@@ -399,7 +479,7 @@ internal sealed class BannerService : IBannerService
             catch (Exception ex)
             {
                 SafeLog(() => _traceLogger.Warning(
-                    $"{nameof(BannerService)}.{nameof(StateChanged)}: subscriber threw: {ex}"));
+                    $"{nameof(BannerService)}.{eventName}: subscriber threw: {ex}"));
             }
         }
     }

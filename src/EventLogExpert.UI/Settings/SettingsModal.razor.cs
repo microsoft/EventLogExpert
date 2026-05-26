@@ -37,7 +37,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IAlertDialogService AlertDialogService { get; init; } = null!;
 
-    [Inject] private IBannerService BannerService { get; init; } = null!;
+    [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
 
@@ -51,7 +51,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     [Inject] private IFilePickerService FilePickerService { get; init; } = null!;
 
-    private bool IsAnyUpgradeInFlight => _entriesUpgrading.Count > 0 || BannerService.SettingsProgress is not null;
+    private bool IsAnyUpgradeInFlight => _entriesUpgrading.Count > 0 || ProgressBannerService.SettingsProgress is not null;
 
     private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
 
@@ -70,7 +70,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
             _classificationCts?.Dispose();
             _classificationCts = null;
             DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
-            BannerService.StateChanged -= OnBannerStateChanged;
+            ProgressBannerService.StateChanged -= OnBannerStateChanged;
         }
 
         await base.DisposeAsyncCore(disposing);
@@ -94,7 +94,7 @@ public sealed partial class SettingsModal : ModalBase<bool>
         LoadFromSettings();
 
         DatabaseService.EntriesChanged += OnDatabaseEntriesChanged;
-        BannerService.StateChanged += OnBannerStateChanged;
+        ProgressBannerService.StateChanged += OnBannerStateChanged;
 
         if (!DatabaseService.InitialClassificationTask.IsCompleted)
         {

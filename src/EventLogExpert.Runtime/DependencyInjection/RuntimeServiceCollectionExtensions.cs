@@ -66,7 +66,19 @@ public static class RuntimeServiceCollectionExtensions
 
         // Application services.
         services.AddSingleton<IAppTitleService, AppTitleService>();
-        services.AddSingleton<IBannerService, BannerService>();
+
+        // BannerService is the shared backing store for the 5 banner facets.
+        // Registered once as the concrete type, then each facet interface resolves
+        // back to the same singleton instance. This preserves cross-facet state
+        // invariants (single lock, single backing store) while letting consumers
+        // depend only on the narrow interface they need.
+        services.AddSingleton<BannerService>();
+        services.AddSingleton<IAttentionBannerService>(static sp => sp.GetRequiredService<BannerService>());
+        services.AddSingleton<IProgressBannerService>(static sp => sp.GetRequiredService<BannerService>());
+        services.AddSingleton<ICriticalErrorService>(static sp => sp.GetRequiredService<BannerService>());
+        services.AddSingleton<IErrorBannerService>(static sp => sp.GetRequiredService<BannerService>());
+        services.AddSingleton<IInfoBannerService>(static sp => sp.GetRequiredService<BannerService>());
+
         services.AddSingleton<DebugLogService>();
         services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
         services.AddSingleton<IFileLogger>(static sp => sp.GetRequiredService<DebugLogService>());

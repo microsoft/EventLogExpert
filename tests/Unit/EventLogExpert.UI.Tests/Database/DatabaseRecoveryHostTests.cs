@@ -15,8 +15,9 @@ namespace EventLogExpert.UI.Tests.Database;
 
 public sealed class DatabaseRecoveryHostTests
 {
-    private readonly IBannerService _bannerService = Substitute.For<IBannerService>();
+    private readonly ICriticalErrorService _criticalErrorService = Substitute.For<ICriticalErrorService>();
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
+    private readonly IErrorBannerService _errorBannerService = Substitute.For<IErrorBannerService>();
     private readonly IMainThreadService _mainThreadService = Substitute.For<IMainThreadService>();
     private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
@@ -27,9 +28,9 @@ public sealed class DatabaseRecoveryHostTests
     public DatabaseRecoveryHostTests()
     {
         _databaseService.Entries.Returns([]);
-        _bannerService.ErrorBanners.Returns([]);
+        _errorBannerService.ErrorBanners.Returns([]);
 
-        _bannerService
+        _errorBannerService
             .ReportError(
                 Arg.Any<string>(),
                 Arg.Any<string>(),
@@ -58,21 +59,22 @@ public sealed class DatabaseRecoveryHostTests
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
-        _bannerService.ErrorBanners.Returns(
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
         using var host = CreateHost();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
         // Act — banner disappears externally; host observes via StateChanged, then EntriesChanged for the same set.
-        _bannerService.ErrorBanners.Returns([]);
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _errorBannerService.ErrorBanners.Returns([]);
+        _errorBannerService.StateChanged += Raise.Event<Action>();
 
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -86,15 +88,16 @@ public sealed class DatabaseRecoveryHostTests
         var initialId = BannerId.Create();
         _nextBannerId = initialId;
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
-        _bannerService.ErrorBanners.Returns(
+        _errorBannerService.ErrorBanners.Returns(
             [new ErrorBannerEntry(initialId, "Database upgrade recovery", "...", "Resolve", null,
                 new DateTime(2024, 1, 1, 12, 0, 0, DateTimeKind.Utc))]);
 
         using var host = CreateHost();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
-        _bannerService.ErrorBanners.Returns([]);
-        _bannerService.StateChanged += Raise.Event<Action>();
+        _errorBannerService.ErrorBanners.Returns([]);
+        _errorBannerService.StateChanged += Raise.Event<Action>();
 
         // Act
         var newId = BannerId.Create();
@@ -104,7 +107,7 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "2 databases need recovery from interrupted upgrade.",
             "Resolve",
@@ -122,7 +125,7 @@ public sealed class DatabaseRecoveryHostTests
         await Task.Yield();
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "1 database needs recovery from interrupted upgrade.",
             "Resolve",
@@ -146,7 +149,7 @@ public sealed class DatabaseRecoveryHostTests
         await _capturedRecoveryAction!();
 
         // Assert
-        _bannerService.Received(1).ReportCritical(openFailure);
+        _criticalErrorService.Received(1).ReportCritical(openFailure);
     }
 
     [Fact]
@@ -163,7 +166,7 @@ public sealed class DatabaseRecoveryHostTests
         host.Dispose();
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
+        _errorBannerService.Received(1).DismissError(initialId);
     }
 
     [Fact]
@@ -175,7 +178,8 @@ public sealed class DatabaseRecoveryHostTests
         var host = CreateHost();
 
         host.Dispose();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
         // Act
         _databaseService.Entries.Returns(
@@ -183,8 +187,8 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -206,7 +210,7 @@ public sealed class DatabaseRecoveryHostTests
         host.Dispose();
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
+        _errorBannerService.Received(1).DismissError(initialId);
     }
 
     [Fact]
@@ -221,7 +225,7 @@ public sealed class DatabaseRecoveryHostTests
         host.Dispose();
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
+        _errorBannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
     }
 
     [Fact]
@@ -233,15 +237,16 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         using var host = CreateHost();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
         // Act
         _databaseService.Entries.Returns([]);
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.Received(1).DismissError(initialId);
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -273,13 +278,14 @@ public sealed class DatabaseRecoveryHostTests
             });
 
         using var host = CreateHost();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
         // Act
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.Received(1).ReportCritical(dispatchFailure);
+        _criticalErrorService.Received(1).ReportCritical(dispatchFailure);
     }
 
     [Fact]
@@ -292,7 +298,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         // Assert — ctor's initial DispatchSafely(EvaluateState) already triggered the handler failure path.
-        _bannerService.Received(1).ReportCritical(handlerFailure);
+        _criticalErrorService.Received(1).ReportCritical(handlerFailure);
     }
 
     [Fact]
@@ -313,8 +319,8 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).DismissError(initialId);
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "2 databases need recovery from interrupted upgrade.",
             "Resolve",
@@ -328,14 +334,15 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.Entries.Returns([BuildEntry("a.db", true)]);
 
         using var host = CreateHost();
-        _bannerService.ClearReceivedCalls();
+        _criticalErrorService.ClearReceivedCalls();
+        _errorBannerService.ClearReceivedCalls();
 
         // Act
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().DismissError(Arg.Any<BannerId>());
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -360,8 +367,8 @@ public sealed class DatabaseRecoveryHostTests
         _databaseService.EntriesChanged += Raise.Event<EventHandler>(_databaseService, EventArgs.Empty);
 
         // Assert
-        _bannerService.Received(1).DismissError(initialId);
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).DismissError(initialId);
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "1 database needs recovery from interrupted upgrade.",
             "Resolve",
@@ -379,7 +386,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "2 databases need recovery from interrupted upgrade.",
             "Resolve",
@@ -396,7 +403,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         // Assert
-        _bannerService.Received(1).ReportError(
+        _errorBannerService.Received(1).ReportError(
             "Database upgrade recovery",
             "1 database needs recovery from interrupted upgrade.",
             "Resolve",
@@ -413,7 +420,7 @@ public sealed class DatabaseRecoveryHostTests
         using var host = CreateHost();
 
         // Assert
-        _bannerService.DidNotReceive().ReportError(
+        _errorBannerService.DidNotReceive().ReportError(
             Arg.Any<string>(),
             Arg.Any<string>(),
             Arg.Any<string?>(),
@@ -489,5 +496,5 @@ public sealed class DatabaseRecoveryHostTests
             backupExists);
 
     private DatabaseRecoveryHost CreateHost() =>
-        new(_bannerService, _databaseService, _modalCoordinator, _traceLogger, _mainThreadService);
+        new(_criticalErrorService, _errorBannerService, _databaseService, _modalCoordinator, _traceLogger, _mainThreadService);
 }
