@@ -31,6 +31,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Database;
 using Fluxor;
 using Fluxor.DependencyInjection;
 
@@ -116,6 +117,7 @@ public static class MauiProgram
             provider.GetRequiredService<MauiMenuActionService>());
 
         builder.Services.AddSingleton<KeyboardShortcutService>();
+        builder.Services.AddSingleton<DatabaseRecoveryHost>();
 
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {
@@ -146,6 +148,7 @@ public static class MauiProgram
         var mauiApp = builder.Build();
 
         mauiApp.Services.GetRequiredService<IBannerService>();
+        mauiApp.Services.GetRequiredService<DatabaseRecoveryHost>();
 
         return mauiApp;
     }

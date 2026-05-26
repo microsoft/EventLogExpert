@@ -4,20 +4,20 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Database;
 
-public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDisposable
+public sealed partial class DatabaseRecoveryDialog : ModalBase<bool>
 {
     private readonly HashSet<string> _failedFileNames = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, RecoveryAction> _selectedActions = new(StringComparer.OrdinalIgnoreCase);
 
-    private ModalChrome? _chrome;
+    private bool _disposed;
     private IReadOnlyList<DatabaseEntry> _entries = [];
     private bool _isApplying;
-    private bool _isDismissed;
 
     private enum RecoveryAction
     {
@@ -25,7 +25,7 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
         Delete
     }
 
-    [Parameter] public EventCallback OnDismissed { get; set; }
+    protected override ModalScope Scope => ModalScope.Critical;
 
     [Inject] private IBannerService BannerService { get; init; } = null!;
 
@@ -33,10 +33,15 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public ValueTask DisposeAsync()
+    protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
-        DatabaseService.EntriesChanged -= OnEntriesChanged;
-        return ValueTask.CompletedTask;
+        if (disposing)
+        {
+            _disposed = true;
+            DatabaseService.EntriesChanged -= OnEntriesChanged;
+        }
+
+        await base.DisposeAsyncCore(disposing);
     }
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -47,12 +52,12 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
             {
                 try
                 {
-                    await DismissAsync();
+                    await CompleteAsync(false);
                 }
                 catch (Exception unexpected)
                 {
                     TraceLogger.Error(
-                        $"DatabaseRecoveryDialog deferred empty-set dismiss threw: {unexpected}");
+                        $"{nameof(DatabaseRecoveryDialog)} deferred empty-set dismiss threw: {unexpected}");
                 }
             });
         }
@@ -67,6 +72,9 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
 
         base.OnInitialized();
     }
+
+    protected override Task<bool> OnRequestCloseAsync(ModalCloseRequest request) =>
+        Task.FromResult(!_isApplying);
 
     private async Task ApplyAsync()
     {
@@ -107,13 +115,13 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
                 catch (InvalidOperationException invalidOperation)
                 {
                     TraceLogger.Warning(
-                        $"DatabaseRecoveryDialog: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
+                        $"{nameof(DatabaseRecoveryDialog)}: skipped '{fileName}' ({action}) — {invalidOperation.Message}");
                     continue;
                 }
                 catch (Exception unexpected)
                 {
                     TraceLogger.Error(
-                        $"DatabaseRecoveryDialog.ApplyAsync threw for '{fileName}' ({action}): {unexpected}");
+                        $"{nameof(DatabaseRecoveryDialog)}.{nameof(ApplyAsync)} threw for '{fileName}' ({action}): {unexpected}");
                     success = false;
                 }
 
@@ -132,7 +140,8 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
         finally
         {
             _isApplying = false;
-            StateHasChanged();
+
+            if (!_disposed) { StateHasChanged(); }
         }
     }
 
@@ -144,28 +153,6 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
         }
     }
 
-    private async Task DismissAsync()
-    {
-        if (_isDismissed) { return; }
-
-        _isDismissed = true;
-
-        try
-        {
-            if (_chrome is not null)
-            {
-                await _chrome.CloseAsync();
-            }
-        }
-        finally
-        {
-            await OnDismissed.InvokeAsync();
-        }
-    }
-
-    private Task HandleCancelOrEscAsync() =>
-        _isApplying ? Task.CompletedTask : DismissAsync();
-
     private async Task HandleEntriesChangedAsync()
     {
         try
@@ -174,7 +161,8 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
 
             if (_entries.Count == 0)
             {
-                await DismissAsync();
+                await CompleteAsync(false);
+
                 return;
             }
 
@@ -183,7 +171,7 @@ public sealed partial class DatabaseRecoveryDialog : ComponentBase, IAsyncDispos
         catch (Exception unexpected)
         {
             TraceLogger.Error(
-                $"DatabaseRecoveryDialog.HandleEntriesChangedAsync threw: {unexpected}");
+                $"{nameof(DatabaseRecoveryDialog)}.{nameof(HandleEntriesChangedAsync)} threw: {unexpected}");
         }
     }
 
