@@ -1,0 +1,30 @@
+<aside class="banner banner-critical" role="alert">
+    <span class="banner-message">An unexpected error occurred: @Critical.GetType().Name: @Critical.Message</span>
+
+    <div class="banner-actions">
+        <button class="button" @onclick="OnReloadClickedAsync" @ref="_reloadButtonRef" type="button">
+            <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Reload
+        </button>
+        <button class="button" @onclick="OnRelaunchClickedAsync" type="button">
+            <i aria-hidden="true" class="bi bi-power"></i> Relaunch
+        </button>
+        <button class="button" @onclick="() => OnCopyDetailsClickedAsync(Critical)" type="button">
+            <i aria-hidden="true" class="bi bi-clipboard"></i> Copy details
+        </button>
+    </div>
+
+    <div class="banner-feedback" role="status">
+        @if (_showCopiedFeedback)
+        {
+            <span class="banner-chip">Copied</span>
+        }
+        @if (!string.IsNullOrEmpty(_recoveryFailureMessage))
+        {
+            <span class="banner-subtitle">@_recoveryFailureMessage</span>
+        }
+        @if (!string.IsNullOrEmpty(_restartFailureMessage))
+        {
+            <span class="banner-subtitle">@_restartFailureMessage</span>
+        }
+    </div>
+</aside>
