@@ -119,7 +119,6 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<IAlertDialogService>(static provider =>
         {
-            var modalService = provider.GetRequiredService<IModalService>();
             var modalCoordinator = provider.GetRequiredService<IModalCoordinator>();
             var mainThreadService = provider.GetRequiredService<IMainThreadService>();
             var bannerService = provider.GetRequiredService<IBannerService>();
@@ -128,12 +127,19 @@ public static class MauiProgram
                 modalCoordinator,
                 mainThreadService,
                 bannerService,
-                parameters => modalService.Show<AlertModal, bool>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value)),
                 async parameters =>
                 {
-                    string? result = await modalService.Show<PromptModal, string>(parameters.ToDictionary(static kvp => kvp.Key, static kvp => kvp.Value));
+                    ModalOpenResult<bool> result = await modalCoordinator.PushAsync<AlertModal, bool>(
+                        parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
 
-                    return result ?? string.Empty;
+                    return result is { WasOpened: true, Result: true };
+                },
+                async parameters =>
+                {
+                    ModalOpenResult<string> result = await modalCoordinator.PushAsync<PromptModal, string>(
+                        parameters as IDictionary<string, object?> ?? new Dictionary<string, object?>(parameters));
+
+                    return result.WasOpened ? result.Result ?? string.Empty : string.Empty;
                 });
         });
 
