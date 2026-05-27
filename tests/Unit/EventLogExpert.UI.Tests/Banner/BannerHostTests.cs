@@ -111,6 +111,50 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
+    public async Task BannerHost_CycleNextAndPrev_AcrossThreeInfoBanners_UpdatesDisplayedEntryAndPagination()
+    {
+        // #526 Bug 1 regression guard. The chevron-display staleness reproduces only in MAUI Blazor
+        // WebView; bUnit's synchronous renderer re-evaluates the parent expression on every click, so
+        // this PASSES today. Kept to document the render-pipeline contract — pagination text and the
+        // rendered Entry must both advance on every click — and to catch any future regression that
+        // breaks that contract in bUnit. The MAUI-specific rendering bug is tracked separately; do NOT
+        // add speculative production fixes (StateHasChanged / @key) on the basis of this test alone.
+        var i0 = new BannerInfoEntry(BannerId.Create(), "First", "first message", BannerSeverity.Info, DateTime.UtcNow);
+        var i1 = new BannerInfoEntry(BannerId.Create(), "Second", "second message", BannerSeverity.Info, DateTime.UtcNow);
+        var i2 = new BannerInfoEntry(BannerId.Create(), "Third", "third message", BannerSeverity.Info, DateTime.UtcNow);
+        _infoBannerService.InfoBanners.Returns([i0, i1, i2]);
+
+        var component = Render<BannerHost>();
+
+        Assert.Contains("First: first message", component.Find("aside.banner-info").TextContent);
+        Assert.Equal("1 of 3", component.Find(".banner-pagination").TextContent.Trim());
+
+        await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("Second: second message", component.Find("aside.banner-info").TextContent);
+        Assert.DoesNotContain("First", component.Find("aside.banner-info").TextContent);
+        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+
+        await component.Find("button.banner-cycle-next").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("Third: third message", component.Find("aside.banner-info").TextContent);
+        Assert.DoesNotContain("Second", component.Find("aside.banner-info").TextContent);
+        Assert.Equal("3 of 3", component.Find(".banner-pagination").TextContent.Trim());
+
+        await component.Find("button.banner-cycle-prev").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("Second: second message", component.Find("aside.banner-info").TextContent);
+        Assert.DoesNotContain("Third", component.Find("aside.banner-info").TextContent);
+        Assert.Equal("2 of 3", component.Find(".banner-pagination").TextContent.Trim());
+
+        await component.Find("button.banner-cycle-prev").ClickAsync(new MouseEventArgs());
+
+        Assert.Contains("First: first message", component.Find("aside.banner-info").TextContent);
+        Assert.DoesNotContain("Second", component.Find("aside.banner-info").TextContent);
+        Assert.Equal("1 of 3", component.Find(".banner-pagination").TextContent.Trim());
+    }
+
+    [Fact]
     public async Task BannerHost_CycleNextAtLast_DisabledAndDoesNotAdvance()
     {
         _errorBannerService.ErrorBanners.Returns(
