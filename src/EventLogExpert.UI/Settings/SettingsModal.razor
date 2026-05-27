@@ -59,6 +59,7 @@
                             <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
                                 Entry="@entry"
                                 IsClassificationPending="@IsClassificationPending"
+                                IsTogglePending="@_pendingToggles.ContainsKey(entry.FileName)"
                                 IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !Coordinator.IsUpgradeInFlight(entry.FileName))"
                                 IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
                                 @key="entry.FileName"

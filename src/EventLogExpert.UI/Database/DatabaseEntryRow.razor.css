@@ -13,16 +13,16 @@
     align-items: center;
     gap: 1rem;
 
-    /* No left padding: the visible left indent lives on .db-entry-info so the
-       content layer's left edge butts up against the trash strip when slid.
-       Background matches the modal chrome (var(--background-dark)) so rows
-       blend visually but the opaque fill is still required to cover the
-       absolutely-positioned trash button underneath at rest. The trash
-       button is rendered earlier in the DOM than this element, so this
-       element paints above it via source order without needing z-index --
-       which also keeps rows below dialog-level overlays (e.g. inline alerts). */
-    padding: .15rem .5rem .15rem 0;
+    /* DOM order is now name-info → actions → trash-remove (last). The trash button is a
+       LATER sibling than .db-entry-row-content but must paint UNDER it at rest. z-index:1
+       promotes content into painting group 7 above trash's group 6 (where z-index:0/auto
+       siblings paint in tree order). Without this, the later-in-DOM trash would obscure
+       the leftmost 2.5rem of the row at rest. Background fill remains required to cover
+       the absolutely-positioned trash strip underneath; z-index alone wouldn't be enough
+       if the content were transparent. */
+    padding: .25rem .5rem .25rem 0;
     background-color: var(--background-dark);
+    z-index: 1;
 
     transition: transform 200ms ease;
 }
@@ -152,4 +152,13 @@
 @keyframes db-entry-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+
+.db-entry-actions ::deep .toggle {
+    border-radius: 4px;
+}
+
+.db-entry-actions--pending ::deep .toggle {
+    box-shadow: 0 0 0 1px var(--clr-lightblue);
 }

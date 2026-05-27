@@ -113,6 +113,33 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_DOMOrder_NameInfoPrecedesActionsPrecedesRemove()
+    {
+        // Arrange — guard the keyboard tab-order contract: name button must come before
+        // the toggle/upgrade action, which must come before the trash. The trash stays
+        // visually pinned to the left edge via CSS (position:absolute; left:0), so this
+        // DOM contract decouples a11y/tab order from visual layout.
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        // Act
+        var component = RenderRow(entry);
+
+        // Assert
+        var row = component.Find(".db-entry-row");
+        var children = row.Children;
+
+        Assert.Equal(2, children.Length);
+        Assert.Contains("db-entry-row-content", children[0].GetAttribute("class") ?? string.Empty);
+        Assert.Contains("db-entry-remove-btn", children[1].GetAttribute("class") ?? string.Empty);
+
+        var content = children[0];
+        var contentChildren = content.Children;
+        Assert.Equal(2, contentChildren.Length);
+        Assert.Contains("db-entry-info", contentChildren[0].GetAttribute("class") ?? string.Empty);
+        Assert.Contains("db-entry-actions", contentChildren[1].GetAttribute("class") ?? string.Empty);
+    }
+
+    [Fact]
     public void Render_FileName_AppearsInRow()
     {
         // Arrange
@@ -206,6 +233,54 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Classifying\u2026", badge.TextContent);
         Assert.Equal("NotClassified", badge.GetAttribute("data-badge"));
+    }
+
+    [Fact]
+    public void Render_PendingToggle_AppendsAriaLabelSuffix()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.Ready, "provider-y.db");
+
+        // Act
+        var component = RenderRow(entry, effectiveEnabled: false, isTogglePending: true);
+
+        // Assert
+        var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
+        Assert.Equal("Database provider-y.db (pending toggle, unsaved)", radiogroup.GetAttribute("aria-label"));
+    }
+
+    [Fact]
+    public void Render_PendingToggle_AppliesIndicatorClass()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        // Act
+        var component = RenderRow(entry, effectiveEnabled: false, isTogglePending: true);
+
+        // Assert
+        var actions = component.Find(".db-entry-actions");
+        Assert.Contains("db-entry-actions--pending", actions.GetAttribute("class") ?? string.Empty);
+    }
+
+    [Fact]
+    public void Render_PendingToggleOnDisabledToggle_DoesNotShowIndicator()
+    {
+        // Arrange — NotClassified routes to ActionKind.DisabledToggle (the toggle renders
+        // but is disabled while classification is still in flight). Even if upstream marks
+        // the row as pending, the indicator (and SR suffix) should be suppressed so the
+        // announcement isn't misleading on a control the user can't actually flip.
+        var entry = MakeEntry(DatabaseStatus.NotClassified, "provider-z.db");
+
+        // Act
+        var component = RenderRow(entry, isTogglePending: true);
+
+        // Assert
+        var actions = component.Find(".db-entry-actions");
+        Assert.DoesNotContain("db-entry-actions--pending", actions.GetAttribute("class") ?? string.Empty);
+
+        var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
+        Assert.Equal("Database provider-z.db", radiogroup.GetAttribute("aria-label"));
     }
 
     [Fact]
@@ -433,11 +508,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
         bool isClassificationPending = false,
         bool isUpgrading = false,
         bool isUpgradeBlocked = false,
-        bool effectiveEnabled = false) =>
+        bool effectiveEnabled = false,
+        bool isTogglePending = false) =>
         Render<DatabaseEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
             .Add(p => p.IsClassificationPending, isClassificationPending)
             .Add(p => p.IsUpgrading, isUpgrading)
             .Add(p => p.IsUpgradeBlocked, isUpgradeBlocked)
-            .Add(p => p.EffectiveEnabled, effectiveEnabled));
+            .Add(p => p.EffectiveEnabled, effectiveEnabled)
+            .Add(p => p.IsTogglePending, isTogglePending));
 }

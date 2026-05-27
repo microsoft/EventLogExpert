@@ -1,12 +1,5 @@
 <div class="db-entry-row @(_isMouseRevealed ? "db-entry-row--revealed" : null)"
     @onmouseleave="HandleRowMouseLeave">
-    <button aria-label="@($"Remove database {Entry.FileName}")"
-        class="button button-red db-entry-remove-btn"
-        @onclick="@(() => OnRemove.InvokeAsync())"
-        type="button">
-        <i aria-hidden="true" class="bi bi-trash"></i>
-    </button>
-
     <div class="db-entry-row-content">
         <div class="db-entry-info">
             <button class="db-entry-name" @onclick="HandleNameClick" type="button">@Entry.FileName</button>
@@ -16,12 +9,12 @@
             }
         </div>
 
-        <div class="db-entry-actions">
+        <div class="db-entry-actions @(ShowPendingIndicator ? "db-entry-actions--pending" : null)">
             @switch (PrimaryAction)
             {
                 case ActionKind.Toggle:
                 case ActionKind.DisabledToggle:
-                    <BooleanSelect AriaLabel="@($"Database {Entry.FileName}")"
+                    <BooleanSelect AriaLabel="@ToggleAriaLabel"
                         Disabled="@(PrimaryAction == ActionKind.DisabledToggle)"
                         Value="EffectiveEnabled"
                         ValueChanged="@(_ => OnToggle.InvokeAsync())" />
@@ -57,4 +50,11 @@
             }
         </div>
     </div>
+
+    <button aria-label="@($"Remove database {Entry.FileName}")"
+        class="button button-red db-entry-remove-btn"
+        @onclick="@(() => OnRemove.InvokeAsync())"
+        type="button">
+        <i aria-hidden="true" class="bi bi-trash"></i>
+    </button>
 </div>
