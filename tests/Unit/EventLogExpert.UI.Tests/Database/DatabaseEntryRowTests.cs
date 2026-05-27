@@ -305,6 +305,17 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_ToggleAriaLabel_UsesDatabasePrefixForBooleanSelectConcatenation()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready, "provider-x.db");
+
+        var component = RenderRow(entry, effectiveEnabled: false);
+
+        var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
+        Assert.Equal("Database provider-x.db", radiogroup.GetAttribute("aria-label"));
+    }
+
+    [Fact]
     public void Render_UpgradeFailedEntry_ShowsRetryButton_AndRedBadge()
     {
         // Arrange

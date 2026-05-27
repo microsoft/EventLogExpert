@@ -1,0 +1,10 @@
+.settings-databases-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    padding: 0.5rem;
+    line-height: 1.4;
+}
+
+.settings-databases-empty strong {
+    color: var(--text-primary);
+}

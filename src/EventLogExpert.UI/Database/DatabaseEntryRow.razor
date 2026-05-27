@@ -21,7 +21,7 @@
             {
                 case ActionKind.Toggle:
                 case ActionKind.DisabledToggle:
-                    <BooleanSelect AriaLabel="@Entry.FileName"
+                    <BooleanSelect AriaLabel="@($"Database {Entry.FileName}")"
                         Disabled="@(PrimaryAction == ActionKind.DisabledToggle)"
                         Value="EffectiveEnabled"
                         ValueChanged="@(_ => OnToggle.InvokeAsync())" />
