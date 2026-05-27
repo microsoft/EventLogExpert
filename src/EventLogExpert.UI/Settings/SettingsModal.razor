@@ -62,9 +62,9 @@
                                 OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
                         }
                     }
-                    else
+                    else if (!IsClassificationPending)
                     {
-                        <p>None</p>
+                        <SettingsDatabasesEmptyState />
                     }
                 </div>
 
