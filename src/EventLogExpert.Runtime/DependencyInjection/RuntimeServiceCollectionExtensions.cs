@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Files;
@@ -82,6 +83,8 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<ICriticalErrorService>(static sp => sp.GetRequiredService<BannerService>());
         services.AddSingleton<IErrorBannerService>(static sp => sp.GetRequiredService<BannerService>());
         services.AddSingleton<IInfoBannerService>(static sp => sp.GetRequiredService<BannerService>());
+
+        services.AddSingleton<IAnnouncementService, AnnouncementService>();
 
         services.AddSingleton<DebugLogService>();
         services.AddSingleton<ITraceLogger>(static sp => sp.GetRequiredService<DebugLogService>());
