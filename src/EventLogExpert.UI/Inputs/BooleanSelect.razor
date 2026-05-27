@@ -1,6 +1,6 @@
 @inherits InputComponent<bool>
 
-<div aria-label="@AriaLabel" class="toggle" role="radiogroup">
+<div aria-label="@(string.IsNullOrEmpty(AriaLabel) ? null : AriaLabel)" class="toggle" role="radiogroup">
     <input aria-label="@AriaLabel @DisabledString" checked="@(!Value)" disabled="@Disabled" id="@($"{Id}_false")" name="@Id" @onchange="UpdateValue" type="radio" value="false" />
     <label data-use-status-colors="@UseStatusColors.ToString().ToLower()" for="@($"{Id}_false")">@DisabledString</label>
 

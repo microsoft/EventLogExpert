@@ -31,6 +31,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
 
     [Parameter] public string? DataHighlight { get; set; }
 
+    [Parameter] public string? Id { get; set; }
+
     /// <summary>
     ///     Text shown by a multi-select <see cref="ValueSelect{T}" /> when no values are selected. Defaults to "Empty";
     ///     consumers should override with a domain-appropriate label such as "All" when an empty selection means "no filter

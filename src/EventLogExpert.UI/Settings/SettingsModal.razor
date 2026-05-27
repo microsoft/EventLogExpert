@@ -21,8 +21,8 @@
                 <SettingsUpgradeProgressBanner />
 
                 <div class="flex-center-aligned-row tz-row">
-                    <text>Time Zone:</text>
-                    <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
+                    <label for="settings-timezone">Time Zone:</label>
+                    <ValueSelect @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" Id="settings-timezone" T="string">
                         @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
                         {
                             <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
@@ -30,10 +30,15 @@
                     </ValueSelect>
                 </div>
 
+                <h3 class="visually-hidden">Databases</h3>
                 <div class="flex-space-between">
                     <div>Databases:</div>
 
-                    <button class="button" @onclick="ImportDatabase" type="button">
+                    <button class="button"
+                        id="settings-import-button"
+                        @onclick="ImportDatabase"
+                        @ref="_importButtonRef"
+                        type="button">
                         <i aria-hidden="true" class="bi bi-plus-circle"></i> Import Database
                     </button>
                 </div>
@@ -68,14 +73,15 @@
                     }
                 </div>
 
+                <h3 class="visually-hidden">Preferences</h3>
                 <div class="flex-center-aligned-row">
                     <text>Expand Display Pane On Selection Change:</text>
                     <BooleanSelect AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
                 </div>
 
                 <div class="flex-center-aligned-row">
-                    <text>Theme:</text>
-                    <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
+                    <label for="settings-theme">Theme:</label>
+                    <ValueSelect @bind-Value="_theme" CssClass="input filter-dropdown" Id="settings-theme" T="Theme">
                         @foreach (Theme item in Enum.GetValues(typeof(Theme)))
                         {
                             <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
@@ -84,8 +90,8 @@
                 </div>
 
                 <div class="flex-center-aligned-row">
-                    <text>Keyboard Copy Behavior:</text>
-                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyFormat" CssClass="input filter-dropdown" T="EventCopyFormat">
+                    <label for="settings-copy-format">Keyboard Copy Behavior:</label>
+                    <ValueSelect @bind-Value="_copyFormat" CssClass="input filter-dropdown" Id="settings-copy-format" T="EventCopyFormat">
                         @foreach (EventCopyFormat item in Enum.GetValues(typeof(EventCopyFormat)))
                         {
                             <ValueSelectItem T="EventCopyFormat" Value="item" />
@@ -94,8 +100,8 @@
                 </div>
 
                 <div class="flex-center-aligned-row">
-                    <text>Logging Level:</text>
-                    <ValueSelect AriaLabel="Logging Level" @bind-Value="_logLevel" CssClass="input filter-dropdown" T="LogLevel">
+                    <label for="settings-log-level">Logging Level:</label>
+                    <ValueSelect @bind-Value="_logLevel" CssClass="input filter-dropdown" Id="settings-log-level" T="LogLevel">
                         @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
                         {
                             <ValueSelectItem T="LogLevel" Value="item" />
