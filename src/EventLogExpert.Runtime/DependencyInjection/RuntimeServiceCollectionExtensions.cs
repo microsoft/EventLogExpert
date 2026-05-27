@@ -38,6 +38,10 @@ public static class RuntimeServiceCollectionExtensions
     ///             <c>AddEventLogProviderDatabase()</c> — database sub-services depend on
     ///             <c>IProviderDatabaseMaintenance</c>.
     ///         </item>
+    ///         <item>
+    ///             <c>IFilePickerService</c> — <c>DatabaseOperationCoordinator</c> depends on it for Import.
+    ///             Host registers a concrete implementation (e.g., <c>MauiFilePickerService</c>).
+    ///         </item>
     ///     </list>
     ///     Omitting any of these produces a DI resolution failure when the dependent services are first activated.
     /// </summary>
@@ -131,5 +135,7 @@ public static class RuntimeServiceCollectionExtensions
         services.AddSingleton<DatabaseService>();
         services.AddSingleton<IDatabaseService>(static sp => sp.GetRequiredService<DatabaseService>());
         services.AddSingleton<IActiveDatabases>(static sp => sp.GetRequiredService<DatabaseService>());
+
+        services.AddSingleton<IDatabaseOperationCoordinator, DatabaseOperationCoordinator>();
     }
 }
