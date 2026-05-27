@@ -32,6 +32,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     [Parameter] public bool IsClassificationPending { get; set; }
 
+    [Parameter] public bool IsTogglePending { get; set; }
+
     [Parameter] public bool IsUpgradeBlocked { get; set; }
 
     [Parameter] public bool IsUpgrading { get; set; }
@@ -73,6 +75,12 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         (!IsUpgrading &&
             Entry.Status != DatabaseStatus.Ready &&
             Entry.Status != DatabaseStatus.UpgradeRequired);
+
+    private bool ShowPendingIndicator => IsTogglePending && PrimaryAction != ActionKind.DisabledToggle;
+
+    private string ToggleAriaLabel => ShowPendingIndicator
+        ? $"Database {Entry.FileName} (pending toggle, unsaved)"
+        : $"Database {Entry.FileName}";
 
     private void HandleNameClick() => _isMouseRevealed = true;
 
