@@ -1719,7 +1719,8 @@ public sealed class EffectsTests
             eventLogState,
             logger,
             closeCoordinator,
-            dispatcher);
+            dispatcher,
+            Substitute.For<IEventLogCommands>());
 
         return new EffectsHarness(
             filtering,

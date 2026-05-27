@@ -69,10 +69,24 @@ function Switch-DockerDaemon([string]$targetOS) {
         throw "docker is not on PATH. Install Docker Desktop and ensure it is available."
     }
 
-    $dockerCli = Join-Path (Split-Path (Split-Path $dockerCmd.Source)) "DockerCli.exe"
+    # Docker Desktop layout has changed across versions: newer installs put DockerCli.exe at
+    # 'C:\Program Files\Docker\Docker\DockerCli.exe', older installs at '...\resources\DockerCli.exe'.
+    # Try the canonical sibling-of-resources path first (newer layout), then the older
+    # resources-relative path, then a recursive scan.
+    $resourcesDir = Split-Path (Split-Path $dockerCmd.Source)
+    $dockerCli = Join-Path (Split-Path $resourcesDir) "DockerCli.exe"
 
     if (-not (Test-Path $dockerCli)) {
-        throw "DockerCli.exe not found at '$dockerCli'. Cannot switch Docker daemon mode."
+        $dockerCli = Join-Path $resourcesDir "DockerCli.exe"
+    }
+
+    if (-not (Test-Path $dockerCli)) {
+        $found = Get-ChildItem (Split-Path $resourcesDir) -Recurse -Filter "DockerCli.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($found) { $dockerCli = $found.FullName }
+    }
+
+    if (-not (Test-Path $dockerCli)) {
+        throw "DockerCli.exe not found near '$resourcesDir'. Cannot switch Docker daemon mode."
     }
 
     & $dockerCli -SwitchDaemon 2>$null
