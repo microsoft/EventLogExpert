@@ -4,6 +4,7 @@
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Resolution;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.AppTitle;
 using EventLogExpert.Runtime.Common.Files;
@@ -115,6 +116,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(ICriticalErrorService))]
     [InlineData(typeof(IErrorBannerService))]
     [InlineData(typeof(IInfoBannerService))]
+    [InlineData(typeof(IAnnouncementService))]
     [InlineData(typeof(IDatabaseService))]
     [InlineData(typeof(IActiveDatabases))]
     [InlineData(typeof(IDatabaseOperationCoordinator))]

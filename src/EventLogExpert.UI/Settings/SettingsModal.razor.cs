@@ -3,6 +3,7 @@
 
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Database;
@@ -32,6 +33,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
     private Theme _theme;
     private string _timeZoneId = string.Empty;
 
+    [Inject] private IAnnouncementService AnnouncementService { get; init; } = null!;
+
     [Inject] private IDatabaseOperationCoordinator Coordinator { get; init; } = null!;
 
     [Inject] private IDatabaseService DatabaseService { get; init; } = null!;
@@ -52,6 +55,12 @@ public sealed partial class SettingsModal : ModalBase<bool>
     [Inject] private ISettingsService Settings { get; init; } = null!;
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
+
+    /// <summary>
+    ///     Test-only seam. <see cref="SettingsModalTests" /> invoke this instead of routing through the ModalChrome
+    ///     footer markup, which would couple tests to chrome button class names.
+    /// </summary>
+    internal Task InvokeOnSaveAsyncForTests() => OnSaveAsync();
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
@@ -116,23 +125,12 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
     protected override async Task OnSaveAsync()
     {
-        if (IsCloseBlocked) { return; }
+        if (await SaveSettingsAsync())
+        {
+            AnnouncementService.Announce("Settings saved");
 
-        var snapshot = _pendingToggles.Keys.ToArray();
-        _pendingToggles.Clear();
-
-        await Coordinator.ApplyPendingTogglesAsync(snapshot);
-
-        if (_disposed) { return; }
-
-        Settings.CopyFormat = _copyFormat;
-        Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
-        Settings.LogLevel = _logLevel;
-        DetailsPanePreferences.DisplayPaneSelectionPreference = _showDisplayPaneOnSelectionChange;
-        Settings.Theme = _theme;
-        Settings.TimeZoneId = _timeZoneId;
-
-        await CompleteAsync(true);
+            await CompleteAsync(true);
+        }
     }
 
     private async Task<bool> AskOverwriteAsync(string fileName, CancellationToken cancellationToken)
@@ -165,12 +163,14 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         if (_disposed) { return; }
 
-        if (outcome.DatabaseStateChanged)
+        if (outcome.DatabaseStateChanged && await SaveSettingsAsync())
         {
-            try { await InvokeAsync(OnSaveAsync); }
+            AnnouncementService.Announce("Database imported");
+
+            try { await CompleteAsync(true); }
             catch (ObjectDisposedException)
             {
-                // Modal torn down between the _disposed check and the dispatcher call; safe to ignore.
+                // Modal torn down between the _disposed check and CompleteAsync; safe to ignore.
             }
         }
     }
@@ -306,6 +306,27 @@ public sealed partial class SettingsModal : ModalBase<bool>
         {
             _databaseStateChanged = true;
         }
+    }
+
+    private async Task<bool> SaveSettingsAsync()
+    {
+        if (IsCloseBlocked) { return false; }
+
+        var snapshot = _pendingToggles.Keys.ToArray();
+        _pendingToggles.Clear();
+
+        await Coordinator.ApplyPendingTogglesAsync(snapshot);
+
+        if (_disposed) { return false; }
+
+        Settings.CopyFormat = _copyFormat;
+        Settings.IsPreReleaseEnabled = _isPreReleaseEnabled;
+        Settings.LogLevel = _logLevel;
+        DetailsPanePreferences.DisplayPaneSelectionPreference = _showDisplayPaneOnSelectionChange;
+        Settings.Theme = _theme;
+        Settings.TimeZoneId = _timeZoneId;
+
+        return true;
     }
 
     private void ToggleDatabase(string fileName)

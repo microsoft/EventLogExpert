@@ -3,6 +3,7 @@
 
 using Bunit;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.DetailsPane;
@@ -11,6 +12,7 @@ using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Settings;
 using Fluxor;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -18,6 +20,7 @@ namespace EventLogExpert.UI.Tests.Settings;
 
 public sealed class SettingsModalTests : BunitContext
 {
+    private readonly IAnnouncementService _announcementService = Substitute.For<IAnnouncementService>();
     private readonly IDatabaseOperationCoordinator _coordinator = Substitute.For<IDatabaseOperationCoordinator>();
     private readonly IDatabaseService _databaseService = Substitute.For<IDatabaseService>();
     private readonly IDetailsPanePreferencesProvider _detailsPanePreferences = Substitute.For<IDetailsPanePreferencesProvider>();
@@ -37,6 +40,7 @@ public sealed class SettingsModalTests : BunitContext
         _progressBannerService.SettingsProgress.Returns((BannerProgressEntry?)null);
         _settings.TimeZoneId.Returns(string.Empty);
 
+        Services.AddSingleton(_announcementService);
         Services.AddSingleton(_coordinator);
         Services.AddSingleton(_databaseService);
         Services.AddSingleton(_detailsPanePreferences);
@@ -75,6 +79,22 @@ public sealed class SettingsModalTests : BunitContext
     }
 
     [Fact]
+    public async Task SettingsModal_ImportSuccess_AnnouncesDatabaseImportedNotSettingsSaved()
+    {
+        // ImportOutcome positional ctor: ImportedCount=1 yields DatabaseStateChanged=true via the
+        // computed property. The split SaveSettingsAsync/announce paths ensure import announces
+        // "Database imported" (not "Settings saved") so SR users hear the user-initiated action.
+        _coordinator.ImportAsync(Arg.Any<Func<string, CancellationToken, Task<bool>>?>(), Arg.Any<CancellationToken>())
+            .Returns(new ImportOutcome(1, [], []));
+
+        var component = Render<SettingsModal>();
+        await component.Find("#settings-import-button").ClickAsync(new MouseEventArgs());
+
+        _announcementService.Received(1).Announce("Database imported");
+        _announcementService.DidNotReceive().Announce("Settings saved");
+    }
+
+    [Fact]
     public void SettingsModal_NoDatabasesAndClassificationComplete_RendersEmptyStateChild()
     {
         var component = Render<SettingsModal>();
@@ -92,6 +112,16 @@ public sealed class SettingsModalTests : BunitContext
 
         Assert.Empty(component.FindAll(".settings-databases-empty"));
         Assert.Single(component.FindAll(".classification-pending"));
+    }
+
+    [Fact]
+    public async Task SettingsModal_OnSaveSuccess_AnnouncesSettingsSaved()
+    {
+        var component = Render<SettingsModal>();
+        // Internal test-only forwarder bypasses ModalChrome footer markup coupling.
+        await component.InvokeAsync(() => component.Instance.InvokeOnSaveAsyncForTests());
+
+        _announcementService.Received(1).Announce("Settings saved");
     }
 
     [Fact]
