@@ -13,6 +13,7 @@ using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Modal;
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
+using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Settings;
 
@@ -20,10 +21,11 @@ public sealed partial class SettingsModal : ModalBase<bool>
 {
     private readonly Dictionary<string, bool> _pendingToggles = new(StringComparer.OrdinalIgnoreCase);
 
-    private CancellationTokenSource? _classificationCts;
+    private CancellationTokenSource? _classificationObservationCts;
     private EventCopyFormat _copyFormat;
     private bool _databaseStateChanged;
     private volatile bool _disposed;
+    private ElementReference _importButtonRef;
     private bool _isPreReleaseEnabled;
     private LogLevel _logLevel;
     private bool _showDisplayPaneOnSelectionChange;
@@ -56,15 +58,30 @@ public sealed partial class SettingsModal : ModalBase<bool>
         if (disposing)
         {
             _disposed = true;
-            _classificationCts?.CancelAsync();
-            _classificationCts?.Dispose();
-            _classificationCts = null;
+            _classificationObservationCts?.CancelAsync();
+            _classificationObservationCts?.Dispose();
+            _classificationObservationCts = null;
             DatabaseService.EntriesChanged -= OnDatabaseEntriesChanged;
             ProgressBannerService.StateChanged -= OnBannerStateChanged;
             Coordinator.UpgradeStateChanged -= OnCoordinatorStateChanged;
         }
 
         await base.DisposeAsyncCore(disposing);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && !_disposed)
+        {
+            try
+            {
+                await _importButtonRef.FocusAsync(preventScroll: true);
+            }
+            catch (ObjectDisposedException) { /* renderer disposed during dispatch; safe to ignore */ }
+            catch (JSException) { /* element absent or detached between dispatch and call */ }
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
     }
 
     protected override async Task OnClosingAsync()
@@ -87,8 +104,8 @@ public sealed partial class SettingsModal : ModalBase<bool>
 
         if (!DatabaseService.InitialClassificationTask.IsCompleted)
         {
-            _classificationCts = new CancellationTokenSource();
-            _ = ObserveClassificationCompletionAsync(_classificationCts.Token);
+            _classificationObservationCts = new CancellationTokenSource();
+            _ = ObserveClassificationCompletionAsync(_classificationObservationCts.Token);
         }
 
         base.OnInitialized();
