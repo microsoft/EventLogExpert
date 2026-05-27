@@ -5,6 +5,7 @@ using EventLogExpert.Eventing.Common.Channels;
 using EventLogExpert.Eventing.Common.EventLogs;
 using EventLogExpert.Logging.Abstractions;
 using Fluxor;
+using System.Runtime.ExceptionServices;
 using IDispatcher = Fluxor.IDispatcher;
 
 namespace EventLogExpert.Runtime.EventLog;
@@ -13,18 +14,24 @@ internal sealed class DatabaseCoordinationEffects(
     IState<EventLogState> eventLogState,
     ITraceLogger logger,
     LogCloseCoordinator closeCoordinator,
-    IDispatcher dispatcher) : ILogReloadCoordinator
+    IDispatcher dispatcher,
+    IEventLogCommands eventLogCommands) : ILogReloadCoordinator
 {
     private readonly LogCloseCoordinator _closeCoordinator = closeCoordinator;
     private readonly IDispatcher _dispatcher = dispatcher;
+    private readonly IEventLogCommands _eventLogCommands = eventLogCommands;
     private readonly IState<EventLogState> _eventLogState = eventLogState;
     private readonly ITraceLogger _logger = logger;
+
+    public bool HasActiveLogs => !_eventLogState.Value.ActiveLogs.IsEmpty;
 
     public async Task PrepareForDatabaseRemovalAsync(
         LogReopenSnapshot snapshot,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(snapshot);
+
+        cancellationToken.ThrowIfCancellationRequested();
 
         var activeLogs = _eventLogState.Value.ActiveLogs.Values.ToList();
 
@@ -66,7 +73,7 @@ internal sealed class DatabaseCoordinationEffects(
                 _dispatcher.Dispatch(new CloseLogAction(id, name));
             }
 
-            foreach (var (id, name, type, task) in waiters)
+            foreach (var (_, name, type, task) in waiters)
             {
                 try
                 {
@@ -76,7 +83,22 @@ internal sealed class DatabaseCoordinationEffects(
                 }
                 catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
                 {
-                    _closeCoordinator.RemoveStrandedCompletion(id);
+                    foreach (var (strandedId, _, _, _) in waiters)
+                    {
+                        _closeCoordinator.RemoveStrandedCompletion(strandedId);
+                    }
+
+                    var alreadySnapshotted = new HashSet<string>(
+                        snapshot.Items.Select(i => i.Name),
+                        StringComparer.Ordinal);
+
+                    foreach (var (_, dispatchedName, dispatchedType, _) in waiters)
+                    {
+                        if (alreadySnapshotted.Add(dispatchedName))
+                        {
+                            snapshot.Add(new LogReopenInfo(dispatchedName, dispatchedType));
+                        }
+                    }
 
                     _logger.Trace(
                         $"{nameof(PrepareForDatabaseRemovalAsync)}: close for log '{name}' did not complete: {ex.GetType().Name}");
@@ -97,6 +119,68 @@ internal sealed class DatabaseCoordinationEffects(
         {
             _closeCoordinator.ReleaseCoordinatorLock();
         }
+    }
+
+    public async Task ReloadAllActiveLogsAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var activeLogsBeforeClose = _eventLogState.Value.ActiveLogs.Values.ToArray();
+        if (activeLogsBeforeClose.Length == 0) { return; }
+
+        await _closeCoordinator.AcquireCoordinatorLockAsync(cancellationToken);
+
+        ExceptionDispatchInfo? deferredCloseFailure = null;
+
+        try
+        {
+            var waiters = new List<(EventLogId Id, string Name, Task Task)>(activeLogsBeforeClose.Length);
+
+            foreach (var log in activeLogsBeforeClose)
+            {
+                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                _closeCoordinator.RegisterCloseCompletion(log.Id, tcs);
+                waiters.Add((log.Id, log.Name, tcs.Task));
+            }
+
+            foreach (var (id, name, _) in waiters)
+            {
+                _dispatcher.Dispatch(new CloseLogAction(id, name));
+            }
+
+            foreach (var (_, name, task) in waiters)
+            {
+                try
+                {
+                    await task.WaitAsync(LogCloseCoordinator.LogCloseTimeout, cancellationToken);
+                }
+                catch (Exception ex) when (ex is TimeoutException or OperationCanceledException)
+                {
+                    foreach (var (strandedId, _, _) in waiters)
+                    {
+                        _closeCoordinator.RemoveStrandedCompletion(strandedId);
+                    }
+
+                    _logger.Trace(
+                        $"{nameof(ReloadAllActiveLogsAsync)}: close for log '{name}' did not complete: {ex.GetType().Name}");
+
+                    deferredCloseFailure = ExceptionDispatchInfo.Capture(ex);
+
+                    break;
+                }
+            }
+        }
+        finally
+        {
+            _closeCoordinator.ReleaseCoordinatorLock();
+        }
+
+        foreach (var log in activeLogsBeforeClose)
+        {
+            _eventLogCommands.OpenLog(log.Name, log.Type, CancellationToken.None);
+        }
+
+        deferredCloseFailure?.Throw();
     }
 
     public void ReopenAfterDatabaseRemoval(IReadOnlyList<LogReopenInfo> snapshot)

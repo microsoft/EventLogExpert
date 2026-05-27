@@ -117,6 +117,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
     [InlineData(typeof(IInfoBannerService))]
     [InlineData(typeof(IDatabaseService))]
     [InlineData(typeof(IActiveDatabases))]
+    [InlineData(typeof(IDatabaseOperationCoordinator))]
     [InlineData(typeof(IModalCoordinator))]
     [InlineData(typeof(ILogWatcherService))]
     [InlineData(typeof(IMenuService))]
@@ -148,6 +149,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<ITitleProvider>());
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
+        services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));
@@ -178,6 +180,7 @@ public sealed class RuntimeServiceCollectionExtensionsTests
         services.AddSingleton(Substitute.For<ITitleProvider>());
         services.AddSingleton(Substitute.For<IMainThreadService>());
         services.AddSingleton(Substitute.For<IWindowsIdentityProvider>());
+        services.AddSingleton(Substitute.For<IFilePickerService>());
         services.AddSingleton(Substitute.For<IState<EventLogState>>());
         services.AddSingleton(Substitute.For<IStateSelection<EventLogState, bool>>());
         services.AddSingleton(new FileLocationOptions(Path.Combine(Path.GetTempPath(), "EventLogExpertTests")));

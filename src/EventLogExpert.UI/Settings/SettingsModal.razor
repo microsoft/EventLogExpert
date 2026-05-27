@@ -12,9 +12,9 @@
     OnDialogClosedByUser="HandleDialogClosedByUserAsync"
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     OnSave="OnSaveAsync"
+    @ref="ChromeRef"
     SaveLabel="Save"
-    StackFooterExtra="true"
-    @ref="ChromeRef">
+    StackFooterExtra="true">
     <ChildContent>
         <div class="settings-form">
             <div class="flex-column-scroll">
@@ -22,7 +22,7 @@
 
                 <div class="flex-center-aligned-row tz-row">
                     <text>Time Zone:</text>
-                    <ValueSelect AriaLabel="Time Zone" CssClass="input timezone-dropdown" T="string" @bind-Value="_timeZoneId">
+                    <ValueSelect AriaLabel="Time Zone" @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" T="string">
                         @foreach (var item in TimeZoneInfo.GetSystemTimeZones())
                         {
                             <ValueSelectItem T="string" Value="item.Id">@item.DisplayName</ValueSelectItem>
@@ -54,12 +54,12 @@
                             <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
                                 Entry="@entry"
                                 IsClassificationPending="@IsClassificationPending"
-                                IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !_entriesUpgrading.Contains(entry.FileName))"
-                                IsUpgrading="@_entriesUpgrading.Contains(entry.FileName)"
+                                IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !Coordinator.IsUpgradeInFlight(entry.FileName))"
+                                IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
+                                @key="entry.FileName"
                                 OnRemove="@(() => RemoveDatabase(entry))"
                                 OnToggle="@(() => ToggleDatabase(entry.FileName))"
-                                OnUpgrade="@(() => UpgradeEntry(entry.FileName))"
-                                @key="entry.FileName" />
+                                OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
                         }
                     }
                     else
@@ -75,7 +75,7 @@
 
                 <div class="flex-center-aligned-row">
                     <text>Theme:</text>
-                    <ValueSelect AriaLabel="Theme" CssClass="input filter-dropdown" T="Theme" @bind-Value="_theme">
+                    <ValueSelect AriaLabel="Theme" @bind-Value="_theme" CssClass="input filter-dropdown" T="Theme">
                         @foreach (Theme item in Enum.GetValues(typeof(Theme)))
                         {
                             <ValueSelectItem T="Theme" Value="item">@(item == Theme.System ? "Follow System" : item.ToString())</ValueSelectItem>
@@ -85,7 +85,7 @@
 
                 <div class="flex-center-aligned-row">
                     <text>Keyboard Copy Behavior:</text>
-                    <ValueSelect AriaLabel="Keyboard Copy Behavior" CssClass="input filter-dropdown" T="EventCopyFormat" @bind-Value="_copyFormat">
+                    <ValueSelect AriaLabel="Keyboard Copy Behavior" @bind-Value="_copyFormat" CssClass="input filter-dropdown" T="EventCopyFormat">
                         @foreach (EventCopyFormat item in Enum.GetValues(typeof(EventCopyFormat)))
                         {
                             <ValueSelectItem T="EventCopyFormat" Value="item" />
@@ -95,7 +95,7 @@
 
                 <div class="flex-center-aligned-row">
                     <text>Logging Level:</text>
-                    <ValueSelect AriaLabel="Logging Level" CssClass="input filter-dropdown" T="LogLevel" @bind-Value="_logLevel">
+                    <ValueSelect AriaLabel="Logging Level" @bind-Value="_logLevel" CssClass="input filter-dropdown" T="LogLevel">
                         @foreach (LogLevel item in Enum.GetValues(typeof(LogLevel)))
                         {
                             <ValueSelectItem T="LogLevel" Value="item" />
