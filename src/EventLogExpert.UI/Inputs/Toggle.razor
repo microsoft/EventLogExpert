@@ -1,0 +1,17 @@
+@inherits InputComponent<bool>
+
+<label class="toggle @CssClass" title="@EffectiveAriaLabel">
+    <input aria-describedby="@AriaDescribedBy"
+        aria-label="@EffectiveAriaLabel"
+        aria-labelledby="@AriaLabelledBy"
+        checked="@Value"
+        class="toggle-input"
+        disabled="@Disabled"
+        id="@Id"
+        @onchange="UpdateValue"
+        role="switch"
+        type="checkbox" />
+    <span aria-hidden="true" class="toggle-track">
+        <span class="toggle-knob"></span>
+    </span>
+</label>

@@ -5,10 +5,8 @@ using Microsoft.AspNetCore.Components;
 
 namespace EventLogExpert.UI.Inputs;
 
-public sealed partial class BooleanSelect : InputComponent<bool>
+public sealed partial class OptionSelect : InputComponent<bool>
 {
-    [Parameter] public string AriaLabel { get; set; } = string.Empty;
-
     [Parameter] public bool Disabled { get; set; }
 
     [Parameter] public string DisabledString { get; set; } = "Disabled";
@@ -18,6 +16,9 @@ public sealed partial class BooleanSelect : InputComponent<bool>
     [Parameter] public string Id { get; set; } = Guid.NewGuid().ToString();
 
     [Parameter] public bool UseStatusColors { get; set; }
+
+    private string OptionAriaLabel(string optionText) =>
+        string.IsNullOrWhiteSpace(EffectiveAriaLabel) ? optionText : $"{EffectiveAriaLabel} {optionText}";
 
     private async Task UpdateValue(ChangeEventArgs args)
     {

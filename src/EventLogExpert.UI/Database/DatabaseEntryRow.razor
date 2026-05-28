@@ -2,7 +2,7 @@
     @onmouseleave="HandleRowMouseLeave">
     <div class="db-entry-row-content">
         <div class="db-entry-info">
-            <button class="db-entry-name" @onclick="HandleNameClick" type="button">@Entry.FileName</button>
+            <button class="db-entry-name" id="@_nameButtonId" @onclick="HandleNameClick" type="button">@Entry.FileName</button>
             @if (ShouldShowBadge)
             {
                 <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
@@ -10,12 +10,19 @@
         </div>
 
         <div class="db-entry-actions @(ShowPendingIndicator ? "db-entry-actions--pending" : null)">
+            @if (ShowPendingIndicator)
+            {
+                <span class="visually-hidden" id="@_pendingStatusId">(pending toggle, unsaved)</span>
+            }
+
             @switch (PrimaryAction)
             {
                 case ActionKind.Toggle:
                 case ActionKind.DisabledToggle:
-                    <BooleanSelect AriaLabel="@ToggleAriaLabel"
+                    <OptionSelect AriaDescribedBy="@(ShowPendingIndicator ? _pendingStatusId : null)"
+                        AriaLabelledBy="@_nameButtonId"
                         Disabled="@(PrimaryAction == ActionKind.DisabledToggle)"
+                        UseStatusColors="true"
                         Value="EffectiveEnabled"
                         ValueChanged="@(_ => OnToggle.InvokeAsync())" />
 

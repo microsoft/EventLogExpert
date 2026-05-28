@@ -10,6 +10,12 @@ public abstract class InputComponent<T> : ComponentBase
 {
     private Func<T?, string> _toStringFunc = x => x?.ToString() ?? string.Empty;
 
+    [Parameter] public string? AriaDescribedBy { get; set; }
+
+    [Parameter] public string? AriaLabel { get; set; }
+
+    [Parameter] public string? AriaLabelledBy { get; set; }
+
     [Parameter]
     public string CssClass { get; set; } = string.Empty;
 
@@ -38,8 +44,11 @@ public abstract class InputComponent<T> : ComponentBase
     public EventCallback<T> ValueChanged { get; set; }
 
     [Parameter]
-    public List<T> Values { get; set; } = default!;
+    public List<T> Values { get; set; } = null!;
 
     [Parameter]
     public EventCallback<List<T>> ValuesChanged { get; set; }
+
+    protected string? EffectiveAriaLabel =>
+        string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null;
 }

@@ -30,10 +30,10 @@ else
                     if (!Filter.IsExcluded)
                     {
                         <ValueSelect AriaLabel="Highlight Color"
+                            @bind-Value="Filter.Color"
                             CssClass="input color-dropdown"
                             DataHighlight="@Filter.Color.ToCssName()"
-                            T="HighlightColor"
-                            @bind-Value="Filter.Color">
+                            T="HighlightColor">
                             @foreach (var item in Enum.GetValues<HighlightColor>())
                             {
                                 <ValueSelectItem CssClass="color-dropdown-item"
@@ -50,7 +50,7 @@ else
                 {
                     if (string.IsNullOrWhiteSpace(savedFilter.ComparisonText))
                     {
-                        <span>No Filter Specified</span>
+                        <span id="@_filterLabelId">No Filter Specified</span>
                     }
                     else
                     {
@@ -61,11 +61,11 @@ else
 
                         if (savedFilter.IsExcluded)
                         {
-                            <span>Exclude: @savedFilter.ComparisonText</span>
+                            <span id="@_filterLabelId">Exclude: @savedFilter.ComparisonText</span>
                         }
                         else
                         {
-                            <span>@savedFilter.ComparisonText</span>
+                            <span id="@_filterLabelId">@savedFilter.ComparisonText</span>
                         }
                     }
                 }
@@ -76,58 +76,50 @@ else
                 {
                     @ExtraEditingButtons
 
-                    <button class="button button-green" @onclick="OnSave">
+                    <button class="button button-green" @onclick="OnSave" type="button">
                         <i class="bi bi-check-circle"></i> Save
                     </button>
 
-                    <button class="button button-red fixed-width" @onclick="OnCancel">
+                    <button class="button button-red fixed-width" @onclick="OnCancel" type="button">
                         <i class="bi bi-x-circle"></i> Cancel
                     </button>
 
                     @if (!IsPending)
                     {
-                        <button class="button button-red fixed-width" @onclick="OnRemove">
+                        <button class="button button-red fixed-width" @onclick="OnRemove" type="button">
                             <i class="bi bi-dash-circle"></i> Remove
                         </button>
                     }
                 }
                 else if (Value is { } savedFilter)
                 {
-                    <button class="button" @onclick="OnEdit">
+                    <button class="button" @onclick="OnEdit" type="button">
                         <i class="bi bi-funnel"></i> Edit
                     </button>
 
                     @if (savedFilter.IsExcluded)
                     {
-                        <button class="button fixed-width" @onclick="OnToggleExclusion">
+                        <button class="button fixed-width" @onclick="OnToggleExclusion" type="button">
                             <i class="bi bi-plus-circle"></i> Include
                         </button>
                     }
                     else
                     {
-                        <button class="button fixed-width" @onclick="OnToggleExclusion">
+                        <button class="button fixed-width" @onclick="OnToggleExclusion" type="button">
                             <i class="bi bi-dash-circle"></i> Exclude
                         </button>
                     }
 
-                    <button class="button button-red fixed-width" @onclick="OnRemove">
+                    <button class="button button-red fixed-width" @onclick="OnRemove" type="button">
                         <i class="bi bi-dash-circle"></i> Remove
                     </button>
 
                     @if (ShowToggleEnabled)
                     {
-                        if (savedFilter.IsEnabled)
-                        {
-                            <button class="button button-red fixed-width" @onclick="OnToggleEnabled">
-                                <i class="bi bi-dash-circle"></i> Disable
-                            </button>
-                        }
-                        else
-                        {
-                            <button class="button button-green fixed-width" @onclick="OnToggleEnabled">
-                                <i class="bi bi-plus-circle"></i> Enable
-                            </button>
-                        }
+                        <Toggle AriaLabel="Filter enabled"
+                            AriaLabelledBy="@_filterLabelId"
+                            Value="savedFilter.IsEnabled"
+                            ValueChanged="@(_ => OnToggleEnabled.InvokeAsync())" />
                     }
                 }
             </div>

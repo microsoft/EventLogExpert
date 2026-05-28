@@ -1,0 +1,8 @@
+.manage-databases-tab {
+    padding: 1rem;
+}
+
+.manage-databases-placeholder {
+    color: var(--clr-lightblue);
+    font-style: italic;
+}

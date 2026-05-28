@@ -77,7 +77,7 @@
                 <h3 class="visually-hidden">Preferences</h3>
                 <div class="flex-center-aligned-row">
                     <text>Expand Display Pane On Selection Change:</text>
-                    <BooleanSelect AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
+                    <Toggle AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
                 </div>
 
                 <div class="flex-center-aligned-row">
@@ -116,7 +116,7 @@
     <ExtraFooterContent>
         <div class="flex-center-aligned-row">
             <text>Pre-release Builds:</text>
-            <BooleanSelect AriaLabel="Pre-release Builds" @bind-Value="_isPreReleaseEnabled" />
+            <Toggle AriaLabel="Pre-release Builds" @bind-Value="_isPreReleaseEnabled" />
         </div>
     </ExtraFooterContent>
 </ModalChrome>

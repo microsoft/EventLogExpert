@@ -7,7 +7,7 @@
         aria-describedby="@AriaDescribedBy"
         aria-expanded="@(_isOpen ? "true" : "false")"
         aria-haspopup="listbox"
-        aria-label="@(string.IsNullOrWhiteSpace(AriaLabelledBy) ? AriaLabel : null)"
+        aria-label="@EffectiveAriaLabel"
         aria-labelledby="@AriaLabelledBy"
         class="@CssClass"
         data-highlight="@DataHighlight"

@@ -1,0 +1,85 @@
+.toggle {
+    /* WCAG 2.5.5 AA: 24x24px minimum hit target (visible track is 36x18). */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px;
+
+    cursor: pointer;
+    user-select: none;
+}
+
+.toggle-input {
+    /* Visually hidden but focusable native checkbox; keeps Space-to-toggle, focus,
+       and form participation. */
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* Track: 36x18 border-box (1px borders included); inner box = 34x16. */
+.toggle-track {
+    box-sizing: border-box;
+    position: relative;
+
+    display: inline-block;
+    width: 36px;
+    height: 18px;
+
+    background-color: var(--background-darkgray);
+    border: 1px solid var(--border-divider);
+    border-radius: 9px;
+    transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+/* Knob: 14x14, translateX(18px) when checked = symmetric 2px gaps inside the 34x16 inner area. */
+.toggle-knob {
+    position: absolute;
+    top: 1px;
+    left: 1px;
+
+    width: 14px;
+    height: 14px;
+
+    background-color: var(--toggle-accent);
+    border-radius: 50%;
+    transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.toggle-input:checked + .toggle-track {
+    background-color: var(--toggle-accent);
+    border-color: var(--toggle-accent);
+}
+
+.toggle-input:checked + .toggle-track .toggle-knob {
+    transform: translateX(18px);
+    background-color: var(--accent-on-fill);
+}
+
+/* WCAG 2.4.7 / 2.4.11 Focus Appearance: two-tone ring (accent outline + dark
+   box-shadow separator). */
+.toggle-input:focus-visible + .toggle-track {
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 4px var(--background-dark);
+}
+
+.toggle-input:disabled + .toggle-track {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toggle-input:disabled ~ * {
+    pointer-events: none;
+}
+
+.toggle:has(.toggle-input:disabled) {
+    cursor: not-allowed;
+}

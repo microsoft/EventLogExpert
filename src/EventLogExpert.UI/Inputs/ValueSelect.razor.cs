@@ -20,18 +20,10 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
     private ElementReference _selectComponent;
     private DotNetObjectReference<ValueSelect<T>>? _selfRef;
 
-    [Parameter] public string? AriaDescribedBy { get; set; }
-
-    [Parameter] public string? AriaLabel { get; set; }
-
-    [Parameter] public string? AriaLabelledBy { get; set; }
-
     [Parameter]
     public RenderFragment ChildContent { get; set; } = null!;
 
     [Parameter] public string? DataHighlight { get; set; }
-
-    [Parameter] public string? Id { get; set; }
 
     /// <summary>
     ///     Text shown by a multi-select <see cref="ValueSelect{T}" /> when no values are selected. Defaults to "Empty";
@@ -54,6 +46,8 @@ public sealed partial class ValueSelect<T> : InputComponent<T>, IAsyncDisposable
             StateHasChanged();
         }
     }
+
+    [Parameter] public string? Id { get; set; }
 
     [Parameter]
     public bool IsInput { get; set; }
