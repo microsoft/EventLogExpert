@@ -25,6 +25,8 @@ public sealed partial class AttentionBanner : ComponentBase
 
     [Inject] private IMenuActionService MenuActionService { get; init; } = null!;
 
+    private string NeedsLabel => AttentionCount == 1 ? "needs" : "need";
+
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     private void OnDismissAttention() => AttentionBannerService.DismissAttention();

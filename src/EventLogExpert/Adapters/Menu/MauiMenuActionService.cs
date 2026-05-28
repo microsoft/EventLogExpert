@@ -364,7 +364,10 @@ public sealed class MauiMenuActionService(
 
             if (!result.WasOpened) { _traceLogger.Trace($"{modalName} open preempted by an active modal."); }
 
-            return true;
+            // Propagate WasOpened so callers like AttentionBanner can surface a fallback error when the
+            // coordinator vetoes preemption (returns ModalOpenResult.NotOpened) rather than misreading
+            // a no-op as a successful open.
+            return result.WasOpened;
         }
         catch (Exception ex)
         {
