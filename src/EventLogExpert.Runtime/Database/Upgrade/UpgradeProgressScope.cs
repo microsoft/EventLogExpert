@@ -6,5 +6,5 @@ namespace EventLogExpert.Runtime.Database.Upgrade;
 public enum UpgradeProgressScope
 {
     Background,
-    SettingsTriggered
+    ManageDatabasesTriggered
 }

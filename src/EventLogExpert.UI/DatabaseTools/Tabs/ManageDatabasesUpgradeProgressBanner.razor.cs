@@ -5,9 +5,9 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using Microsoft.AspNetCore.Components;
 
-namespace EventLogExpert.UI.Settings;
+namespace EventLogExpert.UI.DatabaseTools.Tabs;
 
-public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisposable
+public sealed partial class ManageDatabasesUpgradeProgressBanner : ComponentBase, IDisposable
 {
     private bool _disposed;
 
@@ -39,7 +39,7 @@ public sealed partial class SettingsUpgradeProgressBanner : ComponentBase, IDisp
         }
         catch (Exception ex)
         {
-            TraceLogger.Error($"{nameof(SettingsUpgradeProgressBanner)}.{nameof(OnCancelClickedAsync)}: cancel threw: {ex}");
+            TraceLogger.Error($"{nameof(ManageDatabasesUpgradeProgressBanner)}.{nameof(OnCancelClickedAsync)}: cancel threw: {ex}");
         }
 
         await Task.CompletedTask;

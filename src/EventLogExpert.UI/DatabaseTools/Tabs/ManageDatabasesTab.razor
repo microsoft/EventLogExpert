@@ -1,8 +1,72 @@
 @namespace EventLogExpert.UI.DatabaseTools.Tabs
 
 <div class="manage-databases-tab">
-    <p class="manage-databases-placeholder">
-        Database management is being prepared. The provider database list, import, and recovery
-        controls will move here from Settings in commit 2.
-    </p>
+    @if (IsClassificationPending)
+    {
+        <div class="manage-status-banner manage-status-banner--info" role="status">
+            <i aria-hidden="true" class="bi bi-arrow-repeat manage-status-banner__spinner"></i>
+            <span class="manage-status-banner__message">Classifying databases&hellip;</span>
+        </div>
+    }
+
+    <ManageDatabasesUpgradeProgressBanner />
+
+    <div class="manage-databases-import-row">
+        <button class="button"
+            id="manage-import-button"
+            @onclick="ImportDatabase"
+            type="button">
+            <i aria-hidden="true" class="bi bi-plus-circle"></i> Import database&hellip;
+        </button>
+    </div>
+
+    <div class="manage-databases-entries">
+        @if (DatabaseService.Entries.Count > 0)
+        {
+            @foreach (var entry in DatabaseService.Entries)
+            {
+                <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
+                    Entry="@entry"
+                    IsClassificationPending="@IsClassificationPending"
+                    IsTogglePending="@_pendingToggles.ContainsKey(entry.FileName)"
+                    IsUpgradeBlocked="@(IsUpgradeBlocked && !Coordinator.IsUpgradeInFlight(entry.FileName))"
+                    IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
+                    @key="entry.FileName"
+                    OnRemove="@(() => RemoveDatabase(entry))"
+                    OnRestoreFromBackup="@(() => RestoreFromBackup(entry))"
+                    OnRetryClassification="@(() => RetryClassification(entry))"
+                    OnToggle="@(() => ToggleDatabase(entry.FileName))"
+                    OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
+            }
+        }
+        else if (!IsClassificationPending)
+        {
+            <ManageDatabasesEmptyState />
+        }
+    </div>
+
+    @if (HasPendingChanges)
+    {
+        <div aria-label="Pending database changes" class="manage-databases-save-strip" role="group">
+            <span class="manage-databases-pending-count">
+                @_pendingToggles.Count pending change@(_pendingToggles.Count == 1 ? "" : "s")
+            </span>
+            <button class="button"
+                @onclick="DiscardPending"
+                type="button">
+                Discard
+            </button>
+            <button aria-describedby="@(IsUpgradeBlocked ? _saveBlockedHelpId : null)"
+                aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
+                class="button button-green"
+                id="manage-save"
+                @onclick="OnSaveClickAsync"
+                type="button">
+                Save changes
+            </button>
+            <span aria-live="polite" class="visually-hidden" id="@_saveBlockedHelpId">
+                @(IsUpgradeBlocked ? "Cannot save: a database upgrade is in progress." : string.Empty)
+            </span>
+        </div>
+    }
 </div>

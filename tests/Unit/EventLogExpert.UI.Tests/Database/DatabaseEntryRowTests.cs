@@ -73,6 +73,21 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_BackupExistsEntry_RestoreButton_AriaDisabledWhenBlocked()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+
+        // Act
+        var component = RenderRow(entry, isUpgradeBlocked: true);
+
+        // Assert
+        var restoreBtn = component.Find(".db-entry-restore-btn");
+        Assert.Equal("true", restoreBtn.GetAttribute("aria-disabled"));
+        Assert.False(restoreBtn.HasAttribute("disabled"));
+    }
+
+    [Fact]
     public void Render_BackupExistsEntry_ShowsRecoveryRequiredBadge_AndShowsTrash()
     {
         // Arrange — BackupExists routes the user to the recovery dialog as the primary
@@ -93,6 +108,36 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
 
         Assert.Single(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void Render_BackupExistsEntry_ShowsRestoreButton()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+
+        // Act
+        var component = RenderRow(entry);
+
+        // Assert
+        var restoreBtn = component.Find(".db-entry-restore-btn");
+        Assert.Equal("Restore database a.db from backup", restoreBtn.GetAttribute("aria-label"));
+        Assert.Contains("Restore", restoreBtn.TextContent);
+    }
+
+    [Fact]
+    public void Render_ClassificationFailedEntry_ShowsRetryClassificationButton()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.ClassificationFailed);
+
+        // Act
+        var component = RenderRow(entry);
+
+        // Assert
+        var retryBtn = component.Find(".db-entry-retry-classification-btn");
+        Assert.Equal("Retry classification of database a.db", retryBtn.GetAttribute("aria-label"));
+        Assert.Contains("Retry classification", retryBtn.TextContent);
     }
 
     [Fact]
@@ -153,7 +198,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_IsUpgradeBlocked_DisablesRetryButton()
+    public void Render_IsUpgradeBlocked_AriaDisablesRetryUpgradeButton()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeFailed);
@@ -163,11 +208,12 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.True(button.HasAttribute("disabled"));
+        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("disabled"));
     }
 
     [Fact]
-    public void Render_IsUpgradeBlocked_DisablesUpgradeButton()
+    public void Render_IsUpgradeBlocked_AriaDisablesUpgradeButton()
     {
         // Arrange
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
@@ -177,7 +223,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var button = component.Find(".db-entry-upgrade-btn");
-        Assert.True(button.HasAttribute("disabled"));
+        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("disabled"));
     }
 
     [Fact]
@@ -367,10 +414,9 @@ public sealed class DatabaseEntryRowTests : BunitContext
     [Theory]
     [InlineData(DatabaseStatus.UnrecognizedSchema, "Unrecognized")]
     [InlineData(DatabaseStatus.ObsoleteSchema, "Obsolete")]
-    [InlineData(DatabaseStatus.ClassificationFailed, "Classification failed")]
     public void Render_TerminalStatus_ShowsBadge_AndOnlyTrash(DatabaseStatus status, string expectedLabel)
     {
-        // Arrange
+        // ClassificationFailed intentionally excluded: it now renders the Retry classification button.
         var entry = MakeEntry(status);
 
         // Act
@@ -460,6 +506,41 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task RestoreButtonClick_InvokesOnRestoreFromBackup()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnRestoreFromBackup, () => invocationCount++));
+
+        // Act
+        await component.Find(".db-entry-restore-btn").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task RestoreButtonClick_WhenIsUpgradeBlocked_DoesNotInvokeOnRestoreFromBackup()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsUpgradeBlocked, true)
+            .Add(p => p.OnRestoreFromBackup, () => invocationCount++));
+
+        // Act
+        await component.Find(".db-entry-restore-btn").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.Equal(0, invocationCount);
+    }
+
+    [Fact]
     public async Task RetryButtonClick_InvokesOnUpgrade()
     {
         // Arrange
@@ -471,6 +552,23 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Act
         await component.Find(".db-entry-upgrade-btn").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task RetryClassificationButtonClick_InvokesOnRetryClassification()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.ClassificationFailed);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnRetryClassification, () => invocationCount++));
+
+        // Act
+        await component.Find(".db-entry-retry-classification-btn").ClickAsync(new MouseEventArgs());
 
         // Assert
         Assert.Equal(1, invocationCount);
@@ -510,6 +608,24 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task UpgradeButtonClick_WhenAriaDisabled_DoesNotInvokeOnUpgrade()
+    {
+        // Arrange
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsUpgradeBlocked, true)
+            .Add(p => p.OnUpgrade, () => invocationCount++));
+
+        // Act
+        await component.Find(".db-entry-upgrade-btn").ClickAsync(new MouseEventArgs());
+
+        // Assert
+        Assert.Equal(0, invocationCount);
     }
 
     private static DatabaseEntry MakeEntry(

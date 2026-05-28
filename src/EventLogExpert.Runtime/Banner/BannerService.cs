@@ -26,9 +26,9 @@ internal sealed class BannerService
     private ImmutableHashSet<string> _dismissedAttentionFileNames = ImmutableHashSet<string>.Empty;
     private ImmutableList<ErrorBannerEntry> _errorBanners = ImmutableList<ErrorBannerEntry>.Empty;
     private ImmutableList<BannerInfoEntry> _infoBanners = ImmutableList<BannerInfoEntry>.Empty;
+    private BannerProgressEntry? _manageDatabasesProgress;
     private Func<Task>? _recoveryCallback;
     private object? _recoveryToken;
-    private BannerProgressEntry? _settingsProgress;
 
     public BannerService(IDatabaseService databaseService, ITraceLogger traceLogger)
     {
@@ -128,9 +128,9 @@ internal sealed class BannerService
         get { lock (_stateLock) { return _infoBanners; } }
     }
 
-    public BannerProgressEntry? SettingsProgress
+    public BannerProgressEntry? ManageDatabasesProgress
     {
-        get { lock (_stateLock) { return _settingsProgress; } }
+        get { lock (_stateLock) { return _manageDatabasesProgress; } }
     }
 
     public void ClearCritical()
@@ -309,8 +309,8 @@ internal sealed class BannerService
             case UpgradeProgressScope.Background:
                 _backgroundProgress = entry;
                 break;
-            case UpgradeProgressScope.SettingsTriggered:
-                _settingsProgress = entry;
+            case UpgradeProgressScope.ManageDatabasesTriggered:
+                _manageDatabasesProgress = entry;
                 break;
             default:
                 throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown upgrade progress scope.");
@@ -371,9 +371,9 @@ internal sealed class BannerService
                 _backgroundProgress = null;
                 cleared = true;
             }
-            else if (_settingsProgress is not null && _settingsProgress.BatchId == args.BatchId)
+            else if (_manageDatabasesProgress is not null && _manageDatabasesProgress.BatchId == args.BatchId)
             {
-                _settingsProgress = null;
+                _manageDatabasesProgress = null;
                 cleared = true;
             }
         }
@@ -391,7 +391,7 @@ internal sealed class BannerService
         lock (_stateLock)
         {
             BannerProgressEntry? backgroundSlot = _backgroundProgress;
-            BannerProgressEntry? settingsSlot = _settingsProgress;
+            BannerProgressEntry? manageDatabasesSlot = _manageDatabasesProgress;
 
             if (backgroundSlot is not null && backgroundSlot.BatchId == args.BatchId)
             {
@@ -404,16 +404,16 @@ internal sealed class BannerService
                 };
                 _backgroundProgress = next;
             }
-            else if (settingsSlot is not null && settingsSlot.BatchId == args.BatchId)
+            else if (manageDatabasesSlot is not null && manageDatabasesSlot.BatchId == args.BatchId)
             {
-                next = settingsSlot with
+                next = manageDatabasesSlot with
                 {
                     CurrentBatchPosition = args.Position,
                     CurrentEntryName = args.FileName,
                     CurrentPhase = args.Phase,
                     QueuedBatchesAfter = _databaseService.QueuedBatchCount
                 };
-                _settingsProgress = next;
+                _manageDatabasesProgress = next;
             }
         }
 

@@ -36,22 +36,50 @@
                     break;
 
                 case ActionKind.Upgrade:
-                    <button aria-label="@($"Upgrade database {Entry.FileName}")"
+                    <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
+                        aria-label="@($"Upgrade database {Entry.FileName}")"
                         class="button db-entry-upgrade-btn"
-                        disabled="@IsUpgradeBlocked"
-                        @onclick="@(() => OnUpgrade.InvokeAsync())"
+                        @onclick="@(() =>
+                                  {
+                                      if (!IsUpgradeBlocked) OnUpgrade.InvokeAsync();
+                                  })"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-up-circle"></i> Upgrade
                     </button>
                     break;
 
                 case ActionKind.Retry:
-                    <button aria-label="@($"Retry upgrade of database {Entry.FileName}")"
+                    <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
+                        aria-label="@($"Retry upgrade of database {Entry.FileName}")"
                         class="button button-red db-entry-upgrade-btn"
-                        disabled="@IsUpgradeBlocked"
-                        @onclick="@(() => OnUpgrade.InvokeAsync())"
+                        @onclick="@(() =>
+                                  {
+                                      if (!IsUpgradeBlocked) OnUpgrade.InvokeAsync();
+                                  })"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry Upgrade
+                    </button>
+                    break;
+
+                case ActionKind.RestoreFromBackup:
+                    <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
+                        aria-label="@($"Restore database {Entry.FileName} from backup")"
+                        class="button db-entry-restore-btn"
+                        @onclick="@(() =>
+                                  {
+                                      if (!IsUpgradeBlocked) OnRestoreFromBackup.InvokeAsync();
+                                  })"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-arrow-counterclockwise"></i> Restore
+                    </button>
+                    break;
+
+                case ActionKind.RetryClassification:
+                    <button aria-label="@($"Retry classification of database {Entry.FileName}")"
+                        class="button db-entry-retry-classification-btn"
+                        @onclick="@(() => OnRetryClassification.InvokeAsync())"
+                        type="button">
+                        <i aria-hidden="true" class="bi bi-arrow-repeat"></i> Retry classification
                     </button>
                     break;
             }

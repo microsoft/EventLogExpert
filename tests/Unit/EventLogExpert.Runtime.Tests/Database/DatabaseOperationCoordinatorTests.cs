@@ -715,7 +715,7 @@ public sealed class DatabaseOperationCoordinatorTests
         Assert.False(sut.IsAnyUpgradeInFlight);
         await _databases.Received(1).UpgradeBatchAsync(
             Arg.Is<IReadOnlyList<string>>(l => l.Count == 1 && l[0] == "a.db"),
-            UpgradeProgressScope.SettingsTriggered,
+            UpgradeProgressScope.ManageDatabasesTriggered,
             Arg.Any<CancellationToken>());
     }
 

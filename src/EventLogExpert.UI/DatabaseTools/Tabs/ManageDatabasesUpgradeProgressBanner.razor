@@ -1,0 +1,35 @@
+@using EventLogExpert.Runtime.Database.Upgrade
+@if (ProgressBannerService.ManageDatabasesProgress is { } progress)
+{
+    <aside class="manage-databases-upgrade-banner manage-status-banner manage-status-banner--progress" role="status">
+        <i aria-hidden="true" class="bi bi-arrow-repeat manage-status-banner__spinner"></i>
+
+        @if (string.IsNullOrEmpty(progress.CurrentEntryName))
+        {
+            <span class="manage-status-banner__message">Preparing upgrade of @progress.CurrentBatchSize @(progress.CurrentBatchSize == 1 ? "database" : "databases")&hellip;</span>
+        }
+        else
+        {
+            var verb = progress.CurrentPhase switch
+            {
+                UpgradePhase.BackingUp => "Backing up",
+                UpgradePhase.MigratingSchema => "Migrating schema",
+                UpgradePhase.Verifying => "Verifying",
+                _ => "Upgrading"
+            };
+
+            <span class="manage-status-banner__message">@verb database @progress.CurrentBatchPosition of @progress.CurrentBatchSize: @progress.CurrentEntryName</span>
+        }
+
+        @if (progress.QueuedBatchesAfter > 0)
+        {
+            <span class="banner-subtitle">(+@progress.QueuedBatchesAfter @(progress.QueuedBatchesAfter == 1 ? "batch" : "batches") queued)</span>
+        }
+
+        <button class="banner-action button"
+            @onclick="() => OnCancelClickedAsync(progress)"
+            type="button">
+            Cancel
+        </button>
+    </aside>
+}

@@ -97,6 +97,9 @@ internal sealed class DatabaseService(
     public Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default) =>
         _recoveryService.RestoreFromBackupAsync(fileName, cancellationToken);
 
+    public Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default) =>
+        _classificationService.RetryClassificationAsync(fileName, cancellationToken);
+
     public void Toggle(string fileName) => _registry.Toggle(fileName);
 
     public Task<UpgradeBatchResult> UpgradeBatchAsync(

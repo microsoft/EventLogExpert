@@ -1,7 +1,9 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using Microsoft.AspNetCore.Components;
@@ -10,23 +12,24 @@ using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.DatabaseTools;
 
-public sealed partial class DatabaseToolsModal
+public sealed partial class DatabaseToolsModal : IInlineAlertSurface
 {
     private static readonly (DatabaseToolsTab Tab, string Label)[] s_tabs =
     [
+        (DatabaseToolsTab.Manage, "Manage"),
         (DatabaseToolsTab.Show, "Show Providers"),
         (DatabaseToolsTab.Create, "Create Database"),
         (DatabaseToolsTab.Merge, "Merge Databases"),
         (DatabaseToolsTab.Diff, "Diff Databases"),
-        (DatabaseToolsTab.Upgrade, "Upgrade Database"),
-        (DatabaseToolsTab.Manage, "Manage")
+        (DatabaseToolsTab.Upgrade, "Upgrade Database")
     ];
 
     private readonly Dictionary<DatabaseToolsTab, ElementReference> _tabButtonRefs = new();
 
-    private DatabaseToolsTab _activeTab = DatabaseToolsTab.Show;
+    private DatabaseToolsTab _activeTab = DatabaseToolsTab.Manage;
     private CreateDatabaseTab? _createTab;
     private DiffDatabasesTab? _diffTab;
+    private ManageDatabasesTab? _manageTab;
     private MergeDatabaseTab? _mergeTab;
     private DatabaseToolsTab? _pendingFocusTab;
     private ShowProvidersTab? _showTab;
@@ -44,6 +47,10 @@ public sealed partial class DatabaseToolsModal
         (_upgradeTab?.IsRunning ?? false);
 
     [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
+
+    [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
+
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
     protected override async ValueTask DisposeAsyncCore(bool disposing)
     {
@@ -66,8 +73,6 @@ public sealed partial class DatabaseToolsModal
     {
         if (firstRender)
         {
-            // Inline JS shim: suppresses browser default scrolling on Arrow/Home/End while
-            // keeping Tab/Enter/Space defaults intact for focus + activation.
             try
             {
                 _tabKeyModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
@@ -93,30 +98,83 @@ public sealed partial class DatabaseToolsModal
     protected override async Task OnClosingAsync()
     {
         // CancelIfRunning is a no-op when not running; safe to call from all close paths.
+        // Manage tab is not a DatabaseToolsTabBase<TRequest> and has no Run/Cancel surface.
         _showTab?.CancelIfRunning();
         _createTab?.CancelIfRunning();
         _mergeTab?.CancelIfRunning();
         _diffTab?.CancelIfRunning();
         _upgradeTab?.CancelIfRunning();
 
+        if (_manageTab is { HasDatabaseStateChanged: true })
+        {
+            await PromptAndReloadOpenLogs();
+        }
+
         await base.OnClosingAsync();
     }
 
     protected override async Task<bool> OnRequestCloseAsync(ModalCloseRequest request)
     {
-        if (!AnyTabIsRunning) { return true; }
+        // 1. Hard-block while Manage-tab-initiated upgrade is in flight.
+        if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
 
-        var confirm = await ShowInlineAlertAsync(
-            new InlineAlertRequest(
-                Title: "Operation in progress",
-                Message: "An operation is running. Cancel and close anyway?",
-                AcceptLabel: "Cancel and close",
-                CancelLabel: "Continue running",
-                IsPrompt: false,
-                PromptInitialValue: null),
-            CancellationToken.None);
+        // 2. Pending toggles → save prompt OR discard prompt.
+        if (_manageTab is { HasPendingChanges: true })
+        {
+            var savePrompt = await ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Unsaved changes",
+                    Message: "You have pending database changes. Save them now?",
+                    AcceptLabel: "Save",
+                    CancelLabel: "Don't save",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                CancellationToken.None);
 
-        return confirm.Accepted;
+            if (savePrompt.Accepted)
+            {
+                var saved = await _manageTab.ApplyPendingTogglesAsync();
+                if (!saved) { return false; }
+            }
+            else
+            {
+                var closeAnyway = await ShowInlineAlertAsync(
+                    new InlineAlertRequest(
+                        Title: "Discard changes?",
+                        Message: "Close without saving? Pending changes will be lost.",
+                        AcceptLabel: "Close",
+                        CancelLabel: "Stay open",
+                        IsPrompt: false,
+                        PromptInitialValue: null),
+                    CancellationToken.None);
+
+                if (!closeAnyway.Accepted) { return false; }
+            }
+
+            // Re-check after the async prompt round-trip.
+            if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
+        }
+
+        // 3. Existing AnyTabIsRunning prompt — preserves current behavior.
+        if (AnyTabIsRunning)
+        {
+            var confirm = await ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Operation in progress",
+                    Message: "An operation is running. Cancel and close anyway?",
+                    AcceptLabel: "Cancel and close",
+                    CancelLabel: "Continue running",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                CancellationToken.None);
+
+            if (!confirm.Accepted) { return false; }
+        }
+
+        // 4. Final upgrade re-check covers upgrades started during the AnyTabIsRunning prompt.
+        if (_manageTab is { IsUpgradeInFlight: true }) { return false; }
+
+        return true;
     }
 
     private static DatabaseToolsTab NextTab(DatabaseToolsTab current)
@@ -151,6 +209,42 @@ public sealed partial class DatabaseToolsModal
             case "End":
                 SetActiveTab(s_tabs[^1].Tab);
                 break;
+        }
+    }
+
+    private async Task PromptAndReloadOpenLogs()
+    {
+        if (!LogReloadCoordinator.HasActiveLogs) { return; }
+
+        bool yes;
+
+        try
+        {
+            var result = await ShowInlineAlertAsync(
+                new InlineAlertRequest(
+                    Title: "Reload Open Logs Now?",
+                    Message: "In order for these changes to take effect, all currently open logs must be reloaded. " +
+                        "Would you like to reload all open logs now?",
+                    AcceptLabel: "Yes",
+                    CancelLabel: "No",
+                    IsPrompt: false,
+                    PromptInitialValue: null),
+                CancellationToken.None);
+
+            yes = result.Accepted;
+        }
+        catch (ObjectDisposedException) { return; }
+        catch (OperationCanceledException) { return; }
+
+        if (yes)
+        {
+            try { await LogReloadCoordinator.ReloadAllActiveLogsAsync(); }
+            catch (OperationCanceledException) { }
+            catch (TimeoutException ex)
+            {
+                TraceLogger.Warning(
+                    $"{nameof(DatabaseToolsModal)}.{nameof(PromptAndReloadOpenLogs)}: reload did not complete within timeout: {ex}");
+            }
         }
     }
 

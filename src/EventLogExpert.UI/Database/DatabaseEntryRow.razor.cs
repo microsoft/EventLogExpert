@@ -20,7 +20,9 @@ public sealed partial class DatabaseEntryRow : ComponentBase
         DisabledToggle,
         Upgrade,
         Retry,
-        Spinner
+        Spinner,
+        RestoreFromBackup,
+        RetryClassification
     }
 
     [Parameter] public bool EffectiveEnabled { get; set; }
@@ -37,6 +39,10 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     [Parameter] public EventCallback OnRemove { get; set; }
 
+    [Parameter] public EventCallback OnRestoreFromBackup { get; set; }
+
+    [Parameter] public EventCallback OnRetryClassification { get; set; }
+
     [Parameter] public EventCallback OnToggle { get; set; }
 
     [Parameter] public EventCallback OnUpgrade { get; set; }
@@ -49,7 +55,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     {
         get
         {
-            if (Entry.BackupExists) { return ActionKind.None; }
+            if (Entry.BackupExists) { return ActionKind.RestoreFromBackup; }
 
             if (IsUpgrading) { return ActionKind.Spinner; }
 
@@ -62,7 +68,7 @@ public sealed partial class DatabaseEntryRow : ComponentBase
                 DatabaseStatus.UpgradeFailed => ActionKind.Retry,
                 DatabaseStatus.UnrecognizedSchema => ActionKind.None,
                 DatabaseStatus.ObsoleteSchema => ActionKind.None,
-                DatabaseStatus.ClassificationFailed => ActionKind.None,
+                DatabaseStatus.ClassificationFailed => ActionKind.RetryClassification,
                 _ => ActionKind.None
             };
         }

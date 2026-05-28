@@ -28,6 +28,6 @@ public interface IDatabaseOperationCoordinator
 
     Task UpgradeDatabaseAsync(
         string fileName,
-        UpgradeProgressScope scope = UpgradeProgressScope.SettingsTriggered,
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
         CancellationToken cancellationToken = default);
 }

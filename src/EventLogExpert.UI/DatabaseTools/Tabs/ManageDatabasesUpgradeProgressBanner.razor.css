@@ -1,0 +1,21 @@
+/* Layout + spinner + message shared via wwwroot/css/manage-status-banner.css.
+   This isolated file keeps only banner-component-specific styling (queued-batches subtitle + Cancel button). */
+
+.banner-subtitle {
+    flex: 0 0 auto;
+
+    font-size: .85rem;
+    opacity: .9;
+}
+
+.banner-action {
+    flex: 0 0 auto;
+    padding: .15rem .75rem;
+
+    background: transparent;
+    color: inherit;
+    border: 1px solid currentColor;
+    border-radius: .25rem;
+
+    &:hover { background-color: rgba(255, 255, 255, 0.15); }
+}
