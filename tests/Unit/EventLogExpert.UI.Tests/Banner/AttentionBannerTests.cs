@@ -144,13 +144,14 @@ public sealed class AttentionBannerTests : BunitContext
     }
 
     [Fact]
-    public void AttentionBanner_SingleEntry_UsesSingularDatabaseLabel()
+    public void AttentionBanner_SingleEntry_UsesSingularDatabaseLabelAndVerb()
     {
         var component = RenderAttentionBanner(1);
 
         var banner = component.Find("aside.banner-attention");
-        Assert.Contains("1 database need", banner.TextContent);
-        Assert.DoesNotContain("databases need", banner.TextContent);
+        Assert.Contains("1 database needs attention", banner.TextContent);
+        Assert.DoesNotContain("databases", banner.TextContent);
+        Assert.DoesNotContain("database need ", banner.TextContent);
     }
 
     private IRenderedComponent<AttentionBanner> RenderAttentionBanner(
