@@ -49,7 +49,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
-        Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".option-select"));
 
         // Trash is unconditionally rendered now; visibility is governed by the CSS
         // hover/focus reveal animation, not by markup.
@@ -68,7 +68,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         // Assert
         var badge = component.Find(".db-entry-badge");
         Assert.Equal("Recovery required", badge.TextContent);
-        Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".option-select"));
         Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
@@ -89,7 +89,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Equal("Recovery", badge.GetAttribute("data-badge"));
 
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
-        Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".option-select"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
 
         Assert.Single(component.FindAll(".db-entry-remove-btn"));
@@ -226,7 +226,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         // Assert
-        var radios = component.FindAll(".toggle input[type='radio']");
+        var radios = component.FindAll(".option-select input[type='radio']");
         Assert.NotEmpty(radios);
         Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
 
@@ -236,9 +236,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_PendingToggle_AppendsAriaLabelSuffix()
+    public void Render_PendingToggle_AnnouncesPendingViaAriaDescribedBy()
     {
-        // Arrange
         var entry = MakeEntry(DatabaseStatus.Ready, "provider-y.db");
 
         // Act
@@ -246,7 +245,13 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
-        Assert.Equal("Database provider-y.db (pending toggle, unsaved)", radiogroup.GetAttribute("aria-label"));
+        var describedById = radiogroup.GetAttribute("aria-describedby");
+        Assert.False(string.IsNullOrEmpty(describedById),
+            "Pending toggle must have aria-describedby pointing at the pending-status span.");
+
+        var pendingSpan = component.Find($"#{describedById}");
+        Assert.Equal("(pending toggle, unsaved)", pendingSpan.TextContent.Trim());
+        Assert.Contains("visually-hidden", pendingSpan.GetAttribute("class") ?? string.Empty);
     }
 
     [Fact]
@@ -268,8 +273,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
     {
         // Arrange — NotClassified routes to ActionKind.DisabledToggle (the toggle renders
         // but is disabled while classification is still in flight). Even if upstream marks
-        // the row as pending, the indicator (and SR suffix) should be suppressed so the
-        // announcement isn't misleading on a control the user can't actually flip.
+        // the row as pending, the indicator (and SR pending-status description) should be
+        // suppressed so the announcement isn't misleading on a control the user can't flip.
         var entry = MakeEntry(DatabaseStatus.NotClassified, "provider-z.db");
 
         // Act
@@ -280,7 +285,9 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.DoesNotContain("db-entry-actions--pending", actions.GetAttribute("class") ?? string.Empty);
 
         var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
-        Assert.Equal("Database provider-z.db", radiogroup.GetAttribute("aria-label"));
+        Assert.True(string.IsNullOrEmpty(radiogroup.GetAttribute("aria-describedby")),
+            "Disabled toggle should NOT carry the pending-status description.");
+        Assert.Empty(component.FindAll("span.visually-hidden"));
     }
 
     [Fact]
@@ -322,7 +329,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry);
 
         // Assert
-        Assert.Single(component.FindAll(".toggle"));
+        Assert.Single(component.FindAll(".option-select"));
         Assert.Empty(component.FindAll(".db-entry-badge"));
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
         Assert.Empty(component.FindAll(".db-entry-upgrading"));
@@ -338,7 +345,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, true);
 
         // Assert
-        var radios = component.FindAll(".toggle input[type='radio']");
+        var radios = component.FindAll(".option-select input[type='radio']");
         Assert.NotEmpty(radios);
         Assert.All(radios, r => Assert.True(r.HasAttribute("disabled")));
     }
@@ -375,19 +382,28 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.Equal(status.ToString(), badge.GetAttribute("data-badge"));
 
         Assert.Empty(component.FindAll(".db-entry-upgrade-btn"));
-        Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".option-select"));
         Assert.Single(component.FindAll(".db-entry-remove-btn"));
     }
 
     [Fact]
-    public void Render_ToggleAriaLabel_UsesDatabasePrefixForBooleanSelectConcatenation()
+    public void Render_Toggle_UsesAriaLabelledByPointingAtFilenameButton()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, "provider-x.db");
 
         var component = RenderRow(entry, effectiveEnabled: false);
 
         var radiogroup = component.Find(".db-entry-actions [role='radiogroup']");
-        Assert.Equal("Database provider-x.db", radiogroup.GetAttribute("aria-label"));
+        var labelledById = radiogroup.GetAttribute("aria-labelledby");
+        Assert.False(string.IsNullOrEmpty(labelledById),
+            "Toggle must have aria-labelledby referencing the filename button.");
+
+        var nameButton = component.Find($"#{labelledById}");
+        Assert.Equal("db-entry-name", nameButton.GetAttribute("class"));
+        Assert.Equal("provider-x.db", nameButton.TextContent.Trim());
+
+        Assert.True(string.IsNullOrEmpty(radiogroup.GetAttribute("aria-label")),
+            "Toggle must not fall back to a synthesized aria-label when aria-labelledby is set.");
     }
 
     [Fact]
@@ -440,7 +456,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         Assert.DoesNotContain("button-red", button.GetAttribute("class") ?? string.Empty);
 
         Assert.Empty(component.FindAll(".db-entry-badge"));
-        Assert.Empty(component.FindAll(".toggle"));
+        Assert.Empty(component.FindAll(".option-select"));
     }
 
     [Fact]
@@ -472,7 +488,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Add(p => p.OnToggle, () => invocationCount++));
 
         // Act
-        var enableRadio = component.FindAll(".toggle input[type='radio']")[1];
+        var enableRadio = component.FindAll(".option-select input[type='radio']")[1];
         await enableRadio.ChangeAsync(new ChangeEventArgs { Value = "true" });
 
         // Assert

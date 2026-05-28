@@ -24,6 +24,11 @@
     --background-dark:     light-dark(#E0E0E0, #222222);
     --background-darkgray: light-dark(#CECECE, #353535);
 
+    /* Shared accent for Toggle + OptionSelect. Light is darkened from --clr-lightblue
+       so the on-state hits WCAG 1.4.3 AA against --background-darkgray (#14599D on
+       #CECECE = 4.53:1; dark #9CDCFE on #353535 = 8.23:1). */
+    --toggle-accent: light-dark(#14599D, var(--clr-lightblue));
+
     /* Recessed surface used for content wells (e.g. the trash strip exposed
        behind a database row when it slides aside). Always darker than
        --background-dark in both schemes so the well reads as cut into the

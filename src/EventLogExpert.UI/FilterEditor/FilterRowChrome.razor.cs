@@ -15,6 +15,8 @@ namespace EventLogExpert.UI.FilterEditor;
 /// </summary>
 public sealed partial class FilterRowChrome : ComponentBase
 {
+    private readonly string _filterLabelId = $"filter-row-label-{Guid.NewGuid():N}";
+
     [Parameter] public RenderFragment? EditingContent { get; set; }
 
     [Parameter] public string? ErrorMessage { get; set; }

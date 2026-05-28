@@ -20,7 +20,7 @@
 <label aria-label="Value" id="@($"{Id}_Value")">Value: </label>
 @if (IsTextOnlyProperty(Comparison.Property))
 {
-    <TextInput CssClass="input filter-description" @bind-Value="@Comparison.Value" />
+    <TextInput AriaLabelledBy="@($"{Id}_Value")" CssClass="input filter-description" @bind-Value="@Comparison.Value" />
 }
 else if (Comparison.MatchMode == MatchMode.Many)
 {

@@ -8,12 +8,9 @@ namespace EventLogExpert.UI.Database;
 
 public sealed partial class DatabaseEntryRow : ComponentBase
 {
-    /// <summary>
-    ///     Click-driven reveal flag for the trash strip on the left of the row. Set true when the name button is clicked,
-    ///     cleared when the cursor leaves the row -- so re-entering the row without re-clicking does not re-open the slide,
-    ///     even though the name button may still hold DOM focus. Keyboard navigation drives the reveal via :focus-visible in
-    ///     CSS instead.
-    /// </summary>
+    private readonly string _nameButtonId = $"db-row-{Guid.NewGuid():N}-name";
+    private readonly string _pendingStatusId = $"db-row-{Guid.NewGuid():N}-pending";
+
     private bool _isMouseRevealed;
 
     private enum ActionKind
@@ -77,10 +74,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase
             Entry.Status != DatabaseStatus.UpgradeRequired);
 
     private bool ShowPendingIndicator => IsTogglePending && PrimaryAction != ActionKind.DisabledToggle;
-
-    private string ToggleAriaLabel => ShowPendingIndicator
-        ? $"Database {Entry.FileName} (pending toggle, unsaved)"
-        : $"Database {Entry.FileName}";
 
     private void HandleNameClick() => _isMouseRevealed = true;
 

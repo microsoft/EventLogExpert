@@ -1,0 +1,95 @@
+.option-select {
+    display: inline-flex;
+    margin-left: 5px;
+    width: fit-content;
+}
+
+.option-select input {
+    position: absolute !important;
+    clip: rect(1px, 1px, 1px, 1px);
+    height: 1px !important;
+    width: 1px !important;
+    border: 0 !important;
+    padding: 0 !important;
+    overflow: hidden;
+}
+
+.option-select label {
+    background-color: var(--background-darkgray);
+    color: var(--toggle-accent);
+    line-height: 1;
+    text-align: center;
+    user-select: none;
+
+    /* WCAG 2.5.5 AA: 24px minimum hit target. 5px padding + 14px line-height (10pt
+       font) + 1px border-top/bottom = 25px label cell. */
+    padding: 5px 10px;
+    min-height: 24px;
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    border-top: 1px solid var(--border-divider);
+    border-bottom: 1px solid var(--border-divider);
+    border-left: 1px solid var(--border-divider);
+    transition: background-color 0.1s ease-in-out, color 0.1s ease-in-out,
+        border-color 0.1s ease-in-out;
+    min-width: 4rem;
+}
+
+.option-select label:last-of-type {
+    border-right: 1px solid var(--border-divider);
+}
+
+/* Do not change font-weight on selected state -- bold text causes the label to
+   optically reflow (different kerning width), which shifts adjacent borders by
+   ~1px and breaks center-line alignment between Normal/Verbose-style pairs. */
+.option-select input:checked + label {
+    border-color: var(--toggle-accent);
+    color: var(--toggle-accent);
+}
+
+/* Center-line consistency: when the FIRST label is selected, recolor the SECOND
+   label's border-left to match the accent so the dividing line is one continuous
+   color. (Second-selected case is handled by the rule above since that label
+   owns the divider via its border-left.) */
+.option-select input:checked + label + input + label {
+    border-left-color: var(--toggle-accent);
+}
+
+/* UseStatusColors variant: solid red/green fill for destructive flips
+   (DatabaseEntryRow enable/disable). */
+.option-select input:checked + label[data-use-status-colors="true"]:first-of-type {
+    background-color: var(--clr-red);
+    color: var(--clr-on-status-fill);
+    border-color: var(--clr-red);
+}
+
+.option-select input:checked + label[data-use-status-colors="true"]:last-of-type {
+    background-color: var(--clr-green);
+    color: var(--clr-on-status-fill);
+    border-color: var(--clr-green);
+}
+
+/* Status-colors variant center-line: recolor the second label's border-left to
+   red when the first label (red) is selected. */
+.option-select input:checked + label[data-use-status-colors="true"]:first-of-type + input + label {
+    border-left-color: var(--clr-red);
+}
+
+/* WCAG 2.4.7 / 2.4.11 Focus Appearance: two-tone ring (accent outline + dark
+   box-shadow separator). z-index lifts the focused label above sibling borders. */
+.option-select input:focus-visible + label {
+    position: relative;
+    z-index: 2;
+    outline: 2px solid var(--toggle-accent);
+    outline-offset: 1px;
+    box-shadow: 0 0 0 3px var(--background-dark);
+}
+
+.option-select input:disabled + label {
+    cursor: not-allowed;
+    opacity: 0.5;
+    pointer-events: none;
+}

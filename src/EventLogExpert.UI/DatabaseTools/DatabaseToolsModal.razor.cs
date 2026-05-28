@@ -18,7 +18,8 @@ public sealed partial class DatabaseToolsModal
         (DatabaseToolsTab.Create, "Create Database"),
         (DatabaseToolsTab.Merge, "Merge Databases"),
         (DatabaseToolsTab.Diff, "Diff Databases"),
-        (DatabaseToolsTab.Upgrade, "Upgrade Database")
+        (DatabaseToolsTab.Upgrade, "Upgrade Database"),
+        (DatabaseToolsTab.Manage, "Manage")
     ];
 
     private readonly Dictionary<DatabaseToolsTab, ElementReference> _tabButtonRefs = new();

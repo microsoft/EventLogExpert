@@ -1,0 +1,27 @@
+@inherits InputComponent<bool>
+
+<div aria-describedby="@AriaDescribedBy"
+    aria-label="@EffectiveAriaLabel"
+    aria-labelledby="@AriaLabelledBy"
+    class="option-select @CssClass"
+    role="radiogroup">
+    <input aria-label="@OptionAriaLabel(DisabledString)"
+        checked="@(!Value)"
+        disabled="@Disabled"
+        id="@($"{Id}_false")"
+        name="@Id"
+        @onchange="UpdateValue"
+        type="radio"
+        value="false" />
+    <label data-use-status-colors="@UseStatusColors.ToString().ToLower()" for="@($"{Id}_false")">@DisabledString</label>
+
+    <input aria-label="@OptionAriaLabel(EnabledString)"
+        checked="@(Value)"
+        disabled="@Disabled"
+        id="@($"{Id}_true")"
+        name="@Id"
+        @onchange="UpdateValue"
+        type="radio"
+        value="true" />
+    <label data-use-status-colors="@UseStatusColors.ToString().ToLower()" for="@($"{Id}_true")">@EnabledString</label>
+</div>

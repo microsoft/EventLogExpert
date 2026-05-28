@@ -1,7 +1,7 @@
 @using EventLogExpert.UI.DatabaseTools.Tabs
 @inherits ModalBase<bool>
 
-<ModalChrome AriaLabel="Database Tools"
+<ModalChrome AriaLabel="Databases"
     Footer="FooterPreset.CloseOnly"
     Height="80%"
     InlineAlert="@CurrentInlineAlert"
@@ -13,9 +13,9 @@
     OnInlineAlertResolved="HandleInlineAlertResolvedAsync"
     @ref="ChromeRef">
     <ChildContent>
-        <CascadingValue Value="_verboseLogging" Name="VerboseLogging">
+        <CascadingValue Name="VerboseLogging" Value="_verboseLogging">
             <div class="database-tools">
-                <div aria-orientation="vertical" class="database-tools-tabs" role="tablist" @ref="_tablistRef">
+                <div aria-orientation="vertical" class="database-tools-tabs" @ref="_tablistRef" role="tablist">
                     @foreach (var (tab, label) in s_tabs)
                     {
                         <button aria-controls="@($"db-tabpanel-{tab}")"
@@ -63,6 +63,10 @@
                                     <UpgradeDatabaseTab @ref="_upgradeTab" />
 
                                     break;
+                                case DatabaseToolsTab.Manage:
+                                    <ManageDatabasesTab />
+
+                                    break;
                             }
                         </div>
                     }
@@ -71,18 +75,13 @@
         </CascadingValue>
     </ChildContent>
     <ExtraFooterContent>
-        <div class="verbose-mode" role="group" aria-labelledby="verbose-mode-label">
+        <div aria-labelledby="verbose-mode-label" class="verbose-mode" role="group">
             <span class="verbose-mode-label" id="verbose-mode-label">Output</span>
-            <ValueSelect T="bool"
-                AriaDescribedBy="verbose-mode-help"
+            <OptionSelect AriaDescribedBy="verbose-mode-help"
                 AriaLabelledBy="verbose-mode-label"
-                CssClass="input filter-dropdown verbose-mode-select"
-                ToStringFunc="@(v => v ? "Verbose" : "Normal")"
-                @bind-Value="_verboseLogging">
-                <ValueSelectItem T="bool" Value="false">Normal</ValueSelectItem>
-                <ValueSelectItem T="bool" Value="true">Verbose</ValueSelectItem>
-            </ValueSelect>
-            @* Kept as a visually-hidden span so screen readers still announce the help text on the dropdown. *@
+                @bind-Value="_verboseLogging"
+                DisabledString="Normal"
+                EnabledString="Verbose" />
             <span class="visually-hidden" id="verbose-mode-help">
                 Verbose includes trace-level diagnostic details on next run.
             </span>
