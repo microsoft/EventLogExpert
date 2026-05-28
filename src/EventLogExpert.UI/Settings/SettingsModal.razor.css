@@ -6,6 +6,11 @@
     height: 100%;
 }
 
+/* Padding so :focus-visible rings are not clipped by the ancestor overflow-hidden utility. */
+.settings-form > .flex-column-scroll {
+    padding: .5rem;
+}
+
 .tz-row { margin-bottom: .5rem; }
 
 .fixed-width { width: 50px; }
