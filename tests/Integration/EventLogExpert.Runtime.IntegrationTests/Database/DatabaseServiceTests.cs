@@ -12,6 +12,7 @@ using EventLogExpert.Runtime.IntegrationTests.TestUtils.Constants;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using System.IO.Compression;
 
 namespace EventLogExpert.Runtime.IntegrationTests.Database;
@@ -272,6 +273,22 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV3Schema(dbPath);
+
+        var service = CreateDatabaseService();
+
+        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(service.Entries);
+        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
     public async Task ClassifyEntriesAsync_WhenV3SchemaWithUpgradeBak_ShouldDetectAsUpgradeRequiredAndBackupExistsTrue()
     {
         var databasePath = CreateDatabaseDirectory();
@@ -292,18 +309,18 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ClassifyEntriesAsync_WhenV3Schema_ShouldDetectAsUpgradeRequired()
+    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
     {
         var databasePath = CreateDatabaseDirectory();
         var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV3Schema(dbPath);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
 
         var service = CreateDatabaseService();
 
         await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
 
         var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.UpgradeRequired, entry.Status);
+        Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
     }
 
@@ -325,22 +342,6 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(DatabaseStatus.Ready, entry.Status);
         Assert.False(entry.BackupExists);
         Assert.False(File.Exists(bakPath), "Stale .upgrade.bak must be cleaned up once the main file reaches V4.");
-    }
-
-    [Fact]
-    public async Task ClassifyEntriesAsync_WhenV4Schema_ShouldDetectAsReady()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
-        DatabaseSeedUtils.SeedV4Schema(dbPath);
-
-        var service = CreateDatabaseService();
-
-        await service.ClassifyEntriesAsync(TestContext.Current.CancellationToken);
-
-        var entry = Assert.Single(service.Entries);
-        Assert.Equal(DatabaseStatus.Ready, entry.Status);
-        Assert.False(entry.BackupExists);
     }
 
     [Fact]
@@ -664,25 +665,6 @@ public sealed class DatabaseServiceTests : IDisposable
     }
 
     [Fact]
-    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
-    {
-        var databasePath = CreateDatabaseDirectory();
-        CreateDatabaseFile(databasePath, Constants.TestDb1);
-
-        var service = CreateDatabaseService();
-
-        var secondSubscriberInvocations = 0;
-
-        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
-        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
-
-        service.Toggle(Constants.TestDb1);
-
-        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
-        Assert.Equal(1, secondSubscriberInvocations);
-    }
-
-    [Fact]
     public void Entries_WhenMixedVersionedAndNonVersioned_ShouldSortCorrectly()
     {
         // Arrange
@@ -740,6 +722,25 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.Equal(Constants.DatabaseC + ".db", service.Entries[0].FileName);
         Assert.Equal(Constants.DatabaseB + ".db", service.Entries[1].FileName);
         Assert.Equal(Constants.DatabaseA + ".db", service.Entries[2].FileName);
+    }
+
+    [Fact]
+    public void EntriesChanged_MultipleSubscribers_FirstThrows_ShouldStillInvokeRest()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        CreateDatabaseFile(databasePath, Constants.TestDb1);
+
+        var service = CreateDatabaseService();
+
+        var secondSubscriberInvocations = 0;
+
+        service.EntriesChanged += (_, _) => throw new InvalidOperationException("first subscriber throws");
+        service.EntriesChanged += (_, _) => Interlocked.Increment(ref secondSubscriberInvocations);
+
+        service.Toggle(Constants.TestDb1);
+
+        // If multicast invoke aborted on the first throwing subscriber, this would be 0.
+        Assert.Equal(1, secondSubscriberInvocations);
     }
 
     [Fact]
@@ -1946,6 +1947,78 @@ public sealed class DatabaseServiceTests : IDisposable
         Assert.False(result);
         Assert.True(File.Exists(bakPath));
         Assert.Equal(mainBytesBefore, File.ReadAllBytes(dbPath));
+    }
+
+    [Fact]
+    public async Task RetryClassificationAsync_AlreadyCancelled_Throws()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            async () => await service.RetryClassificationAsync(Constants.TestDb1, cts.Token));
+
+        // Status unchanged since cancellation hits before MarkStatus.
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
+    }
+
+    [Fact]
+    public async Task RetryClassificationAsync_MaintenanceThrows_SetsClassificationFailed()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        var dbPath = Path.Combine(databasePath, Constants.TestDb1);
+        DatabaseSeedUtils.SeedV4Schema(dbPath);
+
+        var fileLocationOptions = new FileLocationOptions(_testDirectory);
+        var preferences = Substitute.For<IDatabasePreferencesProvider>();
+        preferences.DisabledDatabasesPreference.Returns([]);
+        var logger = Substitute.For<ITraceLogger>();
+        var failingMaintenance = Substitute.For<IProviderDatabaseMaintenance>();
+        failingMaintenance.CheckSchemaState(Arg.Any<string>()).Throws(new SqliteException("boom", 1));
+
+        var entryStore = new DatabaseRegistry(fileLocationOptions, preferences, logger);
+        entryStore.Refresh();
+        var classification = new DatabaseClassificationService(entryStore, fileLocationOptions, failingMaintenance, logger);
+
+        await classification.RetryClassificationAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        var entry = entryStore.Entries.Single(e => e.FileName == Constants.TestDb1);
+        Assert.Equal(DatabaseStatus.ClassificationFailed, entry.Status);
+        Assert.False(entry.BackupExists);
+    }
+
+    [Fact]
+    public async Task RetryClassificationAsync_MissingEntry_NoOps()
+    {
+        CreateDatabaseDirectory();
+        var service = CreateDatabaseService();
+
+        // Should not throw; missing entry is treated as stale UI.
+        await service.RetryClassificationAsync("does-not-exist.db", TestContext.Current.CancellationToken);
+
+        Assert.Empty(service.Entries);
+    }
+
+    [Fact]
+    public async Task RetryClassificationAsync_Success_UpdatesEntryToReady()
+    {
+        var databasePath = CreateDatabaseDirectory();
+        DatabaseSeedUtils.SeedV4Schema(Path.Combine(databasePath, Constants.TestDb1));
+
+        var service = CreateDatabaseService();
+        // Reset to a stale status so we can observe the classification.
+        service.MarkStatus(Constants.TestDb1, DatabaseStatus.ClassificationFailed);
+        Assert.Equal(DatabaseStatus.ClassificationFailed, service.Entries[0].Status);
+
+        await service.RetryClassificationAsync(Constants.TestDb1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(DatabaseStatus.Ready, service.Entries[0].Status);
     }
 
     [Fact]

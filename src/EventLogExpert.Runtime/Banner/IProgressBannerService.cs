@@ -9,5 +9,5 @@ public interface IProgressBannerService
 
     BannerProgressEntry? BackgroundProgress { get; }
 
-    BannerProgressEntry? SettingsProgress { get; }
+    BannerProgressEntry? ManageDatabasesProgress { get; }
 }

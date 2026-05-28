@@ -45,30 +45,7 @@ internal sealed class DatabaseClassificationService
 
                     foreach (var entry in snapshot)
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-
-                        try
-                        {
-                            if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
-                            {
-                                perFile[entry.FileName] = (DatabaseStatus.UnrecognizedSchema, false);
-
-                                continue;
-                            }
-
-                            var state = _maintenance.CheckSchemaState(entry.FullPath);
-                            var status = MapSchemaVersionToStatus(state.CurrentVersion);
-                            var backupExists = ProbeOrCleanupBackup(entry, status);
-
-                            perFile[entry.FileName] = (status, backupExists);
-                        }
-                        catch (Exception ex) when (ex is not OperationCanceledException)
-                        {
-                            perFile[entry.FileName] = (DatabaseStatus.ClassificationFailed, false);
-
-                            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
-                                $"{nameof(DatabaseClassificationService)}.{nameof(ClassifyEntriesAsync)} failed to classify '{entry.FileName}': {ex}"));
-                        }
+                        perFile[entry.FileName] = ClassifyEntry(entry, cancellationToken);
                     }
 
                     return perFile;
@@ -79,6 +56,36 @@ internal sealed class DatabaseClassificationService
         _entryStore.ApplyClassificationResults(statuses);
     }
 
+    public async Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var entry = _entryStore.SnapshotEntries()
+            .FirstOrDefault(e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+        if (entry is null) { return; }
+
+        try
+        {
+            _entryStore.MarkStatus(fileName, DatabaseStatus.NotClassified);
+        }
+        catch (InvalidOperationException)
+        {
+            // Entry was removed between SnapshotEntries() and MarkStatus(). Stale UI; nothing to retry.
+            return;
+        }
+
+        var result = await Task.Run(
+                () => ClassifyEntry(entry, cancellationToken),
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        _entryStore.ApplyClassificationResults(
+            new Dictionary<string, (DatabaseStatus Status, bool BackupExists)>(StringComparer.OrdinalIgnoreCase)
+            {
+                [fileName] = result
+            });
+    }
+
     private static DatabaseStatus MapSchemaVersionToStatus(int currentVersion) =>
         currentVersion switch
         {
@@ -87,6 +94,34 @@ internal sealed class DatabaseClassificationService
             1 or 2 => DatabaseStatus.ObsoleteSchema,
             _ => DatabaseStatus.UnrecognizedSchema,
         };
+
+    private (DatabaseStatus Status, bool BackupExists) ClassifyEntry(
+        DatabaseEntry entry,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            if (!File.Exists(entry.FullPath) || new FileInfo(entry.FullPath).Length == 0)
+            {
+                return (DatabaseStatus.UnrecognizedSchema, false);
+            }
+
+            var state = _maintenance.CheckSchemaState(entry.FullPath);
+            var status = MapSchemaVersionToStatus(state.CurrentVersion);
+            var backupExists = ProbeOrCleanupBackup(entry, status);
+
+            return (status, backupExists);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            DatabaseRegistry.SafeLog(() => _traceLogger.Warning(
+                $"{nameof(DatabaseClassificationService)}.{nameof(ClassifyEntry)} failed to classify '{entry.FileName}': {ex}"));
+
+            return (DatabaseStatus.ClassificationFailed, false);
+        }
+    }
 
     private bool ProbeOrCleanupBackup(DatabaseEntry entry, DatabaseStatus status)
     {

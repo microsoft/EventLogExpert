@@ -47,6 +47,8 @@ public interface IDatabaseService : IAsyncDisposable
 
     Task<bool> RestoreFromBackupAsync(string fileName, CancellationToken cancellationToken = default);
 
+    Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default);
+
     void Toggle(string fileName);
 
     Task<UpgradeBatchResult> UpgradeBatchAsync(

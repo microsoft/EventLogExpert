@@ -5,7 +5,6 @@
 <ModalChrome AriaLabel="Settings"
     CancelLabel="Exit"
     Footer="FooterPreset.SaveCancel"
-    FooterDisabled="@IsCloseBlocked"
     Height="60%"
     InlineAlert="@CurrentInlineAlert"
     OnCancel="HandleCancelButtonClickAsync"
@@ -18,8 +17,6 @@
     <ChildContent>
         <div class="settings-form">
             <div class="flex-column-scroll">
-                <SettingsUpgradeProgressBanner />
-
                 <div class="flex-center-aligned-row tz-row">
                     <label for="settings-timezone">Time Zone:</label>
                     <ValueSelect @bind-Value="_timeZoneId" CssClass="input timezone-dropdown" Id="settings-timezone" T="string">
@@ -30,51 +27,6 @@
                     </ValueSelect>
                 </div>
 
-                <h3 class="visually-hidden">Databases</h3>
-                <div class="flex-space-between">
-                    <div>Databases:</div>
-
-                    <button class="button"
-                        id="settings-import-button"
-                        @onclick="ImportDatabase"
-                        @ref="_importButtonRef"
-                        type="button">
-                        <i aria-hidden="true" class="bi bi-plus-circle"></i> Import Database
-                    </button>
-                </div>
-
-                @if (IsClassificationPending)
-                {
-                    <div class="classification-pending" role="status">
-                        <i aria-hidden="true" class="banner-spinner bi bi-arrow-repeat"></i>
-                        <span>Classifying databases&hellip;</span>
-                    </div>
-                }
-
-                <div class="flex-column-scroll">
-                    @if (DatabaseService.Entries.Count > 0)
-                    {
-                        @foreach (var entry in DatabaseService.Entries)
-                        {
-                            <DatabaseEntryRow EffectiveEnabled="GetEffectiveEnabled(entry)"
-                                Entry="@entry"
-                                IsClassificationPending="@IsClassificationPending"
-                                IsTogglePending="@_pendingToggles.ContainsKey(entry.FileName)"
-                                IsUpgradeBlocked="@(IsAnyUpgradeInFlight && !Coordinator.IsUpgradeInFlight(entry.FileName))"
-                                IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
-                                @key="entry.FileName"
-                                OnRemove="@(() => RemoveDatabase(entry))"
-                                OnToggle="@(() => ToggleDatabase(entry.FileName))"
-                                OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
-                        }
-                    }
-                    else if (!IsClassificationPending)
-                    {
-                        <SettingsDatabasesEmptyState />
-                    }
-                </div>
-
-                <h3 class="visually-hidden">Preferences</h3>
                 <div class="flex-center-aligned-row">
                     <text>Expand Display Pane On Selection Change:</text>
                     <Toggle AriaLabel="Expand Display Pane On Selection Change" @bind-Value="_showDisplayPaneOnSelectionChange" />
