@@ -177,6 +177,7 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (outcome.DatabaseStateChanged)
         {
+            _schemaUpgradeOccurred = true;
             AnnouncementService.Announce("Database imported");
         }
     }
