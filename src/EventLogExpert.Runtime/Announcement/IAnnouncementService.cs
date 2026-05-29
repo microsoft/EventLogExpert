@@ -10,7 +10,7 @@ namespace EventLogExpert.Runtime.Announcement;
 /// </summary>
 public interface IAnnouncementService
 {
-    event Action StateChanged;
+    event Action? StateChanged;
 
     string CurrentAnnouncement { get; }
 
