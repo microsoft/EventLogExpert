@@ -15,6 +15,8 @@ public sealed class UpgradeBatchStartedEventArgs(
 
     public int BatchSize { get; } = batchSize;
 
+    public IReadOnlyList<string> FileNames { get; init; } = [];
+
     public UpgradeProgressScope Scope { get; } = scope;
 
     public void Cancel()

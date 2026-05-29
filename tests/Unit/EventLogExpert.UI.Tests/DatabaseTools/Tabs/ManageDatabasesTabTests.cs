@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
+using System.Collections.Frozen;
 using System.Reflection;
 using TestContext = Xunit.TestContext;
 
@@ -65,6 +66,27 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.True(saved);
         _announcementService.DidNotReceive().Announce(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task Background_PreProgress_IsFileInActiveBatch_DetectsFileInBatch()
+    {
+        var entry = Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: string.Empty,
+            currentPhase: UpgradePhase.BackingUp,
+            scope: UpgradeProgressScope.Background,
+            batchFileNames: new[] { "b.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase)));
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -200,6 +222,134 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public async Task CancelThenRemove_DuringPreProgressWindow_CancelsActualBatchAndProceeds()
+    {
+        var entry = Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        var batchId = UpgradeBatchId.Create();
+        var cancelCalled = false;
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: string.Empty,
+            currentPhase: UpgradePhase.BackingUp,
+            scope: UpgradeProgressScope.Background,
+            batchId: batchId,
+            cancel: () => cancelCalled = true,
+            batchFileNames: new[] { "b.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase)));
+
+        var component = Render<ManageDatabasesTab>();
+
+        var cancelTask = InvokeCancelUpgradesAsync(component, ["b.db"]);
+
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.True(cancelCalled);
+        Assert.False(cancelTask.IsCompleted);
+
+        _databaseService.RaiseUpgradeBatchCompleted(
+            new UpgradeBatchCompletedEventArgs(
+                batchId,
+                new UpgradeBatchResult([], ["b.db"], []),
+                wasCancelled: true));
+
+        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task CancelThenRemove_FileNotYetReachedInActiveBatch_CancelsBatchAndProceeds()
+    {
+        var entry = Entry("c.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        var batchId = UpgradeBatchId.Create();
+        var cancelCalled = false;
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: "a.db",
+            currentPhase: UpgradePhase.MigratingSchema,
+            scope: UpgradeProgressScope.Background,
+            batchId: batchId,
+            cancel: () => cancelCalled = true,
+            batchFileNames: new[] { "a.db", "b.db", "c.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase)));
+
+        var component = Render<ManageDatabasesTab>();
+
+        var cancelTask = InvokeCancelUpgradesAsync(component, ["c.db"]);
+
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.True(cancelCalled);
+        Assert.False(cancelTask.IsCompleted);
+
+        _databaseService.RaiseUpgradeBatchCompleted(
+            new UpgradeBatchCompletedEventArgs(
+                batchId,
+                new UpgradeBatchResult([], ["c.db"], []),
+                wasCancelled: true));
+
+        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task CancelThenRemove_PreProgressWindow_AwaitsUpgradeBatchCompletedBeforeRemoveAndProceedsPromptly()
+    {
+        var entry = Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        var batchId = UpgradeBatchId.Create();
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: string.Empty,
+            currentPhase: UpgradePhase.BackingUp,
+            scope: UpgradeProgressScope.Background,
+            batchId: batchId,
+            batchFileNames: new[] { "b.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase)));
+
+        var component = Render<ManageDatabasesTab>();
+
+        var cancelTask = InvokeCancelUpgradesAsync(component, ["b.db"]);
+
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+
+        Assert.False(cancelTask.IsCompleted);
+
+        var beforeRaise = DateTime.UtcNow;
+        _databaseService.RaiseUpgradeBatchCompleted(
+            new UpgradeBatchCompletedEventArgs(
+                batchId,
+                new UpgradeBatchResult([], ["b.db"], []),
+                wasCancelled: true));
+
+        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+        var elapsed = DateTime.UtcNow - beforeRaise;
+        // Must complete well under s_cancelTimeout (30s) — otherwise a hang regression would pass.
+        Assert.True(elapsed < TimeSpan.FromSeconds(2), $"Cancel flow took {elapsed} after batch completion (should be <2s).");
+    }
+
+    [Fact]
+    public async Task CancelThenRemove_QueuedBatchFile_AwaitsConsumerPickupAndCompletionBeforeRemove()
+    {
+        var entry = Entry("c.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        var batchId = UpgradeBatchId.Create();
+        var cancelCalled = false;
+        _databaseService.QueuedBatchesForTest = [new QueuedBatchInfo(
+            batchId,
+            UpgradeProgressScope.Background,
+            new[] { "c.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
+            () => cancelCalled = true)];
+
+        var component = Render<ManageDatabasesTab>();
+
+        var cancelTask = InvokeCancelUpgradesAsync(component, ["c.db"]);
+
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        Assert.True(cancelCalled);
+        Assert.False(cancelTask.IsCompleted);
+
+        _databaseService.RaiseUpgradeBatchCompleted(
+            new UpgradeBatchCompletedEventArgs(
+                batchId,
+                new UpgradeBatchResult([], ["c.db"], []),
+                wasCancelled: true));
+
+        await cancelTask.WaitAsync(TimeSpan.FromSeconds(2), TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
     public async Task ClearSelection_EmptiesSet_HidesBulkStrip()
     {
         _databaseService.Entries = [
@@ -296,6 +446,23 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.Equal(0, _databaseService.EntriesChangedHandlerCount);
         Assert.Equal(0, _databaseService.UpgradeBatchCompletedHandlerCount);
+    }
+
+    [Fact]
+    public async Task GetUpgradeProgressForEntry_Display_OnlyMatchesCurrentEntryName_NotBatchFileNames()
+    {
+        var entry = Entry("b.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
+        _databaseService.Entries = [entry];
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: string.Empty,
+            currentPhase: UpgradePhase.BackingUp,
+            scope: UpgradeProgressScope.Background,
+            batchFileNames: new[] { "b.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase)));
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll(".db-entry-upgrading-text"));
+        await Task.CompletedTask;
     }
 
     [Fact]
@@ -454,6 +621,27 @@ public sealed class ManageDatabasesTabTests : BunitContext
         await Task.Delay(50, TestContext.Current.CancellationToken);
 
         Assert.True(component.Instance.HasDatabaseStateChanged);
+    }
+
+    [Fact]
+    public async Task Remove_FileInQueuedBatch_IsAnyFileUpgradingReturnsTrue()
+    {
+        var entry = Entry("c.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+        _databaseService.QueuedBatchesForTest = [new QueuedBatchInfo(
+            UpgradeBatchId.Create(),
+            UpgradeProgressScope.Background,
+            new[] { "c.db" }.ToFrozenSet(StringComparer.OrdinalIgnoreCase),
+            () => { })];
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -728,22 +916,41 @@ public sealed class ManageDatabasesTabTests : BunitContext
     private static DatabaseEntry Entry(string fileName, bool isEnabled, DatabaseStatus status, bool backupExists = false) =>
         new(fileName, $@"C:\dbs\{fileName}", isEnabled, status, backupExists);
 
+    private static Task InvokeCancelUpgradesAsync(
+        IRenderedComponent<ManageDatabasesTab> component,
+        IReadOnlyList<string> fileNames)
+    {
+        // Reflection bypasses the bunit click + alert-surface chain so the test can deterministically
+        // interleave the batch-completion signal with the await on pendingBatches.
+        var method = typeof(ManageDatabasesTab).GetMethod(
+            "CancelUpgradesAndAwaitCompletionAsync",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(method);
+        return (Task)method!.Invoke(component.Instance, [fileNames])!;
+    }
+
     private static BannerProgressEntry MakeProgress(
         string currentEntryName = "a.db",
         UpgradePhase currentPhase = UpgradePhase.MigratingSchema,
         int currentBatchPosition = 1,
         int currentBatchSize = 1,
         int queuedBatchesAfter = 0,
-        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered) =>
+        UpgradeProgressScope scope = UpgradeProgressScope.ManageDatabasesTriggered,
+        UpgradeBatchId? batchId = null,
+        Action? cancel = null,
+        IReadOnlySet<string>? batchFileNames = null) =>
         new(
-            UpgradeBatchId.Create(),
+            batchId ?? UpgradeBatchId.Create(),
             scope,
             currentBatchPosition,
             currentBatchSize,
             currentEntryName,
             currentPhase,
             queuedBatchesAfter,
-            () => { });
+            cancel ?? (() => { }))
+        {
+            BatchFileNames = batchFileNames ?? FrozenSet<string>.Empty
+        };
 
     private IRenderedComponent<ManageDatabasesTab> RenderWithAlertSurface(IInlineAlertSurface alertSurface) =>
         Render<ManageDatabasesTab>(parameters => parameters

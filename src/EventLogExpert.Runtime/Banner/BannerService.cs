@@ -4,6 +4,7 @@
 using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using System.Collections.Frozen;
 using System.Collections.Immutable;
 
 namespace EventLogExpert.Runtime.Banner;
@@ -433,7 +434,10 @@ internal sealed class BannerService
             string.Empty,
             UpgradePhase.BackingUp,
             _databaseService.QueuedBatchCount,
-            args.Cancel);
+            args.Cancel)
+        {
+            BatchFileNames = args.FileNames.ToFrozenSet(StringComparer.OrdinalIgnoreCase)
+        };
 
         lock (_stateLock)
         {

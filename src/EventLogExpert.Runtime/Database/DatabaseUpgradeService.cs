@@ -5,6 +5,8 @@ using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Provider.Maintenance;
 using EventLogExpert.Provider.Schema;
 using EventLogExpert.Runtime.Database.Upgrade;
+using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Threading.Channels;
 
 namespace EventLogExpert.Runtime.Database;
@@ -15,6 +17,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     private readonly CancellationTokenSource _disposeCts = new();
     private readonly Task _initialClassificationTask;
     private readonly IProviderDatabaseMaintenance _maintenance;
+    private readonly ConcurrentDictionary<UpgradeBatchId, UpgradeBatch> _queuedBatches = new();
     private readonly DatabaseRegistry _registry;
     private readonly ITraceLogger _traceLogger;
     private readonly Channel<UpgradeBatch> _upgradeQueue = Channel.CreateUnbounded<UpgradeBatch>(
@@ -76,6 +79,30 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
         }
 
         _disposeCts.Dispose();
+    }
+
+    /// <summary>Snapshot of enqueued batches not yet picked up by the consumer.</summary>
+    public IReadOnlyList<QueuedBatchInfo> SnapshotQueuedBatches()
+    {
+        var snapshot = _queuedBatches.Values;
+        var list = new List<QueuedBatchInfo>(snapshot.Count);
+
+        foreach (var batch in snapshot)
+        {
+            var fileNames = batch.Entries
+                .Select(entry => entry.FileName)
+                .ToFrozenSet(StringComparer.OrdinalIgnoreCase);
+
+            Action cancel = () =>
+            {
+                try { batch.BatchCts.Cancel(); }
+                catch (ObjectDisposedException) { /* Already disposed; cancellation is moot. */ }
+            };
+
+            list.Add(new QueuedBatchInfo(batch.Id, batch.Scope, fileNames, cancel));
+        }
+
+        return list;
     }
 
     public async Task<UpgradeBatchResult> UpgradeBatchAsync(
@@ -160,12 +187,14 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
             rejected);
 
         Interlocked.Increment(ref _queuedBatchCount);
+        _queuedBatches[batch.Id] = batch;
 
         if (_upgradeQueue.Writer.TryWrite(batch))
         {
             return await tcs.Task.ConfigureAwait(false);
         }
 
+        _queuedBatches.TryRemove(batch.Id, out _);
         Interlocked.Decrement(ref _queuedBatchCount);
         batchCts.Dispose();
 
@@ -216,6 +245,7 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
     {
         while (_upgradeQueue.Reader.TryRead(out var batch))
         {
+            _queuedBatches.TryRemove(batch.Id, out _);
             Interlocked.Decrement(ref _queuedBatchCount);
 
             try { batch.BatchCts.Cancel(); }
@@ -235,6 +265,9 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
 
     private async Task ProcessBatchAsync(UpgradeBatch batch)
     {
+        // _queuedBatches.TryRemove deferred until after SafeRaise UpgradeBatchStarted: gives an
+        // explicit superset overlap (file findable in queued snapshot OR active progress at all
+        // times) instead of a transition gap the remove flow's lookup could miss.
         Interlocked.Decrement(ref _queuedBatchCount);
 
         var succeeded = new List<string>(batch.Entries.Count);
@@ -248,8 +281,13 @@ internal sealed class DatabaseUpgradeService : IAsyncDisposable
             _registry.SafeRaise(
                 UpgradeBatchStarted,
                 this,
-                new UpgradeBatchStartedEventArgs(batch.Id, batch.Scope, batch.Entries.Count, batch.BatchCts),
+                new UpgradeBatchStartedEventArgs(batch.Id, batch.Scope, batch.Entries.Count, batch.BatchCts)
+                {
+                    FileNames = batch.Entries.Select(entry => entry.FileName).ToArray()
+                },
                 nameof(UpgradeBatchStarted));
+
+            _queuedBatches.TryRemove(batch.Id, out _);
 
             for (var i = 0; i < batch.Entries.Count; i++)
             {

@@ -100,6 +100,9 @@ internal sealed class DatabaseService(
     public Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default) =>
         _classificationService.RetryClassificationAsync(fileName, cancellationToken);
 
+    public IReadOnlyList<QueuedBatchInfo> SnapshotQueuedBatches() =>
+        _upgradeService.SnapshotQueuedBatches();
+
     public void Toggle(string fileName) => _registry.Toggle(fileName);
 
     public Task<UpgradeBatchResult> UpgradeBatchAsync(

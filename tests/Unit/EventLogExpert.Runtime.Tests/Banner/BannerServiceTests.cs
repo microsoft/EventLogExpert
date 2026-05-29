@@ -429,6 +429,69 @@ public sealed class BannerServiceTests
     }
 
     [Fact]
+    public void OnUpgradeBatchProgress_PreservesBatchFileNamesOnRecordWith()
+    {
+        var databaseService = Substitute.For<IDatabaseService>();
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        var batchId = UpgradeBatchId.Create();
+        using var cts = new CancellationTokenSource();
+        var startedArgs = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 2, cts)
+        {
+            FileNames = ["a.db", "b.db"]
+        };
+        databaseService.UpgradeBatchStarted += Raise.EventWith(databaseService, startedArgs);
+
+        var progressArgs = new UpgradeBatchProgressEventArgs(batchId, 1, "a.db", UpgradePhase.MigratingSchema);
+        databaseService.UpgradeBatchProgress += Raise.EventWith(databaseService, progressArgs);
+
+        var progress = sut.BackgroundProgress;
+        Assert.NotNull(progress);
+        Assert.Equal("a.db", progress.CurrentEntryName);
+        Assert.Equal(2, progress.BatchFileNames.Count);
+        Assert.Contains("a.db", progress.BatchFileNames);
+        Assert.Contains("b.db", progress.BatchFileNames);
+    }
+
+    [Fact]
+    public void OnUpgradeBatchStarted_FileNamesEmpty_DefaultsToEmptySet()
+    {
+        var databaseService = Substitute.For<IDatabaseService>();
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        var batchId = UpgradeBatchId.Create();
+        using var cts = new CancellationTokenSource();
+        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 1, cts);
+
+        databaseService.UpgradeBatchStarted += Raise.EventWith(databaseService, args);
+
+        var progress = sut.BackgroundProgress;
+        Assert.NotNull(progress);
+        Assert.NotNull(progress.BatchFileNames);
+        Assert.Empty(progress.BatchFileNames);
+    }
+
+    [Fact]
+    public void OnUpgradeBatchStarted_PopulatesBatchFileNamesCaseInsensitive()
+    {
+        var databaseService = Substitute.For<IDatabaseService>();
+        var sut = new BannerService(databaseService, Substitute.For<ITraceLogger>());
+        var batchId = UpgradeBatchId.Create();
+        using var cts = new CancellationTokenSource();
+        var args = new UpgradeBatchStartedEventArgs(batchId, UpgradeProgressScope.Background, 2, cts)
+        {
+            FileNames = ["DB-One.db", "Db-Two.db"]
+        };
+
+        databaseService.UpgradeBatchStarted += Raise.EventWith(databaseService, args);
+
+        var progress = sut.BackgroundProgress;
+        Assert.NotNull(progress);
+        Assert.Equal(2, progress.BatchFileNames.Count);
+        Assert.Contains("db-one.db", progress.BatchFileNames);
+        Assert.Contains("DB-ONE.DB", progress.BatchFileNames);
+        Assert.Contains("db-two.db", progress.BatchFileNames);
+    }
+
+    [Fact]
     public void RaiseStateChanged_WhenSubscriberThrows_StillFiresLaterSubscribersAndLogs()
     {
         // Arrange — multicast safety: a throwing subscriber must not block siblings, and the throw

@@ -49,6 +49,8 @@ public interface IDatabaseService : IAsyncDisposable
 
     Task RetryClassificationAsync(string fileName, CancellationToken cancellationToken = default);
 
+    IReadOnlyList<QueuedBatchInfo> SnapshotQueuedBatches();
+
     void Toggle(string fileName);
 
     Task<UpgradeBatchResult> UpgradeBatchAsync(
