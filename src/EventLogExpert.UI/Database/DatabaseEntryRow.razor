@@ -52,9 +52,9 @@
                     <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
                         aria-label="@($"Retry upgrade of database {Entry.FileName}")"
                         class="button button-red db-entry-upgrade-btn"
-                        @onclick="@(() =>
+                        @onclick="@(async () =>
                                   {
-                                      if (!IsUpgradeBlocked) OnUpgrade.InvokeAsync();
+                                      if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
                                   })"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-clockwise"></i> Retry Upgrade
@@ -65,9 +65,9 @@
                     <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
                         aria-label="@($"Restore database {Entry.FileName} from backup")"
                         class="button db-entry-restore-btn"
-                        @onclick="@(() =>
+                        @onclick="@(async () =>
                                   {
-                                      if (!IsUpgradeBlocked) OnRestoreFromBackup.InvokeAsync();
+                                      if (!IsUpgradeBlocked) { await OnRestoreFromBackup.InvokeAsync(); }
                                   })"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-counterclockwise"></i> Restore
