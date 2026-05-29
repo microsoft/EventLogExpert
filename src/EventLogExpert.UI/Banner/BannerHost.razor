@@ -1,72 +1,66 @@
-@{
+@if (RendersContent)
+{
+    BannerCycleItem? selected = CycleState.SelectedItem;
+    IReadOnlyList<BannerCycleItem> items = CycleState.Items;
+    BannerView view = CycleState.CurrentView;
+    int displayedIndex = CycleState.DisplayedIndex;
+
     Exception? currentCritical = CriticalErrorService.CurrentCritical;
     IReadOnlyList<ErrorBannerEntry> errors = ErrorBannerService.ErrorBanners;
     IReadOnlyList<BannerInfoEntry> infos = InfoBannerService.InfoBanners;
     IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
-    bool attentionDismissed = AttentionBannerService.AttentionDismissed;
     BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
-    bool attentionSuppressedByModalContext = IsAttentionSuppressedByModalContext();
 
-    (BannerCycleItem? selected, BannerView view) = RebuildItemsAndPickSelected(
-        currentCritical,
-        errors,
-        attentionEntries,
-        attentionDismissed,
-        attentionSuppressedByModalContext,
-        backgroundProgress,
-        infos);
-
-    _currentView = view;
-    bool showCyclePagination = _items.Count > 1 && view != BannerView.Critical;
+    bool showCyclePagination = items.Count > 1 && view != BannerView.Critical;
 
     RenderFragment cycleNav = @<text>
                                    @if (showCyclePagination)
                                    {
-                                       <span class="banner-pagination">@(_displayedIndex + 1) of @_items.Count</span>
+                                       <span class="banner-pagination">@(displayedIndex + 1) of @items.Count</span>
                                        <button aria-label="Previous banner"
                                            class="banner-cycle-prev button"
-                                           disabled="@(_displayedIndex == 0)"
-                                           @onclick="OnCyclePrev"
+                                           disabled="@(displayedIndex == 0)"
+                                           @onclick="CycleState.MovePrev"
                                            type="button">
                                            <i aria-hidden="true" class="bi bi-chevron-left"></i>
                                        </button>
                                        <button aria-label="Next banner"
                                            class="banner-cycle-next button"
-                                           disabled="@(_displayedIndex == _items.Count - 1)"
-                                           @onclick="OnCycleNext"
+                                           disabled="@(displayedIndex == items.Count - 1)"
+                                           @onclick="CycleState.MoveNext"
                                            type="button">
                                            <i aria-hidden="true" class="bi bi-chevron-right"></i>
                                        </button>
                                    }
                                </text>;
-}
 
-@switch (view)
-{
-    case BannerView.Critical when currentCritical != null:
-        <CriticalBanner Critical="currentCritical" />
+    @switch (view)
+    {
+        case BannerView.Critical when currentCritical != null:
+            <CriticalBanner Critical="currentCritical" />
 
-        break;
+            break;
 
-    case BannerView.Error when selected != null && selected.IndexWithinSlice < errors.Count:
-        <ErrorBanner CycleNav="cycleNav" Entry="errors[selected.IndexWithinSlice]" />
+        case BannerView.Error when selected != null && selected.IndexWithinSlice < errors.Count:
+            <ErrorBanner CycleNav="cycleNav" Entry="errors[selected.IndexWithinSlice]" />
 
-        break;
+            break;
 
-    case BannerView.Attention when attentionEntries.Count > 0:
-        <AttentionBanner AttentionCount="attentionEntries.Count"
-            CycleNav="cycleNav"
-            OnFallbackErrorPosted="HandleFallbackErrorPosted" />
+        case BannerView.Attention when attentionEntries.Count > 0:
+            <AttentionBanner AttentionCount="attentionEntries.Count"
+                CycleNav="cycleNav"
+                OnFallbackErrorPosted="HandleFallbackErrorPosted" />
 
-        break;
+            break;
 
-    case BannerView.UpgradeProgress when backgroundProgress is { } progress:
-        <UpgradeProgressBanner CycleNav="cycleNav" Progress="progress" />
+        case BannerView.UpgradeProgress when backgroundProgress is { } progress:
+            <UpgradeProgressBanner CycleNav="cycleNav" Progress="progress" />
 
-        break;
+            break;
 
-    case BannerView.Info when selected != null && selected.IndexWithinSlice < infos.Count:
-        <InfoBanner CycleNav="cycleNav" Entry="infos[selected.IndexWithinSlice]" />
+        case BannerView.Info when selected != null && selected.IndexWithinSlice < infos.Count:
+            <InfoBanner CycleNav="cycleNav" Entry="infos[selected.IndexWithinSlice]" />
 
-        break;
+            break;
+    }
 }

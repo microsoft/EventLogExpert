@@ -2,7 +2,9 @@
     Application root. The hybrid shell is intentionally non-routed: there are no @page directives anywhere.
     BannerHost lives outside UnhandledExceptionHandler so the error banner survives when child rendering faults.
 *@
-<BannerHost />
+<div class="banner-region">
+    <BannerHost Location="BannerHostLocation.MainLayout" />
+</div>
 
 <UnhandledExceptionHandler>
     <Fluxor.Blazor.Web.StoreInitializer />

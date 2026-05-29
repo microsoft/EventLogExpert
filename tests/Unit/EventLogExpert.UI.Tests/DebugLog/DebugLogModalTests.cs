@@ -34,6 +34,8 @@ public sealed class DebugLogModalTests : BunitContext
 
     public DebugLogModalTests()
     {
+        Services.AddBannerHostDependencies();
+
         _modalService.ActiveModalId.Returns(new ModalId(1L));
 
         Services.AddSingleton(_alertDialogService);
