@@ -15,6 +15,7 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
     private readonly IInfoBannerService _infos;
     private readonly IModalCoordinator _modalCoordinator;
     private readonly IProgressBannerService _progress;
+    private readonly Lock _stateLock = new();
 
     private BannerView _currentView;
     private int _displayedIndex;
@@ -50,15 +51,30 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
 
     public event Action? StateChanged;
 
-    public BannerView CurrentView => _currentView;
+    public BannerView CurrentView
+    {
+        get { using (_stateLock.EnterScope()) { return _currentView; } }
+    }
 
-    public int DisplayedIndex => _displayedIndex;
+    public int DisplayedIndex
+    {
+        get { using (_stateLock.EnterScope()) { return _displayedIndex; } }
+    }
 
-    public IReadOnlyList<BannerCycleItem> Items => _items;
+    public IReadOnlyList<BannerCycleItem> Items
+    {
+        get { using (_stateLock.EnterScope()) { return _items; } }
+    }
 
-    public bool ModalContentDisplayed => _modalContentDisplayed;
+    public bool ModalContentDisplayed
+    {
+        get { using (_stateLock.EnterScope()) { return _modalContentDisplayed; } }
+    }
 
-    public BannerCycleItem? SelectedItem => _selectedItem;
+    public BannerCycleItem? SelectedItem
+    {
+        get { using (_stateLock.EnterScope()) { return _selectedItem; } }
+    }
 
     public void Dispose()
     {
@@ -72,36 +88,54 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
 
     public void MoveNext()
     {
-        if (_displayedIndex >= _items.Count - 1) { return; }
+        using (_stateLock.EnterScope())
+        {
+            var items = _items;
+            if (_displayedIndex >= items.Count - 1) { return; }
 
-        _displayedIndex++;
-        _selectedItem = _items[_displayedIndex];
-        _currentView = _selectedItem.View;
+            _displayedIndex++;
+            _selectedItem = items[_displayedIndex];
+            _currentView = _selectedItem.View;
+        }
+
         StateChanged?.Invoke();
     }
 
     public void MovePrev()
     {
-        if (_displayedIndex <= 0) { return; }
+        using (_stateLock.EnterScope())
+        {
+            var items = _items;
+            if (_displayedIndex <= 0 || items.Count == 0) { return; }
 
-        _displayedIndex--;
-        _selectedItem = _items[_displayedIndex];
-        _currentView = _selectedItem.View;
+            _displayedIndex--;
+            _selectedItem = items[_displayedIndex];
+            _currentView = _selectedItem.View;
+        }
+
         StateChanged?.Invoke();
     }
 
     public void RegisterFallbackError(BannerCycleItem newCycleItem)
     {
-        _pendingOverrideItem = newCycleItem;
-        RebuildAndReselect();
+        using (_stateLock.EnterScope())
+        {
+            _pendingOverrideItem = newCycleItem;
+            RebuildAndReselectLocked();
+        }
+
         StateChanged?.Invoke();
     }
 
     public void SetModalContentDisplayed(bool displayed)
     {
-        if (_modalContentDisplayed == displayed) { return; }
+        using (_stateLock.EnterScope())
+        {
+            if (_modalContentDisplayed == displayed) { return; }
 
-        _modalContentDisplayed = displayed;
+            _modalContentDisplayed = displayed;
+        }
+
         StateChanged?.Invoke();
     }
 
@@ -114,11 +148,23 @@ public sealed class BannerCycleStateService : IBannerCycleStateService, IDisposa
 
     private void OnFacetChanged()
     {
-        RebuildAndReselect();
+        using (_stateLock.EnterScope())
+        {
+            RebuildAndReselectLocked();
+        }
+
         StateChanged?.Invoke();
     }
 
     private void RebuildAndReselect()
+    {
+        using (_stateLock.EnterScope())
+        {
+            RebuildAndReselectLocked();
+        }
+    }
+
+    private void RebuildAndReselectLocked()
     {
         if (_modalCoordinator.ActiveSession is null)
         {

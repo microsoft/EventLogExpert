@@ -1,6 +1,7 @@
 // // Copyright (c) Microsoft Corporation.
 // // Licensed under the MIT License.
 
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
@@ -91,6 +92,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private bool ShowPendingIndicator => IsTogglePending && PrimaryAction != ActionKind.DisabledToggle;
 
+    [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
+
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (!_shouldFocusNameAfterRender) { return; }
@@ -117,12 +120,19 @@ public sealed partial class DatabaseEntryRow : ComponentBase
     private void OnCancelClick()
     {
         _shouldFocusNameAfterRender = true;
-        UpgradeProgress?.Cancel();
+
+        try { UpgradeProgress?.Cancel(); }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            TraceLogger.Warning(
+                $"{nameof(DatabaseEntryRow)}.{nameof(OnCancelClick)}: cancel threw: {ex}");
+        }
     }
 
-    private void OnRemoveClick()
+    private async Task OnRemoveClick()
     {
         if (IsRemoveBlocked) { return; }
-        OnRemove.InvokeAsync();
+        await OnRemove.InvokeAsync();
     }
 }
