@@ -177,7 +177,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
-    public async Task BulkRemove_PerFileFailure_LogsToTraceLoggerAndAnnouncesFirstFailureDetail()
+    public async Task BulkRemove_PerFileFailure_AnnouncesFirstFailureDetail()
     {
         _databaseService.Entries = [
             Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
