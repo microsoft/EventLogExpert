@@ -1,46 +1,56 @@
 .db-entry-row {
-    --db-entry-trash-reveal: 2.5rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: .5rem;
 
-    position: relative;
-    overflow: hidden;
+    padding: .25rem .5rem;
+    background-color: var(--background-dark);
+
+    border-left: 3px solid transparent;
+
+    transition: background-color 180ms ease, border-left-color 180ms ease;
+}
+
+.db-entry-row--selected {
+    border-left-color: var(--clr-lightblue);
+}
+
+.db-entry-checkbox {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.75rem;
+    min-height: 1.75rem;
+    padding: .25rem;
+
+    cursor: pointer;
+    color: var(--text-secondary);
+
+    transition: color 150ms ease;
+}
+
+.db-entry-checkbox:focus-visible {
+    outline: 2px solid var(--clr-lightblue);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+.db-entry-checkbox[aria-checked="true"] {
+    color: var(--clr-lightblue);
+}
+
+.db-entry-checkbox i {
+    font-size: 1rem;
 }
 
 .db-entry-row-content {
-    position: relative;
-
     display: grid;
     grid-template-columns: 1fr auto;
     align-items: center;
     gap: 1rem;
 
-    /* DOM order is now name-info → actions → trash-remove (last). The trash button is a
-       LATER sibling than .db-entry-row-content but must paint UNDER it at rest. z-index:1
-       promotes content into painting group 7 above trash's group 6 (where z-index:0/auto
-       siblings paint in tree order). Without this, the later-in-DOM trash would obscure
-       the leftmost 2.5rem of the row at rest. Background fill remains required to cover
-       the absolutely-positioned trash strip underneath; z-index alone wouldn't be enough
-       if the content were transparent. */
-    padding: .25rem .5rem .25rem 0;
-    background-color: var(--background-dark);
-    z-index: 1;
-
-    transition: transform 200ms ease;
-}
-
-/* Reveal logic:
-   - Mouse: clicking the name button sets the .db-entry-row--revealed flag in
-     code-behind, which keeps the slide open until the cursor leaves the row
-     (@onmouseleave clears the flag). Re-entering the row without re-clicking
-     does NOT re-open the slide, even if the name button still has DOM focus.
-   - Keyboard: :focus-visible on the name button (matched only when focus
-     came from a key press, not a mouse click) opens the slide independently
-     of hover/state, so keyboard users can see what's there.
-   - Trash :focus keeps the strip open during the click (mouse focus or
-     keyboard focus), so the click reliably lands. */
-.db-entry-row.db-entry-row--revealed .db-entry-row-content,
-.db-entry-row:has(.db-entry-name:focus-visible) .db-entry-row-content,
-.db-entry-row:has(.db-entry-remove-btn:focus) .db-entry-row-content {
-    transform: translateX(var(--db-entry-trash-reveal));
+    padding: .25rem 0;
 }
 
 .db-entry-info {
@@ -48,8 +58,6 @@
     align-items: center;
     gap: .5rem;
     min-width: 0;
-
-    padding-left: .5rem;
 }
 
 .db-entry-name {
@@ -155,34 +163,15 @@
 }
 
 .db-entry-remove-btn {
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: var(--db-entry-trash-reveal);
-
+    flex: 0 0 auto;
     display: flex;
     align-items: center;
     justify-content: center;
-
-    /* Recessed-well treatment: darker fill plus a soft inner shadow makes the
-       exposed trash strip read as a depression cut into the row, rather than
-       a button floating on top. */
-    background-color: var(--surface-inset);
-    box-shadow: inset 0 0 .35rem rgba(0, 0, 0, .55);
-}
-
-@media (hover: none) {
-    .db-entry-row-content {
-        transform: translateX(var(--db-entry-trash-reveal));
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .db-entry-row-content {
-        transition: none;
-    }
-
+    .db-entry-row,
+    .db-entry-checkbox,
     .db-entry-upgrading,
     .db-entry-upgrading-text,
     .db-entry-cancel-btn {

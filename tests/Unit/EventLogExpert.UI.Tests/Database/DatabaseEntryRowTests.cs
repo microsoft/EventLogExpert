@@ -36,7 +36,89 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void RemoveButton_AriaDisabled_DuringBackgroundUpgrade()
+    public void Checkbox_HasRoleCheckboxAndAriaLabelAndTabIndex()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready, "MyDb.evtx");
+
+        var component = RenderRow(entry);
+
+        var checkbox = component.Find(".db-entry-checkbox");
+        Assert.Equal("checkbox", checkbox.GetAttribute("role"));
+        Assert.Equal("Select MyDb.evtx", checkbox.GetAttribute("aria-label"));
+        Assert.Equal("0", checkbox.GetAttribute("tabindex"));
+    }
+
+    [Fact]
+    public async Task CheckboxClick_InvokesOnSelectionToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnSelectionToggle, () => invocationCount++));
+
+        await component.Find(".db-entry-checkbox").ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task CheckboxEnterKey_InvokesOnSelectionToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnSelectionToggle, () => invocationCount++));
+
+        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
+
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public async Task CheckboxKeyDown_NonSpaceOrEnter_DoesNotInvokeOnSelectionToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnSelectionToggle, () => invocationCount++));
+
+        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "Tab" });
+        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "a" });
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    [Fact]
+    public async Task CheckboxSpaceKey_InvokesOnSelectionToggle()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+        int invocationCount = 0;
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.OnSelectionToggle, () => invocationCount++));
+
+        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = " " });
+
+        Assert.Equal(1, invocationCount);
+    }
+
+    [Fact]
+    public void RemoveButton_AlwaysVisible_RowDoesNotHaveSlideRevealClass()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        var row = component.Find(".db-entry-row");
+        Assert.DoesNotContain("db-entry-row--revealed", row.GetAttribute("class") ?? string.Empty);
+        Assert.Single(component.FindAll(".db-entry-remove-btn"));
+    }
+
+    [Fact]
+    public void RemoveButton_DuringBackgroundUpgrade_NotAriaDisabled()
     {
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
         var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
@@ -44,26 +126,15 @@ public sealed class DatabaseEntryRowTests : BunitContext
         var component = RenderRow(entry, upgradeProgress: progress);
 
         var button = component.Find(".db-entry-remove-btn");
-        Assert.Equal("true", button.GetAttribute("aria-disabled"));
+        Assert.False(button.HasAttribute("aria-disabled"));
     }
 
     [Fact]
-    public void RemoveButton_AriaDisabled_DuringManageUpgrade()
+    public void RemoveButton_DuringManageUpgrade_NotAriaDisabled()
     {
         var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
 
         var component = RenderRow(entry, isUpgrading: true);
-
-        var button = component.Find(".db-entry-remove-btn");
-        Assert.Equal("true", button.GetAttribute("aria-disabled"));
-    }
-
-    [Fact]
-    public void RemoveButton_NotAriaDisabled_WhenIdle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-
-        var component = RenderRow(entry);
 
         var button = component.Find(".db-entry-remove-btn");
         Assert.False(button.HasAttribute("aria-disabled"));
@@ -84,40 +155,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         Assert.Equal(1, invocationCount);
-    }
-
-    [Fact]
-    public async Task RemoveButtonClick_WhenIsUpgrading_DoesNotInvokeOnRemove()
-    {
-        // Defense-in-depth: DatabaseRegistry.ReserveFileOperation is the corruption mutex;
-        // this UI guard prevents the confusing "Failed to Remove Database" banner that would
-        // otherwise surface from a Remove click during an in-flight upgrade.
-        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.IsUpgrading, true)
-            .Add(p => p.OnRemove, () => invocationCount++));
-
-        await component.Find(".db-entry-remove-btn").ClickAsync(new MouseEventArgs());
-
-        Assert.Equal(0, invocationCount);
-    }
-
-    [Fact]
-    public async Task RemoveButtonClick_WhenUpgradeProgressNotNull_DoesNotInvokeOnRemove()
-    {
-        var entry = MakeEntry(DatabaseStatus.UpgradeRequired);
-        var progress = MakeProgress(currentEntryName: "a.db", scope: UpgradeProgressScope.Background);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.UpgradeProgress, progress)
-            .Add(p => p.OnRemove, () => invocationCount++));
-
-        await component.Find(".db-entry-remove-btn").ClickAsync(new MouseEventArgs());
-
-        Assert.Equal(0, invocationCount);
     }
 
     [Fact]
@@ -253,6 +290,17 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Render_DefaultIsSelectedFalse_CheckboxUnchecked()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry);
+
+        var checkbox = component.Find(".db-entry-checkbox");
+        Assert.Equal("false", checkbox.GetAttribute("aria-checked"));
+    }
+
+    [Fact]
     public void Render_DisabledEntries_ShowTrashButton()
     {
         foreach (var status in Enum.GetValues<DatabaseStatus>())
@@ -270,33 +318,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Render_DOMOrder_NameInfoPrecedesActionsPrecedesRemove()
-    {
-        // Arrange — guard the keyboard tab-order contract: name button must come before
-        // the toggle/upgrade action, which must come before the trash. The trash stays
-        // visually pinned to the left edge via CSS (position:absolute; left:0), so this
-        // DOM contract decouples a11y/tab order from visual layout.
-        var entry = MakeEntry(DatabaseStatus.Ready);
-
-        // Act
-        var component = RenderRow(entry);
-
-        // Assert
-        var row = component.Find(".db-entry-row");
-        var children = row.Children;
-
-        Assert.Equal(2, children.Length);
-        Assert.Contains("db-entry-row-content", children[0].GetAttribute("class") ?? string.Empty);
-        Assert.Contains("db-entry-remove-btn", children[1].GetAttribute("class") ?? string.Empty);
-
-        var content = children[0];
-        var contentChildren = content.Children;
-        Assert.Equal(2, contentChildren.Length);
-        Assert.Contains("db-entry-info", contentChildren[0].GetAttribute("class") ?? string.Empty);
-        Assert.Contains("db-entry-actions", contentChildren[1].GetAttribute("class") ?? string.Empty);
-    }
-
-    [Fact]
     public void Render_FileName_AppearsInRow()
     {
         // Arrange
@@ -307,6 +328,20 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         // Assert
         Assert.Equal("MyProvider.db", component.Find(".db-entry-name").TextContent);
+    }
+
+    [Fact]
+    public void Render_IsSelectedTrue_CheckboxCheckedAndRowHasSelectedClass()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry, isSelected: true);
+
+        var checkbox = component.Find(".db-entry-checkbox");
+        Assert.Equal("true", checkbox.GetAttribute("aria-checked"));
+
+        var row = component.Find(".db-entry-row");
+        Assert.Contains("db-entry-row--selected", row.GetAttribute("class") ?? string.Empty);
     }
 
     [Fact]
@@ -829,6 +864,17 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public void Row_NoAriaSelectedAttribute()
+    {
+        var entry = MakeEntry(DatabaseStatus.Ready);
+
+        var component = RenderRow(entry, isSelected: true);
+
+        var row = component.Find(".db-entry-row");
+        Assert.False(row.HasAttribute("aria-selected"));
+    }
+
+    [Fact]
     public async Task TogglingTrueRadio_InvokesOnToggle_OnReadyEntry()
     {
         // Arrange
@@ -914,6 +960,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
         bool isUpgradeBlocked = false,
         bool effectiveEnabled = false,
         bool isTogglePending = false,
+        bool isSelected = false,
         BannerProgressEntry? upgradeProgress = null) =>
         Render<DatabaseEntryRow>(parameters => parameters
             .Add(p => p.Entry, entry)
@@ -922,5 +969,6 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Add(p => p.IsUpgradeBlocked, isUpgradeBlocked)
             .Add(p => p.EffectiveEnabled, effectiveEnabled)
             .Add(p => p.IsTogglePending, isTogglePending)
+            .Add(p => p.IsSelected, isSelected)
             .Add(p => p.UpgradeProgress, upgradeProgress));
 }
