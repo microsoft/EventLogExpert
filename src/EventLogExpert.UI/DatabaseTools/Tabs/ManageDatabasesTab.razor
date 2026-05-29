@@ -29,7 +29,7 @@
                     Entry="@entry"
                     IsClassificationPending="@IsClassificationPending"
                     IsTogglePending="@_pendingToggles.ContainsKey(entry.FileName)"
-                    IsUpgradeBlocked="@(IsUpgradeBlocked && !Coordinator.IsUpgradeInFlight(entry.FileName))"
+                    IsUpgradeBlocked="@IsUpgradeBlocked"
                     IsUpgrading="@Coordinator.IsUpgradeInFlight(entry.FileName)"
                     @key="entry.FileName"
                     OnRemove="@(() => RemoveDatabase(entry))"
