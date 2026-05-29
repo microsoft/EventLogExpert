@@ -36,20 +36,18 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
-    public void Checkbox_HasRoleCheckboxAndAriaLabelAndTabIndex()
+    public void Checkbox_RenderedWithAriaLabelInRow()
     {
         var entry = MakeEntry(DatabaseStatus.Ready, "MyDb.evtx");
 
         var component = RenderRow(entry);
 
-        var checkbox = component.Find(".db-entry-checkbox");
-        Assert.Equal("checkbox", checkbox.GetAttribute("role"));
+        var checkbox = component.Find(".db-entry-row input[type='checkbox']");
         Assert.Equal("Select MyDb.evtx", checkbox.GetAttribute("aria-label"));
-        Assert.Equal("0", checkbox.GetAttribute("tabindex"));
     }
 
     [Fact]
-    public async Task CheckboxClick_InvokesOnSelectionToggle()
+    public async Task CheckboxChange_InvokesOnSelectionToggle()
     {
         var entry = MakeEntry(DatabaseStatus.Ready);
         int invocationCount = 0;
@@ -57,50 +55,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
             .Add(p => p.Entry, entry)
             .Add(p => p.OnSelectionToggle, () => invocationCount++));
 
-        await component.Find(".db-entry-checkbox").ClickAsync(new MouseEventArgs());
-
-        Assert.Equal(1, invocationCount);
-    }
-
-    [Fact]
-    public async Task CheckboxEnterKey_InvokesOnSelectionToggle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.OnSelectionToggle, () => invocationCount++));
-
-        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "Enter" });
-
-        Assert.Equal(1, invocationCount);
-    }
-
-    [Fact]
-    public async Task CheckboxKeyDown_NonSpaceOrEnter_DoesNotInvokeOnSelectionToggle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.OnSelectionToggle, () => invocationCount++));
-
-        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "Tab" });
-        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = "a" });
-
-        Assert.Equal(0, invocationCount);
-    }
-
-    [Fact]
-    public async Task CheckboxSpaceKey_InvokesOnSelectionToggle()
-    {
-        var entry = MakeEntry(DatabaseStatus.Ready);
-        int invocationCount = 0;
-        var component = Render<DatabaseEntryRow>(parameters => parameters
-            .Add(p => p.Entry, entry)
-            .Add(p => p.OnSelectionToggle, () => invocationCount++));
-
-        await component.Find(".db-entry-checkbox").KeyDownAsync(new KeyboardEventArgs { Key = " " });
+        await component.Find(".db-entry-row input[type='checkbox']")
+            .ChangeAsync(new ChangeEventArgs { Value = true });
 
         Assert.Equal(1, invocationCount);
     }
@@ -296,8 +252,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry);
 
-        var checkbox = component.Find(".db-entry-checkbox");
-        Assert.Equal("false", checkbox.GetAttribute("aria-checked"));
+        var checkbox = component.Find(".db-entry-row input[type='checkbox']");
+        Assert.False(checkbox.HasAttribute("checked"));
     }
 
     [Fact]
@@ -337,8 +293,8 @@ public sealed class DatabaseEntryRowTests : BunitContext
 
         var component = RenderRow(entry, isSelected: true);
 
-        var checkbox = component.Find(".db-entry-checkbox");
-        Assert.Equal("true", checkbox.GetAttribute("aria-checked"));
+        var checkbox = component.Find(".db-entry-row input[type='checkbox']");
+        Assert.True(checkbox.HasAttribute("checked"));
 
         var row = component.Find(".db-entry-row");
         Assert.Contains("db-entry-row--selected", row.GetAttribute("class") ?? string.Empty);

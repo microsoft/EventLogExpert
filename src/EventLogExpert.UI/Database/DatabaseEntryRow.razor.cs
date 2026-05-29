@@ -6,19 +6,15 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Components.Web;
 using Microsoft.JSInterop;
 
 namespace EventLogExpert.UI.Database;
 
-public sealed partial class DatabaseEntryRow : ComponentBase, IAsyncDisposable
+public sealed partial class DatabaseEntryRow : ComponentBase
 {
     private readonly string _nameButtonId = $"db-row-{Guid.NewGuid():N}-name";
     private readonly string _pendingStatusId = $"db-row-{Guid.NewGuid():N}-pending";
 
-    private ElementReference _checkboxRef;
-    private bool _disposed;
-    private IJSObjectReference? _jsModule;
     private ElementReference _nameButtonRef;
     private ElementReference _removeButtonRef;
     private bool _shouldFocusNameAfterRender;
@@ -67,8 +63,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase, IAsyncDisposable
 
     private string BadgeLabel => DatabaseStatusLabels.GetRowBadgeLabel(Entry);
 
-    [Inject] private IJSRuntime JSRuntime { get; init; } = null!;
-
     private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
 
     private ActionKind PrimaryAction
@@ -104,37 +98,10 @@ public sealed partial class DatabaseEntryRow : ComponentBase, IAsyncDisposable
 
     [Inject] private ITraceLogger TraceLogger { get; init; } = null!;
 
-    public async ValueTask DisposeAsync()
-    {
-        if (_disposed) { return; }
-        _disposed = true;
-
-        if (_jsModule is not null)
-        {
-            try { await _jsModule.DisposeAsync(); }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-            _jsModule = null;
-        }
-    }
-
     public ValueTask FocusRemoveButtonAsync() => _removeButtonRef.FocusAsync(preventScroll: true);
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender)
-        {
-            try
-            {
-                _jsModule = await JSRuntime.InvokeAsync<IJSObjectReference>(
-                    "import",
-                    "./_content/EventLogExpert.UI/Database/DatabaseEntryRow.js");
-                await _jsModule.InvokeVoidAsync("attachCheckboxKeyHandler", _checkboxRef);
-            }
-            catch (JSDisconnectedException) { }
-            catch (ObjectDisposedException) { }
-        }
-
         if (!_shouldFocusNameAfterRender) { return; }
 
         _shouldFocusNameAfterRender = false;
@@ -151,16 +118,6 @@ public sealed partial class DatabaseEntryRow : ComponentBase, IAsyncDisposable
         UpgradePhase.Verifying => "Verifying",
         _ => "Upgrading"
     };
-
-    private async Task HandleCheckboxClick() => await OnSelectionToggle.InvokeAsync();
-
-    private async Task HandleCheckboxKeyDown(KeyboardEventArgs e)
-    {
-        if (e.Key is " " or "Spacebar" or "Enter")
-        {
-            await OnSelectionToggle.InvokeAsync();
-        }
-    }
 
     private void OnCancelClick()
     {
