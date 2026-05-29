@@ -140,7 +140,7 @@ public sealed class MauiMenuActionService(
 
     public void LoadNewEvents() => _eventLogCommands.LoadNewEvents();
 
-    public Task OpenDatabaseToolsAsync() =>
+    public Task<bool> OpenDatabaseToolsAsync() =>
         TryOpenModalAsync(_modalCoordinator.OpenDatabaseToolsAsync, nameof(DatabaseToolsModal));
 
     public Task OpenDocsAsync() =>

@@ -39,9 +39,9 @@
                     <button aria-disabled="@(IsUpgradeBlocked ? "true" : "false")"
                         aria-label="@($"Upgrade database {Entry.FileName}")"
                         class="button db-entry-upgrade-btn"
-                        @onclick="@(() =>
+                        @onclick="@(async () =>
                                   {
-                                      if (!IsUpgradeBlocked) OnUpgrade.InvokeAsync();
+                                      if (!IsUpgradeBlocked) { await OnUpgrade.InvokeAsync(); }
                                   })"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-up-circle"></i> Upgrade
@@ -77,7 +77,7 @@
                 case ActionKind.RetryClassification:
                     <button aria-label="@($"Retry classification of database {Entry.FileName}")"
                         class="button db-entry-retry-classification-btn"
-                        @onclick="@(() => OnRetryClassification.InvokeAsync())"
+                        @onclick="@(async () => await OnRetryClassification.InvokeAsync())"
                         type="button">
                         <i aria-hidden="true" class="bi bi-arrow-repeat"></i> Retry classification
                     </button>
@@ -88,7 +88,7 @@
 
     <button aria-label="@($"Remove database {Entry.FileName}")"
         class="button button-red db-entry-remove-btn"
-        @onclick="@(() => OnRemove.InvokeAsync())"
+        @onclick="@(async () => await OnRemove.InvokeAsync())"
         type="button">
         <i aria-hidden="true" class="bi bi-trash"></i>
     </button>

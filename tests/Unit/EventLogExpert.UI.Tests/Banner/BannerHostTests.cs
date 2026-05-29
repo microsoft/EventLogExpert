@@ -264,28 +264,23 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public async Task BannerHost_OpenSettingsReturnsFalse_RendersNewErrorBanner_NotStaleAttention()
+    public async Task BannerHost_OpenDatabasesReturnsFalse_RendersNewErrorBanner_NotStaleAttention()
     {
-        // Round-2 regression: without explicitly steering _selectedItem to the new error after ReportError,
-        // ItemMatches preserves the stale Attention selection by (View=Attention, EntryId=null) and the user
-        // never sees the failure message they need — the error banner would be one page back in the cycle.
         var attention = BuildDatabaseEntry("a.db");
         var newErrorId = BannerId.Create();
         var newError = new ErrorBannerEntry(
             newErrorId,
-            "Settings",
-            "Failed to open settings; try again from the menu.",
+            "Databases",
+            "Failed to open databases; try again from the menu.",
             null,
             null,
             DateTime.UtcNow);
 
         _attentionBannerService.AttentionEntries.Returns([attention]);
-        _menuActionService.OpenSettingsAsync().Returns(Task.FromResult(false));
-        _errorBannerService.ReportError("Settings", Arg.Any<string>())
+        _menuActionService.OpenDatabaseToolsAsync().Returns(Task.FromResult(false));
+        _errorBannerService.ReportError("Databases", Arg.Any<string>())
             .Returns(_ =>
             {
-                // Simulate the real BannerService side effect: the new error joins the ErrorBanners list so
-                // the next rebuild has both [Error, Attention] in the cycle.
                 _errorBannerService.ErrorBanners.Returns([newError]);
                 return newErrorId;
             });
@@ -294,15 +289,13 @@ public sealed class BannerHostTests : BunitContext
         Assert.Single(component.FindAll("aside.banner-attention"));
 
         await component.Find("aside.banner-attention button.banner-action").ClickAsync(new MouseEventArgs());
-        // Real BannerService raises StateChanged from inside ReportError; the mock does not, so raise it here
-        // to drive the re-render that proves _selectedItem was steered to the new error.
+        // Substitute does not raise StateChanged from ReportError; raise manually to trigger re-render.
         _errorBannerService.StateChanged += Raise.Event<Action>();
 
         component.WaitForState(() => component.FindAll("aside.banner-error").Count > 0);
 
         var errorBanner = component.Find("aside.banner-error");
-        Assert.Contains("Failed to open settings; try again from the menu.", errorBanner.TextContent);
-        // Bug being prevented: stale Attention selection would render Attention here instead of Error.
+        Assert.Contains("Failed to open databases; try again from the menu.", errorBanner.TextContent);
         Assert.Empty(component.FindAll("aside.banner-attention"));
     }
 

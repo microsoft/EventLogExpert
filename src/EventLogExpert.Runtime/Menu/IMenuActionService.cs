@@ -23,7 +23,7 @@ public interface IMenuActionService
 
     void LoadNewEvents();
 
-    Task OpenDatabaseToolsAsync();
+    Task<bool> OpenDatabaseToolsAsync();
 
     Task OpenDocsAsync();
 

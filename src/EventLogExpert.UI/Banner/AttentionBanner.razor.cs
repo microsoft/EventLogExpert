@@ -31,7 +31,7 @@ public sealed partial class AttentionBanner : ComponentBase
 
     private void OnDismissAttention() => AttentionBannerService.DismissAttention();
 
-    private async Task OnOpenSettingsClickedAsync()
+    private async Task OnOpenDatabasesClickedAsync()
     {
         AttentionBannerService.DismissAttention();
 
@@ -39,7 +39,7 @@ public sealed partial class AttentionBanner : ComponentBase
 
         try
         {
-            success = await MenuActionService.OpenSettingsAsync();
+            success = await MenuActionService.OpenDatabaseToolsAsync();
         }
         catch (JSDisconnectedException)
         {
@@ -52,11 +52,11 @@ public sealed partial class AttentionBanner : ComponentBase
         catch (Exception ex)
         {
             TraceLogger.Error(
-                $"{nameof(AttentionBanner)}.{nameof(OnOpenSettingsClickedAsync)}: open settings threw: {ex}");
+                $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases threw: {ex}");
 
             BannerId errorId = ErrorBannerService.ReportError(
-                "Settings",
-                $"Failed to open settings: {ex.Message}");
+                "Databases",
+                $"Failed to open databases: {ex.Message}");
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
 
             return;
@@ -65,11 +65,11 @@ public sealed partial class AttentionBanner : ComponentBase
         if (!success)
         {
             TraceLogger.Error(
-                $"{nameof(AttentionBanner)}.{nameof(OnOpenSettingsClickedAsync)}: open settings returned false");
+                $"{nameof(AttentionBanner)}.{nameof(OnOpenDatabasesClickedAsync)}: open databases returned false");
 
             BannerId errorId = ErrorBannerService.ReportError(
-                "Settings",
-                "Failed to open settings; try again from the menu.");
+                "Databases",
+                "Failed to open databases; try again from the menu.");
             await OnFallbackErrorPosted.InvokeAsync(new BannerCycleItem(BannerView.Error, 0, errorId));
         }
     }
