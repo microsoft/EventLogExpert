@@ -20,16 +20,6 @@
     to   { transform: rotate(360deg); }
 }
 
-.manage-status-banner--progress {
-    position: sticky;
-    top: 0;
-    z-index: 1;
-    background-color: var(--clr-statusbar);
-    color: var(--text-on-statusbar);
-    box-shadow: var(--shadow-modal);
-    border-left-color: var(--clr-statusbar);
-}
-
 .manage-status-banner--info {
     color: var(--clr-lightblue);
     font-style: italic;

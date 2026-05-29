@@ -169,6 +169,25 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool GetEffectiveEnabled(DatabaseEntry entry) =>
         _pendingToggles.TryGetValue(entry.FileName, out var pending) ? pending : entry.IsEnabled;
 
+    private BannerProgressEntry? GetUpgradeProgressForEntry(DatabaseEntry entry)
+    {
+        var manage = ProgressBannerService.ManageDatabasesProgress;
+        if (manage is not null &&
+            string.Equals(manage.CurrentEntryName, entry.FileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return manage;
+        }
+
+        var background = ProgressBannerService.BackgroundProgress;
+        if (background is not null &&
+            string.Equals(background.CurrentEntryName, entry.FileName, StringComparison.OrdinalIgnoreCase))
+        {
+            return background;
+        }
+
+        return null;
+    }
+
     private async Task ImportDatabase()
     {
         var outcome = await Coordinator.ImportAsync(AskOverwriteAsync);
