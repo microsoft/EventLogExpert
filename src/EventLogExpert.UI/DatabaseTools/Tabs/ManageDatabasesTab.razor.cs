@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.Runtime.EventLog;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
@@ -67,6 +68,8 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     private bool IsClassificationPending => !DatabaseService.InitialClassificationTask.IsCompleted;
 
     private bool IsUpgradeBlocked => IsUpgradeInFlight;
+
+    [Inject] private ILogReloadCoordinator LogReloadCoordinator { get; init; } = null!;
 
     [Inject] private IProgressBannerService ProgressBannerService { get; init; } = null!;
 
@@ -172,29 +175,31 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         base.OnInitialized();
     }
 
-    private static string BuildCancelThenRemoveMessage(IReadOnlyList<string> fileNames, IReadOnlyList<string> upgradingFiles)
+    private static string BuildBulkPlainMessage(IReadOnlyList<string> fileNames)
     {
-        var upgradingList = string.Join(", ", upgradingFiles.Take(5));
-        var moreUpgrading = upgradingFiles.Count > 5 ? $", and {upgradingFiles.Count - 5} more" : string.Empty;
-        var fileList = string.Join(", ", fileNames.Take(5));
-        var moreFiles = fileNames.Count > 5 ? $", and {fileNames.Count - 5} more" : string.Empty;
-
-        return $"Upgrade in progress for: {upgradingList}{moreUpgrading}. " +
-               $"This will cancel the upgrade batch(es) \u2014 which may include other files not in your selection \u2014 " +
-               $"and then remove: {fileList}{moreFiles}. Are you sure?";
-    }
-
-    private static string BuildPlainRemoveMessage(IReadOnlyList<string> fileNames)
-    {
-        if (fileNames.Count == 1)
-        {
-            return $"Are you sure you want to remove {fileNames[0]}?";
-        }
-
         var list = string.Join(", ", fileNames.Take(5));
         var more = fileNames.Count > 5 ? $", and {fileNames.Count - 5} more" : string.Empty;
 
         return $"Are you sure you want to remove these {fileNames.Count} databases? ({list}{more})";
+    }
+
+    private string AppendCloseReopenWarningIfNeeded(string baseMessage, IReadOnlyList<string> fileNames)
+    {
+        if (!LogReloadCoordinator.HasActiveLogs) { return baseMessage; }
+
+        bool anyRemovalAffectsActiveLog = fileNames.Any(f =>
+            DatabaseService.Entries.Any(e =>
+                string.Equals(e.FileName, f, StringComparison.OrdinalIgnoreCase) &&
+                e.IsEnabled &&
+                e.Status == DatabaseStatus.Ready));
+
+        if (!anyRemovalAffectsActiveLog) { return baseMessage; }
+
+        string warning = fileNames.Count == 1
+            ? "Removing will close and reopen any affected log views."
+            : "Removing these databases will close and reopen any affected log views.";
+
+        return $"{baseMessage} {warning}";
     }
 
     private async Task<bool> AskOverwriteAsync(string fileName, CancellationToken cancellationToken)
@@ -216,6 +221,29 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             return result.Accepted;
         }
         catch (ObjectDisposedException) { return false; }
+    }
+
+    private string BuildCancelThenRemoveMessage(IReadOnlyList<string> fileNames, IReadOnlyList<string> upgradingFiles)
+    {
+        var upgradingList = string.Join(", ", upgradingFiles.Take(5));
+        var moreUpgrading = upgradingFiles.Count > 5 ? $", and {upgradingFiles.Count - 5} more" : string.Empty;
+        var fileList = string.Join(", ", fileNames.Take(5));
+        var moreFiles = fileNames.Count > 5 ? $", and {fileNames.Count - 5} more" : string.Empty;
+
+        string baseMessage = $"Upgrade in progress for: {upgradingList}{moreUpgrading}. " +
+            $"This will cancel the upgrade batch(es) \u2014 which may include other files not in your selection \u2014 " +
+            $"and then remove: {fileList}{moreFiles}. Are you sure?";
+
+        return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
+    }
+
+    private string BuildPlainRemoveMessage(IReadOnlyList<string> fileNames)
+    {
+        string baseMessage = fileNames.Count == 1
+            ? $"Are you sure you want to remove {fileNames[0]}?"
+            : BuildBulkPlainMessage(fileNames);
+
+        return AppendCloseReopenWarningIfNeeded(baseMessage, fileNames);
     }
 
     private async Task CancelUpgradesAndAwaitCompletionAsync(IReadOnlyList<string> fileNames)
@@ -608,11 +636,15 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                 else
                 {
                     failed.Add((fileName, "removal failed"));
+                    TraceLogger.Warning(
+                        $"{nameof(ManageDatabasesTab)}.{nameof(RemoveDatabasesAsync)}: removal of '{fileName}' did not complete.");
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 failed.Add((fileName, ex.Message));
+                TraceLogger.Warning(
+                    $"{nameof(ManageDatabasesTab)}.{nameof(RemoveDatabasesAsync)}: removal of '{fileName}' threw: {ex}");
             }
         }
 
@@ -635,8 +667,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         if (failed.Count > 0)
         {
+            var (firstFailedFile, firstFailedReason) = failed[0];
             AnnouncementService.Announce(
-                $"{failed.Count} removal{(failed.Count == 1 ? "" : "s")} failed.");
+                $"{failed.Count} removal{(failed.Count == 1 ? "" : "s")} failed. First: {firstFailedFile} ({firstFailedReason}).");
         }
 
         var remainingEntries = DatabaseService.Entries.ToList();
