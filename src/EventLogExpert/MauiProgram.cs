@@ -31,6 +31,7 @@ using EventLogExpert.Runtime.Menu;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Alerts;
+using EventLogExpert.UI.Banner;
 using EventLogExpert.UI.Database;
 using Fluxor;
 using Fluxor.DependencyInjection;
@@ -102,6 +103,8 @@ public static class MauiProgram
         // UI Services
         builder.Services.AddEventLogFiltering();
         builder.Services.AddEventLogRuntime();
+
+        builder.Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
 
         builder.Services.AddSingleton<IMainThreadService, MauiMainThreadService>();
         builder.Services.AddSingleton<ITitleProvider, TitleProvider>();

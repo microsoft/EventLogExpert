@@ -7,6 +7,7 @@ using EventLogExpert.Runtime.DetailsPane;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.Runtime.Settings;
 using EventLogExpert.UI.Settings;
+using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -23,6 +24,8 @@ public sealed class SettingsModalTests : BunitContext
 
     public SettingsModalTests()
     {
+        Services.AddBannerHostDependencies();
+
         _modalService.ActiveModalId.Returns(new ModalId(1L));
 
         _settings.TimeZoneId.Returns(string.Empty);
