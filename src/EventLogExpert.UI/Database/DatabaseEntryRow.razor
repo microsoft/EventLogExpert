@@ -1,8 +1,18 @@
-<div class="db-entry-row @(_isMouseRevealed ? "db-entry-row--revealed" : null)"
-    @onmouseleave="HandleRowMouseLeave">
+<div class="db-entry-row @(IsSelected ? "db-entry-row--selected" : null)">
+    <div aria-checked="@(IsSelected ? "true" : "false")"
+        aria-label="@($"Select {Entry.FileName}")"
+        class="db-entry-checkbox"
+        @onclick="HandleCheckboxClick"
+        @onkeydown="HandleCheckboxKeyDown"
+        @ref="_checkboxRef"
+        role="checkbox"
+        tabindex="0">
+        <i aria-hidden="true" class="bi @(IsSelected ? "bi-check-square-fill" : "bi-square")"></i>
+    </div>
+
     <div class="db-entry-row-content">
         <div class="db-entry-info">
-            <button class="db-entry-name" id="@_nameButtonId" @onclick="HandleNameClick" @ref="_nameButtonRef" type="button">@Entry.FileName</button>
+            <button class="db-entry-name" id="@_nameButtonId" @ref="_nameButtonRef" type="button">@Entry.FileName</button>
             @if (ShouldShowBadge)
             {
                 <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
@@ -111,14 +121,14 @@
                     </button>
                     break;
             }
+
+            <button aria-label="@($"Remove database {Entry.FileName}")"
+                class="button button-red db-entry-remove-btn"
+                @onclick="OnRemoveClick"
+                @ref="_removeButtonRef"
+                type="button">
+                <i aria-hidden="true" class="bi bi-trash"></i>
+            </button>
         </div>
     </div>
-
-    <button aria-disabled="@(IsRemoveBlocked ? "true" : null)"
-        aria-label="@($"Remove database {Entry.FileName}")"
-        class="button button-red db-entry-remove-btn"
-        @onclick="OnRemoveClick"
-        type="button">
-        <i aria-hidden="true" class="bi bi-trash"></i>
-    </button>
 </div>
