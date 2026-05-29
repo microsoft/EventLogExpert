@@ -10,6 +10,10 @@
     @ref="_dialogRef"
     style="@DialogInlineStyle">
     <div class="dialog-group">
+        <div class="banner-region" inert="@HasInlineAlert">
+            <BannerHost Location="BannerHostLocation.InsideModal" />
+        </div>
+
         @if (!string.IsNullOrEmpty(Title))
         {
             <header class="dialog-header" inert="@HasInlineAlert">

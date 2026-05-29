@@ -35,6 +35,7 @@ public sealed class BannerHostTests : BunitContext
     public BannerHostTests()
     {
         Services.AddBannerSubstitutes(out _attentionBannerService, out _progressBannerService, out _criticalErrorService, out _errorBannerService, out _infoBannerService);
+        Services.AddSingleton<IBannerCycleStateService, BannerCycleStateService>();
 
         _criticalErrorService.CurrentCritical.Returns((Exception?)null);
         _errorBannerService.ErrorBanners.Returns([]);
@@ -319,24 +320,86 @@ public sealed class BannerHostTests : BunitContext
     }
 
     [Fact]
-    public void Dispose_UnsubscribesFromModalCoordinator()
+    public void Dispose_UnsubscribesFromCycleState()
     {
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
 
         var component = Render<BannerHost>();
+        Assert.Single(component.FindAll("aside.banner-attention"));
+
         component.Instance.Dispose();
 
-        _modalCoordinator.ActiveSession.Returns(
-            new ModalSession(new ModalId(4), typeof(DatabaseToolsModal), null));
-        _modalCoordinator.StateChanged += Raise.Event<Action>();
+        _attentionBannerService.AttentionEntries.Returns([]);
+        _attentionBannerService.StateChanged += Raise.Event<Action>();
 
         Assert.Single(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void Render_AsInsideModal_WithDatabaseToolsModalActive_OmitsAttentionBanner_RendersOtherBanners()
+    {
+        var errorEntry = new ErrorBannerEntry(
+            BannerId.Create(), "Title", "msg", null, null, DateTime.UtcNow);
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _errorBannerService.ErrorBanners.Returns([errorEntry]);
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(5), typeof(DatabaseToolsModal), null));
+        var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
+        cycleState.SetModalContentDisplayed(true);
+
+        var component = Render<BannerHost>(parameters => parameters
+            .Add(p => p.Location, BannerHostLocation.InsideModal));
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+        Assert.Single(component.FindAll("aside.banner-error"));
+    }
+
+    [Fact]
+    public void Render_AsInsideModal_WithDifferentModalActive_RendersAttentionBanner()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(2), typeof(BannerHost), null));
+        var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
+        cycleState.SetModalContentDisplayed(true);
+
+        var component = Render<BannerHost>(parameters => parameters
+            .Add(p => p.Location, BannerHostLocation.InsideModal));
+
+        Assert.Single(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void Render_AsInsideModalLocation_WithNoModalActive_RendersNothing()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
+
+        var component = Render<BannerHost>(parameters => parameters
+            .Add(p => p.Location, BannerHostLocation.InsideModal));
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void Render_AsMainLayoutLocation_WithModalActive_RendersNothing()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(6), typeof(BannerHost), null));
+        var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
+        cycleState.SetModalContentDisplayed(true);
+
+        var component = Render<BannerHost>();
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
     }
 
     [Fact]
     public async Task Render_ModalActivationTransition_TogglesAttentionVisibility()
     {
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
 
         var component = Render<BannerHost>();
         Assert.Single(component.FindAll("aside.banner-attention"));
@@ -344,6 +407,7 @@ public sealed class BannerHostTests : BunitContext
         _modalCoordinator.ActiveSession.Returns(
             new ModalSession(new ModalId(3), typeof(DatabaseToolsModal), null));
         _modalCoordinator.StateChanged += Raise.Event<Action>();
+        cycleState.SetModalContentDisplayed(true);
 
         await component.WaitForAssertionAsync(() =>
             Assert.Empty(component.FindAll("aside.banner-attention")));
@@ -361,22 +425,12 @@ public sealed class BannerHostTests : BunitContext
         _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
         _modalCoordinator.ActiveSession.Returns(
             new ModalSession(new ModalId(1), typeof(DatabaseToolsModal), null));
+        var cycleState = Services.GetRequiredService<IBannerCycleStateService>();
+        cycleState.SetModalContentDisplayed(true);
 
         var component = Render<BannerHost>();
 
         Assert.Empty(component.FindAll("aside.banner-attention"));
-    }
-
-    [Fact]
-    public void Render_WithDifferentModalActive_RendersAttentionBanner()
-    {
-        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
-        _modalCoordinator.ActiveSession.Returns(
-            new ModalSession(new ModalId(2), typeof(BannerHost), null));
-
-        var component = Render<BannerHost>();
-
-        Assert.Single(component.FindAll("aside.banner-attention"));
     }
 
     [Fact]

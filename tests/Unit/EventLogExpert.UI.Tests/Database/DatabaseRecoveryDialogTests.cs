@@ -9,6 +9,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Database;
+using EventLogExpert.UI.Tests.TestUtils;
 using Fluxor;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -30,6 +31,8 @@ public sealed class DatabaseRecoveryDialogTests : BunitContext
 
     public DatabaseRecoveryDialogTests()
     {
+        Services.AddBannerHostDependencies();
+
         _databaseService.Entries.Returns([]);
         _modalService.ActiveModalId.Returns(_modalId);
 

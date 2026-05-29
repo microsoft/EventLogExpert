@@ -2,6 +2,7 @@
 // // Licensed under the MIT License.
 
 using EventLogExpert.Runtime.Alerts;
+using EventLogExpert.UI.Banner;
 using Microsoft.AspNetCore.Components;
 using Microsoft.JSInterop;
 
@@ -84,6 +85,8 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
 
     [Parameter] public string? Title { get; set; }
 
+    [Inject] private IBannerCycleStateService CycleState { get; init; } = null!;
+
     private string? DialogInlineStyle
     {
         get
@@ -120,7 +123,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
         }
     }
 
-    public async ValueTask DisposeAsync() => await CloseAsync();
+    public async ValueTask DisposeAsync()
+    {
+        CycleState.SetModalContentDisplayed(false);
+        await CloseAsync();
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -129,6 +136,11 @@ public sealed partial class ModalChrome : ComponentBase, IAsyncDisposable
             try
             {
                 await JSRuntime.InvokeVoidAsync("showModal", _dialogRef);
+
+                if (!_isClosed)
+                {
+                    CycleState.SetModalContentDisplayed(true);
+                }
             }
             catch
             {
