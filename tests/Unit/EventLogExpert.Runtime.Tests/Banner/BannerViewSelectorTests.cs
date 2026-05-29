@@ -20,6 +20,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
@@ -43,6 +44,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [e0, e1],
                 attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
                 infoBanners: [i0, i1, i2]);
 
@@ -66,11 +68,42 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [BuildAttention("a.db")],
                 attentionDismissed: true,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
         // Assert
         Assert.Empty(result);
+    }
+
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    public void BuildCycle_AttentionDismissedOrSuppressed_OmitsAttention(
+        bool dismissed,
+        bool suppressedByModalContext,
+        bool expectAttention)
+    {
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [BuildAttention("a.db")],
+                attentionDismissed: dismissed,
+                attentionSuppressedByModalContext: suppressedByModalContext,
+                backgroundProgress: null,
+                infoBanners: []);
+
+        if (expectAttention)
+        {
+            Assert.Single(result);
+            Assert.Equal(BannerView.Attention, result[0].View);
+        }
+        else
+        {
+            Assert.Empty(result);
+        }
     }
 
     [Fact]
@@ -82,6 +115,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
@@ -98,8 +132,45 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: null!,
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []));
+    }
+
+    [Fact]
+    public void BuildCycle_AttentionSuppressedByModalContext_DoesNotAffectOtherSlices()
+    {
+        ErrorBannerEntry err = BuildError();
+        BannerInfoEntry info = BuildInfo();
+
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [err],
+                attentionEntries: [BuildAttention("a.db")],
+                attentionDismissed: false,
+                attentionSuppressedByModalContext: true,
+                backgroundProgress: BuildProgress(),
+                infoBanners: [info]);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal(new BannerCycleItem(BannerView.Error, 0, err.Id), result[0]);
+        Assert.Equal(new BannerCycleItem(BannerView.UpgradeProgress, 0, null), result[1]);
+        Assert.Equal(new BannerCycleItem(BannerView.Info, 0, info.Id), result[2]);
+    }
+
+    [Fact]
+    public void BuildCycle_AttentionSuppressedByModalContext_OmitsAttentionSlice()
+    {
+        IReadOnlyList<BannerCycleItem> result = BannerViewSelector
+            .BuildCycle(currentCritical: null,
+                errorBanners: [],
+                attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
+                attentionDismissed: false,
+                attentionSuppressedByModalContext: true,
+                backgroundProgress: null,
+                infoBanners: []);
+
+        Assert.Empty(result);
     }
 
     [Fact]
@@ -111,6 +182,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [BuildError(), BuildError()],
                 attentionEntries: [BuildAttention("a.db")],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
                 infoBanners: [BuildInfo()]);
 
@@ -130,6 +202,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: null!,
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []));
     }
@@ -143,6 +216,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: null!));
     }
@@ -156,6 +230,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [BuildAttention("a.db"), BuildAttention("b.db")],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
@@ -178,6 +253,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [e0, e1, e2],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
@@ -201,6 +277,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: [i0, i1]);
 
@@ -219,6 +296,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: BuildProgress(),
                 infoBanners: []);
 
@@ -241,6 +319,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [e0, e1, e2],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 
@@ -249,6 +328,7 @@ public sealed class BannerViewSelectorTests
                 errorBanners: [e1, e2],
                 attentionEntries: [],
                 attentionDismissed: false,
+                attentionSuppressedByModalContext: false,
                 backgroundProgress: null,
                 infoBanners: []);
 

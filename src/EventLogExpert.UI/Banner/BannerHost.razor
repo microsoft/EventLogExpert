@@ -5,12 +5,14 @@
     IReadOnlyList<DatabaseEntry> attentionEntries = AttentionBannerService.AttentionEntries;
     bool attentionDismissed = AttentionBannerService.AttentionDismissed;
     BannerProgressEntry? backgroundProgress = ProgressBannerService.BackgroundProgress;
+    bool attentionSuppressedByModalContext = IsAttentionSuppressedByModalContext();
 
     (BannerCycleItem? selected, BannerView view) = RebuildItemsAndPickSelected(
         currentCritical,
         errors,
         attentionEntries,
         attentionDismissed,
+        attentionSuppressedByModalContext,
         backgroundProgress,
         infos);
 
