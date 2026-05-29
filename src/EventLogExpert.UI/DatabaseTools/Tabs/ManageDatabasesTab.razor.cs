@@ -616,7 +616,10 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             }
         }
 
-        _selectedForRemoval.Clear();
+        foreach (var fileName in fileNames)
+        {
+            _selectedForRemoval.Remove(fileName);
+        }
         UpdateSelectionAnnouncement();
 
         if (anyLogsReopened)
