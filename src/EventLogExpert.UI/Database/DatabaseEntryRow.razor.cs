@@ -61,6 +61,8 @@ public sealed partial class DatabaseEntryRow : ComponentBase
 
     private bool IsRemoveBlocked => IsUpgrading || UpgradeProgress is not null;
 
+    private bool IsRestoreBlocked => IsUpgradeBlocked || IsUpgrading || UpgradeProgress is not null;
+
     private ActionKind PrimaryAction
     {
         get

@@ -764,6 +764,37 @@ public sealed class DatabaseEntryRowTests : BunitContext
     }
 
     [Fact]
+    public async Task RestoreButtonClick_WhenUpgradeProgressMatchesRow_DoesNotInvokeOnRestoreFromBackup()
+    {
+        // BackupExists routes to RestoreFromBackup over Spinner; the click guard must still
+        // honor per-row UpgradeProgress so a Background-scope upgrade in flight for the same
+        // database blocks restore.
+        var entry = MakeEntry(DatabaseStatus.UpgradeRequired, backupExists: true);
+        int invocationCount = 0;
+        var progress = new BannerProgressEntry(
+            UpgradeBatchId.Create(),
+            UpgradeProgressScope.Background,
+            CurrentBatchPosition: 1,
+            CurrentBatchSize: 1,
+            CurrentEntryName: entry.FileName,
+            CurrentPhase: UpgradePhase.MigratingSchema,
+            QueuedBatchesAfter: 0,
+            Cancel: () => { });
+        var component = Render<DatabaseEntryRow>(parameters => parameters
+            .Add(p => p.Entry, entry)
+            .Add(p => p.IsUpgradeBlocked, false)
+            .Add(p => p.UpgradeProgress, progress)
+            .Add(p => p.OnRestoreFromBackup, () => invocationCount++));
+
+        var restoreBtn = component.Find(".db-entry-restore-btn");
+        Assert.Equal("true", restoreBtn.GetAttribute("aria-disabled"));
+
+        await restoreBtn.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal(0, invocationCount);
+    }
+
+    [Fact]
     public async Task RetryButtonClick_InvokesOnUpgrade()
     {
         // Arrange
