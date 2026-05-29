@@ -9,8 +9,6 @@
         </div>
     }
 
-    <ManageDatabasesUpgradeProgressBanner />
-
     <div class="manage-databases-import-row">
         <button class="button"
             id="manage-import-button"
@@ -36,7 +34,8 @@
                     OnRestoreFromBackup="@(() => RestoreFromBackup(entry))"
                     OnRetryClassification="@(() => RetryClassification(entry))"
                     OnToggle="@(() => ToggleDatabase(entry.FileName))"
-                    OnUpgrade="@(() => UpgradeEntry(entry.FileName))" />
+                    OnUpgrade="@(() => UpgradeEntry(entry.FileName))"
+                    UpgradeProgress="@GetUpgradeProgressForEntry(entry)" />
             }
         }
         else if (!IsClassificationPending)

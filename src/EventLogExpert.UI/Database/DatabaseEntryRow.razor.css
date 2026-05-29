@@ -108,15 +108,50 @@
 .db-entry-upgrading {
     display: inline-flex;
     align-items: center;
-    gap: .35rem;
+    gap: .5rem;
 
     color: var(--clr-lightblue);
     font-style: italic;
+
+    animation: db-entry-upgrading-fade-in 200ms ease-out;
+}
+
+.db-entry-upgrading-status {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.db-entry-upgrading-text {
+    display: inline-block;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    animation: db-entry-upgrading-text-fade 180ms ease-out;
 }
 
 .db-entry-spinner {
     flex: 0 0 auto;
     animation: db-entry-spin 1.5s linear infinite;
+}
+
+.db-entry-cancel-btn {
+    flex: 0 0 auto;
+    padding: .15rem .65rem;
+
+    background: transparent;
+    color: inherit;
+    border: 1px solid currentColor;
+    border-radius: .25rem;
+
+    font-style: normal;
+
+    transition: background-color 150ms ease;
+
+    &:hover { background-color: rgba(255, 255, 255, 0.12); }
 }
 
 .db-entry-remove-btn {
@@ -147,11 +182,28 @@
     .db-entry-row-content {
         transition: none;
     }
+
+    .db-entry-upgrading,
+    .db-entry-upgrading-text,
+    .db-entry-cancel-btn {
+        animation: none;
+        transition: none;
+    }
 }
 
 @keyframes db-entry-spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
+}
+
+@keyframes db-entry-upgrading-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes db-entry-upgrading-text-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 

@@ -2,7 +2,7 @@
     @onmouseleave="HandleRowMouseLeave">
     <div class="db-entry-row-content">
         <div class="db-entry-info">
-            <button class="db-entry-name" id="@_nameButtonId" @onclick="HandleNameClick" type="button">@Entry.FileName</button>
+            <button class="db-entry-name" id="@_nameButtonId" @onclick="HandleNameClick" @ref="_nameButtonRef" type="button">@Entry.FileName</button>
             @if (ShouldShowBadge)
             {
                 <span class="db-entry-badge" data-badge="@BadgeKind">@BadgeLabel</span>
@@ -29,10 +29,38 @@
                     break;
 
                 case ActionKind.Spinner:
-                    <span class="db-entry-upgrading" role="status">
-                        <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
-                        <span>Upgrading&hellip;</span>
-                    </span>
+                    @if (UpgradeProgress is { } progress)
+                    {
+                        var verb = PhaseVerb(progress.CurrentPhase);
+                        var hasFile = !string.IsNullOrEmpty(progress.CurrentEntryName);
+                        var hasPosition = progress.CurrentBatchSize > 1;
+
+                        var displayText = hasFile
+                            ? (hasPosition ? $"{verb} {progress.CurrentBatchPosition} of {progress.CurrentBatchSize}" : verb)
+                            : $"Preparing upgrade of {progress.CurrentBatchSize} {(progress.CurrentBatchSize == 1 ? "database" : "databases")}\u2026";
+
+                        <span class="db-entry-upgrading">
+                            <span class="db-entry-upgrading-status" role="status">
+                                <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
+                                <span class="db-entry-upgrading-text" @key="verb">@displayText</span>
+                                @if (hasFile)
+                                {
+                                    <span class="visually-hidden"> for @Entry.FileName</span>
+                                }
+                            </span>
+                            <button class="button db-entry-cancel-btn" @onclick="OnCancelClick" type="button">
+                                Cancel
+                            </button>
+                        </span>
+                    }
+                    else
+                    {
+                        <span class="db-entry-upgrading" role="status">
+                            <i aria-hidden="true" class="bi bi-arrow-repeat db-entry-spinner"></i>
+                            <span>Upgrading&hellip;</span>
+                        </span>
+                    }
+
                     break;
 
                 case ActionKind.Upgrade:
@@ -86,9 +114,10 @@
         </div>
     </div>
 
-    <button aria-label="@($"Remove database {Entry.FileName}")"
+    <button aria-disabled="@(IsRemoveBlocked ? "true" : null)"
+        aria-label="@($"Remove database {Entry.FileName}")"
         class="button button-red db-entry-remove-btn"
-        @onclick="@(async () => await OnRemove.InvokeAsync())"
+        @onclick="OnRemoveClick"
         type="button">
         <i aria-hidden="true" class="bi bi-trash"></i>
     </button>
