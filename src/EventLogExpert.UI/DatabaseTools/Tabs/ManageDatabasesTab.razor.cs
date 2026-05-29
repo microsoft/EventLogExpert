@@ -626,18 +626,18 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
                     fileName,
                     static (_, _) => Task.FromResult(true));
 
-                if (outcome.Confirmed)
+                if (outcome.Removed)
                 {
                     succeeded.Add(fileName);
                     _pendingToggles.Remove(fileName);
 
                     if (outcome.LogsReopened) { anyLogsReopened = true; }
                 }
-                else
+                else if (outcome.Confirmed)
                 {
-                    failed.Add((fileName, "removal failed"));
+                    failed.Add((fileName, "removal failed after confirmation"));
                     TraceLogger.Warning(
-                        $"{nameof(ManageDatabasesTab)}.{nameof(RemoveDatabasesAsync)}: removal of '{fileName}' did not complete.");
+                        $"{nameof(ManageDatabasesTab)}.{nameof(RemoveDatabasesAsync)}: removal of '{fileName}' was confirmed but did not complete.");
                 }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
