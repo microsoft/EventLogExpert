@@ -3,10 +3,12 @@
 
 using Bunit;
 using EventLogExpert.Logging.Abstractions;
+using EventLogExpert.Runtime.Alerts;
 using EventLogExpert.Runtime.Announcement;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
+using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +60,152 @@ public sealed class ManageDatabasesTabTests : BunitContext
 
         Assert.True(saved);
         _announcementService.DidNotReceive().Announce(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task BulkRemove_ConfirmationAccepted_InvokesCoordinatorPerFile()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _coordinator.RemoveDatabaseAsync(
+                Arg.Any<string>(),
+                Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, false));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        await component.InvokeAsync(() => checkboxes[1].Click());
+
+        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        await _coordinator.Received(1).RemoveDatabaseAsync(
+            "a.db",
+            Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+            Arg.Any<CancellationToken>());
+        await _coordinator.Received(1).RemoveDatabaseAsync(
+            "b.db",
+            Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BulkRemove_ConfirmationDeclined_DoesNotInvokeCoordinator()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        await component.InvokeAsync(() => checkboxes[1].Click());
+
+        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        await _coordinator.DidNotReceive().RemoveDatabaseAsync(
+            Arg.Any<string>(),
+            Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task BulkRemove_DuringBackgroundUpgrade_DualSignal_AcceptanceLabelMentionsCancel()
+    {
+        var entry = Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready);
+        _databaseService.Entries = [entry];
+
+        _coordinator.IsUpgradeInFlight("a.db").Returns(false);
+        _progressBannerService.BackgroundProgress.Returns(MakeProgress(
+            currentEntryName: "a.db",
+            scope: UpgradeProgressScope.Background));
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("a.db", captured.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BulkRemove_LogsReopened_CallsConsumeReopenedAsBaseline()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: true, status: DatabaseStatus.Ready)];
+
+        _coordinator.RemoveDatabaseAsync(
+                Arg.Any<string>(),
+                Arg.Any<Func<bool, CancellationToken, Task<bool>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new RemoveOutcome(RemoveOutcomeStatus.Confirmed, true, true));
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        _databaseService.RaiseUpgradeBatchCompleted(
+            new UpgradeBatchCompletedEventArgs(
+                UpgradeBatchId.Create(),
+                new UpgradeBatchResult(["a.db"], [], []),
+                wasCancelled: false));
+        Assert.True(component.Instance.HasDatabaseStateChanged);
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        await component.InvokeAsync(() => checkboxes[1].Click());
+
+        var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
+        await component.InvokeAsync(() => bulkRemove.Click());
+
+        Assert.False(component.Instance.HasDatabaseStateChanged);
+    }
+
+    [Fact]
+    public async Task ClearSelection_EmptiesSet_HidesBulkStrip()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        await component.InvokeAsync(() => checkboxes[1].Click());
+        Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
+
+        var clearBtn = component.FindAll(".manage-databases-bulk-strip button")[0];
+        await component.InvokeAsync(() => clearBtn.Click());
+
+        Assert.False(component.Instance.HasSelectedForRemoval);
+        Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
+    }
+
+    [Fact]
+    public async Task ClearSelection_UpdatesAriaLiveAnnouncement()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.NotEqual(string.Empty, liveRegion.TextContent.Trim());
+
+        var clearBtn = component.FindAll(".manage-databases-bulk-strip button")[0];
+        await component.InvokeAsync(() => clearBtn.Click());
+
+        liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.DoesNotContain("selected", liveRegion.TextContent, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -233,6 +381,17 @@ public sealed class ManageDatabasesTabTests : BunitContext
     }
 
     [Fact]
+    public void Render_BulkStrip_HiddenWhenNoSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+
+        var component = Render<ManageDatabasesTab>();
+
+        Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
+        Assert.False(component.Instance.HasSelectedForRemoval);
+    }
+
+    [Fact]
     public void Render_ClassificationPendingNotice_WhenClassificationInProgress()
     {
         _databaseService.Entries = [];
@@ -280,6 +439,18 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
 
         Assert.Single(component.FindAll("#manage-import-button"));
+    }
+
+    [Fact]
+    public void Render_PersistentAriaLiveRegion_PresentRegardlessOfSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+
+        var component = Render<ManageDatabasesTab>();
+
+        var statusRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.NotNull(statusRegion);
+        Assert.Equal("true", statusRegion.GetAttribute("aria-atomic"));
     }
 
     [Fact]
@@ -386,6 +557,98 @@ public sealed class ManageDatabasesTabTests : BunitContext
         Assert.Contains("Migrating schema 1 of 2", text.TextContent);
     }
 
+    [Fact]
+    public async Task SingleRowRemove_DuringCoordinatorUpgrade_DualSignal_AcceptanceLabelMentionsCancel()
+    {
+        var entry = Entry("a.db", isEnabled: false, status: DatabaseStatus.UpgradeRequired);
+        _databaseService.Entries = [entry];
+
+        _coordinator.IsUpgradeInFlight("a.db").Returns(true);
+        _progressBannerService.ManageDatabasesProgress.Returns(MakeProgress(
+            currentEntryName: "a.db",
+            scope: UpgradeProgressScope.ManageDatabasesTriggered));
+
+        var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
+        var component = RenderWithAlertSurface(alertSurface);
+
+        await component.InvokeAsync(() => component.Find(".db-entry-remove-btn").Click());
+
+        var captured = Assert.Single(alertSurface.Requests);
+        Assert.Contains("Cancel", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("upgrade", captured.AcceptLabel ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ToggleSelection_AddsToSelection_RevealsBulkStrip()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+
+        Assert.True(component.Instance.HasSelectedForRemoval);
+        Assert.Single(component.FindAll(".manage-databases-bulk-strip"));
+        Assert.Contains("1 selected", component.Find(".manage-databases-bulk-count").TextContent);
+    }
+
+    [Fact]
+    public async Task ToggleSelection_OnRemovedEntry_PrunedFromSelection()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        await component.InvokeAsync(() => checkboxes[1].Click());
+        Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
+
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        _databaseService.RaiseEntriesChanged();
+        await component.InvokeAsync(() => { });
+
+        Assert.True(component.Instance.HasSelectedForRemoval);
+        Assert.Contains("1 selected", component.Find(".manage-databases-bulk-count").TextContent);
+    }
+
+    [Fact]
+    public async Task ToggleSelection_TwiceOnSameRow_RemovesFromSelection()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        Assert.True(component.Instance.HasSelectedForRemoval);
+
+        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+
+        Assert.False(component.Instance.HasSelectedForRemoval);
+        Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
+    }
+
+    [Fact]
+    public async Task ToggleSelection_UpdatesAriaLiveAnnouncement()
+    {
+        _databaseService.Entries = [
+            Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready),
+            Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
+        var component = Render<ManageDatabasesTab>();
+
+        var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.Equal(string.Empty, liveRegion.TextContent.Trim());
+
+        var checkboxes = component.FindAll(".db-entry-checkbox");
+        await component.InvokeAsync(() => checkboxes[0].Click());
+        liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.Contains("1", liveRegion.TextContent);
+        Assert.Contains("selected", liveRegion.TextContent, StringComparison.OrdinalIgnoreCase);
+
+        await component.InvokeAsync(() => checkboxes[1].Click());
+        liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
+        Assert.Contains("2", liveRegion.TextContent);
+    }
+
     private static DatabaseEntry Entry(string fileName, bool isEnabled, DatabaseStatus status, bool backupExists = false) =>
         new(fileName, $@"C:\dbs\{fileName}", isEnabled, status, backupExists);
 
@@ -405,4 +668,8 @@ public sealed class ManageDatabasesTabTests : BunitContext
             currentPhase,
             queuedBatchesAfter,
             () => { });
+
+    private IRenderedComponent<ManageDatabasesTab> RenderWithAlertSurface(IInlineAlertSurface alertSurface) =>
+        Render<ManageDatabasesTab>(parameters => parameters
+            .AddCascadingValue(alertSurface));
 }
