@@ -8,6 +8,7 @@ using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 using System.Reflection;
@@ -82,6 +83,38 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var component = Render<ManageDatabasesTab>();
 
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
+
+        Assert.True(component.Instance.HasDatabaseStateChanged);
+    }
+
+    [Fact]
+    public async Task HasDatabaseStateChanged_AfterImportNoChanges_False()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
+        _coordinator.ImportAsync(
+                Arg.Any<Func<string, CancellationToken, Task<bool>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(ImportOutcome.None);
+        var component = Render<ManageDatabasesTab>();
+
+        var importBtn = component.Find("#manage-import-button");
+        await component.InvokeAsync(() => importBtn.ClickAsync(new MouseEventArgs()));
+
+        Assert.False(component.Instance.HasDatabaseStateChanged);
+    }
+
+    [Fact]
+    public async Task HasDatabaseStateChanged_AfterImportSuccess_True_ViaStickyFlag()
+    {
+        _databaseService.Entries = [Entry("a.db", isEnabled: true, status: DatabaseStatus.Ready)];
+        _coordinator.ImportAsync(
+                Arg.Any<Func<string, CancellationToken, Task<bool>>>(),
+                Arg.Any<CancellationToken>())
+            .Returns(new ImportOutcome(ImportedCount: 1, Failures: [], UpgradeFailures: []));
+        var component = Render<ManageDatabasesTab>();
+
+        var importBtn = component.Find("#manage-import-button");
+        await component.InvokeAsync(() => importBtn.ClickAsync(new MouseEventArgs()));
 
         Assert.True(component.Instance.HasDatabaseStateChanged);
     }
