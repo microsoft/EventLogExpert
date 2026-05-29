@@ -10,6 +10,7 @@ using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.DatabaseTools.Tabs;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
@@ -76,9 +77,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(true, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
         var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
         await component.InvokeAsync(() => bulkRemove.Click());
@@ -102,9 +103,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
         var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
         await component.InvokeAsync(() => bulkRemove.Click());
@@ -129,7 +130,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var alertSurface = new FakeInlineAlertSurface { Result = new InlineAlertResult(false, null) };
         var component = RenderWithAlertSurface(alertSurface);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
         await component.InvokeAsync(() => bulkRemove.Click());
 
@@ -161,9 +162,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
                 wasCancelled: false));
         Assert.True(component.Instance.HasDatabaseStateChanged);
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
 
         var bulkRemove = component.FindAll(".manage-databases-bulk-strip button")[1];
         await component.InvokeAsync(() => bulkRemove.Click());
@@ -179,9 +180,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
 
         var clearBtn = component.FindAll(".manage-databases-bulk-strip button")[0];
@@ -197,7 +198,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.NotEqual(string.Empty, liveRegion.TextContent.Trim());
 
@@ -584,7 +585,7 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
 
         Assert.True(component.Instance.HasSelectedForRemoval);
         Assert.Single(component.FindAll(".manage-databases-bulk-strip"));
@@ -599,9 +600,9 @@ public sealed class ManageDatabasesTabTests : BunitContext
             Entry("b.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.Contains("2 selected", component.Find(".manage-databases-bulk-count").TextContent);
 
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
@@ -618,10 +619,10 @@ public sealed class ManageDatabasesTabTests : BunitContext
         _databaseService.Entries = [Entry("a.db", isEnabled: false, status: DatabaseStatus.Ready)];
         var component = Render<ManageDatabasesTab>();
 
-        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
         Assert.True(component.Instance.HasSelectedForRemoval);
 
-        await component.InvokeAsync(() => component.Find(".db-entry-checkbox").Click());
+        await component.InvokeAsync(() => component.Find(".db-entry-row input[type='checkbox']").ChangeAsync(new ChangeEventArgs { Value = true }));
 
         Assert.False(component.Instance.HasSelectedForRemoval);
         Assert.Empty(component.FindAll(".manage-databases-bulk-strip"));
@@ -638,13 +639,13 @@ public sealed class ManageDatabasesTabTests : BunitContext
         var liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.Equal(string.Empty, liveRegion.TextContent.Trim());
 
-        var checkboxes = component.FindAll(".db-entry-checkbox");
-        await component.InvokeAsync(() => checkboxes[0].Click());
+        var checkboxes = component.FindAll(".db-entry-row input[type='checkbox']");
+        await component.InvokeAsync(() => checkboxes[0].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.Contains("1", liveRegion.TextContent);
         Assert.Contains("selected", liveRegion.TextContent, StringComparison.OrdinalIgnoreCase);
 
-        await component.InvokeAsync(() => checkboxes[1].Click());
+        await component.InvokeAsync(() => checkboxes[1].ChangeAsync(new ChangeEventArgs { Value = true }));
         liveRegion = component.Find(".manage-databases-tab > span[role='status'][aria-live='polite']");
         Assert.Contains("2", liveRegion.TextContent);
     }

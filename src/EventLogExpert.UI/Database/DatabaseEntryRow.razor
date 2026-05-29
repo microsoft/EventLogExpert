@@ -1,14 +1,7 @@
 <div class="db-entry-row @(IsSelected ? "db-entry-row--selected" : null)">
-    <div aria-checked="@(IsSelected ? "true" : "false")"
-        aria-label="@($"Select {Entry.FileName}")"
-        class="db-entry-checkbox"
-        @onclick="HandleCheckboxClick"
-        @onkeydown="HandleCheckboxKeyDown"
-        @ref="_checkboxRef"
-        role="checkbox"
-        tabindex="0">
-        <i aria-hidden="true" class="bi @(IsSelected ? "bi-check-square-fill" : "bi-square")"></i>
-    </div>
+    <Checkbox AriaLabel="@($"Select {Entry.FileName}")"
+        Value="IsSelected"
+        ValueChanged="@(_ => OnSelectionToggle.InvokeAsync())" />
 
     <div class="db-entry-row-content">
         <div class="db-entry-info">

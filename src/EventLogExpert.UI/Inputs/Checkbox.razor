@@ -1,0 +1,15 @@
+@inherits InputComponent<bool>
+
+<label class="checkbox @CssClass" title="@EffectiveAriaLabel">
+    <input aria-describedby="@AriaDescribedBy"
+        aria-label="@EffectiveAriaLabel"
+        aria-labelledby="@AriaLabelledBy"
+        checked="@Value"
+        class="checkbox-input"
+        disabled="@Disabled"
+        @onchange="UpdateValue"
+        type="checkbox" />
+    <span aria-hidden="true" class="checkbox-icon">
+        <i class="bi @(Value ? "bi-check-square-fill" : "bi-square")"></i>
+    </span>
+</label>
