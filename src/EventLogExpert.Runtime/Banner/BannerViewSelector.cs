@@ -24,6 +24,7 @@ public static class BannerViewSelector
         IReadOnlyList<ErrorBannerEntry> errorBanners,
         IReadOnlyList<DatabaseEntry> attentionEntries,
         bool attentionDismissed,
+        bool attentionSuppressedByModalContext,
         BannerProgressEntry? backgroundProgress,
         IReadOnlyList<BannerInfoEntry> infoBanners)
     {
@@ -36,8 +37,12 @@ public static class BannerViewSelector
             return [new BannerCycleItem(BannerView.Critical, 0, null)];
         }
 
+        bool includeAttention = attentionEntries.Count > 0
+            && !attentionDismissed
+            && !attentionSuppressedByModalContext;
+
         var items = new List<BannerCycleItem>(
-            errorBanners.Count + (attentionEntries.Count > 0 && !attentionDismissed ? 1 : 0)
+            errorBanners.Count + (includeAttention ? 1 : 0)
             + (backgroundProgress is not null ? 1 : 0) + infoBanners.Count);
 
         for (int i = 0; i < errorBanners.Count; i++)
@@ -45,7 +50,7 @@ public static class BannerViewSelector
             items.Add(new BannerCycleItem(BannerView.Error, i, errorBanners[i].Id));
         }
 
-        if (attentionEntries.Count > 0 && !attentionDismissed)
+        if (includeAttention)
         {
             items.Add(new BannerCycleItem(BannerView.Attention, 0, null));
         }

@@ -8,7 +8,9 @@ using EventLogExpert.Runtime.Common.Clipboard;
 using EventLogExpert.Runtime.Common.Restart;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Menu;
+using EventLogExpert.Runtime.Modal;
 using EventLogExpert.UI.Banner;
+using EventLogExpert.UI.DatabaseTools;
 using EventLogExpert.UI.Tests.TestUtils;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,6 +28,7 @@ public sealed class BannerHostTests : BunitContext
     private readonly IErrorBannerService _errorBannerService;
     private readonly IInfoBannerService _infoBannerService;
     private readonly IMenuActionService _menuActionService = Substitute.For<IMenuActionService>();
+    private readonly IModalCoordinator _modalCoordinator = Substitute.For<IModalCoordinator>();
     private readonly IProgressBannerService _progressBannerService;
     private readonly ITraceLogger _traceLogger = Substitute.For<ITraceLogger>();
 
@@ -39,10 +42,12 @@ public sealed class BannerHostTests : BunitContext
         _attentionBannerService.AttentionEntries.Returns([]);
         _attentionBannerService.AttentionDismissed.Returns(false);
         _progressBannerService.BackgroundProgress.Returns((BannerProgressEntry?)null);
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
 
         Services.AddSingleton(_applicationRestartService);
         Services.AddSingleton(_clipboardService);
         Services.AddSingleton(_menuActionService);
+        Services.AddSingleton(_modalCoordinator);
         Services.AddSingleton(_traceLogger);
 
         JSInterop.Mode = JSRuntimeMode.Loose;
@@ -311,6 +316,78 @@ public sealed class BannerHostTests : BunitContext
         Assert.Contains("Database: Schema invalid", banner.TextContent);
         Assert.Empty(component.FindAll("aside.banner-error .banner-pagination"));
         Assert.Single(component.FindAll("aside.banner-error button.banner-dismiss"));
+    }
+
+    [Fact]
+    public void Dispose_UnsubscribesFromModalCoordinator()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        component.Instance.Dispose();
+
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(4), typeof(DatabaseToolsModal), null));
+        _modalCoordinator.StateChanged += Raise.Event<Action>();
+
+        Assert.Single(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public async Task Render_ModalActivationTransition_TogglesAttentionVisibility()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+
+        var component = Render<BannerHost>();
+        Assert.Single(component.FindAll("aside.banner-attention"));
+
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(3), typeof(DatabaseToolsModal), null));
+        _modalCoordinator.StateChanged += Raise.Event<Action>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Empty(component.FindAll("aside.banner-attention")));
+
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
+        _modalCoordinator.StateChanged += Raise.Event<Action>();
+
+        await component.WaitForAssertionAsync(() =>
+            Assert.Single(component.FindAll("aside.banner-attention")));
+    }
+
+    [Fact]
+    public void Render_WithDatabaseToolsModalActive_OmitsAttentionBanner()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(1), typeof(DatabaseToolsModal), null));
+
+        var component = Render<BannerHost>();
+
+        Assert.Empty(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void Render_WithDifferentModalActive_RendersAttentionBanner()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns(
+            new ModalSession(new ModalId(2), typeof(BannerHost), null));
+
+        var component = Render<BannerHost>();
+
+        Assert.Single(component.FindAll("aside.banner-attention"));
+    }
+
+    [Fact]
+    public void Render_WithNoModalActive_RendersAttentionBanner()
+    {
+        _attentionBannerService.AttentionEntries.Returns([BuildDatabaseEntry("a.db")]);
+        _modalCoordinator.ActiveSession.Returns((ModalSession?)null);
+
+        var component = Render<BannerHost>();
+
+        Assert.Single(component.FindAll("aside.banner-attention"));
     }
 
     private static DatabaseEntry BuildDatabaseEntry(string fileName) =>
