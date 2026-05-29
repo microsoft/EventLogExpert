@@ -27,6 +27,8 @@ internal sealed class FakeDatabaseService : IDatabaseService
 
     public int QueuedBatchCount => 0;
 
+    public IReadOnlyList<QueuedBatchInfo> QueuedBatchesForTest { get; set; } = [];
+
     public int RestoreFromBackupCalls { get; private set; }
 
     public bool RestoreFromBackupReturnValue { get; set; } = true;
@@ -65,6 +67,12 @@ internal sealed class FakeDatabaseService : IDatabaseService
     public void RaiseUpgradeBatchCompleted(UpgradeBatchCompletedEventArgs args) =>
         UpgradeBatchCompleted?.Invoke(this, args);
 
+    public void RaiseUpgradeBatchProgress(UpgradeBatchProgressEventArgs args) =>
+        UpgradeBatchProgress?.Invoke(this, args);
+
+    public void RaiseUpgradeBatchStarted(UpgradeBatchStartedEventArgs args) =>
+        UpgradeBatchStarted?.Invoke(this, args);
+
     public void Refresh() { }
 
     public Task RemoveAsync(
@@ -84,6 +92,8 @@ internal sealed class FakeDatabaseService : IDatabaseService
         RetryClassificationCalls++;
         return Task.CompletedTask;
     }
+
+    public IReadOnlyList<QueuedBatchInfo> SnapshotQueuedBatches() => QueuedBatchesForTest;
 
     public void Toggle(string fileName) { }
 

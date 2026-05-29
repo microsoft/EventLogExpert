@@ -250,25 +250,19 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
     {
         var batchesToCancel = new Dictionary<UpgradeBatchId, Action>();
         var batchToFiles = new Dictionary<UpgradeBatchId, List<string>>();
-        var entries = DatabaseService.Entries.ToList();
 
         foreach (var fileName in fileNames)
         {
-            var entry = entries.FirstOrDefault(
-                e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
+            var cancellable = GetCancellableBatchForFile(fileName);
 
-            if (entry is null) { continue; }
+            if (cancellable is null) { continue; }
 
-            var progress = GetUpgradeProgressForEntry(entry);
+            batchesToCancel.TryAdd(cancellable.Value.BatchId, cancellable.Value.Cancel);
 
-            if (progress is null) { continue; }
-
-            batchesToCancel.TryAdd(progress.BatchId, progress.Cancel);
-
-            if (!batchToFiles.TryGetValue(progress.BatchId, out var files))
+            if (!batchToFiles.TryGetValue(cancellable.Value.BatchId, out var files))
             {
                 files = [];
-                batchToFiles[progress.BatchId] = files;
+                batchToFiles[cancellable.Value.BatchId] = files;
             }
 
             files.Add(fileName);
@@ -296,6 +290,9 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             }
         }
 
+        // Coordinator-only — adding IsFileInAnyKnownBatch here would 30s-hang on background batches
+        // (no UpgradeStateChanged event ever fires to re-trigger). pendingBatches + stillAlive below
+        // already gate Remove via UpgradeBatchCompleted.
         void StateChangedHandler()
         {
             if (!fileNames.Any(f => Coordinator.IsUpgradeInFlight(f)))
@@ -311,12 +308,15 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         {
             foreach (var (batchId, files) in batchToFiles)
             {
+                // stillAlive includes IsFileInAnyKnownBatch so pendingBatches stays unset for
+                // pre-progress / queued files until the real UpgradeBatchCompleted fires.
                 bool stillAlive = files.Any(file =>
                 {
                     var entry = DatabaseService.Entries.FirstOrDefault(
                         e => string.Equals(e.FileName, file, StringComparison.OrdinalIgnoreCase));
                     return Coordinator.IsUpgradeInFlight(file) ||
-                           (entry is not null && GetUpgradeProgressForEntry(entry) is not null);
+                           (entry is not null && GetUpgradeProgressForEntry(entry) is not null) ||
+                           IsFileInAnyKnownBatch(file);
                 });
                 if (!stillAlive) { pendingBatches[batchId].TrySetResult(); }
             }
@@ -439,6 +439,33 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
         _pendingToggles.Clear();
     }
 
+    // Lookup by batch membership (active + queued) for the cancel-then-remove flow. Distinct from
+    // GetUpgradeProgressForEntry, which matches by CurrentEntryName for per-row display only.
+    private CancellableBatch? GetCancellableBatchForFile(string fileName)
+    {
+        var manage = ProgressBannerService.ManageDatabasesProgress;
+        if (manage is not null && manage.BatchFileNames.Contains(fileName))
+        {
+            return new CancellableBatch(manage.BatchId, manage.Cancel);
+        }
+
+        var background = ProgressBannerService.BackgroundProgress;
+        if (background is not null && background.BatchFileNames.Contains(fileName))
+        {
+            return new CancellableBatch(background.BatchId, background.Cancel);
+        }
+
+        foreach (var queued in DatabaseService.SnapshotQueuedBatches())
+        {
+            if (queued.FileNames.Contains(fileName))
+            {
+                return new CancellableBatch(queued.BatchId, queued.Cancel);
+            }
+        }
+
+        return null;
+    }
+
     private bool GetEffectiveEnabled(DatabaseEntry entry) =>
         _pendingToggles.TryGetValue(entry.FileName, out var pending) ? pending : entry.IsEnabled;
 
@@ -491,18 +518,20 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
             var entry = entries.FirstOrDefault(
                 e => string.Equals(e.FileName, fileName, StringComparison.OrdinalIgnoreCase));
 
-            if (entry is null) { continue; }
-
             bool coordinatorSays = Coordinator.IsUpgradeInFlight(fileName);
-            bool bannerSays = GetUpgradeProgressForEntry(entry) is not null;
+            bool bannerSays = entry is not null && GetUpgradeProgressForEntry(entry) is not null;
+            bool batchSays = IsFileInAnyKnownBatch(fileName);
 
-            if (coordinatorSays || bannerSays) { upgrading.Add(fileName); }
+            if (coordinatorSays || bannerSays || batchSays) { upgrading.Add(fileName); }
         }
 
         upgradingFiles = upgrading;
 
         return upgrading.Count > 0;
     }
+
+    private bool IsFileInAnyKnownBatch(string fileName) =>
+        GetCancellableBatchForFile(fileName) is not null;
 
     private async Task ObserveClassificationCompletionAsync(CancellationToken cancellationToken)
     {
@@ -784,4 +813,6 @@ public sealed partial class ManageDatabasesTab : ComponentBase, IAsyncDisposable
 
         await InvokeAsyncSafe();
     }
+
+    private readonly record struct CancellableBatch(UpgradeBatchId BatchId, Action Cancel);
 }
