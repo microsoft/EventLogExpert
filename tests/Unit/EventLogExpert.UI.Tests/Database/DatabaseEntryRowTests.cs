@@ -2,12 +2,15 @@
 // // Licensed under the MIT License.
 
 using Bunit;
+using EventLogExpert.Logging.Abstractions;
 using EventLogExpert.Runtime.Banner;
 using EventLogExpert.Runtime.Database;
 using EventLogExpert.Runtime.Database.Upgrade;
 using EventLogExpert.UI.Database;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.DependencyInjection;
+using NSubstitute;
 
 namespace EventLogExpert.UI.Tests.Database;
 
@@ -16,6 +19,7 @@ public sealed class DatabaseEntryRowTests : BunitContext
     public DatabaseEntryRowTests()
     {
         JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddSingleton(Substitute.For<ITraceLogger>());
     }
 
     [Fact]
